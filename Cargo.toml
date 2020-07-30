@@ -1,0 +1,11 @@
+[package]
+name = "all-is-cubes"
+version = "0.1.0"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+edition = "2018"
+publish = false # guard against accidents until things are stable
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cgmath = "0.17.0"
