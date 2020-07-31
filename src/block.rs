@@ -42,66 +42,39 @@ impl Hash for Color {
 // Constructor check ensures that it will satisfy Eq
 impl Eq for Color {}
 
+
 /// A `Block` is something that can exist in the grid of a `Space`.
-///
-/// Note that if a block is to have editable characteristics, it must indirect
-/// to them; `Clone`ing a block is expected to produce a block that is the same
-/// block from a player's perspective.
-pub trait Block: Eq + Clone + Hash + Into<AnyBlock> {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Block {
+    Atom(Color),
+}
+
+impl Block {
     /// Returns the RGBA color to use for this block when viewed as a single voxel.
-    fn color(&self) -> Color;
+    pub fn color(&self) -> Color {
+        match &self {
+            Block::Atom(x) => *x,
+        }
+    }
     
     /*
     /// Returns the space which defines the shape and behavior of this block, if there is one.
     /// 
     /// TODO: there needs to be the concept of read-only derived spaces to make this work
     /// as intended.
-    fn space() -> Option<&Space>;
+    fn space() -> Option<&Space> { ... }
     */
 }
 
-
-/// A block which only has a color.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Atom(pub Color);
-
-impl Block for Atom {
-    fn color(&self) -> Color {
-        return self.0;
-    }
-}
-
-impl Into<AnyBlock> for Atom {
-    fn into(self) -> AnyBlock {
-        AnyBlock::Atom(self)
-    }
-}
-
-/// Generic type to hold any specific kind of block.
-///
-/// TODO: Take a second look at using `dyn` or `Any` instead, once I know more about wrangling Rust types. This is likely to get awkwardly verbose if Block gets any amount of complexity.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum AnyBlock {
-    Atom(Atom),
-}
-
-impl Block for AnyBlock {
-    fn color(&self) -> Color {
-        match &self {
-            AnyBlock::Atom(x) => x.color(),
-        }
-    }
-}
-
 /// Generic 'empty'/'null' block. It is used by Space to respond to out-of-bounds requests.
-pub const AIR :AnyBlock = AnyBlock::Atom(Atom(Color { value: Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 } }));
+pub const AIR :Block = Block::Atom(Color { value: Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 } });
 
 /// Generate some atom blocks with unspecified contents for testing.
-pub fn make_some_blocks(count: usize) -> Vec<AnyBlock> {
-    let mut vec :Vec<AnyBlock> = Vec::with_capacity(count);
+pub fn make_some_blocks(count: usize) -> Vec<Block> {
+    let mut vec :Vec<Block> = Vec::with_capacity(count);
     for i in 0..count {
         let luminance = i as f32 / (count - 1) as f32;
-        vec.push(Atom(Color::rgba(luminance, luminance, luminance, 1.0)).into());
+        vec.push(Block::Atom(Color::rgba(luminance, luminance, luminance, 1.0)));
     }
     vec
 }

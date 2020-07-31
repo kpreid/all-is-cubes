@@ -73,9 +73,9 @@ pub struct Space {
     
     /// Lookup from `Block` value to the index by which it is represented in
     /// the array.
-    block_to_index: HashMap<AnyBlock, BlockIndex>,
+    block_to_index: HashMap<Block, BlockIndex>,
     /// Lookup from arbitrarily assigned indices (used in `contents`) to block.
-    index_to_block: [AnyBlock; BlockIndex::MAX as usize + 1],
+    index_to_block: [Block; BlockIndex::MAX as usize + 1],
     /// Lookup from arbitrarily assigned indices (used in `contents`) to number
     /// of uses of this index.
     index_to_count: [usize; BlockIndex::MAX as usize + 1],
@@ -126,13 +126,12 @@ impl Space {
     /// use all_is_cubes::block::*;
     /// use all_is_cubes::space::*;
     /// let mut space = Space::empty_positive(1, 1, 1);
-    /// let a_block :AnyBlock = Atom(Color::rgba(1.0, 0.0, 0.0, 1.0)).into();
+    /// let a_block = Block::Atom(Color::rgba(1.0, 0.0, 0.0, 1.0));
     /// let p = GridPoint::new(0, 0, 0);
     /// space.set(p, a_block);
     /// assert_eq!(space[p], a_block);
     /// ```
-    pub fn set<T: Into<AnyBlock>>(&mut self, position: GridPoint, block: T) {
-        let block :AnyBlock = block.into();
+    pub fn set(&mut self, position: GridPoint, block: Block) {
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
             let ref old_block = self.index_to_block[old_block_index as usize];
@@ -160,7 +159,10 @@ impl Space {
     }
 
     /// Returns all distinct block types found in the space.
-    fn distinct_blocks(&self) -> Vec<AnyBlock> {
+    ///
+    /// TODO: This was invented for testing the indexing of blocks and should
+    /// be replaced with something else *if* it only gets used for testing.
+    pub fn distinct_blocks(&self) -> Vec<Block> {
         let mut blocks = Vec::new();
         for (&block, &count) in self.index_to_block.iter().zip(self.index_to_count.iter()) {
             if count > 0 {
@@ -170,7 +172,7 @@ impl Space {
         blocks
     }
     
-    fn ensure_block_index(&mut self, block: AnyBlock) -> BlockIndex {
+    fn ensure_block_index(&mut self, block: Block) -> BlockIndex {
         if let Some(&old_index) = self.block_to_index.get(&block) {
             return old_index;
         } else {
@@ -189,7 +191,7 @@ impl Space {
 }
 
 impl std::ops::Index<GridPoint> for Space {
-    type Output = AnyBlock;
+    type Output = Block;
 
     /// Get the block in this space at the given position.
     ///
