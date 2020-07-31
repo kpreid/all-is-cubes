@@ -2,6 +2,7 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 use cgmath::Vector4;
+use std::hash::{Hash, Hasher};
 
 /// Representation of colors of blocks.
 ///
@@ -9,6 +10,12 @@ use cgmath::Vector4;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Color {
     value: Vector4<f32>,
+}
+
+impl Color {
+    pub fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Color { value: Vector4 { x: r, y: g, z: b, w: a } }
+    }
 }
 
 impl std::convert::From<Vector4<f32>> for Color {
@@ -21,6 +28,17 @@ impl std::convert::From<Vector4<f32>> for Color {
     }
 }
 
+impl Hash for Color {
+    // Hash implementation that works given that we have no NaNs.
+    // (In IEEE floating point, there are several representations of NaN, but
+    // only one representation of all other values.)
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for i in 0..3 {
+            self.value[i].to_ne_bytes().hash(state);
+        }
+    }
+}
+
 // Constructor check ensures that it will satisfy Eq
 impl Eq for Color {}
 
@@ -29,7 +47,7 @@ impl Eq for Color {}
 /// Note that if a block is to have editable characteristics, it must indirect
 /// to them; `Clone`ing a block is expected to produce a block that is the same
 /// block from a player's perspective.
-pub trait Block: Clone + Eq {
+pub trait Block: Eq + Clone + Hash + Into<AnyBlock> {
     /// Returns the RGBA color to use for this block when viewed as a single voxel.
     fn color(&self) -> Color;
     
@@ -42,14 +60,48 @@ pub trait Block: Clone + Eq {
     */
 }
 
+
 /// A block which only has a color.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Atom {
-    pub color: Color,
-}
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct Atom(pub Color);
 
 impl Block for Atom {
     fn color(&self) -> Color {
-        return self.color;
+        return self.0;
     }
+}
+
+impl Into<AnyBlock> for Atom {
+    fn into(self) -> AnyBlock {
+        AnyBlock::Atom(self)
+    }
+}
+
+/// Generic type to hold any specific kind of block.
+///
+/// TODO: Take a second look at using `dyn` or `Any` instead, once I know more about wrangling Rust types. This is likely to get awkwardly verbose if Block gets any amount of complexity.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum AnyBlock {
+    Atom(Atom),
+}
+
+impl Block for AnyBlock {
+    fn color(&self) -> Color {
+        match &self {
+            AnyBlock::Atom(x) => x.color(),
+        }
+    }
+}
+
+/// Generic 'empty'/'null' block. It is used by Space to respond to out-of-bounds requests.
+pub const AIR :AnyBlock = AnyBlock::Atom(Atom(Color { value: Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 } }));
+
+/// Generate some atom blocks with unspecified contents for testing.
+pub fn make_some_blocks(count: usize) -> Vec<AnyBlock> {
+    let mut vec :Vec<AnyBlock> = Vec::with_capacity(count);
+    for i in 0..count {
+        let luminance = i as f32 / (count - 1) as f32;
+        vec.push(Atom(Color::rgba(luminance, luminance, luminance, 1.0)).into());
+    }
+    vec
 }
