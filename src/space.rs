@@ -6,7 +6,7 @@
 use crate::block::*;
 use std::collections::HashMap;
 
-pub type GridPoint = cgmath::Point3<isize>;
+pub use crate::math::GridPoint;  // TODO sort out how we want to namespace
 
 /// Specifies the coordinate extent of a `Space`.
 ///

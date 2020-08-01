@@ -2,5 +2,6 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 // TODO: consider exporting individual symbols instead of the modules
-pub mod space;
 pub mod block;
+pub mod space;
+mod math;
