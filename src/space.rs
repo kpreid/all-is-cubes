@@ -75,10 +75,10 @@ pub struct Space {
     /// the array.
     block_to_index: HashMap<Block, BlockIndex>,
     /// Lookup from arbitrarily assigned indices (used in `contents`) to block.
-    index_to_block: [Block; BlockIndex::MAX as usize + 1],
+    index_to_block: Vec<Block>,
     /// Lookup from arbitrarily assigned indices (used in `contents`) to number
     /// of uses of this index.
-    index_to_count: [usize; BlockIndex::MAX as usize + 1],
+    index_to_count: Vec<usize>,
     
     /// The blocks in the space, stored compactly:
     ///
@@ -96,18 +96,15 @@ impl Space {
         // TODO: Might actually be worth checking for memory allocation failure here...?
         let volume = grid.volume();
 
-        // Initialize block tables
-        let mut block_to_index = HashMap::new();
-        let index_to_block = [AIR; BlockIndex::MAX as usize + 1];        
-        let mut index_to_count = [0; BlockIndex::MAX as usize + 1];        
-        block_to_index.insert(AIR, 0);
-        index_to_count[0] = volume;
-        
         Space {
             grid: grid,
-            block_to_index: block_to_index,
-            index_to_block: index_to_block,
-            index_to_count: index_to_count,
+            block_to_index: {
+                let mut map = HashMap::new();
+                map.insert(AIR.clone(), 0);
+                map
+            },
+            index_to_block: vec![AIR.clone()],
+            index_to_count: vec![volume],
             contents: vec![0; volume].into_boxed_slice(),
         }
     }
@@ -126,16 +123,18 @@ impl Space {
     /// use all_is_cubes::block::*;
     /// use all_is_cubes::space::*;
     /// let mut space = Space::empty_positive(1, 1, 1);
-    /// let a_block = Block::Atom(Color::rgba(1.0, 0.0, 0.0, 1.0));
+    /// let a_block = Block::Atom(
+    ///     BlockAttributes::default(),
+    ///     Color::rgba(1.0, 0.0, 0.0, 1.0));
     /// let p = GridPoint::new(0, 0, 0);
-    /// space.set(p, a_block);
+    /// space.set(p, &a_block);
     /// assert_eq!(space[p], a_block);
     /// ```
-    pub fn set(&mut self, position: GridPoint, block: Block) {
+    pub fn set(&mut self, position: GridPoint, block: &Block) {
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
             let ref old_block = self.index_to_block[old_block_index as usize];
-            if *old_block == block {
+            if *old_block == *block {
                 // No change.
                 return;
             }
@@ -145,7 +144,7 @@ impl Space {
             if self.index_to_count[old_block_index as usize] == 0 {
                 // Canonicalize dead entry.
                 // TODO: Depend less on AIR by having a canonical empty-entry value that doesn't appear normally.
-                self.index_to_block[old_block_index as usize] = AIR;
+                self.index_to_block[old_block_index as usize] = AIR.clone();
             }
             
             // Increment count of new block.
@@ -164,28 +163,39 @@ impl Space {
     /// be replaced with something else *if* it only gets used for testing.
     pub fn distinct_blocks(&self) -> Vec<Block> {
         let mut blocks = Vec::new();
-        for (&block, &count) in self.index_to_block.iter().zip(self.index_to_count.iter()) {
-            if count > 0 {
-                blocks.push(block);
+        for (block, count) in self.index_to_block.iter().zip(self.index_to_count.iter()) {
+            if *count > 0 {
+                blocks.push(block.clone());
             }
         }
         blocks
     }
-    
-    fn ensure_block_index(&mut self, block: Block) -> BlockIndex {
+
+    /// Finds or assigns an index to denote the block.
+    ///
+    /// The caller is responsible for incrementing `self.index_to_count`.
+    fn ensure_block_index(&mut self, block: &Block) -> BlockIndex {
         if let Some(&old_index) = self.block_to_index.get(&block) {
             return old_index;
         } else {
+            // Look for if there is a previously used index to take.
             // TODO: more efficient free index finding
-            for new_index in 0..=BlockIndex::MAX {
-                if self.index_to_count[new_index as usize] == 0 {
-                    self.index_to_block[new_index as usize] = block;
-                    // Not incrementing count; caller is responsible for that.
-                    self.block_to_index.insert(block, new_index);
-                    return new_index;
+            let high_mark = self.index_to_count.len();
+            for new_index in 0..high_mark {
+                if self.index_to_count[new_index] == 0 {
+                    self.index_to_block[new_index] = block.clone();
+                    self.block_to_index.insert(block.clone(), new_index as BlockIndex);
+                    return new_index as BlockIndex;
                 }
             }
-            panic!("ran out of block indices");
+            if high_mark >= BlockIndex::MAX as usize {
+                panic!("ran out of block indices");
+            }
+            // Grow the vector.
+            self.index_to_count.push(0);
+            self.index_to_block.push(block.clone());
+            self.block_to_index.insert(block.clone(), high_mark as BlockIndex);
+            return high_mark as BlockIndex;
         }
     }
 }
@@ -226,12 +236,12 @@ mod tests {
         let pt1 = GridPoint::new(0, 0, 0);
         let pt2 = GridPoint::new(1, 0, 0);
         // TODO: This test depends on block allocation order. distinct_blocks() ought to be stable or explicitly return a HashSet or something.
-        assert_eq!(space.distinct_blocks(), vec![AIR], "step 1");
-        space.set(pt1, blocks[0]);
-        assert_eq!(space.distinct_blocks(), vec![AIR, blocks[0]], "step 2");
-        space.set(pt2, blocks[1]);
-        assert_eq!(space.distinct_blocks(), vec![blocks[1], blocks[0]], "step 3");
-        space.set(pt1, blocks[2]);
-        assert_eq!(space.distinct_blocks(), vec![blocks[1], blocks[2]], "step 4");
+        assert_eq!(space.distinct_blocks(), vec![AIR.clone()], "step 1");
+        space.set(pt1, &blocks[0]);
+        assert_eq!(space.distinct_blocks(), vec![AIR.clone(), blocks[0].clone()], "step 2");
+        space.set(pt2, &blocks[1]);
+        assert_eq!(space.distinct_blocks(), vec![blocks[1].clone(), blocks[0].clone()], "step 3");
+        space.set(pt1, &blocks[2]);
+        assert_eq!(space.distinct_blocks(), vec![blocks[1].clone(), blocks[2].clone()], "step 4");
     }
 }

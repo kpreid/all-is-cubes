@@ -3,6 +3,7 @@
 
 use cgmath::Vector4;
 use std::hash::{Hash, Hasher};
+use crate::util::MaybeConstantString;
 
 /// Representation of colors of blocks.
 ///
@@ -16,6 +17,8 @@ impl Color {
     pub fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
         Color { value: Vector4 { x: r, y: g, z: b, w: a } }
     }
+
+    pub const TRANSPARENT :Color = Color { value: Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 } };
 }
 
 impl std::convert::From<Vector4<f32>> for Color {
@@ -44,16 +47,16 @@ impl Eq for Color {}
 
 
 /// A `Block` is something that can exist in the grid of a `Space`.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Block {
-    Atom(Color),
+    Atom(BlockAttributes, Color),
 }
 
 impl Block {
     /// Returns the RGBA color to use for this block when viewed as a single voxel.
     pub fn color(&self) -> Color {
         match &self {
-            Block::Atom(x) => *x,
+            Block::Atom(_a, c) => *c,
         }
     }
     
@@ -66,15 +69,46 @@ impl Block {
     */
 }
 
+/// Collection of miscellaneous attribute data for blocks.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct BlockAttributes {
+    display_name: MaybeConstantString,
+    solid: bool,
+    light_emission: Color,
+    // TODO: add 'behavior' functionality, if we don't come up with something else
+    // TODO: add rotation functionality
+}
+
+static DEFAULT_ATTRIBUTES :BlockAttributes = BlockAttributes {
+    display_name: MaybeConstantString::Static(""),
+    solid: true,
+    light_emission: Color::TRANSPARENT,
+};
+
+impl Default for BlockAttributes {
+    fn default() -> BlockAttributes {
+        DEFAULT_ATTRIBUTES.clone()
+    }
+}
+
+
 /// Generic 'empty'/'null' block. It is used by Space to respond to out-of-bounds requests.
-pub const AIR :Block = Block::Atom(Color { value: Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 } });
+pub static AIR :Block = Block::Atom(
+    BlockAttributes {
+        display_name: MaybeConstantString::Static(""),
+        solid: false,
+        light_emission: Color::TRANSPARENT,
+    },
+    Color::TRANSPARENT);
 
 /// Generate some atom blocks with unspecified contents for testing.
 pub fn make_some_blocks(count: usize) -> Vec<Block> {
     let mut vec :Vec<Block> = Vec::with_capacity(count);
     for i in 0..count {
         let luminance = i as f32 / (count - 1) as f32;
-        vec.push(Block::Atom(Color::rgba(luminance, luminance, luminance, 1.0)));
+        vec.push(Block::Atom(
+            BlockAttributes::default(),
+            Color::rgba(luminance, luminance, luminance, 1.0)));
     }
     vec
 }
