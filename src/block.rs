@@ -107,7 +107,10 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
     for i in 0..count {
         let luminance = i as f32 / (count - 1) as f32;
         vec.push(Block::Atom(
-            BlockAttributes::default(),
+            BlockAttributes {
+                display_name: Cow::Owned(i.to_string()),
+                ..BlockAttributes::default()
+            },
             Color::rgba(luminance, luminance, luminance, 1.0)));
     }
     vec
