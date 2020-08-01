@@ -4,4 +4,3 @@
 // TODO: consider exporting individual symbols instead of the modules
 pub mod space;
 pub mod block;
-mod util;

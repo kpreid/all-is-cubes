@@ -3,7 +3,7 @@
 
 use cgmath::Vector4;
 use std::hash::{Hash, Hasher};
-use crate::util::MaybeConstantString;
+use std::borrow::Cow;
 
 /// Representation of colors of blocks.
 ///
@@ -72,7 +72,7 @@ impl Block {
 /// Collection of miscellaneous attribute data for blocks.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BlockAttributes {
-    display_name: MaybeConstantString,
+    display_name: Cow<'static, str>,
     solid: bool,
     light_emission: Color,
     // TODO: add 'behavior' functionality, if we don't come up with something else
@@ -80,7 +80,7 @@ pub struct BlockAttributes {
 }
 
 static DEFAULT_ATTRIBUTES :BlockAttributes = BlockAttributes {
-    display_name: MaybeConstantString::Static(""),
+    display_name: Cow::Borrowed(""),
     solid: true,
     light_emission: Color::TRANSPARENT,
 };
@@ -95,7 +95,7 @@ impl Default for BlockAttributes {
 /// Generic 'empty'/'null' block. It is used by Space to respond to out-of-bounds requests.
 pub static AIR :Block = Block::Atom(
     BlockAttributes {
-        display_name: MaybeConstantString::Static(""),
+        display_name: Cow::Borrowed(""),
         solid: false,
         light_emission: Color::TRANSPARENT,
     },
