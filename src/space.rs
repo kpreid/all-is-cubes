@@ -51,7 +51,7 @@ impl Grid {
     
     /// Determines whether a point lies within the grid and, if it does, returns the flattened
     /// array index for it.
-    pub fn index(self, point: GridPoint) -> Option<usize> {
+    pub fn index(&self, point: GridPoint) -> Option<usize> {
         let deoffsetted = point - self.lower_bounds;
         for i in 0..3 {
             if deoffsetted[i] < 0 || deoffsetted[i] >= self.sizes[i] {
