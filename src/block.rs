@@ -14,11 +14,11 @@ pub struct Color {
 }
 
 impl Color {
-    pub fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
+    pub const fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
         Color { value: Vector4 { x: r, y: g, z: b, w: a } }
     }
 
-    pub const TRANSPARENT :Color = Color { value: Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 } };
+    pub const TRANSPARENT :Color = Color::rgba(0.0, 0.0, 0.0, 0.0);
 }
 
 impl std::convert::From<Vector4<f32>> for Color {
