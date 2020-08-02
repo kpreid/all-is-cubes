@@ -3,6 +3,7 @@
 
 // TODO: consider exporting individual symbols instead of the modules
 pub mod block;
+pub mod console;
 mod math;
 mod raycast;
 pub mod space;

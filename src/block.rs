@@ -19,6 +19,10 @@ impl Color {
     }
 
     pub const TRANSPARENT :Color = Color::rgba(0.0, 0.0, 0.0, 0.0);
+    
+    pub fn to_rgba(&self) -> Vector4<f32> {
+        self.value
+    }
 }
 
 impl std::convert::From<Vector4<f32>> for Color {
@@ -55,9 +59,15 @@ pub enum Block {
 impl Block {
     /// Returns the RGBA color to use for this block when viewed as a single voxel.
     pub fn color(&self) -> Color {
-        match &self {
+        match self {
             Block::Atom(_a, c) => *c,
         }
+    }
+    
+    pub fn attributes(&self) -> &BlockAttributes {
+        match self {
+            Block::Atom(a, _c) => a,
+        }        
     }
     
     /*
@@ -72,9 +82,9 @@ impl Block {
 /// Collection of miscellaneous attribute data for blocks.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BlockAttributes {
-    display_name: Cow<'static, str>,
-    solid: bool,
-    light_emission: Color,
+    pub display_name: Cow<'static, str>,
+    pub solid: bool,
+    pub light_emission: Color,
     // TODO: add 'behavior' functionality, if we don't come up with something else
     // TODO: add rotation functionality
 }
@@ -95,7 +105,7 @@ impl Default for BlockAttributes {
 /// Generic 'empty'/'null' block. It is used by Space to respond to out-of-bounds requests.
 pub static AIR :Block = Block::Atom(
     BlockAttributes {
-        display_name: Cow::Borrowed(""),
+        display_name: Cow::Borrowed("<air>"),
         solid: false,
         light_emission: Color::TRANSPARENT,
     },

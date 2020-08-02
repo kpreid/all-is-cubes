@@ -75,13 +75,17 @@ impl Grid {
     pub fn upper_bounds(&self) -> GridPoint {
         return self.lower_bounds + Vector3::from(self.sizes);
     }
+    
+    pub fn size(&self) -> Vector3<isize> {
+        return Vector3::from(self.sizes);
+    }
 }
 
 /// Container for blocks arranged in three-dimensional space.
 #[derive(Clone)]
 // TODO: implement Debug
 pub struct Space { 
-    pub grid: Grid,
+    grid: Grid,
     
     /// Lookup from `Block` value to the index by which it is represented in
     /// the array.
@@ -125,6 +129,10 @@ impl Space {
     /// is in the +X+Y+Z quadrant.
     pub fn empty_positive(wx: isize, wy: isize, wz: isize) -> Space {
         return Space::empty(Grid::new(GridPoint::new(0, 0, 0), [wx, wy, wz]));
+    }
+    
+    pub fn grid(&self) -> &Grid {
+        &self.grid
     }
     
     /// Replace the block in this space at the given position.

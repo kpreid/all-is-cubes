@@ -10,3 +10,4 @@ publish = false # guard against accidents until things are stable
 [dependencies]
 cgmath = "0.17.0"
 num-traits = "0.2.12"
+termion = "1.5.5"
