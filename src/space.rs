@@ -3,8 +3,10 @@
 
 //! That which contains many blocks.
 
-use crate::block::*;
+use cgmath::Vector3;
 use std::collections::HashMap;
+
+use crate::block::*;
 
 pub use crate::math::GridPoint;  // TODO sort out how we want to namespace
 
@@ -12,7 +14,7 @@ pub use crate::math::GridPoint;  // TODO sort out how we want to namespace
 ///
 /// TODO: Wait, we're going to have other uses for an axis-aligned-box and this is that
 /// with some additional restrictions.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Grid {
   lower_bounds: GridPoint,
   sizes: [isize; 3],  // always positive
@@ -62,6 +64,16 @@ impl Grid {
             (deoffsetted[0] * self.sizes[1] + deoffsetted[1])
                 * self.sizes[2] + deoffsetted[2]
         ) as usize);
+    }
+    
+    /// Inclusive upper bound.
+    pub fn lower_bounds(&self) -> GridPoint {
+        return self.lower_bounds;
+    }
+    
+    /// Exclusive upper bound.
+    pub fn upper_bounds(&self) -> GridPoint {
+        return self.lower_bounds + Vector3::from(self.sizes);
     }
 }
 

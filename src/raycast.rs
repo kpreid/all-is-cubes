@@ -1,6 +1,7 @@
 use cgmath::{Array, Point3, Vector3};
 
 use crate::math::{FreeCoordinate, GridCoordinate, Modulo};
+use crate::space::Grid;
 
 /// Iterates over grid positions that intersect a given ray.
 ///
@@ -38,6 +39,8 @@ pub struct Raycaster {
     t_delta: Vector3<FreeCoordinate>,
     /// Last face we passed through.
     last_face: Face,
+    /// Grid to filter our outputs to. This makes the iteration finite.
+    grid: Option<Grid>,
 }
 
 impl Raycaster {
@@ -62,7 +65,17 @@ impl Raycaster {
             t_max: scale_to_integer_step_componentwise(origin, direction),
             t_delta: direction.map(|x| x.abs().recip()),
             last_face: Face::WITHIN,
+            grid: None,
         }
+    }
+    
+    pub fn within_grid(mut self, grid: Grid) -> Raycaster {
+        if self.grid == None {
+            self.grid = Some(grid);
+        } else {
+            panic!("unimplemented intersection of grids");  // TODO
+        }
+        self
     }
 
     fn step(&mut self) {
@@ -106,29 +119,63 @@ impl Raycaster {
         // Also check if we had some kind of arithmetic problem in the state.
         && self.t_max.is_finite()
     }
+    
+    /// Returns whether `self.bounds` is outside of `self.grid`.
+    ///
+    /// If `direction` is `1`, only the bounds relevant to _exiting_ are tested.
+    /// If `-1`, only the bounds relevant to entering.
+    fn is_out_of_bounds(&self, direction :GridCoordinate) -> bool {
+        if let Some(grid) = self.grid {
+            for axis in 0..3 {
+                let direction_on_axis = self.step[axis] * direction;
+                if direction_on_axis > 0 {
+                    if self.cube[axis] >= grid.upper_bounds()[axis] {
+                        return true;
+                    }
+                } else if direction_on_axis < 0 {
+                    if self.cube[axis] < grid.lower_bounds()[axis] {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
 }
 
 impl Iterator for Raycaster {
     type Item = RaycastStep;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.emit_current {
-            self.emit_current = false;
-        } else {
-        
-            eprintln!("{:?}", self);
-            if !self.valid_for_stepping() {
-                eprintln!("stopping");
-                // Can't make progress, and we already have done emit_current duty, so stop.
-                return None
+        loop {
+            if self.emit_current {
+                self.emit_current = false;
+            } else {
+                if !self.valid_for_stepping() {
+                    // Can't make progress, and we already have done emit_current duty, so stop.
+                    return None
+                }
+                self.step();
             }
-            self.step();
-        }
 
-        Some(RaycastStep {
-            cube: self.cube,
-            face: self.last_face,
-        })
+            if self.is_out_of_bounds(1) {
+                // We are past the bounds of the grid. There will never again be a cube to report.
+                // Prevent extraneous next() calls from doing any stepping that could overflow.
+                self.emit_current = false;
+                return None;
+            }
+
+            if self.is_out_of_bounds(-1) {
+                // We have not yet intersected the grid volume.
+                // TODO: We could avoid iterating over many preliminary cubes (and avoid having a loop here at all) by calculating the intersection instead of brute forcing. This is easy though.
+                continue;
+            }
+
+            return Some(RaycastStep {
+                cube: self.cube,
+                face: self.last_face,
+            });
+        }
     }
 }
 
@@ -283,5 +330,21 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(1.0, 2.0, FreeCoordinate::NAN)),
             step(10, 20, 30, Face::WITHIN));
+    }
+    
+    #[test]
+    fn filter_within_grid() {
+        // Ray oriented diagonally on the -X side of a grid that is short on the X axis.
+        let mut r = Raycaster::new(Point3::new(0.0, -0.25, -0.5), Vector3::new(1.0, 1.0, 1.0))
+            .within_grid(Grid::new(Point3::new(2, -10, -10), [2, 20, 20]));
+        assert_steps(&mut r, vec![
+            step(2, 1, 1, Face::NX),
+            step(2, 2, 1, Face::NY),
+            step(2, 2, 2, Face::NZ),
+            step(3, 2, 2, Face::NX),
+            step(3, 3, 2, Face::NY),
+            step(3, 3, 3, Face::NZ),
+        ]);
+        assert_eq!(None, r.next());
     }
 }
