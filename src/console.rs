@@ -3,10 +3,11 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::{Deg, EuclideanSpace, Matrix4, Ortho, Point3, Transform, Vector2, Vector4};
+use cgmath::{Basis2, Deg, EuclideanSpace, Matrix4, Ortho, Point3, Rotation, Rotation2, Transform, Vector2, Vector3, Vector4};
 use std::io;
 use termion;
 use termion::{color};
+use termion::event::{Event, Key};
 
 use crate::math::{FreeCoordinate};
 use crate::raycast::Raycaster;
@@ -20,6 +21,7 @@ pub struct View {
     projection: M,
     center: Point3<FreeCoordinate>,
     pub yaw: FreeCoordinate,
+    pub pitch: FreeCoordinate,
 }
 
 impl View {
@@ -49,6 +51,7 @@ impl View {
             center: ((grid.lower_bounds() + grid.upper_bounds().to_vec()) / 2)
                 .map(|x| x as FreeCoordinate),
             yaw: 0.0,
+            pitch: -15.0,
         }
     }
 
@@ -56,10 +59,36 @@ impl View {
         // TODO: For performance, we ought to do the inverse to the projection once
         (
             self.projection
-            * Matrix4::from_angle_x(Deg(self.yaw * 0.5))
+            * Matrix4::from_angle_x(Deg(self.pitch))
             * Matrix4::from_angle_y(Deg(self.yaw))
             * Matrix4::from_translation(-(self.center.to_vec()))
         ).inverse_transform().unwrap()
+    }
+    
+    /// Processes events for moving a View. Returns all those events it does not process.
+    pub fn controller(&mut self, event: Event) -> Option<Event> {
+        let mut walk = |x: FreeCoordinate, z: FreeCoordinate| {
+            let rotation :Basis2<FreeCoordinate> = Rotation2::from_angle(Deg(self.yaw));
+            let dir = Vector2::new(x, z);
+            let dir = rotation.rotate_vector(dir);
+            self.center += Vector3::new(dir.x, 0.0, dir.y);
+        };
+        
+        match event {
+            Event::Key(key) => match key {
+                Key::Char('w') | Key::Char('W') => { walk(0.0, -1.0); },
+                Key::Char('a') | Key::Char('A') => { walk(1.0, 0.0); },
+                Key::Char('s') | Key::Char('S') => { walk(0.0, 1.0); },
+                Key::Char('d') | Key::Char('D') => { walk(-1.0, 0.0); },
+                Key::Up => { self.pitch += 5.0; },
+                Key::Left => { self.yaw += 5.0; },
+                Key::Down => { self.pitch -= 5.0; },
+                Key::Right => { self.yaw -= 5.0; },
+                _ => { return Some(event); },
+            },
+            _ => { return Some(event); },
+        }
+        None  // match branches default to consuming event
     }
 }
 
@@ -87,10 +116,11 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
         }
         // End of line. Reset the color so that if the terminal is bigger, we don't
         // fill the rest of the line with the last pixel color.
-        write!(out, "{}{}\n",
+        write!(out, "{}{}\r\n",
             color::Bg(color::Reset),
             color::Fg(color::Reset))?;
     }
+    out.flush()?;
 
     Ok(())
 }
