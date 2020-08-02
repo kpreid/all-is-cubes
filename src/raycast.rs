@@ -10,7 +10,7 @@ use crate::space::Grid;
 ///
 /// The grid is of unit cubes which are identified by the integer coordinates of
 /// their most negative corners.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Raycaster {
     // From "A Fast Voxel Traversal Algorithm for Ray Tracing"
     // by John Amanatides and Andrew Woo, 1987
