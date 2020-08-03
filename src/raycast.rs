@@ -2,6 +2,7 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 use cgmath::{Array, Point3, Vector3};
+use num_traits::identities::Zero;
 
 use crate::math::{FreeCoordinate, GridCoordinate, Modulo};
 use crate::space::Grid;
@@ -117,10 +118,12 @@ impl Raycaster {
     }
     
     fn valid_for_stepping(&self) -> bool {
-        // If any stepping direction is 0, then we are at risk of not making progress.
-        self.step.x != 0 && self.step.y != 0 && self.step.z != 0
+        // If all stepping directions are 0, then we cannot make progress.
+        self.step != Vector3::zero()
         // Also check if we had some kind of arithmetic problem in the state.
-        && self.t_max.is_finite()
+        // But permit some positive infinity, because that's just an axis-aligned ray.
+        && !self.t_max[..].iter().any(|t| t.is_nan())
+        && self.t_max[..].iter().any(|t| t.is_finite())
     }
     
     /// Returns whether `self.bounds` is outside of `self.grid`.
@@ -231,8 +234,20 @@ mod tests {
     
 
     fn assert_steps<T: IntoIterator<Item = RaycastStep>>(r: &mut Raycaster, steps: T) {
-        for (i, step) in steps.into_iter().enumerate() {
-            assert_eq!(step, r.next().unwrap(), "step {} (left=expected)", i);
+        for (i, expected_step) in steps.into_iter().enumerate() {
+            let r_backup = r.clone();  // save for diagnostics
+            match r.next() {
+                Some(actual_step) => {
+                    assert_eq!(expected_step, actual_step, "step {} (left=expected)\n\
+                        before: {:?}\nafter:  {:?}\n",
+                        i, r_backup, r);
+                },
+                None => {
+                    panic!("stopped sooner than expected at step {}\n\
+                        before: {:?}\nafter:  {:?}\n",
+                        i, r_backup, r);
+                }
+            }
         }
     }
     fn assert_only_one_step(r: &mut Raycaster, step: RaycastStep) {
@@ -259,7 +274,7 @@ mod tests {
             vec![
                 step(10, 20, 30, Face::WITHIN),
                 step(11, 20, 30, Face::NX),
-                step(12, 20, 30, Face::NX)
+                step(12, 20, 30, Face::NX),
             ]);
         assert_steps(
             &mut Raycaster::new(
@@ -268,7 +283,7 @@ mod tests {
             vec![
                 step(10, 20, 30, Face::WITHIN),
                 step(9, 20, 30, Face::PX),
-                step(8, 20, 30, Face::PX)
+                step(8, 20, 30, Face::PX),
             ]);
         assert_steps(
             &mut Raycaster::new(
@@ -277,7 +292,7 @@ mod tests {
             vec![
                 step(10, 20, 30, Face::WITHIN),
                 step(10, 21, 30, Face::NY),
-                step(10, 22, 30, Face::NY)
+                step(10, 22, 30, Face::NY),
             ]);
         assert_steps(
             &mut Raycaster::new(
@@ -286,7 +301,7 @@ mod tests {
             vec![
                 step(10, 20, 30, Face::WITHIN),
                 step(10, 19, 30, Face::PY),
-                step(10, 18, 30, Face::PY)
+                step(10, 18, 30, Face::PY),
             ]);
         assert_steps(
             &mut Raycaster::new(
@@ -295,7 +310,7 @@ mod tests {
             vec![
                 step(10, 20, 30, Face::WITHIN),
                 step(10, 20, 31, Face::NZ),
-                step(10, 20, 32, Face::NZ)
+                step(10, 20, 32, Face::NZ),
             ]);
         assert_steps(
             &mut Raycaster::new(
@@ -304,7 +319,30 @@ mod tests {
             vec![
                 step(10, 20, 30, Face::WITHIN),
                 step(10, 20, 29, Face::PZ),
-                step(10, 20, 28, Face::PZ)
+                step(10, 20, 28, Face::PZ),
+            ]);
+    }
+
+    #[test]
+    fn simple_exactly_1d() {
+        // Not testing all six directions because other tests cover that
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(10.5, 20.5, 30.5),
+                Vector3::new(0.01, 0.0, 0.0)),
+            vec![
+                step(10, 20, 30, Face::WITHIN),
+                step(11, 20, 30, Face::NX),
+                step(12, 20, 30, Face::NX),
+            ]);
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(10.5, 20.5, 30.5),
+                Vector3::new(-0.01, 0.0, 0.0)),
+            vec![
+                step(10, 20, 30, Face::WITHIN),
+                step(9, 20, 30, Face::PX),
+                step(8, 20, 30, Face::PX),
             ]);
     }
 
@@ -349,5 +387,19 @@ mod tests {
             step(3, 3, 3, Face::NZ),
         ]);
         assert_eq!(None, r.next());
+    }
+    
+    /// An example of an axis-aligned ray that wasn't working.
+    #[test]
+    fn regression_test_1() {
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(4.833333333333334, 4.666666666666666, -3.0),
+                Vector3::new(0.0, 0.0, 10.0)),
+            vec![
+                step(4, 4, -3, Face::WITHIN),
+                step(4, 4, -2, Face::NZ),
+                step(4, 4, -1, Face::NZ),
+            ]);
     }
 }
