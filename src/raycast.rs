@@ -137,11 +137,15 @@ impl Raycaster {
         if let Some(grid) = self.grid {
             for axis in 0..3 {
                 let direction_on_axis = self.step[axis] * direction;
-                if direction_on_axis > 0 {
+                // If direction_on_axis is zero, we test both sides. This handles the case
+                // where a ray that has zero component in that axis either always or never
+                // intersects that axis.
+                if direction_on_axis >= 0 {
                     if self.cube[axis] >= grid.upper_bounds()[axis] {
                         return true;
                     }
-                } else if direction_on_axis < 0 {
+                }
+                if direction_on_axis <= 0 {
                     if self.cube[axis] < grid.lower_bounds()[axis] {
                         return true;
                     }
@@ -236,27 +240,25 @@ mod tests {
     // TODO: Have at least one doc test
     
 
-    fn assert_steps<T: IntoIterator<Item = RaycastStep>>(r: &mut Raycaster, steps: T) {
+    fn assert_steps_option<T: IntoIterator<Item = Option<RaycastStep>>>(r: &mut Raycaster, steps: T) {
         for (i, expected_step) in steps.into_iter().enumerate() {
             let r_backup = r.clone();  // save for diagnostics
-            match r.next() {
-                Some(actual_step) => {
-                    assert_eq!(expected_step, actual_step, "step {} (left=expected)\n\
-                        before: {:?}\nafter:  {:?}\n",
-                        i, r_backup, r);
-                },
-                None => {
-                    panic!("stopped sooner than expected at step {}\n\
-                        before: {:?}\nafter:  {:?}\n",
-                        i, r_backup, r);
-                }
+            let actual_step = r.next();
+            if actual_step != expected_step {
+                panic!("step {}\n\
+                    expected: {:?}\n\
+                    actual:   {:?}\n\
+                    before: {:?}\n\
+                    after:  {:?}\n",
+                    i, expected_step, actual_step, r_backup, r);
             }
         }
     }
+    fn assert_steps<T: IntoIterator<Item = RaycastStep>>(r: &mut Raycaster, steps: T) {
+        assert_steps_option(r, steps.into_iter().map(Some))
+    }
     fn assert_only_one_step(r: &mut Raycaster, step: RaycastStep) {
-        assert_eq!(Some(step), r.next(), "step 0 (left=expected)");
-        assert_eq!(None, r.next(), "no step 1");
-        assert_eq!(None, r.next(), "definitely no step 2");
+        assert_steps_option(r, vec![Some(step), None, None]);
     }
     
     /// Helper to construct steps
@@ -412,5 +414,18 @@ mod tests {
                 step(4, 4, -2, Face::NZ),
                 step(4, 4, -1, Face::NZ),
             ]);
+    }
+
+    /// within_grid wasn't working for axis-aligned rays that don't intersect the world,
+    /// which should produce zero steps.
+    #[test]
+    fn regression_test_2() {
+        let grid = Grid::new(Point3::new(0, 0, 0), [10, 10, 10]);
+        assert_steps_option(
+            &mut Raycaster::new(
+                    Point3::new(18.166666666666668, 4.666666666666666, -3.0),
+                    Vector3::new(0.0, 0.0, 16.0))
+                .within_grid(grid),
+            vec![None]);
     }
 }
