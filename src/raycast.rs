@@ -173,8 +173,9 @@ impl Iterator for Raycaster {
 
             if self.is_out_of_bounds(1) {
                 // We are past the bounds of the grid. There will never again be a cube to report.
-                // Prevent extraneous next() calls from doing any stepping that could overflow.
-                self.emit_current = false;
+                // Prevent extraneous next() calls from doing any stepping that could overflow
+                // by reusing the emit_current logic.
+                self.emit_current = true;
                 return None;
             }
 
@@ -383,15 +384,21 @@ mod tests {
         // Ray oriented diagonally on the -X side of a grid that is short on the X axis.
         let mut r = Raycaster::new(Point3::new(0.0, -0.25, -0.5), Vector3::new(1.0, 1.0, 1.0))
             .within_grid(Grid::new(Point3::new(2, -10, -10), [2, 20, 20]));
-        assert_steps(&mut r, vec![
-            step(2, 1, 1, Face::NX),
-            step(2, 2, 1, Face::NY),
-            step(2, 2, 2, Face::NZ),
-            step(3, 2, 2, Face::NX),
-            step(3, 3, 2, Face::NY),
-            step(3, 3, 3, Face::NZ),
+        assert_steps_option(&mut r, vec![
+            Some(step(2, 1, 1, Face::NX)),
+            Some(step(2, 2, 1, Face::NY)),
+            Some(step(2, 2, 2, Face::NZ)),
+            Some(step(3, 2, 2, Face::NX)),
+            Some(step(3, 3, 2, Face::NY)),
+            Some(step(3, 3, 3, Face::NZ)),
+            None,
         ]);
-        assert_eq!(None, r.next());
+        
+        // Verify that extra next()s don't modify the state and potentially cause overflow if continued.
+        let mut r2 = r.clone();
+        r2.next();
+        // Compare the Debug strings, since the state is otherwise private.
+        assert_eq!(format!("{:?}", r), format!("{:?}", r2));
     }
     
     #[test]
