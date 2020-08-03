@@ -64,7 +64,7 @@ impl View {
             * Matrix4::from_translation(-(self.center.to_vec()))
         ).inverse_transform().unwrap()
     }
-    
+
     /// Processes events for moving a View. Returns all those events it does not process.
     pub fn controller(&mut self, event: Event) -> Option<Event> {
         let mut walk = |x: FreeCoordinate, z: FreeCoordinate| {
@@ -73,7 +73,7 @@ impl View {
             let dir = rotation.rotate_vector(dir);
             self.center += Vector3::new(dir.x, 0.0, dir.y);
         };
-        
+
         match event {
             Event::Key(key) => match key {
                 Key::Char('w') | Key::Char('W') => { walk(0.0, -1.0); },
@@ -96,9 +96,9 @@ impl View {
 pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::Result<()> {
     let &grid = space.grid();
     let view_matrix = view.matrix();
-    
+
     // Diagnostic info accumulators
-    let mut center_ray :String = "".to_string();
+    let mut center_info :String = "".to_string();
     let mut number_of_cubes_examined :usize = 0;
 
     write!(out, "{}", termion::cursor::Goto(1, 1))?;
@@ -114,15 +114,18 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
             // World-space endpoints of the camera ray.
             let world_near = Point3::from_homogeneous(view_matrix * ndc_near);
             let world_far = Point3::from_homogeneous(view_matrix * ndc_far);
+            let direction = world_far - world_near;
+
+            let ray = Raycaster::new(world_near, direction)
+                .within_grid(grid);
+            let ray_cubes =
+                write_character_from_ray(ray, space, out)?;
+            number_of_cubes_examined += ray_cubes;
 
             if xch == view.viewport.x / 2 && ych == view.viewport.y / 2 {
-                center_ray = format!("Center {:?} to {:?}", world_near, world_far);
+                center_info = format!("Center {:?} dir {:?} (count = {})", world_near, direction, ray_cubes);
             }
 
-            let ray = Raycaster::new(world_near, world_far - world_near)
-                .within_grid(grid);
-            number_of_cubes_examined += 
-                write_character_from_ray(ray, space, out)?;
         }
         // End of line. Reset the color so that if the terminal is bigger, we don't
         // fill the rest of the line with the last pixel color.
@@ -132,9 +135,9 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
     }
     write!(out,
         "{}Cubes traced: {}\r\n\
-            {}\r\n", 
+            {}\r\n",
         termion::clear::AfterCursor, number_of_cubes_examined,
-        center_ray)?;
+        center_info)?;
     out.flush()?;
 
     Ok(())
