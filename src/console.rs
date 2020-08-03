@@ -92,6 +92,11 @@ impl View {
     }
 }
 
+pub fn viewport_from_terminal_size() -> io::Result<Vector2<u16>> {
+    let (w, h) = termion::terminal_size()?;
+    Ok(Vector2::new(w.max(1), (h - 5).max(1)))
+}
+
 // Draw the space to an ANSI terminal using raytracing.
 pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::Result<()> {
     let &grid = space.grid();

@@ -15,7 +15,7 @@ use termion::input::TermRead;
 
 use all_is_cubes::block::make_some_blocks;
 use all_is_cubes::space::{GridPoint, Space};
-use all_is_cubes::console::{View, draw_space};
+use all_is_cubes::console::{View, draw_space, viewport_from_terminal_size};
 
 /// TODO: break this up into testable library code insofar as feasible.
 
@@ -30,7 +30,9 @@ fn main() -> io::Result<()> {
         }
     }
 
-    let mut view = View::for_grid(Vector2::new(80, 24), space.grid());
+    let mut view = View::for_grid(
+        viewport_from_terminal_size()?,
+        space.grid());
     let mut auto_rotate = true;
 
     let mut out = io::stdout().into_raw_mode()?;
