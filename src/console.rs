@@ -10,7 +10,7 @@ use termion::{color};
 use termion::event::{Event, Key};
 
 use crate::math::{FreeCoordinate};
-use crate::raycast::Raycaster;
+use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, Space};
 
 type M = Matrix4<FreeCoordinate>;
@@ -174,6 +174,7 @@ fn write_character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &m
         let rgba = block.color().to_rgba();
         if rgba[3] > 0.5 {
             // TODO: Pick 8/256/truecolor based on what the terminal supports.
+            let rgba = fake_lighting_adjustment(rgba, hit.face);
             let converted_color = color::AnsiValue::rgb(
                 scale(rgba.x), scale(rgba.y), scale(rgba.z));
             write!(out, "{}{}{}",
@@ -198,4 +199,16 @@ fn write_character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &m
             color::Fg(color::Reset))?;
     }
     return Ok(number_passed);
+}
+
+fn fake_lighting_adjustment(rgba :Vector4<f32>, face :Face) -> Vector4<f32> {
+    let one_step = 1.0/5.0;
+    let v = Vector4::new(1.0, 1.0, 1.0, 0.0);
+    let modifier = match face {
+        Face::PY => v * one_step * 2.0,
+        Face::NY => v * one_step * -1.0,
+        Face::NX | Face::PX => v * one_step * 1.0,
+        _ => v * 0.0,
+    };
+    rgba + modifier
 }

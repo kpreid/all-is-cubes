@@ -3,7 +3,6 @@
 
 //! Simple exercise of all_is_cubes::console.
 
-use cgmath::Vector2;
 use std::io;
 use std::thread;
 use std::sync::mpsc;
