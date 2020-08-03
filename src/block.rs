@@ -19,7 +19,7 @@ impl Color {
     }
 
     pub const TRANSPARENT :Color = Color::rgba(0.0, 0.0, 0.0, 0.0);
-    
+
     pub fn to_rgba(&self) -> Vector4<f32> {
         self.value
     }
@@ -63,16 +63,16 @@ impl Block {
             Block::Atom(_a, c) => *c,
         }
     }
-    
+
     pub fn attributes(&self) -> &BlockAttributes {
         match self {
             Block::Atom(a, _c) => a,
-        }        
+        }
     }
-    
+
     /*
     /// Returns the space which defines the shape and behavior of this block, if there is one.
-    /// 
+    ///
     /// TODO: there needs to be the concept of read-only derived spaces to make this work
     /// as intended.
     fn space() -> Option<&Space> { ... }

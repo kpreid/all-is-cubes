@@ -50,7 +50,7 @@ impl Grid {
     pub fn volume(&self) -> usize {
         return (self.sizes[0] * self.sizes[1] * self.sizes[2]) as usize;
     }
-    
+
     /// Determines whether a point lies within the grid and, if it does, returns the flattened
     /// array index for it.
     pub fn index(&self, point: GridPoint) -> Option<usize> {
@@ -65,17 +65,17 @@ impl Grid {
                 * self.sizes[2] + deoffsetted[2]
         ) as usize);
     }
-    
+
     /// Inclusive upper bound.
     pub fn lower_bounds(&self) -> GridPoint {
         return self.lower_bounds;
     }
-    
+
     /// Exclusive upper bound.
     pub fn upper_bounds(&self) -> GridPoint {
         return self.lower_bounds + Vector3::from(self.sizes);
     }
-    
+
     pub fn size(&self) -> Vector3<isize> {
         return Vector3::from(self.sizes);
     }
@@ -84,9 +84,9 @@ impl Grid {
 /// Container for blocks arranged in three-dimensional space.
 #[derive(Clone)]
 // TODO: implement Debug
-pub struct Space { 
+pub struct Space {
     grid: Grid,
-    
+
     /// Lookup from `Block` value to the index by which it is represented in
     /// the array.
     block_to_index: HashMap<Block, BlockIndex>,
@@ -95,7 +95,7 @@ pub struct Space {
     /// Lookup from arbitrarily assigned indices (used in `contents`) to number
     /// of uses of this index.
     index_to_count: Vec<usize>,
-    
+
     /// The blocks in the space, stored compactly:
     ///
     /// * Coordinates are transformed to indices by `Grid::index`.
@@ -124,17 +124,17 @@ impl Space {
             contents: vec![0; volume].into_boxed_slice(),
         }
     }
-    
+
     /// Constructs a `Space` that is entirely empty and whose coordinate system
     /// is in the +X+Y+Z quadrant.
     pub fn empty_positive(wx: isize, wy: isize, wz: isize) -> Space {
         return Space::empty(Grid::new(GridPoint::new(0, 0, 0), [wx, wy, wz]));
     }
-    
+
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
-    
+
     /// Replace the block in this space at the given position.
     ///
     /// If the position is out of bounds, there is no effect.
@@ -158,7 +158,7 @@ impl Space {
                 // No change.
                 return;
             }
-            
+
             // Decrement count of old block.
             self.index_to_count[old_block_index as usize] -= 1;
             if self.index_to_count[old_block_index as usize] == 0 {
@@ -166,12 +166,12 @@ impl Space {
                 // TODO: Depend less on AIR by having a canonical empty-entry value that doesn't appear normally.
                 self.index_to_block[old_block_index as usize] = AIR.clone();
             }
-            
+
             // Increment count of new block.
             // TODO: Optimize replacements of unique blocks by picking the just-freed index if possible.
             let new_block_index = self.ensure_block_index(block);
             self.index_to_count[new_block_index as usize] += 1;
-            
+
             // Write actual space change
             self.contents[contents_index] = new_block_index;
         }
@@ -239,16 +239,16 @@ impl std::ops::Index<GridPoint> for Space {
 mod tests {
     use super::*;
     use crate::block::make_some_blocks;
-  
+
     #[test]
     fn it_works() {
         let grid = Grid::new(GridPoint::new(0, 0, 0), [100, 100, 100]);
         let _space = Space::empty(grid);
-        
+
         // TODO: Replace this with something meaningful
         assert!(grid.volume() == 1000_000);
     }
-    
+
     #[test]
     fn removed_blocks_are_forgotten() {
         let blocks = make_some_blocks(3);

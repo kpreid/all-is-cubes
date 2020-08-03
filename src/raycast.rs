@@ -61,7 +61,7 @@ impl Raycaster {
                 x.signum() as GridCoordinate
             }
         }
-        
+
         Self {
             emit_current: true,
             cube: origin.map(|x| x.floor() as GridCoordinate),
@@ -72,7 +72,7 @@ impl Raycaster {
             grid: None,
         }
     }
-    
+
     pub fn within_grid(mut self, grid: Grid) -> Self {
         if self.grid == None {
             self.grid = Some(grid);
@@ -100,7 +100,7 @@ impl Raycaster {
             }
         }
     }
-    
+
     fn step_on_axis(&mut self, axis :usize) {
         assert!(self.step[axis] != 0);
 
@@ -119,7 +119,7 @@ impl Raycaster {
         ];
         self.last_face = FACE_TABLE[axis][(self.step[axis] + 1) as usize];
     }
-    
+
     fn valid_for_stepping(&self) -> bool {
         // If all stepping directions are 0, then we cannot make progress.
         self.step != Vector3::zero()
@@ -128,7 +128,7 @@ impl Raycaster {
         && !self.t_max[..].iter().any(|t| t.is_nan())
         && self.t_max[..].iter().any(|t| t.is_finite())
     }
-    
+
     /// Returns whether `self.bounds` is outside of `self.grid`.
     ///
     /// If `direction` is `1`, only the bounds relevant to _exiting_ are tested.
@@ -239,7 +239,7 @@ mod tests {
     use num_traits::identities::Zero;
 
     // TODO: Have at least one doc test
-    
+
 
     fn assert_steps_option<T: IntoIterator<Item = Option<RaycastStep>>>(r: &mut Raycaster, steps: T) {
         for (i, expected_step) in steps.into_iter().enumerate() {
@@ -261,7 +261,7 @@ mod tests {
     fn assert_only_one_step(r: &mut Raycaster, step: RaycastStep) {
         assert_steps_option(r, vec![Some(step), None, None]);
     }
-    
+
     /// Helper to construct steps
     fn step(x :GridCoordinate, y :GridCoordinate, z :GridCoordinate, face :Face) -> RaycastStep {
         RaycastStep {
@@ -378,7 +378,7 @@ mod tests {
                 Vector3::new(1.0, 2.0, FreeCoordinate::NAN)),
             step(10, 20, 30, Face::WITHIN));
     }
-    
+
     #[test]
     fn within_grid() {
         // Ray oriented diagonally on the -X side of a grid that is short on the X axis.
@@ -393,14 +393,14 @@ mod tests {
             Some(step(3, 3, 3, Face::NZ)),
             None,
         ]);
-        
+
         // Verify that extra next()s don't modify the state and potentially cause overflow if continued.
         let mut r2 = r.clone();
         r2.next();
         // Compare the Debug strings, since the state is otherwise private.
         assert_eq!(format!("{:?}", r), format!("{:?}", r2));
     }
-    
+
     #[test]
     #[should_panic(expected = "not implemented: multiple uses of .within_grid()")]
     fn within_grid_twice() {
@@ -408,7 +408,7 @@ mod tests {
         Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
             .within_grid(grid).within_grid(grid);
     }
-    
+
     /// An example of an axis-aligned ray that wasn't working.
     #[test]
     fn regression_test_1() {
