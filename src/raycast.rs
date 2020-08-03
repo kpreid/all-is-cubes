@@ -102,14 +102,17 @@ impl Raycaster {
     }
     
     fn step_on_axis(&mut self, axis :usize) {
+        assert!(self.step[axis] != 0);
+
         // Move into the new cube.
         self.cube[axis] += self.step[axis];
-        
+
         // Update t_max to reflect that we have crossed the previous t_max boundary.
         self.t_max[axis] += self.t_delta[axis];
-        
+
         // Update face crossing info
         static FACE_TABLE :[[Face; 3]; 3] = [
+            // Middle column is never used.
             [Face::PX, Face::WITHIN, Face::NX],
             [Face::PY, Face::WITHIN, Face::NY],
             [Face::PZ, Face::WITHIN, Face::NZ],
