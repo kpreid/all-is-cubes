@@ -209,7 +209,7 @@ impl Space {
                 }
             }
             if high_mark >= BlockIndex::MAX as usize {
-                panic!("ran out of block indices");
+                todo!("more than {} block types is not yet supported", BlockIndex::MAX as usize + 1);
             }
             // Grow the vector.
             self.index_to_count.push(0);

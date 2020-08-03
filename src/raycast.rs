@@ -73,11 +73,11 @@ impl Raycaster {
         }
     }
     
-    pub fn within_grid(mut self, grid: Grid) -> Raycaster {
+    pub fn within_grid(mut self, grid: Grid) -> Self {
         if self.grid == None {
             self.grid = Some(grid);
         } else {
-            panic!("unimplemented intersection of grids");  // TODO
+            unimplemented!("multiple uses of .within_grid()");
         }
         self
     }
@@ -374,7 +374,7 @@ mod tests {
     }
     
     #[test]
-    fn filter_within_grid() {
+    fn within_grid() {
         // Ray oriented diagonally on the -X side of a grid that is short on the X axis.
         let mut r = Raycaster::new(Point3::new(0.0, -0.25, -0.5), Vector3::new(1.0, 1.0, 1.0))
             .within_grid(Grid::new(Point3::new(2, -10, -10), [2, 20, 20]));
@@ -387,6 +387,14 @@ mod tests {
             step(3, 3, 3, Face::NZ),
         ]);
         assert_eq!(None, r.next());
+    }
+    
+    #[test]
+    #[should_panic(expected = "not implemented: multiple uses of .within_grid()")]
+    fn within_grid_twice() {
+        let grid = Grid::new(Point3::new(2, -10, -10), [2, 20, 20]);
+        Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
+            .within_grid(grid).within_grid(grid);
     }
     
     /// An example of an axis-aligned ray that wasn't working.
