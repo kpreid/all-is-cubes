@@ -96,7 +96,10 @@ impl View {
 pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::Result<()> {
     let &grid = space.grid();
     let view_matrix = view.matrix();
+    
+    // Diagnostic info accumulators
     let mut center_ray :String = "".to_string();
+    let mut number_of_cubes_examined :usize = 0;
 
     write!(out, "{}", termion::cursor::Goto(1, 1))?;
 
@@ -116,8 +119,10 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
                 center_ray = format!("Center {:?} to {:?}", world_near, world_far);
             }
 
-            let ray = Raycaster::new(world_near, world_far - world_near).within_grid(grid);
-            character_from_ray(ray, space, out)?;
+            let ray = Raycaster::new(world_near, world_far - world_near)
+                .within_grid(grid);
+            number_of_cubes_examined += 
+                write_character_from_ray(ray, space, out)?;
         }
         // End of line. Reset the color so that if the terminal is bigger, we don't
         // fill the rest of the line with the last pixel color.
@@ -125,7 +130,11 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
             color::Bg(color::Reset),
             color::Fg(color::Reset))?;
     }
-    write!(out, "{}{}\r\n", termion::clear::AfterCursor, center_ray)?;
+    write!(out,
+        "{}Cubes traced: {}\r\n\
+            {}\r\n", 
+        termion::clear::AfterCursor, number_of_cubes_examined,
+        center_ray)?;
     out.flush()?;
 
     Ok(())
@@ -137,7 +146,7 @@ fn normalize_pixel_coordinate(position: u16, size: u16) -> FreeCoordinate {
 }
 
 /// Write a character corresponding to what one ray hits.
-fn character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &mut O) -> io::Result<()> {
+fn write_character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &mut O) -> io::Result<usize> {
     fn scale(x :f32) -> u8 {
         let scale = 5.0;
         (x * scale).max(0.0).min(scale) as u8
@@ -149,7 +158,7 @@ fn character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &mut O) 
         if number_passed > 1000 {
             // Abort excessively long traces.
             write!(out, "{}{}X", color::Bg(color::Red), color::Fg(color::Black))?;
-            return Ok(());
+            return Ok(number_passed);
         }
 
         let block = &space[hit.cube];
@@ -163,7 +172,7 @@ fn character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &mut O) 
                 color::Bg(converted_color),
                 color::Fg(color::Black),
                 &attributes.display_name[0..1])?;
-            return Ok(());
+            return Ok(number_passed);
         }
     }
 
@@ -180,5 +189,5 @@ fn character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &mut O) 
             color::Bg(color::Reset),
             color::Fg(color::Reset))?;
     }
-    return Ok(());
+    return Ok(number_passed);
 }
