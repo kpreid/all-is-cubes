@@ -96,6 +96,7 @@ impl View {
 pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::Result<()> {
     let &grid = space.grid();
     let view_matrix = view.matrix();
+    let mut center_ray :String = "".to_string();
 
     write!(out, "{}", termion::cursor::Goto(1, 1))?;
 
@@ -111,6 +112,10 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
             let world_near = Point3::from_homogeneous(view_matrix * ndc_near);
             let world_far = Point3::from_homogeneous(view_matrix * ndc_far);
 
+            if xch == view.viewport.x / 2 && ych == view.viewport.y / 2 {
+                center_ray = format!("Center {:?} to {:?}", world_near, world_far);
+            }
+
             let ray = Raycaster::new(world_near, world_far - world_near).within_grid(grid);
             character_from_ray(ray, space, out)?;
         }
@@ -120,6 +125,7 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
             color::Bg(color::Reset),
             color::Fg(color::Reset))?;
     }
+    write!(out, "{}{}\r\n", termion::clear::AfterCursor, center_ray)?;
     out.flush()?;
 
     Ok(())
