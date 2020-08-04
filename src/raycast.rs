@@ -48,7 +48,6 @@ pub struct Raycaster {
 }
 
 impl Raycaster {
-    #[allow(dead_code)]  // TODO: Raycaster not yet used in rest of crate
     pub fn new(
         origin: Point3<FreeCoordinate>,
         direction: Vector3<FreeCoordinate>,
