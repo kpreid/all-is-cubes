@@ -101,6 +101,21 @@ impl Grid {
     fn axis_range(&self, axis: usize) -> Range<GridCoordinate> {
         return (self.lower_bounds()[axis])..(self.upper_bounds()[axis]);
     }
+
+    /// Returns whether the grid includes the cube with the given coordinates in its
+    /// volume.
+    ///
+    /// ```
+    /// use all_is_cubes::space::*;
+    /// let grid = Grid::new((4, 4, 4), (6, 6, 6));
+    /// assert!(!grid.contains_cube((3, 5, 5)));
+    /// assert!(grid.contains_cube((4, 5, 5)));
+    /// assert!(grid.contains_cube((9, 5, 5)));
+    /// assert!(!grid.contains_cube((10, 5, 5)));
+    /// ```
+    pub fn contains_cube(&self, point: impl Into<GridPoint>) -> bool {
+        return self.index(point).is_some();
+    }
 }
 
 /// Container for blocks arranged in three-dimensional space.
