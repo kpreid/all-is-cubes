@@ -12,9 +12,9 @@ use termion::event::{Event, Key};
 use termion::raw::IntoRawMode;
 use termion::input::TermRead;
 
-use all_is_cubes::worldgen::make_some_blocks;
-use all_is_cubes::space::{GridPoint, Space};
 use all_is_cubes::console::{View, draw_space, viewport_from_terminal_size};
+use all_is_cubes::space::Space;
+use all_is_cubes::worldgen::make_some_blocks;
 
 /// TODO: break this up into testable library code insofar as feasible.
 
@@ -24,8 +24,8 @@ fn main() -> io::Result<()> {
     let mut space = Space::empty_positive(10, 10, 10);
     for x in 0..10 {
         for z in 0..10 {
-            space.set(GridPoint::new(x, 0, z), &blocks[x as usize]);
-            space.set(GridPoint::new(x, x, z), &blocks[x as usize]);
+            space.set((x, 0, z), &blocks[x as usize]);
+            space.set((x, x, z), &blocks[x as usize]);
         }
     }
 

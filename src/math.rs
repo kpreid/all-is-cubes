@@ -6,8 +6,13 @@
 use std::ops::{Rem, Add};
 use cgmath::{BaseNum, EuclideanSpace, Point3, Vector3};
 
+/// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = isize;
+/// Positions that are locked to the cube grid.
 pub type GridPoint = Point3<GridCoordinate>;
+/// Vectors that are locked to the cube grid.
+pub type GridVector = Vector3<GridCoordinate>;
+/// Coordinates that are not locked to the cube grid.
 pub type FreeCoordinate = f64;
 
 pub trait Modulo<M = Self> {

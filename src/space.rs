@@ -3,13 +3,12 @@
 
 //! That which contains many blocks.
 
-use cgmath::Vector3;
 use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::block::*;
+use crate::math::{GridCoordinate, GridPoint, GridVector};
 
-pub use crate::math::{GridCoordinate, GridPoint};  // TODO sort out how we want to namespace
 
 /// Specifies the coordinate extent of a `Space`.
 ///
@@ -18,7 +17,7 @@ pub use crate::math::{GridCoordinate, GridPoint};  // TODO sort out how we want 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Grid {
   lower_bounds: GridPoint,
-  sizes: [isize; 3],  // always positive
+  sizes: GridVector,  // checked to be always positive
 }
 
 impl Grid {
@@ -27,7 +26,10 @@ impl Grid {
     /// For example, if on one axis the lower bound is 5 and the size is 10,
     /// then the positions where blocks can exist are numbered 5 through 14
     /// (inclusive) and the occupied volume spans 5 to 15.
-    pub fn new(lower_bounds: GridPoint, sizes: [isize; 3]) -> Grid {
+    pub fn new(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridVector>) -> Grid {
+        let lower_bounds = lower_bounds.into();
+        let sizes = sizes.into();
+
         // TODO: Replace assert! with nice error reporting and then test it
         for i in 0..3 {
             assert!(sizes[i] > 0);
@@ -36,6 +38,7 @@ impl Grid {
         assert!(
             sizes[0].checked_mul(sizes[1]).map(|xy| xy.checked_mul(sizes[2])).is_some(),
             "Volume too large");
+
         Grid {
             lower_bounds,
             sizes,
@@ -45,7 +48,7 @@ impl Grid {
     /// Computes the volume of this space in blocks, i.e. the sum of all sizes.
     ///
     /// ```
-    /// let grid = all_is_cubes::space::Grid::new(all_is_cubes::space::GridPoint::new(-10, 3, 7), [100, 200, 300]);
+    /// let grid = all_is_cubes::space::Grid::new((-10, 3, 7), (100, 200, 300));
     /// assert_eq!(grid.volume(), 6_000_000);
     /// ```
     pub fn volume(&self) -> usize {
@@ -54,7 +57,8 @@ impl Grid {
 
     /// Determines whether a point lies within the grid and, if it does, returns the flattened
     /// array index for it.
-    pub fn index(&self, point: GridPoint) -> Option<usize> {
+    pub fn index(&self, point: impl Into<GridPoint>) -> Option<usize> {
+        let point = point.into();
         let deoffsetted = point - self.lower_bounds;
         for i in 0..3 {
             if deoffsetted[i] < 0 || deoffsetted[i] >= self.sizes[i] {
@@ -74,11 +78,11 @@ impl Grid {
 
     /// Exclusive upper bound.
     pub fn upper_bounds(&self) -> GridPoint {
-        return self.lower_bounds + Vector3::from(self.sizes);
+        return self.lower_bounds + self.sizes;
     }
 
-    pub fn size(&self) -> Vector3<isize> {
-        return Vector3::from(self.sizes);
+    pub fn size(&self) -> GridVector {
+        return self.sizes;
     }
 
     pub fn x_range(&self) -> Range<GridCoordinate> {
@@ -146,7 +150,7 @@ impl Space {
     /// Constructs a `Space` that is entirely empty and whose coordinate system
     /// is in the +X+Y+Z quadrant.
     pub fn empty_positive(wx: isize, wy: isize, wz: isize) -> Space {
-        return Space::empty(Grid::new(GridPoint::new(0, 0, 0), [wx, wy, wz]));
+        return Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)));
     }
 
     pub fn grid(&self) -> &Grid {
@@ -164,9 +168,8 @@ impl Space {
     /// let a_block = Block::Atom(
     ///     BlockAttributes::default(),
     ///     Color::rgba(1.0, 0.0, 0.0, 1.0));
-    /// let p = GridPoint::new(0, 0, 0);
-    /// space.set(p, &a_block);
-    /// assert_eq!(space[p], a_block);
+    /// space.set((0, 0, 0), &a_block);
+    /// assert_eq!(space[(0, 0, 0)], a_block);
     /// ```
     pub fn set(&mut self, position: impl Into<GridPoint>, block: &Block) {
         let position :GridPoint = position.into();
@@ -239,13 +242,13 @@ impl Space {
     }
 }
 
-impl std::ops::Index<GridPoint> for Space {
+impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     type Output = Block;
 
     /// Get the block in this space at the given position.
     ///
     /// If the position is out of bounds, there is no effect.
-    fn index(&self, position: GridPoint) -> &Self::Output {
+    fn index(&self, position: T) -> &Self::Output {
         if let Some(index) = self.grid.index(position) {
             &self.index_to_block[self.contents[index] as usize]
         } else {
@@ -257,6 +260,7 @@ impl std::ops::Index<GridPoint> for Space {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::GridPoint;
     use crate::worldgen::make_some_blocks;
 
     #[test]
