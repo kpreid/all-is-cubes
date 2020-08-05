@@ -5,10 +5,11 @@
 
 use cgmath::Vector3;
 use std::collections::HashMap;
+use std::ops::Range;
 
 use crate::block::*;
 
-pub use crate::math::GridPoint;  // TODO sort out how we want to namespace
+pub use crate::math::{GridCoordinate, GridPoint};  // TODO sort out how we want to namespace
 
 /// Specifies the coordinate extent of a `Space`.
 ///
@@ -78,6 +79,23 @@ impl Grid {
 
     pub fn size(&self) -> Vector3<isize> {
         return Vector3::from(self.sizes);
+    }
+
+    pub fn x_range(&self) -> Range<GridCoordinate> {
+        return self.axis_range(0);
+    }
+
+    pub fn y_range(&self) -> Range<GridCoordinate> {
+        return self.axis_range(1);
+    }
+
+    pub fn z_range(&self) -> Range<GridCoordinate> {
+        return self.axis_range(2);
+    }
+
+    // TODO: decide if this should be public
+    fn axis_range(&self, axis: usize) -> Range<GridCoordinate> {
+        return (self.lower_bounds()[axis])..(self.upper_bounds()[axis]);
     }
 }
 
@@ -150,7 +168,8 @@ impl Space {
     /// space.set(p, &a_block);
     /// assert_eq!(space[p], a_block);
     /// ```
-    pub fn set(&mut self, position: GridPoint, block: &Block) {
+    pub fn set(&mut self, position: impl Into<GridPoint>, block: &Block) {
+        let position :GridPoint = position.into();
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
             let ref old_block = self.index_to_block[old_block_index as usize];
@@ -238,7 +257,7 @@ impl std::ops::Index<GridPoint> for Space {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::make_some_blocks;
+    use crate::worldgen::make_some_blocks;
 
     #[test]
     fn it_works() {

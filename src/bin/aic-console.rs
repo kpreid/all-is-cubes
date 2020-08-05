@@ -12,7 +12,7 @@ use termion::event::{Event, Key};
 use termion::raw::IntoRawMode;
 use termion::input::TermRead;
 
-use all_is_cubes::block::make_some_blocks;
+use all_is_cubes::worldgen::make_some_blocks;
 use all_is_cubes::space::{GridPoint, Space};
 use all_is_cubes::console::{View, draw_space, viewport_from_terminal_size};
 

@@ -110,18 +110,3 @@ pub static AIR :Block = Block::Atom(
         light_emission: Color::TRANSPARENT,
     },
     Color::TRANSPARENT);
-
-/// Generate some atom blocks with unspecified contents for testing.
-pub fn make_some_blocks(count: usize) -> Vec<Block> {
-    let mut vec :Vec<Block> = Vec::with_capacity(count);
-    for i in 0..count {
-        let luminance = i as f32 / (count - 1) as f32;
-        vec.push(Block::Atom(
-            BlockAttributes {
-                display_name: Cow::Owned(i.to_string()),
-                ..BlockAttributes::default()
-            },
-            Color::rgba(luminance, luminance, luminance, 1.0)));
-    }
-    vec
-}

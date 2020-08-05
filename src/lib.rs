@@ -7,3 +7,4 @@ pub mod console;
 mod math;
 mod raycast;
 pub mod space;
+pub mod worldgen;
