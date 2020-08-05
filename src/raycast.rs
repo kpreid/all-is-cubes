@@ -7,6 +7,8 @@ use num_traits::identities::Zero;
 use crate::math::{FreeCoordinate, GridCoordinate, Modulo};
 use crate::space::Grid;
 
+pub use crate::math::Face;  // necessary for any use of raycast, so let it be used
+
 /// Iterates over grid positions that intersect a given ray.
 ///
 /// The grid is of unit cubes which are identified by the integer coordinates of
@@ -49,9 +51,11 @@ pub struct Raycaster {
 
 impl Raycaster {
     pub fn new(
-        origin: Point3<FreeCoordinate>,
-        direction: Vector3<FreeCoordinate>,
+        origin: impl Into<Point3<FreeCoordinate>>,
+        direction: impl Into<Vector3<FreeCoordinate>>,
     ) -> Self {
+        let origin = origin.into();
+        let direction = direction.into();
         fn improved_signum(x :FreeCoordinate) -> GridCoordinate {
             // We want 0 as an error indication..
             if x == 0.0 {
@@ -196,20 +200,10 @@ impl Iterator for Raycaster {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RaycastStep {
     pub cube: Point3<GridCoordinate>,
+    /// Which face of the cube the ray struck to enter it.
+    /// If the ray started within the cube, is `Face::WITHIN`.
     pub face: Face,
 }
-
-/// Describes which cube face the ray struck.
-///
-/// WITHIN means "the ray started here".
-///
-/// TODO: Add methods for e.g. converting to/from unit vectors.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Face {
-    NX, NY, NZ, PX, PY, PZ, WITHIN
-}
-
-
 
 /// Find the smallest positive t such that s + t * ds is an integer.
 // TODO: Tests!

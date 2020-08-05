@@ -7,8 +7,9 @@ use cgmath::Vector4;
 use std::borrow::Cow;
 
 use crate::block::{AIR, Block, BlockAttributes, Color};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint};
-use crate::space::{Grid, Space};
+use crate::math::{FreeCoordinate, GridCoordinate};
+use crate::raycast::{Face, Raycaster};
+use crate::space::{Space};
 
 pub struct LandscapeBlocks {
     pub air: Block,
@@ -72,35 +73,33 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 /// assert!(space[(0, 0, -10)] != AIR);
 /// ```
 pub fn axes(space: &mut Space) {
-    let grid :Grid = *space.grid();
-    for axis in 0..3 {
-        for direction in &[1, -1] {
-            for i in 1.. {
-                let mut v = GridPoint::new(0, 0, 0);
-                v[axis] += direction * i;
-                if !grid.contains_cube(v) {
-                    break;
-                }
-            
-                let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
-                let mut name :Cow<'static, str> = (i % 10).to_string().into();
-                if i % 2 == 0 {
-                    color[axis] = if *direction > 0 { 1.0 } else { 0.9 };
+    for face in Face::all_six() {
+        let axis = face.axis_number();
+        let direction = face.normal_vector()[axis];
+        let raycaster = Raycaster::new(
+            (0.5, 0.5, 0.5),
+            face.normal_vector().cast::<FreeCoordinate>().unwrap())
+            .within_grid(*space.grid());
+        for step in raycaster {
+            let i = step.cube[axis] * direction;  // always positive
+            let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
+            let mut name :Cow<'static, str> = (i % 10).to_string().into();
+            if i % 2 == 0 {
+                color[axis] = if direction > 0 { 1.0 } else { 0.9 };
+            } else {
+                if direction > 0 {
+                    color = Vector4::new(1.0, 1.0, 1.0, 1.0);
+                    name = ["X", "Y", "Z"][axis].into();
                 } else {
-                    if *direction > 0 {
-                        color = Vector4::new(1.0, 1.0, 1.0, 1.0);
-                        name = ["X", "Y", "Z"][axis].into();
-                    } else {
-                        name = ["x", "y", "z"][axis].into();
-                    };
-                }
-                space.set(v, &Block::Atom(
-                    BlockAttributes {
-                        display_name: name.into(),
-                        ..BlockAttributes::default()
-                    },
-                    color.into()));
+                    name = ["x", "y", "z"][axis].into();
+                };
             }
+            space.set(step.cube, &Block::Atom(
+                BlockAttributes {
+                    display_name: name.into(),
+                    ..BlockAttributes::default()
+                },
+                color.into()));
         }
     }
 }
