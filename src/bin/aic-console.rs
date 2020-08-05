@@ -52,7 +52,7 @@ fn main() -> io::Result<()> {
 
     print!("{}", termion::clear::All);
     loop {
-        thread::sleep(Duration::from_millis(50));
+        thread::sleep(Duration::from_millis(1000/30));
 
         'input: loop {
             match event_rx.try_recv() {

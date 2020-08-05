@@ -4,6 +4,7 @@
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
 use cgmath::{Basis2, Deg, EuclideanSpace, Matrix4, Ortho, Point3, Rotation, Rotation2, Transform, Vector2, Vector3, Vector4};
+use rayon::iter::{ParallelIterator, IntoParallelIterator};
 use std::io;
 use termion;
 use termion::{color};
@@ -99,50 +100,38 @@ pub fn viewport_from_terminal_size() -> io::Result<Vector2<u16>> {
 
 // Draw the space to an ANSI terminal using raytracing.
 pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::Result<()> {
-    let &grid = space.grid();
     let view_matrix = view.matrix();
 
     // Diagnostic info accumulators
-    let mut center_info :String = "".to_string();
     let mut number_of_cubes_examined :usize = 0;
 
-    write!(out, "{}", termion::cursor::Goto(1, 1))?;
-
-    for ych in 0..view.viewport.y {
+    let pixel_iterator = (0..view.viewport.y).into_par_iter().map(move |ych| {
         let y = normalize_pixel_coordinate(ych, view.viewport.y);
-        for xch in 0..view.viewport.x {
+        (0..view.viewport.x).into_par_iter().map(move |xch| {
             let x = normalize_pixel_coordinate(xch, view.viewport.x);
+            (xch, ych, x, y)
+        })
+    }).flatten();
 
-            // Homogeneous-coordinate endpoints of the camera ray.
-            let ndc_near = Vector4::new(x, y, 1.0, 1.0);
-            let ndc_far = Vector4::new(x, y, -1.0, 1.0);
-            // World-space endpoints of the camera ray.
-            let world_near = Point3::from_homogeneous(view_matrix * ndc_near);
-            let world_far = Point3::from_homogeneous(view_matrix * ndc_far);
-            let direction = world_far - world_near;
+    let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
+        let (text, count) = character_from_cell(x, y, &view_matrix, &space);
+        (xch, ych, text, count)
+    });
 
-            let ray = Raycaster::new(world_near, direction)
-                .within_grid(grid);
-            let ray_cubes =
-                write_character_from_ray(ray, space, out)?;
-            number_of_cubes_examined += ray_cubes;
-
-            if xch == view.viewport.x / 2 && ych == view.viewport.y / 2 {
-                center_info = format!("Center {:?} dir {:?} (count = {})", world_near, direction, ray_cubes);
-            }
-
+    // The actual output writing must be done serially, so collect() the results.
+    write!(out, "{}", termion::cursor::Goto(1, 1))?;
+    for (xch, ych, text, count) in output_iterator.collect::<Vec<_>>() {
+        if xch == 0 && ych != 0 {
+            write!(out, "{}", *END_OF_LINE)?;
         }
-        // End of line. Reset the color so that if the terminal is bigger, we don't
-        // fill the rest of the line with the last pixel color.
-        write!(out, "{}{}\r\n",
-            color::Bg(color::Reset),
-            color::Fg(color::Reset))?;
+        number_of_cubes_examined += count;
+        write!(out, "{}", text)?;
     }
     write!(out,
-        "{}Cubes traced: {}\r\n\
-            {}\r\n",
-        termion::clear::AfterCursor, number_of_cubes_examined,
-        center_info)?;
+        "{}{}Cubes traced through: {}\r\n",
+        *END_OF_LINE,
+        termion::clear::AfterCursor,
+        number_of_cubes_examined)?;
     out.flush()?;
 
     Ok(())
@@ -153,8 +142,21 @@ fn normalize_pixel_coordinate(position: u16, size: u16) -> FreeCoordinate {
     (position as FreeCoordinate + 0.5) / (size as FreeCoordinate) * -2.0 + 1.0
 }
 
-/// Write a character corresponding to what one ray hits.
-fn write_character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &mut O) -> io::Result<usize> {
+fn character_from_cell(x: FreeCoordinate, y: FreeCoordinate, view_matrix: &Matrix4<FreeCoordinate>, space: &Space) -> (String, usize) {
+    // Homogeneous-coordinate endpoints of the camera ray.
+    let ndc_near = Vector4::new(x, y, 1.0, 1.0);
+    let ndc_far = Vector4::new(x, y, -1.0, 1.0);
+    // World-space endpoints of the camera ray.
+    let world_near = Point3::from_homogeneous(view_matrix * ndc_near);
+    let world_far = Point3::from_homogeneous(view_matrix * ndc_far);
+    let direction = world_far - world_near;
+
+    let ray = Raycaster::new(world_near, direction).within_grid(*space.grid());
+    character_from_ray(ray, space)
+}
+
+/// Compute a colored character corresponding to what one ray hits.
+fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
     fn scale(x :f32) -> u8 {
         let scale = 5.0;
         (x * scale).max(0.0).min(scale) as u8
@@ -165,8 +167,9 @@ fn write_character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &m
         number_passed += 1;
         if number_passed > 1000 {
             // Abort excessively long traces.
-            write!(out, "{}{}X", color::Bg(color::Red), color::Fg(color::Black))?;
-            return Ok(number_passed);
+            return (
+                format!("{}{}X", color::Bg(color::Red), color::Fg(color::Black)),
+                number_passed);
         }
 
         let block = &space[hit.cube];
@@ -177,28 +180,30 @@ fn write_character_from_ray<O: io::Write>(ray :Raycaster, space: &Space, out: &m
             let rgba = fake_lighting_adjustment(rgba, hit.face);
             let converted_color = color::AnsiValue::rgb(
                 scale(rgba.x), scale(rgba.y), scale(rgba.z));
-            write!(out, "{}{}{}",
-                color::Bg(converted_color),
-                color::Fg(color::Black),
-                &attributes.display_name[0..1])?;
-            return Ok(number_passed);
+            return (
+                format!("{}{}{}",
+                    color::Bg(converted_color),
+                    color::Fg(color::Black),
+                    &attributes.display_name[0..1]),
+                number_passed);
         }
     }
 
     // Didn't hit any blocks; write a "sky".
+    let s :String;
     if number_passed > 0 {
         // Intersected the world, but no opaque blocks.
         let c = number_passed.min(4) as u8;
-        write!(out, "{}{}.",
+        s = format!("{}{}.",
             color::Bg(color::AnsiValue::rgb(c, c, 5)),
-            color::Fg(color::AnsiValue::rgb(5, 5, 5)))?;
+            color::Fg(color::AnsiValue::rgb(5, 5, 5)));
     } else {
         // Didn't intersect the world at all. Draw these as plain background
-        write!(out, "{}{} ",
+        s = format!("{}{} ",
             color::Bg(color::Reset),
-            color::Fg(color::Reset))?;
+            color::Fg(color::Reset));
     }
-    return Ok(number_passed);
+    return (s, number_passed);
 }
 
 fn fake_lighting_adjustment(rgba :Vector4<f32>, face :Face) -> Vector4<f32> {
@@ -211,4 +216,10 @@ fn fake_lighting_adjustment(rgba :Vector4<f32>, face :Face) -> Vector4<f32> {
         _ => v * 0.0,
     };
     rgba + modifier
+}
+
+lazy_static! {
+    static ref END_OF_LINE: String = format!("{}{}\r\n",
+        color::Bg(color::Reset),
+        color::Fg(color::Reset));
 }
