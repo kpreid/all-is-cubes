@@ -10,7 +10,7 @@ publish = false # guard against accidents until things are stable
 console = ["rayon", "termion"]
 
 # Enables WebAssembly 
-wasm = ["console_error_panic_hook", "wasm-bindgen", "web-sys"]
+wasm = ["console_error_panic_hook", "js-sys", "wasm-bindgen", "web-sys"]
 
 [lib]
 # "cdylib" is for WebAssembly target
@@ -38,6 +38,7 @@ termion = { version = "1.5.5", optional = true }
 # WebAssembly-only dependencies
 console_error_panic_hook = { version = "0.1.5", optional = true }
 wasm-bindgen = { version = "0.2.67", optional = true }
+js-sys = { version = "0.3.44", optional = true }
 [dependencies.web-sys]
 version = "0.3.22"
 optional = true

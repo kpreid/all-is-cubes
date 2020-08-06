@@ -6,6 +6,7 @@ version = "0.1.0"
 dependencies = [
  "cgmath",
  "console_error_panic_hook",
+ "js-sys",
  "lazy_static",
  "num-traits",
  "rayon",
