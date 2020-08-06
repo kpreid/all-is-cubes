@@ -38,4 +38,7 @@ termion = { version = "1.5.5", optional = true }
 # WebAssembly-only dependencies
 console_error_panic_hook = { version = "0.1.5", optional = true }
 wasm-bindgen = { version = "0.2.67", optional = true }
-web-sys = { version = "0.3.22", optional = true, features = ["console"] }
+[dependencies.web-sys]
+version = "0.3.22"
+optional = true
+features = ["console", "Document", "Element", "HtmlElement", "Window"]
