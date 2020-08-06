@@ -5,14 +5,37 @@ authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
 publish = false # guard against accidents until things are stable
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+# Enables the aic-console binary which renders to ASCII-art by raytracing.
+console = ["rayon", "termion"]
+
+# Enables WebAssembly 
+wasm = ["console_error_panic_hook", "wasm-bindgen", "web-sys"]
+
+[lib]
+# "cdylib" is for WebAssembly target
+# "lib" is for running tests and aic-console
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "aic-console"
+required-features = ["console"]
 
 [profile.release]
+# TODO: review recommended options for wasm releases
 overflow-checks = true
 
 [dependencies]
+# Unconditional dependencies
 cgmath = "0.17.0"
 lazy_static = "1.4.0"
 num-traits = "0.2.12"
-rayon = "1.3.1"
-termion = "1.5.5"
+
+# Console-only dependencies
+rayon = { version = "1.3.1", optional = true }
+termion = { version = "1.5.5", optional = true }
+
+# WebAssembly-only dependencies
+console_error_panic_hook = { version = "0.1.5", optional = true }
+wasm-bindgen = { version = "0.2.67", optional = true }
+web-sys = { version = "0.3.22", optional = true, features = ["console"] }

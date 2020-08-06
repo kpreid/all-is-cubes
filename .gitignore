@@ -1,2 +1,7 @@
+# Rust (Cargo) build files
 /target
-Cargo.lock
+
+# JavaScript (NPM) build files
+node_modules
+/dist
+/pkg

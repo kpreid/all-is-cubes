@@ -6,8 +6,13 @@ extern crate lazy_static;
 
 // TODO: consider exporting individual symbols instead of the modules
 pub mod block;
-pub mod console;
 pub mod math;
 mod raycast;
 pub mod space;
 pub mod worldgen;
+
+#[cfg(feature = "console")]
+pub mod console;
+
+#[cfg(feature = "wasm")]
+pub mod wasmglue;
