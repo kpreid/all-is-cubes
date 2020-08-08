@@ -12,11 +12,13 @@ use luminance_derive::{Semantics, Vertex};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
 use luminance_front::render_state::RenderState;
-use luminance_front::shader::Program;
+use luminance_front::shader::{BuiltProgram, Program};
 use luminance_front::tess::Mode;
 use luminance_web_sys::{WebSysWebGL2Surface, WebSysWebGL2SurfaceError};
 use luminance_windowing::WindowOpt;
 use std::time::Duration;
+use wasm_bindgen::prelude::*;
+use web_sys::console;
 
 use crate::math::{FreeCoordinate, GridPoint};
 use crate::space::Space;
@@ -37,15 +39,17 @@ impl GLRenderer {
     pub fn new(canvas_id: &str) -> Result<Self, WebSysWebGL2SurfaceError> {
         let mut surface = WebSysWebGL2Surface::new(canvas_id, WindowOpt::default())?;
 
-        let block_program = surface
+        let BuiltProgram {program: block_program, warnings} = surface
             .new_shader_program::<VertexSemantics, (), ()>()
             .from_strings(
                 &(SHADER_COMMON.to_owned() + SHADER_VERTEX_COMMON + SHADER_VERTEX_BLOCK),
                 None,
                 None,
                 &(SHADER_COMMON.to_owned() + SHADER_FRAGMENT))
-            .unwrap()
-            .ignore_warnings();  // TODO
+            .expect("shader compilation failure");
+        for warning in warnings {
+            console::warn_1(&JsValue::from_str(&format!("GLSL warning: {:?}", warning)));
+        }
 
         Ok(Self {
             surface,
