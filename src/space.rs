@@ -166,7 +166,7 @@ pub struct Space {
 }
 
 /// Number used to compactly store blocks.
-type BlockIndex = u8;
+pub(crate) type BlockIndex = u8;
 
 impl Space {
     /// Constructs a `Space` that is entirely empty.
@@ -195,6 +195,11 @@ impl Space {
 
     pub fn grid(&self) -> &Grid {
         &self.grid
+    }
+
+    /// Returns the internal unstable numeric ID for the block at the given position.
+    pub(crate) fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
+        self.grid.index(position.into()).map(|contents_index| self.contents[contents_index])
     }
 
     /// Replace the block in this space at the given position.
@@ -251,6 +256,11 @@ impl Space {
             }
         }
         blocks
+    }
+
+    /// Returns all the blocks assigned IDs in the space.
+    pub(crate) fn distinct_blocks_unfiltered(&self) -> &Vec<Block> {
+        &self.index_to_block
     }
 
     /// Finds or assigns an index to denote the block.

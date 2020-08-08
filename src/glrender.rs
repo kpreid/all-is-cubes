@@ -7,7 +7,7 @@
 // how to write _actually_ generic luminance code.
 #![cfg(feature = "wasm")]
 
-use cgmath::{Point3, Vector3};
+use cgmath::Vector3;
 use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
@@ -137,41 +137,63 @@ pub struct Vertex {
     color: VertexRGBA,
 }
 
-fn polygonize_space(context :&mut WebSysWebGL2Surface, space: &Space) -> luminance_front::tess::Tess<Vertex> {
-    // TODO: take a Grid parameter for chunked rendering
+/// Precomputes vertices for blocks present in a space.
+///
+/// The resulting Vec is indexed by the `Space`'s internal unstable IDs.
+fn polygonize_blocks(space: &Space) -> Vec<Box<[Vertex]>> {
+    let mut results: Vec<Box<[Vertex]>> = Vec::new();
+    for block in space.distinct_blocks_unfiltered() {
+        let mut block_vertices: Vec<Vertex> = Vec::new();
 
-    let mut vertices :Vec<Vertex> = Vec::new();
-
-    for cube in space.grid().interior_iter() {
-        let low_corner = cube.cast::<f32>().unwrap();
-        let color = space[cube].color();
-
+        let color = block.color();
         // TODO: Port over pseudo-transparency mechanism, then change this to a
         // within-epsilon-of-zero test.
-        if !color.binary_opaque() {
-            continue;
+        if color.binary_opaque() {
+            let mut color_attribute = VertexRGBA::new(color.to_rgba_array());
+            color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
+
+            let mut push_1 = |p: Vector3<f32>| {
+                block_vertices.push(Vertex::new(VertexPosition::new(p.into()), color_attribute));
+            };
+
+            // Two-triangle quad.
+            // TODO: We can save CPU/memory/bandwidth by using a tesselation shader to generate
+            // all six vertices from just one, right?
+            push_1(Vector3::new(0.0, 0.0, 0.0));
+            push_1(Vector3::new(1.0, 0.0, 0.0));
+            push_1(Vector3::new(0.0, 1.0, 0.0));
+            push_1(Vector3::new(1.0, 0.0, 0.0));
+            push_1(Vector3::new(0.0, 1.0, 0.0));
+            push_1(Vector3::new(1.0, 1.0, 0.0));
         }
-        let mut color_attribute = VertexRGBA::new(color.to_rgba_array());
-        color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
 
-        let mut push_1 = |p: Point3<f32>| {
-            vertices.push(Vertex::new(VertexPosition::new(p.into()), color_attribute));
-        };
+        results.push(block_vertices.into_boxed_slice());
+    }
+    results
+}
 
-        // Two-triangle quad.
-        // TODO: We can save CPU and memory by using a tesselation shader to generate
-        // all six vertices from just one, right?
-        push_1(low_corner);
-        push_1(low_corner + Vector3::new(1.0, 0.0, 0.0));
-        push_1(low_corner + Vector3::new(0.0, 1.0, 0.0));
-        push_1(low_corner + Vector3::new(1.0, 0.0, 0.0));
-        push_1(low_corner + Vector3::new(0.0, 1.0, 0.0));
-        push_1(low_corner + Vector3::new(1.0, 1.0, 0.0));
+fn polygonize_space(context :&mut WebSysWebGL2Surface, space: &Space) -> luminance_front::tess::Tess<Vertex> {
+    // TODO: take a Grid parameter for chunked rendering
+    let block_precomputations = polygonize_blocks(&space);
+
+    let mut tess_vertices: Vec<Vertex> = Vec::new();
+    for cube in space.grid().interior_iter() {
+        let low_corner = cube.cast::<f32>().unwrap();
+        let index = space.get_block_index(cube).unwrap();
+        let precomputed = &block_precomputations[index as usize];
+        // Copy vertices, offset to the block position.
+        for vertex in precomputed.iter() {
+            let mut positioned_vertex: Vertex = *vertex;
+            positioned_vertex.position.repr[0] += low_corner.x;
+            positioned_vertex.position.repr[1] += low_corner.y;
+            positioned_vertex.position.repr[2] += low_corner.z;
+            tess_vertices.push(positioned_vertex);
+        }
     }
 
     context
         .new_tess()
-        .set_vertices(vertices)
+        .set_vertices(tess_vertices)
         .set_mode(Mode::Triangle)
         .build()
         .unwrap()  // TODO error handling
