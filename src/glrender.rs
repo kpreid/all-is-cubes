@@ -109,25 +109,9 @@ pub struct Vertex {
     #[allow(dead_code)]  // read by shader
     position: VertexPosition,
 
-    #[vertex(normalized = "true")]
     #[allow(dead_code)]  // read by shader
     color: VertexRGBA,
 }
-
-const TEST_VERTICES: [Vertex; 3] = [
-    Vertex::new(
-        VertexPosition::new([-0.5, -0.5, 0.0]),
-        VertexRGBA::new([0.0, 1.0, 0.0, 1.0]),
-    ),
-    Vertex::new(
-        VertexPosition::new([0.5, -0.5, 0.0]),
-        VertexRGBA::new([1.0, 0.0, 0.0, 1.0]),
-    ),
-    Vertex::new(
-        VertexPosition::new([0., 0.5, 0.0]),
-        VertexRGBA::new([0.0, 0.0, 1.0, 1.0])
-    ),
-];
 
 fn polygonize_space(context :&mut WebSysWebGL2Surface, space: &Space) -> luminance_front::tess::Tess<Vertex> {
     // TODO: take a Grid parameter for chunked rendering
@@ -145,8 +129,6 @@ fn polygonize_space(context :&mut WebSysWebGL2Surface, space: &Space) -> luminan
         push_1(free + Vector3::new(1.0, 0.0, 0.0));
         push_1(free + Vector3::new(0.0, 1.0, 0.0));
     }
-
-    vertices.extend(&TEST_VERTICES);
 
     context
         .new_tess()
