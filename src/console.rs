@@ -42,7 +42,7 @@ impl View {
         // Inverse of regular camera matrix because we are transforming screen space to
         // world space to raycast, instead of transforming vertices in world space to 
         // screen space.
-        self.camera.matrix().inverse_transform().unwrap()
+        self.camera.combined_matrix().inverse_transform().unwrap()
     }
 
     /// Processes events for moving a View. Returns all those events it does not process.

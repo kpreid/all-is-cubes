@@ -39,14 +39,20 @@ impl Camera {
         }
     }
 
-    pub fn matrix(&self) -> M {
-        // TODO: For performance, we ought to do the inverse to the projection once
+    pub fn projection(&self) -> M {
         self.projection
-            * Matrix4::from_angle_x(Deg(self.pitch))
+    }
+
+    pub fn view(&self) -> M {
+        Matrix4::from_angle_x(Deg(self.pitch))
             * Matrix4::from_angle_y(Deg(self.yaw))
             * Matrix4::from_translation(-(self.center.to_vec()))
     }
-    
+
+    pub fn combined_matrix(&self) -> M {
+        self.projection() * self.view()
+    }
+
     pub fn walk(&mut self, x: FreeCoordinate, z: FreeCoordinate) {
         let rotation :Basis2<FreeCoordinate> = Rotation2::from_angle(Deg(self.yaw));
         let dir = Vector2::new(x, z);

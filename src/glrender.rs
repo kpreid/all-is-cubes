@@ -74,12 +74,17 @@ impl GLRenderer {
             &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
             |_, mut shading_gate| {
                 shading_gate.shade(block_program, |mut shader_iface, u, mut render_gate| {
-                    let pm: [[f32; 4]; 4] = camera.matrix().cast::<f32>().unwrap().into();
+                    let pm: [[f32; 4]; 4] = camera.projection().cast::<f32>().unwrap().into();
                     shader_iface.set(&u.projection_matrix0, pm[0]);
                     shader_iface.set(&u.projection_matrix1, pm[1]);
                     shader_iface.set(&u.projection_matrix2, pm[2]);
                     shader_iface.set(&u.projection_matrix3, pm[3]);
-                    //shader_iface.set(&u.view_matrix, Matrix4::<f32>::identity().into());  // TODO split matrices
+
+                    let vm: [[f32; 4]; 4] = camera.view().cast::<f32>().unwrap().into();
+                    shader_iface.set(&u.view_matrix0, vm[0]);
+                    shader_iface.set(&u.view_matrix1, vm[1]);
+                    shader_iface.set(&u.view_matrix2, vm[2]);
+                    shader_iface.set(&u.view_matrix3, vm[3]);
 
                     render_gate.render(&RenderState::default(), |mut tess_gate| {
                          tess_gate.render(&triangle)
@@ -98,15 +103,17 @@ impl GLRenderer {
 
 #[derive(Debug, UniformInterface)]
 struct ShaderInterface {
-    // TODO: Passing the projection matrix as four vectors due to bug
+    // TODO: Passing matrices as four vectors due to bug
     //     https://github.com/phaazon/luminance-rs/issues/434
     #[uniform(unbound)] projection_matrix0: Uniform<[f32; 4]>,
     #[uniform(unbound)] projection_matrix1: Uniform<[f32; 4]>,
     #[uniform(unbound)] projection_matrix2: Uniform<[f32; 4]>,
     #[uniform(unbound)] projection_matrix3: Uniform<[f32; 4]>,
 
-    //  #[uniform(unbound)]
-    //  view_matrix: Uniform<[[f32; 4]; 4]>,
+    #[uniform(unbound)] view_matrix0: Uniform<[f32; 4]>,
+    #[uniform(unbound)] view_matrix1: Uniform<[f32; 4]>,
+    #[uniform(unbound)] view_matrix2: Uniform<[f32; 4]>,
+    #[uniform(unbound)] view_matrix3: Uniform<[f32; 4]>,
 }
 
 /// Defines vertex array structure for luminance framework.
