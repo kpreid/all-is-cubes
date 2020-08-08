@@ -3,8 +3,9 @@
 
 //! Mathematical utilities and decisions.
 
+use cgmath::{BaseFloat, BaseNum, EuclideanSpace, Matrix4, Point3, Vector3};
+use num_traits::identities::Zero;
 use std::ops::{Rem, Add};
-use cgmath::{BaseNum, EuclideanSpace, Point3, Vector3};
 
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = isize;
@@ -84,6 +85,54 @@ impl Face {
             Face::PY => GridVector::new(0, 1, 0),
             Face::PZ => GridVector::new(0, 0, 1),
             Face::WITHIN => GridVector::new(0, 0, 0),
+        }
+    }
+    
+    /// Returns a homogeneous transformation matrix which, if given points on the square
+    /// with x ∈ [0, 1], y ∈ [0, 1] and z = 0, converts them to points that lie on the
+    /// faces of the cube with x ∈ [0, 1], y ∈ [0, 1], and z ∈ [0, 1].
+    pub fn matrix<S: BaseFloat>(&self) -> Matrix4<S> {
+        match self {
+            Face::NX => Matrix4::new(
+                S::zero(), S::one(), S::zero(), S::zero(),
+                S::zero(), S::zero(), S::one(), S::zero(),
+                S::one(), S::zero(), S::zero(), S::zero(),
+                S::zero(), S::zero(), S::zero(), S::one(),
+            ),
+            Face::NY => Matrix4::new(
+                S::zero(), S::zero(), S::one(), S::zero(),
+                S::one(), S::zero(), S::zero(), S::zero(),
+                S::zero(), S::one(), S::zero(), S::zero(),
+                S::zero(), S::zero(), S::zero(), S::one(),
+            ),
+            Face::NZ => Matrix4::new(
+                // Z face leaves X and Y unchanged!
+                S::one(), S::zero(), S::zero(), S::zero(),
+                S::zero(), S::one(), S::zero(), S::zero(),
+                S::zero(), S::zero(), S::one(), S::zero(),
+                S::zero(), S::zero(), S::zero(), S::one(),
+            ),
+            // Positives are same as negatives but with translation.
+            // Note that this implies a handedness flip. TODO: Revisit.
+            Face::PX => Matrix4::new(
+                S::zero(), S::one(), S::zero(), S::zero(),
+                S::zero(), S::zero(), S::one(), S::zero(),
+                S::one(), S::zero(), S::zero(), S::zero(),
+                S::one(), S::zero(), S::zero(), S::one(),
+            ),
+            Face::PY => Matrix4::new(
+                S::zero(), S::zero(), S::one(), S::zero(),
+                S::one(), S::zero(), S::zero(), S::zero(),
+                S::zero(), S::one(), S::zero(), S::zero(),
+                S::zero(), S::one(), S::zero(), S::one(),
+            ),
+            Face::PZ => Matrix4::new(
+                S::one(), S::zero(), S::zero(), S::zero(),
+                S::zero(), S::one(), S::zero(), S::zero(),
+                S::zero(), S::zero(), S::one(), S::zero(),
+                S::zero(), S::zero(), S::one(), S::one(),
+            ),
+            Face::WITHIN => Matrix4::zero(),
         }
     }
 }

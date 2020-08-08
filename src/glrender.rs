@@ -7,7 +7,7 @@
 // how to write _actually_ generic luminance code.
 #![cfg(feature = "wasm")]
 
-use cgmath::Vector3;
+use cgmath::{Matrix4, Point3, Transform as _};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
@@ -21,6 +21,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use crate::camera::Camera;
+use crate::math::Face;
 use crate::space::Space;
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
@@ -141,6 +142,8 @@ pub struct Vertex {
 ///
 /// The resulting Vec is indexed by the `Space`'s internal unstable IDs.
 fn polygonize_blocks(space: &Space) -> Vec<Box<[Vertex]>> {
+    type S = f32;  // TODO have a sensible alias somewhere that agrees with others
+    
     let mut results: Vec<Box<[Vertex]>> = Vec::new();
     for block in space.distinct_blocks_unfiltered() {
         let mut block_vertices: Vec<Vertex> = Vec::new();
@@ -152,19 +155,27 @@ fn polygonize_blocks(space: &Space) -> Vec<Box<[Vertex]>> {
             let mut color_attribute = VertexRGBA::new(color.to_rgba_array());
             color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
 
-            let mut push_1 = |p: Vector3<f32>| {
-                block_vertices.push(Vertex::new(VertexPosition::new(p.into()), color_attribute));
+            let mut push_1 = |transform: Matrix4<S>, p: Point3<S>| {
+                block_vertices.push(Vertex {
+                    position: VertexPosition::new(transform.transform_point(p).into()),
+                    color: color_attribute
+                });
+            };
+            let mut push_square = |transform: Matrix4<S>| {
+                // Two-triangle quad.
+                // TODO: We can save CPU/memory/bandwidth by using a tessellation shader
+                // to generate all six vertices from just one, right?
+                push_1(transform, Point3::new(0.0, 0.0, 0.0));
+                push_1(transform, Point3::new(1.0, 0.0, 0.0));
+                push_1(transform, Point3::new(0.0, 1.0, 0.0));
+                push_1(transform, Point3::new(1.0, 0.0, 0.0));
+                push_1(transform, Point3::new(0.0, 1.0, 0.0));
+                push_1(transform, Point3::new(1.0, 1.0, 0.0));
             };
 
-            // Two-triangle quad.
-            // TODO: We can save CPU/memory/bandwidth by using a tesselation shader to generate
-            // all six vertices from just one, right?
-            push_1(Vector3::new(0.0, 0.0, 0.0));
-            push_1(Vector3::new(1.0, 0.0, 0.0));
-            push_1(Vector3::new(0.0, 1.0, 0.0));
-            push_1(Vector3::new(1.0, 0.0, 0.0));
-            push_1(Vector3::new(0.0, 1.0, 0.0));
-            push_1(Vector3::new(1.0, 1.0, 0.0));
+            for face in Face::all_six() {
+                push_square(face.matrix());
+            }
         }
 
         results.push(block_vertices.into_boxed_slice());
