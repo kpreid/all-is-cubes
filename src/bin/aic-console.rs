@@ -71,7 +71,7 @@ fn main() -> io::Result<()> {
         }
 
         if auto_rotate {
-            view.yaw += 5.0;
+            view.camera.yaw += 5.0;
         }
 
         draw_space(&space, &view, &mut out)?;

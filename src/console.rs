@@ -10,6 +10,7 @@ use termion;
 use termion::{color};
 use termion::event::{Event, Key};
 
+use crate::camera::Camera;
 use crate::math::{FreeCoordinate};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, Space};
@@ -19,72 +20,43 @@ type M = Matrix4<FreeCoordinate>;
 /// Describes a camera for an ascii-art view of 3D space.
 pub struct View {
     viewport: Vector2<u16>,
-    projection: M,
-    center: Point3<FreeCoordinate>,
-    pub yaw: FreeCoordinate,
-    pub pitch: FreeCoordinate,
+    pub camera: Camera,
 }
 
 impl View {
     /// Fits the given grid into the viewport.
     pub fn for_grid(viewport: Vector2<u16>, grid: &Grid) -> Self {
-        // TODO: ew, complicated and also wrongish (need euclidean distance to corner), but this is all prototype stuff anyway.
-        let grid_view_radius = *(grid.size()[..].into_iter().max().unwrap()) as FreeCoordinate * 0.8;
-
-        let character_aspect_ratio = 0.5;  // approximately half as wide as high
-
+        let character_aspect_ratio = 0.5;
         let viewport_aspect_ratio :FreeCoordinate =
             viewport.x as FreeCoordinate
             / viewport.y as FreeCoordinate
              * character_aspect_ratio;
 
-        View {
+        Self {
             viewport: viewport,
-            projection: Ortho {
-                left: -grid_view_radius * viewport_aspect_ratio,
-                right: grid_view_radius * viewport_aspect_ratio,
-                bottom: -grid_view_radius,
-                top: grid_view_radius,
-                // TODO: far & near should be longer...
-                far: grid_view_radius * 1.0,
-                near: -grid_view_radius * 1.0,
-            }.into(),
-            center: ((grid.lower_bounds() + grid.upper_bounds().to_vec()) / 2)
-                .map(|x| x as FreeCoordinate),
-            yaw: 0.0,
-            pitch: -15.0,
+            camera: Camera::for_grid(viewport_aspect_ratio, grid),
         }
     }
 
     fn matrix(&self) -> M {
-        // TODO: For performance, we ought to do the inverse to the projection once
-        (
-            self.projection
-            * Matrix4::from_angle_x(Deg(self.pitch))
-            * Matrix4::from_angle_y(Deg(self.yaw))
-            * Matrix4::from_translation(-(self.center.to_vec()))
-        ).inverse_transform().unwrap()
+        // Inverse of regular camera matrix because we are transforming screen space to
+        // world space to raycast, instead of transforming vertices in world space to 
+        // screen space.
+        self.camera.matrix().inverse_transform().unwrap()
     }
 
     /// Processes events for moving a View. Returns all those events it does not process.
     pub fn controller(&mut self, event: Event) -> Option<Event> {
-        let mut walk = |x: FreeCoordinate, z: FreeCoordinate| {
-            let rotation :Basis2<FreeCoordinate> = Rotation2::from_angle(Deg(self.yaw));
-            let dir = Vector2::new(x, z);
-            let dir = rotation.rotate_vector(dir);
-            self.center += Vector3::new(dir.x, 0.0, dir.y);
-        };
-
         match event {
             Event::Key(key) => match key {
-                Key::Char('w') | Key::Char('W') => { walk(0.0, -1.0); },
-                Key::Char('a') | Key::Char('A') => { walk(1.0, 0.0); },
-                Key::Char('s') | Key::Char('S') => { walk(0.0, 1.0); },
-                Key::Char('d') | Key::Char('D') => { walk(-1.0, 0.0); },
-                Key::Up => { self.pitch += 5.0; },
-                Key::Left => { self.yaw += 5.0; },
-                Key::Down => { self.pitch -= 5.0; },
-                Key::Right => { self.yaw -= 5.0; },
+                Key::Char('w') | Key::Char('W') => { self.camera.walk(0.0, -1.0); },
+                Key::Char('a') | Key::Char('A') => { self.camera.walk(1.0, 0.0); },
+                Key::Char('s') | Key::Char('S') => { self.camera.walk(0.0, 1.0); },
+                Key::Char('d') | Key::Char('D') => { self.camera.walk(-1.0, 0.0); },
+                Key::Up => { self.camera.pitch += 5.0; },
+                Key::Left => { self.camera.yaw += 5.0; },
+                Key::Down => { self.camera.pitch -= 5.0; },
+                Key::Right => { self.camera.yaw -= 5.0; },
                 _ => { return Some(event); },
             },
             _ => { return Some(event); },
