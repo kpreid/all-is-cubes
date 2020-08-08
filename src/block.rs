@@ -8,6 +8,7 @@ use std::borrow::Cow;
 /// Representation of colors of blocks.
 ///
 /// RGBA in nominal range 0 to 1, but out of range is permitted.
+/// Not using premultiplied alpha.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Color {
     value: Vector4<f32>,
@@ -20,11 +21,18 @@ impl Color {
 
     pub const TRANSPARENT :Color = Color::rgba(0.0, 0.0, 0.0, 0.0);
 
+    /// Renderers which can only consider a block to be opaque or not may use this value
+    /// as their decision.
+    pub fn binary_opaque(&self) -> bool {
+        return self.value.w > 0.5;
+    }
+
     pub fn to_rgba(&self) -> Vector4<f32> {
         self.value
     }
 
     /// Convenience for rendering.
+    #[allow(dead_code)]
     pub(crate) fn to_rgba_array(&self) -> [f32; 4] {
         self.value.into()
     }

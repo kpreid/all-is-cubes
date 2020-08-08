@@ -20,7 +20,6 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use crate::math::{FreeCoordinate, GridPoint};
 use crate::space::Space;
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
@@ -116,15 +115,30 @@ fn polygonize_space(context :&mut WebSysWebGL2Surface, space: &Space) -> luminan
     let mut vertices :Vec<Vertex> = Vec::new();
 
     for cube in space.grid().interior_iter() {
-        let free = cube.cast::<f32>().unwrap();
-        let color = VertexRGBA::new(space[cube].color().to_rgba_array());
+        let low_corner = cube.cast::<f32>().unwrap();
+        let color = space[cube].color();
+
+        // TODO: Port over pseudo-transparency mechanism, then change this to a
+        // within-epsilon-of-zero test.
+        if !color.binary_opaque() {
+            continue;
+        }
+        let mut color_attribute = VertexRGBA::new(color.to_rgba_array());
+        color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
+
         let mut push_1 = |p: Point3<f32>| {
-            vertices.push(Vertex::new(VertexPosition::new(p.into()), color));
+            vertices.push(Vertex::new(VertexPosition::new(p.into()), color_attribute));
         };
 
-        push_1(free);
-        push_1(free + Vector3::new(1.0, 0.0, 0.0));
-        push_1(free + Vector3::new(0.0, 1.0, 0.0));
+        // Two-triangle quad.
+        // TODO: We can save CPU and memory by using a tesselation shader to generate
+        // all six vertices from just one, right?
+        push_1(low_corner);
+        push_1(low_corner + Vector3::new(1.0, 0.0, 0.0));
+        push_1(low_corner + Vector3::new(0.0, 1.0, 0.0));
+        push_1(low_corner + Vector3::new(1.0, 0.0, 0.0));
+        push_1(low_corner + Vector3::new(0.0, 1.0, 0.0));
+        push_1(low_corner + Vector3::new(1.0, 1.0, 0.0));
     }
 
     context
