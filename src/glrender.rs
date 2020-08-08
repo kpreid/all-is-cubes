@@ -7,12 +7,12 @@
 // how to write _actually_ generic luminance code.
 #![cfg(feature = "wasm")]
 
-use cgmath::{Point3, Vector3};
-use luminance_derive::{Semantics, Vertex};
+use cgmath::{Matrix4, Point3, SquareMatrix as _, Vector3};
+use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
 use luminance_front::render_state::RenderState;
-use luminance_front::shader::{BuiltProgram, Program};
+use luminance_front::shader::{BuiltProgram, Program, Uniform};
 use luminance_front::tess::Mode;
 use luminance_web_sys::{WebSysWebGL2Surface, WebSysWebGL2SurfaceError};
 use luminance_windowing::WindowOpt;
@@ -20,6 +20,7 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
+use crate::camera::Camera;
 use crate::space::Space;
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
@@ -29,7 +30,7 @@ const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 
 pub(crate) struct GLRenderer {
     surface: WebSysWebGL2Surface,
-    block_program: Program<VertexSemantics, (), ()>,
+    block_program: Program<VertexSemantics, (), ShaderInterface>,
     fake_time: Duration,
 }
 
@@ -39,7 +40,7 @@ impl GLRenderer {
         let mut surface = WebSysWebGL2Surface::new(canvas_id, WindowOpt::default())?;
 
         let BuiltProgram {program: block_program, warnings} = surface
-            .new_shader_program::<VertexSemantics, (), ()>()
+            .new_shader_program::<VertexSemantics, (), ShaderInterface>()
             .from_strings(
                 &(SHADER_COMMON.to_owned() + SHADER_VERTEX_COMMON + SHADER_VERTEX_BLOCK),
                 None,
@@ -57,7 +58,7 @@ impl GLRenderer {
         })
     }
 
-    pub fn render_frame(&mut self, space: &Space) {
+    pub fn render_frame(&mut self, space: &Space, camera: &Camera) {
         let mut surface = &mut self.surface;
         let block_program = &mut self.block_program;
 
@@ -72,7 +73,14 @@ impl GLRenderer {
             // TODO: port skybox cube map code
             &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
             |_, mut shading_gate| {
-                shading_gate.shade(block_program, |_, _, mut render_gate| {
+                shading_gate.shade(block_program, |mut shader_iface, u, mut render_gate| {
+                    let pm: [[f32; 4]; 4] = camera.matrix().cast::<f32>().unwrap().into();
+                    shader_iface.set(&u.projection_matrix0, pm[0]);
+                    shader_iface.set(&u.projection_matrix1, pm[1]);
+                    shader_iface.set(&u.projection_matrix2, pm[2]);
+                    shader_iface.set(&u.projection_matrix3, pm[3]);
+                    //shader_iface.set(&u.view_matrix, Matrix4::<f32>::identity().into());  // TODO split matrices
+
                     render_gate.render(&RenderState::default(), |mut tess_gate| {
                          tess_gate.render(&triangle)
                     })
@@ -86,6 +94,19 @@ impl GLRenderer {
 
         // There is no swap_buffers operation because WebGL implicitly does so.
     }
+}
+
+#[derive(Debug, UniformInterface)]
+struct ShaderInterface {
+    // TODO: Passing the projection matrix as four vectors due to bug
+    //     https://github.com/phaazon/luminance-rs/issues/434
+    #[uniform(unbound)] projection_matrix0: Uniform<[f32; 4]>,
+    #[uniform(unbound)] projection_matrix1: Uniform<[f32; 4]>,
+    #[uniform(unbound)] projection_matrix2: Uniform<[f32; 4]>,
+    #[uniform(unbound)] projection_matrix3: Uniform<[f32; 4]>,
+
+    //  #[uniform(unbound)]
+    //  view_matrix: Uniform<[[f32; 4]; 4]>,
 }
 
 /// Defines vertex array structure for luminance framework.

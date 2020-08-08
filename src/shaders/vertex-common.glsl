@@ -1,6 +1,4 @@
 void basicVertex(highp vec3 vertex_position) {
-  // Temporary placeholder, to be replaced with actual matrices
-  vertex_position /= 30.0;
-
-  gl_Position = vec4(vertex_position, 1.0);
+  highp mat4 projection_matrix = mat4(projection_matrix0, projection_matrix1, projection_matrix2, projection_matrix3);
+  gl_Position = projection_matrix * /* view_matrix * */ vec4(vertex_position, 1.0);
 }

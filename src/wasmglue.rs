@@ -8,6 +8,7 @@ use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
 use web_sys::{Document, HtmlCanvasElement, HtmlElement, console};
 
+use crate::camera::Camera;
 use crate::glrender::GLRenderer;
 use crate::space::{Grid, Space};
 use crate::worldgen::{axes, plain_color_blocks, wavy_landscape};
@@ -56,6 +57,7 @@ pub fn start_game() -> Result<(), JsValue> {
 struct WebGameRoot {
     static_dom: StaticDom,
     space: Space,
+    camera: Camera,
     renderer: GLRenderer,
     raf_callback: Closure<dyn FnMut()>,
     /// In order to be able to set up callbacks to ourselves, we need to live in a mutable
@@ -69,11 +71,15 @@ struct WebGameRoot {
 
 impl WebGameRoot {
     pub fn new(static_dom: StaticDom, space: Space, renderer: GLRenderer) -> Rc<RefCell<WebGameRoot>> {
+        let aspect_ratio = static_dom.view_canvas.width() as f64 / static_dom.view_canvas.height() as f64;
+        let mut camera = Camera::for_grid(aspect_ratio, space.grid());
+
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {
             static_dom,
-            renderer,
             space,
+            camera,
+            renderer,
             raf_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
             self_ref: Weak::new(),
         }));
@@ -98,7 +104,8 @@ impl WebGameRoot {
     }
     
     fn raf_callback_impl(&mut self) {
-        self.renderer.render_frame(&self.space);
+        self.camera.yaw += 1.0;
+        self.renderer.render_frame(&self.space, &self.camera);
         self.start_loop();
     }
 }
