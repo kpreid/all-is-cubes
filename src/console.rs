@@ -3,7 +3,7 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::{Basis2, Deg, EuclideanSpace, Matrix4, Ortho, Point3, Rotation, Rotation2, Transform, Vector2, Vector3, Vector4};
+use cgmath::{Matrix4, Point3, Transform, Vector2, Vector4};
 use rayon::iter::{ParallelIterator, IntoParallelIterator};
 use std::io;
 use termion;

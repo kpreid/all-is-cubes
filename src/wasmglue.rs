@@ -72,7 +72,7 @@ struct WebGameRoot {
 impl WebGameRoot {
     pub fn new(static_dom: StaticDom, space: Space, renderer: GLRenderer) -> Rc<RefCell<WebGameRoot>> {
         let aspect_ratio = static_dom.view_canvas.width() as f64 / static_dom.view_canvas.height() as f64;
-        let mut camera = Camera::for_grid(aspect_ratio, space.grid());
+        let camera = Camera::for_grid(aspect_ratio, space.grid());
 
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {

@@ -7,7 +7,7 @@
 // how to write _actually_ generic luminance code.
 #![cfg(feature = "wasm")]
 
-use cgmath::{Matrix4, Point3, SquareMatrix as _, Vector3};
+use cgmath::{Point3, Vector3};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
