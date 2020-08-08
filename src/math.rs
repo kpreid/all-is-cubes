@@ -5,7 +5,7 @@
 
 use cgmath::{BaseFloat, BaseNum, EuclideanSpace, Matrix4, Point3, Vector3};
 use num_traits::identities::Zero;
-use std::ops::{Rem, Add};
+use std::ops::{Add, Index, IndexMut, Rem};
 
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = isize;
@@ -18,7 +18,7 @@ pub type FreeCoordinate = f64;
 
 pub trait Modulo<M = Self> {
     type Output;
-    
+
     fn modulo(self, modulus :M) -> Self::Output;
 }
 
@@ -56,6 +56,9 @@ fn modulo_impl<
 
 /// Identifies a face of a cube or an orthogonal unit vector, except for `WITHIN` meaning
 /// "zero distance and undefined direction".
+///
+/// So far, nearly every usage of Face has a use for `WITHIN`, but we should keep an eye
+/// out for uses of the 'true' 6-face version.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Face {
     NX, NY, NZ, PX, PY, PZ, WITHIN
@@ -65,7 +68,7 @@ impl Face {
     pub fn all_six() -> &'static [Face; 6] {
         return &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
     }
-    
+
     pub fn axis_number(&self) -> usize {
         match self {
             Face::NX | Face::PX => 0,
@@ -74,7 +77,20 @@ impl Face {
             Face::WITHIN => panic!("WITHIN has no axis number"),
         }
     }
-    
+
+    /// Returns the opposite face (maps `PX` to `NX` and so on).
+    pub fn opposite(&self) -> Face {
+        match self {
+            Face::NX => Face::PX,
+            Face::NY => Face::PY,
+            Face::NZ => Face::PZ,
+            Face::PX => Face::NX,
+            Face::PY => Face::NY,
+            Face::PZ => Face::NZ,
+            Face::WITHIN => Face::WITHIN,
+        }
+    }
+
     /// Returns the vector normal to this face. `WITHIN` is assigned the zero vector.
     pub fn normal_vector(&self) -> GridVector {
         match self {
@@ -87,7 +103,7 @@ impl Face {
             Face::WITHIN => GridVector::new(0, 0, 0),
         }
     }
-    
+
     /// Returns a homogeneous transformation matrix which, if given points on the square
     /// with x ∈ [0, 1], y ∈ [0, 1] and z = 0, converts them to points that lie on the
     /// faces of the cube with x ∈ [0, 1], y ∈ [0, 1], and z ∈ [0, 1].
@@ -137,6 +153,60 @@ impl Face {
     }
 }
 
+pub struct FaceMap<V> {
+    pub nx: V,
+    pub ny: V,
+    pub nz: V,
+    pub px: V,
+    pub py: V,
+    pub pz: V,
+    pub within: V,
+}
+
+impl<V> FaceMap<V> {
+    // TODO: tests and docs
+    pub fn generate(f: impl Fn(Face) -> V) -> Self {
+        Self {
+            nx: f(Face::NX),
+            ny: f(Face::NY),
+            nz: f(Face::NZ),
+            px: f(Face::PX),
+            py: f(Face::PY),
+            pz: f(Face::PZ),
+            within: f(Face::WITHIN),
+        }
+    }
+}
+
+impl<V> Index<Face> for FaceMap<V> {
+    type Output = V;
+    fn index(&self, face: Face) -> &V {
+        match face {
+            Face::NX => &self.nx,
+            Face::NY => &self.ny,
+            Face::NZ => &self.nz,
+            Face::PX => &self.px,
+            Face::PY => &self.py,
+            Face::PZ => &self.pz,
+            Face::WITHIN => &self.within,
+        }
+    }
+}
+
+impl<V> IndexMut<Face> for FaceMap<V> {
+    fn index_mut(&mut self, face: Face) -> &mut V {
+        match face {
+            Face::NX => &mut self.nx,
+            Face::NY => &mut self.ny,
+            Face::NZ => &mut self.nz,
+            Face::PX => &mut self.px,
+            Face::PY => &mut self.py,
+            Face::PZ => &mut self.pz,
+            Face::WITHIN => &mut self.within,
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -146,13 +216,13 @@ mod tests {
     // Tests for modulo, which is not currently a public function so can't have doc tests.
 
     #[test]
-    fn modulo_positive() { 
+    fn modulo_positive() {
         assert_eq!(0.0.modulo(1.0), 0.0);
         assert_eq!(0.25.modulo(1.0), 0.25);
         assert_eq!(1.0.modulo(1.0), 0.0);
         assert_eq!(1.25.modulo(1.0), 0.25);
         assert_eq!(6.25.modulo(1.0), 0.25);
-        
+
         assert_eq!(0.0.modulo(1.5), 0.0);
         assert_eq!(1.0.modulo(1.5), 1.0);
         assert_eq!(1.5.modulo(1.5), 0.0);
@@ -160,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn modulo_negative_value() { 
+    fn modulo_negative_value() {
         assert_eq!((-0.0).modulo(1.0), 0.0);
         assert_eq!((-0.25).modulo(1.0), 0.75);
         assert_eq!((-1.0).modulo(1.0), 0.0);
@@ -169,14 +239,14 @@ mod tests {
     }
 
     #[test]
-    fn modulo_negative_modulus() { 
+    fn modulo_negative_modulus() {
         assert_eq!(0.0.modulo(-1.0), -0.0);
         assert_eq!(0.25.modulo(-1.0), -0.75);
         assert_eq!(1.0.modulo(-1.0), -0.0);
         assert_eq!(1.25.modulo(-1.0), -0.75);
         assert_eq!(6.25.modulo(-1.0), -0.75);
     }
-    
+
     #[test]
     fn modulo_of_vector() {
         assert_eq!(

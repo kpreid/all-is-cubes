@@ -7,7 +7,7 @@
 // how to write _actually_ generic luminance code.
 #![cfg(feature = "wasm")]
 
-use cgmath::{Matrix4, Point3, Transform as _};
+use cgmath::{Point3, Transform as _};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
@@ -21,7 +21,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use crate::camera::Camera;
-use crate::math::Face;
+use crate::math::{Face, FaceMap};
 use crate::space::Space;
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
@@ -129,7 +129,7 @@ pub enum VertexSemantics {
     Color,
 }
 
-#[derive(Clone, Copy, Vertex)]
+#[derive(Clone, Copy, Debug, Vertex)]
 #[vertex(sem = "VertexSemantics")]
 struct Vertex {
     #[allow(dead_code)]  // read by shader
@@ -139,47 +139,75 @@ struct Vertex {
     color: VertexRGBA,
 }
 
+// Describes how to draw one `Face` of a `Block`.
+#[derive(Debug)]
+struct FaceRenderData {
+    vertices: Box<[Vertex]>,
+    fully_opaque: bool,
+}
+
+impl Default for FaceRenderData {
+    fn default() -> Self {
+        FaceRenderData {
+            vertices: Box::new([]),
+            fully_opaque: false,
+        }
+    }
+}
+
+lazy_static! {
+    static ref EMPTY_BLOCK_RENDER_DATA: FaceMap<FaceRenderData> =
+        FaceMap::generate(|_| FaceRenderData::default());
+}
+
 /// Precomputes vertices for blocks present in a space.
 ///
 /// The resulting Vec is indexed by the `Space`'s internal unstable IDs.
-fn polygonize_blocks(space: &Space) -> Vec<Box<[Vertex]>> {
+fn polygonize_blocks(space: &Space) -> Vec<FaceMap<FaceRenderData>> {
     type S = f32;  // TODO have a sensible alias somewhere that agrees with others
     
-    let mut results: Vec<Box<[Vertex]>> = Vec::new();
+    let mut results: Vec<FaceMap<FaceRenderData>> = Vec::new();
     for block in space.distinct_blocks_unfiltered() {
-        let mut block_vertices: Vec<Vertex> = Vec::new();
+        results.push(FaceMap::generate(|face| {
+            if face == Face::WITHIN {
+                // Until we have blocks with interior detail, nothing to do here.
+                return FaceRenderData::default();
+            }
+            
+            let mut face_vertices: Vec<Vertex> = Vec::new();
+            let transform = face.matrix();
+            let color = block.color();
+            let fully_opaque = color.binary_opaque();
 
-        let color = block.color();
-        // TODO: Port over pseudo-transparency mechanism, then change this to a
-        // within-epsilon-of-zero test.
-        if color.binary_opaque() {
-            let mut color_attribute = VertexRGBA::new(color.to_rgba_array());
-            color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
+            // TODO: Port over pseudo-transparency mechanism, then change this to a
+            // within-epsilon-of-zero test.
+            if fully_opaque {
+                let mut color_attribute = VertexRGBA::new(color.to_rgba_array());
+                color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
 
-            let mut push_1 = |transform: Matrix4<S>, p: Point3<S>| {
-                block_vertices.push(Vertex {
-                    position: VertexPosition::new(transform.transform_point(p).into()),
-                    color: color_attribute
-                });
-            };
-            let mut push_square = |transform: Matrix4<S>| {
+                let mut push_1 = |p: Point3<S>| {
+                    face_vertices.push(Vertex {
+                        position: VertexPosition::new(transform.transform_point(p).into()),
+                        color: color_attribute
+                    });
+                };
+
                 // Two-triangle quad.
                 // TODO: We can save CPU/memory/bandwidth by using a tessellation shader
                 // to generate all six vertices from just one, right?
-                push_1(transform, Point3::new(0.0, 0.0, 0.0));
-                push_1(transform, Point3::new(1.0, 0.0, 0.0));
-                push_1(transform, Point3::new(0.0, 1.0, 0.0));
-                push_1(transform, Point3::new(1.0, 0.0, 0.0));
-                push_1(transform, Point3::new(0.0, 1.0, 0.0));
-                push_1(transform, Point3::new(1.0, 1.0, 0.0));
-            };
-
-            for face in Face::all_six() {
-                push_square(face.matrix());
+                push_1(Point3::new(0.0, 0.0, 0.0));
+                push_1(Point3::new(1.0, 0.0, 0.0));
+                push_1(Point3::new(0.0, 1.0, 0.0));
+                push_1(Point3::new(1.0, 0.0, 0.0));
+                push_1(Point3::new(0.0, 1.0, 0.0));
+                push_1(Point3::new(1.0, 1.0, 0.0));
             }
-        }
 
-        results.push(block_vertices.into_boxed_slice());
+            FaceRenderData {
+                vertices: face_vertices.into_boxed_slice(),
+                fully_opaque: fully_opaque,
+            }
+        }));
     }
     results
 }
@@ -187,19 +215,33 @@ fn polygonize_blocks(space: &Space) -> Vec<Box<[Vertex]>> {
 fn polygonize_space(context :&mut WebSysWebGL2Surface, space: &Space) -> luminance_front::tess::Tess<Vertex> {
     // TODO: take a Grid parameter for chunked rendering
     let block_precomputations = polygonize_blocks(&space);
+    let lookup = |cube| {
+        match space.get_block_index(cube) {
+            Some(index) => &block_precomputations[index as usize],
+            None => &*EMPTY_BLOCK_RENDER_DATA,
+        }
+    };
 
     let mut tess_vertices: Vec<Vertex> = Vec::new();
     for cube in space.grid().interior_iter() {
+        let precomputed = lookup(cube);
         let low_corner = cube.cast::<f32>().unwrap();
-        let index = space.get_block_index(cube).unwrap();
-        let precomputed = &block_precomputations[index as usize];
-        // Copy vertices, offset to the block position.
-        for vertex in precomputed.iter() {
-            let mut positioned_vertex: Vertex = *vertex;
-            positioned_vertex.position.repr[0] += low_corner.x;
-            positioned_vertex.position.repr[1] += low_corner.y;
-            positioned_vertex.position.repr[2] += low_corner.z;
-            tess_vertices.push(positioned_vertex);
+        // TODO: Tidy this up by implementing an Iterator for FaceMap.
+        for &face in Face::all_six() {
+            if lookup(cube + face.normal_vector())[face.opposite()].fully_opaque {
+                // Don't draw obscured faces
+                continue;
+            }
+
+            let face_vertices = &precomputed[face].vertices;
+            // Copy vertices, offset to the block position.
+            for vertex in face_vertices.into_iter() {
+                let mut positioned_vertex: Vertex = *vertex;
+                positioned_vertex.position.repr[0] += low_corner.x;
+                positioned_vertex.position.repr[1] += low_corner.y;
+                positioned_vertex.position.repr[2] += low_corner.z;
+                tess_vertices.push(positioned_vertex);
+            }
         }
     }
 

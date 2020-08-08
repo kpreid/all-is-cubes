@@ -198,6 +198,7 @@ impl Space {
     }
 
     /// Returns the internal unstable numeric ID for the block at the given position.
+    #[allow(dead_code)]  // Used only in GL renderer
     pub(crate) fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
         self.grid.index(position.into()).map(|contents_index| self.contents[contents_index])
     }
@@ -259,6 +260,7 @@ impl Space {
     }
 
     /// Returns all the blocks assigned IDs in the space.
+    #[allow(dead_code)]  // Used only in GL renderer
     pub(crate) fn distinct_blocks_unfiltered(&self) -> &Vec<Block> {
         &self.index_to_block
     }
