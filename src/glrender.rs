@@ -68,13 +68,10 @@ impl GLRenderer {
 
         let triangle = polygonize_space(&mut surface, &space);
 
-        // sample code from https://rust-tutorials.github.io/learn-luminance/chapter_1_3.html
-        let t = self.fake_time.as_millis() as f32 * 1e-3;
-        let color = [t.cos(), t.sin(), 0.5, 1.];
-
         let render = surface.new_pipeline_gate().pipeline(
             &back_buffer,
-            &PipelineState::default().set_clear_color(color),
+            // TODO: port skybox cube map code
+            &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
             |_, mut shading_gate| {
                 shading_gate.shade(block_program, |_, _, mut render_gate| {
                     render_gate.render(&RenderState::default(), |mut tess_gate| {
