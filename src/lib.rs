@@ -7,6 +7,7 @@ extern crate lazy_static;
 // TODO: consider exporting individual symbols instead of the modules
 pub mod block;
 mod camera;
+mod glrender;
 pub mod math;
 mod raycast;
 pub mod space;

@@ -23,6 +23,11 @@ impl Color {
     pub fn to_rgba(&self) -> Vector4<f32> {
         self.value
     }
+
+    /// Convenience for rendering.
+    pub(crate) fn to_rgba_array(&self) -> [f32; 4] {
+        self.value.into()
+    }
 }
 
 impl std::convert::From<Vector4<f32>> for Color {

@@ -3,6 +3,7 @@
 
 //! That which contains many blocks.
 
+use itertools::Itertools as _;
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -96,6 +97,30 @@ impl Grid {
     pub fn z_range(&self) -> Range<GridCoordinate> {
         return self.axis_range(2);
     }
+    
+    /// Iterate over all cubes.
+    ///
+    /// ```
+    /// use all_is_cubes::math::GridPoint;
+    /// use all_is_cubes::space::Grid;
+    /// let grid = Grid::new((10, 20, 30), (1, 2, 3));
+    /// assert_eq!(
+    ///     grid.interior_iter().collect::<Vec<GridPoint>>(),
+    ///     &[
+    ///         GridPoint::new(10, 20, 30),
+    ///         GridPoint::new(10, 20, 31),
+    ///         GridPoint::new(10, 20, 32),
+    ///         GridPoint::new(10, 21, 30),
+    ///         GridPoint::new(10, 21, 31),
+    ///         GridPoint::new(10, 21, 32),
+    ///     ])
+    /// ```
+    pub fn interior_iter(&self) -> impl Iterator<Item = GridPoint> {
+        return self.x_range()
+            .cartesian_product(self.y_range())
+            .cartesian_product(self.z_range())
+            .map(|((x, y), z)| GridPoint::new(x, y, z))
+    }
 
     // TODO: decide if this should be public
     fn axis_range(&self, axis: usize) -> Range<GridCoordinate> {
@@ -106,7 +131,7 @@ impl Grid {
     /// volume.
     ///
     /// ```
-    /// use all_is_cubes::space::*;
+    /// use all_is_cubes::space::Grid;
     /// let grid = Grid::new((4, 4, 4), (6, 6, 6));
     /// assert!(!grid.contains_cube((3, 5, 5)));
     /// assert!(grid.contains_cube((4, 5, 5)));
