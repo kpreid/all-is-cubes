@@ -4,7 +4,7 @@
 use js_sys::{Error};
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
-use web_sys::{Document, HtmlElement, console};
+use web_sys::{Document, Element, console};
 
 /// Runs on module load. Does only key Rust environment initialization things;
 /// application logic is separately called from JS.
@@ -25,9 +25,11 @@ pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -
         .map_err(|_| Error::new(&format!("element {:?} was not a {:?}", id, std::any::type_name::<E>())))
 }
 
-/// Equivalent of JS `element.innerText += text`.
+/// Equivalent of JS `element.textContent += text`.
 /// Note that this is a read-modify-write and as such is not efficient for long text.
-pub fn append_inner_text<'a>(element: &HtmlElement, text: impl Into<&'a str>) {
+pub fn append_text_content<'a>(element: &Element, text: impl Into<&'a str>) {
     let text = text.into();
-    element.set_inner_text(&(element.inner_text() + text));
+    // text_content is an Option<String> but always present for Element
+    let existing = element.text_content().unwrap();
+    element.set_text_content(Some((existing + text).as_str()));
 }

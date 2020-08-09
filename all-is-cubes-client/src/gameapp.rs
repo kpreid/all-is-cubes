@@ -13,7 +13,7 @@ use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::worldgen::{axes, plain_color_blocks, wavy_landscape};
 
 use crate::glrender::GLRenderer;
-use crate::web_glue::{append_inner_text, get_mandatory_element};
+use crate::web_glue::{append_text_content, get_mandatory_element};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
@@ -23,7 +23,7 @@ pub fn start_game() -> Result<(), JsValue> {
 
     let static_dom = StaticDom::new(&document)?;
 
-    append_inner_text(&static_dom.scene_info_text, "\nRusting...");
+    append_text_content(&static_dom.scene_info_text, "\nRusting...");
 
     let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));
     let blocks = plain_color_blocks();
@@ -33,7 +33,7 @@ pub fn start_game() -> Result<(), JsValue> {
     let renderer = GLRenderer::new(&static_dom.view_canvas.id())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
-    append_inner_text(&static_dom.scene_info_text, "\nGL ready.");
+    append_text_content(&static_dom.scene_info_text, "\nGL ready.");
 
     let root = WebGameRoot::new(static_dom, space, renderer);
 
