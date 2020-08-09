@@ -32,7 +32,7 @@ impl Color {
     }
 
     /// Convenience for rendering.
-    #[allow(dead_code)]
+    #[allow(dead_code)]  // Used only in GL renderer
     pub(crate) fn to_rgba_array(&self) -> [f32; 4] {
         self.value.into()
     }
