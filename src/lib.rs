@@ -11,6 +11,7 @@ mod glrender;
 pub mod math;
 mod raycast;
 pub mod space;
+mod triangulator;
 pub mod worldgen;
 
 #[cfg(feature = "console")]
