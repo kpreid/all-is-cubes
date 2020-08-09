@@ -24,6 +24,7 @@ pub trait BlockVertex: Clone + Sized {
 /// Describes how to draw one `Face` of a `Block`.
 #[derive(Clone, Debug)]
 struct FaceRenderData<V: BlockVertex> {
+    /// Vertices of triangles (i.e. length is a multiple of 3) in counterclockwise order.
     vertices: Box<[V]>,
     fully_opaque: bool,
 }
@@ -77,11 +78,15 @@ fn triangulate_block<V: BlockVertex>(block :&Block) -> BlockRenderData<V> {
             };
 
             // Two-triangle quad.
+            // Note that looked at from a X-right Y-up view, these triangles are
+            // clockwise, but they're properly counterclockwise from the perspective
+            // that we're drawing the face _facing towards negative Z_ (into the screen).
+            //
             // TODO: We can save CPU/memory/bandwidth by using a tessellation shader
             // to generate all six vertices from just one, right?
             push_1(Point3::new(0.0, 0.0, 0.0));
-            push_1(Point3::new(1.0, 0.0, 0.0));
             push_1(Point3::new(0.0, 1.0, 0.0));
+            push_1(Point3::new(1.0, 0.0, 0.0));
             push_1(Point3::new(1.0, 0.0, 0.0));
             push_1(Point3::new(0.0, 1.0, 0.0));
             push_1(Point3::new(1.0, 1.0, 0.0));
@@ -184,7 +189,7 @@ mod tests {
 
         let rendering :Vec<TestVertex> = triangulate_space(&space, &triangulate_blocks(&space));
         assert_eq!(
-            Vec::<&TestVertex>::new(), 
+            Vec::<&TestVertex>::new(),
             rendering.iter()
                 .filter(|vertex|
                         vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)

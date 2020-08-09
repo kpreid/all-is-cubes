@@ -9,6 +9,7 @@
 
 use cgmath::{Vector3};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
+use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
 use luminance_front::render_state::RenderState;
@@ -75,7 +76,10 @@ impl GLRenderer {
 
         let back_buffer = surface.back_buffer().unwrap();  // TODO error handling
 
-        let triangle = tess_space(&mut surface, &space, block_render_data);
+        let tess = tess_space(&mut surface, &space, block_render_data);
+
+        let render_state = RenderState::default()
+            .set_face_culling(FaceCulling{order: FaceCullingOrder::CCW, mode: FaceCullingMode::Back});
 
         let render = surface.new_pipeline_gate().pipeline(
             &back_buffer,
@@ -95,8 +99,8 @@ impl GLRenderer {
                     shader_iface.set(&u.view_matrix2, vm[2]);
                     shader_iface.set(&u.view_matrix3, vm[3]);
 
-                    render_gate.render(&RenderState::default(), |mut tess_gate| {
-                         tess_gate.render(&triangle)
+                    render_gate.render(&render_state, |mut tess_gate| {
+                         tess_gate.render(&tess)
                     })
                 })
             },
@@ -157,7 +161,7 @@ impl BlockVertex for Vertex {
             color: color_attribute
         }
     }
-    
+
     fn translate(&mut self, offset: Vector3<FreeCoordinate>) {
         self.position.repr[0] += offset.x as f32;
         self.position.repr[1] += offset.y as f32;

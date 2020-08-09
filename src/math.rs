@@ -107,6 +107,10 @@ impl Face {
     /// Returns a homogeneous transformation matrix which, if given points on the square
     /// with x ∈ [0, 1], y ∈ [0, 1] and z = 0, converts them to points that lie on the
     /// faces of the cube with x ∈ [0, 1], y ∈ [0, 1], and z ∈ [0, 1].
+    ///
+    /// Specifically, `Face::NZ.matrix()` is the identity matrix and all others are
+    /// consistent with that. Note that there are arbitrary choices in the rotation
+    /// of all other faces. (TODO: Document those choices and test them.)
     pub fn matrix<S: BaseFloat>(&self) -> Matrix4<S> {
         match self {
             Face::NX => Matrix4::new(
@@ -128,25 +132,27 @@ impl Face {
                 S::zero(), S::zero(), S::one(), S::zero(),
                 S::zero(), S::zero(), S::zero(), S::one(),
             ),
-            // Positives are same as negatives but with translation.
-            // Note that this implies a handedness flip. TODO: Revisit.
+            // Positives are same as negatives but with translation and an arbitrary choice of rotation.
+            // PX rotates about Y.
             Face::PX => Matrix4::new(
-                S::zero(), S::one(), S::zero(), S::zero(),
+                S::zero(), -S::one(), S::zero(), S::zero(),
                 S::zero(), S::zero(), S::one(), S::zero(),
-                S::one(), S::zero(), S::zero(), S::zero(),
-                S::one(), S::zero(), S::zero(), S::one(),
+                -S::one(), S::zero(), S::zero(), S::zero(),
+                S::one(), S::one(), S::zero(), S::one(),
             ),
+            // PY rotates about X.
             Face::PY => Matrix4::new(
                 S::zero(), S::zero(), S::one(), S::zero(),
-                S::one(), S::zero(), S::zero(), S::zero(),
-                S::zero(), S::one(), S::zero(), S::zero(),
-                S::zero(), S::one(), S::zero(), S::one(),
+                -S::one(), S::zero(), S::zero(), S::zero(),
+                S::zero(), -S::one(), S::zero(), S::zero(),
+                S::one(), S::one(), S::zero(), S::one(),
             ),
+            // PZ rotates about Y.
             Face::PZ => Matrix4::new(
                 S::one(), S::zero(), S::zero(), S::zero(),
-                S::zero(), S::one(), S::zero(), S::zero(),
-                S::zero(), S::zero(), S::one(), S::zero(),
-                S::zero(), S::zero(), S::one(), S::one(),
+                S::zero(), -S::one(), S::zero(), S::zero(),
+                S::zero(), S::zero(), -S::one(), S::zero(),
+                S::zero(), S::one(), S::one(), S::one(),
             ),
             Face::WITHIN => Matrix4::zero(),
         }
@@ -212,6 +218,7 @@ impl<V> IndexMut<Face> for FaceMap<V> {
 mod tests {
     use super::*;
     use cgmath::Vector3;
+    use cgmath::SquareMatrix as _;  // determinant()
 
     // Tests for modulo, which is not currently a public function so can't have doc tests.
 
@@ -257,4 +264,13 @@ mod tests {
     #[test]
     // Note: Not specifically desiring this behavior, just documenting it.
     fn modulo_zero_float() { assert!((3.0 as f64).modulo(0.0).is_nan()); }
+
+    #[test]
+    fn face_matrix_does_not_scale_or_reflect() {
+        Face::all_six().iter().for_each(|face| {
+            assert_eq!(1.0, face.matrix().determinant());
+        });
+    }
+
+    // TODO: More tests of face.matrix()
 }
