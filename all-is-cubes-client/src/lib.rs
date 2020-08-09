@@ -4,4 +4,5 @@
 #![cfg(target_arch = "wasm32")]
 
 mod glrender;
-pub mod wasmglue;  // TODO: rethink what's public
+pub mod gameapp;
+mod web_glue;

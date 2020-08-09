@@ -13,17 +13,7 @@ use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::worldgen::{axes, plain_color_blocks, wavy_landscape};
 
 use crate::glrender::GLRenderer;
-
-/// Runs on module load. Do only key Rust environment initialization things here.
-#[wasm_bindgen(start)]
-pub fn main_js() -> Result<(), JsValue> {
-    #[cfg(debug_assertions)]
-    console_error_panic_hook::set_once();
-
-    console::log_1(&JsValue::from_str("Rust startup hook ran."));
-
-    Ok(())
-}
+use crate::web_glue::{append_inner_text, get_mandatory_element};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
@@ -119,22 +109,8 @@ struct StaticDom {
 impl StaticDom {
     fn new(document: &Document) -> Result<Self, Error> {
         Ok(Self {
-            scene_info_text: Self::get_mandatory_element(document, "scene-info-text")?,
-            view_canvas: Self::get_mandatory_element(document, "view-canvas")?,
+            scene_info_text: get_mandatory_element(document, "scene-info-text")?,
+            view_canvas: get_mandatory_element(document, "view-canvas")?,
         })
     }
-
-    fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -> Result<E, Error> {
-        document.get_element_by_id(id)
-            .ok_or_else(|| Error::new(&format!("missing element {:?}", id)))?
-            .dyn_into::<E>()
-            .map_err(|_| Error::new(&format!("element {:?} was not a {:?}", id, std::any::type_name::<E>())))
-    }
-}
-
-/// Equivalent of JS `element.innerText += text`.
-/// Note that this is a read-modify-write and as such is not efficient for long text.
-fn append_inner_text<'a>(element: &HtmlElement, text: impl Into<&'a str>) {
-    let text = text.into();
-    element.set_inner_text(&(element.inner_text() + text));
 }
