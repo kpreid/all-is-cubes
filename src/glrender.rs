@@ -32,6 +32,7 @@ const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 pub(crate) struct GLRenderer {
     surface: WebSysWebGL2Surface,
     block_program: Program<VertexSemantics, (), ShaderInterface>,
+    block_data_cache: Option<BlocksRenderData>,  // TODO: quick hack, needs an invalidation strategy
     fake_time: Duration,
 }
 
@@ -55,6 +56,7 @@ impl GLRenderer {
         Ok(Self {
             surface,
             block_program,
+            block_data_cache: None,
             fake_time: Duration::default(),
         })
     }
@@ -63,11 +65,15 @@ impl GLRenderer {
         let mut surface = &mut self.surface;
         let block_program = &mut self.block_program;
 
+        // TODO: quick hack; we need actual invalidation, not memoization
+        let block_render_data = self.block_data_cache
+            .get_or_insert_with(|| polygonize_blocks(space));
+
         self.fake_time += Duration::from_millis(1000/60);  // TODO
 
         let back_buffer = surface.back_buffer().unwrap();  // TODO error handling
 
-        let triangle = polygonize_space(&mut surface, &space);
+        let triangle = polygonize_space(&mut surface, &space, block_render_data);
 
         let render = surface.new_pipeline_gate().pipeline(
             &back_buffer,
@@ -155,6 +161,8 @@ impl Default for FaceRenderData {
     }
 }
 
+type BlocksRenderData = Vec<FaceMap<FaceRenderData>>;
+
 lazy_static! {
     static ref EMPTY_BLOCK_RENDER_DATA: FaceMap<FaceRenderData> =
         FaceMap::generate(|_| FaceRenderData::default());
@@ -163,17 +171,17 @@ lazy_static! {
 /// Precomputes vertices for blocks present in a space.
 ///
 /// The resulting Vec is indexed by the `Space`'s internal unstable IDs.
-fn polygonize_blocks(space: &Space) -> Vec<FaceMap<FaceRenderData>> {
+fn polygonize_blocks(space: &Space) -> BlocksRenderData {
     type S = f32;  // TODO have a sensible alias somewhere that agrees with others
-    
-    let mut results: Vec<FaceMap<FaceRenderData>> = Vec::new();
+
+    let mut results: BlocksRenderData = Vec::new();
     for block in space.distinct_blocks_unfiltered() {
         results.push(FaceMap::generate(|face| {
             if face == Face::WITHIN {
                 // Until we have blocks with interior detail, nothing to do here.
                 return FaceRenderData::default();
             }
-            
+
             let mut face_vertices: Vec<Vertex> = Vec::new();
             let transform = face.matrix();
             let color = block.color();
@@ -212,12 +220,12 @@ fn polygonize_blocks(space: &Space) -> Vec<FaceMap<FaceRenderData>> {
     results
 }
 
-fn polygonize_space(context :&mut WebSysWebGL2Surface, space: &Space) -> luminance_front::tess::Tess<Vertex> {
+fn polygonize_space(context :&mut WebSysWebGL2Surface, space: &Space, blocks_render_data: &BlocksRenderData) -> luminance_front::tess::Tess<Vertex> {
     // TODO: take a Grid parameter for chunked rendering
-    let block_precomputations = polygonize_blocks(&space);
+
     let lookup = |cube| {
         match space.get_block_index(cube) {
-            Some(index) => &block_precomputations[index as usize],
+            Some(index) => &blocks_render_data[index as usize],
             None => &*EMPTY_BLOCK_RENDER_DATA,
         }
     };
