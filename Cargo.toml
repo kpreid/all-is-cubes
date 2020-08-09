@@ -5,6 +5,10 @@ members = [
   "all-is-cubes-server",
 ]
 
+[profile.dev]
+# Enable some optimization to improve interactive performance in manual testing/experimenting.
+opt-level = 1
+
 [profile.release]
 # TODO: review recommended options for wasm releases
 overflow-checks = true
