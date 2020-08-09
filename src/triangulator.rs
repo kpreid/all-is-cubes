@@ -7,7 +7,7 @@
 //! All of the algorithms here are independent of graphics API but may presume that
 //! one exists and has specific data types to specialize in.
 
-use cgmath::{EuclideanSpace, Point3, Transform as _, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
 
 use crate::block::{Block, Color};
 use crate::math::{Face, FaceMap, FreeCoordinate};
@@ -17,7 +17,7 @@ use crate::space::{Space};
 pub trait BlockVertex: Clone + Sized {
     // TODO: Eventually color will be replaced with texture coordinates.
     fn from_block_vertex_parts(position: Vector3<FreeCoordinate>, color: Color) -> Self;
-    
+
     fn translate(&mut self, offset: Vector3<FreeCoordinate>);
 }
 
@@ -92,7 +92,7 @@ fn triangulate_block<V: BlockVertex>(block :&Block) -> BlockRenderData<V> {
             fully_opaque: fully_opaque,
         }
     });
-    
+
     BlockRenderData {
         faces
     }
@@ -101,6 +101,7 @@ fn triangulate_block<V: BlockVertex>(block :&Block) -> BlockRenderData<V> {
 /// Precomputes vertices for blocks present in a space.
 ///
 /// The resulting `Vec` is indexed by the `Space`'s internal unstable IDs.
+#[allow(dead_code)]  // Used only in GL renderer
 pub(crate) fn triangulate_blocks<V: BlockVertex>(space: &Space) -> BlocksRenderData<V> {
     let mut results: BlocksRenderData<V> = Vec::new();
     for block in space.distinct_blocks_unfiltered() {
@@ -113,6 +114,7 @@ pub(crate) fn triangulate_blocks<V: BlockVertex>(space: &Space) -> BlocksRenderD
 ///
 /// `blocks_render_data` should be provided by `triangulate_blocks` and must be up to
 /// date (TODO: provide a means to ensure it is up to date).
+#[allow(dead_code)]  // Used only in GL renderer
 pub(crate) fn triangulate_space<V: BlockVertex>(space: &Space, blocks_render_data: &BlocksRenderData<V>) -> Vec<V> {
     // TODO: take a Grid parameter for chunked rendering
 
@@ -147,16 +149,53 @@ pub(crate) fn triangulate_space<V: BlockVertex>(space: &Space, blocks_render_dat
     space_vertices
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cgmath::{MetricSpace as _};
+    use crate::worldgen::make_some_blocks;
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     struct TestVertex {
         position: Point3<FreeCoordinate>,
         color: Color,
     }
-    
-    // TODO: write tests
+
+    impl BlockVertex for TestVertex {
+        fn from_block_vertex_parts(position: Vector3<FreeCoordinate>, color: Color) -> Self {
+            Self {
+                position: Point3::from_vec(position),
+                color,
+            }
+        }
+
+        fn translate(&mut self, offset: Vector3<FreeCoordinate>) {
+            self.position += offset;
+        }
+    }
+
+    #[test]
+    fn excludes_interior_faces() {
+        let block = make_some_blocks(1).swap_remove(0);
+        let mut space = Space::empty_positive(2, 2, 2);
+        for cube in space.grid().interior_iter() {
+            space.set(cube, &block);
+        }
+
+        let rendering :Vec<TestVertex> = triangulate_space(&space, &triangulate_blocks(&space));
+        assert_eq!(
+            Vec::<&TestVertex>::new(), 
+            rendering.iter()
+                .filter(|vertex|
+                        vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
+                .collect::<Vec<&TestVertex>>(),
+            "found an interior point");
+        assert_eq!(rendering.len(),
+            6 /* vertices per face */
+            * 4 /* block faces per exterior side of space */
+            * 6 /* sides of space */,
+            "wrong number of faces");
+    }
+
+    // TODO: more tests
 }
