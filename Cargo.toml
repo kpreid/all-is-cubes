@@ -55,3 +55,6 @@ wasm-bindgen = { version = "0.2.67", optional = true }
 version = "0.3.22"
 optional = true
 features = ["console", "Document", "Element", "HtmlElement", "Window"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.2"

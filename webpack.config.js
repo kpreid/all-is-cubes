@@ -32,7 +32,7 @@ module.exports = {
       //
       // These args are passed to wasm-pack, and "--" signals passing
       // the rest to cargo build.
-      extraArgs: "-- --features wasm",
+      extraArgs: "-- --features=wasm",
     }),
   ]
 };
