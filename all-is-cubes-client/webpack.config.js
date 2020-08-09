@@ -26,13 +26,6 @@ module.exports = {
 
     new WasmPackPlugin({
       crateDirectory: __dirname,
-      // Enable our wasm-specific dependencies and code. (This is a
-      // customization, not part of the standard wasm-pack project
-      // layout.)
-      //
-      // These args are passed to wasm-pack, and "--" signals passing
-      // the rest to cargo build.
-      extraArgs: "-- --features=wasm",
     }),
   ]
 };

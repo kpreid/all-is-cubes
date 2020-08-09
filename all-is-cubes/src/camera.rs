@@ -49,7 +49,6 @@ impl Camera {
             * Matrix4::from_translation(-(self.center.to_vec()))
     }
 
-    #[allow(dead_code)]  // used only in console builds
     pub fn combined_matrix(&self) -> M {
         self.projection() * self.view()
     }

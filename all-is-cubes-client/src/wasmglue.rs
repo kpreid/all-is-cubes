@@ -8,10 +8,11 @@ use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
 use web_sys::{Document, HtmlCanvasElement, HtmlElement, console};
 
-use crate::camera::Camera;
+use all_is_cubes::camera::Camera;
+use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::worldgen::{axes, plain_color_blocks, wavy_landscape};
+
 use crate::glrender::GLRenderer;
-use crate::space::{Grid, Space};
-use crate::worldgen::{axes, plain_color_blocks, wavy_landscape};
 
 /// Runs on module load. Do only key Rust environment initialization things here.
 #[wasm_bindgen(start)]

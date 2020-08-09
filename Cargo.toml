@@ -1,60 +1,10 @@
-[package]
-name = "all-is-cubes"
-version = "0.1.0"
-authors = ["Kevin Reid <kpreid@switchb.org>"]
-edition = "2018"
-publish = false # guard against accidents until things are stable
-
-[features]
-# Enables the aic-console binary which renders to ASCII-art by raytracing.
-# This must be a conditional dependency because termion will not cross-compile to wasm.
-# rayon is also conditional because wasm does not currently offer threading, so any
-# use of threading needs to be optional.
-console = ["rayon", "termion"]
-
-# Enables WebAssembly build.
-# These dependencies don't strictly need to be conditional but it seems like a great idea
-# to have compile-time errors about code that is inapplicable to some environments...
-wasm = ["console_error_panic_hook", "js-sys", "luminance-web-sys", "luminance-webgl", "wasm-bindgen", "web-sys"]
-
-[lib]
-# "cdylib" is for WebAssembly target
-# "lib" is for running tests and aic-console
-crate-type = ["cdylib", "lib"]
-
-[[bin]]
-name = "aic-console"
-required-features = ["console"]
+[workspace]
+members = [
+  "all-is-cubes",
+  "all-is-cubes-client",
+  "all-is-cubes-server",
+]
 
 [profile.release]
 # TODO: review recommended options for wasm releases
 overflow-checks = true
-
-[dependencies]
-# Unconditional dependencies
-cgmath = "0.17.0"
-itertools = "0.9.0"
-lazy_static = "1.4.0"
-num-traits = "0.2.12"
-luminance = "0.41.0"
-luminance-derive = "0.6.1"
-luminance-front = "0.2.3"
-luminance-windowing = "0.9.1"
-
-# Console-only dependencies
-rayon = { version = "1.3.1", optional = true }
-termion = { version = "1.5.5", optional = true }
-
-# WebAssembly-only dependencies
-console_error_panic_hook = { version = "0.1.5", optional = true }
-js-sys = { version = "0.3.44", optional = true }
-luminance-web-sys = { version = "0.1.1", optional = true }
-luminance-webgl = { version = "0.1.1", optional = true }
-wasm-bindgen = { version = "0.2.67", optional = true }
-[dependencies.web-sys]
-version = "0.3.22"
-optional = true
-features = ["console", "Document", "Element", "HtmlElement", "Window"]
-
-[dev-dependencies]
-wasm-bindgen-test = "0.2"

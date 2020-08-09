@@ -8,11 +8,19 @@ Or rather, that's the plan; for now, this is just my very first project written 
 Project organization and development
 ------------------------------------
 
-The files in this directory define both a Rust package and a NPM package; the latter depends on the former via `wasm-pack`. The Rust package has two *features* controlling necessary conditional compilation for the target platform: `console` for things that only work in a binary talking to a text-mode terminal, and `wasm` for things that only work in WebAssembly.
+This is a Cargo workspace divided into three packages (crates):
 
-**Testing:** Right now, all the tests are pure Rust tests that will be run appropriately if you `cargo test --features=console`. In the future there will likely be browser-only tests too, in which case `npm test` will do both.
+* `all-is-cubes/` contains all of the fundamental data types and algorithms.
+* `all-is-cubes-client/` is the web UI/renderer which will only run in the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`.
+* `all-is-cubes-server/` is to be a network server for the game, but right now only contains code to render worlds as colored ASCII art (which is in this category because it depends on the `termion` package which will not compile to WebAssembly).
 
-**Development server:** Run `npm start`.
+**Testing:** Right now, all the tests are pure Rust tests that will be run appropriately if you run `cargo test`. In the future there will likely be browser-only tests too, in which case you'll need
+
+    (cd all-is-cubes-client && npm test)
+
+**Development server:**
+
+    (cd all-is-cubes-client && npm start)
 
 License
 -------

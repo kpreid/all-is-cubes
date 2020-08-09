@@ -12,9 +12,10 @@ use termion::event::{Event, Key};
 use termion::raw::IntoRawMode;
 use termion::input::TermRead;
 
-use all_is_cubes::console::{View, draw_space, viewport_from_terminal_size};
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::worldgen::{axes, plain_color_blocks, wavy_landscape};
+
+use all_is_cubes_server::console::{View, draw_space, viewport_from_terminal_size};
 
 /// TODO: break this up into testable library code insofar as feasible.
 

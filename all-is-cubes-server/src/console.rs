@@ -10,10 +10,10 @@ use termion;
 use termion::{color};
 use termion::event::{Event, Key};
 
-use crate::camera::Camera;
-use crate::math::{FreeCoordinate};
-use crate::raycast::{Face, Raycaster};
-use crate::space::{Grid, Space};
+use all_is_cubes::camera::Camera;
+use all_is_cubes::math::{FreeCoordinate};
+use all_is_cubes::raycast::{Face, Raycaster};
+use all_is_cubes::space::{Grid, Space};
 
 type M = Matrix4<FreeCoordinate>;
 

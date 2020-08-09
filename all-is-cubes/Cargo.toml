@@ -1,0 +1,11 @@
+[package]
+name = "all-is-cubes"
+version = "0.1.0"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+edition = "2018"
+publish = false # guard against accidents until things are stable
+
+[dependencies]
+cgmath = "0.17.0"
+itertools = "0.9.0"
+num-traits = "0.2.12"

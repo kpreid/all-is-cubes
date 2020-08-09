@@ -3,10 +3,6 @@
 
 //! OpenGL-based graphics rendering.
 
-// Right now, we don't do 'native' rendering, only wasm, and I haven't figured out
-// how to write _actually_ generic luminance code.
-#![cfg(feature = "wasm")]
-
 use cgmath::{Vector3};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
@@ -21,18 +17,18 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use crate::block::{Color};
-use crate::camera::Camera;
-use crate::math::{FreeCoordinate};
-use crate::space::Space;
-use crate::triangulator::{BlockVertex, BlocksRenderData, triangulate_blocks, triangulate_space};
+use all_is_cubes::block::{Color};
+use all_is_cubes::camera::Camera;
+use all_is_cubes::math::{FreeCoordinate};
+use all_is_cubes::space::Space;
+use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, triangulate_blocks, triangulate_space};
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
 const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
 const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
 const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 
-pub(crate) struct GLRenderer {
+pub struct GLRenderer {
     surface: WebSysWebGL2Surface,
     block_program: Program<VertexSemantics, (), ShaderInterface>,
     block_data_cache: Option<BlocksRenderData<Vertex>>,  // TODO: quick hack, needs an invalidation strategy
@@ -40,7 +36,6 @@ pub(crate) struct GLRenderer {
 }
 
 impl GLRenderer {
-    #[cfg(feature = "wasm")]
     pub fn new(canvas_id: &str) -> Result<Self, WebSysWebGL2SurfaceError> {
         let mut surface = WebSysWebGL2Surface::new(canvas_id, WindowOpt::default())?;
 

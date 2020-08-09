@@ -5,22 +5,44 @@ name = "all-is-cubes"
 version = "0.1.0"
 dependencies = [
  "cgmath",
- "console_error_panic_hook",
  "itertools",
+ "num-traits",
+]
+
+[[package]]
+name = "all-is-cubes-client"
+version = "0.1.0"
+dependencies = [
+ "all-is-cubes",
+ "cgmath",
+ "console_error_panic_hook",
  "js-sys",
- "lazy_static",
  "luminance",
  "luminance-derive",
  "luminance-front",
  "luminance-web-sys",
  "luminance-webgl",
  "luminance-windowing",
- "num-traits",
- "rayon",
- "termion",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
+]
+
+[[package]]
+name = "all-is-cubes-server"
+version = "0.1.0"
+dependencies = [
+ "all-is-cubes",
+ "cgmath",
+ "itertools",
+ "lazy_static",
+ "luminance",
+ "luminance-derive",
+ "luminance-front",
+ "luminance-windowing",
+ "num-traits",
+ "rayon",
+ "termion",
 ]
 
 [[package]]

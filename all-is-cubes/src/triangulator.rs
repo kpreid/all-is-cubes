@@ -39,7 +39,7 @@ impl<V: BlockVertex> Default for FaceRenderData<V> {
 }
 
 /// Describes how to draw a block, as broken down by face.
-pub(crate) struct BlockRenderData<V: BlockVertex> {
+pub struct BlockRenderData<V: BlockVertex> {
     ///The value for `Face::WITHIN` is the parts which do not touch the cube faces.
     faces: FaceMap<FaceRenderData<V>>,
 }
@@ -53,7 +53,7 @@ impl<V: BlockVertex> Default for BlockRenderData<V> {
 }
 
 /// Collection of `BlockRenderData` indexed by a `Space`'s block indices.
-pub(crate) type BlocksRenderData<V> = Vec<BlockRenderData<V>>;
+pub type BlocksRenderData<V> = Vec<BlockRenderData<V>>;
 
 /// Generate `BlockRenderData` for a block.
 fn triangulate_block<V: BlockVertex>(block :&Block) -> BlockRenderData<V> {
@@ -106,8 +106,7 @@ fn triangulate_block<V: BlockVertex>(block :&Block) -> BlockRenderData<V> {
 /// Precomputes vertices for blocks present in a space.
 ///
 /// The resulting `Vec` is indexed by the `Space`'s internal unstable IDs.
-#[allow(dead_code)]  // Used only in GL renderer
-pub(crate) fn triangulate_blocks<V: BlockVertex>(space: &Space) -> BlocksRenderData<V> {
+pub fn triangulate_blocks<V: BlockVertex>(space: &Space) -> BlocksRenderData<V> {
     let mut results: BlocksRenderData<V> = Vec::new();
     for block in space.distinct_blocks_unfiltered() {
         results.push(triangulate_block(block));
@@ -119,8 +118,7 @@ pub(crate) fn triangulate_blocks<V: BlockVertex>(space: &Space) -> BlocksRenderD
 ///
 /// `blocks_render_data` should be provided by `triangulate_blocks` and must be up to
 /// date (TODO: provide a means to ensure it is up to date).
-#[allow(dead_code)]  // Used only in GL renderer
-pub(crate) fn triangulate_space<V: BlockVertex>(space: &Space, blocks_render_data: &BlocksRenderData<V>) -> Vec<V> {
+pub fn triangulate_space<V: BlockVertex>(space: &Space, blocks_render_data: &BlocksRenderData<V>) -> Vec<V> {
     // TODO: take a Grid parameter for chunked rendering
 
     let empty_render = BlockRenderData::<V>::default();
