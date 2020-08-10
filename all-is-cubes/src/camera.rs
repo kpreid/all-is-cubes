@@ -19,23 +19,19 @@ pub struct Camera {
 
 impl Camera {
     pub fn for_grid(aspect_ratio: FreeCoordinate, grid: &Grid) -> Self {
-        // TODO: ew, complicated and also wrongish (need euclidean distance to corner), but this is all prototype stuff anyway.
-        let grid_view_radius = *(grid.size()[..].into_iter().max().unwrap()) as FreeCoordinate * 0.8;
-
+        // TODO: Support dynamic aspect ratio.
         Self {
-            projection: Ortho {
-                left: -grid_view_radius * aspect_ratio,
-                right: grid_view_radius * aspect_ratio,
-                bottom: -grid_view_radius,
-                top: grid_view_radius,
-                // TODO: far & near should be longer...
-                far: grid_view_radius * 1.0,
-                near: -grid_view_radius * 1.0,
-            }.into(),
+            projection: cgmath::perspective(
+                /* fovy: */ Deg(90.0),
+                aspect_ratio,
+                /* near: */ 0.1,
+                /* far: */ 2000.0,
+            ).into(),
+            // TODO: this starting point is pretty arbitrary, but we'll be replacing it with persistent character position tied into worldgen.
             center: ((grid.lower_bounds() + grid.upper_bounds().to_vec()) / 2)
-                .map(|x| x as FreeCoordinate),
-            yaw: 0.0,
-            pitch: -15.0,
+                .map(|x| x as FreeCoordinate) + Vector3::new(-3.0, 3.0, -3.0),
+            yaw: 90.0,
+            pitch: 15.0,
         }
     }
 

@@ -106,9 +106,9 @@ impl WebGameRoot {
                 }
                 match event.key_code() as u8 as char {
                     'w' | 'W' => { self2.camera.walk(0.0, -1.0); },
-                    'a' | 'A' => { self2.camera.walk(1.0, 0.0); },
+                    'a' | 'A' => { self2.camera.walk(-1.0, 0.0); },
                     's' | 'S' => { self2.camera.walk(0.0, 1.0); },
-                    'd' | 'D' => { self2.camera.walk(-1.0, 0.0); },
+                    'd' | 'D' => { self2.camera.walk(1.0, 0.0); },
                     '\x25' => { self2.camera.yaw += 5.0; },
                     '\x26' => { self2.camera.pitch += 5.0; },
                     '\x27' => { self2.camera.yaw -= 5.0; },
@@ -129,7 +129,6 @@ impl WebGameRoot {
     }
     
     fn raf_callback_impl(&mut self) {
-        self.camera.yaw += 1.0;
         self.renderer.render_frame(&self.space, &self.camera);
         self.start_loop();
     }

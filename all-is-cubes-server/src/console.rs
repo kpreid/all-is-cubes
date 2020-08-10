@@ -24,7 +24,6 @@ pub struct View {
 }
 
 impl View {
-    /// Fits the given grid into the viewport.
     pub fn for_grid(viewport: Vector2<u16>, grid: &Grid) -> Self {
         let character_aspect_ratio = 0.5;
         let viewport_aspect_ratio :FreeCoordinate =
@@ -50,9 +49,9 @@ impl View {
         match event {
             Event::Key(key) => match key {
                 Key::Char('w') | Key::Char('W') => { self.camera.walk(0.0, -1.0); },
-                Key::Char('a') | Key::Char('A') => { self.camera.walk(1.0, 0.0); },
+                Key::Char('a') | Key::Char('A') => { self.camera.walk(-1.0, 0.0); },
                 Key::Char('s') | Key::Char('S') => { self.camera.walk(0.0, 1.0); },
-                Key::Char('d') | Key::Char('D') => { self.camera.walk(-1.0, 0.0); },
+                Key::Char('d') | Key::Char('D') => { self.camera.walk(1.0, 0.0); },
                 Key::Up => { self.camera.pitch += 5.0; },
                 Key::Left => { self.camera.yaw += 5.0; },
                 Key::Down => { self.camera.pitch -= 5.0; },
@@ -78,7 +77,7 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
     let mut number_of_cubes_examined :usize = 0;
 
     let pixel_iterator = (0..view.viewport.y).into_par_iter().map(move |ych| {
-        let y = normalize_pixel_coordinate(ych, view.viewport.y);
+        let y = -normalize_pixel_coordinate(ych, view.viewport.y);
         (0..view.viewport.x).into_par_iter().map(move |xch| {
             let x = normalize_pixel_coordinate(xch, view.viewport.x);
             (xch, ych, x, y)
@@ -111,13 +110,13 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
 
 /// As per OpenGL normalized device coordinates, output ranges from -1 to 1.
 fn normalize_pixel_coordinate(position: u16, size: u16) -> FreeCoordinate {
-    (position as FreeCoordinate + 0.5) / (size as FreeCoordinate) * -2.0 + 1.0
+    (position as FreeCoordinate + 0.5) / (size as FreeCoordinate) * 2.0 - 1.0
 }
 
 fn character_from_cell(x: FreeCoordinate, y: FreeCoordinate, view_matrix: &Matrix4<FreeCoordinate>, space: &Space) -> (String, usize) {
     // Homogeneous-coordinate endpoints of the camera ray.
-    let ndc_near = Vector4::new(x, y, 1.0, 1.0);
-    let ndc_far = Vector4::new(x, y, -1.0, 1.0);
+    let ndc_near = Vector4::new(x, y, -1.0, 1.0);
+    let ndc_far = Vector4::new(x, y, 1.0, 1.0);
     // World-space endpoints of the camera ray.
     let world_near = Point3::from_homogeneous(view_matrix * ndc_near);
     let world_far = Point3::from_homogeneous(view_matrix * ndc_far);
