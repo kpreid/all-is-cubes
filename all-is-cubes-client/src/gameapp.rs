@@ -6,14 +6,14 @@ use std::rc::{Rc, Weak};
 use js_sys::{Error};
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
-use web_sys::{Document, HtmlCanvasElement, HtmlElement, console};
+use web_sys::{AddEventListenerOptions, Document, Event, HtmlCanvasElement, HtmlElement, KeyboardEvent, console};
 
 use all_is_cubes::camera::Camera;
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::worldgen::{axes, plain_color_blocks, wavy_landscape};
 
 use crate::glrender::GLRenderer;
-use crate::web_glue::{append_text_content, get_mandatory_element};
+use crate::web_glue::{add_event_listener, append_text_content, get_mandatory_element};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
@@ -85,9 +85,43 @@ impl WebGameRoot {
                 (*self_cell_ref_for_closure).borrow_mut().raf_callback_impl();
             }));
         }
+        // Other initialization.
+        (*self_cell_ref).borrow().init_dom();
+
         self_cell_ref
     }
-    
+
+    /// This method is broken out of new() so we can just use `self`. Well, some of the time.
+    fn init_dom(&self) {
+        // Install event listeners.
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.static_dom.view_canvas, &"keydown", move |event :KeyboardEvent| {
+            // TODO: Put some abstraction over this mess of reference issues.
+            // (There are two parts of it: The `Weak` reference might have gone away,
+            // and we also need to runtime borrow the `RefCell`)
+            if let Some(refcell_ref) = self_ref.upgrade() {
+                let mut self2 :std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+                if event.alt_key() || event.ctrl_key() || event.meta_key() {
+                    return;
+                }
+                match event.key_code() as u8 as char {
+                    'w' | 'W' => { self2.camera.walk(0.0, -1.0); },
+                    'a' | 'A' => { self2.camera.walk(1.0, 0.0); },
+                    's' | 'S' => { self2.camera.walk(0.0, 1.0); },
+                    'd' | 'D' => { self2.camera.walk(-1.0, 0.0); },
+                    '\x25' => { self2.camera.yaw += 5.0; },
+                    '\x26' => { self2.camera.pitch += 5.0; },
+                    '\x27' => { self2.camera.yaw -= 5.0; },
+                    '\x28' => { self2.camera.pitch -= 5.0; },
+                    _ => { return; },
+                }
+                let event: &Event = event.as_ref();
+                event.stop_propagation();  // only if we didn't return already
+                event.prevent_default();
+            }
+        }, &AddEventListenerOptions::new());
+    }
+
     pub fn start_loop(&self) {
         // This strategy from https://rustwasm.github.io/docs/wasm-bindgen/examples/request-animation-frame.html
         web_sys::window().unwrap().request_animation_frame(self.raf_callback.as_ref().unchecked_ref())

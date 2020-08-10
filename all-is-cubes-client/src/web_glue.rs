@@ -4,7 +4,7 @@
 use js_sys::{Error};
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
-use web_sys::{Document, Element, console};
+use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, console};
 
 /// Runs on module load. Does only key Rust environment initialization things;
 /// application logic is separately called from JS.
@@ -23,6 +23,26 @@ pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -
         .ok_or_else(|| Error::new(&format!("missing element {:?}", id)))?
         .dyn_into::<E>()
         .map_err(|_| Error::new(&format!("element {:?} was not a {:?}", id, std::any::type_name::<E>())))
+}
+
+pub fn add_event_listener<E, F>(
+    target: &EventTarget,
+    event_type: &str,
+    listener: F,
+    options: &AddEventListenerOptions
+) where
+    E: JsCast,
+    F: Fn(E) + 'static,
+{
+    let closure :Closure<dyn Fn(Event)> = Closure::wrap(Box::new(move |event: Event| {
+        listener(event.dyn_into::<E>().unwrap())
+    }));
+    target.add_event_listener_with_callback_and_add_event_listener_options(
+        event_type,
+        closure.as_ref().unchecked_ref(),
+        options,
+    ).expect("addEventListener failure");
+    closure.forget();  // TODO: Instead return the closure or some other kind of handle
 }
 
 /// Equivalent of JS `element.textContent += text`.
