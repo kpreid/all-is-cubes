@@ -124,7 +124,8 @@ pub fn triangulate_space<V: BlockVertex>(space: &Space, blocks_render_data: &Blo
     let empty_render = BlockRenderData::<V>::default();
     let lookup = |cube| {
         match space.get_block_index(cube) {
-            Some(index) => &blocks_render_data[index as usize],
+            // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one.
+            Some(index) => &blocks_render_data.get(index as usize).unwrap_or(&empty_render),
             None => &empty_render,
         }
     };
@@ -198,6 +199,18 @@ mod tests {
             * 4 /* block faces per exterior side of space */
             * 6 /* sides of space */,
             "wrong number of faces");
+    }
+
+    #[test]
+    fn no_panic_on_missing_blocks() {
+        let block = make_some_blocks(1).swap_remove(0);
+        let mut space = Space::empty_positive(2, 1, 1);
+        let blocks_render_data = triangulate_blocks(&space);
+        assert_eq!(blocks_render_data.len(), 1);  // check our assumption
+
+        // This should not panic; visual glitches are preferable to failure.
+        space.set((0, 0, 0), &block);  // render data does not know about this
+        let _ :Vec<TestVertex> = triangulate_space(&space, &blocks_render_data);
     }
 
     // TODO: more tests
