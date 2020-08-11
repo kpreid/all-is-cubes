@@ -64,6 +64,7 @@ impl Eq for Color {}
 
 /// A `Block` is something that can exist in the grid of a `Space`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Block {
     Atom(BlockAttributes, Color),
 }
@@ -93,6 +94,7 @@ impl Block {
 
 /// Collection of miscellaneous attribute data for blocks.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub struct BlockAttributes {
     pub display_name: Cow<'static, str>,
     pub solid: bool,

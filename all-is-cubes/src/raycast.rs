@@ -198,6 +198,7 @@ impl Iterator for Raycaster {
 
 /// Describes a ray striking a cube as defined by `Raycaster`
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct RaycastStep {
     pub cube: Point3<GridCoordinate>,
     /// Which face of the cube the ray struck to enter it.
