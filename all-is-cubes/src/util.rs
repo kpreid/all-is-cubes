@@ -58,3 +58,21 @@ impl<S: fmt::Debug> ConciseDebug for Vector4<S> {
         write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z, self.w)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_concise_debug() {
+        #[derive(Debug)]
+        struct Foo;
+        impl ConciseDebug for Foo {
+            fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+                write!(fmt, "<Foo>")
+            }
+        }
+        assert_eq!("Foo", format!("{:?}", Foo));
+        assert_eq!("<Foo>", format!("{:?}", Foo.as_concise_debug()));
+    }
+}
