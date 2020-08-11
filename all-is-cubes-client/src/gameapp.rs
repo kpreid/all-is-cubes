@@ -14,14 +14,16 @@ use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::worldgen::{axes, plain_color_blocks, wavy_landscape};
 
 use crate::glrender::GLRenderer;
+use crate::js_bindings::{CanvasHelper, GuiHelpers};
 use crate::web_glue::{add_event_listener, append_text_content, get_mandatory_element};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
-pub fn start_game() -> Result<(), JsValue> {
+pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let document = web_sys::window().expect("missing `window`")
         .document().expect("missing `document`");
 
+    // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them.
     let static_dom = StaticDom::new(&document)?;
 
     append_text_content(&static_dom.scene_info_text, "\nRusting...");
@@ -36,7 +38,7 @@ pub fn start_game() -> Result<(), JsValue> {
 
     append_text_content(&static_dom.scene_info_text, "\nGL ready.");
 
-    let root = WebGameRoot::new(static_dom, space, renderer);
+    let root = WebGameRoot::new(gui_helpers, static_dom, space, renderer);
 
     root.borrow().start_loop();
     // Explicitly keep the game loop alive.
@@ -47,6 +49,7 @@ pub fn start_game() -> Result<(), JsValue> {
 }
 
 struct WebGameRoot {
+    gui_helpers: GuiHelpers,
     static_dom: StaticDom,
     space: Space,
     camera: Camera,
@@ -62,12 +65,13 @@ struct WebGameRoot {
 }
 
 impl WebGameRoot {
-    pub fn new(static_dom: StaticDom, space: Space, renderer: GLRenderer) -> Rc<RefCell<WebGameRoot>> {
-        let aspect_ratio = static_dom.view_canvas.width() as f64 / static_dom.view_canvas.height() as f64;
+    pub fn new(gui_helpers: GuiHelpers, static_dom: StaticDom, space: Space, renderer: GLRenderer) -> Rc<RefCell<WebGameRoot>> {
+        let aspect_ratio = gui_helpers.canvas_helper().aspect_ratio();
         let camera = Camera::for_grid(aspect_ratio, space.grid());
 
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {
+            gui_helpers,
             static_dom,
             space,
             camera,
@@ -94,9 +98,12 @@ impl WebGameRoot {
 
     /// This method is broken out of new() so we can just use `self`. Well, some of the time.
     fn init_dom(&self) {
-        // Install event listeners.
+        // self_ref can be kept.
         let self_ref = self.self_ref.clone();
-        add_event_listener(&self.static_dom.view_canvas, &"keydown", move |event :KeyboardEvent| {
+        
+        // TODO: Replace this with the JS GuiHelpers handling the event processing,
+        // because this is messy.
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"keydown", move |event :KeyboardEvent| {
             // TODO: Put some abstraction over this mess of reference issues.
             // (There are two parts of it: The `Weak` reference might have gone away,
             // and we also need to runtime borrow the `RefCell`)
@@ -130,6 +137,10 @@ impl WebGameRoot {
     }
     
     fn raf_callback_impl(&mut self) {
+        // TODO do only when needed
+        let aspect_ratio = self.gui_helpers.canvas_helper().aspect_ratio();
+        self.camera.set_aspect_ratio(aspect_ratio);
+        
         // requestAnimationFrame is specified to repeat at 1/60 s.
         self.camera.step(Duration::from_secs_f64(1.0/60.0), &self.space);
         self.renderer.render_frame(&self.space, &self.camera);

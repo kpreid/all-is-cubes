@@ -5,4 +5,5 @@
 
 mod glrender;
 pub mod gameapp;
+mod js_bindings;
 mod web_glue;
