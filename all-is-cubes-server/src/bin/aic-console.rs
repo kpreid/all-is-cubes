@@ -48,6 +48,7 @@ fn main() -> io::Result<()> {
 
     print!("{}", termion::clear::All);
     loop {
+        // TODO: manage time steps correctly
         thread::sleep(Duration::from_millis(1000/30));
 
         'input: loop {
@@ -71,9 +72,11 @@ fn main() -> io::Result<()> {
             }
         }
 
+        // TODO: move auto_rotate to camera object now that it has stepping
         if auto_rotate {
-            view.camera.yaw += 5.0;
+            view.camera.body.yaw += 5.0;
         }
+        view.camera.step(Duration::from_secs_f64(1.0/20.0), &space);
 
         draw_space(&space, &view, &mut out)?;
     }

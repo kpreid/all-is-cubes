@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use std::time::Duration;
 use js_sys::{Error};
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
@@ -109,10 +110,10 @@ impl WebGameRoot {
                     'a' | 'A' => { self2.camera.walk(-1.0, 0.0); },
                     's' | 'S' => { self2.camera.walk(0.0, 1.0); },
                     'd' | 'D' => { self2.camera.walk(1.0, 0.0); },
-                    '\x25' => { self2.camera.yaw += 5.0; },
-                    '\x26' => { self2.camera.pitch += 5.0; },
-                    '\x27' => { self2.camera.yaw -= 5.0; },
-                    '\x28' => { self2.camera.pitch -= 5.0; },
+                    '\x25' => { self2.camera.body.yaw -= 5.0; },
+                    '\x26' => { self2.camera.body.pitch += 5.0; },
+                    '\x27' => { self2.camera.body.yaw += 5.0; },
+                    '\x28' => { self2.camera.body.pitch -= 5.0; },
                     _ => { return; },
                 }
                 let event: &Event = event.as_ref();
@@ -129,7 +130,12 @@ impl WebGameRoot {
     }
     
     fn raf_callback_impl(&mut self) {
+        // requestAnimationFrame is specified to repeat at 1/60 s.
+        self.camera.step(Duration::from_secs_f64(1.0/60.0), &self.space);
         self.renderer.render_frame(&self.space, &self.camera);
+        self.static_dom.scene_info_text.set_text_content(Some(&format!(
+            "{:#?}", self.camera)));
+
         self.start_loop();
     }
 }
