@@ -38,13 +38,8 @@ impl std::fmt::Debug for Camera {
 impl Camera {
     pub fn for_grid(aspect_ratio: FreeCoordinate, grid: &Grid) -> Self {
         // TODO: Support dynamic aspect ratio.
-        Self {
-            projection: cgmath::perspective(
-                /* fovy: */ Deg(90.0),
-                aspect_ratio,
-                /* near: */ 0.1,
-                /* far: */ 2000.0,
-            ).into(),
+        let mut new_self = Self {
+            projection: M::zero(),
             body: Body {
                 // TODO: this starting point is pretty arbitrary, but we'll be replacing it with persistent character position tied into worldgen.
                 position: ((grid.lower_bounds() + grid.upper_bounds().to_vec()) / 2)
@@ -54,9 +49,17 @@ impl Camera {
                 pitch: 15.0,
             },
             velocity_input: Vector3::zero(),
-        }
+        };
+        new_self.compute_projection(aspect_ratio);
+        new_self
     }
 
+    /// Updates the projection for a new viewport aspect ratio.
+    pub fn set_aspect_ratio(&mut self, aspect_ratio: FreeCoordinate) {
+        self.compute_projection(aspect_ratio);
+    }
+
+    /// Returns a projection matrix suitable for OpenGL use.
     pub fn projection(&self) -> M {
         self.projection
     }
@@ -95,5 +98,15 @@ impl Camera {
     // TODO: Remove this
     pub fn walk(&mut self, x: FreeCoordinate, z: FreeCoordinate) {
         self.velocity_input = Vector3::new(x, 0.0, z);
+    }
+
+    fn compute_projection(&mut self, aspect_ratio: FreeCoordinate) {
+        // TODO: Support dynamic aspect ratio.
+        self.projection = cgmath::perspective(
+            /* fovy: */ Deg(90.0),
+            aspect_ratio,
+            /* near: */ 0.1,
+            /* far: */ 2000.0,
+        ).into();
     }
 }
