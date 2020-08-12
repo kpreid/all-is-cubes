@@ -5,7 +5,7 @@
 # bundled together with conventional names rather than a collection of shell
 # scripts.
 
-.PHONY: all lint test run-server
+.PHONY: all lint test run-server update
 
 all:
 	cargo build  # ignores wasm-only code
@@ -22,3 +22,7 @@ test:
 
 run-server:
 	(cd all-is-cubes-client && npm start)
+
+update:
+	cargo update
+	(cd all-is-cubes-client && npm update)
