@@ -1,4 +1,4 @@
-All Is Cubes
+All is Cubes
 ============
 
 This project is (will be) a game engine for worlds made of cubical blocks. The unique feature of this engine is that each ordinary block is itself made out of blocks; each block can be directly edited in the same fashion as the outside world.
@@ -14,13 +14,15 @@ This is a Cargo workspace divided into three packages (crates):
 * `all-is-cubes-client/` is the web UI/renderer which will only run in the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`.
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains code to render worlds as colored ASCII art (which is in this category because it depends on the `termion` package which will not compile to WebAssembly).
 
-**Testing:** Right now, all the tests are pure Rust tests that will be run appropriately if you run `cargo test`. In the future there will likely be browser-only tests too, in which case you'll need
+Commands for building, testing, and running are collected in the `Makefile` for convenience (because there are some complications due to some of the code not being able to run in wasm and some not being able to run _outside_ wasm), but feel free to use it as a collection of suggestions.
 
-    (cd all-is-cubes-client && npm test)
+*   Test: `make test`
 
-**Development server:**
+*   Lint: `make lint`
 
-    (cd all-is-cubes-client && npm start)
+*   Development server: `make run-server`
+
+    Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-client/`.*
 
 License
 -------
