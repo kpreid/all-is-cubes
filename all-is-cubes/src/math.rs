@@ -51,7 +51,7 @@ fn modulo_impl<
     // Shift the range to (0, 2*modulus).
     let guaranteed_positive :T = remainder + modulus;
     // Collapse the two cases (0, modulus) and [modulus, 2*modulus) to [0, modulus).
-    return guaranteed_positive % modulus;
+    guaranteed_positive % modulus
 }
 
 /// Identifies a face of a cube or an orthogonal unit vector, except for `WITHIN` meaning
@@ -66,7 +66,7 @@ pub enum Face {
 
 impl Face {
     pub fn all_six() -> &'static [Face; 6] {
-        return &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
+        &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ]
     }
 
     pub fn axis_number(&self) -> usize {

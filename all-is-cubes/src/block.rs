@@ -24,7 +24,7 @@ impl Color {
     /// Renderers which can only consider a block to be opaque or not may use this value
     /// as their decision.
     pub fn binary_opaque(&self) -> bool {
-        return self.value.w > 0.5;
+        self.value.w > 0.5
     }
 
     pub fn to_rgba(&self) -> Vector4<f32> {

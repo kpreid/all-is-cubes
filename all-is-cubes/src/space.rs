@@ -53,7 +53,7 @@ impl Grid {
     /// assert_eq!(grid.volume(), 6_000_000);
     /// ```
     pub fn volume(&self) -> usize {
-        return (self.sizes[0] * self.sizes[1] * self.sizes[2]) as usize;
+        (self.sizes[0] * self.sizes[1] * self.sizes[2]) as usize
     }
 
     /// Determines whether a point lies within the grid and, if it does, returns the flattened
@@ -74,28 +74,28 @@ impl Grid {
 
     /// Inclusive upper bound.
     pub fn lower_bounds(&self) -> GridPoint {
-        return self.lower_bounds;
+        self.lower_bounds
     }
 
     /// Exclusive upper bound.
     pub fn upper_bounds(&self) -> GridPoint {
-        return self.lower_bounds + self.sizes;
+        self.lower_bounds + self.sizes
     }
 
     pub fn size(&self) -> GridVector {
-        return self.sizes;
+        self.sizes
     }
 
     pub fn x_range(&self) -> Range<GridCoordinate> {
-        return self.axis_range(0);
+        self.axis_range(0)
     }
 
     pub fn y_range(&self) -> Range<GridCoordinate> {
-        return self.axis_range(1);
+        self.axis_range(1)
     }
 
     pub fn z_range(&self) -> Range<GridCoordinate> {
-        return self.axis_range(2);
+        self.axis_range(2)
     }
     
     /// Iterate over all cubes.
@@ -116,7 +116,7 @@ impl Grid {
     ///     ])
     /// ```
     pub fn interior_iter(&self) -> impl Iterator<Item = GridPoint> {
-        return self.x_range()
+        self.x_range()
             .cartesian_product(self.y_range())
             .cartesian_product(self.z_range())
             .map(|((x, y), z)| GridPoint::new(x, y, z))
@@ -124,7 +124,7 @@ impl Grid {
 
     // TODO: decide if this should be public
     fn axis_range(&self, axis: usize) -> Range<GridCoordinate> {
-        return (self.lower_bounds()[axis])..(self.upper_bounds()[axis]);
+        (self.lower_bounds()[axis])..(self.upper_bounds()[axis])
     }
 
     /// Returns whether the grid includes the cube with the given coordinates in its
@@ -139,7 +139,7 @@ impl Grid {
     /// assert!(!grid.contains_cube((10, 5, 5)));
     /// ```
     pub fn contains_cube(&self, point: impl Into<GridPoint>) -> bool {
-        return self.index(point).is_some();
+        self.index(point).is_some()
     }
 }
 
@@ -190,7 +190,7 @@ impl Space {
     /// Constructs a `Space` that is entirely empty and whose coordinate system
     /// is in the +X+Y+Z quadrant.
     pub fn empty_positive(wx: isize, wy: isize, wz: isize) -> Space {
-        return Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)));
+        Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)))
     }
 
     pub fn grid(&self) -> &Grid {
@@ -268,7 +268,7 @@ impl Space {
     /// The caller is responsible for incrementing `self.index_to_count`.
     fn ensure_block_index(&mut self, block: &Block) -> BlockIndex {
         if let Some(&old_index) = self.block_to_index.get(&block) {
-            return old_index;
+            old_index
         } else {
             // Look for if there is a previously used index to take.
             // TODO: more efficient free index finding
@@ -287,7 +287,7 @@ impl Space {
             self.index_to_count.push(0);
             self.index_to_block.push(block.clone());
             self.block_to_index.insert(block.clone(), high_mark as BlockIndex);
-            return high_mark as BlockIndex;
+            high_mark as BlockIndex
         }
     }
 }

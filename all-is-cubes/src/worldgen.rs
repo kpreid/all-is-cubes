@@ -31,7 +31,7 @@ pub fn plain_color_blocks() -> LandscapeBlocks {
             Color::rgba(r, g, b, 1.0))
     }
     
-    return LandscapeBlocks {
+    LandscapeBlocks {
         air: AIR.clone(),
         grass: color_and_name(0.3, 0.8, 0.3, "Grass"),
         dirt: color_and_name(0.4, 0.2, 0.2, "Dirt"),

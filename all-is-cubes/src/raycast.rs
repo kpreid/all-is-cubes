@@ -155,7 +155,7 @@ impl Raycaster {
                 }
             }
         }
-        return false;
+        false
     }
 }
 
