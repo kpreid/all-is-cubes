@@ -66,7 +66,7 @@ impl<V: GfxVertex> Default for BlockRenderData<V> {
 }
 
 /// Collection of `BlockRenderData` indexed by a `Space`'s block indices.
-pub type BlocksRenderData<V> = Vec<BlockRenderData<V>>;
+pub type BlocksRenderData<V> = Box<[BlockRenderData<V>]>;
 
 /// Generate `BlockRenderData` for a block.
 fn triangulate_block<V: GfxVertex>(block :&Block) -> BlockRenderData<V> {
@@ -122,11 +122,7 @@ fn triangulate_block<V: GfxVertex>(block :&Block) -> BlockRenderData<V> {
 ///
 /// The resulting `Vec` is indexed by the `Space`'s internal unstable IDs.
 pub fn triangulate_blocks<V: GfxVertex>(space: &Space) -> BlocksRenderData<V> {
-    let mut results: BlocksRenderData<V> = Vec::new();
-    for block in space.distinct_blocks_unfiltered() {
-        results.push(triangulate_block(block));
-    }
-    results
+    space.distinct_blocks_unfiltered().iter().map(triangulate_block).collect()
 }
 
 /// Computes a triangle-based representation of a `Space` for rasterization.
@@ -156,12 +152,13 @@ pub fn triangulate_space<V: GfxVertex>(space: &Space, blocks_render_data: &Block
                 continue;
             }
 
-            let face_vertices = &precomputed.faces[face].vertices;
             // Copy vertices, offset to the block position.
-            for vertex in face_vertices.into_iter() {
-                let mut positioned_vertex: V = (*vertex).clone();
-                positioned_vertex.translate(low_corner.to_vec());
-                space_vertices.push(positioned_vertex);
+            for vertex in precomputed.faces[face].vertices.iter() {
+                space_vertices.push({
+                    let mut v = (*vertex).clone();
+                    v.translate(low_corner.to_vec());
+                    v
+                });
             }
         }
     }

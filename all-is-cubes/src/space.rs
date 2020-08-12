@@ -220,7 +220,7 @@ impl Space {
         let position :GridPoint = position.into();
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
-            let ref old_block = self.index_to_block[old_block_index as usize];
+            let old_block = &self.index_to_block[old_block_index as usize];
             if *old_block == *block {
                 // No change.
                 return;

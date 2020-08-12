@@ -83,20 +83,20 @@ pub fn axes(space: &mut Space) {
         for step in raycaster {
             let i = step.cube[axis] * direction;  // always positive
             let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
-            let mut name :Cow<'static, str> = (i % 10).to_string().into();
+            let mut display_name :Cow<'static, str> = (i % 10).to_string().into();
             if i % 2 == 0 {
                 color[axis] = if direction > 0 { 1.0 } else { 0.9 };
             } else {
                 if direction > 0 {
                     color = Vector4::new(1.0, 1.0, 1.0, 1.0);
-                    name = ["X", "Y", "Z"][axis].into();
+                    display_name = ["X", "Y", "Z"][axis].into();
                 } else {
-                    name = ["x", "y", "z"][axis].into();
+                    display_name = ["x", "y", "z"][axis].into();
                 };
             }
             space.set(step.cube, &Block::Atom(
                 BlockAttributes {
-                    display_name: name.into(),
+                    display_name,
                     ..BlockAttributes::default()
                 },
                 color.into()));

@@ -47,6 +47,7 @@ impl std::convert::From<Vector4<f32>> for Color {
     }
 }
 
+#[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Color {
     // Hash implementation that works given that we have no NaNs.
     // (In IEEE floating point, there are several representations of NaN, but
