@@ -7,7 +7,6 @@ use std::io;
 use std::thread;
 use std::sync::mpsc;
 use std::time::Duration;
-use termion;
 use termion::event::{Event, Key};
 use termion::raw::IntoRawMode;
 use termion::input::TermRead;

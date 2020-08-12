@@ -13,7 +13,7 @@ pub trait ConciseDebug: Sized {
     /// Wrap this value to provide an alternate concise format. This format
     /// may be on one line despite the pretty-printing option, and may lose
     /// precision or Rust syntax in favor of a short at-a-glance representation.
-    fn as_concise_debug<'a>(&'a self) -> ConciseDebugWrapper<'a, Self> {
+    fn as_concise_debug(&self) -> ConciseDebugWrapper<'_, Self> {
         ConciseDebugWrapper(self)
     }
 

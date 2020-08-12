@@ -43,7 +43,7 @@ impl std::convert::From<Vector4<f32>> for Color {
         for i in 0..3 {
             assert!(!value[i].is_nan());
         }
-        Color { value: value }
+        Color { value }
     }
 }
 

@@ -66,10 +66,10 @@ impl Grid {
                 return None;
             }
         }
-        return Some((
+        Some((
             (deoffsetted[0] * self.sizes[1] + deoffsetted[1])
                 * self.sizes[2] + deoffsetted[2]
-        ) as usize);
+        ) as usize)
     }
 
     /// Inclusive upper bound.
@@ -175,7 +175,7 @@ impl Space {
         let volume = grid.volume();
 
         Space {
-            grid: grid,
+            grid,
             block_to_index: {
                 let mut map = HashMap::new();
                 map.insert(AIR.clone(), 0);

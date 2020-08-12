@@ -22,7 +22,7 @@ pub struct LandscapeBlocks {
 
 /// Generate a bland instance of LandscapeBlocks.
 pub fn plain_color_blocks() -> LandscapeBlocks {
-    fn color_and_name<'a>(r: f32, g: f32, b: f32, name: &'a str) -> Block {
+    fn color_and_name(r: f32, g: f32, b: f32, name: &str) -> Block {
         Block::Atom(
             BlockAttributes {
                 display_name: name.to_owned().into(),

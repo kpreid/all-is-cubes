@@ -107,6 +107,6 @@ impl Camera {
             aspect_ratio,
             /* near: */ 0.1,
             /* far: */ 2000.0,
-        ).into();
+        );
     }
 }

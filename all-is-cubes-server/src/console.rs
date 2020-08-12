@@ -6,7 +6,6 @@
 use cgmath::{Matrix4, Point3, Transform, Vector2, Vector4};
 use rayon::iter::{ParallelIterator, IntoParallelIterator};
 use std::io;
-use termion;
 use termion::{color};
 use termion::event::{Event, Key};
 
@@ -32,7 +31,7 @@ impl View {
              * character_aspect_ratio;
 
         Self {
-            viewport: viewport,
+            viewport,
             camera: Camera::for_grid(viewport_aspect_ratio, grid),
         }
     }
@@ -176,7 +175,7 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
             color::Bg(color::Reset),
             color::Fg(color::Reset));
     }
-    return (s, number_passed);
+    (s, number_passed)
 }
 
 fn fake_lighting_adjustment(rgba :Vector4<f32>, face :Face) -> Vector4<f32> {

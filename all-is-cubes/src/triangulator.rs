@@ -109,7 +109,7 @@ fn triangulate_block<V: GfxVertex>(block :&Block) -> BlockRenderData<V> {
 
         FaceRenderData {
             vertices: face_vertices.into_boxed_slice(),
-            fully_opaque: fully_opaque,
+            fully_opaque,
         }
     });
 
