@@ -14,7 +14,7 @@ use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::worldgen::{axes, plain_color_blocks, wavy_landscape};
 
 use crate::glrender::GLRenderer;
-use crate::js_bindings::{CanvasHelper, GuiHelpers};
+use crate::js_bindings::{GuiHelpers};
 use crate::web_glue::{add_event_listener, append_text_content, get_mandatory_element};
 
 /// Entry point for normal game-in-a-web-page operation.

@@ -114,6 +114,8 @@ impl Face {
     /// consistent with that. Note that there are arbitrary choices in the rotation
     /// of all other faces. (TODO: Document those choices and test them.)
     pub fn matrix<S: BaseFloat>(&self) -> Matrix4<S> {
+        // Note: This is not generalized to BaseNum + Neg like normal_vector is because
+        // cgmath itself requires BaseFloat for matrices.
         match self {
             Face::NX => Matrix4::new(
                 S::zero(), S::one(), S::zero(), S::zero(),
