@@ -92,15 +92,17 @@ impl Face {
     }
 
     /// Returns the vector normal to this face. `WITHIN` is assigned the zero vector.
-    pub fn normal_vector(&self) -> GridVector {
+    pub fn normal_vector<S>(&self) -> Vector3<S> where
+        S: BaseNum + std::ops::Neg<Output = S>
+    {
         match self {
-            Face::NX => GridVector::new(-1, 0, 0),
-            Face::NY => GridVector::new(0, -1, 0),
-            Face::NZ => GridVector::new(0, 0, -1),
-            Face::PX => GridVector::new(1, 0, 0),
-            Face::PY => GridVector::new(0, 1, 0),
-            Face::PZ => GridVector::new(0, 0, 1),
-            Face::WITHIN => GridVector::new(0, 0, 0),
+            Face::NX => Vector3::new(-S::one(), S::zero(), S::zero()),
+            Face::NY => Vector3::new(S::zero(), -S::one(), S::zero()),
+            Face::NZ => Vector3::new(S::zero(), S::zero(), -S::one()),
+            Face::PX => Vector3::new(S::one(), S::zero(), S::zero()),
+            Face::PY => Vector3::new(S::zero(), S::one(), S::zero()),
+            Face::PZ => Vector3::new(S::zero(), S::zero(), S::one()),
+            Face::WITHIN => Vector3::new(S::zero(), S::zero(), S::zero()),
         }
     }
 

@@ -9,7 +9,7 @@ use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrd
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
 use luminance_front::render_state::RenderState;
-use luminance_front::shader::{BuiltProgram, Program, Uniform};
+use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
 use luminance_front::tess::Mode;
 use luminance_web_sys::{WebSysWebGL2Surface, WebSysWebGL2SurfaceError};
 use luminance_windowing::WindowOpt;
@@ -17,11 +17,10 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use all_is_cubes::block::{Color};
 use all_is_cubes::camera::Camera;
 use all_is_cubes::math::{FreeCoordinate};
 use all_is_cubes::space::Space;
-use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, triangulate_blocks, triangulate_space};
+use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, GfxVertex, triangulate_blocks, triangulate_space};
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
 const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
@@ -39,14 +38,28 @@ impl GLRenderer {
     pub fn new(canvas_id: &str) -> Result<Self, WebSysWebGL2SurfaceError> {
         let mut surface = WebSysWebGL2Surface::new(canvas_id, WindowOpt::default())?;
 
-        let BuiltProgram {program: block_program, warnings} = surface
+        let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = surface
             .new_shader_program::<VertexSemantics, (), ShaderInterface>()
             .from_strings(
-                &(SHADER_COMMON.to_owned() + SHADER_VERTEX_COMMON + SHADER_VERTEX_BLOCK),
+                &(SHADER_COMMON.to_owned()
+                    + "#line 1 1\n" + SHADER_VERTEX_COMMON
+                    + "#line 1 2\n" + SHADER_VERTEX_BLOCK),
                 None,
                 None,
-                &(SHADER_COMMON.to_owned() + SHADER_FRAGMENT))
-            .expect("shader compilation failure");
+                &(SHADER_COMMON.to_owned()
+                    + "#line 1 1\n" + SHADER_FRAGMENT));
+        let BuiltProgram {program: block_program, warnings} = program_attempt
+            .unwrap_or_else(|error| {
+                // Extract text and send to console so we get less quoting
+                let error_text = match error {
+                    ProgramError::CreationFailed(text) => text,
+                    ProgramError::StageError(StageError::CompilationFailed(_, text)) => text,
+                    ProgramError::LinkFailed(text) => text,
+                    _ => format!("{:?}", error),
+                };
+                console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error_text)));
+                panic!("shader compilation failed");
+            });
         for warning in warnings {
             console::warn_1(&JsValue::from_str(&format!("GLSL warning: {:?}", warning)));
         }
@@ -130,9 +143,11 @@ struct ShaderInterface {
 #[derive(Copy, Clone, Debug, Semantics)]
 pub enum VertexSemantics {
     // TODO: revisit compact representations
-    #[sem(name = "position", repr = "[f32; 3]", wrapper = "VertexPosition")]
+    #[sem(name = "a_position", repr = "[f32; 3]", wrapper = "VertexPosition")]
     Position,
-    #[sem(name = "color", repr = "[f32; 4]", wrapper = "VertexRGBA")]
+    #[sem(name = "a_normal", repr = "[f32; 3]", wrapper = "VertexNormal")]
+    Normal,
+    #[sem(name = "a_color", repr = "[f32; 4]", wrapper = "VertexRGBA")]
     Color,
 }
 
@@ -143,20 +158,26 @@ struct Vertex {
     position: VertexPosition,
 
     #[allow(dead_code)]  // read by shader
+    normal: VertexNormal,
+
+    #[allow(dead_code)]  // read by shader
     color: VertexRGBA,
 }
 
-impl BlockVertex for Vertex {
-    fn from_block_vertex_parts(position: Vector3<FreeCoordinate>, color: Color) -> Self {
-        let mut color_attribute = VertexRGBA::new(color.to_rgba_array());
+impl From<BlockVertex> for Vertex {
+    fn from(v: BlockVertex) -> Self {
+        let mut color_attribute = VertexRGBA::new(v.color.to_rgba_array());
         color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
 
         Self {
-            position: VertexPosition::new(position.cast::<f32>().unwrap().into()),
+            position: VertexPosition::new(v.position.cast::<f32>().unwrap().into()),
+            normal: VertexNormal::new(v.normal.cast::<f32>().unwrap().into()),
             color: color_attribute
         }
     }
+}
 
+impl GfxVertex for Vertex {
     fn translate(&mut self, offset: Vector3<FreeCoordinate>) {
         self.position.repr[0] += offset.x as f32;
         self.position.repr[1] += offset.y as f32;

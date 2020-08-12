@@ -75,10 +75,10 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 pub fn axes(space: &mut Space) {
     for face in Face::all_six() {
         let axis = face.axis_number();
-        let direction = face.normal_vector()[axis];
+        let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new(
             (0.5, 0.5, 0.5),
-            face.normal_vector().cast::<FreeCoordinate>().unwrap())
+            face.normal_vector::<FreeCoordinate>())
             .within_grid(*space.grid());
         for step in raycaster {
             let i = step.cube[axis] * direction;  // always positive

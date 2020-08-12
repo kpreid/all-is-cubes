@@ -13,23 +13,36 @@ use crate::block::{Block, Color};
 use crate::math::{Face, FaceMap, FreeCoordinate};
 use crate::space::{Space};
 
-/// Trait allowing construction of specific vertex types from input data.
-pub trait BlockVertex: Clone + Sized {
+/// Generic structure of output from triangulator. Implement `GfxVertex`
+/// to provide a specialized version.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct BlockVertex {
+    pub position: Point3<FreeCoordinate>,
+    pub normal: Vector3<FreeCoordinate>,
     // TODO: Eventually color will be replaced with texture coordinates.
-    fn from_block_vertex_parts(position: Vector3<FreeCoordinate>, color: Color) -> Self;
+    pub color: Color,
+}
 
+pub trait GfxVertex: From<BlockVertex> + Clone + Sized {
     fn translate(&mut self, offset: Vector3<FreeCoordinate>);
+}
+
+impl GfxVertex for BlockVertex {
+    fn translate(&mut self, offset: Vector3<FreeCoordinate>) {
+        self.position += offset;
+    }
 }
 
 /// Describes how to draw one `Face` of a `Block`.
 #[derive(Clone, Debug)]
-struct FaceRenderData<V: BlockVertex> {
+struct FaceRenderData<V: GfxVertex> {
     /// Vertices of triangles (i.e. length is a multiple of 3) in counterclockwise order.
     vertices: Box<[V]>,
     fully_opaque: bool,
 }
 
-impl<V: BlockVertex> Default for FaceRenderData<V> {
+impl<V: GfxVertex> Default for FaceRenderData<V> {
     fn default() -> Self {
         FaceRenderData {
             vertices: Box::new([]),
@@ -39,12 +52,12 @@ impl<V: BlockVertex> Default for FaceRenderData<V> {
 }
 
 /// Describes how to draw a block, as broken down by face.
-pub struct BlockRenderData<V: BlockVertex> {
+pub struct BlockRenderData<V: GfxVertex> {
     ///The value for `Face::WITHIN` is the parts which do not touch the cube faces.
     faces: FaceMap<FaceRenderData<V>>,
 }
 
-impl<V: BlockVertex> Default for BlockRenderData<V> {
+impl<V: GfxVertex> Default for BlockRenderData<V> {
     fn default() -> Self {
         Self {
             faces: FaceMap::generate(|_| FaceRenderData::default())
@@ -56,7 +69,7 @@ impl<V: BlockVertex> Default for BlockRenderData<V> {
 pub type BlocksRenderData<V> = Vec<BlockRenderData<V>>;
 
 /// Generate `BlockRenderData` for a block.
-fn triangulate_block<V: BlockVertex>(block :&Block) -> BlockRenderData<V> {
+fn triangulate_block<V: GfxVertex>(block :&Block) -> BlockRenderData<V> {
     let faces = FaceMap::generate(|face| {
         if face == Face::WITHIN {
             // Until we have blocks with interior detail, nothing to do here.
@@ -69,12 +82,14 @@ fn triangulate_block<V: BlockVertex>(block :&Block) -> BlockRenderData<V> {
         let fully_opaque = color.binary_opaque();
 
         // TODO: Port over pseudo-transparency mechanism, then change this to a
-        // within-epsilon-of-zero test. ...conditional on `BlockVertex` specifying support.
+        // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
         if fully_opaque {
             let mut push_1 = |p: Point3<FreeCoordinate>| {
-                face_vertices.push(V::from_block_vertex_parts(
-                    transform.transform_point(p).to_vec(),
-                    color));
+                face_vertices.push(V::from(BlockVertex {
+                    position: transform.transform_point(p),
+                    normal: face.normal_vector(),
+                    color,
+                }));
             };
 
             // Two-triangle quad.
@@ -106,7 +121,7 @@ fn triangulate_block<V: BlockVertex>(block :&Block) -> BlockRenderData<V> {
 /// Precomputes vertices for blocks present in a space.
 ///
 /// The resulting `Vec` is indexed by the `Space`'s internal unstable IDs.
-pub fn triangulate_blocks<V: BlockVertex>(space: &Space) -> BlocksRenderData<V> {
+pub fn triangulate_blocks<V: GfxVertex>(space: &Space) -> BlocksRenderData<V> {
     let mut results: BlocksRenderData<V> = Vec::new();
     for block in space.distinct_blocks_unfiltered() {
         results.push(triangulate_block(block));
@@ -118,7 +133,7 @@ pub fn triangulate_blocks<V: BlockVertex>(space: &Space) -> BlocksRenderData<V> 
 ///
 /// `blocks_render_data` should be provided by `triangulate_blocks` and must be up to
 /// date (TODO: provide a means to ensure it is up to date).
-pub fn triangulate_space<V: BlockVertex>(space: &Space, blocks_render_data: &BlocksRenderData<V>) -> Vec<V> {
+pub fn triangulate_space<V: GfxVertex>(space: &Space, blocks_render_data: &BlocksRenderData<V>) -> Vec<V> {
     // TODO: take a Grid parameter for chunked rendering
 
     let empty_render = BlockRenderData::<V>::default();
@@ -159,25 +174,6 @@ mod tests {
     use cgmath::{MetricSpace as _};
     use crate::worldgen::make_some_blocks;
 
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    struct TestVertex {
-        position: Point3<FreeCoordinate>,
-        color: Color,
-    }
-
-    impl BlockVertex for TestVertex {
-        fn from_block_vertex_parts(position: Vector3<FreeCoordinate>, color: Color) -> Self {
-            Self {
-                position: Point3::from_vec(position),
-                color,
-            }
-        }
-
-        fn translate(&mut self, offset: Vector3<FreeCoordinate>) {
-            self.position += offset;
-        }
-    }
-
     #[test]
     fn excludes_interior_faces() {
         let block = make_some_blocks(1).swap_remove(0);
@@ -186,13 +182,13 @@ mod tests {
             space.set(cube, &block);
         }
 
-        let rendering :Vec<TestVertex> = triangulate_space(&space, &triangulate_blocks(&space));
+        let rendering :Vec<BlockVertex> = triangulate_space(&space, &triangulate_blocks(&space));
         assert_eq!(
-            Vec::<&TestVertex>::new(),
+            Vec::<&BlockVertex>::new(),
             rendering.iter()
                 .filter(|vertex|
                         vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
-                .collect::<Vec<&TestVertex>>(),
+                .collect::<Vec<&BlockVertex>>(),
             "found an interior point");
         assert_eq!(rendering.len(),
             6 /* vertices per face */
@@ -210,7 +206,7 @@ mod tests {
 
         // This should not panic; visual glitches are preferable to failure.
         space.set((0, 0, 0), &block);  // render data does not know about this
-        let _ :Vec<TestVertex> = triangulate_space(&space, &blocks_render_data);
+        let _ :Vec<BlockVertex> = triangulate_space(&space, &blocks_render_data);
     }
 
     // TODO: more tests
