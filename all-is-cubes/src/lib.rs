@@ -3,6 +3,9 @@
 
 #![allow(clippy::collapsible_if)]
 
+#[macro_use]
+extern crate lazy_static;
+
 // TODO: consider exporting individual symbols instead of the modules, because
 // the modules are mostly per-data-type rather than being convenient usage bundles.
 // Or have modules reexport by API consumer (world-builder versus renderer etc.)
@@ -10,6 +13,7 @@
 pub mod block;
 pub mod camera;
 pub mod math;
+mod lighting;
 mod physics;
 pub mod raycast;
 pub mod space;

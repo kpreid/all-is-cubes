@@ -144,13 +144,13 @@ impl WebGameRoot {
         // Do game state updates.
         // requestAnimationFrame is specified to repeat at 1/60 s.
         let timestep = Duration::from_secs_f64(1.0/60.0);
-        let space_update_info = self.space.step(timestep);
+        let space_step_info = self.space.step(timestep);
         self.camera.step(timestep, &self.space);
 
         // Do graphics and UI
         self.renderer.render_frame(&self.space, &self.camera);
         self.static_dom.scene_info_text.set_text_content(Some(&format!(
-            "{:#?}\n{:#?}", self.camera, space_update_info)));
+            "{:#?}\n{:#?}", self.camera, space_step_info)));
 
         // Schedule next requestAnimationFrame
         self.start_loop();

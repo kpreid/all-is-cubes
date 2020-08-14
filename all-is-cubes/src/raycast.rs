@@ -206,6 +206,12 @@ pub struct RaycastStep {
     pub face: Face,
 }
 
+impl RaycastStep {
+    pub fn previous_cube(&self) -> Point3<GridCoordinate> {
+        self.cube + self.face.normal_vector()
+    }
+}
+
 /// Find the smallest positive t such that s + t * ds is an integer.
 // TODO: Tests!
 fn scale_to_integer_step(s: FreeCoordinate, ds: FreeCoordinate) -> FreeCoordinate {

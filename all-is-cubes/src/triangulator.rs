@@ -11,6 +11,7 @@ use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
 
 use crate::block::{Block};
 use crate::math::{Face, FaceMap, FreeCoordinate, RGBA};
+use crate::lighting::PackedLight;
 use crate::space::{Space};
 
 /// Generic structure of output from triangulator. Implement `GfxVertex`
@@ -22,15 +23,19 @@ pub struct BlockVertex {
     pub normal: Vector3<FreeCoordinate>,
     // TODO: Eventually color will be replaced with texture coordinates.
     pub color: RGBA,
+    pub lighting: PackedLight,
 }
 
 pub trait GfxVertex: From<BlockVertex> + Clone + Sized {
-    fn translate(&mut self, offset: Vector3<FreeCoordinate>);
+    // TODO: bad name and also dubious interface design; maybe we should give up on
+    // precomputing GfxVertex entirely (but don't at least until we've done texturing)
+    fn set_per_block(&mut self, offset: Vector3<FreeCoordinate>, lighting: PackedLight);
 }
 
 impl GfxVertex for BlockVertex {
-    fn translate(&mut self, offset: Vector3<FreeCoordinate>) {
+    fn set_per_block(&mut self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) {
         self.position += offset;
+        self.lighting = lighting;
     }
 }
 
@@ -89,6 +94,7 @@ fn triangulate_block<V: GfxVertex>(block :&Block) -> BlockRenderData<V> {
                     position: transform.transform_point(p),
                     normal: face.normal_vector(),
                     color,
+                    lighting: PackedLight::INITIAL,
                 }));
             };
 
@@ -147,16 +153,19 @@ pub fn triangulate_space<V: GfxVertex>(space: &Space, blocks_render_data: &Block
         let low_corner = cube.cast::<FreeCoordinate>().unwrap();
         // TODO: Tidy this up by implementing an Iterator for FaceMap.
         for &face in Face::all_six() {
-            if lookup(cube + face.normal_vector()).faces[face.opposite()].fully_opaque {
+            let adjacent_cube = cube + face.normal_vector();
+            if lookup(adjacent_cube).faces[face.opposite()].fully_opaque {
                 // Don't draw obscured faces
                 continue;
             }
 
-            // Copy vertices, offset to the block position.
+            let lighting = space.get_lighting(adjacent_cube);
+
+            // Copy vertices, offset to the block position and with lighting
             for vertex in precomputed.faces[face].vertices.iter() {
                 space_vertices.push({
                     let mut v = (*vertex).clone();
-                    v.translate(low_corner.to_vec());
+                    v.set_per_block(low_corner.to_vec(), lighting);
                     v
                 });
             }

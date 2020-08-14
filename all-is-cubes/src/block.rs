@@ -33,6 +33,11 @@ impl Block {
     /// as intended.
     fn space() -> Option<&Space> { ... }
     */
+
+    pub fn opaque_to_light(&self) -> bool {
+        // TODO account for complex shapes (probably need some memoization instead of defining it here...)
+        self.color().alpha() > 0.99
+    }
 }
 
 /// Collection of miscellaneous attribute data for blocks.

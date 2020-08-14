@@ -19,7 +19,7 @@ use web_sys::console;
 
 use all_is_cubes::camera::Camera;
 use all_is_cubes::math::{FreeCoordinate};
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{PackedLight, Space};
 use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, GfxVertex, triangulate_blocks, triangulate_space};
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
@@ -149,6 +149,9 @@ pub enum VertexSemantics {
     Normal,
     #[sem(name = "a_color", repr = "[f32; 4]", wrapper = "VertexRGBA")]
     Color,
+    // TODO: look into packed repr for lighting
+    #[sem(name = "a_lighting", repr = "[f32; 3]", wrapper = "VertexLighting")]
+    Lighting,
 }
 
 #[derive(Clone, Copy, Debug, Vertex)]
@@ -162,6 +165,9 @@ struct Vertex {
 
     #[allow(dead_code)]  // read by shader
     color: VertexRGBA,
+
+    #[allow(dead_code)]  // read by shader
+    lighting: VertexLighting,
 }
 
 impl From<BlockVertex> for Vertex {
@@ -172,16 +178,19 @@ impl From<BlockVertex> for Vertex {
         Self {
             position: VertexPosition::new(v.position.cast::<f32>().unwrap().into()),
             normal: VertexNormal::new(v.normal.cast::<f32>().unwrap().into()),
-            color: color_attribute
+            color: color_attribute,
+            lighting: VertexLighting::new(v.lighting.into()),
         }
     }
 }
 
 impl GfxVertex for Vertex {
-    fn translate(&mut self, offset: Vector3<FreeCoordinate>) {
+    fn set_per_block(&mut self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) {
         self.position.repr[0] += offset.x as f32;
         self.position.repr[1] += offset.y as f32;
         self.position.repr[2] += offset.z as f32;
+
+        self.lighting = VertexLighting::new(lighting.into());
     }
 }
 

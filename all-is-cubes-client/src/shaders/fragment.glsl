@@ -1,5 +1,6 @@
 in mediump vec4 v_color;
 in mediump vec3 v_normal;
+in lowp vec3 v_lighting;
 
 out mediump vec4 fragment_color;
 
@@ -14,10 +15,10 @@ lowp float fixed_lighting_environment() {
   );
 }
 
-lowp float lighting() {
-  return fixed_lighting_environment();
+lowp vec3 lighting() {
+  return fixed_lighting_environment() * v_lighting;
 }
 
 void main(void) {
-  fragment_color = v_color * lighting();
+  fragment_color = v_color * vec4(lighting(), 1.0);
 }

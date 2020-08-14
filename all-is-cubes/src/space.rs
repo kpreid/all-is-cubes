@@ -4,12 +4,17 @@
 //! That which contains many blocks.
 
 use itertools::Itertools as _;
+use rand::SeedableRng as _;
 use std::collections::HashMap;
+use std::collections::binary_heap::BinaryHeap;
 use std::ops::Range;
 use std::time::Duration;
 
 use crate::block::*;
-use crate::math::{GridCoordinate, GridPoint, GridVector};
+use crate::lighting::*;
+use crate::math::*;
+
+pub use crate::lighting::PackedLight;
 
 /// Specifies the coordinate extent of a `Space`.
 ///
@@ -97,7 +102,7 @@ impl Grid {
     pub fn z_range(&self) -> Range<GridCoordinate> {
         self.axis_range(2)
     }
-    
+
     /// Iterate over all cubes.
     ///
     /// ```
@@ -141,6 +146,14 @@ impl Grid {
     pub fn contains_cube(&self, point: impl Into<GridPoint>) -> bool {
         self.index(point).is_some()
     }
+    
+    pub fn random_cube(&self, rng: &mut impl rand::Rng) -> GridPoint {
+        GridPoint::new(
+            rng.gen_range(self.lower_bounds()[0], self.upper_bounds()[0]),
+            rng.gen_range(self.lower_bounds()[1], self.upper_bounds()[1]),
+            rng.gen_range(self.lower_bounds()[2], self.upper_bounds()[2]),
+        )
+    }
 }
 
 /// Container for blocks arranged in three-dimensional space.
@@ -163,6 +176,13 @@ pub struct Space {
     /// * Coordinates are transformed to indices by `Grid::index`.
     /// * Each element is an index into `self.index_to_block`.
     contents: Box<[BlockIndex]>,
+
+    /// Parallel array to `contents` for lighting data.
+    pub(crate) lighting: Box<[PackedLight]>,
+    /// Queue of positions that could really use lighting updates.
+    pub(crate) lighting_update_queue: BinaryHeap<crate::lighting::LightUpdateRequest>,
+
+    rng: rand_xoshiro::Xoshiro256Plus,
 }
 
 /// Number used to compactly store blocks.
@@ -184,6 +204,9 @@ impl Space {
             index_to_block: vec![AIR.clone()],
             index_to_count: vec![volume],
             contents: vec![0; volume].into_boxed_slice(),
+            lighting: initialize_lighting(grid),
+            lighting_update_queue: BinaryHeap::new(),
+            rng: rand_xoshiro::Xoshiro256Plus::seed_from_u64(0),  // deterministic!
         }
     }
 
@@ -199,7 +222,13 @@ impl Space {
 
     /// Returns the internal unstable numeric ID for the block at the given position.
     pub(crate) fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
-        self.grid.index(position.into()).map(|contents_index| self.contents[contents_index])
+        self.grid.index(position.into())
+            .map(|contents_index| self.contents[contents_index])
+    }
+
+    pub fn get_lighting(&self, position: impl Into<GridPoint>) -> PackedLight {
+        self.grid.index(position.into())
+            .map(|contents_index| self.lighting[contents_index]).unwrap_or(PackedLight::INITIAL)
     }
 
     /// Replace the block in this space at the given position.
@@ -242,7 +271,14 @@ impl Space {
 
             // Write actual space change
             self.contents[contents_index] = new_block_index;
+
+            self.side_effects_of_set(position);
         }
+    }
+
+    // Implement the consequences of changing a block.
+    fn side_effects_of_set(&mut self, position: GridPoint) {
+        self.light_needs_update(position, PackedLightScalar::MAX);
     }
 
     /// Returns all distinct block types found in the space.
@@ -266,8 +302,17 @@ impl Space {
 
     /// Advance time in the space.
     pub fn step(&mut self, _timestep: Duration) -> SpaceStepInfo {
-        // TODO: Nothing here yet
-        SpaceStepInfo {}
+        // TODO: other world behaviors...
+
+        // TODO: Replace this randomly triggered light update with being systematic about
+        // post-worldgen updates.
+        for _ in 0..4 {
+            let cube = self.grid.random_cube(&mut self.rng);
+            self.light_needs_update(cube, 0);
+        }
+        let light_update_count = self.update_lighting_from_queue();
+
+        SpaceStepInfo { light_update_count }
     }
 
     /// Finds or assigns an index to denote the block.
@@ -316,7 +361,9 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
 
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
-pub struct SpaceStepInfo {}
+pub struct SpaceStepInfo {
+    light_update_count: usize,
+}
 
 #[cfg(test)]
 mod tests {
