@@ -166,7 +166,7 @@ struct Vertex {
 
 impl From<BlockVertex> for Vertex {
     fn from(v: BlockVertex) -> Self {
-        let mut color_attribute = VertexRGBA::new(v.color.to_rgba_array());
+        let mut color_attribute = VertexRGBA::new(v.color.into());
         color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
 
         Self {

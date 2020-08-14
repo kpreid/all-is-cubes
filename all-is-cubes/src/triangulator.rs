@@ -9,8 +9,8 @@
 
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
 
-use crate::block::{Block, Color};
-use crate::math::{Face, FaceMap, FreeCoordinate};
+use crate::block::{Block};
+use crate::math::{Face, FaceMap, FreeCoordinate, RGBA};
 use crate::space::{Space};
 
 /// Generic structure of output from triangulator. Implement `GfxVertex`
@@ -21,7 +21,7 @@ pub struct BlockVertex {
     pub position: Point3<FreeCoordinate>,
     pub normal: Vector3<FreeCoordinate>,
     // TODO: Eventually color will be replaced with texture coordinates.
-    pub color: Color,
+    pub color: RGBA,
 }
 
 pub trait GfxVertex: From<BlockVertex> + Clone + Sized {

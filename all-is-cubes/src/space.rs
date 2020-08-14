@@ -208,11 +208,12 @@ impl Space {
     ///
     /// ```
     /// use all_is_cubes::block::*;
-    /// use all_is_cubes::space::*;
+    /// use all_is_cubes::math::RGBA;
+    /// use all_is_cubes::space::Space;
     /// let mut space = Space::empty_positive(1, 1, 1);
     /// let a_block = Block::Atom(
     ///     BlockAttributes::default(),
-    ///     Color::rgba(1.0, 0.0, 0.0, 1.0));
+    ///     RGBA::new(1.0, 0.0, 0.0, 1.0));
     /// space.set((0, 0, 0), &a_block);
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// ```

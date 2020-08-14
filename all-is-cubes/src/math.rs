@@ -3,8 +3,10 @@
 
 //! Mathematical utilities and decisions.
 
-use cgmath::{BaseFloat, BaseNum, EuclideanSpace, Matrix4, Point3, Vector3};
+use cgmath::{Array, BaseFloat, BaseNum, EuclideanSpace, Matrix4, Point3, Vector3, Vector4};
 use num_traits::identities::Zero;
+use std::convert::{TryFrom};
+use std::hash::{Hash, Hasher};
 use std::ops::{Add, Index, IndexMut, Rem};
 
 /// Coordinates that are locked to the cube grid.
@@ -216,6 +218,108 @@ impl<V> IndexMut<Face> for FaceMap<V> {
         }
     }
 }
+
+/// RGB in nominal range 0 to 1, but out of range is permitted.
+/// NaN is banned so that `Eq` may be implemented.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RGB(Vector3<f32>);
+
+/// RGBA in nominal range 0 to 1, but out of range is permitted.
+/// NaN is banned so that `Eq` may be implemented.
+/// Not using premultiplied alpha.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RGBA(Vector4<f32>);
+
+impl RGB {
+    pub const ZERO :RGB = RGB(Vector3::new(0.0, 0.0, 0.0));
+
+    pub fn new(r: f32, g: f32, b: f32) -> Self {
+        Self::try_from(Vector3::new(r, g, b)).expect("Color components may not be NaN")
+    }
+}
+impl RGBA {
+    pub const TRANSPARENT :RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 0.0));
+
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
+    }
+
+    /// Renderers which can only consider a block to be opaque or not may use this value
+    /// as their decision.
+    pub fn binary_opaque(self) -> bool {
+        self.alpha() > 0.5
+    }
+
+    pub fn to_rgb(self) -> RGB {
+        RGB(self.0.truncate())
+    }
+
+    pub fn alpha(self) -> f32 {
+        self.0.w
+    }
+}
+
+impl From<RGB> for Vector3<f32> {
+    fn from(value: RGB) -> Self { value.0 }
+}
+impl From<RGBA> for Vector4<f32> {
+    fn from(value: RGBA) -> Self { value.0 }
+}
+
+impl From<RGB> for [f32; 3] {
+    fn from(value: RGB) -> Self { value.0.into() }
+}
+impl From<RGBA> for [f32; 4] {
+    fn from(value: RGBA) -> Self { value.0.into() }
+}
+
+impl TryFrom<Vector3<f32>> for RGB {
+    type Error = ColorIsNan;
+    fn try_from(value: Vector3<f32>) -> Result<Self, Self::Error> {
+        if value.sum().is_nan() {
+            Err(ColorIsNan)
+        } else {
+            Ok(RGB(value))
+        }
+    }
+}
+impl TryFrom<Vector4<f32>> for RGBA {
+    type Error = ColorIsNan;
+    fn try_from(value: Vector4<f32>) -> Result<Self, Self::Error> {
+        if value.sum().is_nan() {
+            Err(ColorIsNan)
+        } else {
+            Ok(RGBA(value))
+        }
+    }
+}
+
+#[allow(clippy::derive_hash_xor_eq)]
+impl Hash for RGB {
+    // Hash implementation that works given that we have no NaNs.
+    // (In IEEE floating point, there are several representations of NaN, but
+    // only one representation of all other values.)
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for i in 0..3 {
+            self.0[i].to_ne_bytes().hash(state);
+        }
+    }
+}
+#[allow(clippy::derive_hash_xor_eq)]
+impl Hash for RGBA {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for i in 0..4 {
+            self.0[i].to_ne_bytes().hash(state);
+        }
+    }
+}
+// Constructor check ensures that it will satisfy Eq
+impl Eq for RGB {}
+impl Eq for RGBA {}
+
+/// Error reported when a color type is given a NaN value.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ColorIsNan;
 
 
 #[cfg(test)]

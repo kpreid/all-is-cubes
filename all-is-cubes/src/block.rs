@@ -1,78 +1,20 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-use cgmath::Vector4;
-use std::hash::{Hash, Hasher};
 use std::borrow::Cow;
 
-/// Representation of colors of blocks.
-///
-/// RGBA in nominal range 0 to 1, but out of range is permitted.
-/// Not using premultiplied alpha.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Color {
-    value: Vector4<f32>,
-}
-
-impl Color {
-    pub const fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Color { value: Vector4 { x: r, y: g, z: b, w: a } }
-    }
-
-    pub const TRANSPARENT :Color = Color::rgba(0.0, 0.0, 0.0, 0.0);
-
-    /// Renderers which can only consider a block to be opaque or not may use this value
-    /// as their decision.
-    pub fn binary_opaque(&self) -> bool {
-        self.value.w > 0.5
-    }
-
-    pub fn to_rgba(&self) -> Vector4<f32> {
-        self.value
-    }
-
-    /// Convenience for rendering.
-    pub fn to_rgba_array(&self) -> [f32; 4] {
-        self.value.into()
-    }
-}
-
-impl std::convert::From<Vector4<f32>> for Color {
-    fn from(value: Vector4<f32>) -> Self {
-        // Ensure components can be compared for equality.
-        for i in 0..3 {
-            assert!(!value[i].is_nan());
-        }
-        Color { value }
-    }
-}
-
-#[allow(clippy::derive_hash_xor_eq)]
-impl Hash for Color {
-    // Hash implementation that works given that we have no NaNs.
-    // (In IEEE floating point, there are several representations of NaN, but
-    // only one representation of all other values.)
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for i in 0..3 {
-            self.value[i].to_ne_bytes().hash(state);
-        }
-    }
-}
-
-// Constructor check ensures that it will satisfy Eq
-impl Eq for Color {}
-
+use crate::math::{RGB, RGBA};
 
 /// A `Block` is something that can exist in the grid of a `Space`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Block {
-    Atom(BlockAttributes, Color),
+    Atom(BlockAttributes, RGBA),
 }
 
 impl Block {
     /// Returns the RGBA color to use for this block when viewed as a single voxel.
-    pub fn color(&self) -> Color {
+    pub fn color(&self) -> RGBA {
         match self {
             Block::Atom(_a, c) => *c,
         }
@@ -99,7 +41,7 @@ impl Block {
 pub struct BlockAttributes {
     pub display_name: Cow<'static, str>,
     pub solid: bool,
-    pub light_emission: Color,
+    pub light_emission: RGB,
     // TODO: add 'behavior' functionality, if we don't come up with something else
     // TODO: add rotation functionality
 }
@@ -107,7 +49,7 @@ pub struct BlockAttributes {
 static DEFAULT_ATTRIBUTES :BlockAttributes = BlockAttributes {
     display_name: Cow::Borrowed(""),
     solid: true,
-    light_emission: Color::TRANSPARENT,
+    light_emission: RGB::ZERO,
 };
 
 impl Default for BlockAttributes {
@@ -122,6 +64,6 @@ pub static AIR :Block = Block::Atom(
     BlockAttributes {
         display_name: Cow::Borrowed("<air>"),
         solid: false,
-        light_emission: Color::TRANSPARENT,
+        light_emission: RGB::ZERO,
     },
-    Color::TRANSPARENT);
+    RGBA::TRANSPARENT);

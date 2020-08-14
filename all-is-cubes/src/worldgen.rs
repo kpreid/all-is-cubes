@@ -5,9 +5,10 @@
 
 use cgmath::Vector4;
 use std::borrow::Cow;
+use std::convert::TryInto;
 
-use crate::block::{AIR, Block, BlockAttributes, Color};
-use crate::math::{FreeCoordinate, GridCoordinate};
+use crate::block::{AIR, Block, BlockAttributes};
+use crate::math::{FreeCoordinate, GridCoordinate, RGBA};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Space};
 
@@ -28,7 +29,7 @@ pub fn plain_color_blocks() -> LandscapeBlocks {
                 display_name: name.to_owned().into(),
                 ..BlockAttributes::default()
             },
-            Color::rgba(r, g, b, 1.0))
+            RGBA::new(r, g, b, 1.0))
     }
     
     LandscapeBlocks {
@@ -45,13 +46,17 @@ pub fn plain_color_blocks() -> LandscapeBlocks {
 pub fn make_some_blocks(count: usize) -> Vec<Block> {
     let mut vec :Vec<Block> = Vec::with_capacity(count);
     for i in 0..count {
-        let luminance = i as f32 / (count - 1) as f32;
+        let luminance = if count > 1 {
+            i as f32 / (count - 1) as f32
+        } else {
+            0.5
+        };
         vec.push(Block::Atom(
             BlockAttributes {
                 display_name: i.to_string().into(),
                 ..BlockAttributes::default()
             },
-            Color::rgba(luminance, luminance, luminance, 1.0)));
+            RGBA::new(luminance, luminance, luminance, 1.0)));
     }
     vec
 }
@@ -99,7 +104,7 @@ pub fn axes(space: &mut Space) {
                     display_name,
                     ..BlockAttributes::default()
                 },
-                color.into()));
+                color.try_into().expect("axes() color generation failed")));
         }
     }
 }

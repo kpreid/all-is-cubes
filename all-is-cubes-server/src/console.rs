@@ -147,7 +147,7 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
         let color = block.color();
         // TODO: Implement general transparency. We might as well.
         if color.binary_opaque() {
-            let rgba = block.color().to_rgba();
+            let rgba :Vector4<f32> = block.color().into();
             // TODO: Pick 8/256/truecolor based on what the terminal supports.
             let rgba = fake_lighting_adjustment(rgba, hit.face);
             let converted_color = color::AnsiValue::rgb(
