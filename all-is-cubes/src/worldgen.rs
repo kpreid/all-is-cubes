@@ -43,6 +43,11 @@ pub fn plain_color_blocks() -> LandscapeBlocks {
 }
 
 /// Generate some atom blocks with unspecified contents for testing.
+///
+/// ```
+/// use all_is_cubes::worldgen::make_some_blocks;
+/// assert_eq!(make_some_blocks(3).len(), 3);
+/// ```
 pub fn make_some_blocks(count: usize) -> Vec<Block> {
     let mut vec :Vec<Block> = Vec::with_capacity(count);
     for i in 0..count {
@@ -154,5 +159,29 @@ pub fn wavy_landscape(
                 // TODO: Add various decorations on the ground. And trees.
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn make_some_blocks_0() {
+        assert_eq!(Vec::<Block>::new(), make_some_blocks(0));
+    }
+
+    #[test]
+    fn make_some_blocks_1() {
+        // should succeed even though the color range collapses range
+        let blocks = make_some_blocks(1);
+        assert_eq!(blocks[0].color(), RGBA::new(0.5, 0.5, 0.5, 1.0));
+    }
+
+    #[test]
+    fn make_some_blocks_2() {
+        let blocks = make_some_blocks(2);
+        assert_eq!(blocks[0].color(), RGBA::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(blocks[1].color(), RGBA::new(1.0, 1.0, 1.0, 1.0));
     }
 }
