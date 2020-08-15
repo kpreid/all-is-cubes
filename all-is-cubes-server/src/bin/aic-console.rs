@@ -75,7 +75,9 @@ fn main() -> io::Result<()> {
         if auto_rotate {
             view.camera.body.yaw += 5.0;
         }
-        view.camera.step(Duration::from_secs_f64(1.0/20.0), &space);
+        let timestep = Duration::from_secs_f64(1.0/20.0);
+        view.camera.step(timestep, &space);
+        space.step(timestep);
 
         draw_space(&space, &view, &mut out)?;
     }

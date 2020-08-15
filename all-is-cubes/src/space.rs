@@ -6,10 +6,10 @@
 use itertools::Itertools as _;
 use std::collections::HashMap;
 use std::ops::Range;
+use std::time::Duration;
 
 use crate::block::*;
 use crate::math::{GridCoordinate, GridPoint, GridVector};
-
 
 /// Specifies the coordinate extent of a `Space`.
 ///
@@ -264,6 +264,12 @@ impl Space {
         &self.index_to_block
     }
 
+    /// Advance time in the space.
+    pub fn step(&mut self, _timestep: Duration) -> SpaceStepInfo {
+        // TODO: Nothing here yet
+        SpaceStepInfo {}
+    }
+
     /// Finds or assigns an index to denote the block.
     ///
     /// The caller is responsible for incrementing `self.index_to_count`.
@@ -307,6 +313,10 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct SpaceStepInfo {}
 
 #[cfg(test)]
 mod tests {

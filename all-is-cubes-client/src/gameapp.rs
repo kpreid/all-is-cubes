@@ -84,7 +84,7 @@ impl WebGameRoot {
         {
             let mut self_mut = (*self_cell_ref).borrow_mut();
             self_mut.self_ref = Rc::downgrade(&self_cell_ref);
-            
+
             let self_cell_ref_for_closure = self_cell_ref.clone();
             self_mut.raf_callback = Closure::wrap(Box::new(move || {
                 (*self_cell_ref_for_closure).borrow_mut().raf_callback_impl();
@@ -100,7 +100,7 @@ impl WebGameRoot {
     fn init_dom(&self) {
         // self_ref can be kept.
         let self_ref = self.self_ref.clone();
-        
+
         // TODO: Replace this with the JS GuiHelpers handling the event processing,
         // because this is messy.
         add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"keydown", move |event :KeyboardEvent| {
@@ -135,18 +135,24 @@ impl WebGameRoot {
         web_sys::window().unwrap().request_animation_frame(self.raf_callback.as_ref().unchecked_ref())
             .unwrap();
     }
-    
+
     fn raf_callback_impl(&mut self) {
-        // TODO do only when needed
+        // TODO do projection updates only when needed
         let aspect_ratio = self.gui_helpers.canvas_helper().aspect_ratio();
         self.camera.set_aspect_ratio(aspect_ratio);
-        
+
+        // Do game state updates.
         // requestAnimationFrame is specified to repeat at 1/60 s.
-        self.camera.step(Duration::from_secs_f64(1.0/60.0), &self.space);
+        let timestep = Duration::from_secs_f64(1.0/60.0);
+        let space_update_info = self.space.step(timestep);
+        self.camera.step(timestep, &self.space);
+
+        // Do graphics and UI
         self.renderer.render_frame(&self.space, &self.camera);
         self.static_dom.scene_info_text.set_text_content(Some(&format!(
-            "{:#?}", self.camera)));
+            "{:#?}\n{:#?}", self.camera, space_update_info)));
 
+        // Schedule next requestAnimationFrame
         self.start_loop();
     }
 }
