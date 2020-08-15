@@ -5,9 +5,9 @@
 
 use cgmath::{Array, BaseFloat, BaseNum, EuclideanSpace, Matrix4, Point3, Vector3, Vector4};
 use num_traits::identities::Zero;
-use std::convert::{TryFrom};
+use std::convert::{TryFrom, TryInto};
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, Index, IndexMut, Rem};
+use std::ops::{Add, AddAssign, Div, Index, IndexMut, Rem};
 
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = isize;
@@ -236,6 +236,10 @@ impl RGB {
     pub fn new(r: f32, g: f32, b: f32) -> Self {
         Self::try_from(Vector3::new(r, g, b)).expect("Color components may not be NaN")
     }
+
+    pub fn red(self) -> f32 { self.0.x }
+    pub fn green(self) -> f32 { self.0.y }
+    pub fn blue(self) -> f32 { self.0.z }
 }
 impl RGBA {
     pub const TRANSPARENT :RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 0.0));
@@ -254,9 +258,10 @@ impl RGBA {
         RGB(self.0.truncate())
     }
 
-    pub fn alpha(self) -> f32 {
-        self.0.w
-    }
+    pub fn red(self) -> f32 { self.0.x }
+    pub fn green(self) -> f32 { self.0.y }
+    pub fn blue(self) -> f32 { self.0.z }
+    pub fn alpha(self) -> f32 { self.0.w }
 }
 
 impl From<RGB> for Vector3<f32> {
@@ -291,6 +296,27 @@ impl TryFrom<Vector4<f32>> for RGBA {
         } else {
             Ok(RGBA(value))
         }
+    }
+}
+
+impl Add<RGB> for RGB {
+    type Output = Self;
+    fn add(self, other: Self) -> Self { Self(self.0 + other.0) }
+}
+impl Add<RGBA> for RGBA {
+    type Output = Self;
+    fn add(self, other: Self) -> Self { Self(self.0 + other.0) }
+}
+impl AddAssign<RGB> for RGB {
+    fn add_assign(&mut self, other: Self) { self.0 += other.0; }
+}
+impl AddAssign<RGBA> for RGBA {
+    fn add_assign(&mut self, other: Self) { self.0 += other.0; }
+}
+impl Div<f32> for RGB {
+    type Output = Self;
+    fn div(self, scalar: f32) -> Self {
+        (self.0 / scalar).try_into().expect("division by zero")
     }
 }
 
