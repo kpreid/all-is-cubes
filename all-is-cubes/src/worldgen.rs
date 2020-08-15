@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::convert::TryInto;
 
 use crate::block::{AIR, Block, BlockAttributes};
-use crate::math::{FreeCoordinate, GridCoordinate, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, RGB, RGBA};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Space};
 
@@ -107,6 +107,7 @@ pub fn axes(space: &mut Space) {
             space.set(step.cube, &Block::Atom(
                 BlockAttributes {
                     display_name,
+                    light_emission: RGB::new(1.0, 1.0, 1.0),
                     ..BlockAttributes::default()
                 },
                 color.try_into().expect("axes() color generation failed")));
