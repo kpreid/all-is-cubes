@@ -33,8 +33,6 @@ pub struct BlockVertex {
 /// Implement this trait along with `From<BlockVertex>` to provide a representation
 /// of `BlockVertex` suitable for the target graphics system.
 pub trait ToGfxVertex<GV>: From<BlockVertex> + Sized {
-    // TODO: bad name and also dubious interface design; maybe we should give up on
-    // precomputing GfxVertex entirely (but don't at least until we've done texturing)
     fn instantiate(&self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) -> GV;
 }
 
