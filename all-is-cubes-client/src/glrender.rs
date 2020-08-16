@@ -20,7 +20,7 @@ use web_sys::console;
 use all_is_cubes::camera::Camera;
 use all_is_cubes::math::{FreeCoordinate};
 use all_is_cubes::space::{PackedLight, Space};
-use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, GfxVertex, triangulate_blocks, triangulate_space};
+use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, ToGfxVertex, triangulate_blocks, triangulate_space};
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
 const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
@@ -30,7 +30,7 @@ const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 pub struct GLRenderer {
     surface: WebSysWebGL2Surface,
     block_program: Program<VertexSemantics, (), ShaderInterface>,
-    block_data_cache: Option<BlocksRenderData<Vertex>>,  // TODO: quick hack, needs an invalidation strategy
+    block_data_cache: Option<BlocksRenderData<BlockVertex>>,  // TODO: quick hack, needs an invalidation strategy
     fake_time: Duration,
 }
 
@@ -170,33 +170,25 @@ struct Vertex {
     lighting: VertexLighting,
 }
 
-impl From<BlockVertex> for Vertex {
-    fn from(v: BlockVertex) -> Self {
-        let mut color_attribute = VertexRGBA::new(v.color.into());
-        color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
+impl ToGfxVertex<Vertex> for BlockVertex {
+    // TODO: Stop using BlockVertex as our block vertex type, because it stores FreeCoordinate
+    // and we want f32, forcing us to translate at every instantiation.
 
-        Self {
-            position: VertexPosition::new(v.position.cast::<f32>().unwrap().into()),
-            normal: VertexNormal::new(v.normal.cast::<f32>().unwrap().into()),
-            color: color_attribute,
-            lighting: VertexLighting::new(v.lighting.into()),
+    fn instantiate(&self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) -> Vertex {
+        Vertex {
+            position: VertexPosition::new((self.position + offset).cast::<f32>().unwrap().into()),
+            normal: VertexNormal::new(self.normal.cast::<f32>().unwrap().into()),
+            color: {
+                let mut color_attribute = VertexRGBA::new(self.color.into());
+                color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
+                color_attribute
+            },
+            lighting: VertexLighting::new(lighting.into()),
         }
     }
 }
 
-impl GfxVertex for Vertex {
-    fn set_per_block(&mut self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) {
-        self.position.repr[0] += offset.x as f32;
-        self.position.repr[1] += offset.y as f32;
-        self.position.repr[2] += offset.z as f32;
-
-        self.lighting = VertexLighting::new(lighting.into());
-    }
-}
-
-
-
-fn tess_space(context :&mut WebSysWebGL2Surface, space: &Space, blocks_render_data: &BlocksRenderData<Vertex>) -> luminance_front::tess::Tess<Vertex> {
+fn tess_space(context :&mut WebSysWebGL2Surface, space: &Space, blocks_render_data: &BlocksRenderData<BlockVertex>) -> luminance_front::tess::Tess<Vertex> {
     let tess_vertices = triangulate_space(space, blocks_render_data);
 
     context
