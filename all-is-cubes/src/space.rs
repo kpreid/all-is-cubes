@@ -31,7 +31,8 @@ impl Grid {
     ///
     /// For example, if on one axis the lower bound is 5 and the size is 10,
     /// then the positions where blocks can exist are numbered 5 through 14
-    /// (inclusive) and the occupied volume spans 5 to 15.
+    /// (inclusive) and the occupied volume (from a perspective of continuous
+    /// rather than discrete coordinates) spans 5 to 15.
     pub fn new(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridVector>) -> Grid {
         let lower_bounds = lower_bounds.into();
         let sizes = sizes.into();
@@ -63,6 +64,19 @@ impl Grid {
 
     /// Determines whether a point lies within the grid and, if it does, returns the flattened
     /// array index for it.
+    ///
+    /// The flattening is currently X major, Z minor, but this is not guaranteed to be
+    /// the same in future versions; profiling may lead us to choose to place the Y axis
+    /// first or last.
+    ///
+    /// ```
+    /// let grid = all_is_cubes::space::Grid::new((0, 0, 0), (10, 10, 10));
+    /// assert_eq!(grid.index((0, 0, 0)), Some(0));
+    /// assert_eq!(grid.index((1, 2, 3)), Some(123));
+    /// assert_eq!(grid.index((9, 9, 9)), Some(999));
+    /// assert_eq!(grid.index((0, 0, -1)), None);
+    /// assert_eq!(grid.index((0, 0, 10)), None);
+    /// ```
     pub fn index(&self, point: impl Into<GridPoint>) -> Option<usize> {
         let point = point.into();
         let deoffsetted = point - self.lower_bounds;
@@ -77,28 +91,35 @@ impl Grid {
         ) as usize)
     }
 
-    /// Inclusive upper bound.
+    /// Inclusive upper bounds on grid coordinates, or the most negative corner of the
+    /// grid.
     pub fn lower_bounds(&self) -> GridPoint {
         self.lower_bounds
     }
 
-    /// Exclusive upper bound.
+    /// Exclusive upper bounds on grid coordinates, or the most positive corner of the
+    /// grid.
     pub fn upper_bounds(&self) -> GridPoint {
         self.lower_bounds + self.sizes
     }
 
+    /// Size of the grid in each axis; equivalent to
+    /// `self.upper_bounds() = self.lower_bounds()`.
     pub fn size(&self) -> GridVector {
         self.sizes
     }
 
+    /// The range of X coordinates for cubes within the grid.
     pub fn x_range(&self) -> Range<GridCoordinate> {
         self.axis_range(0)
     }
 
+    /// The range of Y coordinates for cubes within the grid.
     pub fn y_range(&self) -> Range<GridCoordinate> {
         self.axis_range(1)
     }
 
+    /// The range of Z coordinates for cubes within the grid.
     pub fn z_range(&self) -> Range<GridCoordinate> {
         self.axis_range(2)
     }
@@ -136,8 +157,7 @@ impl Grid {
     /// volume.
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
-    /// let grid = Grid::new((4, 4, 4), (6, 6, 6));
+    /// let grid = all_is_cubes::space::Grid::new((4, 4, 4), (6, 6, 6));
     /// assert!(!grid.contains_cube((3, 5, 5)));
     /// assert!(grid.contains_cube((4, 5, 5)));
     /// assert!(grid.contains_cube((9, 5, 5)));
@@ -147,6 +167,16 @@ impl Grid {
         self.index(point).is_some()
     }
     
+    /// Returns a random point within the cube.
+    ///
+    /// ```
+    /// use rand::SeedableRng;
+    /// let grid = all_is_cubes::space::Grid::new((4, 4, 4), (6, 6, 6));
+    /// let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+    /// for _ in 0..50 {
+    ///     assert!(grid.contains_cube(grid.random_cube(&mut rng)));
+    /// }
+    /// ```
     pub fn random_cube(&self, rng: &mut impl rand::Rng) -> GridPoint {
         GridPoint::new(
             rng.gen_range(self.lower_bounds()[0], self.upper_bounds()[0]),
@@ -189,7 +219,7 @@ pub struct Space {
 pub(crate) type BlockIndex = u8;
 
 impl Space {
-    /// Constructs a `Space` that is entirely empty.
+    /// Constructs a `Space` that is entirely filled with `all_is_cubes::block::AIR`.
     pub fn empty(grid: Grid) -> Space {
         // TODO: Might actually be worth checking for memory allocation failure here...?
         let volume = grid.volume();
@@ -211,21 +241,37 @@ impl Space {
     }
 
     /// Constructs a `Space` that is entirely empty and whose coordinate system
-    /// is in the +X+Y+Z quadrant.
+    /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
     pub fn empty_positive(wx: isize, wy: isize, wz: isize) -> Space {
         Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)))
     }
 
+    /// Returns the `Grid` describing the bounds of this `Space`; no blocks may exist
+    /// outside it.
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
 
-    /// Returns the internal unstable numeric ID for the block at the given position.
+    /// Returns the internal unstable numeric ID for the block at the given position,
+    /// which may be mapped to a `Block` by `.distinct_blocks_unfiltered()`.
+    ///
+    /// These IDs may be used to perform efficient processing of many blocks, but they
+    /// may be renumbered after any mutation.
     pub(crate) fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
         self.grid.index(position.into())
             .map(|contents_index| self.contents[contents_index])
     }
 
+    /// Returns the light occupying the given cube.
+    ///
+    /// This value may be considered as representing the average of the light reflecting
+    /// off of all surfaces within, or immediately adjacent to and facing toward, this cube.
+    /// If there are no such surfaces, or if the given position is out of bounds, the result
+    /// is arbitrary. If the position is within an opaque block, the result will be black.
+    ///
+    /// Lighting is updated asynchronously after modifications, so all above claims about
+    /// the meaning of this value are actually “will eventually be, if no more changes are
+    /// made”.
     pub fn get_lighting(&self, position: impl Into<GridPoint>) -> PackedLight {
         self.grid.index(position.into())
             .map(|contents_index| self.lighting[contents_index]).unwrap_or(PackedLight::INITIAL)
@@ -276,7 +322,7 @@ impl Space {
         }
     }
 
-    // Implement the consequences of changing a block.
+    /// Implement the consequences of changing a block.
     fn side_effects_of_set(&mut self, position: GridPoint) {
         self.light_needs_update(position, PackedLightScalar::MAX);
     }
@@ -295,7 +341,11 @@ impl Space {
         blocks
     }
 
-    /// Returns all the blocks assigned IDs in the space.
+    /// Returns all the blocks assigned internal IDs in the space, which may be a
+    /// superset of all blocks which actually exist in the space.
+    ///
+    /// The indices of the returned vector are the internal IDs, and match the results
+    /// of `.get_block_index()`.
     pub(crate) fn distinct_blocks_unfiltered(&self) -> &Vec<Block> {
         &self.index_to_block
     }
@@ -359,10 +409,14 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     }
 }
 
+/// Performance data returned by `Space::step`. The exact contents of this structure
+/// are unstable; use only `Debug` formatting to examine its contents unless you have
+/// a specific need for one of the values.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct SpaceStepInfo {
-    light_update_count: usize,
+    /// Number of blocks whose light data was updated this step.
+    pub light_update_count: usize,
 }
 
 #[cfg(test)]

@@ -6,6 +6,11 @@
 //!
 //! All of the algorithms here are independent of graphics API but may presume that
 //! one exists and has specific data types to specialize in.
+//!
+//! Note: Some sources say that “tesselation” would be a better name for this
+//! operation than “triangulation”. However, “tesselation” means a specific
+//! other operation in OpenGL graphics programming, and “triangulation” seems to
+//! be the more commonly used terms.
 
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
 
@@ -26,6 +31,8 @@ pub struct BlockVertex {
     pub lighting: PackedLight,
 }
 
+/// Implement this trait along with `From<BlockVertex>` to provide a representation
+/// of `BlockVertex` suitable for the target graphics system.
 pub trait GfxVertex: From<BlockVertex> + Clone + Sized {
     // TODO: bad name and also dubious interface design; maybe we should give up on
     // precomputing GfxVertex entirely (but don't at least until we've done texturing)
@@ -44,6 +51,8 @@ impl GfxVertex for BlockVertex {
 struct FaceRenderData<V: GfxVertex> {
     /// Vertices of triangles (i.e. length is a multiple of 3) in counterclockwise order.
     vertices: Box<[V]>,
+    /// Whether the block entirely fills its cube, such that nothing can be seen through
+    /// it and faces of adjacent blocks may be removed.
     fully_opaque: bool,
 }
 
@@ -56,9 +65,13 @@ impl<V: GfxVertex> Default for FaceRenderData<V> {
     }
 }
 
-/// Describes how to draw a block, as broken down by face.
+/// Describes how to draw a block. Pass it to `triangulate_space` to use it.
 pub struct BlockRenderData<V: GfxVertex> {
-    ///The value for `Face::WITHIN` is the parts which do not touch the cube faces.
+    /// Vertices grouped by the face they belong to.
+    /// 
+    /// All triangles which are on the surface of the cube (such that they may be omitted
+    /// when a `fully_opaque` block is adjacent) are grouped under the corresponding
+    /// face, and all other triangles are grouped under `Face::WITHIN`.
     faces: FaceMap<FaceRenderData<V>>,
 }
 
@@ -71,6 +84,7 @@ impl<V: GfxVertex> Default for BlockRenderData<V> {
 }
 
 /// Collection of `BlockRenderData` indexed by a `Space`'s block indices.
+/// Pass it to `triangulate_space` to use it.
 pub type BlocksRenderData<V> = Box<[BlockRenderData<V>]>;
 
 /// Generate `BlockRenderData` for a block.
@@ -102,9 +116,6 @@ fn triangulate_block<V: GfxVertex>(block :&Block) -> BlockRenderData<V> {
             // Note that looked at from a X-right Y-up view, these triangles are
             // clockwise, but they're properly counterclockwise from the perspective
             // that we're drawing the face _facing towards negative Z_ (into the screen).
-            //
-            // TODO: We can save CPU/memory/bandwidth by using a tessellation shader
-            // to generate all six vertices from just one, right?
             push_1(Point3::new(0.0, 0.0, 0.0));
             push_1(Point3::new(0.0, 1.0, 0.0));
             push_1(Point3::new(1.0, 0.0, 0.0));

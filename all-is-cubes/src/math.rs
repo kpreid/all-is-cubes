@@ -18,9 +18,13 @@ pub type GridVector = Vector3<GridCoordinate>;
 /// Coordinates that are not locked to the cube grid.
 pub type FreeCoordinate = f64;
 
+/// Modulo operation which uses the sign of the modulus and not the dividend.
 pub trait Modulo<M = Self> {
     type Output;
 
+    /// Computes `self` mod `modulus` defined such that the result is within the range [0, `modulus`) if `modulus` is positive and (`modulus`, 0] if `modulus` is negative.
+    ///
+    /// When applied to vectors, acts componentwise; `M` must be a scalar type.
     fn modulo(self, modulus :M) -> Self::Output;
 }
 
@@ -165,6 +169,7 @@ impl Face {
     }
 }
 
+/// Container for values keyed by `Face`s.
 pub struct FaceMap<V> {
     pub nx: V,
     pub ny: V,
@@ -176,7 +181,7 @@ pub struct FaceMap<V> {
 }
 
 impl<V> FaceMap<V> {
-    // TODO: tests and docs
+    /// Compute and store a value for each `Face` enum variant.
     pub fn generate(f: impl Fn(Face) -> V) -> Self {
         Self {
             nx: f(Face::NX),
@@ -219,20 +224,31 @@ impl<V> IndexMut<Face> for FaceMap<V> {
     }
 }
 
-/// RGB in nominal range 0 to 1, but out of range is permitted.
-/// NaN is banned so that `Eq` may be implemented.
+/// A floating-point RGB color value.
+///
+/// * Nominal range 0 to 1, but permitting out of range values.
+/// * NaN is banned with runtime checks so that `Eq` may be implemented.
+///   (Infinities are permitted.)
+/// * Color values are linear (gamma = 1).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RGB(Vector3<f32>);
 
-/// RGBA in nominal range 0 to 1, but out of range is permitted.
-/// NaN is banned so that `Eq` may be implemented.
-/// Not using premultiplied alpha.
+/// A floating-point RGBA color value.
+///
+/// * Nominal range 0 to 1, but permitting out of range values.
+/// * NaN is banned with runtime checks so that `Eq` may be implemented.
+///   (Infinities are permitted.)
+/// * Color values are linear (gamma = 1).
+/// * The alpha is not premultiplied.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RGBA(Vector4<f32>);
 
 impl RGB {
+    /// Black.
     pub const ZERO :RGB = RGB(Vector3::new(0.0, 0.0, 0.0));
 
+    /// Constructs a color from components. Panics if any component is NaN.
+    /// No other range checks are performed.
     pub fn new(r: f32, g: f32, b: f32) -> Self {
         Self::try_from(Vector3::new(r, g, b)).expect("Color components may not be NaN")
     }
@@ -242,18 +258,27 @@ impl RGB {
     pub fn blue(self) -> f32 { self.0.z }
 }
 impl RGBA {
+    /// Transparent black (all components zero).
     pub const TRANSPARENT :RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 0.0));
 
+    /// Constructs a color from components. Panics if any component is NaN.
+    /// No other range checks are performed.
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
     }
 
     /// Renderers which can only consider a block to be opaque or not may use this value
     /// as their decision.
+    ///
+    /// TODO: This no longer belongs here, in the generic color type, or does it?
     pub fn binary_opaque(self) -> bool {
         self.alpha() > 0.5
     }
 
+    /// Discards the alpha component to produce an RGB color.
+    ///
+    /// Note that if alpha is 0 then the components could be any value and yet be “hidden”
+    /// by the transparency.
     pub fn to_rgb(self) -> RGB {
         RGB(self.0.truncate())
     }
@@ -315,7 +340,10 @@ impl AddAssign<RGBA> for RGBA {
 }
 impl Div<f32> for RGB {
     type Output = Self;
+    /// Divides this color value by a scalar. Panics if the scalar is zero.
     fn div(self, scalar: f32) -> Self {
+        // TODO: On further thought, why don't we provide only multiplication instead of only division?
+        // Or even better, use ordered_float::NotNan as the argument?
         (self.0 / scalar).try_into().expect("division by zero")
     }
 }
@@ -407,4 +435,6 @@ mod tests {
     }
 
     // TODO: More tests of face.matrix()
+
+    // TODO: Tests of FaceMap
 }

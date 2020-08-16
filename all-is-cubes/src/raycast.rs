@@ -1,6 +1,8 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
+//! Algorithm for raycasting through voxel grids.
+
 use cgmath::{Point3, Vector3};
 use num_traits::identities::Zero;
 
@@ -9,12 +11,14 @@ use crate::space::Grid;
 
 pub use crate::math::Face;  // necessary for any use of raycast, so let it be used
 
-/// Iterates over grid positions that intersect a given ray.
+/// Iterator over grid positions that intersect a given ray.
 ///
 /// The grid is of unit cubes which are identified by the integer coordinates of
-/// their most negative corners.
+/// their most negative corners, the same definition used by `Space` and `Grid`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Raycaster {
+    // Implementation notes:
+    //
     // From "A Fast Voxel Traversal Algorithm for Ray Tracing"
     // by John Amanatides and Andrew Woo, 1987
     // <http://www.cse.yorku.ca/~amana/research/grid.pdf>
@@ -37,9 +41,9 @@ pub struct Raycaster {
     cube: Point3<GridCoordinate>,
     /// Which way to increment `cube` when stepping; signum of `direction`.
     step: Vector3<GridCoordinate>,
-    // t_max stores the t-value at which we would next cross a cube boundary,
-    // for each axis in which we could move. Thus, the least element of t_max
-    // is the next intersection between the grid and the ray.
+    /// t_max stores the t-value at which we would next cross a cube boundary,
+    /// for each axis in which we could move. Thus, the least element of t_max
+    /// is the next intersection between the grid and the ray.
     t_max: Vector3<FreeCoordinate>,
     /// The change in t when taking a full grid step along a given axis. Always positive.
     t_delta: Vector3<FreeCoordinate>,
@@ -50,6 +54,13 @@ pub struct Raycaster {
 }
 
 impl Raycaster {
+    /// Construct a `Raycaster` for a ray with the given `origin` and `direction` vector.
+    ///
+    /// The magnitude of `direction` has no observable effect but may affect calculation
+    /// precision, so should not be especially large or small.
+    ///
+    /// Note that this is an infinite iterator by default. Use `.within_grid()` to
+    /// restrict it.
     pub fn new(
         origin: impl Into<Point3<FreeCoordinate>>,
         direction: impl Into<Vector3<FreeCoordinate>>,
@@ -76,6 +87,10 @@ impl Raycaster {
         }
     }
 
+    /// Restrict the cubes iterated over to those which lie within the given `Grid`.
+    ///
+    /// This makes the iterator finite: `next()` will return `None` forevermore once
+    /// there are no more cubes intersecting the grid to report.
     pub fn within_grid(mut self, grid: Grid) -> Self {
         if self.grid == None {
             self.grid = Some(grid);
@@ -162,7 +177,8 @@ impl Raycaster {
 impl Iterator for Raycaster {
     type Item = RaycastStep;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    /// Returns a `RaycastStep` describing the next cube intersected by the ray.
+    fn next(&mut self) -> Option<RaycastStep> {
         loop {
             if self.emit_current {
                 self.emit_current = false;
@@ -194,20 +210,45 @@ impl Iterator for Raycaster {
             });
         }
     }
+
+    // TODO: Implement optional methods:
+    // size_hint (can be determined by finding the far end and summing the offset in each axis)
+    // count, last (requires precise version of size_hint algorithm)
 }
+
+impl std::iter::FusedIterator for Raycaster {}
 
 /// Describes a ray striking a cube as defined by `Raycaster`
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct RaycastStep {
+    /// The cube which was entered.
     pub cube: Point3<GridCoordinate>,
     /// Which face of the cube the ray struck to enter it.
-    /// If the ray started within the cube, is `Face::WITHIN`.
+    /// If the ray's origin was within the cube, is `Face::WITHIN`.
     pub face: Face,
 }
 
 impl RaycastStep {
+    /// Returns the cube adjacent to `self.cube` which the ray arrived from within.
+    ///
+    /// If this cube contained the origin of the ray, then instead of an adjacent cube
+    /// the same cube will be returned.
+    ///
+    /// ```
+    /// use all_is_cubes::math::GridPoint;
+    /// use all_is_cubes::raycast::Raycaster;
+    ///
+    /// let mut r = Raycaster::new((0.5, 0.5, 0.5), (1.0, 0.0, 0.0));
+    /// let mut next = || r.next().unwrap();
+    ///
+    /// assert_eq!(next().previous_cube(), GridPoint::new(0, 0, 0));  // started here
+    /// assert_eq!(next().previous_cube(), GridPoint::new(0, 0, 0));  // moved to (1, 0, 0)
+    /// assert_eq!(next().previous_cube(), GridPoint::new(1, 0, 0));  // which is now previous...
+    /// assert_eq!(next().previous_cube(), GridPoint::new(2, 0, 0));
+    /// ```
     pub fn previous_cube(&self) -> Point3<GridCoordinate> {
+        // TODO: Write unit tests
         self.cube + self.face.normal_vector()
     }
 }

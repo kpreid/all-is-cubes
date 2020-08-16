@@ -12,6 +12,7 @@ use crate::math::{FreeCoordinate, GridCoordinate, RGBA};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Space};
 
+/// A collection of block types assigned specific roles in generating outdoor landscapes.
 pub struct LandscapeBlocks {
     pub air: Block,
     pub grass: Block,
@@ -21,7 +22,7 @@ pub struct LandscapeBlocks {
     pub leaves: Block,
 }
 
-/// Generate a bland instance of LandscapeBlocks.
+/// Generate a bland instance of `LandscapeBlocks`.
 pub fn plain_color_blocks() -> LandscapeBlocks {
     fn color_and_name(r: f32, g: f32, b: f32, name: &str) -> Block {
         Block::Atom(
@@ -49,6 +50,7 @@ pub fn plain_color_blocks() -> LandscapeBlocks {
 /// assert_eq!(make_some_blocks(3).len(), 3);
 /// ```
 pub fn make_some_blocks(count: usize) -> Vec<Block> {
+    // TODO: should this return an iterator? would anyone care?
     let mut vec :Vec<Block> = Vec::with_capacity(count);
     for i in 0..count {
         let luminance = if count > 1 {

@@ -1,14 +1,22 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
+//! Definition of blocks, which are game objects which live in the grid of a
+//! `Space`. See `block::Block` for details.
+
 use std::borrow::Cow;
 
 use crate::math::{RGB, RGBA};
 
-/// A `Block` is something that can exist in the grid of a `Space`.
+/// A `Block` is something that can exist in the grid of a `Space`; it occupies one unit
+/// cube of space and has a specified appearance and behavior.
+///
+/// TODO: Wrote an explanation about cloning and mutability versus game mechanics.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Block {
+    /// A block that is a solid-colored unit cube. (It may still be be transparent or
+    /// non-solid.)
     Atom(BlockAttributes, RGBA),
 }
 
@@ -20,6 +28,7 @@ impl Block {
         }
     }
 
+    /// Returns the `BlockAttributes` for this block.
     pub fn attributes(&self) -> &BlockAttributes {
         match self {
             Block::Atom(a, _c) => a,
@@ -34,8 +43,10 @@ impl Block {
     fn space() -> Option<&Space> { ... }
     */
 
+    /// Returns whether this block should be considered a total obstruction to light
+    // propagation.
     pub fn opaque_to_light(&self) -> bool {
-        // TODO account for complex shapes (probably need some memoization instead of defining it here...)
+        // TODO account for complex shapes (probably need some memoization instead of defining it here... and also an interface that is per-face)
         self.color().alpha() > 0.99
     }
 }
@@ -44,11 +55,13 @@ impl Block {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct BlockAttributes {
+    /// The name that should be displayed to players.
     pub display_name: Cow<'static, str>,
+    /// Whether the block is a physical obstacle.
     pub solid: bool,
+    /// Light emitted by the block.
     pub light_emission: RGB,
     // TODO: add 'behavior' functionality, if we don't come up with something else
-    // TODO: add rotation functionality
 }
 
 static DEFAULT_ATTRIBUTES :BlockAttributes = BlockAttributes {
@@ -58,13 +71,14 @@ static DEFAULT_ATTRIBUTES :BlockAttributes = BlockAttributes {
 };
 
 impl Default for BlockAttributes {
+    /// Block attributes suitable as default values for in-game use.
     fn default() -> BlockAttributes {
         DEFAULT_ATTRIBUTES.clone()
     }
 }
 
 
-/// Generic 'empty'/'null' block. It is used by Space to respond to out-of-bounds requests.
+/// Generic 'empty'/'null' block. It is used by `Space` to respond to out-of-bounds requests.
 pub static AIR :Block = Block::Atom(
     BlockAttributes {
         display_name: Cow::Borrowed("<air>"),
