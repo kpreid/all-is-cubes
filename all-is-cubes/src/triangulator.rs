@@ -145,10 +145,15 @@ pub fn triangulate_blocks<V: From<BlockVertex>>(space: &Space) -> BlocksRenderDa
 ///
 /// `blocks_render_data` should be provided by `triangulate_blocks` and must be up to
 /// date (TODO: provide a means to ensure it is up to date).
+///
+/// The triangles will be written into `output_vertices`, replacing the existing
+/// contents. This is intended to avoid memory reallocation in the common case of
+/// new geometry being similar to old geometry.
 pub fn triangulate_space<BV, GV>(
     space: &Space,
-    blocks_render_data: &BlocksRenderData<BV>
-) -> Vec<GV> where
+    blocks_render_data: &BlocksRenderData<BV>,
+    output_vertices: &mut Vec<GV>,
+) where
     BV: ToGfxVertex<GV>
 {
     // TODO: take a Grid parameter for chunked rendering
@@ -162,7 +167,7 @@ pub fn triangulate_space<BV, GV>(
         }
     };
 
-    let mut space_vertices: Vec<GV> = Vec::new();
+    output_vertices.clear();  // use the buffer but not the existing data
     for cube in space.grid().interior_iter() {
         let precomputed = lookup(cube);
         let low_corner = cube.cast::<FreeCoordinate>().unwrap();
@@ -178,11 +183,10 @@ pub fn triangulate_space<BV, GV>(
 
             // Copy vertices, offset to the block position and with lighting
             for vertex in precomputed.faces[face].vertices.iter() {
-                space_vertices.push(vertex.instantiate(low_corner.to_vec(), lighting));
+                output_vertices.push(vertex.instantiate(low_corner.to_vec(), lighting));
             }
         }
     }
-    space_vertices
 }
 
 #[cfg(test)]

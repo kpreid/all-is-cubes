@@ -10,7 +10,8 @@ use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::PipelineState;
 use luminance_front::render_state::RenderState;
 use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
-use luminance_front::tess::Mode;
+use luminance_front::tess::{Mode, Tess, VerticesMut};
+use luminance_front::tess_gate::TessGate;
 use luminance_web_sys::{WebSysWebGL2Surface, WebSysWebGL2SurfaceError};
 use luminance_windowing::WindowOpt;
 use std::time::Duration;
@@ -31,6 +32,7 @@ pub struct GLRenderer {
     surface: WebSysWebGL2Surface,
     block_program: Program<VertexSemantics, (), ShaderInterface>,
     block_data_cache: Option<BlocksRenderData<BlockVertex>>,  // TODO: quick hack, needs an invalidation strategy
+    chunk: Chunk,
     fake_time: Duration,
 }
 
@@ -68,6 +70,7 @@ impl GLRenderer {
             surface,
             block_program,
             block_data_cache: None,
+            chunk: Chunk::new(),
             fake_time: Duration::default(),
         })
     }
@@ -84,7 +87,8 @@ impl GLRenderer {
 
         let back_buffer = surface.back_buffer().unwrap();  // TODO error handling
 
-        let tess = tess_space(&mut surface, &space, block_render_data);
+        self.chunk.update(&mut surface, &space, block_render_data);
+        let ct = &self.chunk;
 
         let render_state = RenderState::default()
             .set_face_culling(FaceCulling{order: FaceCullingOrder::CCW, mode: FaceCullingMode::Back});
@@ -108,7 +112,8 @@ impl GLRenderer {
                     shader_iface.set(&u.view_matrix3, vm[3]);
 
                     render_gate.render(&render_state, |mut tess_gate| {
-                         tess_gate.render(&tess)
+                         ct.render(&mut tess_gate)?;
+                         Ok(())
                     })
                 })
             },
@@ -188,13 +193,51 @@ impl ToGfxVertex<Vertex> for BlockVertex {
     }
 }
 
-fn tess_space(context :&mut WebSysWebGL2Surface, space: &Space, blocks_render_data: &BlocksRenderData<BlockVertex>) -> luminance_front::tess::Tess<Vertex> {
-    let tess_vertices = triangulate_space(space, blocks_render_data);
+/// Not yet actually chunked rendering, but bundles the data that would be used in one.
+struct Chunk {
+    // bounds: Grid,
+    vertices: Vec<Vertex>,
+    tess: Option<Tess<Vertex>>,
+}
 
-    context
-        .new_tess()
-        .set_vertices(tess_vertices)
-        .set_mode(Mode::Triangle)
-        .build()
-        .unwrap()  // TODO error handling
+impl Chunk {
+    fn new() -> Self {
+        Chunk { vertices: Vec::new(), tess: None }
+    }
+
+    fn update(&mut self, context: &mut WebSysWebGL2Surface, space: &Space, blocks_render_data: &BlocksRenderData<BlockVertex>) {
+        triangulate_space(space, blocks_render_data, &mut self.vertices);
+
+        // TODO: updating an existing Tess doesn't work because of
+        // https://github.com/phaazon/luminance-rs/issues/436
+        // -- reenable this when bug is fixes
+        if false {
+            if let Some(tess) = self.tess.as_mut() {
+                if tess.vert_nb() == self.vertices.len() {
+                    // Same length; reuse buffer.
+                    // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
+                    let mut buffer_slice: VerticesMut<Vertex, _, _, _, _> =
+                        tess.vertices_mut().expect("failed to map vertices for copying");
+                    assert_eq!(buffer_slice.len(), tess.vert_nb());
+                    buffer_slice.copy_from_slice(&*self.vertices);
+                    return;
+                }
+            }
+        }
+
+        // Failed to reuse; make a new buffer
+        self.tess = Some(context
+            .new_tess()
+            .set_vertices(self.vertices.clone())
+            .set_mode(Mode::Triangle)
+            .build()
+            .unwrap());  // TODO need any error handling?
+    }
+
+    fn render<E>(&self, tess_gate: &mut TessGate) -> Result<(), E> {
+        if let Some(tess) = self.tess.as_ref() {
+            tess_gate.render(tess)?;
+        }
+        Ok(())
+    }
 }
