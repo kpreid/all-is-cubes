@@ -203,8 +203,8 @@ mod tests {
             space.set(cube, &block);
         }
 
-        let rendering: Vec<BlockVertex> = triangulate_space::<BlockVertex, BlockVertex>(
-            &space, &triangulate_blocks(&space));
+        let mut rendering: Vec<BlockVertex> = Vec::new();
+        triangulate_space::<BlockVertex, BlockVertex>(&space, &triangulate_blocks(&space), &mut  rendering);
         assert_eq!(
             Vec::<&BlockVertex>::new(),
             rendering.iter()
@@ -228,7 +228,7 @@ mod tests {
 
         // This should not panic; visual glitches are preferable to failure.
         space.set((0, 0, 0), &block);  // render data does not know about this
-        let _ :Vec<BlockVertex> = triangulate_space(&space, &blocks_render_data);
+        triangulate_space(&space, &blocks_render_data, &mut Vec::new());
     }
 
     // TODO: more tests
