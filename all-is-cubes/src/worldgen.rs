@@ -3,12 +3,12 @@
 
 //! Procedural world generation.
 
-use cgmath::Vector4;
+use cgmath::{Vector3, Vector4};
 use std::borrow::Cow;
 use std::convert::TryInto;
 
 use crate::block::{AIR, Block, BlockAttributes};
-use crate::math::{FreeCoordinate, GridCoordinate, RGB, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, RGBA};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Space};
 
@@ -93,6 +93,7 @@ pub fn axes(space: &mut Space) {
         for step in raycaster {
             let i = step.cube[axis] * direction;  // always positive
             let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
+            let mut light = Vector3::new(0.0, 0.0, 0.0);
             let mut display_name :Cow<'static, str> = (i % 10).to_string().into();
             if i % 2 == 0 {
                 color[axis] = if direction > 0 { 1.0 } else { 0.9 };
@@ -104,10 +105,11 @@ pub fn axes(space: &mut Space) {
                     display_name = ["x", "y", "z"][axis].into();
                 };
             }
+            light[axis] = 3.0;
             space.set(step.cube, &Block::Atom(
                 BlockAttributes {
                     display_name,
-                    light_emission: RGB::new(1.0, 1.0, 1.0),
+                    light_emission: light.try_into().unwrap(),
                     ..BlockAttributes::default()
                 },
                 color.try_into().expect("axes() color generation failed")));
