@@ -3,6 +3,13 @@ name = "all-is-cubes-server"
 version = "0.1.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
+description = "Game server and text-mode utilities for the recursive voxel game All is Cubes."
+readme = "../README.md"
+# TODO: add homepage = "..." when we have one
+repository = "https://github.com/kpreid/all-is-cubes"
+license = "MIT"
+# TODO: revisit categories once it's more settled how useful this is as an engine
+categories = ["games", "rendering"]
 publish = false # guard against accidents until things are stable
 
 [[bin]]
@@ -16,7 +23,3 @@ lazy_static = "1.4.0"
 num-traits = "0.2.12"
 rayon = "1.3.1"
 termion = "1.5.5"
-luminance = "0.41.0"
-luminance-derive = "0.6.1"
-luminance-front = "0.2.3"
-luminance-windowing = "0.9.1"

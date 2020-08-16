@@ -3,6 +3,13 @@ name = "all-is-cubes-client"
 version = "0.1.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
+description = "Web client for the recursive voxel game All is Cubes."
+readme = "../README.md"
+# TODO: add homepage = "..." when we have one
+repository = "https://github.com/kpreid/all-is-cubes"
+license = "MIT"
+# TODO: revisit categories once it's more settled how useful this is as an engine
+categories = ["games", "wasm"]
 publish = false # guard against accidents until things are stable
 
 [lib]
@@ -12,22 +19,14 @@ crate-type = ["cdylib"]
 all-is-cubes = { path = "../all-is-cubes" }
 cgmath = "0.17.0"
 console_error_panic_hook = "0.1.5"
-# itertools = "0.9.0"
 js-sys = "0.3.44"
-# lazy_static = "1.4.0"
-# num-traits = "0.2.12"
 luminance = "0.41.0"
 luminance-derive = "0.6.1"
+luminance-front = "0.2.3"
 luminance-web-sys = "0.1.1"
 luminance-webgl = "0.1.1"
 luminance-windowing = "0.9.1"
 wasm-bindgen = "0.2.67"
-
-[dependencies.luminance-front]
-# Note: This is not sufficient by itself for a successful webgl build: we also need to ensure the target arch is wasm32, or luminance-front will fail to compile. In order to keep things simple, the main library has conditional compilation so it is empty if _not_ wasm32.
-version = "0.2.3"
-features = ["webgl2"]
-default-features = false
 
 [dependencies.web-sys]
 version = "0.3.22"
