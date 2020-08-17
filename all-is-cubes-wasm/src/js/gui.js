@@ -20,7 +20,7 @@ export function makeAllStaticGuiHelpers(window, document) {
 
 // Manages a <canvas> element; particularly, resizing it to have 1:1 pixel resolution.
 export class CanvasHelper {
-  // TODO: unit test this class
+  // TODO: unit test this class ... where?
 
   constructor(canvas) {
     if (!canvas) throw new Error('canvas missing');

@@ -41,7 +41,8 @@
 #[cfg(target_family = "wasm")]
 pub mod gameapp;
 #[cfg(target_family = "wasm")]
-mod js_bindings;
+#[doc(hidden)] // public for testing
+pub mod js_bindings;
 #[cfg(any(target_family = "wasm", test))]
 mod url_params;
 #[cfg(target_family = "wasm")]

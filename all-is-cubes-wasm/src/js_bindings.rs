@@ -23,6 +23,8 @@ extern "C" {
 
     #[derive(Clone)]
     pub type CanvasHelper;
+    #[wasm_bindgen(constructor)]
+    pub fn new(canvas: HtmlCanvasElement) -> CanvasHelper;
     #[wasm_bindgen(method, js_name = updateViewport)]
     pub fn update_viewport(this: &CanvasHelper);
     #[wasm_bindgen(method, js_name = setFullscreen)]

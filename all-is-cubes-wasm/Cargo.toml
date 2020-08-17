@@ -17,7 +17,8 @@ publish = false
 bench = false
 # There are some host-runnable unit tests (but we might move those...)
 test = true
-crate-type = ["cdylib"]
+# Need "cdylib" for the final wasm module, and "lib" for building tests
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
@@ -69,3 +70,6 @@ features = [
   "Text",
   "Window",
 ]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
