@@ -9,76 +9,62 @@ use std::io;
 use termion::{color};
 use termion::event::{Event, Key};
 
-use all_is_cubes::camera::Camera;
+use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate};
 use all_is_cubes::raycast::{Face, Raycaster};
-use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::space::{Space};
 
 type M = Matrix4<FreeCoordinate>;
 
-/// Describes a camera for an ascii-art view of 3D space.
-pub struct View {
-    viewport: Vector2<u16>,
-    pub camera: Camera,
-}
-
-impl View {
-    pub fn for_grid(viewport: Vector2<u16>, grid: &Grid) -> Self {
-        let character_aspect_ratio = 0.5;
-        let viewport_aspect_ratio :FreeCoordinate =
-            viewport.x as FreeCoordinate
-            / viewport.y as FreeCoordinate
-             * character_aspect_ratio;
-
-        Self {
-            viewport,
-            camera: Camera::for_grid(viewport_aspect_ratio, grid),
-        }
-    }
-
-    fn matrix(&self) -> M {
-        // Inverse of regular camera matrix because we are transforming screen space to
-        // world space to raycast, instead of transforming vertices in world space to 
-        // screen space.
-        self.camera.combined_matrix().inverse_transform().unwrap()
-    }
-
-    /// Processes events for moving a View. Returns all those events it does not process.
-    pub fn controller(&mut self, event: Event) -> Option<Event> {
-        match event {
-            Event::Key(key) => match key {
-                Key::Char('w') | Key::Char('W') => { self.camera.walk(0.0, -1.0); },
-                Key::Char('a') | Key::Char('A') => { self.camera.walk(-1.0, 0.0); },
-                Key::Char('s') | Key::Char('S') => { self.camera.walk(0.0, 1.0); },
-                Key::Char('d') | Key::Char('D') => { self.camera.walk(1.0, 0.0); },
-                Key::Up => { self.camera.body.pitch += 5.0; },
-                Key::Left => { self.camera.body.yaw += 5.0; },
-                Key::Down => { self.camera.body.pitch -= 5.0; },
-                Key::Right => { self.camera.body.yaw -= 5.0; },
-                _ => { return Some(event); },
-            },
+/// Processes events for moving a camera. Returns all those events it does not process.
+pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
+    camera.auto_rotate = false;  // stop on any keypress
+    match event {
+        Event::Key(key) => match key {
+            Key::Char('w') | Key::Char('W') => { camera.walk(0.0, -1.0); },
+            Key::Char('a') | Key::Char('A') => { camera.walk(-1.0, 0.0); },
+            Key::Char('s') | Key::Char('S') => { camera.walk(0.0, 1.0); },
+            Key::Char('d') | Key::Char('D') => { camera.walk(1.0, 0.0); },
+            Key::Up => { camera.body.pitch += 5.0; },
+            Key::Left => { camera.body.yaw += 5.0; },
+            Key::Down => { camera.body.pitch -= 5.0; },
+            Key::Right => { camera.body.yaw -= 5.0; },
             _ => { return Some(event); },
-        }
-        None  // match branches default to consuming event
+        },
+        _ => { return Some(event); },
     }
+    None  // match branches default to consuming event
 }
 
-pub fn viewport_from_terminal_size() -> io::Result<Vector2<u16>> {
+fn camera_matrix(projection: &ProjectionHelper, camera: &Camera) -> M {
+    // Inverse of regular camera matrix because we are transforming screen space to
+    // world space to raycast, instead of transforming vertices in world space to
+    // screen space.
+    (projection.projection() * camera.view()).inverse_transform().unwrap()
+}
+
+pub fn viewport_from_terminal_size() -> io::Result<Vector2<usize>> {
     let (w, h) = termion::terminal_size()?;
-    Ok(Vector2::new(w.max(1), (h - 5).max(1)))
+    Ok(Vector2::new(w.max(1) as usize, (h - 5).max(1) as usize))
 }
 
 // Draw the space to an ANSI terminal using raytracing.
-pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::Result<()> {
-    let view_matrix = view.matrix();
+pub fn draw_space<O: io::Write>(
+    space: &Space,
+    projection: &ProjectionHelper,
+    camera: &Camera,
+    out: &mut O,
+) -> io::Result<()> {
+    let viewport = projection.viewport();
+    let view_matrix = camera_matrix(projection, camera);
 
     // Diagnostic info accumulators
     let mut number_of_cubes_examined :usize = 0;
 
-    let pixel_iterator = (0..view.viewport.y).into_par_iter().map(move |ych| {
-        let y = -normalize_pixel_coordinate(ych, view.viewport.y);
-        (0..view.viewport.x).into_par_iter().map(move |xch| {
-            let x = normalize_pixel_coordinate(xch, view.viewport.x);
+    let pixel_iterator = (0..viewport.y).into_par_iter().map(move |ych| {
+        let y = -projection.normalize_pixel_y(ych);
+        (0..viewport.x).into_par_iter().map(move |xch| {
+            let x = projection.normalize_pixel_x(xch);
             (xch, ych, x, y)
         })
     }).flatten();
@@ -105,11 +91,6 @@ pub fn draw_space<O: io::Write>(space: &Space, view: &View, out: &mut O) -> io::
     out.flush()?;
 
     Ok(())
-}
-
-/// As per OpenGL normalized device coordinates, output ranges from -1 to 1.
-fn normalize_pixel_coordinate(position: u16, size: u16) -> FreeCoordinate {
-    (position as FreeCoordinate + 0.5) / (size as FreeCoordinate) * 2.0 - 1.0
 }
 
 fn character_from_cell(x: FreeCoordinate, y: FreeCoordinate, view_matrix: &Matrix4<FreeCoordinate>, space: &Space) -> (String, usize) {

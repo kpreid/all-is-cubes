@@ -18,6 +18,8 @@ export function makeAllStaticGuiHelpers(window, document) {
 
 // Manages a <canvas> element; particularly, resizing it to have 1:1 pixel resolution.
 export class CanvasHelper {
+  // TODO: unit test this class
+
   constructor(canvas) {
     if (!canvas) throw new Error('canvas missing');
 
@@ -37,7 +39,7 @@ export class CanvasHelper {
       canvas.width = layoutPixelWidth * window.devicePixelRatio;
       canvas.height = layoutPixelHeight * window.devicePixelRatio;
 
-      this.aspectRatio = layoutPixelWidth / layoutPixelHeight;
+      this.viewportPx = Object.freeze([layoutPixelWidth, layoutPixelHeight]);
     };
     updateViewport();
 
@@ -50,6 +52,16 @@ export class CanvasHelper {
   }
 
   // property .canvas
-  
-  // property .aspectRatio
+
+  // property .viewportPx
+
+  // Get the ID of the canvas element, assigning one if needed.
+  id() {
+    let id = this.canvas.id;
+    if (typeof id !== 'string') {
+      console.warn('canvas has no id; assigning a random one');
+      this.canvas.id = id = 'canvas' + Math.random();
+    }
+    return id;
+  }
 }

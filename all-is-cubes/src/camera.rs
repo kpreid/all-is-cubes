@@ -3,7 +3,7 @@
 
 //! Basic camera. TODO: This will eventually become 'character', probably, but for now we have static worlds and want to move a viewpoint around.
 
-use cgmath::{Deg, EuclideanSpace, Matrix3, Matrix4, Vector3};
+use cgmath::{Deg, EuclideanSpace, Matrix3, Matrix4, Vector2, Vector3};
 use num_traits::identities::Zero;
 use std::time::Duration;
 
@@ -12,34 +12,32 @@ use crate::physics::{Body};
 use crate::space::{Grid, Space};
 use crate::util::{ConciseDebug as _};
 
-type M = Matrix4<FreeCoordinate>;
-
 // Control characteristics.
 //const WALKING_SPEED: FreeCoordinate = 10.0;
 const FLYING_SPEED: FreeCoordinate = 10.0;
 //const JUMP_SPEED: FreeCoordinate = 10.0;
 
 pub struct Camera {
-    projection: M,
+    // TODO: This is now less about rendering and more about hanging an input controller on a Body.
+    // Rename!
     pub body: Body,
+    pub auto_rotate: bool,
     velocity_input: Vector3<FreeCoordinate>,
 }
 
 impl std::fmt::Debug for Camera {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         fmt.debug_struct("Camera")
-            .field("projection", &self.projection.as_concise_debug())
             .field("body", &self.body)
+            .field("auto_rotate", &self.auto_rotate)
             .field("velocity_input", &self.velocity_input.as_concise_debug())
             .finish()
     }
 }
 
 impl Camera {
-    pub fn for_grid(aspect_ratio: FreeCoordinate, grid: &Grid) -> Self {
-        // TODO: Support dynamic aspect ratio.
-        let mut new_self = Self {
-            projection: M::zero(),
+    pub fn for_grid(grid: &Grid) -> Self {
+        Self {
             body: Body {
                 // TODO: this starting point is pretty arbitrary, but we'll be replacing it with persistent character position tied into worldgen.
                 position: ((grid.lower_bounds() + grid.upper_bounds().to_vec()) / 2)
@@ -48,30 +46,15 @@ impl Camera {
                 yaw: 90.0,
                 pitch: 15.0,
             },
+            auto_rotate: false,
             velocity_input: Vector3::zero(),
-        };
-        new_self.compute_projection(aspect_ratio);
-        new_self
-    }
-
-    /// Updates the projection for a new viewport aspect ratio.
-    pub fn set_aspect_ratio(&mut self, aspect_ratio: FreeCoordinate) {
-        self.compute_projection(aspect_ratio);
-    }
-
-    /// Returns a projection matrix suitable for OpenGL use.
-    pub fn projection(&self) -> M {
-        self.projection
+        }
     }
 
     pub fn view(&self) -> M {
         Matrix4::from_angle_x(Deg(self.body.pitch))
             * Matrix4::from_angle_y(Deg(self.body.yaw))
             * Matrix4::from_translation(-(self.body.position.to_vec()))
-    }
-
-    pub fn combined_matrix(&self) -> M {
-        self.projection() * self.view()
     }
 
     pub fn step(&mut self, duration: Duration, space: &Space) {
@@ -88,6 +71,10 @@ impl Camera {
 
         // TODO: temporary placeholder while we change over to continuous movement controls
         self.velocity_input *= (0.1 as FreeCoordinate).powf(dt);
+
+        if self.auto_rotate {
+            self.body.yaw += 45.0 * dt;
+        }
     }
 
     /// Maximum range for normal keyboard input should be -1 to 1
@@ -99,9 +86,57 @@ impl Camera {
     pub fn walk(&mut self, x: FreeCoordinate, z: FreeCoordinate) {
         self.velocity_input = Vector3::new(x, 0.0, z);
     }
+}
 
-    fn compute_projection(&mut self, aspect_ratio: FreeCoordinate) {
-        // TODO: Support dynamic aspect ratio.
+type M = Matrix4<FreeCoordinate>;
+
+pub struct ProjectionHelper {
+    viewport: Vector2<usize>,
+    pixel_aspect_ratio: FreeCoordinate,
+    projection: Matrix4<FreeCoordinate>,
+}
+
+impl ProjectionHelper {
+    /// pixel_aspect_ratio is the width divided by the height
+    pub fn new(pixel_aspect_ratio: FreeCoordinate, viewport: Vector2<usize>) -> Self {
+        assert!(pixel_aspect_ratio.is_finite(), "pixel_aspect_ratio must be finite");
+        assert!(viewport.x > 0, "viewport.x must be > 0");
+        assert!(viewport.y > 0, "viewport.y must be > 0");
+        let mut new_self = Self {
+            viewport,
+            pixel_aspect_ratio,
+            projection: M::zero(),
+        };
+        new_self.compute_projection();
+        new_self
+    }
+
+    pub fn viewport(&self) -> Vector2<usize> { self.viewport }
+
+    /// Updates the projection for a new viewport aspect ratio.
+    pub fn set_viewport(&mut self, viewport: Vector2<usize>) {
+        self.viewport = viewport;
+        self.compute_projection();
+    }
+
+    /// As per OpenGL normalized device coordinates, output ranges from -1 to 1.
+    pub fn normalize_pixel_x(&self, x: usize) -> FreeCoordinate {
+        (x as FreeCoordinate + 0.5) / (self.viewport.x as FreeCoordinate) * 2.0 - 1.0
+    }
+
+    /// As per OpenGL normalized device coordinates, output ranges from -1 to 1.
+    pub fn normalize_pixel_y(&self, y: usize) -> FreeCoordinate {
+        (y as FreeCoordinate + 0.5) / (self.viewport.y as FreeCoordinate) * 2.0 - 1.0
+    }
+
+    /// Returns a projection matrix suitable for OpenGL use.
+    pub fn projection(&self) -> M {
+        self.projection
+    }
+
+    fn compute_projection(&mut self) {
+        let aspect_ratio = self.pixel_aspect_ratio *
+            ((self.viewport.x as FreeCoordinate) / (self.viewport.y as FreeCoordinate));
         self.projection = cgmath::perspective(
             /* fovy: */ Deg(90.0),
             aspect_ratio,

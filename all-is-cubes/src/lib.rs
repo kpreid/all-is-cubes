@@ -18,5 +18,6 @@ mod physics;
 pub mod raycast;
 pub mod space;
 pub mod triangulator;
-pub mod worldgen;
+pub mod universe;
 mod util;
+pub mod worldgen;

@@ -7,11 +7,9 @@ use std::time::Duration;
 use js_sys::{Error};
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
-use web_sys::{AddEventListenerOptions, Document, Event, HtmlCanvasElement, HtmlElement, KeyboardEvent, console};
+use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, console};
 
-use all_is_cubes::camera::Camera;
-use all_is_cubes::space::{Grid, Space};
-use all_is_cubes::worldgen::{axes, plain_color_blocks, wavy_landscape};
+use all_is_cubes::universe::{Universe};
 
 use crate::glrender::GLRenderer;
 use crate::js_bindings::{GuiHelpers};
@@ -28,17 +26,14 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     append_text_content(&static_dom.scene_info_text, "\nRusting...");
 
-    let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));
-    let blocks = plain_color_blocks();
-    wavy_landscape(&mut space, blocks, 1.0);
-    axes(&mut space);
+    let universe = Universe::new_test_universe();
 
-    let renderer = GLRenderer::new(&static_dom.view_canvas.id())
+    let renderer = GLRenderer::new(gui_helpers.canvas_helper())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
     append_text_content(&static_dom.scene_info_text, "\nGL ready.");
 
-    let root = WebGameRoot::new(gui_helpers, static_dom, space, renderer);
+    let root = WebGameRoot::new(gui_helpers, static_dom, universe, renderer);
 
     root.borrow().start_loop();
     // Explicitly keep the game loop alive.
@@ -51,8 +46,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 struct WebGameRoot {
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
-    space: Space,
-    camera: Camera,
+    universe: Universe,
     renderer: GLRenderer,
     raf_callback: Closure<dyn FnMut()>,
     /// In order to be able to set up callbacks to ourselves, we need to live in a mutable
@@ -65,16 +59,12 @@ struct WebGameRoot {
 }
 
 impl WebGameRoot {
-    pub fn new(gui_helpers: GuiHelpers, static_dom: StaticDom, space: Space, renderer: GLRenderer) -> Rc<RefCell<WebGameRoot>> {
-        let aspect_ratio = gui_helpers.canvas_helper().aspect_ratio();
-        let camera = Camera::for_grid(aspect_ratio, space.grid());
-
+    pub fn new(gui_helpers: GuiHelpers, static_dom: StaticDom, universe: Universe, renderer: GLRenderer) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {
             gui_helpers,
             static_dom,
-            space,
-            camera,
+            universe,
             renderer,
             raf_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
             self_ref: Weak::new(),
@@ -109,18 +99,19 @@ impl WebGameRoot {
             // and we also need to runtime borrow the `RefCell`)
             if let Some(refcell_ref) = self_ref.upgrade() {
                 let mut self2 :std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+                let camera = self2.universe.camera_mut();
                 if event.alt_key() || event.ctrl_key() || event.meta_key() {
                     return;
                 }
                 match event.key_code() as u8 as char {
-                    'w' | 'W' => { self2.camera.walk(0.0, -1.0); },
-                    'a' | 'A' => { self2.camera.walk(-1.0, 0.0); },
-                    's' | 'S' => { self2.camera.walk(0.0, 1.0); },
-                    'd' | 'D' => { self2.camera.walk(1.0, 0.0); },
-                    '\x25' => { self2.camera.body.yaw -= 5.0; },
-                    '\x26' => { self2.camera.body.pitch += 5.0; },
-                    '\x27' => { self2.camera.body.yaw += 5.0; },
-                    '\x28' => { self2.camera.body.pitch -= 5.0; },
+                    'w' | 'W' => { camera.walk(0.0, -1.0); },
+                    'a' | 'A' => { camera.walk(-1.0, 0.0); },
+                    's' | 'S' => { camera.walk(0.0, 1.0); },
+                    'd' | 'D' => { camera.walk(1.0, 0.0); },
+                    '\x25' => { camera.body.yaw -= 5.0; },
+                    '\x26' => { camera.body.pitch += 5.0; },
+                    '\x27' => { camera.body.yaw += 5.0; },
+                    '\x28' => { camera.body.pitch -= 5.0; },
                     _ => { return; },
                 }
                 let event: &Event = event.as_ref();
@@ -138,19 +129,17 @@ impl WebGameRoot {
 
     fn raf_callback_impl(&mut self) {
         // TODO do projection updates only when needed
-        let aspect_ratio = self.gui_helpers.canvas_helper().aspect_ratio();
-        self.camera.set_aspect_ratio(aspect_ratio);
+        self.renderer.update_viewport();
 
         // Do game state updates.
         // requestAnimationFrame is specified to repeat at 1/60 s.
         let timestep = Duration::from_secs_f64(1.0/60.0);
-        let space_step_info = self.space.step(timestep);
-        self.camera.step(timestep, &self.space);
+        let (space_step_info, _) = self.universe.step(timestep);
 
         // Do graphics and UI
-        self.renderer.render_frame(&self.space, &self.camera);
+        self.renderer.render_frame(self.universe.space(), self.universe.camera());
         self.static_dom.scene_info_text.set_text_content(Some(&format!(
-            "{:#?}\n{:#?}", self.camera, space_step_info)));
+            "{:#?}\n{:#?}", self.universe.camera(), space_step_info)));
 
         // Schedule next requestAnimationFrame
         self.start_loop();
@@ -159,14 +148,12 @@ impl WebGameRoot {
 
 struct StaticDom {
     scene_info_text: HtmlElement,
-    view_canvas: HtmlCanvasElement,
 }
 
 impl StaticDom {
     fn new(document: &Document) -> Result<Self, Error> {
         Ok(Self {
             scene_info_text: get_mandatory_element(document, "scene-info-text")?,
-            view_canvas: get_mandatory_element(document, "view-canvas")?,
         })
     }
 }

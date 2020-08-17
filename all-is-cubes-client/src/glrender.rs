@@ -18,10 +18,12 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use all_is_cubes::camera::Camera;
+use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate};
 use all_is_cubes::space::{PackedLight, Space};
 use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, ToGfxVertex, triangulate_blocks, triangulate_space};
+
+use crate::js_bindings::{CanvasHelper};
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
 const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
@@ -29,7 +31,9 @@ const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
 const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 
 pub struct GLRenderer {
+    canvas_helper: CanvasHelper,
     surface: WebSysWebGL2Surface,
+    proj: ProjectionHelper,
     block_program: Program<VertexSemantics, (), ShaderInterface>,
     block_data_cache: Option<BlocksRenderData<BlockVertex>>,  // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
@@ -37,8 +41,8 @@ pub struct GLRenderer {
 }
 
 impl GLRenderer {
-    pub fn new(canvas_id: &str) -> Result<Self, WebSysWebGL2SurfaceError> {
-        let mut surface = WebSysWebGL2Surface::new(canvas_id, WindowOpt::default())?;
+    pub fn new(canvas_helper: CanvasHelper) -> Result<Self, WebSysWebGL2SurfaceError> {
+        let mut surface = WebSysWebGL2Surface::new(canvas_helper.id(), WindowOpt::default())?;
 
         let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = surface
             .new_shader_program::<VertexSemantics, (), ShaderInterface>()
@@ -66,8 +70,11 @@ impl GLRenderer {
             console::warn_1(&JsValue::from_str(&format!("GLSL warning: {:?}", warning)));
         }
 
+        let proj = ProjectionHelper::new(1.0, canvas_helper.viewport_px());
         Ok(Self {
+            canvas_helper,
             surface,
+            proj,
             block_program,
             block_data_cache: None,
             chunk: Chunk::new(),
@@ -75,9 +82,14 @@ impl GLRenderer {
         })
     }
 
+    pub fn update_viewport(&mut self) {
+        self.proj.set_viewport(self.canvas_helper.viewport_px());
+    }
+
     pub fn render_frame(&mut self, space: &Space, camera: &Camera) {
         let mut surface = &mut self.surface;
         let block_program = &mut self.block_program;
+        let projection_matrix = self.proj.projection();
 
         // TODO: quick hack; we need actual invalidation, not memoization
         let block_render_data = self.block_data_cache
@@ -99,7 +111,7 @@ impl GLRenderer {
             &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
             |_, mut shading_gate| {
                 shading_gate.shade(block_program, |mut shader_iface, u, mut render_gate| {
-                    let pm: [[f32; 4]; 4] = camera.projection().cast::<f32>().unwrap().into();
+                    let pm: [[f32; 4]; 4] = projection_matrix.cast::<f32>().unwrap().into();
                     shader_iface.set(&u.projection_matrix0, pm[0]);
                     shader_iface.set(&u.projection_matrix1, pm[1]);
                     shader_iface.set(&u.projection_matrix2, pm[2]);
