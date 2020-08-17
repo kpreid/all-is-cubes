@@ -3,18 +3,15 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::{Matrix4, Point3, Transform, Vector2, Vector4};
+use cgmath::{Vector2, Vector4};
 use rayon::iter::{ParallelIterator, IntoParallelIterator};
 use std::io;
 use termion::{color};
 use termion::event::{Event, Key};
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::{FreeCoordinate};
 use all_is_cubes::raycast::{Face, Raycaster};
 use all_is_cubes::space::{Space};
-
-type M = Matrix4<FreeCoordinate>;
 
 /// Processes events for moving a camera. Returns all those events it does not process.
 pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
@@ -36,13 +33,6 @@ pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
     None  // match branches default to consuming event
 }
 
-fn camera_matrix(projection: &ProjectionHelper, camera: &Camera) -> M {
-    // Inverse of regular camera matrix because we are transforming screen space to
-    // world space to raycast, instead of transforming vertices in world space to
-    // screen space.
-    (projection.projection() * camera.view()).inverse_transform().unwrap()
-}
-
 pub fn viewport_from_terminal_size() -> io::Result<Vector2<usize>> {
     let (w, h) = termion::terminal_size()?;
     Ok(Vector2::new(w.max(1) as usize, (h - 5).max(1) as usize))
@@ -51,26 +41,30 @@ pub fn viewport_from_terminal_size() -> io::Result<Vector2<usize>> {
 // Draw the space to an ANSI terminal using raytracing.
 pub fn draw_space<O: io::Write>(
     space: &Space,
-    projection: &ProjectionHelper,
+    projection: &mut ProjectionHelper,
     camera: &Camera,
     out: &mut O,
 ) -> io::Result<()> {
-    let viewport = projection.viewport();
-    let view_matrix = camera_matrix(projection, camera);
+    // TODO: consider refactoring so that we don't need &mut Camera
+    projection.set_view_matrix(camera.view());
+    let projection_copy_for_parallel: ProjectionHelper = *projection;
 
     // Diagnostic info accumulators
     let mut number_of_cubes_examined :usize = 0;
 
+    let viewport = projection.viewport();
     let pixel_iterator = (0..viewport.y).into_par_iter().map(move |ych| {
         let y = -projection.normalize_pixel_y(ych);
         (0..viewport.x).into_par_iter().map(move |xch| {
-            let x = projection.normalize_pixel_x(xch);
+            let x = projection_copy_for_parallel.normalize_pixel_x(xch);
             (xch, ych, x, y)
         })
     }).flatten();
 
     let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
-        let (text, count) = character_from_cell(x, y, &view_matrix, &space);
+        let (origin, direction) = projection_copy_for_parallel.project_ndc_into_world(x, y);
+        let ray = Raycaster::new(origin, direction).within_grid(*space.grid());
+        let (text, count) = character_from_ray(ray, space);
         (xch, ych, text, count)
     });
 
@@ -91,19 +85,6 @@ pub fn draw_space<O: io::Write>(
     out.flush()?;
 
     Ok(())
-}
-
-fn character_from_cell(x: FreeCoordinate, y: FreeCoordinate, view_matrix: &Matrix4<FreeCoordinate>, space: &Space) -> (String, usize) {
-    // Homogeneous-coordinate endpoints of the camera ray.
-    let ndc_near = Vector4::new(x, y, -1.0, 1.0);
-    let ndc_far = Vector4::new(x, y, 1.0, 1.0);
-    // World-space endpoints of the camera ray.
-    let world_near = Point3::from_homogeneous(view_matrix * ndc_near);
-    let world_far = Point3::from_homogeneous(view_matrix * ndc_far);
-    let direction = world_far - world_near;
-
-    let ray = Raycaster::new(world_near, direction).within_grid(*space.grid());
-    character_from_ray(ray, space)
 }
 
 /// Compute a colored character corresponding to what one ray hits.

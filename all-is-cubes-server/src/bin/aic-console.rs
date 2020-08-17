@@ -20,9 +20,9 @@ use all_is_cubes_server::console::{controller, draw_space, viewport_from_termina
 
 fn main() -> io::Result<()> {
     let mut universe = Universe::new_test_universe();
-    let proj: ProjectionHelper = ProjectionHelper::new(0.5, viewport_from_terminal_size()?);
+    let mut proj: ProjectionHelper = ProjectionHelper::new(0.5, viewport_from_terminal_size()?);
     let mut out = io::stdout().into_raw_mode()?;
-    
+
     universe.camera_mut().auto_rotate = true;
 
     // Park stdin blocking reads on another thread.
@@ -67,6 +67,6 @@ fn main() -> io::Result<()> {
         }
 
         universe.step(timestep);
-        draw_space(universe.space(), &proj, &universe.camera(), &mut out)?;
+        draw_space(universe.space(), &mut proj, &universe.camera(), &mut out)?;
     }
 }

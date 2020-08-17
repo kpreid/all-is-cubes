@@ -3,7 +3,14 @@
 
 //! Basic camera. TODO: This will eventually become 'character', probably, but for now we have static worlds and want to move a viewpoint around.
 
-use cgmath::{Deg, EuclideanSpace, Matrix3, Matrix4, Vector2, Vector3};
+use cgmath::{
+    Deg,
+    EuclideanSpace,
+    Matrix3, Matrix4,
+    Point3,
+    SquareMatrix, Transform,
+    Vector2, Vector3, Vector4,
+};
 use num_traits::identities::Zero;
 use std::time::Duration;
 
@@ -90,10 +97,21 @@ impl Camera {
 
 type M = Matrix4<FreeCoordinate>;
 
+/// Tool for setting up and using a projection matrix. Stores viewport dimensions
+/// and aspect ratio, and derives a projection matrix.
+///
+/// Also stores an externally-provided view matrix (world space to camera space).
+/// If not needed, can be ignored.
+#[derive(Clone, Copy, Debug)]
 pub struct ProjectionHelper {
+    // Caller-provided data
     viewport: Vector2<usize>,
     pixel_aspect_ratio: FreeCoordinate,
-    projection: Matrix4<FreeCoordinate>,
+    view: M,
+
+    // Derived data
+    projection: M,
+    inverse_projection_view: M,
 }
 
 impl ProjectionHelper {
@@ -105,18 +123,28 @@ impl ProjectionHelper {
         let mut new_self = Self {
             viewport,
             pixel_aspect_ratio,
-            projection: M::zero(),
+            projection: M::identity(),  // overwritten immediately
+            view: M::identity(),
+            inverse_projection_view: M::identity(), // overwritten immediately
         };
-        new_self.compute_projection();
+        new_self.compute_matrices();
         new_self
     }
 
     pub fn viewport(&self) -> Vector2<usize> { self.viewport }
 
-    /// Updates the projection for a new viewport aspect ratio.
     pub fn set_viewport(&mut self, viewport: Vector2<usize>) {
-        self.viewport = viewport;
-        self.compute_projection();
+        if viewport != self.viewport {
+            self.viewport = viewport;
+            self.compute_matrices();
+        }
+    }
+
+    pub fn set_view_matrix(&mut self, view: M) {
+        if view != self.view {
+            self.view = view;
+            self.compute_matrices();
+        }
     }
 
     /// As per OpenGL normalized device coordinates, output ranges from -1 to 1.
@@ -134,7 +162,20 @@ impl ProjectionHelper {
         self.projection
     }
 
-    fn compute_projection(&mut self) {
+    /// Convert a screen position in normalized device coordinates (as produced by
+    /// `normalize_pixel_x` & `normalize_pixel_y`) into a ray in world space.
+    /// Uses the view transformation given by `set_view_matrix`.
+    pub fn project_ndc_into_world(&self, ndc_x: FreeCoordinate, ndc_y: FreeCoordinate) -> (Point3<FreeCoordinate>, Vector3<FreeCoordinate>) {
+        let ndc_near = Vector4::new(ndc_x, ndc_y, -1.0, 1.0);
+        let ndc_far = Vector4::new(ndc_x, ndc_y, 1.0, 1.0);
+        // World-space endpoints of the ray.
+        let world_near = Point3::from_homogeneous(self.inverse_projection_view * ndc_near);
+        let world_far = Point3::from_homogeneous(self.inverse_projection_view * ndc_far);
+        let direction = world_far - world_near;
+        (world_near, direction)
+    }
+
+    fn compute_matrices(&mut self) {
         let aspect_ratio = self.pixel_aspect_ratio *
             ((self.viewport.x as FreeCoordinate) / (self.viewport.y as FreeCoordinate));
         self.projection = cgmath::perspective(
@@ -143,5 +184,7 @@ impl ProjectionHelper {
             /* near: */ 0.1,
             /* far: */ 2000.0,
         );
+        self.inverse_projection_view = (self.projection * self.view).inverse_transform()
+            .expect("projection and view matrix was not invertible");
     }
 }
