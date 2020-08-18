@@ -23,6 +23,7 @@ use web_sys::console;
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate};
 use all_is_cubes::space::{PackedLight, Space};
+use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, ToGfxVertex, triangulate_blocks, triangulate_space};
 
 use crate::js_bindings::{CanvasHelper};
@@ -95,6 +96,9 @@ impl GLRenderer {
     }
 
     pub fn render_frame(&mut self, space: &Space, camera: &Camera) {
+        // Not used directly for rendering, but used for cursor.
+        self.proj.set_view_matrix(camera.view());
+
         let mut surface = &mut self.surface;
         let block_program = &mut self.block_program;
         let projection_matrix = self.proj.projection();
@@ -142,6 +146,11 @@ impl GLRenderer {
         }
 
         // There is no swap_buffers operation because WebGL implicitly does so.
+    }
+
+    pub fn cursor_raycaster(&self, /* TODO: offset ... or move this function */) -> Raycaster {
+        let (origin, direction) = self.proj.project_ndc_into_world(0.0, 0.0);
+        Raycaster::new(origin, direction)
     }
 }
 

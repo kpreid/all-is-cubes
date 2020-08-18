@@ -57,6 +57,8 @@ impl Block {
 pub struct BlockAttributes {
     /// The name that should be displayed to players.
     pub display_name: Cow<'static, str>,
+    /// Whether players' cursors target it or pass through it.
+    pub selectable: bool,
     /// Whether the block is a physical obstacle.
     pub solid: bool,
     /// Light emitted by the block.
@@ -66,6 +68,7 @@ pub struct BlockAttributes {
 
 static DEFAULT_ATTRIBUTES :BlockAttributes = BlockAttributes {
     display_name: Cow::Borrowed(""),
+    selectable: true,
     solid: true,
     light_emission: RGB::ZERO,
 };
@@ -82,6 +85,7 @@ impl Default for BlockAttributes {
 pub static AIR :Block = Block::Atom(
     BlockAttributes {
         display_name: Cow::Borrowed("<air>"),
+        selectable: false,
         solid: false,
         light_emission: RGB::ZERO,
     },

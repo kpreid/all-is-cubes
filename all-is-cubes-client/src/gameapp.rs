@@ -1,6 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
@@ -9,6 +10,7 @@ use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
 use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, console};
 
+use all_is_cubes::camera::{cursor_raycast};
 use all_is_cubes::universe::{Universe};
 
 use crate::glrender::GLRenderer;
@@ -136,10 +138,21 @@ impl WebGameRoot {
         let timestep = Duration::from_secs_f64(1.0/60.0);
         let (space_step_info, _) = self.universe.step(timestep);
 
-        // Do graphics and UI
+        // Do graphics
         self.renderer.render_frame(self.universe.space(), self.universe.camera());
+        
+        // Compute info text.
+        // TODO: tidy up cursor result formatting, make it reusable
+        let cursor_result = cursor_raycast(self.renderer.cursor_raycaster(), self.universe.space());
+        let cursor_result_text = match cursor_result {
+            Some(cursor) => Cow::Owned(format!("{}", cursor)),
+            None => Cow::Borrowed("No block"),
+        };
         self.static_dom.scene_info_text.set_text_content(Some(&format!(
-            "{:#?}\n{:#?}", self.universe.camera(), space_step_info)));
+            "{:#?}\n{:#?}\n\n{}",
+            self.universe.camera(),
+            space_step_info,
+            cursor_result_text)));
 
         // Schedule next requestAnimationFrame
         self.start_loop();

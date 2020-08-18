@@ -14,8 +14,10 @@ use cgmath::{
 use num_traits::identities::Zero;
 use std::time::Duration;
 
+use crate::block::{Block};
 use crate::math::{FreeCoordinate};
 use crate::physics::{Body};
+use crate::raycast::{Raycaster, RaycastStep};
 use crate::space::{Grid, Space};
 use crate::util::{ConciseDebug as _};
 
@@ -186,5 +188,35 @@ impl ProjectionHelper {
         );
         self.inverse_projection_view = (self.projection * self.view).inverse_transform()
             .expect("projection and view matrix was not invertible");
+    }
+}
+
+pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
+    let ray = ray.within_grid(*space.grid());
+    // TODO: implement 'reach' radius limit
+    // Note: it may become the cse in the future that we want to pass something more specialized than a RaycastStep, but for now RaycastStep is exactly the right structure.
+    for step in ray {
+        let block = &space[step.cube];
+        if block.attributes().selectable {
+            return Some(Cursor {
+                place: step,
+                block: block.clone(),
+            });
+        }
+    }
+    None
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Cursor {
+    place: RaycastStep,
+    block: Block,
+}
+
+impl std::fmt::Display for Cursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Block: {}\n   at: {:?}",
+            self.block.attributes().display_name,
+            self.place.cube.as_concise_debug())
     }
 }
