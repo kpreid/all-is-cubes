@@ -235,20 +235,14 @@ impl Chunk {
     fn update(&mut self, context: &mut WebSysWebGL2Surface, space: &Space, blocks_render_data: &BlocksRenderData<BlockVertex>) {
         triangulate_space(space, blocks_render_data, &mut self.vertices);
 
-        // TODO: updating an existing Tess doesn't work because of
-        // https://github.com/phaazon/luminance-rs/issues/436
-        // -- reenable this when bug is fixes
-        if false {
-            if let Some(tess) = self.tess.as_mut() {
-                if tess.vert_nb() == self.vertices.len() {
-                    // Same length; reuse buffer.
-                    // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
-                    let mut buffer_slice: VerticesMut<Backend, Vertex, _, _, _, _> =
-                        tess.vertices_mut().expect("failed to map vertices for copying");
-                    assert_eq!(buffer_slice.len(), tess.vert_nb());
-                    buffer_slice.copy_from_slice(&*self.vertices);
-                    return;
-                }
+        if let Some(tess) = self.tess.as_mut() {
+            if tess.vert_nb() == self.vertices.len() {
+                // Same length; reuse existing buffer.
+                // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
+                let mut buffer_slice: VerticesMut<Backend, Vertex, _, _, _, _> =
+                    tess.vertices_mut().expect("failed to map vertices for copying");
+                buffer_slice.copy_from_slice(&*self.vertices);
+                return;
             }
         }
 

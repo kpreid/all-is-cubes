@@ -23,7 +23,7 @@ js-sys = "0.3.44"
 luminance = "0.41.0"
 luminance-derive = "0.6.1"
 luminance-web-sys = "0.1.1"
-luminance-webgl = "0.1.1"
+luminance-webgl = "0.1.2"
 luminance-windowing = "0.9.1"
 wasm-bindgen = "0.2.67"
 
