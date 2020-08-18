@@ -5,15 +5,15 @@
 
 use cgmath::{Vector3};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
-use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
-use luminance_front::context::GraphicsContext;
-use luminance_front::pipeline::PipelineState;
-use luminance_front::render_state::RenderState;
-use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
-use luminance_front::tess::{Mode, Tess, VerticesMut};
-use luminance_front::tess_gate::TessGate;
+use luminance::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
+use luminance::context::GraphicsContext;
+use luminance::pipeline::PipelineState;
+use luminance::render_state::RenderState;
+use luminance::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
+use luminance::tess::{Mode, Tess, VerticesMut};
+use luminance::tess_gate::TessGate;
 use luminance_web_sys::{WebSysWebGL2Surface, WebSysWebGL2SurfaceError};
-use luminance_windowing::WindowOpt;
+use luminance_windowing::{WindowOpt};
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
@@ -25,6 +25,8 @@ use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, ToGfxVertex, tri
 
 use crate::js_bindings::{CanvasHelper};
 
+type Backend = luminance_webgl::WebGL2;
+
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
 const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
 const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
@@ -34,7 +36,7 @@ pub struct GLRenderer {
     canvas_helper: CanvasHelper,
     surface: WebSysWebGL2Surface,
     proj: ProjectionHelper,
-    block_program: Program<VertexSemantics, (), ShaderInterface>,
+    block_program: Program<Backend, VertexSemantics, (), ShaderInterface>,
     block_data_cache: Option<BlocksRenderData<BlockVertex>>,  // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
     fake_time: Duration,
@@ -44,7 +46,7 @@ impl GLRenderer {
     pub fn new(canvas_helper: CanvasHelper) -> Result<Self, WebSysWebGL2SurfaceError> {
         let mut surface = WebSysWebGL2Surface::new(canvas_helper.id(), WindowOpt::default())?;
 
-        let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = surface
+        let program_attempt: Result<BuiltProgram<_, _, _, _>, ProgramError> = surface
             .new_shader_program::<VertexSemantics, (), ShaderInterface>()
             .from_strings(
                 &(SHADER_COMMON.to_owned()
@@ -209,7 +211,7 @@ impl ToGfxVertex<Vertex> for BlockVertex {
 struct Chunk {
     // bounds: Grid,
     vertices: Vec<Vertex>,
-    tess: Option<Tess<Vertex>>,
+    tess: Option<Tess<Backend, Vertex>>,
 }
 
 impl Chunk {
@@ -228,7 +230,7 @@ impl Chunk {
                 if tess.vert_nb() == self.vertices.len() {
                     // Same length; reuse buffer.
                     // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
-                    let mut buffer_slice: VerticesMut<Vertex, _, _, _, _> =
+                    let mut buffer_slice: VerticesMut<Backend, Vertex, _, _, _, _> =
                         tess.vertices_mut().expect("failed to map vertices for copying");
                     assert_eq!(buffer_slice.len(), tess.vert_nb());
                     buffer_slice.copy_from_slice(&*self.vertices);
@@ -246,7 +248,7 @@ impl Chunk {
             .unwrap());  // TODO need any error handling?
     }
 
-    fn render<E>(&self, tess_gate: &mut TessGate) -> Result<(), E> {
+    fn render<E>(&self, tess_gate: &mut TessGate<Backend>) -> Result<(), E> {
         if let Some(tess) = self.tess.as_ref() {
             tess_gate.render(tess)?;
         }
