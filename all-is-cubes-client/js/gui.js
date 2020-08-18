@@ -40,6 +40,7 @@ export class CanvasHelper {
       canvas.height = layoutPixelHeight * window.devicePixelRatio;
 
       this.viewportPx = Object.freeze([layoutPixelWidth, layoutPixelHeight]);
+      this.viewportDev = Object.freeze([canvas.width, canvas.height]);
     };
     updateViewport();
 

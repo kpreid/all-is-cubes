@@ -22,6 +22,7 @@ dependencies = [
  "js-sys",
  "luminance",
  "luminance-derive",
+ "luminance-front",
  "luminance-web-sys",
  "luminance-webgl",
  "luminance-windowing",
@@ -190,6 +191,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "gl"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a94edab108827d67608095e269cf862e60d920f144a5026d3dbcfd8b877fb404"
+dependencies = [
+ "gl_generator",
+]
+
+[[package]]
+name = "gl_generator"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a95dfc23a2b4a9a2f5ab41d194f8bfda3cabec42af4e39f08c339eb2a0c124d"
+dependencies = [
+ "khronos_api",
+ "log",
+ "xml-rs",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -215,6 +236,12 @@ checksum = "85a7e2c92a4804dd459b86c339278d0fe87cf93757fae222c3fa3ae75458bc73"
 dependencies = [
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "khronos_api"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
 name = "lazy_static"
@@ -252,6 +279,27 @@ dependencies = [
  "proc-macro2 1.0.19",
  "quote 1.0.7",
  "syn",
+]
+
+[[package]]
+name = "luminance-front"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a497514e609ef806f0048683a3bb0e4f4d1a9183cb583d0ae83cf94a973e2b8"
+dependencies = [
+ "luminance",
+ "luminance-gl",
+ "luminance-webgl",
+]
+
+[[package]]
+name = "luminance-gl"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44c8439470a3af537d7f8c399be6743e8a4db4f9df23eb8cd0915d9bb8070427"
+dependencies = [
+ "gl",
+ "luminance",
 ]
 
 [[package]]
@@ -770,3 +818,9 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "xml-rs"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b07db065a5cf61a7e4ba64f29e67db906fb1787316516c4e6e5ff0fea1efcd8a"

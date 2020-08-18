@@ -6,6 +6,8 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 use js_sys::{Error};
+use luminance_web_sys::{WebSysWebGL2Surface};
+use luminance_windowing::WindowOpt;
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
 use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, console};
@@ -30,8 +32,10 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     let universe = Universe::new_test_universe();
 
-    let renderer = GLRenderer::new(gui_helpers.canvas_helper())
+    let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id(), WindowOpt::default())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
+
+    let renderer = GLRenderer::new(surface, gui_helpers.canvas_helper());
 
     append_text_content(&static_dom.scene_info_text, "\nGL ready.");
 
@@ -49,7 +53,7 @@ struct WebGameRoot {
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
     universe: Universe,
-    renderer: GLRenderer,
+    renderer: GLRenderer<WebSysWebGL2Surface>,
     raf_callback: Closure<dyn FnMut()>,
     /// In order to be able to set up callbacks to ourselves, we need to live in a mutable
     /// heap-allocated location, and we need to have a reference to that location. In
@@ -61,7 +65,7 @@ struct WebGameRoot {
 }
 
 impl WebGameRoot {
-    pub fn new(gui_helpers: GuiHelpers, static_dom: StaticDom, universe: Universe, renderer: GLRenderer) -> Rc<RefCell<WebGameRoot>> {
+    pub fn new(gui_helpers: GuiHelpers, static_dom: StaticDom, universe: Universe, renderer: GLRenderer<WebSysWebGL2Surface>) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {
             gui_helpers,

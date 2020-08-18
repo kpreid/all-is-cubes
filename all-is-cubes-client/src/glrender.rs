@@ -5,17 +5,16 @@
 
 use cgmath::{Vector3};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
-use luminance::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
-use luminance::context::GraphicsContext;
-use luminance::framebuffer::Framebuffer;
-use luminance::pipeline::PipelineState;
-use luminance::render_state::RenderState;
-use luminance::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
-use luminance::tess::{Mode, Tess, VerticesMut};
-use luminance::tess_gate::TessGate;
-use luminance::texture::Dim2;
-use luminance_web_sys::{WebSysWebGL2Surface, WebSysWebGL2SurfaceError};
-use luminance_windowing::{WindowOpt};
+use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
+use luminance_front::context::GraphicsContext;
+use luminance_front::framebuffer::Framebuffer;
+use luminance_front::pipeline::PipelineState;
+use luminance_front::render_state::RenderState;
+use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
+use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
+use luminance_front::tess_gate::TessGate;
+use luminance_front::texture::Dim2;
+use luminance_front::Backend;
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
@@ -28,29 +27,25 @@ use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, ToGfxVertex, tri
 
 use crate::js_bindings::{CanvasHelper};
 
-type Backend = luminance_webgl::WebGL2;
-
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
 const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
 const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
 const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 
-pub struct GLRenderer {
+pub struct GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
     canvas_helper: CanvasHelper,
-    surface: WebSysWebGL2Surface,
-    back_buffer: Framebuffer<Backend, Dim2, (), ()>,
+    surface: C,
+    back_buffer: Framebuffer<Dim2, (), ()>,
     proj: ProjectionHelper,
-    block_program: Program<Backend, VertexSemantics, (), ShaderInterface>,
+    block_program: Program<VertexSemantics, (), ShaderInterface>,
     block_data_cache: Option<BlocksRenderData<BlockVertex>>,  // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
     fake_time: Duration,
 }
 
-impl GLRenderer {
-    pub fn new(canvas_helper: CanvasHelper) -> Result<Self, WebSysWebGL2SurfaceError> {
-        let mut surface = WebSysWebGL2Surface::new(canvas_helper.id(), WindowOpt::default())?;
-
-        let program_attempt: Result<BuiltProgram<_, _, _, _>, ProgramError> = surface
+impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
+    pub fn new(mut surface: C, canvas_helper: CanvasHelper) -> Self {
+        let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = surface
             .new_shader_program::<VertexSemantics, (), ShaderInterface>()
             .from_strings(
                 &(SHADER_COMMON.to_owned()
@@ -77,8 +72,8 @@ impl GLRenderer {
         }
 
         let proj = ProjectionHelper::new(1.0, canvas_helper.viewport_px());
-        let back_buffer = surface.back_buffer().expect("back_buffer() failed");
-        Ok(Self {
+        let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(&mut surface, canvas_helper.viewport_dev()).unwrap();  // TODO error handling
+        Self {
             canvas_helper,
             surface,
             back_buffer,
@@ -87,19 +82,19 @@ impl GLRenderer {
             block_data_cache: None,
             chunk: Chunk::new(),
             fake_time: Duration::default(),
-        })
+        }
     }
 
     pub fn update_viewport(&mut self) {
         self.proj.set_viewport(self.canvas_helper.viewport_px());
-        self.back_buffer = self.surface.back_buffer().expect("back_buffer() failed");
+        self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(&mut self.surface, self.canvas_helper.viewport_dev()).unwrap();  // TODO error handling
     }
 
     pub fn render_frame(&mut self, space: &Space, camera: &Camera) {
         // Not used directly for rendering, but used for cursor.
         self.proj.set_view_matrix(camera.view());
 
-        let mut surface = &mut self.surface;
+        let surface = &mut self.surface;
         let block_program = &mut self.block_program;
         let projection_matrix = self.proj.projection();
 
@@ -109,7 +104,7 @@ impl GLRenderer {
 
         self.fake_time += Duration::from_millis(1000/60);  // TODO
 
-        self.chunk.update(&mut surface, &space, block_render_data);
+        self.chunk.update(surface, &space, block_render_data);
         let ct = &self.chunk;
 
         let render_state = RenderState::default()
@@ -224,7 +219,7 @@ impl ToGfxVertex<Vertex> for BlockVertex {
 struct Chunk {
     // bounds: Grid,
     vertices: Vec<Vertex>,
-    tess: Option<Tess<Backend, Vertex>>,
+    tess: Option<Tess<Vertex>>,
 }
 
 impl Chunk {
@@ -232,14 +227,19 @@ impl Chunk {
         Chunk { vertices: Vec::new(), tess: None }
     }
 
-    fn update(&mut self, context: &mut WebSysWebGL2Surface, space: &Space, blocks_render_data: &BlocksRenderData<BlockVertex>) {
+    fn update<C: GraphicsContext<Backend = Backend>>(
+        &mut self,
+        context: &mut C,
+        space: &Space,
+        blocks_render_data: &BlocksRenderData<BlockVertex>,
+    ) {
         triangulate_space(space, blocks_render_data, &mut self.vertices);
 
         if let Some(tess) = self.tess.as_mut() {
             if tess.vert_nb() == self.vertices.len() {
                 // Same length; reuse existing buffer.
                 // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
-                let mut buffer_slice: VerticesMut<Backend, Vertex, _, _, _, _> =
+                let mut buffer_slice: VerticesMut<Vertex, (), (), Interleaved, Vertex> =
                     tess.vertices_mut().expect("failed to map vertices for copying");
                 buffer_slice.copy_from_slice(&*self.vertices);
                 return;
@@ -255,7 +255,7 @@ impl Chunk {
             .unwrap());  // TODO need any error handling?
     }
 
-    fn render<E>(&self, tess_gate: &mut TessGate<Backend>) -> Result<(), E> {
+    fn render<E>(&self, tess_gate: &mut TessGate) -> Result<(), E> {
         if let Some(tess) = self.tess.as_ref() {
             tess_gate.render(tess)?;
         }
