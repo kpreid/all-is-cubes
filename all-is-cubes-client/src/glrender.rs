@@ -7,11 +7,13 @@ use cgmath::{Vector3};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance::context::GraphicsContext;
+use luminance::framebuffer::Framebuffer;
 use luminance::pipeline::PipelineState;
 use luminance::render_state::RenderState;
 use luminance::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
 use luminance::tess::{Mode, Tess, VerticesMut};
 use luminance::tess_gate::TessGate;
+use luminance::texture::Dim2;
 use luminance_web_sys::{WebSysWebGL2Surface, WebSysWebGL2SurfaceError};
 use luminance_windowing::{WindowOpt};
 use std::time::Duration;
@@ -35,6 +37,7 @@ const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 pub struct GLRenderer {
     canvas_helper: CanvasHelper,
     surface: WebSysWebGL2Surface,
+    back_buffer: Framebuffer<Backend, Dim2, (), ()>,
     proj: ProjectionHelper,
     block_program: Program<Backend, VertexSemantics, (), ShaderInterface>,
     block_data_cache: Option<BlocksRenderData<BlockVertex>>,  // TODO: quick hack, needs an invalidation strategy
@@ -73,9 +76,11 @@ impl GLRenderer {
         }
 
         let proj = ProjectionHelper::new(1.0, canvas_helper.viewport_px());
+        let back_buffer = surface.back_buffer().expect("back_buffer() failed");
         Ok(Self {
             canvas_helper,
             surface,
+            back_buffer,
             proj,
             block_program,
             block_data_cache: None,
@@ -86,6 +91,7 @@ impl GLRenderer {
 
     pub fn update_viewport(&mut self) {
         self.proj.set_viewport(self.canvas_helper.viewport_px());
+        self.back_buffer = self.surface.back_buffer().expect("back_buffer() failed");
     }
 
     pub fn render_frame(&mut self, space: &Space, camera: &Camera) {
@@ -99,8 +105,6 @@ impl GLRenderer {
 
         self.fake_time += Duration::from_millis(1000/60);  // TODO
 
-        let back_buffer = surface.back_buffer().unwrap();  // TODO error handling
-
         self.chunk.update(&mut surface, &space, block_render_data);
         let ct = &self.chunk;
 
@@ -108,7 +112,7 @@ impl GLRenderer {
             .set_face_culling(FaceCulling{order: FaceCullingOrder::CCW, mode: FaceCullingMode::Back});
 
         let render = surface.new_pipeline_gate().pipeline(
-            &back_buffer,
+            &self.back_buffer,
             // TODO: port skybox cube map code
             &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
             |_, mut shading_gate| {
