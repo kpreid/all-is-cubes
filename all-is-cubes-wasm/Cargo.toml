@@ -1,5 +1,5 @@
 [package]
-name = "all-is-cubes-client"
+name = "all-is-cubes-wasm"
 version = "0.1.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"

@@ -2,6 +2,6 @@
 /target
 
 # JavaScript (NPM) build files
-/all-is-cubes-client/node_modules
-/all-is-cubes-client/dist
-/all-is-cubes-client/pkg
+/all-is-cubes-wasm/node_modules
+/all-is-cubes-wasm/dist
+/all-is-cubes-wasm/pkg

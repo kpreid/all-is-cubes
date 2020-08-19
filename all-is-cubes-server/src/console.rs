@@ -131,7 +131,7 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
         // Note this is not true volumetric ray tracing: we're considering each
         // block to be discrete.
         let alpha_for_add = color.alpha() * ray_alpha;
-        ray_alpha *= (1.0 - color.alpha());
+        ray_alpha *= 1.0 - color.alpha();
         color_accumulator += fake_lighting_adjustment(color.to_rgb() * lighting, hit.face)
              * alpha_for_add;
     }

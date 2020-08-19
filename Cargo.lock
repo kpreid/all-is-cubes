@@ -13,7 +13,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "all-is-cubes-client"
+name = "all-is-cubes-server"
+version = "0.1.0"
+dependencies = [
+ "all-is-cubes",
+ "cgmath",
+ "itertools",
+ "lazy_static",
+ "num-traits",
+ "rayon",
+ "termion",
+]
+
+[[package]]
+name = "all-is-cubes-wasm"
 version = "0.1.0"
 dependencies = [
  "all-is-cubes",
@@ -29,19 +42,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
-]
-
-[[package]]
-name = "all-is-cubes-server"
-version = "0.1.0"
-dependencies = [
- "all-is-cubes",
- "cgmath",
- "itertools",
- "lazy_static",
- "num-traits",
- "rayon",
- "termion",
 ]
 
 [[package]]

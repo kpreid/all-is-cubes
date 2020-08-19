@@ -9,20 +9,20 @@
 
 all:
 	cargo build  # ignores wasm-only code
-	(cd all-is-cubes-client && npm run-script build)
+	(cd all-is-cubes-wasm && npm run-script build)
 
 lint:
 	cargo clippy  # ignores wasm-only code
-	(cd all-is-cubes-client && cargo clippy --target=wasm32-unknown-unknown)
+	(cd all-is-cubes-wasm && cargo clippy --target=wasm32-unknown-unknown)
 	# TODO: add JS linting
 
 test:
 	cargo test  # ignores wasm-only code
-	(cd all-is-cubes-client && npm test)
+	(cd all-is-cubes-wasm && npm test)
 
 run-server:
-	(cd all-is-cubes-client && npm start)
+	(cd all-is-cubes-wasm && npm start)
 
 update:
 	cargo update
-	(cd all-is-cubes-client && npm update)
+	(cd all-is-cubes-wasm && npm update)
