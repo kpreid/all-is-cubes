@@ -15,7 +15,7 @@ categories = ["games", "rendering"]
 name = "aic-console"
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.1.0" }
 cgmath = "0.17.0"
 itertools = "0.9.0"
 lazy_static = "1.4.0"
