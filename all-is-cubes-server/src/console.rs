@@ -131,7 +131,7 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
         // Note this is not true volumetric ray tracing: we're considering each
         // block to be discrete.
         let alpha_for_add = color.alpha() * ray_alpha;
-        ray_alpha = ray_alpha * (1.0 - color.alpha());
+        ray_alpha *= (1.0 - color.alpha());
         color_accumulator += fake_lighting_adjustment(color.to_rgb() * lighting, hit.face)
              * alpha_for_add;
     }
@@ -140,25 +140,31 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
         // Didn't intersect the world at all. Draw these as plain background.
         return (
             format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)),
-            0);
+            0,
+        );
     }
 
     // Fill up color buffer with "sky" color.
     let sky_vary = (number_passed.min(4) as f32) / 5.0;
     let sky_color = RGB::new(sky_vary, sky_vary, 1.0);
-    color_accumulator = color_accumulator + sky_color * ray_alpha;
+    color_accumulator += sky_color * ray_alpha;
     
     // TODO: Pick 8/256/truecolor based on what the terminal supports.
     let converted_color = color::AnsiValue::rgb(
         scale(color_accumulator.red()),
         scale(color_accumulator.green()),
         scale(color_accumulator.blue()));
-    return (
+    let colored_text = if let Some(text) = hit_text {
         format!("{}{}{}",
             color::Bg(converted_color),
             color::Fg(color::Black),
-            hit_text.unwrap_or(".".to_string())),  // TODO less allocation
-        number_passed);
+            text)
+    } else {
+        format!("{}{}.",
+            color::Bg(converted_color),
+            color::Fg(color::AnsiValue::rgb(5, 5, 5)))
+    };
+    (colored_text, number_passed)
 }
 
 fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
