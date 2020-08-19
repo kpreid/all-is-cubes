@@ -4,6 +4,7 @@
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
 use cgmath::{Vector2, Vector4};
+use lazy_static::lazy_static;
 use rayon::iter::{ParallelIterator, IntoParallelIterator};
 use std::io;
 use termion::{color};
