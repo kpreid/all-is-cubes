@@ -8,9 +8,7 @@ readme = "../README.md"
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"
-# TODO: revisit categories once it's more settled how useful this is as an engine
 categories = ["games", "wasm"]
-publish = false # guard against accidents until things are stable
 
 [lib]
 crate-type = ["cdylib"]

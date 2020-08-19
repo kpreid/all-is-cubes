@@ -3,14 +3,13 @@ name = "all-is-cubes"
 version = "0.1.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
-description = "Recursive voxel game/engine. Can be used for voxel raytracing."
+description = "Recursive voxel game/engine. Can be used for lo-fi voxel raytracing."
 readme = "../README.md"
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"
 # TODO: revisit categories once it's more settled how useful this is as an engine
 categories = ["games", "graphics"]
-publish = false # guard against accidents until things are stable
 
 [dependencies]
 cgmath = "0.17.0"
