@@ -9,6 +9,8 @@ readme = "../README.md"
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"
 categories = ["games", "wasm"]
+# Disable publishing for now because if I understand correctly, publishing this _Rust_ package is mostly useless as it leaves behind all of the JS/static stuff. It would only be useful if there was a need to build something *else* that depends on the Rust code but none of the JS.
+publish = false
 
 [lib]
 crate-type = ["cdylib"]
