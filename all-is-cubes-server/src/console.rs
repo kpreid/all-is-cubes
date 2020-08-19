@@ -3,14 +3,16 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::{Vector2, Vector4};
+use cgmath::{Vector2, Vector3};
 use lazy_static::lazy_static;
 use rayon::iter::{ParallelIterator, IntoParallelIterator};
+use std::convert::TryInto;
 use std::io;
 use termion::{color};
 use termion::event::{Event, Key};
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
+use all_is_cubes::math::{RGB};
 use all_is_cubes::raycast::{Face, Raycaster};
 use all_is_cubes::space::{Space};
 
@@ -95,7 +97,10 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
         (x * scale).max(0.0).min(scale) as u8
     }
 
-    let mut number_passed :usize = 0;
+    let mut number_passed: usize = 0;
+    let mut hit_text: Option<String> = None;
+    let mut color_accumulator = RGB::ZERO;
+    let mut ray_alpha = 1.0;
     for hit in ray {
         number_passed += 1;
         if number_passed > 1000 {
@@ -108,49 +113,64 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
         let block = &space[hit.cube];
         let attributes = &block.attributes();
         let color = block.color();
-        // TODO: Implement general transparency. We might as well.
-        if color.binary_opaque() {
-            let rgba :Vector4<f32> = block.color().into();
-            // TODO: Pick 8/256/truecolor based on what the terminal supports.
-            let rgba = fake_lighting_adjustment(rgba, hit.face);
-            let converted_color = color::AnsiValue::rgb(
-                scale(rgba.x), scale(rgba.y), scale(rgba.z));
-            return (
-                format!("{}{}{}",
-                    color::Bg(converted_color),
-                    color::Fg(color::Black),
-                    &attributes.display_name[0..1]),
-                number_passed);
+        if color.alpha() <= 0.0 {
+            continue;
         }
+
+        // Use text of the first non-completely-transparent block.
+        if hit_text.is_none() {
+            // TODO: For more Unicode correctness, index by grapheme cluster...
+            // ...and do something clever about double-width characters.
+            hit_text = Some(attributes.display_name[0..1].to_string());
+        }
+        
+        // Find lighting.
+        let lighting: RGB = space.get_lighting(hit.previous_cube()).into();
+
+        // Blend in color of this block.
+        // Note this is not true volumetric ray tracing: we're considering each
+        // block to be discrete.
+        let alpha_for_add = color.alpha() * ray_alpha;
+        ray_alpha = ray_alpha * (1.0 - color.alpha());
+        color_accumulator += fake_lighting_adjustment(color.to_rgb() * lighting, hit.face)
+             * alpha_for_add;
     }
 
-    // Didn't hit any blocks; write a "sky".
-    let s :String;
-    if number_passed > 0 {
-        // Intersected the world, but no opaque blocks.
-        let c = number_passed.min(4) as u8;
-        s = format!("{}{}.",
-            color::Bg(color::AnsiValue::rgb(c, c, 5)),
-            color::Fg(color::AnsiValue::rgb(5, 5, 5)));
-    } else {
-        // Didn't intersect the world at all. Draw these as plain background
-        s = format!("{}{} ",
-            color::Bg(color::Reset),
-            color::Fg(color::Reset));
+    if number_passed == 0 {
+        // Didn't intersect the world at all. Draw these as plain background.
+        return (
+            format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)),
+            0);
     }
-    (s, number_passed)
+
+    // Fill up color buffer with "sky" color.
+    let sky_vary = (number_passed.min(4) as f32) / 5.0;
+    let sky_color = RGB::new(sky_vary, sky_vary, 1.0);
+    color_accumulator = color_accumulator + sky_color * ray_alpha;
+    
+    // TODO: Pick 8/256/truecolor based on what the terminal supports.
+    let converted_color = color::AnsiValue::rgb(
+        scale(color_accumulator.red()),
+        scale(color_accumulator.green()),
+        scale(color_accumulator.blue()));
+    return (
+        format!("{}{}{}",
+            color::Bg(converted_color),
+            color::Fg(color::Black),
+            hit_text.unwrap_or(".".to_string())),  // TODO less allocation
+        number_passed);
 }
 
-fn fake_lighting_adjustment(rgba :Vector4<f32>, face :Face) -> Vector4<f32> {
+fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
     let one_step = 1.0/5.0;
-    let v = Vector4::new(1.0, 1.0, 1.0, 0.0);
+    let v = Vector3::new(1.0, 1.0, 1.0);
     let modifier = match face {
         Face::PY => v * one_step * 2.0,
         Face::NY => v * one_step * -1.0,
         Face::NX | Face::PX => v * one_step * 1.0,
         _ => v * 0.0,
     };
-    rgba + modifier
+    rgb + modifier.try_into().unwrap()
 }
 
 lazy_static! {

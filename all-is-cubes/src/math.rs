@@ -3,11 +3,11 @@
 
 //! Mathematical utilities and decisions.
 
-use cgmath::{Array, BaseFloat, BaseNum, EuclideanSpace, Matrix4, Point3, Vector3, Vector4};
+use cgmath::{Array, BaseFloat, BaseNum, ElementWise, EuclideanSpace, Matrix4, Point3, Vector3, Vector4};
 use num_traits::identities::Zero;
 use std::convert::{TryFrom, TryInto};
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, AddAssign, Div, Index, IndexMut, Rem};
+use std::ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Rem};
 
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = isize;
@@ -338,11 +338,25 @@ impl AddAssign<RGB> for RGB {
 impl AddAssign<RGBA> for RGBA {
     fn add_assign(&mut self, other: Self) { self.0 += other.0; }
 }
+impl Mul<RGB> for RGB {
+    type Output = Self;
+    /// Multiplies this color value componentwise.
+    fn mul(self, other: RGB) -> Self {
+        (self.0.mul_element_wise(other.0)).try_into().unwrap()
+    }
+}
+impl Mul<f32> for RGB {
+    type Output = Self;
+    /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
+    fn mul(self, scalar: f32) -> Self {
+        (self.0 * scalar).try_into().expect("multiplication by NaN")
+    }
+}
 impl Div<f32> for RGB {
     type Output = Self;
     /// Divides this color value by a scalar. Panics if the scalar is zero.
     fn div(self, scalar: f32) -> Self {
-        // TODO: On further thought, why don't we provide only multiplication instead of only division?
+        // TODO: On further thought, why don't we provide only multiplication
         // Or even better, use ordered_float::NotNan as the argument?
         (self.0 / scalar).try_into().expect("division by zero")
     }
