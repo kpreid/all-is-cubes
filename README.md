@@ -8,13 +8,13 @@ Or rather, that's the plan; for now, this is just my very first project written 
 Project organization and development
 ------------------------------------
 
-This is a Cargo workspace divided into three packages (crates):
+This repository is divided into three packages (crates):
 
 * `all-is-cubes/` contains all of the fundamental data types and algorithms.
 * `all-is-cubes-client/` is the web UI/renderer which will only run in the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`.
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains code to render worlds as colored ASCII art (which is in this category because it depends on the `termion` package which will not compile to WebAssembly).
 
-Commands for building, testing, and running are collected in the `Makefile` for convenience (because there are some complications due to some of the code not being able to run in wasm and some not being able to run _outside_ wasm), but feel free to use it as a collection of suggestions.
+Because of the complication of having some wasm-specific code, some commands for building, testing, and running the entire project are collected in the `Makefile` for convenience:
 
 *   Test: `make test`
 
@@ -23,6 +23,8 @@ Commands for building, testing, and running are collected in the `Makefile` for 
 *   Development server: `make run-server`
 
     Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-client/`.*
+
+*   Run the terminal raytracer version: `cargo run`
 
 License
 -------
