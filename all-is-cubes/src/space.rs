@@ -272,6 +272,35 @@ impl Space {
             .map(|contents_index| self.contents[contents_index])
     }
 
+    /// Copy data out of a portion of the space in a caller-chosen format.
+    pub fn extract<V>(
+        &self,
+        subgrid: Grid,
+        extractor: impl Fn(BlockIndex, &Block, PackedLight) -> V,
+    ) -> GridArray<V> {
+        // assert!(self.grid.contains_grid(subgrid), "cannot extract outside of space");
+        let mut output: Vec<V> = Vec::with_capacity(subgrid.volume());
+        // TODO: Implement optimized index calculation, maybe as an iterator
+        for x in subgrid.x_range() {
+            for y in subgrid.y_range() {
+                for z in subgrid.z_range() {
+                    let cube_index = self.grid.index((x, y, z)).expect("cannot extract outside of space");
+                    let block_index = self.contents[cube_index];
+                    output.push(extractor(
+                        block_index,
+                        &self.index_to_block[block_index as usize],
+                        self.lighting[cube_index],
+                    ));
+                }
+            }
+        }
+
+        GridArray {
+            grid: subgrid,
+            contents: output.into_boxed_slice(),
+        }
+    }
+
     /// Returns the light occupying the given cube.
     ///
     /// This value may be considered as representing the average of the light reflecting
@@ -427,6 +456,33 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
 pub struct SpaceStepInfo {
     /// Number of blocks whose light data was updated this step.
     pub light_update_count: usize,
+}
+
+/// A 3-dimensional array with arbitrary element type instead of `Space`'s fixed types.
+///
+/// TODO: Should we rebuild Space on top of this?
+pub struct GridArray<V> {
+    grid: Grid,
+    contents: Box<[V]>,
+}
+
+impl<V> GridArray<V> {
+    pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
+        self.grid.index(position).map(|index| &self.contents[index])
+    }
+}
+
+impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
+    type Output = V;
+
+    fn index(&self, position: P) -> &Self::Output {
+        let position: GridPoint = position.into();
+        if let Some(index) = self.grid.index(position) {
+            &self.contents[index]
+        } else {
+            panic!("GridArray position out of range {:?} in {:?}", position, self.grid)
+        }
+    }
 }
 
 #[cfg(test)]

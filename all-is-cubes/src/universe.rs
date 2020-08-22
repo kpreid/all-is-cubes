@@ -4,7 +4,9 @@
 //! Top-level game state container.
 
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
+use std::collections::hash_map::DefaultHasher;
 use std::cell::{Ref, RefCell, RefMut};
+use std::hash::{Hash, Hasher};
 use std::rc::{Rc, Weak};
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
@@ -73,6 +75,7 @@ pub struct URef<T> {
     /// the assumption is that the overall game system will keep the `Universe` alive
     /// and that `Universe` will ensure no entry goes away while referenced.
     weak_ref: Weak<RefCell<UEntry<T>>>,
+    hash: u64,
 }
 
 impl<T: 'static> URef<T> {
@@ -104,6 +107,11 @@ impl<T> PartialEq for URef<T> {
 }
 /// `URef`s are compared by pointer equality.
 impl<T> Eq for URef<T> {}
+impl<T> Hash for URef<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash.hash(state);
+    }
+}
 
 /// A wrapper type for an immutably borrowed value from an `URef<T>`.
 pub struct UBorrow<T: 'static>(
@@ -142,15 +150,26 @@ struct UEntry<T> {
 #[derive(Debug)]
 struct URootRef<T> {
     strong_ref: StrongEntryRef<T>,
+    /// Arbitrary hash code assigned to this entry's `URef`s.
+    hash: u64,
 }
 
 impl<T> URootRef<T> {
     fn new(name: impl Into<String>, initial_value: T) -> Self {
+        let name = name.into();
+
+        // Grab whatever we can to make a random unique hash code, which isn't much.
+        // Hopefully we're rarely creating many refs with the same name that will
+        // be compared.
+        let mut hasher = DefaultHasher::new();
+        name.hash(&mut hasher);
+
         URootRef {
             strong_ref: Rc::new(RefCell::new(UEntry {
                 data: initial_value,
                 name: name.into(),
             })),
+            hash: hasher.finish(),
         }
     }
 
@@ -159,7 +178,10 @@ impl<T> URootRef<T> {
     /// TODO: As we add graph analysis features, this will need additional arguments
     /// like where the ref is being held, and it will probably need to be renamed.
     fn downgrade(&self) -> URef<T> {
-        URef { weak_ref: Rc::downgrade(&self.strong_ref) }
+        URef {
+            weak_ref: Rc::downgrade(&self.strong_ref),
+            hash: self.hash
+        }
     }
 
     /// Borrow the value, in the sense of std::RefCell::borrow.

@@ -12,9 +12,9 @@ use termion::{color};
 use termion::event::{Event, Key};
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::{RGB};
+use all_is_cubes::math::{RGB, RGBA};
 use all_is_cubes::raycast::{Face, Raycaster};
-use all_is_cubes::space::{Space};
+use all_is_cubes::space::{GridArray, PackedLight, Space};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
 pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
@@ -55,6 +55,18 @@ pub fn draw_space<O: io::Write>(
     // Diagnostic info accumulators
     let mut number_of_cubes_examined :usize = 0;
 
+    // Copy data out of Space (whose access is not thread safe due to contained URefs).
+    let grid = *space.grid();
+    let space_data: GridArray<TracingData> = space.extract(grid, |_index, block, lighting| {
+        TracingData {
+            color: block.color(),
+            lighting,
+            // TODO precompute this on indices
+            character: block.attributes().display_name.chars().next().unwrap_or(' '),
+        }
+    });
+
+    // Construct iterator over pixel positions.
     let viewport = projection.viewport();
     let pixel_iterator = (0..viewport.y).into_par_iter().map(move |ych| {
         let y = -projection.normalize_pixel_y(ych);
@@ -66,8 +78,8 @@ pub fn draw_space<O: io::Write>(
 
     let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
         let (origin, direction) = projection_copy_for_parallel.project_ndc_into_world(x, y);
-        let ray = Raycaster::new(origin, direction).within_grid(*space.grid());
-        let (text, count) = character_from_ray(ray, space);
+        let ray = Raycaster::new(origin, direction).within_grid(grid);
+        let (text, count) = character_from_ray(ray, &space_data);
         (xch, ych, text, count)
     });
 
@@ -90,8 +102,15 @@ pub fn draw_space<O: io::Write>(
     Ok(())
 }
 
+#[derive(Clone, Debug)]
+struct TracingData {
+    color: RGBA,
+    lighting: PackedLight,
+    character: char,
+}
+
 /// Compute a colored character corresponding to what one ray hits.
-fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
+fn character_from_ray(ray :Raycaster, space_data: &GridArray<TracingData>) -> (String, usize) {
     fn scale(x :f32) -> u8 {
         let scale = 5.0;
         (x * scale).max(0.0).min(scale) as u8
@@ -110,9 +129,8 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
                 number_passed);
         }
 
-        let block = &space[hit.cube];
-        let attributes = &block.attributes();
-        let color = block.color();
+        let block = &space_data[hit.cube];
+        let color = block.color;
         if color.alpha() <= 0.0 {
             continue;
         }
@@ -121,11 +139,13 @@ fn character_from_ray(ray :Raycaster, space: &Space) -> (String, usize) {
         if hit_text.is_none() {
             // TODO: For more Unicode correctness, index by grapheme cluster...
             // ...and do something clever about double-width characters.
-            hit_text = Some(attributes.display_name[0..1].to_string());
+            hit_text = Some(block.character.to_string());
         }
         
         // Find lighting.
-        let lighting: RGB = space.get_lighting(hit.previous_cube()).into();
+        let lighting: RGB = space_data.get(hit.previous_cube())
+            .map(|b| b.lighting.into())
+            .unwrap_or(PackedLight::SKY.into());
 
         // Blend in color of this block.
         // Note this is not true volumetric ray tracing: we're considering each

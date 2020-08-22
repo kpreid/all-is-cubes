@@ -7,6 +7,8 @@
 use std::borrow::Cow;
 
 use crate::math::{RGB, RGBA};
+use crate::space::Space;
+use crate::universe::URef;
 
 /// A `Block` is something that can exist in the grid of a `Space`; it occupies one unit
 /// cube of space and has a specified appearance and behavior.
@@ -18,30 +20,36 @@ pub enum Block {
     /// A block that is a solid-colored unit cube. (It may still be be transparent or
     /// non-solid.)
     Atom(BlockAttributes, RGBA),
+    Recur(BlockAttributes, URef<Space>),
 }
 
 impl Block {
     /// Returns the RGBA color to use for this block when viewed as a single voxel.
     pub fn color(&self) -> RGBA {
         match self {
-            Block::Atom(_a, c) => *c,
+            Block::Atom(_, c) => *c,
+            Block::Recur(_, _) => unimplemented!("TODO oops how do we color efficiently"),
         }
     }
 
     /// Returns the `BlockAttributes` for this block.
     pub fn attributes(&self) -> &BlockAttributes {
         match self {
-            Block::Atom(a, _c) => a,
+            Block::Atom(a, _) => a,
+            Block::Recur(a, _) => a,
         }
     }
 
-    /*
     /// Returns the space which defines the shape and behavior of this block, if there is one.
     ///
     /// TODO: there needs to be the concept of read-only derived spaces to make this work
     /// as intended.
-    fn space() -> Option<&Space> { ... }
-    */
+    fn space(&self) -> Option<&URef<Space>> {
+        match self {
+            Block::Atom(_, _) => None,
+            Block::Recur(_, space_ref) => Some(&space_ref),
+        }
+    }
 
     /// Returns whether this block should be considered a total obstruction to light
     // propagation.
@@ -82,7 +90,7 @@ impl Default for BlockAttributes {
 
 
 /// Generic 'empty'/'null' block. It is used by `Space` to respond to out-of-bounds requests.
-pub static AIR :Block = Block::Atom(
+pub const AIR :Block = Block::Atom(
     BlockAttributes {
         display_name: Cow::Borrowed("<air>"),
         selectable: false,
