@@ -95,6 +95,16 @@ impl<T: 'static> URef<T> {
     }
 }
 
+/// `URef`s are compared by pointer equality: they are equal only if they refer to
+/// the same mutable cell.
+impl<T> PartialEq for URef<T> {
+    fn eq(&self, other: &Self) -> bool {
+        return Weak::ptr_eq(&self.weak_ref, &other.weak_ref);
+    }
+}
+/// `URef`s are compared by pointer equality.
+impl<T> Eq for URef<T> {}
+
 /// A wrapper type for an immutably borrowed value from an `URef<T>`.
 pub struct UBorrow<T: 'static>(
     OwningRef<
@@ -174,6 +184,18 @@ mod tests {
         u.camera();
         u.camera_mut();
         u.step(Duration::from_millis(10));
+    }
+
+    #[test]
+    pub fn uref_equality_is_pointer_equality() {
+        let root_a = URootRef::new("space", Space::empty_positive(1, 1, 1));
+        let root_b = URootRef::new("space", Space::empty_positive(1, 1, 1));
+        let ref_a_1 = root_a.downgrade();
+        let ref_a_2 = root_a.downgrade();
+        let ref_b_1 = root_b.downgrade();
+        assert_eq!(ref_a_1, ref_a_1, "reflexive eq");
+        assert_eq!(ref_a_1, ref_a_2, "separately constructed are equal");
+        assert!(ref_a_1 != ref_b_1, "not equal");
     }
 
     // TODO: more tests of the hairy reference logic

@@ -215,6 +215,16 @@ pub struct Space {
     rng: rand_xoshiro::Xoshiro256Plus,
 }
 
+impl std::fmt::Debug for Space {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // Make the assumption that a Space is too big to print in its entirety.
+        fmt.debug_struct("Space")
+            .field("grid", &self.grid)
+            .field("index_to_block", &self.index_to_block)
+            .finish()  // TODO: use .finish_non_exhaustive() if that stabilizes
+    }
+}
+
 /// Number used to compactly store blocks.
 pub(crate) type BlockIndex = u8;
 
