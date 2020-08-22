@@ -245,7 +245,9 @@ pub struct RGBA(Vector4<f32>);
 
 impl RGB {
     /// Black.
-    pub const ZERO :RGB = RGB(Vector3::new(0.0, 0.0, 0.0));
+    pub const ZERO: RGB = RGB(Vector3::new(0.0, 0.0, 0.0));
+    /// White (unity brightness.)
+    pub const ONE: RGB = RGB(Vector3::new(1.0, 1.0, 1.0));
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.

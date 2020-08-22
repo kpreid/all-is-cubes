@@ -14,6 +14,10 @@ use crate::space::*;
 
 pub(crate) type PackedLightScalar = u8;
 
+/// RGB color for lighting from outside the space. Defined to be consistent with
+/// `PackedLight::SKY`.
+pub const SKY: RGB = RGB::ONE;
+
 /// Lighting within a `Space`.
 ///
 /// Each component is essentially a fixed-point value; `PackedLight::UNIT` is the

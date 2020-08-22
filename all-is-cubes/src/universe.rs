@@ -102,7 +102,7 @@ impl<T: 'static> URef<T> {
 /// the same mutable cell.
 impl<T> PartialEq for URef<T> {
     fn eq(&self, other: &Self) -> bool {
-        return Weak::ptr_eq(&self.weak_ref, &other.weak_ref);
+        Weak::ptr_eq(&self.weak_ref, &other.weak_ref)
     }
 }
 /// `URef`s are compared by pointer equality.
@@ -167,7 +167,7 @@ impl<T> URootRef<T> {
         URootRef {
             strong_ref: Rc::new(RefCell::new(UEntry {
                 data: initial_value,
-                name: name.into(),
+                name,
             })),
             hash: hasher.finish(),
         }

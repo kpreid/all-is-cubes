@@ -14,7 +14,7 @@ use crate::block::*;
 use crate::lighting::*;
 use crate::math::*;
 
-pub use crate::lighting::PackedLight;
+pub use crate::lighting::{PackedLight, SKY};
 
 /// Specifies the coordinate extent of a `Space`.
 ///

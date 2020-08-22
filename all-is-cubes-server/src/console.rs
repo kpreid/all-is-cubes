@@ -14,7 +14,7 @@ use termion::event::{Event, Key};
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{RGB, RGBA};
 use all_is_cubes::raycast::{Face, Raycaster};
-use all_is_cubes::space::{GridArray, PackedLight, Space};
+use all_is_cubes::space::{GridArray, PackedLight, SKY, Space};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
 pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
@@ -145,7 +145,7 @@ fn character_from_ray(ray :Raycaster, space_data: &GridArray<TracingData>) -> (S
         // Find lighting.
         let lighting: RGB = space_data.get(hit.previous_cube())
             .map(|b| b.lighting.into())
-            .unwrap_or(PackedLight::SKY.into());
+            .unwrap_or(SKY);
 
         // Blend in color of this block.
         // Note this is not true volumetric ray tracing: we're considering each
