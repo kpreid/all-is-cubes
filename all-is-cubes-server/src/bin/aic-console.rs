@@ -49,7 +49,7 @@ fn main() -> io::Result<()> {
         'input: loop {
             match event_rx.try_recv() {
                 Ok(event) => {
-                    if let Some(Event::Key(key)) = controller(universe.camera_mut(), event) {
+                    if let Some(Event::Key(key)) = controller(&mut *universe.camera_mut(), event) {
                         match key {
                             Key::Esc | Key::Ctrl('c') | Key::Ctrl('d') => {
                                 return Ok(());
@@ -67,6 +67,6 @@ fn main() -> io::Result<()> {
         }
 
         universe.step(timestep);
-        draw_space(universe.space(), &mut proj, &universe.camera(), &mut out)?;
+        draw_space(&*universe.space(), &mut proj, &universe.camera(), &mut out)?;
     }
 }

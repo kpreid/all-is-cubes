@@ -105,7 +105,7 @@ impl WebGameRoot {
             // and we also need to runtime borrow the `RefCell`)
             if let Some(refcell_ref) = self_ref.upgrade() {
                 let mut self2 :std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
-                let camera = self2.universe.camera_mut();
+                let camera = &mut *self2.universe.camera_mut();
                 if event.alt_key() || event.ctrl_key() || event.meta_key() {
                     return;
                 }
@@ -143,18 +143,18 @@ impl WebGameRoot {
         let (space_step_info, _) = self.universe.step(timestep);
 
         // Do graphics
-        self.renderer.render_frame(self.universe.space(), self.universe.camera());
+        self.renderer.render_frame(&*self.universe.space(), &*self.universe.camera());
         
         // Compute info text.
         // TODO: tidy up cursor result formatting, make it reusable
-        let cursor_result = cursor_raycast(self.renderer.cursor_raycaster(), self.universe.space());
+        let cursor_result = cursor_raycast(self.renderer.cursor_raycaster(), &*self.universe.space());
         let cursor_result_text = match cursor_result {
             Some(cursor) => Cow::Owned(format!("{}", cursor)),
             None => Cow::Borrowed("No block"),
         };
         self.static_dom.scene_info_text.set_text_content(Some(&format!(
             "{:#?}\n{:#?}\n\n{}",
-            self.universe.camera(),
+            &*self.universe.camera(),
             space_step_info,
             cursor_result_text)));
 
