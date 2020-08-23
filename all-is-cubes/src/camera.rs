@@ -66,7 +66,7 @@ impl Camera {
             * Matrix4::from_translation(-(self.body.position.to_vec()))
     }
 
-    pub fn step(&mut self, duration: Duration, space: &Space) {
+    pub fn step(&mut self, duration: Duration) {
         let dt = duration.as_secs_f64();
         let control_orientation :Matrix3<FreeCoordinate> = Matrix3::from_angle_y(-Deg(self.body.yaw));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
@@ -76,7 +76,7 @@ impl Camera {
 
         self.body.velocity += (velocity_target - self.body.velocity) * stiffness * dt;
 
-        self.body.step(duration, space);
+        self.body.step(duration);
 
         // TODO: temporary placeholder while we change over to continuous movement controls
         self.velocity_input *= (0.1 as FreeCoordinate).powf(dt);

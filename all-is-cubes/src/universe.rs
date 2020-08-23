@@ -4,7 +4,7 @@
 //! Top-level game state container.
 
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
-use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_map::{DefaultHasher, HashMap};
 use std::cell::{Ref, RefCell, RefMut};
 use std::hash::{Hash, Hasher};
 use std::rc::{Rc, Weak};
@@ -15,43 +15,82 @@ use crate::space::{Grid, Space, SpaceStepInfo};
 use crate::camera::Camera;
 use crate::worldgen::{axes, plain_color_blocks, wavy_landscape};
 
-/// In the future, a Universe will be a collection of named objects, which can refer
-/// to each other. It will enable multiple references, garbage collection, change
-/// notification, and inter-object invariants.
-///
-/// For now, it's a hardcoded container of all the mutable/steppable game state, which
-/// stores each entry in the fashion which imposes constraints needed for the above.
+type Name = String;  // TODO we want a non-flat namespace with nuances like 'anonymous/autoassigned'
+
+/// A collection of named objects which can refer to each other via `URef`. In the future,
+/// it will enable multiple references, garbage collection, change notification, and
+/// inter-object invariants.
 pub struct Universe {
-    space: URootRef<Space>,
-    camera: URootRef<Camera>,
+    spaces: HashMap<Name, URootRef<Space>>,
+    cameras: HashMap<Name, URootRef<Camera>>,
 }
 
 impl Universe {
-    /// Creates a Universe with some content for a "new game", as much as that can exist.
-    pub fn new_test_universe() -> Self {
-        let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));
-        let blocks = plain_color_blocks();
-        wavy_landscape(&mut space, blocks, 1.0);
-        axes(&mut space);
-
-        let camera = Camera::for_grid(space.grid());
-
-        Self {
-            space: URootRef::new("space", space),
-            camera: URootRef::new("camera", camera),
+    fn new() -> Self {
+        Universe {
+            spaces: HashMap::new(),
+            // TODO: bodies so body-in-world stepping
+            cameras: HashMap::new(),
         }
     }
 
-    // TODO: These should eventually go away as the universe becomes more complex.
-    pub fn space(&self) -> UBorrow<Space> { self.space.borrow() }
-    pub fn camera(&self) -> UBorrow<Camera> { self.camera.borrow() }
-    pub fn camera_mut(&mut self) -> UBorrowMut<Camera> { self.camera.borrow_mut() }
+    /// Creates a Universe with some content for a "new game", as much as that can exist.
+    pub fn new_test_universe() -> Self {
+        let mut universe = Self::new();
+
+        let grid = Grid::new((-10, -10, -10), (21, 21, 21));
+        let mut space = Space::empty(grid);
+        let blocks = plain_color_blocks();
+        wavy_landscape(&mut space, blocks, 1.0);
+        axes(&mut space);
+        universe.insert("space".into(), space);
+
+        let camera = Camera::for_grid(&grid);
+        universe.insert("camera".into(), camera);
+        universe
+    }
+
+    // TODO: temporary shortcuts to be replaced with more nuance
+    pub fn get_default_space(&self) -> URef<Space> {
+        self.get(&"space".into()).unwrap()
+    }
+    pub fn get_default_camera(&self) -> URef<Camera> {
+        self.get(&"camera".into()).unwrap()
+    }
 
     /// Advance time.
     pub fn step(&mut self, timestep: Duration) -> (SpaceStepInfo, ()) {
-        let space_info = self.space.borrow_mut().step(timestep);
-        let camera_info = self.camera.borrow_mut().step(timestep, &*self.space());
-        (space_info, camera_info)
+        let mut space_info = SpaceStepInfo::default();
+        for space in self.spaces.values() {
+            space_info += space.borrow_mut().step(timestep);
+        }
+        for camera in self.cameras.values() {
+            let _camera_info = camera.borrow_mut().step(timestep);
+        }
+        (space_info, ())
+    }
+}
+
+pub trait UniverseIndex<T> {
+    fn get(&self, name: &Name) -> Option<URef<T>>;
+    fn insert(&mut self, name: Name, value: T);
+}
+impl UniverseIndex<Space> for Universe {
+    fn get(&self, name: &Name) -> Option<URef<Space>> {
+        self.spaces.get(name).map(URootRef::downgrade)
+    }
+    fn insert(&mut self, name: Name, value: Space) {
+        // TODO: prohibit existing names under any type
+        self.spaces.insert(name.clone(), URootRef::new(name, value));
+    }
+}
+impl UniverseIndex<Camera> for Universe {
+    fn get(&self, name: &Name) -> Option<URef<Camera>> {
+        self.cameras.get(name).map(URootRef::downgrade)
+    }
+    fn insert(&mut self, name: Name, value: Camera) {
+        // TODO: prohibit existing names under any type
+        self.cameras.insert(name.clone(), URootRef::new(name, value));
     }
 }
 
@@ -143,10 +182,11 @@ impl<T> DerefMut for UBorrowMut<T> {
 #[derive(Debug)]
 struct UEntry<T> {
     data: T,
-    name: String,
+    name: Name,
 }
 
 /// The unique reference to an entry in a `Universe` from that `Universe`.
+/// Normal usage is via `URef` instead.
 #[derive(Debug)]
 struct URootRef<T> {
     strong_ref: StrongEntryRef<T>,
@@ -184,11 +224,6 @@ impl<T> URootRef<T> {
         }
     }
 
-    /// Borrow the value, in the sense of std::RefCell::borrow.
-    fn borrow(&self) -> UBorrow<T> {
-        self.downgrade().borrow()
-    }
-
     /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut.
     fn borrow_mut(&self) -> UBorrowMut<T> {
         self.downgrade().borrow_mut()
@@ -202,9 +237,7 @@ mod tests {
     #[test]
     pub fn new_test_universe_smoke_test() {
         let mut u = Universe::new_test_universe();
-        u.space();
-        u.camera();
-        u.camera_mut();
+        u.get_default_space();
         u.step(Duration::from_millis(10));
     }
 

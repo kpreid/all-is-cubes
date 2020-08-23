@@ -451,12 +451,18 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
 /// Performance data returned by `Space::step`. The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 #[non_exhaustive]
 pub struct SpaceStepInfo {
     /// Number of blocks whose light data was updated this step.
     pub light_update_count: usize,
 }
+impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
+    fn add_assign(&mut self, other: Self) {
+         self.light_update_count += other.light_update_count;
+     }
+}
+
 
 /// A 3-dimensional array with arbitrary element type instead of `Space`'s fixed types.
 ///

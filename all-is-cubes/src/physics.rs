@@ -5,7 +5,6 @@ use cgmath::{Basis2, Deg, InnerSpace as _, Point3, Rotation, Rotation2, Vector2,
 use std::time::Duration;
 
 use crate::math::{FreeCoordinate};
-use crate::space::{Space};
 use crate::util::{ConciseDebug as _};
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
@@ -15,6 +14,8 @@ const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Body {
+    // TODO: pub space: Option<URef<Space>>   --- or maybe backwards?
+
     pub position: Point3<FreeCoordinate>,
     pub velocity: Vector3<FreeCoordinate>,
 
@@ -34,7 +35,7 @@ impl std::fmt::Debug for Body {
 }
 
 impl Body {
-    pub fn step(&mut self, duration: Duration, _space: &Space) {
+    pub fn step(&mut self, duration: Duration) {
         let dt = duration.as_secs_f64();
 
         // TODO: Reset any non-finite values found to allow recovery from glitches.
@@ -64,18 +65,16 @@ impl Body {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::space::{Grid, Space};
 
     #[test]
     fn basic_physics() {
-        let space = Space::empty(Grid::new((-10, -10, -10), (20, 20, 20)));
         let mut body = Body {
             position: Point3::new(0.0, 1.0, 0.0),
             velocity: Vector3::new(2.0, 0.0, 0.0),
             yaw: 0.0,
             pitch: 0.0,
         };
-        body.step(Duration::from_secs(2), &space);
+        body.step(Duration::from_secs(2));
         assert_eq!(body.position, Point3::new(4.0, 1.0, 0.0));
     }
 

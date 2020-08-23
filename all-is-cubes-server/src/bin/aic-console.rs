@@ -20,10 +20,12 @@ use all_is_cubes_server::console::{controller, draw_space, viewport_from_termina
 
 fn main() -> io::Result<()> {
     let mut universe = Universe::new_test_universe();
+    let camera_ref = universe.get_default_camera();
+    let space_ref = universe.get_default_space();
     let mut proj: ProjectionHelper = ProjectionHelper::new(0.5, viewport_from_terminal_size()?);
     let mut out = io::stdout().into_raw_mode()?;
 
-    universe.camera_mut().auto_rotate = true;
+    (*camera_ref.borrow_mut()).auto_rotate = true;
 
     // Park stdin blocking reads on another thread.
     let (event_tx, event_rx) = mpsc::channel();
@@ -49,7 +51,7 @@ fn main() -> io::Result<()> {
         'input: loop {
             match event_rx.try_recv() {
                 Ok(event) => {
-                    if let Some(Event::Key(key)) = controller(&mut *universe.camera_mut(), event) {
+                    if let Some(Event::Key(key)) = controller(&mut *camera_ref.borrow_mut(), event) {
                         match key {
                             Key::Esc | Key::Ctrl('c') | Key::Ctrl('d') => {
                                 return Ok(());
@@ -67,6 +69,6 @@ fn main() -> io::Result<()> {
         }
 
         universe.step(timestep);
-        draw_space(&*universe.space(), &mut proj, &universe.camera(), &mut out)?;
+        draw_space(&*space_ref.borrow(), &mut proj, &camera_ref.borrow(), &mut out)?;
     }
 }
