@@ -57,8 +57,8 @@ pub fn draw_space<O: io::Write>(
 
     // Copy data out of Space (whose access is not thread safe due to contained URefs).
     let grid = *space.grid();
-    let space_data: GridArray<TracingData> = space.extract(grid, |_index, block, lighting| {
-        TracingData {
+    let space_data: GridArray<TracingBlockData> = space.extract(grid, |_index, block, lighting| {
+        TracingBlockData {
             color: block.color(),
             lighting,
             // TODO precompute this on indices
@@ -102,89 +102,120 @@ pub fn draw_space<O: io::Write>(
     Ok(())
 }
 
-#[derive(Clone, Debug)]
-struct TracingData {
-    color: RGBA,
-    lighting: PackedLight,
-    character: char,
-}
-
 /// Compute a colored character corresponding to what one ray hits.
-fn character_from_ray(ray :Raycaster, space_data: &GridArray<TracingData>) -> (String, usize) {
-    fn scale(x :f32) -> u8 {
-        let scale = 5.0;
-        (x * scale).max(0.0).min(scale) as u8
-    }
-
-    let mut number_passed: usize = 0;
-    let mut hit_text: Option<String> = None;
-    let mut color_accumulator = RGB::ZERO;
-    let mut ray_alpha = 1.0;
+fn character_from_ray(ray :Raycaster, space_data: &GridArray<TracingBlockData>) -> TraceResult {
+    let mut s: TracingState = TracingState::default();
     for hit in ray {
-        number_passed += 1;
-        if number_passed > 1000 {
+        s.number_passed += 1;
+        if s.number_passed > 1000 {
             // Abort excessively long traces.
             return (
                 format!("{}{}X", color::Bg(color::Red), color::Fg(color::Black)),
-                number_passed);
+                s.number_passed);
         }
 
         let block = &space_data[hit.cube];
         let color = block.color;
         if color.alpha() <= 0.0 {
+            // Skip lighting lookup
             continue;
         }
 
         // Use text of the first non-completely-transparent block.
-        if hit_text.is_none() {
+        if s.hit_text.is_none() {
             // TODO: For more Unicode correctness, index by grapheme cluster...
             // ...and do something clever about double-width characters.
-            hit_text = Some(block.character.to_string());
+            s.hit_text = Some(block.character.to_string());
         }
-        
+
         // Find lighting.
         let lighting: RGB = space_data.get(hit.previous_cube())
             .map(|b| b.lighting.into())
             .unwrap_or(SKY);
 
-        // Blend in color of this block.
-        // Note this is not true volumetric ray tracing: we're considering each
-        // block to be discrete.
-        let alpha_for_add = color.alpha() * ray_alpha;
-        ray_alpha *= 1.0 - color.alpha();
-        color_accumulator += fake_lighting_adjustment(color.to_rgb() * lighting, hit.face)
+        s.trace_through_surface(color, lighting, hit.face);
+    }
+    s.finish()
+}
+
+#[derive(Clone, Debug)]
+struct TracingBlockData {
+    color: RGBA,
+    lighting: PackedLight,
+    character: char,
+}
+
+type TraceResult = (String, usize);
+
+#[derive(Clone, Debug)]
+struct TracingState {
+    number_passed: usize,
+    hit_text: Option<String>,
+    color_accumulator: RGB,
+    ray_alpha: f32,
+}
+impl TracingState {
+    fn finish(mut self) -> TraceResult {
+        if self.number_passed == 0 {
+            // Didn't intersect the world at all. Draw these as plain background.
+            return (
+                format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)),
+                0,
+            );
+        }
+
+        // Fill up color buffer with "sky" color.
+        let sky_vary = (self.number_passed.min(4) as f32) / 5.0;
+        let sky_color = RGB::new(sky_vary, sky_vary, 1.0);
+        self.color_accumulator += sky_color * self.ray_alpha;
+
+        // TODO: Pick 8/256/truecolor based on what the terminal supports.
+        fn scale(x :f32) -> u8 {
+            let scale = 5.0;
+            (x * scale).max(0.0).min(scale) as u8
+        }
+        let converted_color = color::AnsiValue::rgb(
+            scale(self.color_accumulator.red()),
+            scale(self.color_accumulator.green()),
+            scale(self.color_accumulator.blue()));
+        let colored_text = if let Some(text) = self.hit_text {
+            format!("{}{}{}",
+                color::Bg(converted_color),
+                color::Fg(color::Black),
+                text)
+        } else {
+            format!("{}{}.",
+                color::Bg(converted_color),
+                color::Fg(color::AnsiValue::rgb(5, 5, 5)))
+        };
+        (colored_text, self.number_passed)
+    }
+
+    /// Apply the effect of a given surface color.
+    ///
+    /// Note this is not true volumetric ray tracing: we're considering each
+    /// voxel s to be discrete.
+    fn trace_through_surface(&mut self, surface: RGBA, lighting: RGB, face: Face) {
+        let surface_alpha = surface.alpha();
+        if surface_alpha <= 0.0 {
+            return;
+        }
+        let alpha_for_add = surface_alpha * self.ray_alpha;
+        self.ray_alpha *= 1.0 - surface_alpha;
+        self.color_accumulator += fake_lighting_adjustment(surface.to_rgb() * lighting, face)
              * alpha_for_add;
-    }
 
-    if number_passed == 0 {
-        // Didn't intersect the world at all. Draw these as plain background.
-        return (
-            format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)),
-            0,
-        );
     }
-
-    // Fill up color buffer with "sky" color.
-    let sky_vary = (number_passed.min(4) as f32) / 5.0;
-    let sky_color = RGB::new(sky_vary, sky_vary, 1.0);
-    color_accumulator += sky_color * ray_alpha;
-    
-    // TODO: Pick 8/256/truecolor based on what the terminal supports.
-    let converted_color = color::AnsiValue::rgb(
-        scale(color_accumulator.red()),
-        scale(color_accumulator.green()),
-        scale(color_accumulator.blue()));
-    let colored_text = if let Some(text) = hit_text {
-        format!("{}{}{}",
-            color::Bg(converted_color),
-            color::Fg(color::Black),
-            text)
-    } else {
-        format!("{}{}.",
-            color::Bg(converted_color),
-            color::Fg(color::AnsiValue::rgb(5, 5, 5)))
-    };
-    (colored_text, number_passed)
+}
+impl Default for TracingState {
+    fn default() -> Self {
+        Self {
+            number_passed: 0,
+            hit_text: None,
+            color_accumulator: RGB::ZERO,
+            ray_alpha: 1.0,
+        }
+    }
 }
 
 fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
