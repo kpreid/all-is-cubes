@@ -18,16 +18,27 @@ use crate::block::{Block};
 use crate::math::{Face, FaceMap, FreeCoordinate, RGBA};
 use crate::lighting::PackedLight;
 use crate::space::{Space};
+use crate::util::{ConciseDebug as _};
 
 /// Generic structure of output from triangulator. Implement `GfxVertex`
 /// to provide a specialized version.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 #[non_exhaustive]
 pub struct BlockVertex {
     pub position: Point3<FreeCoordinate>,
-    pub normal: Vector3<FreeCoordinate>,
+    pub normal: Vector3<FreeCoordinate>,  // TODO: Use a smaller number type? Storage vs convenience?
     // TODO: Eventually color will be replaced with texture coordinates.
     pub color: RGBA,
+}
+
+impl std::fmt::Debug for BlockVertex {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // Print compactly on single line even if the formatter is in prettyprint mode.
+        write!(fmt, "{{ p: {:?} n: {:?} c: {:?} }}",
+            self.position.as_concise_debug(),
+            self.normal.cast::<i8>().unwrap().as_concise_debug(),  // no decimals!
+            self.color)
+    }
 }
 
 /// Implement this trait along with `From<BlockVertex>` to provide a representation
@@ -47,7 +58,7 @@ impl ToGfxVertex<BlockVertex> for BlockVertex {
 }
 
 /// Describes how to draw one `Face` of a `Block`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct FaceRenderData<V: From<BlockVertex>> {
     /// Vertices of triangles (i.e. length is a multiple of 3) in counterclockwise order.
     vertices: Box<[V]>,
@@ -66,6 +77,7 @@ impl<V: From<BlockVertex>> Default for FaceRenderData<V> {
 }
 
 /// Describes how to draw a block. Pass it to `triangulate_space` to use it.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockRenderData<V: From<BlockVertex>> {
     /// Vertices grouped by the face they belong to.
     /// 
@@ -89,48 +101,79 @@ pub type BlocksRenderData<V> = Box<[BlockRenderData<V>]>;
 
 /// Generate `BlockRenderData` for a block.
 fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> {
-    let faces = FaceMap::generate(|face| {
-        if face == Face::WITHIN {
-            // Until we have blocks with interior detail, nothing to do here.
-            return FaceRenderData::default();
+    match block {
+        Block::Atom(_attributes, color) => {
+            let faces = FaceMap::generate(|face| {
+                if face == Face::WITHIN {
+                    // Until we have blocks with interior detail, nothing to do here.
+                    return FaceRenderData::default();
+                }
+
+                let mut face_vertices: Vec<V> = Vec::new();
+                let transform = face.matrix();
+                let fully_opaque = color.binary_opaque();
+
+                // TODO: Port over pseudo-transparency mechanism, then change this to a
+                // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
+                if fully_opaque {
+                    let mut push_1 = |p: Point3<FreeCoordinate>| {
+                        face_vertices.push(V::from(BlockVertex {
+                            position: transform.transform_point(p),
+                            normal: face.normal_vector(),
+                            color: *color,
+                        }));
+                    };
+
+                    // Two-triangle quad.
+                    // Note that looked at from a X-right Y-up view, these triangles are
+                    // clockwise, but they're properly counterclockwise from the perspective
+                    // that we're drawing the face _facing towards negative Z_ (into the screen).
+                    push_1(Point3::new(0.0, 0.0, 0.0));
+                    push_1(Point3::new(0.0, 1.0, 0.0));
+                    push_1(Point3::new(1.0, 0.0, 0.0));
+                    push_1(Point3::new(1.0, 0.0, 0.0));
+                    push_1(Point3::new(0.0, 1.0, 0.0));
+                    push_1(Point3::new(1.0, 1.0, 0.0));
+                }
+
+                FaceRenderData {
+                    vertices: face_vertices.into_boxed_slice(),
+                    fully_opaque,
+                }
+            });
+
+            BlockRenderData {
+                faces
+            }
         }
+        Block::Recur(_attributes, space_ref) => {
+            // TODO: Recursive triangulation is a bad strategy; use texturing instead, at least
+            // for rectangular areas.
+            let mut space_vertices: Vec<BlockVertex> = Vec::new();
+            let space = &*space_ref.borrow();
+            triangulate_space(space, &triangulate_blocks::<BlockVertex>(space), &mut space_vertices);
 
-        let mut face_vertices: Vec<V> = Vec::new();
-        let transform = face.matrix();
-        let color = block.color();
-        let fully_opaque = color.binary_opaque();
+            // TODO: do error-checking on the transformation (what if the space is not cubical, or
+            // not in the positive octant).
+            let scale = 1.0 / (space.grid().size().x as FreeCoordinate);
 
-        // TODO: Port over pseudo-transparency mechanism, then change this to a
-        // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
-        if fully_opaque {
-            let mut push_1 = |p: Point3<FreeCoordinate>| {
-                face_vertices.push(V::from(BlockVertex {
-                    position: transform.transform_point(p),
-                    normal: face.normal_vector(),
-                    color,
-                }));
+            // Transform vertices.
+            let mut faces = BlockRenderData::default().faces;
+            faces.within = FaceRenderData {
+                vertices: space_vertices.into_iter().map(|v| V::from(BlockVertex {
+                    position: v.position * scale,
+                    ..v
+                })).collect(),
+                fully_opaque: false,
             };
 
-            // Two-triangle quad.
-            // Note that looked at from a X-right Y-up view, these triangles are
-            // clockwise, but they're properly counterclockwise from the perspective
-            // that we're drawing the face _facing towards negative Z_ (into the screen).
-            push_1(Point3::new(0.0, 0.0, 0.0));
-            push_1(Point3::new(0.0, 1.0, 0.0));
-            push_1(Point3::new(1.0, 0.0, 0.0));
-            push_1(Point3::new(1.0, 0.0, 0.0));
-            push_1(Point3::new(0.0, 1.0, 0.0));
-            push_1(Point3::new(1.0, 1.0, 0.0));
-        }
+            for &face in Face::all_six() {
+                faces[face].fully_opaque = true;  // TODO: calculate all of these
+            }
 
-        FaceRenderData {
-            vertices: face_vertices.into_boxed_slice(),
-            fully_opaque,
+            //panic!("{} {}", faces.within.vertices.len(), scale);
+            BlockRenderData { faces }
         }
-    });
-
-    BlockRenderData {
-        faces
     }
 }
 
@@ -171,8 +214,7 @@ pub fn triangulate_space<BV, GV>(
     for cube in space.grid().interior_iter() {
         let precomputed = lookup(cube);
         let low_corner = cube.cast::<FreeCoordinate>().unwrap();
-        // TODO: Tidy this up by implementing an Iterator for FaceMap.
-        for &face in Face::all_six() {
+        for &face in Face::all_seven() {
             let adjacent_cube = cube + face.normal_vector();
             if lookup(adjacent_cube).faces[face.opposite()].fully_opaque {
                 // Don't draw obscured faces
@@ -193,7 +235,9 @@ pub fn triangulate_space<BV, GV>(
 mod tests {
     use super::*;
     use cgmath::{MetricSpace as _};
+    use crate::block::BlockAttributes;
     use crate::blockgen::make_some_blocks;
+    use crate::universe::{Universe};
 
     #[test]
     fn excludes_interior_faces() {
@@ -229,6 +273,25 @@ mod tests {
         // This should not panic; visual glitches are preferable to failure.
         space.set((0, 0, 0), &block);  // render data does not know about this
         triangulate_space(&space, &blocks_render_data, &mut Vec::new());
+    }
+
+    #[test]
+    fn trivial_subcube_rendering() {
+        let mut u = Universe::new();
+        let mut inner_block_space = Space::empty_positive(1, 1, 1);
+        inner_block_space.set((0, 0, 0), &make_some_blocks(1)[0]);
+        let inner_block = Block::Recur(BlockAttributes::default(), u.insert_anonymous(inner_block_space));
+        let mut outer_space = Space::empty_positive(1, 1, 1);
+        outer_space.set((0, 0, 0), &inner_block);
+
+        let blocks_render_data: BlocksRenderData<BlockVertex> = triangulate_blocks(&outer_space);
+        eprintln!("{:#?}", blocks_render_data);
+        let mut space_rendered = Vec::new();
+        triangulate_space(&outer_space, &blocks_render_data, &mut space_rendered);
+        eprintln!("{:#?}", space_rendered);
+
+        // TODO: Once things are done more correctly we will need to check all vertices
+        assert_eq!(*space_rendered, *blocks_render_data[0].faces.within.vertices);
     }
 
     // TODO: more tests

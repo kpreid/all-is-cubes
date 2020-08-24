@@ -75,6 +75,10 @@ impl Face {
         &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ]
     }
 
+    pub fn all_seven() -> &'static [Face; 7] {
+        &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ, Face::WITHIN]
+    }
+
     pub fn axis_number(&self) -> usize {
         match self {
             Face::NX | Face::PX => 0,
