@@ -127,12 +127,8 @@ fn character_from_ray(
 ) -> TraceResult {
     let mut s: TracingState = TracingState::default();
     for hit in Raycaster::new(origin, direction).within_grid(grid) {
-        s.number_passed += 1;
-        if s.number_passed > 1000 {
-            // Abort excessively long traces.
-            return (
-                format!("{}{}X", color::Bg(color::Red), color::Fg(color::Black)),
-                s.number_passed);
+        if s.count_step_should_stop() {
+            break;
         }
 
         let cube_data = &space_data[hit.cube];
@@ -164,9 +160,16 @@ fn character_from_ray(
                     .map(|b| b.lighting.into())
                     .unwrap_or(SKY);
 
+                // Find where the origin in the space's coordinate system is.
+                // TODO: Raycaster does not efficiently implement advancing from outside a
+                // grid. Fix that to get way more performance.
                 let adjusted_origin = Point3::from_vec(
                     (origin - hit.cube.cast::<FreeCoordinate>().unwrap()) * (array.grid().size().x as FreeCoordinate));
+
                 for subcube_hit in Raycaster::new(adjusted_origin, direction).within_grid(*array.grid()) {
+                    if s.count_step_should_stop() {
+                        break;
+                    }
                     let color = &array[subcube_hit.cube];
                     s.trace_through_surface(*color, lighting, subcube_hit.face);
                 }
@@ -191,12 +194,33 @@ type TraceResult = (String, usize);
 
 #[derive(Clone, Debug)]
 struct TracingState {
+    /// Number of cubes traced through -- controlled by the caller, so not necessarily
+    /// equal to the number of calls to trace_through_surface().
     number_passed: usize,
+    /// Character to draw, if determined yet.
     hit_text: Option<String>,
+    /// Color buffer, in “premultiplied alpha” format (each contribution is scaled by
+    /// the current `ray_alpha`).
     color_accumulator: RGB,
+    /// Fraction of the color value that is to be determined by future, rather than past,
+    /// tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
     ray_alpha: f32,
 }
 impl TracingState {
+    fn count_step_should_stop(&mut self) -> bool {
+        self.number_passed += 1;
+        if self.number_passed > 1000 {
+            // Abort excessively long traces.
+            self.hit_text = Some("X".to_string());
+            self.color_accumulator = RGB::new(1.0, 0.0, 0.0);
+            self.ray_alpha = 0.0;
+            true
+        } else {
+            // Check if we've passed through essentially full opacity.
+            self.ray_alpha <= 1e-3
+        }
+    }
+
     fn finish(mut self) -> TraceResult {
         if self.number_passed == 0 {
             // Didn't intersect the world at all. Draw these as plain background.
@@ -210,6 +234,7 @@ impl TracingState {
         let sky_vary = (self.number_passed.min(4) as f32) / 5.0;
         let sky_color = RGB::new(sky_vary, sky_vary, 1.0);
         self.color_accumulator += sky_color * self.ray_alpha;
+        //self.ray_alpha = 0.0;
 
         // TODO: Pick 8/256/truecolor based on what the terminal supports.
         fn scale(x :f32) -> u8 {
