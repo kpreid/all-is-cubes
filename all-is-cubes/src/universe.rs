@@ -16,7 +16,14 @@ use crate::camera::Camera;
 use crate::space::{Grid, Space, SpaceStepInfo};
 use crate::worldgen::{axes, wavy_landscape};
 
-type Name = String;  // TODO we want a non-flat namespace with nuances like 'anonymous/autoassigned'
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub enum Name {
+    Specific(String),
+    Anonym(usize),
+}
+impl From<&str> for Name {
+    fn from(value: &str) -> Self { Self::Specific(value.to_string()) }
+}
 
 /// A collection of named objects which can refer to each other via `URef`. In the future,
 /// it will enable multiple references, garbage collection, change notification, and
@@ -79,7 +86,7 @@ impl Universe {
     
     pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T> where Self: UniverseIndex<T> {
         // TODO: Names should not be strings, so these can be guaranteed unique.
-        let name = format!("anonymous_{}", self.next_anonym);
+        let name = Name::Anonym(self.next_anonym);
         self.next_anonym += 1;
         self.insert(name, value)
     }
@@ -215,9 +222,7 @@ struct URootRef<T> {
 }
 
 impl<T> URootRef<T> {
-    fn new(name: impl Into<String>, initial_value: T) -> Self {
-        let name = name.into();
-
+    fn new(name: Name, initial_value: T) -> Self {
         // Grab whatever we can to make a random unique hash code, which isn't much.
         // Hopefully we're rarely creating many refs with the same name that will
         // be compared.
@@ -264,8 +269,8 @@ mod tests {
 
     #[test]
     pub fn uref_equality_is_pointer_equality() {
-        let root_a = URootRef::new("space", Space::empty_positive(1, 1, 1));
-        let root_b = URootRef::new("space", Space::empty_positive(1, 1, 1));
+        let root_a = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
+        let root_b = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
         let ref_a_1 = root_a.downgrade();
         let ref_a_2 = root_a.downgrade();
         let ref_b_1 = root_b.downgrade();
