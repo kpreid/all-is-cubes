@@ -35,7 +35,7 @@ pub struct Universe {
 }
 
 impl Universe {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Universe {
             spaces: HashMap::new(),
             // TODO: bodies so body-in-world stepping
