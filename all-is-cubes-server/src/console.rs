@@ -68,7 +68,7 @@ pub fn draw_space<O: io::Write>(
                     block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
                         // Do not recurse indefinitely, just one level, because that's the
                         // standard visualization. TODO: But maybe it'd be more fun if...?
-                        sub_block.color()
+                        (character, sub_block.color())
                     })
                 ))
             } else {
@@ -139,19 +139,12 @@ fn character_from_ray(
                     continue;
                 }
 
-                // Use text of the first non-completely-transparent block.
-                if s.hit_text.is_none() {
-                    // TODO: For more Unicode correctness, index by grapheme cluster...
-                    // ...and do something clever about double-width characters.
-                    s.hit_text = Some(character.to_string());
-                }
-
                 // Find lighting.
                 let lighting: RGB = space_data.get(hit.previous_cube())
                     .map(|b| b.lighting.into())
                     .unwrap_or(SKY);
 
-                s.trace_through_surface(*color, lighting, hit.face);
+                s.trace_through_surface(*character, *color, lighting, hit.face);
             }
             TracingBlock::Recur(array) => {
                 // Find lighting.
@@ -170,8 +163,8 @@ fn character_from_ray(
                     if s.count_step_should_stop() {
                         break;
                     }
-                    let color = &array[subcube_hit.cube];
-                    s.trace_through_surface(*color, lighting, subcube_hit.face);
+                    let (character, color) = array[subcube_hit.cube];
+                    s.trace_through_surface(character, color, lighting, subcube_hit.face);
                 }
             }
         }
@@ -187,7 +180,7 @@ struct TracingCubeData<'a> {
 #[derive(Clone, Copy, Debug)]
 enum TracingBlock<'a> {
     Atom(char, RGBA),
-    Recur(&'a GridArray<RGBA>),
+    Recur(&'a GridArray<(char, RGBA)>),
 }
 
 type TraceResult = (String, usize);
@@ -262,7 +255,7 @@ impl TracingState {
     ///
     /// Note this is not true volumetric ray tracing: we're considering each
     /// voxel s to be discrete.
-    fn trace_through_surface(&mut self, surface: RGBA, lighting: RGB, face: Face) {
+    fn trace_through_surface(&mut self, character: char, surface: RGBA, lighting: RGB, face: Face) {
         let surface_alpha = surface.alpha();
         if surface_alpha <= 0.0 {
             return;
@@ -272,6 +265,12 @@ impl TracingState {
         self.color_accumulator += fake_lighting_adjustment(surface.to_rgb() * lighting, face)
              * alpha_for_add;
 
+         // Use text of the first non-completely-transparent block.
+         if self.hit_text.is_none() {
+             // TODO: For more Unicode correctness, index by grapheme cluster...
+             // ...and do something clever about double-width characters.
+             self.hit_text = Some(character.to_string());
+         }
     }
 }
 impl Default for TracingState {
