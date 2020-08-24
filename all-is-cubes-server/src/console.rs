@@ -223,11 +223,11 @@ impl TracingState {
             );
         }
 
-        // Fill up color buffer with "sky" color.
-        let sky_vary = (self.number_passed.min(4) as f32) / 5.0;
+        // Fill up color buffer with "sky" color. Also use it to visualize the world boundary.
+        let sky_vary = 1.0 - (self.number_passed.min(3) as f32 - 1.0) / 5.0;
         let sky_color = RGB::new(sky_vary, sky_vary, 1.0);
         self.color_accumulator += sky_color * self.ray_alpha;
-        //self.ray_alpha = 0.0;
+        self.ray_alpha = 0.0;
 
         // TODO: Pick 8/256/truecolor based on what the terminal supports.
         fn scale(x :f32) -> u8 {
