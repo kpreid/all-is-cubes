@@ -3,18 +3,19 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::{Vector2, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Vector2, Vector3};
 use lazy_static::lazy_static;
 use rayon::iter::{ParallelIterator, IntoParallelIterator};
 use std::convert::TryInto;
 use std::io;
 use termion::{color};
 use termion::event::{Event, Key};
+use typed_arena::Arena;
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::{RGB, RGBA};
+use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
 use all_is_cubes::raycast::{Face, Raycaster};
-use all_is_cubes::space::{GridArray, PackedLight, SKY, Space};
+use all_is_cubes::space::{Grid, GridArray, PackedLight, SKY, Space};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
 pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
@@ -57,12 +58,28 @@ pub fn draw_space<O: io::Write>(
 
     // Copy data out of Space (whose access is not thread safe due to contained URefs).
     let grid = *space.grid();
-    let space_data: GridArray<TracingBlockData> = space.extract(grid, |_index, block, lighting| {
-        TracingBlockData {
-            color: block.color(),
+    let recur_arena = Arena::with_capacity(space.distinct_blocks_unfiltered().len());
+    let block_data: Vec<TracingBlock> = space.distinct_blocks_unfiltered().iter()
+        .map(|block| {
+            let character = block.attributes().display_name.chars().next().unwrap_or(' ');
+            if let Some(space_ref) = block.space() {
+                let block_space = space_ref.borrow();
+                TracingBlock::Recur(recur_arena.alloc(
+                    block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
+                        // Do not recurse indefinitely, just one level, because that's the
+                        // standard visualization. TODO: But maybe it'd be more fun if...?
+                        sub_block.color()
+                    })
+                ))
+            } else {
+                TracingBlock::Atom(character, block.color())
+            }
+        })
+        .collect();
+    let space_data: GridArray<TracingCubeData> = space.extract(grid, |index, _block, lighting| {
+        TracingCubeData {
+            block: block_data[index as usize],
             lighting,
-            // TODO precompute this on indices
-            character: block.attributes().display_name.chars().next().unwrap_or(' '),
         }
     });
 
@@ -78,8 +95,7 @@ pub fn draw_space<O: io::Write>(
 
     let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
         let (origin, direction) = projection_copy_for_parallel.project_ndc_into_world(x, y);
-        let ray = Raycaster::new(origin, direction).within_grid(grid);
-        let (text, count) = character_from_ray(ray, &space_data);
+        let (text, count) = character_from_ray(origin, direction, grid, &space_data);
         (xch, ych, text, count)
     });
 
@@ -103,9 +119,14 @@ pub fn draw_space<O: io::Write>(
 }
 
 /// Compute a colored character corresponding to what one ray hits.
-fn character_from_ray(ray :Raycaster, space_data: &GridArray<TracingBlockData>) -> TraceResult {
+fn character_from_ray(
+    origin: Point3<FreeCoordinate>,
+    direction: Vector3<FreeCoordinate>,
+    grid: Grid,
+    space_data: &GridArray<TracingCubeData>,
+) -> TraceResult {
     let mut s: TracingState = TracingState::default();
-    for hit in ray {
+    for hit in Raycaster::new(origin, direction).within_grid(grid) {
         s.number_passed += 1;
         if s.number_passed > 1000 {
             // Abort excessively long traces.
@@ -114,35 +135,56 @@ fn character_from_ray(ray :Raycaster, space_data: &GridArray<TracingBlockData>) 
                 s.number_passed);
         }
 
-        let block = &space_data[hit.cube];
-        let color = block.color;
-        if color.alpha() <= 0.0 {
-            // Skip lighting lookup
-            continue;
+        let cube_data = &space_data[hit.cube];
+        match &cube_data.block {
+            TracingBlock::Atom(character, color) => {
+                if color.alpha() <= 0.0 {
+                    // Skip lighting lookup
+                    continue;
+                }
+
+                // Use text of the first non-completely-transparent block.
+                if s.hit_text.is_none() {
+                    // TODO: For more Unicode correctness, index by grapheme cluster...
+                    // ...and do something clever about double-width characters.
+                    s.hit_text = Some(character.to_string());
+                }
+
+                // Find lighting.
+                let lighting: RGB = space_data.get(hit.previous_cube())
+                    .map(|b| b.lighting.into())
+                    .unwrap_or(SKY);
+
+                s.trace_through_surface(*color, lighting, hit.face);
+            }
+            TracingBlock::Recur(array) => {
+                // Find lighting.
+                // TODO: duplicated code
+                let lighting: RGB = space_data.get(hit.previous_cube())
+                    .map(|b| b.lighting.into())
+                    .unwrap_or(SKY);
+
+                let adjusted_origin = Point3::from_vec(
+                    (origin - hit.cube.cast::<FreeCoordinate>().unwrap()) * (array.grid().size().x as FreeCoordinate));
+                for subcube_hit in Raycaster::new(adjusted_origin, direction).within_grid(*array.grid()) {
+                    let color = &array[subcube_hit.cube];
+                    s.trace_through_surface(*color, lighting, subcube_hit.face);
+                }
+            }
         }
-
-        // Use text of the first non-completely-transparent block.
-        if s.hit_text.is_none() {
-            // TODO: For more Unicode correctness, index by grapheme cluster...
-            // ...and do something clever about double-width characters.
-            s.hit_text = Some(block.character.to_string());
-        }
-
-        // Find lighting.
-        let lighting: RGB = space_data.get(hit.previous_cube())
-            .map(|b| b.lighting.into())
-            .unwrap_or(SKY);
-
-        s.trace_through_surface(color, lighting, hit.face);
     }
     s.finish()
 }
 
 #[derive(Clone, Debug)]
-struct TracingBlockData {
-    color: RGBA,
+struct TracingCubeData<'a> {
+    block: TracingBlock<'a>,
     lighting: PackedLight,
-    character: char,
+}
+#[derive(Clone, Copy, Debug)]
+enum TracingBlock<'a> {
+    Atom(char, RGBA),
+    Recur(&'a GridArray<RGBA>),
 }
 
 type TraceResult = (String, usize);

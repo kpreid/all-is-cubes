@@ -166,7 +166,7 @@ impl Grid {
     pub fn contains_cube(&self, point: impl Into<GridPoint>) -> bool {
         self.index(point).is_some()
     }
-    
+
     /// Returns a random point within the cube.
     ///
     /// ```
@@ -385,7 +385,7 @@ impl Space {
     ///
     /// The indices of the returned vector are the internal IDs, and match the results
     /// of `.get_block_index()`.
-    pub(crate) fn distinct_blocks_unfiltered(&self) -> &Vec<Block> {
+    pub fn distinct_blocks_unfiltered(&self) -> &Vec<Block> {
         &self.index_to_block
     }
 
@@ -467,12 +467,15 @@ impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
 /// A 3-dimensional array with arbitrary element type instead of `Space`'s fixed types.
 ///
 /// TODO: Should we rebuild Space on top of this?
+#[derive(Clone, Debug)]  // TODO: nondefault Debug
 pub struct GridArray<V> {
     grid: Grid,
     contents: Box<[V]>,
 }
 
 impl<V> GridArray<V> {
+    pub fn grid(&self) -> &Grid { &self.grid }
+
     pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
         self.grid.index(position).map(|index| &self.contents[index])
     }

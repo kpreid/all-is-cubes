@@ -44,7 +44,7 @@ impl Block {
     ///
     /// TODO: there needs to be the concept of read-only derived spaces to make this work
     /// as intended.
-    fn space(&self) -> Option<&URef<Space>> {
+    pub fn space(&self) -> Option<&URef<Space>> {
         match self {
             Block::Atom(_, _) => None,
             Block::Recur(_, space_ref) => Some(&space_ref),
