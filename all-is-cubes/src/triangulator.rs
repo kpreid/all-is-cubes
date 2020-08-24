@@ -193,7 +193,7 @@ pub fn triangulate_space<BV, GV>(
 mod tests {
     use super::*;
     use cgmath::{MetricSpace as _};
-    use crate::worldgen::make_some_blocks;
+    use crate::blockgen::make_some_blocks;
 
     #[test]
     fn excludes_interior_faces() {

@@ -495,7 +495,7 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
 mod tests {
     use super::*;
     use crate::math::GridPoint;
-    use crate::worldgen::make_some_blocks;
+    use crate::blockgen::make_some_blocks;
 
     #[test]
     fn it_works() {

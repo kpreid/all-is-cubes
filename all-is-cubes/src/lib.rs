@@ -8,6 +8,7 @@
 // Or have modules reexport by API consumer (world-builder versus renderer etc.)
 
 pub mod block;
+pub mod blockgen;
 pub mod camera;
 pub mod math;
 mod lighting;

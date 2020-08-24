@@ -11,9 +11,10 @@ use std::rc::{Rc, Weak};
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
-use crate::space::{Grid, Space, SpaceStepInfo};
+use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
-use crate::worldgen::{axes, plain_color_blocks, wavy_landscape};
+use crate::space::{Grid, Space, SpaceStepInfo};
+use crate::worldgen::{axes, wavy_landscape};
 
 type Name = String;  // TODO we want a non-flat namespace with nuances like 'anonymous/autoassigned'
 
@@ -23,6 +24,7 @@ type Name = String;  // TODO we want a non-flat namespace with nuances like 'ano
 pub struct Universe {
     spaces: HashMap<Name, URootRef<Space>>,
     cameras: HashMap<Name, URootRef<Camera>>,
+    next_anonym: usize,
 }
 
 impl Universe {
@@ -31,6 +33,7 @@ impl Universe {
             spaces: HashMap::new(),
             // TODO: bodies so body-in-world stepping
             cameras: HashMap::new(),
+            next_anonym: 0,
         }
     }
 
@@ -38,9 +41,13 @@ impl Universe {
     pub fn new_test_universe() -> Self {
         let mut universe = Self::new();
 
+        let blocks = {
+            let mut bg = BlockGen { universe: &mut universe, size: 16, };
+            LandscapeBlocks::new(&mut bg)
+        };
+
         let grid = Grid::new((-10, -10, -10), (21, 21, 21));
         let mut space = Space::empty(grid);
-        let blocks = plain_color_blocks();
         wavy_landscape(&mut space, blocks, 1.0);
         axes(&mut space);
         universe.insert("space".into(), space);
@@ -69,28 +76,41 @@ impl Universe {
         }
         (space_info, ())
     }
+    
+    pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T> where Self: UniverseIndex<T> {
+        // TODO: Names should not be strings, so these can be guaranteed unique.
+        let name = format!("anonymous_{}", self.next_anonym);
+        self.next_anonym += 1;
+        self.insert(name, value)
+    }
 }
 
 pub trait UniverseIndex<T> {
     fn get(&self, name: &Name) -> Option<URef<T>>;
-    fn insert(&mut self, name: Name, value: T);
+    fn insert(&mut self, name: Name, value: T) -> URef<T>;
 }
 impl UniverseIndex<Space> for Universe {
     fn get(&self, name: &Name) -> Option<URef<Space>> {
         self.spaces.get(name).map(URootRef::downgrade)
     }
-    fn insert(&mut self, name: Name, value: Space) {
+    fn insert(&mut self, name: Name, value: Space) -> URef<Space> {
         // TODO: prohibit existing names under any type
-        self.spaces.insert(name.clone(), URootRef::new(name, value));
+        let root_ref = URootRef::new(name.clone(), value);
+        let returned_ref = root_ref.downgrade();
+        self.spaces.insert(name, root_ref);
+        returned_ref
     }
 }
 impl UniverseIndex<Camera> for Universe {
     fn get(&self, name: &Name) -> Option<URef<Camera>> {
         self.cameras.get(name).map(URootRef::downgrade)
     }
-    fn insert(&mut self, name: Name, value: Camera) {
+    fn insert(&mut self, name: Name, value: Camera) -> URef<Camera> {
         // TODO: prohibit existing names under any type
-        self.cameras.insert(name.clone(), URootRef::new(name, value));
+        let root_ref = URootRef::new(name.clone(), value);
+        let returned_ref = root_ref.downgrade();
+        self.cameras.insert(name, root_ref);
+        returned_ref
     }
 }
 
@@ -233,6 +253,7 @@ impl<T> URootRef<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockgen::make_some_blocks;
 
     #[test]
     pub fn new_test_universe_smoke_test() {
@@ -254,4 +275,16 @@ mod tests {
     }
 
     // TODO: more tests of the hairy reference logic
+
+    #[test]
+    pub fn insert_anonymous_makes_distinct_names() {
+        let blocks = make_some_blocks(2);
+        let mut u = Universe::new();
+        let ref_a = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let ref_b = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        ref_a.borrow_mut().set((0, 0, 0), &blocks[0]);
+        ref_b.borrow_mut().set((0, 0, 0), &blocks[1]);
+        assert!(ref_a != ref_b, "not equal");
+        assert!(ref_a.borrow()[(0, 0, 0)] != ref_b.borrow()[(0, 0, 0)], "different values");
+    }
 }

@@ -7,66 +7,11 @@ use cgmath::{Vector3, Vector4};
 use std::borrow::Cow;
 use std::convert::TryInto;
 
-use crate::block::{AIR, Block, BlockAttributes};
-use crate::math::{FreeCoordinate, GridCoordinate, RGBA};
+use crate::block::{Block, BlockAttributes};
+use crate::blockgen::LandscapeBlocks;
+use crate::math::{FreeCoordinate, GridCoordinate};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Space};
-
-/// A collection of block types assigned specific roles in generating outdoor landscapes.
-pub struct LandscapeBlocks {
-    pub air: Block,
-    pub grass: Block,
-    pub dirt: Block,
-    pub stone: Block,
-    pub trunk: Block,
-    pub leaves: Block,
-}
-
-/// Generate a bland instance of `LandscapeBlocks`.
-pub fn plain_color_blocks() -> LandscapeBlocks {
-    fn color_and_name(r: f32, g: f32, b: f32, name: &str) -> Block {
-        Block::Atom(
-            BlockAttributes {
-                display_name: name.to_owned().into(),
-                ..BlockAttributes::default()
-            },
-            RGBA::new(r, g, b, 1.0))
-    }
-    
-    LandscapeBlocks {
-        air: AIR.clone(),
-        grass: color_and_name(0.3, 0.8, 0.3, "Grass"),
-        dirt: color_and_name(0.4, 0.2, 0.2, "Dirt"),
-        stone: color_and_name(0.5, 0.5, 0.5, "Stone"),
-        trunk: color_and_name(0.6, 0.3, 0.6, "Wood"),
-        leaves: color_and_name(0.0, 0.7, 0.2, "Leaves"),
-    }
-}
-
-/// Generate some atom blocks with unspecified contents for testing.
-///
-/// ```
-/// use all_is_cubes::worldgen::make_some_blocks;
-/// assert_eq!(make_some_blocks(3).len(), 3);
-/// ```
-pub fn make_some_blocks(count: usize) -> Vec<Block> {
-    // TODO: should this return an iterator? would anyone care?
-    let mut vec :Vec<Block> = Vec::with_capacity(count);
-    for i in 0..count {
-        let luminance = if count > 1 {
-            i as f32 / (count - 1) as f32
-        } else {
-            0.5
-        };
-        vec.push(Block::Atom(
-            BlockAttributes {
-                display_name: i.to_string().into(),
-                ..BlockAttributes::default()
-            },
-            RGBA::new(luminance, luminance, luminance, 1.0)));
-    }
-    vec
-}
 
 /// Draw the world axes as lines of blocks centered on (0, 0, 0).
 ///
@@ -124,10 +69,10 @@ pub fn axes(space: &mut Space) {
 ///
 /// ```
 /// use all_is_cubes::space::Space;
-/// use all_is_cubes::worldgen::{plain_color_blocks, wavy_landscape};
+/// use all_is_cubes::blockgen::LandscapeBlocks;
+/// use all_is_cubes::worldgen::wavy_landscape;
 /// let mut space = Space::empty_positive(10, 10, 10);
-/// let blocks = plain_color_blocks();
-/// wavy_landscape(&mut space, blocks, 1.0);
+/// wavy_landscape(&mut space, LandscapeBlocks::default(), 1.0);
 /// # // TODO: It didn't panic, but how about some assertions?
 /// ```
 pub fn wavy_landscape(
@@ -164,29 +109,5 @@ pub fn wavy_landscape(
                 // TODO: Add various decorations on the ground. And trees.
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn make_some_blocks_0() {
-        assert_eq!(Vec::<Block>::new(), make_some_blocks(0));
-    }
-
-    #[test]
-    fn make_some_blocks_1() {
-        // should succeed even though the color range collapses range
-        let blocks = make_some_blocks(1);
-        assert_eq!(blocks[0].color(), RGBA::new(0.5, 0.5, 0.5, 1.0));
-    }
-
-    #[test]
-    fn make_some_blocks_2() {
-        let blocks = make_some_blocks(2);
-        assert_eq!(blocks[0].color(), RGBA::new(0.0, 0.0, 0.0, 1.0));
-        assert_eq!(blocks[1].color(), RGBA::new(1.0, 1.0, 1.0, 1.0));
     }
 }

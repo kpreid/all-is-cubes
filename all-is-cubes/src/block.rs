@@ -28,7 +28,7 @@ impl Block {
     pub fn color(&self) -> RGBA {
         match self {
             Block::Atom(_, c) => *c,
-            Block::Recur(_, _) => unimplemented!("TODO oops how do we color efficiently"),
+            Block::Recur(_, _) => RGBA::new(0.5, 0.5, 0.5, 1.0),  // TODO: need a solution for memoizing the color
         }
     }
 
