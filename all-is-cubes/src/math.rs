@@ -170,6 +170,7 @@ impl Face {
 }
 
 /// Container for values keyed by `Face`s.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FaceMap<V> {
     pub nx: V,
     pub ny: V,
@@ -230,7 +231,7 @@ impl<V> IndexMut<Face> for FaceMap<V> {
 /// * NaN is banned with runtime checks so that `Eq` may be implemented.
 ///   (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct RGB(Vector3<f32>);
 
 /// A floating-point RGBA color value.
@@ -240,7 +241,7 @@ pub struct RGB(Vector3<f32>);
 ///   (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
 /// * The alpha is not premultiplied.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct RGBA(Vector4<f32>);
 
 impl RGB {
@@ -387,6 +388,18 @@ impl Hash for RGBA {
 impl Eq for RGB {}
 impl Eq for RGBA {}
 
+impl std::fmt::Debug for RGB {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "RGB({:?}, {:?}, {:?})", self.red(), self.green(), self.blue())
+    }
+}
+impl std::fmt::Debug for RGBA {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "RGBA({:?}, {:?}, {:?}, {:?})",
+            self.red(), self.green(), self.blue(), self.alpha())
+    }
+}
+
 /// Error reported when a color type is given a NaN value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ColorIsNan;
@@ -453,4 +466,12 @@ mod tests {
     // TODO: More tests of face.matrix()
 
     // TODO: Tests of FaceMap
+
+    // TODO: Add tests of the color not-NaN mechanisms.
+
+    #[test]
+    fn rgb_rgba_debug() {
+        assert_eq!(format!("{:#?}", RGB::new(0.1, 0.2, 0.3)), "RGB(0.1, 0.2, 0.3)");
+        assert_eq!(format!("{:#?}", RGBA::new(0.1, 0.2, 0.3, 0.4)), "RGBA(0.1, 0.2, 0.3, 0.4)");
+    }
 }
