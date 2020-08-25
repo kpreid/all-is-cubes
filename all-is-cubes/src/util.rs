@@ -3,7 +3,7 @@
 
 //! Dumping ground for stuff that hasn't gotten big enough to put in a well-named module yet.
 
-use cgmath::{Point3, Matrix4, Vector3, Vector4};
+use cgmath::{Point3, Matrix4, Vector2, Vector3, Vector4};
 use std::fmt;
 
 /// Objects for which alternate `Debug` representations can be generated.
@@ -47,12 +47,16 @@ impl<S: fmt::Debug> ConciseDebug for Matrix4<S> {
     }
 }
 
+impl<S: fmt::Debug> ConciseDebug for Vector2<S> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "({:+.3?}, {:+.3?})", self.x, self.y)
+    }
+}
 impl<S: fmt::Debug> ConciseDebug for Vector3<S> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z)
     }
 }
-
 impl<S: fmt::Debug> ConciseDebug for Vector4<S> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z, self.w)

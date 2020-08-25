@@ -12,13 +12,15 @@
 //! other operation in OpenGL graphics programming, and “triangulation” seems to
 //! be the more commonly used terms.
 
-use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
 
 use crate::block::{Block};
 use crate::math::{Face, FaceMap, FreeCoordinate, RGBA};
 use crate::lighting::PackedLight;
 use crate::space::{Space};
 use crate::util::{ConciseDebug as _};
+
+pub type TextureCoordinate = f32;
 
 /// Generic structure of output from triangulator. Implement `GfxVertex`
 /// to provide a specialized version.
@@ -27,17 +29,19 @@ use crate::util::{ConciseDebug as _};
 pub struct BlockVertex {
     pub position: Point3<FreeCoordinate>,
     pub normal: Vector3<FreeCoordinate>,  // TODO: Use a smaller number type? Storage vs convenience?
-    // TODO: Eventually color will be replaced with texture coordinates.
+    // TODO: Eventually color will be fully replaced with texture coordinates.
     pub color: RGBA,
+    pub tex: Vector2<TextureCoordinate>,
 }
 
 impl std::fmt::Debug for BlockVertex {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Print compactly on single line even if the formatter is in prettyprint mode.
-        write!(fmt, "{{ p: {:?} n: {:?} c: {:?} }}",
+        write!(fmt, "{{ p: {:?} n: {:?} c: {:?} t: {:?} }}",
             self.position.as_concise_debug(),
             self.normal.cast::<i8>().unwrap().as_concise_debug(),  // no decimals!
-            self.color)
+            self.color,
+            self.tex.as_concise_debug())
     }
 }
 
@@ -121,6 +125,7 @@ fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> 
                             position: transform.transform_point(p),
                             normal: face.normal_vector(),
                             color: *color,
+                            tex: Vector2::new(p.x as TextureCoordinate, p.y as TextureCoordinate),
                         }));
                     };
 

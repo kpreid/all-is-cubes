@@ -1,5 +1,6 @@
 in mediump vec4 v_color;
 in mediump vec3 v_normal;
+in mediump vec2 v_tex;
 in lowp vec3 v_lighting;
 
 out mediump vec4 fragment_color;
@@ -20,5 +21,5 @@ lowp vec3 lighting() {
 }
 
 void main(void) {
-  fragment_color = v_color * vec4(lighting(), 1.0);
+  fragment_color = v_color * vec4(lighting(), 1.0) * texture(block_texture, vec3(v_tex, 0));
 }

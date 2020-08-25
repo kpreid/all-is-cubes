@@ -8,12 +8,13 @@ use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::context::GraphicsContext;
 use luminance_front::framebuffer::Framebuffer;
-use luminance_front::pipeline::PipelineState;
+use luminance_front::pipeline::{PipelineState, TextureBinding};
+use luminance_front::pixel::{NormRGBA8UI, NormUnsigned};
 use luminance_front::render_state::RenderState;
 use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
 use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
-use luminance_front::texture::Dim2;
+use luminance_front::texture::{Dim2, Dim2Array, GenMipmaps, Sampler, Texture, TextureError};
 use luminance_front::Backend;
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
@@ -38,7 +39,7 @@ pub struct GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
     back_buffer: Framebuffer<Dim2, (), ()>,
     proj: ProjectionHelper,
     block_program: Program<VertexSemantics, (), ShaderInterface>,
-    block_data_cache: Option<BlocksRenderData<BlockVertex>>,  // TODO: quick hack, needs an invalidation strategy
+    block_data_cache: Option<BlockGLRenderData>,  // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
     fake_time: Duration,
 }
@@ -101,12 +102,12 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
         let mut info = RenderInfo::default();
 
         // TODO: quick hack; we need actual invalidation, not memoization
-        let block_render_data = self.block_data_cache
-            .get_or_insert_with(|| triangulate_blocks(space));
+        let block_data = self.block_data_cache
+            .get_or_insert_with(|| BlockGLRenderData::prepare(surface, space).expect("texture failure"));
 
         self.fake_time += Duration::from_millis(1000/60);  // TODO
 
-        self.chunk.update(surface, &space, block_render_data);
+        self.chunk.update(surface, &space, &block_data.block_render_data);
         let ct = &self.chunk;
 
         let render_state = RenderState::default()
@@ -116,7 +117,9 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
             &self.back_buffer,
             // TODO: port skybox cube map code
             &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
-            |_, mut shading_gate| {
+            |pipeline, mut shading_gate| {
+                let bound_block_texture = pipeline.bind_texture(&mut block_data.texture)?;
+
                 shading_gate.shade(block_program, |mut shader_iface, u, mut render_gate| {
                     let pm: [[f32; 4]; 4] = projection_matrix.cast::<f32>().unwrap().into();
                     shader_iface.set(&u.projection_matrix0, pm[0]);
@@ -129,6 +132,8 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
                     shader_iface.set(&u.view_matrix1, vm[1]);
                     shader_iface.set(&u.view_matrix2, vm[2]);
                     shader_iface.set(&u.view_matrix3, vm[3]);
+
+                    shader_iface.set(&u.block_texture, bound_block_texture.binding());
 
                     render_gate.render(&render_state, |mut tess_gate| {
                         info.square_count += ct.render(&mut tess_gate)?;
@@ -171,6 +176,8 @@ struct ShaderInterface {
     #[uniform(unbound)] view_matrix1: Uniform<[f32; 4]>,
     #[uniform(unbound)] view_matrix2: Uniform<[f32; 4]>,
     #[uniform(unbound)] view_matrix3: Uniform<[f32; 4]>,
+    
+    #[uniform(unbound)] block_texture: Uniform<TextureBinding<Dim2Array, NormUnsigned>>,
 }
 
 /// Defines vertex array structure for luminance framework.
@@ -185,6 +192,8 @@ pub enum VertexSemantics {
     Normal,
     #[sem(name = "a_color", repr = "[f32; 4]", wrapper = "VertexRGBA")]
     Color,
+    #[sem(name = "a_tex", repr = "[f32; 2]", wrapper = "VertexTex")]
+    Texture,
     // TODO: look into packed repr for lighting
     #[sem(name = "a_lighting", repr = "[f32; 3]", wrapper = "VertexLighting")]
     Lighting,
@@ -203,6 +212,9 @@ struct Vertex {
     color: VertexRGBA,
 
     #[allow(dead_code)]  // read by shader
+    tex: VertexTex,
+
+    #[allow(dead_code)]  // read by shader
     lighting: VertexLighting,
 }
 
@@ -219,6 +231,7 @@ impl ToGfxVertex<Vertex> for BlockVertex {
                 color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
                 color_attribute
             },
+            tex: VertexTex::new(self.tex.into()),
             lighting: VertexLighting::new(lighting.into()),
         }
     }
@@ -287,5 +300,30 @@ impl Chunk {
             }
         }
         Ok(count)
+    }
+}
+
+struct BlockGLRenderData {
+    block_render_data: BlocksRenderData<BlockVertex>,
+    texture: Texture<Dim2Array, NormRGBA8UI>,
+}
+
+impl BlockGLRenderData {
+    fn prepare<C>(context: &mut C, space: &Space) -> Result<Self, TextureError> where C: GraphicsContext<Backend = Backend> {
+        // TODO: fixed dimensions are not a correct assumption!
+        // TODO: Use data actually from triangulate_blocks
+        let mut texture = Texture::new(context, ([16, 16], 100), 0, Sampler::default())?;
+        let texels: Vec<(u8, u8, u8, u8)> = 
+            (0..100).flat_map(move |i|
+                (0..16).flat_map(move |x|
+                    (0..16).map(move |y|
+                        (x as u8 * 16, y as u8 * 16, 255 - i as u8, 255))))
+            .collect();
+        texture.upload(GenMipmaps::Yes, &texels)?;
+
+        Ok(BlockGLRenderData {
+            block_render_data: triangulate_blocks(space),
+            texture,
+        })
     }
 }
