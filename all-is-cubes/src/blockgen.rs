@@ -3,6 +3,8 @@
 
 //! Procedural block generation.
 
+use rand::{Rng, SeedableRng as _};
+
 use crate::block::{AIR, Block, BlockAttributes};
 use crate::math::{GridPoint, RGBA};
 use crate::space::{Space};
@@ -17,11 +19,12 @@ impl<'a> BlockGen<'a> {
     pub fn block_from_function(
         &mut self,
         attributes: BlockAttributes,
-        f: impl Fn(&BlockGen, GridPoint) -> Block
+        f: impl Fn(&BlockGen, GridPoint, f32) -> Block
     ) -> Block {
         let mut space = Space::empty_positive(self.size, self.size, self.size);
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for point in space.grid().interior_iter() {
-            space.set(point, &f(self, point));
+            space.set(point, &f(self, point, rng.gen_range(0.0, 1.0)));
         }
         Block::Recur(attributes, self.universe.insert_anonymous(space))
     }
@@ -66,6 +69,7 @@ impl LandscapeBlocks {
     /// TODO: Improve and document
     pub fn new(ctx: &mut BlockGen) -> Self {
         let mut result = Self::default();
+
         let grass_color = result.grass.clone();
         let dirt_color = result.dirt.clone();
 
@@ -75,8 +79,8 @@ impl LandscapeBlocks {
                 display_name: grass_color.attributes().display_name.clone(),
                 ..BlockAttributes::default()
             },
-            |ctx, point| {
-                if point.y >= ctx.size - 1 {
+            |ctx, point, random| {
+                if point.y >= ctx.size - (random * 3.0 + 1.0) as isize {
                     grass_color.clone()
                 } else {
                     dirt_color.clone()
