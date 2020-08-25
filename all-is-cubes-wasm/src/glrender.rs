@@ -90,13 +90,15 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(&mut self.surface, self.canvas_helper.viewport_dev()).unwrap();  // TODO error handling
     }
 
-    pub fn render_frame(&mut self, space: &Space, camera: &Camera) {
+    pub fn render_frame(&mut self, space: &Space, camera: &Camera) -> RenderInfo {
         // Not used directly for rendering, but used for cursor.
         self.proj.set_view_matrix(camera.view());
 
         let surface = &mut self.surface;
         let block_program = &mut self.block_program;
         let projection_matrix = self.proj.projection();
+
+        let mut info = RenderInfo::default();
 
         // TODO: quick hack; we need actual invalidation, not memoization
         let block_render_data = self.block_data_cache
@@ -129,8 +131,8 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
                     shader_iface.set(&u.view_matrix3, vm[3]);
 
                     render_gate.render(&render_state, |mut tess_gate| {
-                         ct.render(&mut tess_gate)?;
-                         Ok(())
+                        info.square_count += ct.render(&mut tess_gate)?;
+                        Ok(())
                     })
                 })
             },
@@ -141,12 +143,19 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
         }
 
         // There is no swap_buffers operation because WebGL implicitly does so.
+        info
     }
 
     pub fn cursor_raycaster(&self, /* TODO: offset ... or move this function */) -> Raycaster {
         let (origin, direction) = self.proj.project_ndc_into_world(0.0, 0.0);
         Raycaster::new(origin, direction)
     }
+}
+
+/// Information about render performance
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RenderInfo {
+    square_count: usize,
 }
 
 #[derive(Debug, UniformInterface)]
@@ -269,12 +278,15 @@ impl Chunk {
         }
     }
 
-    fn render<E>(&self, tess_gate: &mut TessGate) -> Result<(), E> {
+    fn render<E>(&self, tess_gate: &mut TessGate) -> Result<usize, E> {
+        let mut count = 0;
         if let Some(tesses) = self.tesses.as_ref() {
             for &face in Face::ALL_SEVEN {
-                tess_gate.render(&tesses[face])?;
+                let tess = &tesses[face];
+                count += tess.vert_nb() / 6;
+                tess_gate.render(tess)?;
             }
         }
-        Ok(())
+        Ok(count)
     }
 }

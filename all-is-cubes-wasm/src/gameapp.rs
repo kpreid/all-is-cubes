@@ -150,7 +150,9 @@ impl WebGameRoot {
         let (space_step_info, _) = self.universe.step(timestep);
 
         // Do graphics
-        self.renderer.render_frame(&*self.space_ref.borrow_mut(), &*self.camera_ref.borrow_mut());
+        let render_info = self.renderer.render_frame(
+            &*self.space_ref.borrow(),
+            &*self.camera_ref.borrow());
         
         // Compute info text.
         // TODO: tidy up cursor result formatting, make it reusable
@@ -160,9 +162,10 @@ impl WebGameRoot {
             None => Cow::Borrowed("No block"),
         };
         self.static_dom.scene_info_text.set_text_content(Some(&format!(
-            "{:#?}\n{:#?}\n\n{}",
+            "{:#?}\n{:#?}\n{:#?}\n\n{}",
             &*self.camera_ref.borrow(),
             space_step_info,
+            render_info,
             cursor_result_text)));
 
         // Schedule next requestAnimationFrame
