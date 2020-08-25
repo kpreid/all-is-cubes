@@ -121,6 +121,10 @@ impl UniverseIndex<Camera> for Universe {
     }
 }
 
+impl Default for Universe {
+   fn default() -> Self { Self::new() }
+}
+
 /// Type of a strong reference to an entry in a `Universe`. Defined to make types
 /// parameterized with this somewhat less hairy.
 type StrongEntryRef<T> = Rc<RefCell<UEntry<T>>>;
