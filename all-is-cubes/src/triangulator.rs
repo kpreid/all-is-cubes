@@ -213,14 +213,14 @@ pub fn triangulate_space<BV, GV>(
         }
     };
 
-    for &face in Face::all_seven() {
+    for &face in Face::ALL_SEVEN.iter() {
         // use the buffer but not the existing data
         output_vertices[face].clear();
     }
     for cube in space.grid().interior_iter() {
         let precomputed = lookup(cube);
         let low_corner = cube.cast::<FreeCoordinate>().unwrap();
-        for &face in Face::all_seven() {
+        for &face in Face::ALL_SEVEN {
             let adjacent_cube = cube + face.normal_vector();
             if lookup(adjacent_cube).faces[face.opposite()].fully_opaque {
                 // Don't draw obscured faces

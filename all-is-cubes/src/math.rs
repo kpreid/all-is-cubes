@@ -67,37 +67,36 @@ fn modulo_impl<
 /// out for uses of the 'true' 6-face version.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Face {
-    NX, NY, NZ, PX, PY, PZ, WITHIN
+    WITHIN, NX, NY, NZ, PX, PY, PZ
 }
 
 impl Face {
-    pub fn all_six() -> &'static [Face; 6] {
-        &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ]
-    }
-
-    pub fn all_seven() -> &'static [Face; 7] {
-        &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ, Face::WITHIN]
-    }
-
+    pub const ALL_SIX: &'static [Face; 6] =
+        &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
+    pub const ALL_SEVEN: &'static [Face; 7] =
+        &[Face::WITHIN, Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
+    
+    /// Returns which axis this face's normal vector is parallel to, with the numbering
+    /// X = 0, Y = 1, Z = 2. Panics if given `Face::WITHIN`.
     pub fn axis_number(&self) -> usize {
         match self {
+            Face::WITHIN => panic!("WITHIN has no axis number"),
             Face::NX | Face::PX => 0,
             Face::NY | Face::PY => 1,
             Face::NZ | Face::PZ => 2,
-            Face::WITHIN => panic!("WITHIN has no axis number"),
         }
     }
 
     /// Returns the opposite face (maps `PX` to `NX` and so on).
     pub fn opposite(&self) -> Face {
         match self {
+            Face::WITHIN => Face::WITHIN,
             Face::NX => Face::PX,
             Face::NY => Face::PY,
             Face::NZ => Face::PZ,
             Face::PX => Face::NX,
             Face::PY => Face::NY,
             Face::PZ => Face::NZ,
-            Face::WITHIN => Face::WITHIN,
         }
     }
 
@@ -106,13 +105,13 @@ impl Face {
         S: BaseNum + std::ops::Neg<Output = S>
     {
         match self {
+            Face::WITHIN => Vector3::new(S::zero(), S::zero(), S::zero()),
             Face::NX => Vector3::new(-S::one(), S::zero(), S::zero()),
             Face::NY => Vector3::new(S::zero(), -S::one(), S::zero()),
             Face::NZ => Vector3::new(S::zero(), S::zero(), -S::one()),
             Face::PX => Vector3::new(S::one(), S::zero(), S::zero()),
             Face::PY => Vector3::new(S::zero(), S::one(), S::zero()),
             Face::PZ => Vector3::new(S::zero(), S::zero(), S::one()),
-            Face::WITHIN => Vector3::new(S::zero(), S::zero(), S::zero()),
         }
     }
 
@@ -127,6 +126,7 @@ impl Face {
         // Note: This is not generalized to BaseNum + Neg like normal_vector is because
         // cgmath itself requires BaseFloat for matrices.
         match self {
+            Face::WITHIN => Matrix4::zero(),
             Face::NX => Matrix4::new(
                 S::zero(), S::one(), S::zero(), S::zero(),
                 S::zero(), S::zero(), S::one(), S::zero(),
@@ -168,7 +168,6 @@ impl Face {
                 S::zero(), S::zero(), -S::one(), S::zero(),
                 S::zero(), S::one(), S::one(), S::one(),
             ),
-            Face::WITHIN => Matrix4::zero(),
         }
     }
 }
@@ -189,13 +188,13 @@ impl<V> FaceMap<V> {
     /// Compute and store a value for each `Face` enum variant.
     pub fn generate(mut f: impl FnMut(Face) -> V) -> Self {
         Self {
+            within: f(Face::WITHIN),
             nx: f(Face::NX),
             ny: f(Face::NY),
             nz: f(Face::NZ),
             px: f(Face::PX),
             py: f(Face::PY),
             pz: f(Face::PZ),
-            within: f(Face::WITHIN),
         }
     }
 
@@ -211,13 +210,13 @@ impl<V> FaceMap<V> {
     /// TODO: Should wr do this in terms of iterators?
     pub fn map<U>(self, mut f: impl FnMut(Face, V) -> U) -> FaceMap<U> {
         FaceMap {
+            within: f(Face::WITHIN, self.within),
             nx: f(Face::NX, self.nx),
             ny: f(Face::NY, self.ny),
             nz: f(Face::NZ, self.nz),
             px: f(Face::PX, self.px),
             py: f(Face::PY, self.py),
             pz: f(Face::PZ, self.pz),
-            within: f(Face::WITHIN, self.within),
         }
     }
 
@@ -228,13 +227,13 @@ impl<V> Index<Face> for FaceMap<V> {
     type Output = V;
     fn index(&self, face: Face) -> &V {
         match face {
+            Face::WITHIN => &self.within,
             Face::NX => &self.nx,
             Face::NY => &self.ny,
             Face::NZ => &self.nz,
             Face::PX => &self.px,
             Face::PY => &self.py,
             Face::PZ => &self.pz,
-            Face::WITHIN => &self.within,
         }
     }
 }
@@ -242,13 +241,13 @@ impl<V> Index<Face> for FaceMap<V> {
 impl<V> IndexMut<Face> for FaceMap<V> {
     fn index_mut(&mut self, face: Face) -> &mut V {
         match face {
+            Face::WITHIN => &mut self.within,
             Face::NX => &mut self.nx,
             Face::NY => &mut self.ny,
             Face::NZ => &mut self.nz,
             Face::PX => &mut self.px,
             Face::PY => &mut self.py,
             Face::PZ => &mut self.pz,
-            Face::WITHIN => &mut self.within,
         }
     }
 }
@@ -486,9 +485,9 @@ mod tests {
 
     #[test]
     fn face_matrix_does_not_scale_or_reflect() {
-        Face::all_six().iter().for_each(|face| {
+        for &face in Face::ALL_SIX {
             assert_eq!(1.0, face.matrix().determinant());
-        });
+        }
     }
 
     // TODO: More tests of face.matrix()

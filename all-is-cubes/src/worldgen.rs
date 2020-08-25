@@ -30,7 +30,7 @@ use crate::space::{Space};
 /// assert!(space[(0, 0, -10)] != AIR);
 /// ```
 pub fn axes(space: &mut Space) {
-    for face in Face::all_six() {
+    for &face in Face::ALL_SIX {
         let axis = face.axis_number();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new(

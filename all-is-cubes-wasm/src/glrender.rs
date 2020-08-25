@@ -238,7 +238,7 @@ impl Chunk {
 
         // TODO: replace unwrap()s with an error logging/flagging mechanism
         if let Some(tesses) = self.tesses.as_mut() {
-            for &face in Face::all_seven() {
+            for &face in Face::ALL_SEVEN {
                 let new_vertices :&[Vertex] = self.vertices[face].as_ref();
                 let tess = &mut tesses[face];
             
@@ -270,7 +270,7 @@ impl Chunk {
 
     fn render<E>(&self, tess_gate: &mut TessGate) -> Result<(), E> {
         if let Some(tesses) = self.tesses.as_ref() {
-            for &face in Face::all_seven() {
+            for &face in Face::ALL_SEVEN {
                 tess_gate.render(&tesses[face])?;
             }
         }

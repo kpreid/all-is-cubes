@@ -96,7 +96,7 @@ struct LightRay {
 lazy_static! {
     static ref LIGHT_RAYS: [FaceRayData; 6] = {
         let mut ray_data = Vec::new();
-        for face in Face::all_six() {
+        for &face in Face::ALL_SIX {
             let origin = Vector3::new(0.5, 0.5, 0.5) + face.normal_vector() * -0.25;
             let reflect_face = Vector3::new(0, 0, 0) + face.normal_vector() * -1;
             let mut rays = Vec::new();
