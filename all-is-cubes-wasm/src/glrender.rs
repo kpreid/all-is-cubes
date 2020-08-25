@@ -243,12 +243,13 @@ impl Chunk {
                 let tess = &mut tesses[face];
             
                 if tess.vert_nb() == new_vertices.len() {
-                    // Same length; reuse existing buffer.
-                    // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
-                    let mut buffer_slice: VerticesMut<Vertex, (), (), Interleaved, Vertex> =
-                        tess.vertices_mut().expect("failed to map vertices for copying");
-                    buffer_slice.copy_from_slice(new_vertices);
-                    return;
+                    if new_vertices.len() != 0 {  // Skip degenerate case which would error
+                        // Same length; reuse existing buffer.
+                        // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
+                        let mut buffer_slice: VerticesMut<Vertex, (), (), Interleaved, Vertex> =
+                            tess.vertices_mut().expect("failed to map vertices for copying");
+                        buffer_slice.copy_from_slice(new_vertices);
+                    }
                 } else {
                     // Failed to reuse; make a new buffer
                     *tess = context.new_tess()
