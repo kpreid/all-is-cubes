@@ -115,10 +115,12 @@ impl WebGameRoot {
                     return;
                 }
                 match event.key_code() as u8 as char {
-                    'w' | 'W' => { camera.walk(0.0, -1.0); },
-                    'a' | 'A' => { camera.walk(-1.0, 0.0); },
-                    's' | 'S' => { camera.walk(0.0, 1.0); },
-                    'd' | 'D' => { camera.walk(1.0, 0.0); },
+                    'w' | 'W' => { camera.set_velocity_input(( 0.0,  0.0, -1.0)); },
+                    'a' | 'A' => { camera.set_velocity_input((-1.0,  0.0,  0.0)); },
+                    's' | 'S' => { camera.set_velocity_input(( 0.0,  0.0,  1.0)); },
+                    'd' | 'D' => { camera.set_velocity_input(( 1.0,  0.0,  0.0)); },
+                    'e' | 'E' => { camera.set_velocity_input(( 0.0,  1.0,  0.0)); },
+                    'c' | 'C' => { camera.set_velocity_input(( 0.0, -1.0,  0.0)); },
                     '\x25' => { camera.body.yaw -= 5.0; },
                     '\x26' => { camera.body.pitch += 5.0; },
                     '\x27' => { camera.body.yaw += 5.0; },

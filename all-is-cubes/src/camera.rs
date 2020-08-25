@@ -87,13 +87,8 @@ impl Camera {
     }
 
     /// Maximum range for normal keyboard input should be -1 to 1
-    pub fn set_velocity_input(&mut self, velocity: Vector3<FreeCoordinate>) {
-        self.velocity_input = velocity;
-    }
-
-    // TODO: Remove this
-    pub fn walk(&mut self, x: FreeCoordinate, z: FreeCoordinate) {
-        self.velocity_input = Vector3::new(x, 0.0, z);
+    pub fn set_velocity_input(&mut self, velocity: impl Into<Vector3<FreeCoordinate>>) {
+        self.velocity_input = velocity.into();
     }
 }
 

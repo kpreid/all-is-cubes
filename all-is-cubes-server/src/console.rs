@@ -22,14 +22,16 @@ pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
     camera.auto_rotate = false;  // stop on any keypress
     match event {
         Event::Key(key) => match key {
-            Key::Char('w') | Key::Char('W') => { camera.walk(0.0, -1.0); },
-            Key::Char('a') | Key::Char('A') => { camera.walk(-1.0, 0.0); },
-            Key::Char('s') | Key::Char('S') => { camera.walk(0.0, 1.0); },
-            Key::Char('d') | Key::Char('D') => { camera.walk(1.0, 0.0); },
+            Key::Char('w') | Key::Char('W') => { camera.set_velocity_input(( 0.0,  0.0, -1.0)); },
+            Key::Char('a') | Key::Char('A') => { camera.set_velocity_input((-1.0,  0.0,  0.0)); },
+            Key::Char('s') | Key::Char('S') => { camera.set_velocity_input(( 0.0,  0.0,  1.0)); },
+            Key::Char('d') | Key::Char('D') => { camera.set_velocity_input(( 1.0,  0.0,  0.0)); },
+            Key::Char('e') | Key::Char('E') => { camera.set_velocity_input(( 0.0,  1.0,  0.0)); },
+            Key::Char('c') | Key::Char('C') => { camera.set_velocity_input(( 0.0, -1.0,  0.0)); },
             Key::Up => { camera.body.pitch += 5.0; },
-            Key::Left => { camera.body.yaw += 5.0; },
             Key::Down => { camera.body.pitch -= 5.0; },
-            Key::Right => { camera.body.yaw -= 5.0; },
+            Key::Left => { camera.body.yaw -= 5.0; },
+            Key::Right => { camera.body.yaw += 5.0; },
             _ => { return Some(event); },
         },
         _ => { return Some(event); },
