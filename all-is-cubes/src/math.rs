@@ -173,7 +173,7 @@ impl Face {
 }
 
 /// Container for values keyed by `Face`s.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FaceMap<V> {
     pub nx: V,
     pub ny: V,
