@@ -149,7 +149,7 @@ fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> 
         Block::Recur(_attributes, space_ref) => {
             // TODO: Recursive triangulation is a bad strategy; use texturing instead, at least
             // for rectangular areas.
-            let mut space_vertices: Vec<BlockVertex> = Vec::new();
+            let mut space_vertices: FaceMap<Vec<BlockVertex>> = FaceMap::generate(|_| Vec::new());
             let space = &*space_ref.borrow();
             triangulate_space(space, &triangulate_blocks::<BlockVertex>(space), &mut space_vertices);
 
@@ -158,20 +158,15 @@ fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> 
             let scale = 1.0 / (space.grid().size().x as FreeCoordinate);
 
             // Transform vertices.
-            let mut faces = BlockRenderData::default().faces;
-            faces.within = FaceRenderData {
-                vertices: space_vertices.into_iter().map(|v| V::from(BlockVertex {
-                    position: v.position * scale,
-                    ..v
-                })).collect(),
-                fully_opaque: false,
-            };
-
-            for &face in Face::all_six() {
-                faces[face].fully_opaque = true;  // TODO: calculate all of these
-            }
-
-            //panic!("{} {}", faces.within.vertices.len(), scale);
+            let faces = FaceMap::generate(|face| {
+                FaceRenderData {
+                    vertices: space_vertices[face].iter().map(|v| V::from(BlockVertex {
+                        position: v.position * scale,
+                        ..*v
+                    })).collect(),
+                    fully_opaque: true,  // TODO: actually calculate this
+                }
+            });
             BlockRenderData { faces }
         }
     }
@@ -184,6 +179,11 @@ pub fn triangulate_blocks<V: From<BlockVertex>>(space: &Space) -> BlocksRenderDa
     space.distinct_blocks_unfiltered().iter().map(triangulate_block).collect()
 }
 
+/// Allocate an output buffer for `triangulate_space`.
+pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
+    FaceMap::generate(|_| Vec::new())
+}
+
 /// Computes a triangle-based representation of a `Space` for rasterization.
 ///
 /// `blocks_render_data` should be provided by `triangulate_blocks` and must be up to
@@ -192,10 +192,13 @@ pub fn triangulate_blocks<V: From<BlockVertex>>(space: &Space) -> BlocksRenderDa
 /// The triangles will be written into `output_vertices`, replacing the existing
 /// contents. This is intended to avoid memory reallocation in the common case of
 /// new geometry being similar to old geometry.
+///
+/// `output_vertices` is a `FaceMap` dividing the faces according to their normal
+/// vectors.
 pub fn triangulate_space<BV, GV>(
     space: &Space,
     blocks_render_data: &BlocksRenderData<BV>,
-    output_vertices: &mut Vec<GV>,
+    output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
     BV: ToGfxVertex<GV>
 {
@@ -210,7 +213,10 @@ pub fn triangulate_space<BV, GV>(
         }
     };
 
-    output_vertices.clear();  // use the buffer but not the existing data
+    for &face in Face::all_seven() {
+        // use the buffer but not the existing data
+        output_vertices[face].clear();
+    }
     for cube in space.grid().interior_iter() {
         let precomputed = lookup(cube);
         let low_corner = cube.cast::<FreeCoordinate>().unwrap();
@@ -225,7 +231,8 @@ pub fn triangulate_space<BV, GV>(
 
             // Copy vertices, offset to the block position and with lighting
             for vertex in precomputed.faces[face].vertices.iter() {
-                output_vertices.push(vertex.instantiate(low_corner.to_vec(), lighting));
+                output_vertices[face].push(
+                    vertex.instantiate(low_corner.to_vec(), lighting));
             }
         }
     }
@@ -247,16 +254,17 @@ mod tests {
             space.set(cube, &block);
         }
 
-        let mut rendering: Vec<BlockVertex> = Vec::new();
-        triangulate_space::<BlockVertex, BlockVertex>(&space, &triangulate_blocks(&space), &mut  rendering);
+        let mut rendering = new_space_buffer();
+        triangulate_space::<BlockVertex, BlockVertex>(&space, &triangulate_blocks(&space), &mut rendering);
+        let rendering_flattened: Vec<BlockVertex> = rendering.values().iter().flat_map(|r| (*r).clone()).collect();
         assert_eq!(
             Vec::<&BlockVertex>::new(),
-            rendering.iter()
+            rendering_flattened.iter()
                 .filter(|vertex|
                         vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
                 .collect::<Vec<&BlockVertex>>(),
             "found an interior point");
-        assert_eq!(rendering.len(),
+        assert_eq!(rendering_flattened.len(),
             6 /* vertices per face */
             * 4 /* block faces per exterior side of space */
             * 6 /* sides of space */,
@@ -272,7 +280,7 @@ mod tests {
 
         // This should not panic; visual glitches are preferable to failure.
         space.set((0, 0, 0), &block);  // render data does not know about this
-        triangulate_space(&space, &blocks_render_data, &mut Vec::new());
+        triangulate_space(&space, &blocks_render_data, &mut new_space_buffer());
     }
 
     #[test]
@@ -285,13 +293,14 @@ mod tests {
         outer_space.set((0, 0, 0), &inner_block);
 
         let blocks_render_data: BlocksRenderData<BlockVertex> = triangulate_blocks(&outer_space);
+        let block_render_data: BlockRenderData<BlockVertex> = blocks_render_data[0].clone();
+        
         eprintln!("{:#?}", blocks_render_data);
-        let mut space_rendered = Vec::new();
+        let mut space_rendered = new_space_buffer();
         triangulate_space(&outer_space, &blocks_render_data, &mut space_rendered);
         eprintln!("{:#?}", space_rendered);
 
-        // TODO: Once things are done more correctly we will need to check all vertices
-        assert_eq!(*space_rendered, *blocks_render_data[0].faces.within.vertices);
+        assert_eq!(space_rendered, block_render_data.faces.map(|_, frd| frd.vertices.to_vec()));
     }
 
     // TODO: more tests

@@ -187,7 +187,7 @@ pub struct FaceMap<V> {
 
 impl<V> FaceMap<V> {
     /// Compute and store a value for each `Face` enum variant.
-    pub fn generate(f: impl Fn(Face) -> V) -> Self {
+    pub fn generate(mut f: impl FnMut(Face) -> V) -> Self {
         Self {
             nx: f(Face::NX),
             ny: f(Face::NY),
@@ -198,6 +198,30 @@ impl<V> FaceMap<V> {
             within: f(Face::WITHIN),
         }
     }
+
+    /// Access all of the values.
+    /// TODO: Return an iterator instead; right now the problem is the iterator won't
+    /// own the data until we implement a custom iterator.
+    pub fn values(&self) -> [&V; 7] {
+        [&self.nx, &self.ny, &self.nz, &self.px, &self.py, &self.pz, &self.within]
+    }
+
+    /// Transform values.
+    ///
+    /// TODO: Should wr do this in terms of iterators?
+    pub fn map<U>(self, mut f: impl FnMut(Face, V) -> U) -> FaceMap<U> {
+        FaceMap {
+            nx: f(Face::NX, self.nx),
+            ny: f(Face::NY, self.ny),
+            nz: f(Face::NZ, self.nz),
+            px: f(Face::PX, self.px),
+            py: f(Face::PY, self.py),
+            pz: f(Face::PZ, self.pz),
+            within: f(Face::WITHIN, self.within),
+        }
+    }
+
+    // TODO: provide more convenience methods for iteration & transformation
 }
 
 impl<V> Index<Face> for FaceMap<V> {

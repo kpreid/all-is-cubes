@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::{FreeCoordinate};
+use all_is_cubes::math::{Face, FaceMap, FreeCoordinate};
 use all_is_cubes::space::{PackedLight, Space};
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, ToGfxVertex, triangulate_blocks, triangulate_space};
@@ -218,13 +218,14 @@ impl ToGfxVertex<Vertex> for BlockVertex {
 /// Not yet actually chunked rendering, but bundles the data that would be used in one.
 struct Chunk {
     // bounds: Grid,
-    vertices: Vec<Vertex>,
-    tess: Option<Tess<Vertex>>,
+    /// Vertices grouped by the direction they face
+    vertices: FaceMap<Vec<Vertex>>,
+    tesses: Option<FaceMap<Tess<Vertex>>>,
 }
 
 impl Chunk {
     fn new() -> Self {
-        Chunk { vertices: Vec::new(), tess: None }
+        Chunk { vertices: FaceMap::generate(|_| Vec::new()), tesses: None }
     }
 
     fn update<C: GraphicsContext<Backend = Backend>>(
@@ -235,29 +236,43 @@ impl Chunk {
     ) {
         triangulate_space(space, blocks_render_data, &mut self.vertices);
 
-        if let Some(tess) = self.tess.as_mut() {
-            if tess.vert_nb() == self.vertices.len() {
-                // Same length; reuse existing buffer.
-                // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
-                let mut buffer_slice: VerticesMut<Vertex, (), (), Interleaved, Vertex> =
-                    tess.vertices_mut().expect("failed to map vertices for copying");
-                buffer_slice.copy_from_slice(&*self.vertices);
-                return;
+        // TODO: replace unwrap()s with an error logging/flagging mechanism
+        if let Some(tesses) = self.tesses.as_mut() {
+            for &face in Face::all_seven() {
+                let new_vertices :&[Vertex] = self.vertices[face].as_ref();
+                let tess = &mut tesses[face];
+            
+                if tess.vert_nb() == new_vertices.len() {
+                    // Same length; reuse existing buffer.
+                    // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
+                    let mut buffer_slice: VerticesMut<Vertex, (), (), Interleaved, Vertex> =
+                        tess.vertices_mut().expect("failed to map vertices for copying");
+                    buffer_slice.copy_from_slice(new_vertices);
+                    return;
+                } else {
+                    // Failed to reuse; make a new buffer
+                    *tess = context.new_tess()
+                        .set_vertices(self.vertices[face].clone())
+                        .set_mode(Mode::Triangle)
+                        .build()
+                        .unwrap();
+                }
             }
+        } else {
+            self.tesses = Some(FaceMap::generate(
+                |face| context.new_tess()
+                    .set_vertices(self.vertices[face].clone())
+                    .set_mode(Mode::Triangle)
+                    .build()
+                    .unwrap()));
         }
-
-        // Failed to reuse; make a new buffer
-        self.tess = Some(context
-            .new_tess()
-            .set_vertices(self.vertices.clone())
-            .set_mode(Mode::Triangle)
-            .build()
-            .unwrap());  // TODO need any error handling?
     }
 
     fn render<E>(&self, tess_gate: &mut TessGate) -> Result<(), E> {
-        if let Some(tess) = self.tess.as_ref() {
-            tess_gate.render(tess)?;
+        if let Some(tesses) = self.tesses.as_ref() {
+            for &face in Face::all_seven() {
+                tess_gate.render(&tesses[face])?;
+            }
         }
         Ok(())
     }
