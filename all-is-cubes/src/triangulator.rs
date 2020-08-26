@@ -12,7 +12,7 @@
 //! other operation in OpenGL graphics programming, and “triangulation” seems to
 //! be the more commonly used terms.
 
-use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
 
 use crate::block::{Block};
 use crate::math::{Face, FaceMap, FreeCoordinate, RGBA};
@@ -31,7 +31,7 @@ pub struct BlockVertex {
     pub normal: Vector3<FreeCoordinate>,  // TODO: Use a smaller number type? Storage vs convenience?
     // TODO: Eventually color will be fully replaced with texture coordinates.
     pub color: RGBA,
-    pub tex: Vector2<TextureCoordinate>,
+    pub tex: Vector3<TextureCoordinate>,
 }
 
 impl std::fmt::Debug for BlockVertex {
@@ -125,7 +125,7 @@ fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> 
                             position: transform.transform_point(p),
                             normal: face.normal_vector(),
                             color: *color,
-                            tex: Vector2::new(p.x as TextureCoordinate, p.y as TextureCoordinate),
+                            tex: Vector3::new(p.x as TextureCoordinate, p.y as TextureCoordinate, 0.0),
                         }));
                     };
 

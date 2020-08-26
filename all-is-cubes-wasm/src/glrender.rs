@@ -192,7 +192,8 @@ pub enum VertexSemantics {
     Normal,
     #[sem(name = "a_color", repr = "[f32; 4]", wrapper = "VertexRGBA")]
     Color,
-    #[sem(name = "a_tex", repr = "[f32; 2]", wrapper = "VertexTex")]
+    // TODO: more efficient representation by packing the index coordinates somewhere else...?
+    #[sem(name = "a_tex", repr = "[f32; 3]", wrapper = "VertexTex")]
     Texture,
     // TODO: look into packed repr for lighting
     #[sem(name = "a_lighting", repr = "[f32; 3]", wrapper = "VertexLighting")]
