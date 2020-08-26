@@ -317,6 +317,17 @@ impl RGBA {
     pub fn green(self) -> f32 { self.0.y }
     pub fn blue(self) -> f32 { self.0.z }
     pub fn alpha(self) -> f32 { self.0.w }
+
+    pub fn to_saturating_8bpp(self) -> (u8, u8, u8, u8) {
+        // As of Rust 1.45, `as` on float to int is saturating
+        fn convert_component(x: f32) -> u8 { (x * 255.0) as u8 }
+        (
+            convert_component(self.red()),
+            convert_component(self.green()),
+            convert_component(self.blue()),
+            convert_component(self.alpha()),
+        )
+    }
 }
 
 impl From<RGB> for Vector3<f32> {
@@ -495,6 +506,14 @@ mod tests {
     // TODO: Tests of FaceMap
 
     // TODO: Add tests of the color not-NaN mechanisms.
+    
+    #[test]
+    fn rgba_to_saturating_8bpp() {
+        assert_eq!(RGBA::new(0.125, 0.25, 0.5, 0.75).to_saturating_8bpp(), (31, 63, 127, 191));
+
+        // Test saturation
+        assert_eq!(RGBA::new(0.5, -1.0, 10.0, 1.0).to_saturating_8bpp(), (127, 0, 255, 255));
+    }
 
     #[test]
     fn rgb_rgba_debug() {

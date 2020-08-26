@@ -323,7 +323,7 @@ impl BlockGLRenderData {
         texture.upload(GenMipmaps::Yes, &texels)?;
 
         Ok(BlockGLRenderData {
-            block_render_data: triangulate_blocks(space),
+            block_render_data: triangulate_blocks(space, &mut all_is_cubes::triangulator::NullTextureAllocator),
             texture,
         })
     }

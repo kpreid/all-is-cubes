@@ -15,7 +15,7 @@
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
 
 use crate::block::{Block};
-use crate::math::{Face, FaceMap, FreeCoordinate, RGBA};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
 use crate::lighting::PackedLight;
 use crate::space::{Space};
 use crate::util::{ConciseDebug as _};
@@ -84,7 +84,7 @@ impl<V: From<BlockVertex>> Default for FaceRenderData<V> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockRenderData<V: From<BlockVertex>> {
     /// Vertices grouped by the face they belong to.
-    /// 
+    ///
     /// All triangles which are on the surface of the cube (such that they may be omitted
     /// when a `fully_opaque` block is adjacent) are grouped under the corresponding
     /// face, and all other triangles are grouped under `Face::WITHIN`.
@@ -128,7 +128,12 @@ fn push_quad<V: From<BlockVertex>>(vertices: &mut Vec<V>, face: Face, color: RGB
 }
 
 /// Generate `BlockRenderData` for a block.
-fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> {
+fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
+    // TODO: Arrange to pass in a buffer of old data such that we can reuse existing textures.
+    // This will allow for efficient implementation of animated blocks.
+    block :&Block,
+    texture_allocator: &mut A,
+) -> BlockRenderData<V> {
     match block {
         Block::Atom(_attributes, color) => {
             let faces = FaceMap::generate(|face| {
@@ -157,23 +162,38 @@ fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> 
             }
         }
         Block::Recur(_attributes, space_ref) => {
-            // TODO: Recursive triangulation is a bad strategy; use texturing instead, at least
-            // for rectangular areas.
-            let mut space_vertices: FaceMap<Vec<BlockVertex>> = FaceMap::generate(|_| Vec::new());
             let space = &*space_ref.borrow();
-            triangulate_space(space, &triangulate_blocks::<BlockVertex>(space), &mut space_vertices);
+            let grid = space.grid();
+            let mut vertices_by_face: FaceMap<Vec<V>> = FaceMap::generate(|_| Vec::new());
 
-            // TODO: do error-checking on the transformation (what if the space is not cubical, or
-            // not in the positive octant).
-            let scale = 1.0 / (space.grid().size().x as FreeCoordinate);
+            let tile_size: GridCoordinate = grid.size()[0];  // TODO: have a general policy about what if the space is the wrong size.
 
-            // Transform vertices.
+            for &face in Face::ALL_SIX {
+                let vertices = &mut vertices_by_face[face];  // TODO split by interior and not
+                let transform = face.matrix();
+                for layer in 0..tile_size {
+                    // TODO: JS version would detect fully-opaque blocks (a derived property of Block)
+                    // and only scan the first and last faces
+                    let mut tile_texels: Vec<(u8, u8, u8, u8)> = Vec::with_capacity((tile_size * tile_size) as usize);
+                    for t in 0..tile_size {
+                        for s in 0..tile_size {
+                            // TODO: Matrix4 isn't allowed to be integer. Provide a better strategy.
+                            let cube :Point3<GridCoordinate> = transform.transform_point(Point3::new(s as FreeCoordinate, t as FreeCoordinate, layer as FreeCoordinate)).cast::<GridCoordinate>().unwrap();
+
+                            tile_texels.push(space[cube].color().to_saturating_8bpp());
+                        }
+                    }
+                    let mut texture_tile = texture_allocator.allocate();
+                    texture_tile.write(tile_texels.as_ref());
+
+                    // TODO hook up the texture coordinates
+                    push_quad(vertices, face, RGBA::new(0.5, 0.5, 0.5, 1.0)); // TODO stop having this color
+                }
+            }
+
             let faces = FaceMap::generate(|face| {
                 FaceRenderData {
-                    vertices: space_vertices[face].iter().map(|v| V::from(BlockVertex {
-                        position: v.position * scale,
-                        ..*v
-                    })).collect(),
+                    vertices: vertices_by_face[face].drain(..).collect(),  // TODO awkward move
                     fully_opaque: true,  // TODO: actually calculate this
                 }
             });
@@ -185,8 +205,13 @@ fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> 
 /// Precomputes vertices for blocks present in a space.
 ///
 /// The resulting `Vec` is indexed by the `Space`'s internal unstable IDs.
-pub fn triangulate_blocks<V: From<BlockVertex>>(space: &Space) -> BlocksRenderData<V> {
-    space.distinct_blocks_unfiltered().iter().map(triangulate_block).collect()
+pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
+    space: &Space,
+    texture_allocator: &mut A,
+) -> BlocksRenderData<V> {
+    space.distinct_blocks_unfiltered().iter()
+        .map(|b| triangulate_block(b, texture_allocator))
+        .collect()
 }
 
 /// Allocate an output buffer for `triangulate_space`.
@@ -248,6 +273,37 @@ pub fn triangulate_space<BV, GV>(
     }
 }
 
+/// Allocator of 2D textures to paint block faces into.
+pub trait TextureAllocator {
+    type Tile: TextureTile;
+    fn allocate(&mut self) -> Self::Tile;
+}
+
+/// 2D texture to paint block faces into. It is assumed that when this value is dropped,
+/// the texture allocation will be released.
+pub trait TextureTile {
+    /// Value to write into the third texture coordinate component to indicate this tile.
+    fn index(&self) -> TextureCoordinate;
+    
+    /// Width=height of the texture tile.
+    fn size(&self) -> usize;
+
+    /// Write texture data as RGBA color.
+    fn write(&mut self, data: &[(u8, u8, u8, u8)]);
+}
+
+/// `TextureAllocator` which discards all input; for testing.
+pub struct NullTextureAllocator;
+impl TextureAllocator for NullTextureAllocator {
+    type Tile = ();
+    fn allocate(&mut self) -> () { () }
+}
+impl TextureTile for () {
+    fn index(&self) -> TextureCoordinate { 0.0 }
+    fn size(&self) -> usize { 1 }
+    fn write(&mut self, _data: &[(u8, u8, u8, u8)]) {}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,7 +321,10 @@ mod tests {
         }
 
         let mut rendering = new_space_buffer();
-        triangulate_space::<BlockVertex, BlockVertex>(&space, &triangulate_blocks(&space), &mut rendering);
+        triangulate_space::<BlockVertex, BlockVertex>(
+            &space,
+            &triangulate_blocks(&space, &mut NullTextureAllocator),
+            &mut rendering);
         let rendering_flattened: Vec<BlockVertex> = rendering.values().iter().flat_map(|r| (*r).clone()).collect();
         assert_eq!(
             Vec::<&BlockVertex>::new(),
@@ -285,7 +344,8 @@ mod tests {
     fn no_panic_on_missing_blocks() {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 1, 1);
-        let blocks_render_data: BlocksRenderData<BlockVertex> = triangulate_blocks(&space);
+        let blocks_render_data: BlocksRenderData<BlockVertex> =
+            triangulate_blocks(&space, &mut NullTextureAllocator);
         assert_eq!(blocks_render_data.len(), 1);  // check our assumption
 
         // This should not panic; visual glitches are preferable to failure.
@@ -302,9 +362,10 @@ mod tests {
         let mut outer_space = Space::empty_positive(1, 1, 1);
         outer_space.set((0, 0, 0), &inner_block);
 
-        let blocks_render_data: BlocksRenderData<BlockVertex> = triangulate_blocks(&outer_space);
+        let blocks_render_data: BlocksRenderData<BlockVertex> =
+            triangulate_blocks(&outer_space, &mut NullTextureAllocator);
         let block_render_data: BlockRenderData<BlockVertex> = blocks_render_data[0].clone();
-        
+
         eprintln!("{:#?}", blocks_render_data);
         let mut space_rendered = new_space_buffer();
         triangulate_space(&outer_space, &blocks_render_data, &mut space_rendered);
