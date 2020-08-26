@@ -103,42 +103,47 @@ impl<V: From<BlockVertex>> Default for BlockRenderData<V> {
 /// Pass it to `triangulate_space` to use it.
 pub type BlocksRenderData<V> = Box<[BlockRenderData<V>]>;
 
+fn push_quad<V: From<BlockVertex>>(vertices: &mut Vec<V>, face: Face, color: RGBA) {
+    let transform = face.matrix();
+    let mut push_1 = |p: Point3<FreeCoordinate>| {
+        vertices.push(V::from(BlockVertex {
+            position: transform.transform_point(p),
+            normal: face.normal_vector(),
+            color: color,
+            tex: Vector3::new(p.x as TextureCoordinate, p.y as TextureCoordinate, 0.0),
+        }));
+    };
+    
+    // Two-triangle quad.
+    // Note that looked at from a X-right Y-up view, these triangles are
+    // clockwise, but they're properly counterclockwise from the perspective
+    // that we're drawing the face _facing towards negative Z_ (into the screen),
+    // which is how cube faces as implicitly defined by Face::matrix work.
+    push_1(Point3::new(0.0, 0.0, 0.0));
+    push_1(Point3::new(0.0, 1.0, 0.0));
+    push_1(Point3::new(1.0, 0.0, 0.0));
+    push_1(Point3::new(1.0, 0.0, 0.0));
+    push_1(Point3::new(0.0, 1.0, 0.0));
+    push_1(Point3::new(1.0, 1.0, 0.0));
+}
+
 /// Generate `BlockRenderData` for a block.
 fn triangulate_block<V: From<BlockVertex>>(block :&Block) -> BlockRenderData<V> {
     match block {
         Block::Atom(_attributes, color) => {
             let faces = FaceMap::generate(|face| {
                 if face == Face::WITHIN {
-                    // Until we have blocks with interior detail, nothing to do here.
+                    // No interior detail for atom blocks.
                     return FaceRenderData::default();
                 }
 
                 let mut face_vertices: Vec<V> = Vec::new();
-                let transform = face.matrix();
                 let fully_opaque = color.binary_opaque();
 
                 // TODO: Port over pseudo-transparency mechanism, then change this to a
                 // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
                 if fully_opaque {
-                    let mut push_1 = |p: Point3<FreeCoordinate>| {
-                        face_vertices.push(V::from(BlockVertex {
-                            position: transform.transform_point(p),
-                            normal: face.normal_vector(),
-                            color: *color,
-                            tex: Vector3::new(p.x as TextureCoordinate, p.y as TextureCoordinate, 0.0),
-                        }));
-                    };
-
-                    // Two-triangle quad.
-                    // Note that looked at from a X-right Y-up view, these triangles are
-                    // clockwise, but they're properly counterclockwise from the perspective
-                    // that we're drawing the face _facing towards negative Z_ (into the screen).
-                    push_1(Point3::new(0.0, 0.0, 0.0));
-                    push_1(Point3::new(0.0, 1.0, 0.0));
-                    push_1(Point3::new(1.0, 0.0, 0.0));
-                    push_1(Point3::new(1.0, 0.0, 0.0));
-                    push_1(Point3::new(0.0, 1.0, 0.0));
-                    push_1(Point3::new(1.0, 1.0, 0.0));
+                    push_quad(&mut face_vertices, face, *color);
                 }
 
                 FaceRenderData {
