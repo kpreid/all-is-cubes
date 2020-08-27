@@ -283,6 +283,11 @@ impl RGB {
         Self::try_from(Vector3::new(r, g, b)).expect("Color components may not be NaN")
     }
 
+    /// Adds an alpha component to produce an RGBA color.
+    pub fn with_alpha(self, alpha: f32) -> RGBA {
+        RGBA::new(self.red(), self.green(), self.blue(), alpha)
+    }
+
     pub fn red(self) -> f32 { self.0.x }
     pub fn green(self) -> f32 { self.0.y }
     pub fn blue(self) -> f32 { self.0.z }
@@ -297,13 +302,10 @@ impl RGBA {
         Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
     }
 
-    /// Renderers which can only consider a block to be opaque or not may use this value
-    /// as their decision.
-    ///
-    /// TODO: This no longer belongs here, in the generic color type, or does it?
-    pub fn binary_opaque(self) -> bool {
-        self.alpha() > 0.5
-    }
+    pub fn red(self) -> f32 { self.0.x }
+    pub fn green(self) -> f32 { self.0.y }
+    pub fn blue(self) -> f32 { self.0.z }
+    pub fn alpha(self) -> f32 { self.0.w }
 
     /// Discards the alpha component to produce an RGB color.
     ///
@@ -313,10 +315,13 @@ impl RGBA {
         RGB(self.0.truncate())
     }
 
-    pub fn red(self) -> f32 { self.0.x }
-    pub fn green(self) -> f32 { self.0.y }
-    pub fn blue(self) -> f32 { self.0.z }
-    pub fn alpha(self) -> f32 { self.0.w }
+    /// Renderers which can only consider a block to be opaque or not may use this value
+    /// as their decision.
+    ///
+    /// TODO: This no longer belongs here, in the generic color type, or does it?
+    pub fn binary_opaque(self) -> bool {
+        self.alpha() > 0.5
+    }
 
     pub fn to_saturating_8bpp(self) -> (u8, u8, u8, u8) {
         // As of Rust 1.45, `as` on float to int is saturating

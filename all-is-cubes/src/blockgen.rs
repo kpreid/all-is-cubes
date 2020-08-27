@@ -30,6 +30,15 @@ impl<'a> BlockGen<'a> {
     }
 }
 
+pub fn scale_color(block: Block, scalar: f32) -> Block {
+    match block {
+        Block::Atom(attributes, color) => Block::Atom(
+            attributes,
+            (color.to_rgb() * scalar).with_alpha(color.alpha())),
+        _ => panic!("unimplemented: scale_color({:?})", block),
+    }
+}
+
 /// Generate some atom blocks with unspecified contents for testing.
 ///
 /// ```
@@ -80,10 +89,13 @@ impl LandscapeBlocks {
                 ..BlockAttributes::default()
             },
             |ctx, point, random| {
+                // Discrete randomization so that we don't generate too many distinct
+                // block types. TODO: Better strategy, perhaps palette-based.
+                let color_randomization = 1.0 + ((random * 5.0).floor() - 2.0) * 0.05;
                 if point.y >= ctx.size - (random * 3.0 + 1.0) as isize {
-                    grass_color.clone()
+                    scale_color(grass_color.clone(), color_randomization)
                 } else {
-                    dirt_color.clone()
+                    scale_color(dirt_color.clone(), color_randomization)
                 }
             });
 
