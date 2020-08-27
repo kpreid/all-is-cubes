@@ -16,6 +16,9 @@ use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::texture::{Dim2, Dim2Array, GenMipmaps, Sampler, Texture, TextureError};
 use luminance_front::Backend;
+use std::cell::RefCell;
+use std::convert::TryInto;
+use std::rc::{Rc, Weak};
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
@@ -24,7 +27,11 @@ use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{Face, FaceMap, FreeCoordinate};
 use all_is_cubes::space::{PackedLight, Space};
 use all_is_cubes::raycast::Raycaster;
-use all_is_cubes::triangulator::{BlockVertex, BlocksRenderData, ToGfxVertex, triangulate_blocks, triangulate_space};
+use all_is_cubes::triangulator::{
+    BlockVertex, BlocksRenderData,
+    Texel, TextureAllocator, TextureCoordinate, TextureTile,
+    ToGfxVertex,
+    triangulate_blocks, triangulate_space};
 
 use crate::js_bindings::{CanvasHelper};
 
@@ -118,7 +125,7 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
             // TODO: port skybox cube map code
             &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
             |pipeline, mut shading_gate| {
-                let bound_block_texture = pipeline.bind_texture(&mut block_data.texture)?;
+                let bound_block_texture = pipeline.bind_texture(&mut block_data.texture_allocator.texture)?;
 
                 shading_gate.shade(block_program, |mut shader_iface, u, mut render_gate| {
                     let pm: [[f32; 4]; 4] = projection_matrix.cast::<f32>().unwrap().into();
@@ -176,7 +183,7 @@ struct ShaderInterface {
     #[uniform(unbound)] view_matrix1: Uniform<[f32; 4]>,
     #[uniform(unbound)] view_matrix2: Uniform<[f32; 4]>,
     #[uniform(unbound)] view_matrix3: Uniform<[f32; 4]>,
-    
+
     #[uniform(unbound)] block_texture: Uniform<TextureBinding<Dim2Array, NormUnsigned>>,
 }
 
@@ -258,7 +265,7 @@ impl Chunk {
         &mut self,
         context: &mut C,
         space: &Space,
-        blocks_render_data: &BlocksRenderData<BlockVertex>,
+        blocks_render_data: &BlocksRenderData<BlockVertex, BlockGLTexture>,
     ) {
         triangulate_space(space, blocks_render_data, &mut self.vertices);
 
@@ -305,26 +312,115 @@ impl Chunk {
 }
 
 struct BlockGLRenderData {
-    block_render_data: BlocksRenderData<BlockVertex>,
-    texture: Texture<Dim2Array, NormRGBA8UI>,
+    block_render_data: BlocksRenderData<BlockVertex, BlockGLTexture>,
+    texture_allocator: BlockGLTexture,
 }
 
 impl BlockGLRenderData {
     fn prepare<C>(context: &mut C, space: &Space) -> Result<Self, TextureError> where C: GraphicsContext<Backend = Backend> {
-        // TODO: fixed dimensions are not a correct assumption!
-        // TODO: Use data actually from triangulate_blocks
-        let mut texture = Texture::new(context, ([16, 16], 100), 0, Sampler::default())?;
-        let texels: Vec<(u8, u8, u8, u8)> = 
-            (0..100).flat_map(move |i|
-                (0..16).flat_map(move |x|
-                    (0..16).map(move |y|
-                        (x as u8 * 16, y as u8 * 16, 255 - i as u8, 255))))
-            .collect();
-        texture.upload(GenMipmaps::Yes, &texels)?;
+        let mut texture_allocator = BlockGLTexture::new(context)?;
+        let mut result = BlockGLRenderData {
+            block_render_data: triangulate_blocks(space, &mut texture_allocator),
+            texture_allocator,
+        };
+        result.texture_allocator.flush()?;
+        Ok(result)
+    }
+}
 
-        Ok(BlockGLRenderData {
-            block_render_data: triangulate_blocks(space, &mut all_is_cubes::triangulator::NullTextureAllocator),
-            texture,
+/// Manages a block face texture, which is an array texture (each face gets a separate
+/// texture layer).
+struct BlockGLTexture {
+    texture: Texture<Dim2Array, NormRGBA8UI>,
+    tile_size: u32,
+    layer_count: u32,  // u32 is the type luminance uses
+    next_free: u32,
+    in_use: Vec<Weak<RefCell<TileBacking>>>,
+}
+#[derive(Clone, Debug)]
+struct GLTile {
+    index: u32,
+    backing: Rc<RefCell<TileBacking>>,  // TODO: Instead of runtime interior mutability, can we arrange to enable mutability through having a mutable ref to the allocator?
+}
+#[derive(Debug)]
+struct TileBacking {
+    index: u32,
+    data: Option<Box<[Texel]>>,
+}
+
+impl BlockGLTexture {
+    fn new<C>(context: &mut C) -> Result<Self, TextureError>  where C: GraphicsContext<Backend = Backend> {
+        let layer_count = 100;  // TODO implement reallocation
+        let tile_size = 16;
+        Ok(Self {
+            texture: Texture::new(context, ([tile_size, tile_size], layer_count), 0, Sampler::default())?,
+            tile_size,
+            layer_count: layer_count,
+            next_free: 0,
+            in_use: Vec::new(),
         })
+    }
+
+    fn flush(&mut self) -> Result<(), TextureError> {
+        let tile_size_in_array = self.tile_size_in_array();
+        // Allocate contiguous storage for uploading.
+        // TODO: Should we keep this allocated? Probably.
+        let mut texels = vec![
+            (255, 0, 255, 255);
+            (self.layer_count * self.tile_size * self.tile_size)
+                .try_into().expect("texture too big for memory?!")];
+        let mut count_written = 0;
+
+        // TODO: Add dirty flags to enable deciding not to upload after all
+        self.in_use.retain(|weak_backing| {
+            // Process the non-dropped weak references
+            weak_backing.upgrade().map_or(false, |strong_backing| {
+                let backing: &TileBacking = &strong_backing.borrow();
+                if let Some(data) = backing.data.as_ref() {
+                    let tile_index: usize = backing.index as usize;
+                    texels[(tile_index * tile_size_in_array)
+                           ..((tile_index + 1) * tile_size_in_array)].copy_from_slice(&*data);
+                    count_written += 1;
+                }
+                true  // retain in self.in_use
+            })
+        });
+
+        self.texture.upload(GenMipmaps::Yes, &texels)?;
+        console::info_1(&JsValue::from_str(&format!(
+            "flushed block texture with {:?} tiles out of {:?}",
+            count_written,
+            self.in_use.len())));
+        Ok(())
+    }
+
+    /// Number of texel array elements a single tile spans.
+    fn tile_size_in_array(&self) -> usize {
+        (self.tile_size * self.tile_size) as usize
+    }
+}
+
+impl TextureAllocator for BlockGLTexture {
+    type Tile = GLTile;
+    fn allocate(&mut self) -> GLTile {
+        if self.next_free == self.layer_count {
+            todo!("ran out of tile space, but reallocation is not implemented");
+        }
+        let result = GLTile {
+            index: self.next_free,
+            backing: Rc::new(RefCell::new(TileBacking {
+                index: self.next_free,
+                data: None,
+            })),
+        };
+        self.next_free += 1;
+        self.in_use.push(Rc::downgrade(&result.backing));
+        result
+    }
+}
+impl TextureTile for GLTile {
+    fn index(&self) -> TextureCoordinate { self.index as TextureCoordinate }
+    fn write(&mut self, data: &[Texel]) {
+        self.backing.borrow_mut().data = Some(data.into());
     }
 }

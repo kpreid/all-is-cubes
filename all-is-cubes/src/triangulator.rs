@@ -82,35 +82,43 @@ impl<V: From<BlockVertex>> Default for FaceRenderData<V> {
 
 /// Describes how to draw a block. Pass it to `triangulate_space` to use it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BlockRenderData<V: From<BlockVertex>> {
+pub struct BlockRenderData<V: From<BlockVertex>, A: TextureAllocator> {
     /// Vertices grouped by the face they belong to.
     ///
     /// All triangles which are on the surface of the cube (such that they may be omitted
     /// when a `fully_opaque` block is adjacent) are grouped under the corresponding
     /// face, and all other triangles are grouped under `Face::WITHIN`.
     faces: FaceMap<FaceRenderData<V>>,
+    
+    textures_used: Vec<A::Tile>,
 }
 
-impl<V: From<BlockVertex>> Default for BlockRenderData<V> {
+impl<V: From<BlockVertex>, A: TextureAllocator> Default for BlockRenderData<V, A> {
     fn default() -> Self {
         Self {
-            faces: FaceMap::generate(|_| FaceRenderData::default())
+            faces: FaceMap::generate(|_| FaceRenderData::default()),
+            textures_used: Vec::new(),
         }
     }
 }
 
 /// Collection of `BlockRenderData` indexed by a `Space`'s block indices.
 /// Pass it to `triangulate_space` to use it.
-pub type BlocksRenderData<V> = Box<[BlockRenderData<V>]>;
+pub type BlocksRenderData<V, A> = Box<[BlockRenderData<V, A>]>;
 
-fn push_quad<V: From<BlockVertex>>(vertices: &mut Vec<V>, face: Face, color: RGBA) {
+fn push_quad<V: From<BlockVertex>>(
+    vertices: &mut Vec<V>,
+    face: Face,
+    color: RGBA,
+    texture_index_coordinate: TextureCoordinate,
+) {
     let transform = face.matrix();
     let mut push_1 = |p: Point3<FreeCoordinate>| {
         vertices.push(V::from(BlockVertex {
             position: transform.transform_point(p),
             normal: face.normal_vector(),
             color: color,
-            tex: Vector3::new(p.x as TextureCoordinate, p.y as TextureCoordinate, 0.0),
+            tex: Vector3::new(p.x as TextureCoordinate, p.y as TextureCoordinate, texture_index_coordinate),
         }));
     };
     
@@ -133,7 +141,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // This will allow for efficient implementation of animated blocks.
     block :&Block,
     texture_allocator: &mut A,
-) -> BlockRenderData<V> {
+) -> BlockRenderData<V, A> {
     match block {
         Block::Atom(_attributes, color) => {
             let faces = FaceMap::generate(|face| {
@@ -148,7 +156,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 // TODO: Port over pseudo-transparency mechanism, then change this to a
                 // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
                 if fully_opaque {
-                    push_quad(&mut face_vertices, face, *color);
+                    push_quad(&mut face_vertices, face, *color, 0.0);  // TODO: wrong texture coordinate
                 }
 
                 FaceRenderData {
@@ -158,13 +166,15 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             });
 
             BlockRenderData {
-                faces
+                faces,
+                textures_used: vec![],
             }
         }
         Block::Recur(_attributes, space_ref) => {
             let space = &*space_ref.borrow();
             let grid = space.grid();
             let mut vertices_by_face: FaceMap<Vec<V>> = FaceMap::generate(|_| Vec::new());
+            let mut textures_used = Vec::new();
 
             let tile_size: GridCoordinate = grid.size()[0];  // TODO: have a general policy about what if the space is the wrong size.
 
@@ -186,8 +196,10 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     let mut texture_tile = texture_allocator.allocate();
                     texture_tile.write(tile_texels.as_ref());
 
-                    // TODO hook up the texture coordinates
-                    push_quad(vertices, face, RGBA::new(0.5, 0.5, 0.5, 1.0)); // TODO stop having this color
+                    // TODO stop having this color
+                    push_quad(vertices, face, RGBA::new(0.5, 0.5, 0.5, 1.0), texture_tile.index());
+
+                    textures_used.push(texture_tile);
                 }
             }
 
@@ -197,7 +209,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     fully_opaque: true,  // TODO: actually calculate this
                 }
             });
-            BlockRenderData { faces }
+            BlockRenderData { faces, textures_used }
         }
     }
 }
@@ -208,7 +220,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
-) -> BlocksRenderData<V> {
+) -> BlocksRenderData<V, A> {
     space.distinct_blocks_unfiltered().iter()
         .map(|b| triangulate_block(b, texture_allocator))
         .collect()
@@ -230,16 +242,17 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 ///
 /// `output_vertices` is a `FaceMap` dividing the faces according to their normal
 /// vectors.
-pub fn triangulate_space<BV, GV>(
+pub fn triangulate_space<BV, GV, A>(
     space: &Space,
-    blocks_render_data: &BlocksRenderData<BV>,
+    blocks_render_data: &BlocksRenderData<BV, A>,
     output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
-    BV: ToGfxVertex<GV>
+    BV: ToGfxVertex<GV>,
+    A: TextureAllocator,
 {
     // TODO: take a Grid parameter for chunked rendering
 
-    let empty_render = BlockRenderData::<BV>::default();
+    let empty_render = BlockRenderData::<BV, A>::default();
     let lookup = |cube| {
         match space.get_block_index(cube) {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one.
@@ -273,6 +286,8 @@ pub fn triangulate_space<BV, GV>(
     }
 }
 
+pub type Texel = (u8, u8, u8, u8);
+
 /// Allocator of 2D textures to paint block faces into.
 pub trait TextureAllocator {
     type Tile: TextureTile;
@@ -285,11 +300,8 @@ pub trait TextureTile {
     /// Value to write into the third texture coordinate component to indicate this tile.
     fn index(&self) -> TextureCoordinate;
     
-    /// Width=height of the texture tile.
-    fn size(&self) -> usize;
-
     /// Write texture data as RGBA color.
-    fn write(&mut self, data: &[(u8, u8, u8, u8)]);
+    fn write(&mut self, data: &[Texel]);
 }
 
 /// `TextureAllocator` which discards all input; for testing.
@@ -300,7 +312,6 @@ impl TextureAllocator for NullTextureAllocator {
 }
 impl TextureTile for () {
     fn index(&self) -> TextureCoordinate { 0.0 }
-    fn size(&self) -> usize { 1 }
     fn write(&mut self, _data: &[(u8, u8, u8, u8)]) {}
 }
 
