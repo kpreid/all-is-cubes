@@ -14,7 +14,7 @@ use luminance_front::render_state::RenderState;
 use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
 use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
-use luminance_front::texture::{Dim2, Dim2Array, GenMipmaps, Sampler, Texture, TextureError};
+use luminance_front::texture::{Dim2, Dim2Array, GenMipmaps, MagFilter, Sampler, Texture, TextureError, Wrap};
 use luminance_front::Backend;
 use std::cell::RefCell;
 use std::convert::TryInto;
@@ -355,7 +355,16 @@ impl BlockGLTexture {
         let layer_count = 100;  // TODO implement reallocation
         let tile_size = 16;
         Ok(Self {
-            texture: Texture::new(context, ([tile_size, tile_size], layer_count), 0, Sampler::default())?,
+            texture: Texture::new(
+                context,
+                ([tile_size, tile_size], layer_count),
+                0,  // mipmaps
+                Sampler {
+                    wrap_s: Wrap::ClampToEdge,
+                    wrap_t: Wrap::ClampToEdge,
+                    mag_filter: MagFilter::Nearest,
+                    ..Sampler::default()
+                })?,
             tile_size,
             layer_count,
             next_free: 0,
