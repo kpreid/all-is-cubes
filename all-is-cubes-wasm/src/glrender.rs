@@ -29,6 +29,7 @@ use all_is_cubes::space::{PackedLight, Space};
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::triangulator::{
     BlockVertex, BlocksRenderData,
+    Coloring,
     Texel, TextureAllocator, TextureCoordinate, TextureTile,
     ToGfxVertex,
     triangulate_blocks, triangulate_space};
@@ -197,11 +198,11 @@ pub enum VertexSemantics {
     Position,
     #[sem(name = "a_normal", repr = "[f32; 3]", wrapper = "VertexNormal")]
     Normal,
-    #[sem(name = "a_color", repr = "[f32; 4]", wrapper = "VertexRGBA")]
-    Color,
-    // TODO: more efficient representation by packing the index coordinates somewhere else...?
-    #[sem(name = "a_tex", repr = "[f32; 3]", wrapper = "VertexTex")]
-    Texture,
+    /// Packed format:
+    /// * If [3] is in the range 0.0 to 1.0, then the attribute is a solid RGBA color.
+    /// * If [3] is -1.0, then the first three components are array texture coordinates.
+    #[sem(name = "a_color_or_texture", repr = "[f32; 4]", wrapper = "VertexColorOrTexture")]
+    ColorOrTexture,
     // TODO: look into packed repr for lighting
     #[sem(name = "a_lighting", repr = "[f32; 3]", wrapper = "VertexLighting")]
     Lighting,
@@ -217,10 +218,7 @@ struct Vertex {
     normal: VertexNormal,
 
     #[allow(dead_code)]  // read by shader
-    color: VertexRGBA,
-
-    #[allow(dead_code)]  // read by shader
-    tex: VertexTex,
+    color_or_texture: VertexColorOrTexture,
 
     #[allow(dead_code)]  // read by shader
     lighting: VertexLighting,
@@ -234,12 +232,16 @@ impl ToGfxVertex<Vertex> for BlockVertex {
         Vertex {
             position: VertexPosition::new((self.position + offset).cast::<f32>().unwrap().into()),
             normal: VertexNormal::new(self.normal.cast::<f32>().unwrap().into()),
-            color: {
-                let mut color_attribute = VertexRGBA::new(self.color.into());
-                color_attribute[3] = 1.0;  // Force alpha to 1 until we have a better answer.
-                color_attribute
+            color_or_texture: match self.coloring {
+                Coloring::Solid(color) => {
+                    let mut color_attribute = VertexColorOrTexture::new(color.into());
+                    // Force alpha to 1 until we have a better transparency answer. When we do,
+                    // also make sure to clamp it to meet the VertexColorOrTexture protocol.
+                    color_attribute[3] = 1.0;
+                    color_attribute
+                },
+                Coloring::Texture(tc) => VertexColorOrTexture::new([tc[0], tc[1], tc[2], -1.0]),
             },
-            tex: VertexTex::new(self.tex.into()),
             lighting: VertexLighting::new(lighting.into()),
         }
     }
@@ -355,7 +357,7 @@ impl BlockGLTexture {
         Ok(Self {
             texture: Texture::new(context, ([tile_size, tile_size], layer_count), 0, Sampler::default())?,
             tile_size,
-            layer_count: layer_count,
+            layer_count,
             next_free: 0,
             in_use: Vec::new(),
         })

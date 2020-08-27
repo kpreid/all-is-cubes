@@ -1,6 +1,5 @@
-in mediump vec4 v_color;
+in mediump vec4 v_color_or_texture;
 in mediump vec3 v_normal;
-in mediump vec3 v_tex;
 in lowp vec3 v_lighting;
 
 out mediump vec4 fragment_color;
@@ -21,5 +20,11 @@ lowp vec3 lighting() {
 }
 
 void main(void) {
-  fragment_color = v_color * vec4(lighting(), 1.0) * texture(block_texture, v_tex);
+  mediump vec4 diffuse_color;
+  if (v_color_or_texture[3] < -0.5) {
+    diffuse_color = texture(block_texture, v_color_or_texture.stp);
+  } else {
+    diffuse_color = v_color_or_texture;
+  }
+  fragment_color = diffuse_color * vec4(lighting(), 1.0);
 }

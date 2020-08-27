@@ -30,18 +30,30 @@ pub struct BlockVertex {
     pub position: Point3<FreeCoordinate>,
     pub normal: Vector3<FreeCoordinate>,  // TODO: Use a smaller number type? Storage vs convenience?
     // TODO: Eventually color will be fully replaced with texture coordinates.
-    pub color: RGBA,
-    pub tex: Vector3<TextureCoordinate>,
+    pub coloring: Coloring,
+}
+#[derive(Clone, Copy, PartialEq)]
+pub enum Coloring {
+    Solid(RGBA),
+    Texture(Vector3<TextureCoordinate>),
 }
 
 impl std::fmt::Debug for BlockVertex {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Print compactly on single line even if the formatter is in prettyprint mode.
-        write!(fmt, "{{ p: {:?} n: {:?} c: {:?} t: {:?} }}",
+        write!(fmt, "{{ p: {:?} n: {:?} c: {:?} }}",
             self.position.as_concise_debug(),
             self.normal.cast::<i8>().unwrap().as_concise_debug(),  // no decimals!
-            self.color,
-            self.tex.as_concise_debug())
+            self.coloring)
+    }
+}
+impl std::fmt::Debug for Coloring {
+    // TODO: test formatting of this
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Coloring::Solid(color) => write!(fmt, "Solid({:?})", color),
+            Coloring::Texture(tc) => write!(fmt, "Texture({:?})", tc.as_concise_debug()),
+        }
     }
 }
 
@@ -106,33 +118,51 @@ impl<V: From<BlockVertex>, A: TextureAllocator> Default for BlockRenderData<V, A
 /// Pass it to `triangulate_space` to use it.
 pub type BlocksRenderData<V, A> = Box<[BlockRenderData<V, A>]>;
 
-fn push_quad<V: From<BlockVertex>>(
-    vertices: &mut Vec<V>,
-    face: Face,
-    color: RGBA,
-    texture_index_coordinate: TextureCoordinate,
-) {
-    let transform = face.matrix();
-    let mut push_1 = |p: Point3<FreeCoordinate>| {
-        vertices.push(V::from(BlockVertex {
-            position: transform.transform_point(p),
-            normal: face.normal_vector(),
-            color: color,
-            tex: Vector3::new(p.x as TextureCoordinate, p.y as TextureCoordinate, texture_index_coordinate),
-        }));
-    };
-    
+const QUAD_VERTICES: &[Point3<FreeCoordinate>; 6] = &[
     // Two-triangle quad.
     // Note that looked at from a X-right Y-up view, these triangles are
     // clockwise, but they're properly counterclockwise from the perspective
     // that we're drawing the face _facing towards negative Z_ (into the screen),
     // which is how cube faces as implicitly defined by Face::matrix work.
-    push_1(Point3::new(0.0, 0.0, 0.0));
-    push_1(Point3::new(0.0, 1.0, 0.0));
-    push_1(Point3::new(1.0, 0.0, 0.0));
-    push_1(Point3::new(1.0, 0.0, 0.0));
-    push_1(Point3::new(0.0, 1.0, 0.0));
-    push_1(Point3::new(1.0, 1.0, 0.0));
+    Point3::new(0.0, 0.0, 0.0),
+    Point3::new(0.0, 1.0, 0.0),
+    Point3::new(1.0, 0.0, 0.0),
+    Point3::new(1.0, 0.0, 0.0),
+    Point3::new(0.0, 1.0, 0.0),
+    Point3::new(1.0, 1.0, 0.0),
+];
+
+fn push_quad_solid<V: From<BlockVertex>>(
+    vertices: &mut Vec<V>,
+    face: Face,
+    color: RGBA,
+) {
+    let transform = face.matrix();
+    for &p in QUAD_VERTICES {
+        vertices.push(V::from(BlockVertex {
+            position: transform.transform_point(p),
+            normal: face.normal_vector(),
+            coloring: Coloring::Solid(color),
+        }));
+    }
+}
+
+fn push_quad_textured<V: From<BlockVertex>>(
+    vertices: &mut Vec<V>,
+    face: Face,
+    texture_index_coordinate: TextureCoordinate,
+) {
+    let transform = face.matrix();
+    for &p in QUAD_VERTICES {
+        vertices.push(V::from(BlockVertex {
+            position: transform.transform_point(p),
+            normal: face.normal_vector(),
+            coloring: Coloring::Texture(Vector3::new(
+                p.x as TextureCoordinate,
+                p.y as TextureCoordinate,
+                texture_index_coordinate)),
+        }));
+    }
 }
 
 /// Generate `BlockRenderData` for a block.
@@ -156,7 +186,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 // TODO: Port over pseudo-transparency mechanism, then change this to a
                 // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
                 if fully_opaque {
-                    push_quad(&mut face_vertices, face, *color, 0.0);  // TODO: wrong texture coordinate
+                    push_quad_solid(&mut face_vertices, face, *color);
                 }
 
                 FaceRenderData {
@@ -196,8 +226,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     let mut texture_tile = texture_allocator.allocate();
                     texture_tile.write(tile_texels.as_ref());
 
-                    // TODO stop having this color
-                    push_quad(vertices, face, RGBA::new(0.5, 0.5, 0.5, 1.0), texture_tile.index());
+                    push_quad_textured(vertices, face, texture_tile.index());
 
                     textures_used.push(texture_tile);
                 }
@@ -305,10 +334,11 @@ pub trait TextureTile {
 }
 
 /// `TextureAllocator` which discards all input; for testing.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NullTextureAllocator;
 impl TextureAllocator for NullTextureAllocator {
     type Tile = ();
-    fn allocate(&mut self) -> () { () }
+    fn allocate(&mut self) {}
 }
 impl TextureTile for () {
     fn index(&self) -> TextureCoordinate { 0.0 }
@@ -332,7 +362,7 @@ mod tests {
         }
 
         let mut rendering = new_space_buffer();
-        triangulate_space::<BlockVertex, BlockVertex>(
+        triangulate_space::<BlockVertex, BlockVertex, NullTextureAllocator>(
             &space,
             &triangulate_blocks(&space, &mut NullTextureAllocator),
             &mut rendering);
@@ -355,7 +385,7 @@ mod tests {
     fn no_panic_on_missing_blocks() {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 1, 1);
-        let blocks_render_data: BlocksRenderData<BlockVertex> =
+        let blocks_render_data: BlocksRenderData<BlockVertex, _> =
             triangulate_blocks(&space, &mut NullTextureAllocator);
         assert_eq!(blocks_render_data.len(), 1);  // check our assumption
 
@@ -373,9 +403,9 @@ mod tests {
         let mut outer_space = Space::empty_positive(1, 1, 1);
         outer_space.set((0, 0, 0), &inner_block);
 
-        let blocks_render_data: BlocksRenderData<BlockVertex> =
+        let blocks_render_data: BlocksRenderData<BlockVertex, _> =
             triangulate_blocks(&outer_space, &mut NullTextureAllocator);
-        let block_render_data: BlockRenderData<BlockVertex> = blocks_render_data[0].clone();
+        let block_render_data: BlockRenderData<_, _> = blocks_render_data[0].clone();
 
         eprintln!("{:#?}", blocks_render_data);
         let mut space_rendered = new_space_buffer();
