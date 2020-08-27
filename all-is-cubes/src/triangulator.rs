@@ -150,12 +150,13 @@ fn push_quad_solid<V: From<BlockVertex>>(
 fn push_quad_textured<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
     face: Face,
+    depth: FreeCoordinate,
     texture_index_coordinate: TextureCoordinate,
 ) {
     let transform = face.matrix();
     for &p in QUAD_VERTICES {
         vertices.push(V::from(BlockVertex {
-            position: transform.transform_point(p),
+            position: transform.transform_point(p + Vector3::new(0.0, 0.0, depth)),
             normal: face.normal_vector(),
             coloring: Coloring::Texture(Vector3::new(
                 p.x as TextureCoordinate,
@@ -223,10 +224,11 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             tile_texels.push(space[cube].color().to_saturating_8bpp());
                         }
                     }
+                    // TODO: write tile only if nonempty, etc.
                     let mut texture_tile = texture_allocator.allocate();
                     texture_tile.write(tile_texels.as_ref());
 
-                    push_quad_textured(vertices, face, texture_tile.index());
+                    push_quad_textured(vertices, face, layer as FreeCoordinate / tile_size as FreeCoordinate, texture_tile.index());
 
                     textures_used.push(texture_tile);
                 }
