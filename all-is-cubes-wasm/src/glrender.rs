@@ -24,7 +24,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::{Face, FaceMap, FreeCoordinate};
+use all_is_cubes::math::{Face, FaceMap, FreeCoordinate, GridCoordinate};
 use all_is_cubes::space::{PackedLight, Space};
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::triangulator::{
@@ -422,6 +422,11 @@ impl BlockGLTexture {
 
 impl TextureAllocator for BlockGLTexture {
     type Tile = GLTile;
+
+    fn size(&self) -> GridCoordinate {
+        self.tile_size as GridCoordinate
+    }
+
     fn allocate(&mut self) -> GLTile {
         if self.next_free == self.layer_count {
             todo!("ran out of tile space, but reallocation is not implemented");

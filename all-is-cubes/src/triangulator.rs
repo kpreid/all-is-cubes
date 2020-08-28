@@ -203,11 +203,13 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
         }
         Block::Recur(_attributes, space_ref) => {
             let space = &*space_ref.borrow();
-            let grid = space.grid();
             let mut vertices_by_face: FaceMap<Vec<V>> = FaceMap::generate(|_| Vec::new());
             let mut textures_used = Vec::new();
 
-            let tile_size: GridCoordinate = grid.size()[0];  // TODO: have a general policy about what if the space is the wrong size.
+            // Use the size from the textures, regardless of what the actual tile size is,
+            // because this won't panic and the other strategy will. TODO: Implement
+            // dynamic choice of texture size.
+            let tile_size: GridCoordinate = texture_allocator.size();
 
             for &face in Face::ALL_SIX {
                 let vertices = &mut vertices_by_face[face];  // TODO split by interior and not
@@ -241,7 +243,8 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 layer_is_visible_somewhere = true;
                             }
 
-                            // Diagnose out-of-space accesses
+                            // Diagnose out-of-space accesses. TODO: Tidy this up and document it, or remove it:
+                            // it will happen whenever the space is the wrong size for the textures.
                             let color = if space.grid().contains_cube(cube) {
                                 space[cube].color()
                             } else {
@@ -352,6 +355,12 @@ pub type Texel = (u8, u8, u8, u8);
 /// Allocator of 2D textures to paint block faces into.
 pub trait TextureAllocator {
     type Tile: TextureTile;
+
+    /// Edge length of the texture tiles
+    fn size(&self) -> GridCoordinate;
+
+    // Allocate a tile, whose texture coordinates will be available as long as the Tile
+    // value is not dropped.
     fn allocate(&mut self) -> Self::Tile;
 }
 
@@ -362,6 +371,8 @@ pub trait TextureTile {
     fn index(&self) -> TextureCoordinate;
 
     /// Write texture data as RGBA color.
+    ///
+    /// `data` must be of length `allocator.size() * allocator.size()`.
     fn write(&mut self, data: &[Texel]);
 }
 
@@ -370,6 +381,7 @@ pub trait TextureTile {
 pub struct NullTextureAllocator;
 impl TextureAllocator for NullTextureAllocator {
     type Tile = ();
+    fn size(&self) -> GridCoordinate { 1 }
     fn allocate(&mut self) {}
 }
 impl TextureTile for () {
