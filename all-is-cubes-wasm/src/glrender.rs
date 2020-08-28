@@ -253,6 +253,7 @@ struct Chunk {
     /// Vertices grouped by the direction they face
     vertices: FaceMap<Vec<Vertex>>,
     tesses: FaceMap<Option<Tess<Vertex>>>,
+    last_valid_counter: u32,
 }
 
 impl Chunk {
@@ -260,6 +261,7 @@ impl Chunk {
         Chunk {
             vertices: FaceMap::default(),
             tesses: FaceMap::default(),
+            last_valid_counter: 0,
         }
     }
 
@@ -269,6 +271,13 @@ impl Chunk {
         space: &Space,
         blocks_render_data: &BlocksRenderData<BlockVertex, BlockGLTexture>,
     ) {
+        // TODO: quick hack to avoid rerendering unnecessarily.
+        // Doesn't account for block render data changes.
+        if space.mutation_counter == self.last_valid_counter {
+            return;
+        }
+        self.last_valid_counter = space.mutation_counter;
+
         triangulate_space(space, blocks_render_data, &mut self.vertices);
 
         for &face in Face::ALL_SEVEN {

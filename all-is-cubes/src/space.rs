@@ -212,6 +212,12 @@ pub struct Space {
     /// Queue of positions that could really use lighting updates.
     pub(crate) lighting_update_queue: BinaryHeap<crate::lighting::LightUpdateRequest>,
 
+    /// Increments every time the space is modified in an externally visible way.
+    /// Quick hack of a method to detect changes and redraw. TODO: Replace this, or if we
+    /// decide to make it more robust, give it a getter method.
+    pub mutation_counter: u32,
+
+    /// Random number generator used for random behavior.
     rng: rand_xoshiro::Xoshiro256Plus,
 }
 
@@ -246,6 +252,7 @@ impl Space {
             contents: vec![0; volume].into_boxed_slice(),
             lighting: initialize_lighting(grid),
             lighting_update_queue: BinaryHeap::new(),
+            mutation_counter: 0,
             rng: rand_xoshiro::Xoshiro256Plus::seed_from_u64(0),  // deterministic!
         }
     }
@@ -364,6 +371,7 @@ impl Space {
     /// Implement the consequences of changing a block.
     fn side_effects_of_set(&mut self, position: GridPoint) {
         self.light_needs_update(position, PackedLightScalar::MAX);
+        self.mutation_counter += 1;
     }
 
     /// Returns all distinct block types found in the space.
