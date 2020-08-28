@@ -3,8 +3,6 @@
 
 //! Top-level game state container.
 
-use embedded_graphics::fonts::Font8x16;
-use embedded_graphics::pixelcolor::Rgb888;
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
 use std::collections::hash_map::{DefaultHasher, HashMap};
 use std::cell::{Ref, RefCell, RefMut};
@@ -13,12 +11,8 @@ use std::rc::{Rc, Weak};
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
-use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
-use crate::math::GridPoint;
-use crate::space::{Grid, Space, SpaceStepInfo};
-use crate::drawing::{draw_text};
-use crate::worldgen::{axes, wavy_landscape};
+use crate::space::{Space, SpaceStepInfo};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Name {
@@ -48,26 +42,6 @@ impl Universe {
         }
     }
 
-    /// Creates a Universe with some content for a "new game", as much as that can exist.
-    pub fn new_test_universe() -> Self {
-        let mut universe = Self::new();
-
-        let mut bg = BlockGen { universe: &mut universe, size: 16, };
-        let blocks = LandscapeBlocks::new(&mut bg);
-
-        let grid = Grid::new((-16, -16, -16), (33, 33, 33));
-        let mut space = Space::empty(grid);
-        wavy_landscape(&mut space, &blocks, 1.0);
-        axes(&mut space);
-        draw_text(&mut space, Rgb888::new(120, 100, 200), GridPoint::new(-16, -16, -16), Font8x16, "Hello");
-
-        universe.insert("space".into(), space);
-
-        let camera = Camera::for_grid(&grid);
-        universe.insert("camera".into(), camera);
-        universe
-    }
-
     // TODO: temporary shortcuts to be replaced with more nuance
     pub fn get_default_space(&self) -> URef<Space> {
         self.get(&"space".into()).unwrap()
@@ -87,7 +61,7 @@ impl Universe {
         }
         (space_info, ())
     }
-    
+
     pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T> where Self: UniverseIndex<T> {
         // TODO: Names should not be strings, so these can be guaranteed unique.
         let name = Name::Anonym(self.next_anonym);
@@ -96,6 +70,7 @@ impl Universe {
     }
 }
 
+/// Trait implemented once for each type of object that can be stored in a `Universe`.
 pub trait UniverseIndex<T> {
     fn get(&self, name: &Name) -> Option<URef<T>>;
     fn insert(&mut self, name: Name, value: T) -> URef<T>;
@@ -267,13 +242,6 @@ impl<T> URootRef<T> {
 mod tests {
     use super::*;
     use crate::blockgen::make_some_blocks;
-
-    #[test]
-    pub fn new_test_universe_smoke_test() {
-        let mut u = Universe::new_test_universe();
-        u.get_default_space();
-        u.step(Duration::from_millis(10));
-    }
 
     #[test]
     pub fn uref_equality_is_pointer_equality() {

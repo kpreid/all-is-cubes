@@ -12,14 +12,14 @@ use termion::raw::IntoRawMode;
 use termion::input::TermRead;
 
 use all_is_cubes::camera::{ProjectionHelper};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::demo_content::new_universe_with_stuff;
 
 use all_is_cubes_server::console::{controller, draw_space, viewport_from_terminal_size};
 
 /// TODO: break this up into testable library code insofar as feasible.
 
 fn main() -> io::Result<()> {
-    let mut universe = Universe::new_test_universe();
+    let mut universe = new_universe_with_stuff();
     let camera_ref = universe.get_default_camera();
     let space_ref = universe.get_default_space();
     let mut proj: ProjectionHelper = ProjectionHelper::new(0.5, viewport_from_terminal_size()?);

@@ -13,6 +13,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, console};
 
 use all_is_cubes::camera::{Camera, cursor_raycast};
+use all_is_cubes::demo_content::new_universe_with_stuff;
 use all_is_cubes::space::{Space};
 use all_is_cubes::universe::{Universe, URef};
 
@@ -31,7 +32,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     append_text_content(&static_dom.scene_info_text, "\nRusting...");
 
-    let universe = Universe::new_test_universe();
+    let universe = new_universe_with_stuff();
 
     let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id(), WindowOpt::default())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
