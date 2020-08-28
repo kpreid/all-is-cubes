@@ -13,6 +13,7 @@
 //! be the more commonly used terms.
 
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
+use std::convert::TryFrom;
 
 use crate::block::{Block};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
@@ -381,12 +382,18 @@ pub trait TextureTile {
 pub struct NullTextureAllocator;
 impl TextureAllocator for NullTextureAllocator {
     type Tile = ();
-    fn size(&self) -> GridCoordinate { 1 }
+    fn size(&self) -> GridCoordinate { 14 }  // an arbitrary size
     fn allocate(&mut self) {}
 }
 impl TextureTile for () {
     fn index(&self) -> TextureCoordinate { 0.0 }
-    fn write(&mut self, _data: &[(u8, u8, u8, u8)]) {}
+    fn write(&mut self, data: &[(u8, u8, u8, u8)]) {
+        // Validate data size.
+        assert_eq!(
+            isize::try_from(data.len()).expect("tile data way too big"),
+            NullTextureAllocator.size() * NullTextureAllocator.size(),
+            "tile data did not match tile size");
+    }
 }
 
 #[cfg(test)]
