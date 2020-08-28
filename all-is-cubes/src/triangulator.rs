@@ -101,7 +101,7 @@ pub struct BlockRenderData<V: From<BlockVertex>, A: TextureAllocator> {
     /// when a `fully_opaque` block is adjacent) are grouped under the corresponding
     /// face, and all other triangles are grouped under `Face::WITHIN`.
     faces: FaceMap<FaceRenderData<V>>,
-    
+
     textures_used: Vec<A::Tile>,
 }
 
@@ -212,25 +212,36 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             for &face in Face::ALL_SIX {
                 let vertices = &mut vertices_by_face[face];  // TODO split by interior and not
                 let transform = face.matrix();
+
                 for layer in 0..tile_size {
                     // TODO: JS version would detect fully-opaque blocks (a derived property of Block)
                     // and only scan the first and last faces
                     let mut tile_texels: Vec<(u8, u8, u8, u8)> = Vec::with_capacity((tile_size * tile_size) as usize);
+                    let mut layer_is_visible_somewhere = false;
                     for t in 0..tile_size {
                         for s in 0..tile_size {
                             // TODO: Matrix4 isn't allowed to be integer. Provide a better strategy.
                             let cube :Point3<GridCoordinate> = transform.transform_point(Point3::new(s as FreeCoordinate, t as FreeCoordinate, layer as FreeCoordinate)).cast::<GridCoordinate>().unwrap();
 
+                            let obscuring_cube = cube + face.normal_vector();
+                            let obscured = space[obscuring_cube].color().alpha() >= 1.0;  // TODO formalize test consistency
+                            if !obscured {
+                                layer_is_visible_somewhere = true;
+                            }
+
                             tile_texels.push(space[cube].color().to_saturating_8bpp());
                         }
                     }
-                    // TODO: write tile only if nonempty, etc.
-                    let mut texture_tile = texture_allocator.allocate();
-                    texture_tile.write(tile_texels.as_ref());
-
-                    push_quad_textured(vertices, face, layer as FreeCoordinate / tile_size as FreeCoordinate, texture_tile.index());
-
-                    textures_used.push(texture_tile);
+                    if layer_is_visible_somewhere {
+                        let mut texture_tile = texture_allocator.allocate();
+                        texture_tile.write(tile_texels.as_ref());
+                        push_quad_textured(
+                            vertices,
+                            face, 
+                            layer as FreeCoordinate / tile_size as FreeCoordinate,
+                            texture_tile.index());
+                        textures_used.push(texture_tile);
+                    }
                 }
             }
 
@@ -330,7 +341,7 @@ pub trait TextureAllocator {
 pub trait TextureTile {
     /// Value to write into the third texture coordinate component to indicate this tile.
     fn index(&self) -> TextureCoordinate;
-    
+
     /// Write texture data as RGBA color.
     fn write(&mut self, data: &[Texel]);
 }
