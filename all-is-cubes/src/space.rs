@@ -407,9 +407,9 @@ impl Space {
             let cube = self.grid.random_cube(&mut self.rng);
             self.light_needs_update(cube, 0);
         }
-        let light_update_count = self.update_lighting_from_queue();
+        let (light_update_count, max_light_update_difference) = self.update_lighting_from_queue();
 
-        SpaceStepInfo { light_update_count }
+        SpaceStepInfo { light_update_count, max_light_update_difference }
     }
 
     /// Finds or assigns an index to denote the block.
@@ -464,10 +464,12 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
 pub struct SpaceStepInfo {
     /// Number of blocks whose light data was updated this step.
     pub light_update_count: usize,
+    pub max_light_update_difference: u8,
 }
 impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     fn add_assign(&mut self, other: Self) {
          self.light_update_count += other.light_update_count;
+         self.max_light_update_difference += other.max_light_update_difference;
      }
 }
 

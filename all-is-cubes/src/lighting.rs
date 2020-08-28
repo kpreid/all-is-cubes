@@ -143,20 +143,21 @@ impl Space {
     }
 
     /// Do some lighting updates.
-    pub(crate) fn update_lighting_from_queue(&mut self) -> usize {
+    pub(crate) fn update_lighting_from_queue(&mut self) -> (usize, PackedLightScalar) {
         // Do a finite number of updates.
         let mut update_count: usize = 0;
+        let mut max_difference: u8 = 0;
         while let Some(LightUpdateRequest { cube, .. }) = self.lighting_update_queue.pop() {
             update_count += 1;
-            self.update_lighting_now_on(cube);
+            max_difference = max_difference.max(self.update_lighting_now_on(cube));
             if update_count >= 120 {
                 break;
             }
         }
-        update_count
+        (update_count, max_difference)
     }
 
-    fn update_lighting_now_on(&mut self, cube: GridPoint) {
+    fn update_lighting_now_on(&mut self, cube: GridPoint) -> PackedLightScalar {
         let mut total_rays = 0;
         let mut incoming_light :RGB = RGB::ZERO;
         let mut dependencies :Vec<GridPoint> = Vec::new();  // TODO: reuse buffer instead of allocating every time
@@ -213,5 +214,6 @@ impl Space {
                 self.light_needs_update(cube, difference_magnitude);
             }
         }
+        difference_magnitude
     }
 }
