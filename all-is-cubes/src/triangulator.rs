@@ -220,16 +220,35 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     let mut layer_is_visible_somewhere = false;
                     for t in 0..tile_size {
                         for s in 0..tile_size {
-                            // TODO: Matrix4 isn't allowed to be integer. Provide a better strategy.
-                            let cube :Point3<GridCoordinate> = transform.transform_point(Point3::new(s as FreeCoordinate, t as FreeCoordinate, layer as FreeCoordinate)).cast::<GridCoordinate>().unwrap();
+                            // TODO: Matrix4 isn't allowed to be integer. Make Face provide a better strategy.
+                            // While we're at it, also implement the optimization that positive and negative
+                            // faces can share a texture sometimes (which requires dropping the property
+                            // Face::matrix provides where all transforms contain no mirroring).
+                            let cube :Point3<GridCoordinate> = (
+                                transform.transform_point(
+                                    (Point3::new(
+                                        s as FreeCoordinate,
+                                        t as FreeCoordinate,
+                                        layer as FreeCoordinate
+                                    ) + Vector3::new(0.5, 0.5, 0.5))
+                                    / tile_size as FreeCoordinate
+                                ) * tile_size as FreeCoordinate - Vector3::new(0.5, 0.5, 0.5)
+                            ).cast::<GridCoordinate>().unwrap();
 
                             let obscuring_cube = cube + face.normal_vector();
-                            let obscured = space[obscuring_cube].color().alpha() >= 1.0;  // TODO formalize test consistency
+                            let obscured = space[obscuring_cube].color().alpha() >= 1.0;  // TODO give a standard definition of this
                             if !obscured {
                                 layer_is_visible_somewhere = true;
                             }
 
-                            tile_texels.push(space[cube].color().to_saturating_8bpp());
+                            // Diagnose out-of-space accesses
+                            let color = if space.grid().contains_cube(cube) {
+                                space[cube].color()
+                            } else {
+                                RGBA::new(1.0, 1.0, 0.0, 1.0)
+                            };
+
+                            tile_texels.push(color.to_saturating_8bpp());
                         }
                     }
                     if layer_is_visible_somewhere {
