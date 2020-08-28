@@ -13,6 +13,7 @@ categories = ["games", "graphics"]
 
 [dependencies]
 cgmath = "0.17.0"
+embedded-graphics = "0.6.2"
 itertools = "0.9.0"
 lazy_static = "1.4.0"
 num-traits = "0.2.12"

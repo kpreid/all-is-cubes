@@ -72,12 +72,12 @@ pub fn axes(space: &mut Space) {
 /// use all_is_cubes::blockgen::LandscapeBlocks;
 /// use all_is_cubes::worldgen::wavy_landscape;
 /// let mut space = Space::empty_positive(10, 10, 10);
-/// wavy_landscape(&mut space, LandscapeBlocks::default(), 1.0);
+/// wavy_landscape(&mut space, &LandscapeBlocks::default(), 1.0);
 /// # // TODO: It didn't panic, but how about some assertions?
 /// ```
 pub fn wavy_landscape(
         space: &mut Space,
-        blocks: LandscapeBlocks,
+        blocks: &LandscapeBlocks,
         max_slope :FreeCoordinate) {
     // TODO: justify this constant (came from cubes v1 code).
     let slope_scaled = max_slope / 0.904087;

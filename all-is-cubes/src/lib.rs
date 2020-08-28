@@ -10,6 +10,7 @@
 pub mod block;
 pub mod blockgen;
 pub mod camera;
+pub mod drawing;
 pub mod math;
 mod lighting;
 mod physics;

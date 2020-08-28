@@ -3,6 +3,8 @@
 
 //! Top-level game state container.
 
+use embedded_graphics::fonts::Font8x16;
+use embedded_graphics::pixelcolor::Rgb888;
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
 use std::collections::hash_map::{DefaultHasher, HashMap};
 use std::cell::{Ref, RefCell, RefMut};
@@ -13,7 +15,9 @@ use std::time::Duration;
 
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
+use crate::math::GridPoint;
 use crate::space::{Grid, Space, SpaceStepInfo};
+use crate::drawing::{draw_text};
 use crate::worldgen::{axes, wavy_landscape};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -48,15 +52,15 @@ impl Universe {
     pub fn new_test_universe() -> Self {
         let mut universe = Self::new();
 
-        let blocks = {
-            let mut bg = BlockGen { universe: &mut universe, size: 16, };
-            LandscapeBlocks::new(&mut bg)
-        };
+        let mut bg = BlockGen { universe: &mut universe, size: 16, };
+        let blocks = LandscapeBlocks::new(&mut bg);
 
-        let grid = Grid::new((-10, -10, -10), (21, 21, 21));
+        let grid = Grid::new((-16, -16, -16), (33, 33, 33));
         let mut space = Space::empty(grid);
-        wavy_landscape(&mut space, blocks, 1.0);
+        wavy_landscape(&mut space, &blocks, 1.0);
         axes(&mut space);
+        draw_text(&mut space, Rgb888::new(120, 100, 200), GridPoint::new(-16, -16, -16), Font8x16, "Hello");
+
         universe.insert("space".into(), space);
 
         let camera = Camera::for_grid(&grid);
