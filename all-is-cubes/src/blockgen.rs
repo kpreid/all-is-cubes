@@ -10,18 +10,31 @@ use crate::math::{GridPoint, RGBA};
 use crate::space::{Space};
 use crate::universe::{Universe};
 
+/// Utilities for generating blocks that are compatible with each other.
 pub struct BlockGen<'a> {
+    /// The `Universe` in which block spaces live.
     pub universe: &'a mut Universe,
+    /// The side length of block spaces.
     pub size: isize,
 }
 
 impl<'a> BlockGen<'a> {
+    pub fn new(universe: &'a mut Universe, size: isize) -> Self {
+        assert!(size > 0);
+        Self { universe, size }
+    }
+
+    /// Create a `Space` of a suitable size for a block.
+    pub fn new_block_space(&self) -> Space {
+        Space::empty_positive(self.size, self.size, self.size)
+    }
+
     pub fn block_from_function(
         &mut self,
         attributes: BlockAttributes,
         f: impl Fn(&BlockGen, GridPoint, f32) -> Block
     ) -> Block {
-        let mut space = Space::empty_positive(self.size, self.size, self.size);
+        let mut space = self.new_block_space();
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for point in space.grid().interior_iter() {
             space.set(point, &f(self, point, rng.gen_range(0.0, 1.0)));
@@ -129,6 +142,16 @@ impl Default for LandscapeBlocks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::space::Grid;
+
+    #[test]
+    fn blockgen_new_block_space() {
+        let mut universe = Universe::new();
+        let ctx = BlockGen::new(&mut universe, 10);
+        assert_eq!(
+            ctx.new_block_space().grid(),
+            &Grid::new((0, 0, 0), (10, 10, 10)));
+    }
 
     // TODO: test block_from_function
 
