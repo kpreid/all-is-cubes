@@ -469,7 +469,8 @@ pub struct SpaceStepInfo {
 impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     fn add_assign(&mut self, other: Self) {
          self.light_update_count += other.light_update_count;
-         self.max_light_update_difference += other.max_light_update_difference;
+         self.max_light_update_difference =
+             self.max_light_update_difference.max(other.max_light_update_difference);
      }
 }
 
