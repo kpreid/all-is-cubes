@@ -9,6 +9,7 @@
 use embedded_graphics::fonts::Font8x16;
 use embedded_graphics::pixelcolor::Rgb888;
 
+use crate::block::BlockAttributes;
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
 use crate::drawing::{draw_text};
@@ -24,11 +25,15 @@ pub fn new_universe_with_stuff() -> Universe {
     let mut bg = BlockGen { universe: &mut universe, size: 16, };
     let blocks = LandscapeBlocks::new(&mut bg);
 
+    let (axis_block, mut axis_space) = bg.new_recursive_block(BlockAttributes::default());
+    axes(&mut *axis_space);
+
     let grid = Grid::new((-16, -16, -16), (33, 33, 33));
     let mut space = Space::empty(grid);
     wavy_landscape(&mut space, &blocks, 1.0);
     axes(&mut space);
     draw_text(&mut space, Rgb888::new(120, 100, 200), GridPoint::new(-16, -16, -16), Font8x16, "Hello");
+    space.set((-1, 3, -1), &axis_block);
 
     universe.insert("space".into(), space);
 
