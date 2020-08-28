@@ -8,7 +8,7 @@ use rand::{Rng, SeedableRng as _};
 use crate::block::{AIR, Block, BlockAttributes};
 use crate::math::{GridPoint, RGBA};
 use crate::space::{Space};
-use crate::universe::{Universe};
+use crate::universe::{Universe, UBorrowMut};
 
 /// Utilities for generating blocks that are compatible with each other.
 pub struct BlockGen<'a> {
@@ -29,17 +29,24 @@ impl<'a> BlockGen<'a> {
         Space::empty_positive(self.size, self.size, self.size)
     }
 
+    /// Create a `Block` referring to a `Space` and return the `Space` for modification.
+    pub fn new_recursive_block(&mut self, attributes: BlockAttributes)
+            -> (Block, UBorrowMut<Space>) {
+        let space_ref = self.universe.insert_anonymous(self.new_block_space());
+        (Block::Recur(attributes, space_ref.clone()), space_ref.borrow_mut())
+    }
+
     pub fn block_from_function(
         &mut self,
         attributes: BlockAttributes,
         f: impl Fn(&BlockGen, GridPoint, f32) -> Block
     ) -> Block {
-        let mut space = self.new_block_space();
+        let (block, mut space) = self.new_recursive_block(attributes);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for point in space.grid().interior_iter() {
             space.set(point, &f(self, point, rng.gen_range(0.0, 1.0)));
         }
-        Block::Recur(attributes, self.universe.insert_anonymous(space))
+        block
     }
 }
 
