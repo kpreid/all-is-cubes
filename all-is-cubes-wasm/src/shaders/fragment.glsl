@@ -20,11 +20,24 @@ lowp vec3 lighting() {
 }
 
 void main(void) {
+  // Parse multipurpose v_color_or_texture.
   mediump vec4 diffuse_color;
   if (v_color_or_texture[3] < -0.5) {
+    // Texture coordinates.
     diffuse_color = texture(block_texture, v_color_or_texture.stp);
   } else {
+    // Solid color.
     diffuse_color = v_color_or_texture;
   }
+
+  if (diffuse_color.a <= 0.0001) {
+    // Fully transparent.
+    discard;
+  } else {
+    // We don't support partial transparency, so in case it arises, force to opaque.
+    diffuse_color.a = 1.0;
+  }
+  
+
   fragment_color = diffuse_color * vec4(lighting(), 1.0);
 }
