@@ -52,7 +52,7 @@ impl Camera {
                 position: ((grid.lower_bounds() + grid.upper_bounds().to_vec()) / 2)
                     .map(|x| x as FreeCoordinate) + Vector3::new(-3.0, 3.0, -3.0),
                 velocity: Vector3::zero(),
-                yaw: 90.0,
+                yaw: 00.0,
                 pitch: 15.0,
             },
             auto_rotate: false,

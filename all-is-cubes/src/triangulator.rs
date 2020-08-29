@@ -78,7 +78,7 @@ impl ToGfxVertex<BlockVertex> for BlockVertex {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FaceRenderData<V: From<BlockVertex>> {
     /// Vertices of triangles (i.e. length is a multiple of 3) in counterclockwise order.
-    vertices: Box<[V]>,
+    vertices: Vec<V>,
     /// Whether the block entirely fills its cube, such that nothing can be seen through
     /// it and faces of adjacent blocks may be removed.
     fully_opaque: bool,
@@ -87,7 +87,7 @@ struct FaceRenderData<V: From<BlockVertex>> {
 impl<V: From<BlockVertex>> Default for FaceRenderData<V> {
     fn default() -> Self {
         FaceRenderData {
-            vertices: Box::new([]),
+            vertices: Vec::new(),
             fully_opaque: false,
         }
     }
@@ -103,6 +103,8 @@ pub struct BlockRenderData<V: From<BlockVertex>, A: TextureAllocator> {
     /// face, and all other triangles are grouped under `Face::WITHIN`.
     faces: FaceMap<FaceRenderData<V>>,
 
+    /// Texture tiles used by the vertices; holding these objects ensures the texture
+    /// coordinates stay valid.
     textures_used: Vec<A::Tile>,
 }
 
@@ -182,17 +184,17 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     return FaceRenderData::default();
                 }
 
-                let mut face_vertices: Vec<V> = Vec::new();
                 let fully_opaque = color.binary_opaque();
-
-                // TODO: Port over pseudo-transparency mechanism, then change this to a
-                // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
-                if fully_opaque {
-                    push_quad_solid(&mut face_vertices, face, *color);
-                }
-
                 FaceRenderData {
-                    vertices: face_vertices.into_boxed_slice(),
+                    // TODO: Port over pseudo-transparency mechanism, then change this to a
+                    // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
+                    vertices: if fully_opaque {
+                        let mut face_vertices: Vec<V> = Vec::with_capacity(6);
+                        push_quad_solid(&mut face_vertices, face, *color);
+                        face_vertices
+                    } else {
+                        Vec::new()
+                    },
                     fully_opaque,
                 }
             });
@@ -204,7 +206,17 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
         }
         Block::Recur(_attributes, space_ref) => {
             let space = &*space_ref.borrow();
-            let mut vertices_by_face: FaceMap<Vec<V>> = FaceMap::generate(|_| Vec::new());
+            // Construct empty output to mutate, because inside the loops we'll be
+            // updating WITHIN independently of other faces.
+            let mut output_by_face = FaceMap::generate(|face| FaceRenderData {
+                vertices: Vec::new(),
+                // Start assuming opacity; if we find any transparent pixels we'll set 
+                // this to false. WITHIN is always "transparent" because the algorithm
+                // that consumes this structure will say "draw this face if its adjacent
+                // cube's opposing face is not opaque", and WITHIN means the adjacent
+                // cube is ourself.
+                fully_opaque: face != Face::WITHIN,
+            });
             let mut textures_used = Vec::new();
 
             // Use the size from the textures, regardless of what the actual tile size is,
@@ -213,9 +225,10 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             let tile_size: GridCoordinate = texture_allocator.size();
 
             for &face in Face::ALL_SIX {
-                let vertices = &mut vertices_by_face[face];  // TODO split by interior and not
                 let transform = face.matrix();
 
+                // Layer 0 is the outside surface of the cube and successive layers are
+                // deeper inside.
                 for layer in 0..tile_size {
                     // TODO: JS version would detect fully-opaque blocks (a derived property of Block)
                     // and only scan the first and last faces
@@ -252,14 +265,23 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 RGBA::new(1.0, 1.0, 0.0, 1.0)
                             };
 
+                            if layer == 0 && color.alpha() < 1.0 {
+                                // If the first layer is transparent somewhere...
+                                output_by_face[face].fully_opaque = false;
+                            }
+
                             tile_texels.push(color.to_saturating_8bpp());
                         }
                     }
                     if layer_is_visible_somewhere {
+                        // Actually store and use the texels we just computed.
                         let mut texture_tile = texture_allocator.allocate();
                         texture_tile.write(tile_texels.as_ref());
                         push_quad_textured(
-                            vertices,
+                            // Only the surface faces go anywhere but WITHIN.
+                            &mut output_by_face[
+                                if layer == 0 { face } else { Face::WITHIN }
+                            ].vertices,
                             face, 
                             layer as FreeCoordinate / tile_size as FreeCoordinate,
                             texture_tile.index());
@@ -268,13 +290,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 }
             }
 
-            let faces = FaceMap::generate(|face| {
-                FaceRenderData {
-                    vertices: vertices_by_face[face].drain(..).collect(),  // TODO awkward move
-                    fully_opaque: true,  // TODO: actually calculate this
-                }
-            });
-            BlockRenderData { faces, textures_used }
+            BlockRenderData { faces: output_by_face, textures_used }
         }
     }
 }
