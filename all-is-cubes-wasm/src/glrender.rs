@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Vector3};
+use cgmath::{Vector2, Vector3};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::context::GraphicsContext;
@@ -444,7 +444,9 @@ impl TextureAllocator for BlockGLTexture {
     }
 }
 impl TextureTile for GLTile {
-    fn index(&self) -> TextureCoordinate { self.index as TextureCoordinate }
+    fn texcoord(&self, in_tile: Vector2<TextureCoordinate>) -> Vector3<TextureCoordinate> {
+        in_tile.extend(self.index as TextureCoordinate)
+    }
     fn write(&mut self, data: &[Texel]) {
         self.backing.borrow_mut().data = Some(data.into());
     }

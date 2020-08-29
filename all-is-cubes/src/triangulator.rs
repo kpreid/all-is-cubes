@@ -12,7 +12,7 @@
 //! other operation in OpenGL graphics programming, and “triangulation” seems to
 //! be the more commonly used terms.
 
-use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
 use std::convert::TryFrom;
 
 use crate::block::{Block};
@@ -154,17 +154,15 @@ fn push_quad_textured<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
     face: Face,
     depth: FreeCoordinate,
-    texture_index_coordinate: TextureCoordinate,
+    texture_tile: &impl TextureTile,
 ) {
     let transform = face.matrix();
     for &p in QUAD_VERTICES {
         vertices.push(V::from(BlockVertex {
             position: transform.transform_point(p + Vector3::new(0.0, 0.0, depth)),
             normal: face.normal_vector(),
-            coloring: Coloring::Texture(Vector3::new(
-                p.x as TextureCoordinate,
-                p.y as TextureCoordinate,
-                texture_index_coordinate)),
+            coloring: Coloring::Texture(texture_tile.texcoord(
+                Vector2::new(p.x as TextureCoordinate, p.y as TextureCoordinate))),
         }));
     }
 }
@@ -284,7 +282,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             ].vertices,
                             face, 
                             layer as FreeCoordinate / tile_size as FreeCoordinate,
-                            texture_tile.index());
+                            &texture_tile);
                         textures_used.push(texture_tile);
                     }
                 }
@@ -384,8 +382,9 @@ pub trait TextureAllocator {
 /// 2D texture to paint block faces into. It is assumed that when this value is dropped,
 /// the texture allocation will be released.
 pub trait TextureTile {
-    /// Value to write into the third texture coordinate component to indicate this tile.
-    fn index(&self) -> TextureCoordinate;
+    /// Transform a unit-square texture coordinate for the tile ([0..1] in each
+    /// component) into a general texture coordinate.
+    fn texcoord(&self, in_tile: Vector2<TextureCoordinate>) -> Vector3<TextureCoordinate>;
 
     /// Write texture data as RGBA color.
     ///
@@ -402,7 +401,10 @@ impl TextureAllocator for NullTextureAllocator {
     fn allocate(&mut self) {}
 }
 impl TextureTile for () {
-    fn index(&self) -> TextureCoordinate { 0.0 }
+    fn texcoord(&self, in_tile: Vector2<TextureCoordinate>) -> Vector3<TextureCoordinate> {
+        in_tile.extend(0.0)
+    }
+
     fn write(&mut self, data: &[(u8, u8, u8, u8)]) {
         // Validate data size.
         assert_eq!(
