@@ -155,7 +155,7 @@ mod tests {
     use embedded_graphics::primitives::{Primitive, Rectangle};
     use embedded_graphics::style::{PrimitiveStyle, PrimitiveStyleBuilder};
     use crate::math::RGBA;
-    use crate::universe::{Universe, UniverseIndex};
+    use crate::universe::{Universe};
 
     #[test]
     fn drawing_adapter_works() -> Result<(), Infallible> {
