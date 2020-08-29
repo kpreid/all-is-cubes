@@ -4,7 +4,7 @@
 //! Lighting algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
-use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3, Zero as _};
 use once_cell::sync::Lazy;
 use std::convert::TryInto as _;
 
@@ -67,11 +67,16 @@ impl From<PackedLight> for RGB {
     }
 }
 
+const RAY_DIRECTION_STEP: isize = 2;
+const RAYS_PER_FACE: usize = ((1 + RAY_DIRECTION_STEP * 2) * (1 + RAY_DIRECTION_STEP * 2)) as usize;
+
 /// Fixed configuration of light rays to use for light tracing.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct FaceRayData {
+    // TODO: reflect_face was used in the original lighting algorithm but we haven't implemented that part yet (and one try produced bad results).
+    #[allow(dead_code)]
     reflect_face: Vector3<GridCoordinate>,
-    rays: [Ray; 3 * 3],
+    rays: [Ray; RAYS_PER_FACE],
 }
 
 static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
@@ -79,23 +84,30 @@ static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
     for &face in Face::ALL_SIX {
         let origin = Point3::new(0.5, 0.5, 0.5) + face.normal_vector() * -0.25;
         let reflect_face = Vector3::new(0, 0, 0) + face.normal_vector() * -1;
-        let mut rays = Vec::new();
-        for rayx in -1..=1 {
-            for rayy in -1..=1 {
-                rays.push(Ray {
+        let mut face_ray_data = FaceRayData {
+            reflect_face,
+            rays: [Ray {
+                origin: Point3::origin(),
+                direction: Vector3::zero(),
+            }; RAYS_PER_FACE],
+        };
+        // RAYS_PER_FACE is too big to use convenience traits, so we have to
+        // explicitly index it to write into it.
+        let mut i = 0;
+        for rayx in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
+            for rayy in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
+                face_ray_data.rays[i] = Ray {
                     origin,
                     direction: face.matrix().transform_vector(Vector3::new(
-                        rayx.into(),
-                        rayy.into(),
+                        rayx as FreeCoordinate,
+                        rayy as FreeCoordinate,
                         1.0,
                     )),
-                });
+                };
+                i += 1;
             }
         }
-        ray_data.push(FaceRayData {
-            reflect_face,
-            rays: (*rays).try_into().unwrap(),
-        });
+        ray_data.push(face_ray_data);
     }
     (*ray_data).try_into().unwrap()
 });
@@ -166,7 +178,7 @@ impl Space {
             for face_ray_data in &*LIGHT_RAYS {
                 // TODO port over the empty space test here
 
-                for ray in &face_ray_data.rays {
+                for ray in &face_ray_data.rays[..] {
                     // TODO this is wrong it is not the nested algorithm
                     total_rays += 1;
                     let raycaster = (*ray + cube.cast::<FreeCoordinate>().unwrap().to_vec())
