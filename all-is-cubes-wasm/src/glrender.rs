@@ -361,7 +361,7 @@ struct TileBacking {
 
 impl BlockGLTexture {
     fn new<C>(context: &mut C) -> Result<Self, TextureError>  where C: GraphicsContext<Backend = Backend> {
-        let layer_count = 1000;  // TODO implement reallocation
+        let layer_count = 2048;  // TODO implement reallocation
         let tile_size = 16;
         Ok(Self {
             texture: Texture::new(
