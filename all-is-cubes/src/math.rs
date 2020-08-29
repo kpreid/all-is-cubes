@@ -88,7 +88,7 @@ impl Face {
     }
 
     /// Returns the opposite face (maps `PX` to `NX` and so on).
-    pub fn opposite(&self) -> Face {
+    pub const fn opposite(&self) -> Face {
         match self {
             Face::WITHIN => Face::WITHIN,
             Face::NX => Face::PX,
@@ -201,7 +201,7 @@ impl<V> FaceMap<V> {
     /// Access all of the values.
     /// TODO: Return an iterator instead; right now the problem is the iterator won't
     /// own the data until we implement a custom iterator.
-    pub fn values(&self) -> [&V; 7] {
+    pub const fn values(&self) -> [&V; 7] {
         [&self.nx, &self.ny, &self.nz, &self.px, &self.py, &self.pz, &self.within]
     }
 
@@ -288,9 +288,9 @@ impl RGB {
         RGBA::new(self.red(), self.green(), self.blue(), alpha)
     }
 
-    pub fn red(self) -> f32 { self.0.x }
-    pub fn green(self) -> f32 { self.0.y }
-    pub fn blue(self) -> f32 { self.0.z }
+    pub const fn red(self) -> f32 { self.0.x }
+    pub const fn green(self) -> f32 { self.0.y }
+    pub const fn blue(self) -> f32 { self.0.z }
 }
 impl RGBA {
     /// Transparent black (all components zero).
@@ -302,10 +302,10 @@ impl RGBA {
         Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
     }
 
-    pub fn red(self) -> f32 { self.0.x }
-    pub fn green(self) -> f32 { self.0.y }
-    pub fn blue(self) -> f32 { self.0.z }
-    pub fn alpha(self) -> f32 { self.0.w }
+    pub const fn red(self) -> f32 { self.0.x }
+    pub const fn green(self) -> f32 { self.0.y }
+    pub const fn blue(self) -> f32 { self.0.z }
+    pub const fn alpha(self) -> f32 { self.0.w }
 
     /// Discards the alpha component to produce an RGB color.
     ///
