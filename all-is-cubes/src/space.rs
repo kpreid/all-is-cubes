@@ -339,7 +339,7 @@ impl Space {
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// ```
     pub fn set(&mut self, position: impl Into<GridPoint>, block: &Block) {
-        let position :GridPoint = position.into();
+        let position: GridPoint = position.into();
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
             let old_block = &self.index_to_block[old_block_index as usize];

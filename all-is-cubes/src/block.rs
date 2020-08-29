@@ -74,7 +74,7 @@ pub struct BlockAttributes {
     // TODO: add 'behavior' functionality, if we don't come up with something else
 }
 
-static DEFAULT_ATTRIBUTES :BlockAttributes = BlockAttributes {
+static DEFAULT_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: Cow::Borrowed(""),
     selectable: true,
     solid: true,
@@ -90,7 +90,7 @@ impl Default for BlockAttributes {
 
 
 /// Generic 'empty'/'null' block. It is used by `Space` to respond to out-of-bounds requests.
-pub const AIR :Block = Block::Atom(
+pub const AIR: Block = Block::Atom(
     BlockAttributes {
         display_name: Cow::Borrowed("<air>"),
         selectable: false,

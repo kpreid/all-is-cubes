@@ -277,7 +277,7 @@ impl Chunk {
 
         for &face in Face::ALL_SEVEN {
             let tess_option = &mut self.tesses[face];
-            let new_vertices :&[Vertex] = self.vertices[face].as_ref();
+            let new_vertices: &[Vertex] = self.vertices[face].as_ref();
 
             if tess_option.as_ref().map(|tess| tess.vert_nb()) != Some(new_vertices.len()) {
                 // Existing buffer, if any, is not the right length. Discard it.

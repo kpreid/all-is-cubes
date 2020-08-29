@@ -41,7 +41,7 @@ pub fn axes(space: &mut Space) {
             let i = step.cube[axis] * direction;  // always positive
             let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
             let mut light = Vector3::new(0.0, 0.0, 0.0);
-            let mut display_name :Cow<'static, str> = (i % 10).to_string().into();
+            let mut display_name: Cow<'static, str> = (i % 10).to_string().into();
             if i % 2 == 0 {
                 color[axis] = if direction > 0 { 1.0 } else { 0.9 };
             } else {
@@ -78,7 +78,7 @@ pub fn axes(space: &mut Space) {
 pub fn wavy_landscape(
         space: &mut Space,
         blocks: &LandscapeBlocks,
-        max_slope :FreeCoordinate) {
+        max_slope: FreeCoordinate) {
     // TODO: justify this constant (came from cubes v1 code).
     let slope_scaled = max_slope / 0.904087;
     let middle_y = (space.grid().lower_bounds().y + space.grid().upper_bounds().y) / 2;
@@ -95,7 +95,7 @@ pub fn wavy_landscape(
             let surface_y = middle_y + (terrain_variation as GridCoordinate);
             for y in space.grid().y_range() {
                 let altitude = y - surface_y;
-                let block :&Block = if altitude > 0 {
+                let block: &Block = if altitude > 0 {
                     // TODO: Consider swapping over to "leave the block untouched" to allow more composition
                     &blocks.air
                 } else if altitude == 0 {

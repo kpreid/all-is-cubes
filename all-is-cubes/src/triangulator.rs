@@ -171,7 +171,7 @@ fn push_quad_textured<V: From<BlockVertex>>(
 fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // TODO: Arrange to pass in a buffer of old data such that we can reuse existing textures.
     // This will allow for efficient implementation of animated blocks.
-    block :&Block,
+    block: &Block,
     texture_allocator: &mut A,
 ) -> BlockRenderData<V, A> {
     match block {
@@ -238,7 +238,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             // While we're at it, also implement the optimization that positive and negative
                             // faces can share a texture sometimes (which requires dropping the property
                             // Face::matrix provides where all transforms contain no mirroring).
-                            let cube :Point3<GridCoordinate> = (
+                            let cube: Point3<GridCoordinate> = (
                                 transform.transform_point(
                                     (Point3::new(
                                         s as FreeCoordinate,

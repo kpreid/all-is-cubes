@@ -67,7 +67,7 @@ impl Raycaster {
     ) -> Self {
         let origin = origin.into();
         let direction = direction.into();
-        fn improved_signum(x :FreeCoordinate) -> GridCoordinate {
+        fn improved_signum(x: FreeCoordinate) -> GridCoordinate {
             // We want 0 as an error indication..
             if x == 0.0 {
                 0
@@ -119,7 +119,7 @@ impl Raycaster {
         }
     }
 
-    fn step_on_axis(&mut self, axis :usize) {
+    fn step_on_axis(&mut self, axis: usize) {
         assert!(self.step[axis] != 0);
 
         // Move into the new cube.
@@ -129,7 +129,7 @@ impl Raycaster {
         self.t_max[axis] += self.t_delta[axis];
 
         // Update face crossing info
-        static FACE_TABLE :[[Face; 3]; 3] = [
+        static FACE_TABLE: [[Face; 3]; 3] = [
             // Middle column is never used.
             [Face::PX, Face::WITHIN, Face::NX],
             [Face::PY, Face::WITHIN, Face::NY],
@@ -151,7 +151,7 @@ impl Raycaster {
     ///
     /// If `direction` is `1`, only the bounds relevant to _exiting_ are tested.
     /// If `-1`, only the bounds relevant to entering.
-    fn is_out_of_bounds(&self, direction :GridCoordinate) -> bool {
+    fn is_out_of_bounds(&self, direction: GridCoordinate) -> bool {
         if let Some(grid) = self.grid {
             for axis in 0..3 {
                 let direction_on_axis = self.step[axis] * direction;
@@ -304,7 +304,7 @@ mod tests {
     }
 
     /// Helper to construct steps
-    fn step(x :GridCoordinate, y :GridCoordinate, z :GridCoordinate, face :Face) -> RaycastStep {
+    fn step(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate, face: Face) -> RaycastStep {
         RaycastStep {
             cube: Point3::new(x, y, z),
             face,

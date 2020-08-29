@@ -34,7 +34,7 @@ pub fn add_event_listener<E, F>(
     E: JsCast,
     F: Fn(E) + 'static,
 {
-    let closure :Closure<dyn Fn(Event)> = Closure::wrap(Box::new(move |event: Event| {
+    let closure: Closure<dyn Fn(Event)> = Closure::wrap(Box::new(move |event: Event| {
         listener(event.dyn_into::<E>().unwrap())
     }));
     target.add_event_listener_with_callback_and_add_event_listener_options(

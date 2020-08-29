@@ -67,7 +67,7 @@ pub fn scale_color(block: Block, scalar: f32) -> Block {
 /// ```
 pub fn make_some_blocks(count: usize) -> Vec<Block> {
     // TODO: should this return an iterator? would anyone care?
-    let mut vec :Vec<Block> = Vec::with_capacity(count);
+    let mut vec: Vec<Block> = Vec::with_capacity(count);
     for i in 0..count {
         let luminance = if count > 1 {
             i as f32 / (count - 1) as f32

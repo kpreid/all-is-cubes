@@ -68,7 +68,7 @@ impl Camera {
 
     pub fn step(&mut self, duration: Duration) {
         let dt = duration.as_secs_f64();
-        let control_orientation :Matrix3<FreeCoordinate> = Matrix3::from_angle_y(-Deg(self.body.yaw));
+        let control_orientation: Matrix3<FreeCoordinate> = Matrix3::from_angle_y(-Deg(self.body.yaw));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
 
         let velocity_target = control_orientation * self.velocity_input * FLYING_SPEED;

@@ -114,7 +114,7 @@ impl WebGameRoot {
             // (There are two parts of it: The `Weak` reference might have gone away,
             // and we also need to runtime borrow the `RefCell`)
             if let Some(refcell_ref) = self_ref.upgrade() {
-                let self2 :std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+                let self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
                 let camera = &mut *self2.camera_ref.borrow_mut();
                 if event.alt_key() || event.ctrl_key() || event.meta_key() {
                     return;
@@ -141,7 +141,7 @@ impl WebGameRoot {
         let self_ref = self.self_ref.clone();
         add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mousemove", move |event: MouseEvent| {
             if let Some(refcell_ref) = self_ref.upgrade() {
-                let mut self2 :std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
 
                 self2.cursor_ndc_position = Vector2::new(
                     event.client_x().into(),

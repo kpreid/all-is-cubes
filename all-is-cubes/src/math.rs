@@ -25,37 +25,37 @@ pub trait Modulo<M = Self> {
     /// Computes `self` mod `modulus` defined such that the result is within the range [0, `modulus`) if `modulus` is positive and (`modulus`, 0] if `modulus` is negative.
     ///
     /// When applied to vectors, acts componentwise; `M` must be a scalar type.
-    fn modulo(self, modulus :M) -> Self::Output;
+    fn modulo(self, modulus: M) -> Self::Output;
 }
 
 // Implementing Modulo on a case-by-case basis because the compiler objected
 // to providing impls for both Vector3 and the full generality of modulo_impl.
 impl Modulo for f32 {
     type Output = Self;
-    fn modulo(self, modulus :Self) -> Self { modulo_impl(self, modulus) }
+    fn modulo(self, modulus: Self) -> Self { modulo_impl(self, modulus) }
 }
 impl Modulo for f64 {
     type Output = Self;
-    fn modulo(self, modulus :Self) -> Self { modulo_impl(self, modulus) }
+    fn modulo(self, modulus: Self) -> Self { modulo_impl(self, modulus) }
 }
-impl<S : Modulo<S, Output = S> + Copy> Modulo<S> for Vector3<S> {
+impl<S: Modulo<S, Output = S> + Copy> Modulo<S> for Vector3<S> {
     type Output = Self;
-    fn modulo(self, modulus :S) -> Self { self.map(|x| x.modulo(modulus)) }
+    fn modulo(self, modulus: S) -> Self { self.map(|x| x.modulo(modulus)) }
 }
-impl<S : BaseNum + Modulo<S, Output = S>> Modulo<S> for Point3<S> {
+impl<S: BaseNum + Modulo<S, Output = S>> Modulo<S> for Point3<S> {
     type Output = Vector3<S>;
-    fn modulo(self, modulus :S) -> Vector3<S> { self.to_vec().modulo(modulus) }
+    fn modulo(self, modulus: S) -> Vector3<S> { self.to_vec().modulo(modulus) }
 }
 
 /// Implement modulo in terms of remainder and addition.
 fn modulo_impl<
     T: Rem<M, Output = T> + Add<M, Output = T>,
     M: Copy,
->(value :T, modulus :M) -> T {
+>(value: T, modulus: M) -> T {
     // Remainder, which lies in the range (-modulus, +modulus).
-    let remainder :T = value % modulus;
+    let remainder: T = value % modulus;
     // Shift the range to (0, 2*modulus).
-    let guaranteed_positive :T = remainder + modulus;
+    let guaranteed_positive: T = remainder + modulus;
     // Collapse the two cases (0, modulus) and [modulus, 2*modulus) to [0, modulus).
     guaranteed_positive % modulus
 }
@@ -294,7 +294,7 @@ impl RGB {
 }
 impl RGBA {
     /// Transparent black (all components zero).
-    pub const TRANSPARENT :RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 0.0));
+    pub const TRANSPARENT: RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 0.0));
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.

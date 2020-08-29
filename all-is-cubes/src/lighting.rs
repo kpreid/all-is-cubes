@@ -159,8 +159,8 @@ impl Space {
 
     fn update_lighting_now_on(&mut self, cube: GridPoint) -> PackedLightScalar {
         let mut total_rays = 0;
-        let mut incoming_light :RGB = RGB::ZERO;
-        let mut dependencies :Vec<GridPoint> = Vec::new();  // TODO: reuse buffer instead of allocating every time
+        let mut incoming_light: RGB = RGB::ZERO;
+        let mut dependencies: Vec<GridPoint> = Vec::new();  // TODO: reuse buffer instead of allocating every time
 
         if self[cube].opaque_to_light() {
             // Opaque blocks are always dark inside
@@ -202,8 +202,8 @@ impl Space {
 
         // Compare and set new value. Note that we MUST compare the packed value so that
         // changes are detected in terms of the low-resolution values.
-        let new_light_value :PackedLight = (incoming_light / total_rays as f32).into();
-        let old_light_value :PackedLight = self.get_lighting(cube);
+        let new_light_value: PackedLight = (incoming_light / total_rays as f32).into();
+        let old_light_value: PackedLight = self.get_lighting(cube);
         let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
         if difference_magnitude > 0 {
             // TODO: compute index only once

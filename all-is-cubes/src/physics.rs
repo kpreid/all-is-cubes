@@ -55,7 +55,7 @@ impl Body {
     }
 
     pub fn walk(&mut self, x: FreeCoordinate, z: FreeCoordinate) {
-        let rotation :Basis2<FreeCoordinate> = Rotation2::from_angle(Deg(self.yaw));
+        let rotation: Basis2<FreeCoordinate> = Rotation2::from_angle(Deg(self.yaw));
         let dir = Vector2::new(x, z);
         let dir = rotation.rotate_vector(dir);
         self.position += Vector3::new(dir.x, 0.0, dir.y);

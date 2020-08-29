@@ -56,7 +56,7 @@ pub fn draw_space<O: io::Write>(
     let projection_copy_for_parallel: ProjectionHelper = *projection;
 
     // Diagnostic info accumulators
-    let mut number_of_cubes_examined :usize = 0;
+    let mut number_of_cubes_examined: usize = 0;
 
     // Copy data out of Space (whose access is not thread safe due to contained URefs).
     let grid = *space.grid();
@@ -232,7 +232,7 @@ impl TracingState {
         self.ray_alpha = 0.0;
 
         // TODO: Pick 8/256/truecolor based on what the terminal supports.
-        fn scale(x :f32) -> u8 {
+        fn scale(x: f32) -> u8 {
             let scale = 5.0;
             (x * scale).max(0.0).min(scale) as u8
         }
