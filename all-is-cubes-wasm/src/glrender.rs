@@ -19,7 +19,6 @@ use luminance_front::Backend;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::rc::{Rc, Weak};
-use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
@@ -49,7 +48,6 @@ pub struct GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
     block_program: Program<VertexSemantics, (), ShaderInterface>,
     block_data_cache: Option<BlockGLRenderData>,  // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
-    fake_time: Duration,
 }
 
 impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
@@ -90,7 +88,6 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
             block_program,
             block_data_cache: None,
             chunk: Chunk::new(),
-            fake_time: Duration::default(),
         }
     }
 
@@ -112,8 +109,6 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
         // TODO: quick hack; we need actual invalidation, not memoization
         let block_data = self.block_data_cache
             .get_or_insert_with(|| BlockGLRenderData::prepare(surface, space).expect("texture failure"));
-
-        self.fake_time += Duration::from_millis(1000/60);  // TODO
 
         self.chunk.update(surface, &space, &block_data.block_render_data);
         let ct = &self.chunk;
