@@ -32,6 +32,7 @@ use all_is_cubes::triangulator::{
     Texel, TextureAllocator, TextureCoordinate, TextureTile,
     ToGfxVertex,
     triangulate_blocks, triangulate_space};
+use all_is_cubes::universe::{URef};
 
 use crate::js_bindings::{CanvasHelper};
 
@@ -41,13 +42,19 @@ const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
 const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 
 pub struct GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
-    canvas_helper: CanvasHelper,
+    // Graphics objects
     surface: C,
     back_buffer: Framebuffer<Dim2, (), ()>,
-    proj: ProjectionHelper,
     block_program: Program<VertexSemantics, (), ShaderInterface>,
+
+    // Rendering state
+    space: Option<URef<Space>>,
     block_data_cache: Option<BlockGLRenderData>,  // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
+
+    // Miscellaneous
+    canvas_helper: CanvasHelper,
+    proj: ProjectionHelper,
 }
 
 impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
@@ -81,13 +88,14 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
         let proj = ProjectionHelper::new(1.0, canvas_helper.viewport_px());
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(&mut surface, canvas_helper.viewport_dev()).unwrap();  // TODO error handling
         Self {
-            canvas_helper,
             surface,
             back_buffer,
-            proj,
             block_program,
+            space: None,
             block_data_cache: None,
             chunk: Chunk::new(),
+            canvas_helper,
+            proj,
         }
     }
 
@@ -96,15 +104,24 @@ impl<C> GLRenderer<C> where C: GraphicsContext<Backend = Backend> {
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(&mut self.surface, self.canvas_helper.viewport_dev()).unwrap();  // TODO error handling
     }
 
-    pub fn render_frame(&mut self, space: &Space, camera: &Camera) -> RenderInfo {
+    pub fn set_space(&mut self, space: Option<URef<Space>>) {
+        self.space = space;
+    }
+
+    pub fn render_frame(&mut self, camera: &Camera) -> RenderInfo {
+        let mut info = RenderInfo::default();
+
         // Not used directly for rendering, but used for cursor.
         self.proj.set_view_matrix(camera.view());
 
+        let space: &Space = &*(if let Some(space_ref) = &self.space {
+            space_ref.borrow()
+        } else {
+            return info;
+        });
         let surface = &mut self.surface;
         let block_program = &mut self.block_program;
         let projection_matrix = self.proj.projection();
-
-        let mut info = RenderInfo::default();
 
         // TODO: quick hack; we need actual invalidation, not memoization
         let block_data = self.block_data_cache

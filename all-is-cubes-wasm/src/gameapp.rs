@@ -39,7 +39,8 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id(), WindowOpt::default())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
-    let renderer = GLRenderer::new(surface, gui_helpers.canvas_helper());
+    let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper());
+    renderer.set_space(Some(universe.get_default_space()));
 
     append_text_content(&static_dom.scene_info_text, "\nGL ready.");
 
@@ -166,9 +167,7 @@ impl WebGameRoot {
         let (space_step_info, _) = self.universe.step(timestep);
 
         // Do graphics
-        let render_info = self.renderer.render_frame(
-            &*self.space_ref.borrow(),
-            &*self.camera_ref.borrow());
+        let render_info = self.renderer.render_frame(&*self.camera_ref.borrow());
         
         // Compute info text.
         // TODO: tidy up cursor result formatting, make it reusable
