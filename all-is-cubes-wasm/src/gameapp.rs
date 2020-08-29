@@ -1,6 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
+use cgmath::{Vector2, Zero as _};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
@@ -10,10 +11,11 @@ use luminance_web_sys::{WebSysWebGL2Surface};
 use luminance_windowing::WindowOpt;
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
-use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, console};
+use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, console};
 
 use all_is_cubes::camera::{Camera, cursor_raycast};
 use all_is_cubes::demo_content::new_universe_with_stuff;
+use all_is_cubes::math::{FreeCoordinate};
 use all_is_cubes::space::{Space};
 use all_is_cubes::universe::{Universe, URef};
 
@@ -52,13 +54,6 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 }
 
 struct WebGameRoot {
-    gui_helpers: GuiHelpers,
-    static_dom: StaticDom,
-    universe: Universe,
-    space_ref: URef<Space>,
-    camera_ref: URef<Camera>,
-    renderer: GLRenderer<WebSysWebGL2Surface>,
-    raf_callback: Closure<dyn FnMut()>,
     /// In order to be able to set up callbacks to ourselves, we need to live in a mutable
     /// heap-allocated location, and we need to have a reference to that location. In
     /// order to not be a guaranteed memory leak, we need that reference to be weak.
@@ -66,12 +61,23 @@ struct WebGameRoot {
     /// This technique taken from [this example of how to build a requestAnimationFrame
     /// loop](https://rustwasm.github.io/docs/wasm-bindgen/examples/request-animation-frame.html).
     self_ref: Weak<RefCell<WebGameRoot>>,
+
+    gui_helpers: GuiHelpers,
+    static_dom: StaticDom,
+    universe: Universe,
+    space_ref: URef<Space>,
+    camera_ref: URef<Camera>,
+    renderer: GLRenderer<WebSysWebGL2Surface>,
+    raf_callback: Closure<dyn FnMut()>,
+    cursor_ndc_position: Vector2<FreeCoordinate>,
 }
 
 impl WebGameRoot {
     pub fn new(gui_helpers: GuiHelpers, static_dom: StaticDom, universe: Universe, renderer: GLRenderer<WebSysWebGL2Surface>) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {
+            self_ref: Weak::new(),
+
             gui_helpers,
             static_dom,
             space_ref: universe.get_default_space(),
@@ -79,7 +85,7 @@ impl WebGameRoot {
             universe,
             renderer,
             raf_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
-            self_ref: Weak::new(),
+            cursor_ndc_position: Vector2::zero(),
         }));
 
         // Add the self-references.
@@ -100,12 +106,10 @@ impl WebGameRoot {
 
     /// This method is broken out of new() so we can just use `self`. Well, some of the time.
     fn init_dom(&self) {
-        // self_ref can be kept.
-        let self_ref = self.self_ref.clone();
-
         // TODO: Replace this with the JS GuiHelpers handling the event processing,
         // because this is messy.
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"keydown", move |event :KeyboardEvent| {
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"keydown", move |event: KeyboardEvent| {
             // TODO: Put some abstraction over this mess of reference issues.
             // (There are two parts of it: The `Weak` reference might have gone away,
             // and we also need to runtime borrow the `RefCell`)
@@ -133,6 +137,17 @@ impl WebGameRoot {
                 event.prevent_default();
             }
         }, &AddEventListenerOptions::new());
+
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mousemove", move |event: MouseEvent| {
+            if let Some(refcell_ref) = self_ref.upgrade() {
+                let mut self2 :std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+
+                self2.cursor_ndc_position = Vector2::new(
+                    event.client_x().into(),
+                    event.client_y().into());
+            }
+        }, &AddEventListenerOptions::new().passive(true));
     }
 
     pub fn start_loop(&self) {

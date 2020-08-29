@@ -7,6 +7,8 @@ use cgmath::Vector2;
 use wasm_bindgen::prelude::*;
 use web_sys::{HtmlCanvasElement};
 
+use all_is_cubes::math::FreeCoordinate;
+
 #[wasm_bindgen(raw_module = "gui")]
 extern "C" {
     pub type GuiHelpers;
@@ -19,9 +21,11 @@ extern "C" {
     #[wasm_bindgen(method, getter)]
     pub fn canvas(this: &CanvasHelper) -> HtmlCanvasElement;
     #[wasm_bindgen(method, getter, js_name = viewportPx)]
-    pub fn viewport_px_raw(this: &CanvasHelper) -> Vec<f64>;
+    fn viewport_px_raw(this: &CanvasHelper) -> Vec<f64>;
     #[wasm_bindgen(method, getter, js_name = viewportDev)]
-    pub fn viewport_dev_raw(this: &CanvasHelper) -> Vec<f64>;
+    fn viewport_dev_raw(this: &CanvasHelper) -> Vec<f64>;
+    #[wasm_bindgen(method, js_name = normalizePosition)]
+    fn normalize_position_raw(this: &CanvasHelper) -> Vec<f64>;
 }
 
 impl CanvasHelper {
@@ -34,5 +38,11 @@ impl CanvasHelper {
     pub fn viewport_dev(&self) -> [u32; 2] {
         let raw = self.viewport_dev_raw();
         [raw[0] as u32, raw[1] as u32]
+    }
+
+    // TODO: return type is at the whim of what's useful for luminance right now
+    pub fn normalize_position(&self) -> Vector2<FreeCoordinate> {
+        let raw = self.normalize_position_raw();
+        Vector2::new(raw[0], raw[1])
     }
 }

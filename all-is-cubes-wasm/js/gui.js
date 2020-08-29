@@ -65,4 +65,13 @@ export class CanvasHelper {
     }
     return id;
   }
+
+  // Given pixel X and Y as used in mouse events, return GL-style normalized
+  // device coordinates.
+  normalizePosition(x, y) {
+    return [
+      x / this.viewportPx[0] * 2 - 1,
+      y / this.viewportPx[1] * -2 + 1,
+    ];
+  }
 }
