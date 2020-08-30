@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Vector2, Vector3};
+use cgmath::{EuclideanSpace as _, Vector2, Vector3};
 use luminance_derive::{Semantics, Vertex, UniformInterface};
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::context::GraphicsContext;
@@ -220,6 +220,7 @@ pub enum VertexSemantics {
     Lighting,
 }
 
+/// Vertex type sent to GPU. See also ``
 #[derive(Clone, Copy, Debug, Vertex)]
 #[vertex(sem = "VertexSemantics")]
 struct Vertex {
@@ -236,15 +237,20 @@ struct Vertex {
     lighting: VertexLighting,
 }
 
-impl ToGfxVertex<Vertex> for BlockVertex {
-    // TODO: Stop using BlockVertex as our block vertex type, because it stores FreeCoordinate
-    // and we want f32, forcing us to translate at every instantiation.
+/// Vertex format for `triangulate_blocks` that is as close as possible to
+/// `Vertex` without containing unnecessary parts.
+struct GLBlockVertex {
+    position: Vector3<f32>,
+    normal: VertexNormal,
+    color_or_texture: VertexColorOrTexture,
+}
 
-    fn instantiate(&self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) -> Vertex {
-        Vertex {
-            position: VertexPosition::new((self.position + offset).cast::<f32>().unwrap().into()),
-            normal: VertexNormal::new(self.normal.cast::<f32>().unwrap().into()),
-            color_or_texture: match self.coloring {
+impl From<BlockVertex> for GLBlockVertex {
+    fn from(vertex: BlockVertex) -> Self {
+        Self {
+            position: vertex.position.cast::<f32>().unwrap().to_vec(),
+            normal: VertexNormal::new(vertex.normal.cast::<f32>().unwrap().into()),
+            color_or_texture: match vertex.coloring {
                 Coloring::Solid(color) => {
                     let mut color_attribute = VertexColorOrTexture::new(color.into());
                     // Force alpha to 1 until we have a better transparency answer. When we do,
@@ -254,6 +260,16 @@ impl ToGfxVertex<Vertex> for BlockVertex {
                 },
                 Coloring::Texture(tc) => VertexColorOrTexture::new([tc[0], tc[1], tc[2], -1.0]),
             },
+        }
+    }
+}
+
+impl ToGfxVertex<Vertex> for GLBlockVertex {
+    fn instantiate(&self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) -> Vertex {
+        Vertex {
+            position: VertexPosition::new((self.position + offset.cast::<f32>().unwrap()).into()),
+            normal: self.normal,
+            color_or_texture: self.color_or_texture,
             lighting: VertexLighting::new(lighting.into()),
         }
     }
@@ -281,7 +297,7 @@ impl Chunk {
         &mut self,
         context: &mut C,
         space: &Space,
-        blocks_render_data: &BlocksRenderData<BlockVertex, BlockGLTexture>,
+        blocks_render_data: &BlocksRenderData<GLBlockVertex, BlockGLTexture>,
     ) {
         // TODO: quick hack to avoid rerendering unnecessarily.
         // Doesn't account for block render data changes.
@@ -335,7 +351,7 @@ impl Chunk {
 }
 
 struct BlockGLRenderData {
-    block_render_data: BlocksRenderData<BlockVertex, BlockGLTexture>,
+    block_render_data: BlocksRenderData<GLBlockVertex, BlockGLTexture>,
     texture_allocator: BlockGLTexture,
 }
 
