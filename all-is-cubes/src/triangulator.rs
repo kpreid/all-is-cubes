@@ -61,11 +61,14 @@ impl std::fmt::Debug for Coloring {
 /// Implement this trait along with `From<BlockVertex>` to provide a representation
 /// of `BlockVertex` suitable for the target graphics system.
 pub trait ToGfxVertex<GV>: From<BlockVertex> + Sized {
-    fn instantiate(&self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) -> GV;
+    type Coordinate: cgmath::BaseNum;
+
+    fn instantiate(&self, offset: Vector3<Self::Coordinate>, lighting: PackedLight) -> GV;
 }
 
 /// Trivial implementation for testing purposes. Discards lighting.
 impl ToGfxVertex<BlockVertex> for BlockVertex {
+    type Coordinate = FreeCoordinate;
     fn instantiate(&self, offset: Vector3<FreeCoordinate>, _lighting: PackedLight) -> Self {
         Self {
             position: self.position + offset,
@@ -346,7 +349,7 @@ pub fn triangulate_space<BV, GV, A>(
     }
     for cube in space.grid().interior_iter() {
         let precomputed = lookup(cube);
-        let low_corner = cube.cast::<FreeCoordinate>().unwrap();
+        let low_corner = cube.cast::<BV::Coordinate>().unwrap();
         for &face in Face::ALL_SEVEN {
             let adjacent_cube = cube + face.normal_vector();
             if lookup(adjacent_cube).faces[face.opposite()].fully_opaque {

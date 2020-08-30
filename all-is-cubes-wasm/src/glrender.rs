@@ -23,7 +23,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::{Face, FaceMap, FreeCoordinate, GridCoordinate};
+use all_is_cubes::math::{Face, FaceMap, GridCoordinate};
 use all_is_cubes::space::{PackedLight, Space};
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::triangulator::{
@@ -265,9 +265,11 @@ impl From<BlockVertex> for GLBlockVertex {
 }
 
 impl ToGfxVertex<Vertex> for GLBlockVertex {
-    fn instantiate(&self, offset: Vector3<FreeCoordinate>, lighting: PackedLight) -> Vertex {
+    type Coordinate = f32;
+
+    fn instantiate(&self, offset: Vector3<Self::Coordinate>, lighting: PackedLight) -> Vertex {
         Vertex {
-            position: VertexPosition::new((self.position + offset.cast::<f32>().unwrap()).into()),
+            position: VertexPosition::new((self.position + offset).into()),
             normal: self.normal,
             color_or_texture: self.color_or_texture,
             lighting: VertexLighting::new(lighting.into()),
