@@ -11,6 +11,10 @@ license = "MIT"
 # TODO: revisit categories once it's more settled how useful this is as an engine
 categories = ["games", "graphics"]
 
+[[bench]]
+name = "lighting"
+harness = false
+
 [dependencies]
 cgmath = "0.17.0"
 embedded-graphics = "0.6.2"
@@ -20,3 +24,6 @@ num-traits = "0.2.12"
 owning_ref = "0.4.1"
 rand = "0.7.3"
 rand_xoshiro = "0.4.0"
+
+[dev-dependencies]
+criterion = "0.3"

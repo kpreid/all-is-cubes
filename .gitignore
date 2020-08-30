@@ -1,5 +1,6 @@
 # Rust (Cargo) build files
 /target
+/*/target
 
 # JavaScript (NPM) build files
 /all-is-cubes-wasm/node_modules
