@@ -364,13 +364,21 @@ impl Space {
             // Write actual space change
             self.contents[contents_index] = new_block_index;
 
-            self.side_effects_of_set(position);
+            self.side_effects_of_set(block, position);
         }
     }
 
     /// Implement the consequences of changing a block.
-    fn side_effects_of_set(&mut self, position: GridPoint) {
-        self.light_needs_update(position, PackedLightScalar::MAX);
+    fn side_effects_of_set(&mut self, block: &Block, position: GridPoint) {
+        if block.opaque_to_light() {
+            for &neighbor in Face::ALL_SIX {
+                self.light_needs_update(
+                    position + neighbor.normal_vector(),
+                    PackedLightScalar::MAX);
+            }
+        } else {
+            self.light_needs_update(position, PackedLightScalar::MAX);
+        }
         self.mutation_counter += 1;
     }
 
@@ -401,12 +409,6 @@ impl Space {
     pub fn step(&mut self, _timestep: Duration) -> SpaceStepInfo {
         // TODO: other world behaviors...
 
-        // TODO: Replace this randomly triggered light update with being systematic about
-        // post-worldgen updates.
-        for _ in 0..4 {
-            let cube = self.grid.random_cube(&mut self.rng);
-            self.light_needs_update(cube, 0);
-        }
         let (light_update_count, max_light_update_difference) = self.update_lighting_from_queue();
 
         SpaceStepInfo { light_update_count, max_light_update_difference }

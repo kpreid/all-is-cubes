@@ -139,7 +139,9 @@ impl PartialOrd for LightUpdateRequest {
 
 impl Space {
     pub(crate) fn light_needs_update(&mut self, cube: GridPoint, priority: PackedLightScalar) {
-        self.lighting_update_queue.push(LightUpdateRequest {priority, cube});
+        if self.grid().contains_cube(cube) {
+            self.lighting_update_queue.push(LightUpdateRequest {priority, cube});
+        }
     }
 
     /// Do some lighting updates.
