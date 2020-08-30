@@ -100,6 +100,7 @@ impl Raycaster {
         self
     }
 
+    #[inline(always)]
     fn step(&mut self) {
         // t_max stores the t-value at which we cross a cube boundary along the
         // X axis, per component. Therefore, choosing the least t_max axis
@@ -119,6 +120,7 @@ impl Raycaster {
         }
     }
 
+    #[inline(always)]
     fn step_on_axis(&mut self, axis: usize) {
         assert!(self.step[axis] != 0);
 
@@ -138,6 +140,7 @@ impl Raycaster {
         self.last_face = FACE_TABLE[axis][(self.step[axis] + 1) as usize];
     }
 
+    #[inline(always)]
     fn valid_for_stepping(&self) -> bool {
         // If all stepping directions are 0, then we cannot make progress.
         self.step != Vector3::zero()
@@ -151,6 +154,7 @@ impl Raycaster {
     ///
     /// If `direction` is `1`, only the bounds relevant to _exiting_ are tested.
     /// If `-1`, only the bounds relevant to entering.
+    #[inline(always)]
     fn is_out_of_bounds(&self, direction: GridCoordinate) -> bool {
         if let Some(grid) = self.grid {
             for axis in 0..3 {
@@ -178,6 +182,7 @@ impl Iterator for Raycaster {
     type Item = RaycastStep;
 
     /// Returns a `RaycastStep` describing the next cube intersected by the ray.
+    #[inline]
     fn next(&mut self) -> Option<RaycastStep> {
         loop {
             if self.emit_current {

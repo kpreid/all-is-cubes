@@ -77,6 +77,7 @@ impl Grid {
     /// assert_eq!(grid.index((0, 0, -1)), None);
     /// assert_eq!(grid.index((0, 0, 10)), None);
     /// ```
+    #[inline(always)]  // very hot code
     pub fn index(&self, point: impl Into<GridPoint>) -> Option<usize> {
         let point = point.into();
         let deoffsetted = point - self.lower_bounds;
@@ -277,6 +278,7 @@ impl Space {
     ///
     /// These IDs may be used to perform efficient processing of many blocks, but they
     /// may be renumbered after any mutation.
+    #[inline(always)]
     pub(crate) fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
         self.grid.index(position.into())
             .map(|contents_index| self.contents[contents_index])
@@ -321,6 +323,7 @@ impl Space {
     /// Lighting is updated asynchronously after modifications, so all above claims about
     /// the meaning of this value are actually “will eventually be, if no more changes are
     /// made”.
+    #[inline(always)]
     pub fn get_lighting(&self, position: impl Into<GridPoint>) -> PackedLight {
         self.grid.index(position.into())
             .map(|contents_index| self.lighting[contents_index]).unwrap_or(PackedLight::INITIAL)
@@ -450,6 +453,7 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     /// Get the block in this space at the given position.
     ///
     /// If the position is out of bounds, there is no effect.
+    #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
         if let Some(index) = self.grid.index(position) {
             &self.index_to_block[self.contents[index] as usize]
