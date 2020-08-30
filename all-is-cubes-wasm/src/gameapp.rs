@@ -16,8 +16,8 @@ use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEve
 use all_is_cubes::camera::{Camera, cursor_raycast};
 use all_is_cubes::demo_content::new_universe_with_stuff;
 use all_is_cubes::math::{FreeCoordinate};
-use all_is_cubes::space::{Space};
-use all_is_cubes::universe::{Universe, URef};
+use all_is_cubes::space::{Space, SpaceStepInfo};
+use all_is_cubes::universe::{FrameClock, Universe, URef};
 
 use crate::glrender::GLRenderer;
 use crate::js_bindings::{GuiHelpers};
@@ -69,7 +69,12 @@ struct WebGameRoot {
     space_ref: URef<Space>,
     camera_ref: URef<Camera>,
     renderer: GLRenderer<WebSysWebGL2Surface>,
-    raf_callback: Closure<dyn FnMut()>,
+    raf_callback: Closure<dyn FnMut(f64)>,
+    step_callback: Closure<dyn FnMut()>,
+    step_callback_scheduled: bool,
+    frame_clock: FrameClock,
+    last_raf_timestamp: f64,
+    last_step_info: SpaceStepInfo,
     cursor_ndc_position: Vector2<FreeCoordinate>,
 }
 
@@ -85,7 +90,12 @@ impl WebGameRoot {
             camera_ref: universe.get_default_camera(),
             universe,
             renderer,
-            raf_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
+            raf_callback: Closure::wrap(Box::new(|_| { /* dummy no-op for initialization */ })),
+            step_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
+            step_callback_scheduled: false,
+            frame_clock: FrameClock::new(),
+            last_raf_timestamp: 0.0,  // TODO better initial value or special case
+            last_step_info: SpaceStepInfo::default(),
             cursor_ndc_position: Vector2::zero(),
         }));
 
@@ -95,8 +105,13 @@ impl WebGameRoot {
             self_mut.self_ref = Rc::downgrade(&self_cell_ref);
 
             let self_cell_ref_for_closure = self_cell_ref.clone();
-            self_mut.raf_callback = Closure::wrap(Box::new(move || {
-                (*self_cell_ref_for_closure).borrow_mut().raf_callback_impl();
+            self_mut.raf_callback = Closure::wrap(Box::new(move |dom_timestamp: f64| {
+                (*self_cell_ref_for_closure).borrow_mut().raf_callback_impl(dom_timestamp);
+            }));
+
+            let self_cell_ref_for_closure = self_cell_ref.clone();
+            self_mut.step_callback = Closure::wrap(Box::new(move || {
+                (*self_cell_ref_for_closure).borrow_mut().step_callback_impl();
             }));
         }
         // Other initialization.
@@ -157,34 +172,55 @@ impl WebGameRoot {
             .unwrap();
     }
 
-    fn raf_callback_impl(&mut self) {
-        // TODO do projection updates only when needed
-        self.renderer.update_viewport();
+    fn raf_callback_impl(&mut self, dom_timestamp: f64) {
+        let delta = Duration::from_secs_f64((dom_timestamp - self.last_raf_timestamp) / 1000.0);
+        self.last_raf_timestamp = dom_timestamp;
+        let should_draw = self.frame_clock.request_frame(delta);
 
-        // Do game state updates.
-        // requestAnimationFrame is specified to repeat at 1/60 s.
-        let timestep = Duration::from_secs_f64(1.0/60.0);
-        let (space_step_info, _) = self.universe.step(timestep);
+        if should_draw {
+            // TODO do projection updates only when needed
+            self.renderer.update_viewport();
 
-        // Do graphics
-        let render_info = self.renderer.render_frame(&*self.camera_ref.borrow());
-        
-        // Compute info text.
-        // TODO: tidy up cursor result formatting, make it reusable
-        let cursor_result = cursor_raycast(self.renderer.cursor_raycaster(), &*self.space_ref.borrow());
-        let cursor_result_text = match cursor_result {
-            Some(cursor) => Cow::Owned(format!("{}", cursor)),
-            None => Cow::Borrowed("No block"),
-        };
-        self.static_dom.scene_info_text.set_text_content(Some(&format!(
-            "{:#?}\n{:#?}\n{:#?}\n\n{}",
-            &*self.camera_ref.borrow(),
-            space_step_info,
-            render_info,
-            cursor_result_text)));
+            // Do graphics
+            let render_info = self.renderer.render_frame(&*self.camera_ref.borrow());
+
+            // Compute info text.
+            // TODO: tidy up cursor result formatting, make it reusable
+            let cursor_result = cursor_raycast(self.renderer.cursor_raycaster(), &*self.space_ref.borrow());
+            let cursor_result_text = match cursor_result {
+                Some(cursor) => Cow::Owned(format!("{}", cursor)),
+                None => Cow::Borrowed("No block"),
+            };
+            self.static_dom.scene_info_text.set_text_content(Some(&format!(
+                "{:#?}\n{:#?}\n{:#?}\n\n{}",
+                &*self.camera_ref.borrow(),
+                self.last_step_info,
+                render_info,
+                cursor_result_text)));
+        }
+
+        if self.frame_clock.should_step() && !self.step_callback_scheduled {
+            self.step_callback_scheduled = true;
+            web_sys::window().unwrap().set_timeout_with_callback_and_timeout_and_arguments_0(
+                self.step_callback.as_ref().unchecked_ref(),
+                0,
+            ).unwrap();
+        }
 
         // Schedule next requestAnimationFrame
         self.start_loop();
+    }
+
+    fn step_callback_impl(&mut self) {
+        self.step_callback_scheduled = false;
+        for _ in 0..2 { // allow finite amount of catch-up or varying timestep
+            if self.frame_clock.should_step() {
+                self.frame_clock.did_step();
+                // TODO: Do this in a separate task, not requestAnimationFrame
+                let (space_step_info, _) = self.universe.step(self.frame_clock.step_length());
+                self.last_step_info = space_step_info;
+            }
+        }
     }
 }
 

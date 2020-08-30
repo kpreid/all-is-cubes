@@ -9,7 +9,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::hash::{Hash, Hasher};
 use std::rc::{Rc, Weak};
 use std::ops::{Deref, DerefMut};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::camera::Camera;
 use crate::space::{Space, SpaceStepInfo};
@@ -236,6 +236,91 @@ impl<T> URootRef<T> {
     fn borrow_mut(&self) -> UBorrowMut<T> {
         self.downgrade().borrow_mut()
     }
+}
+
+/// Algorithm for deciding how to execute simulation and rendering frames.
+/// Platform-independent; only returns decisions given provided information.
+pub struct FrameClock {
+    last_absolute_time: Option<Instant>,
+    /// Whether there was a step and we should therefore draw a frame.
+    /// TODO: This might go away in favor of actual dirty-notifications.
+    render_dirty: bool,
+    accumulated_step_time: Duration,
+}
+
+impl FrameClock {
+    const STEP_LENGTH: Duration = Duration::from_micros(1_000_000 / 60);
+    const ACCUMULATOR_CAP: Duration = Duration::from_millis(500);
+
+    pub fn new() -> Self {
+        Self {
+            last_absolute_time: None,
+            render_dirty: true,
+            accumulated_step_time: Duration::default(),
+        }
+    }
+
+    /// Advance the clock using a source of absolute time.
+    ///
+    /// This cannot be meaningfully used in combination with `request_frame()`.
+    pub fn advance_to(&mut self, instant: Instant) {
+        if let Some(last_absolute_time) = self.last_absolute_time {
+            let delta = instant - last_absolute_time;
+            self.accumulated_step_time += delta;
+            self.cap_step_time();
+        }
+        self.last_absolute_time = Some(instant);
+    }
+
+    /// Reacts to a callback from the environment requesting drawing a frame ASAP if
+    /// we're going to (i.e. requestAnimationFrame on the web). Drives the simulation
+    /// clock based on this input (it will not advance if no requests are made).
+    ///
+    /// Returns whether a frame should actually be rendered now. The caller should also
+    /// consult `should_step()` afterward to schedule game state steps.
+    ///
+    /// This cannot be meaningfully used in combination with `advance_to()`.
+    #[must_use]
+    pub fn request_frame(&mut self, time_since_last_frame: Duration) -> bool {
+        let result = self.should_draw();
+        self.did_draw();
+
+        self.accumulated_step_time += time_since_last_frame;
+        self.cap_step_time();
+
+        result
+    }
+
+    pub fn should_draw(&self) -> bool {
+        self.render_dirty
+    }
+
+    pub fn did_draw(&mut self) {
+        self.render_dirty = false;
+    }
+
+    pub fn should_step(&self) -> bool {
+        self.accumulated_step_time >= Self::STEP_LENGTH
+    }
+
+    pub fn step_length(&self) -> Duration {
+        Self::STEP_LENGTH
+    }
+
+    pub fn did_step(&mut self) {
+        self.accumulated_step_time -= Self::STEP_LENGTH;
+        self.render_dirty = true;
+    }
+
+    fn cap_step_time(&mut self) {
+        if self.accumulated_step_time > Self::ACCUMULATOR_CAP {
+            self.accumulated_step_time = Self::ACCUMULATOR_CAP;
+        }
+    }
+}
+
+impl Default for FrameClock {
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]

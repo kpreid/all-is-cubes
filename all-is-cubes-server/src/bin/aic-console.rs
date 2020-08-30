@@ -6,13 +6,14 @@
 use std::io;
 use std::thread;
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Instant};
 use termion::event::{Event, Key};
 use termion::raw::IntoRawMode;
 use termion::input::TermRead;
 
 use all_is_cubes::camera::{ProjectionHelper};
 use all_is_cubes::demo_content::new_universe_with_stuff;
+use all_is_cubes::universe::FrameClock;
 
 use all_is_cubes_server::console::{controller, draw_space, viewport_from_terminal_size};
 
@@ -43,11 +44,9 @@ fn main() -> io::Result<()> {
     });
 
     print!("{}", termion::clear::All);
-    loop {
-        // TODO: manage time steps correctly
-        thread::sleep(Duration::from_millis(1000/30));
-        let timestep = Duration::from_secs_f64(1.0/20.0);
 
+    let mut frame_clock = FrameClock::new();
+    loop {
         'input: loop {
             match event_rx.try_recv() {
                 Ok(event) => {
@@ -68,7 +67,14 @@ fn main() -> io::Result<()> {
             }
         }
 
-        universe.step(timestep);
-        draw_space(&*space_ref.borrow(), &mut proj, &camera_ref.borrow(), &mut out)?;
+        frame_clock.advance_to(Instant::now());
+        if frame_clock.should_step() {
+            universe.step(frame_clock.step_length());
+            frame_clock.did_step();
+        }
+        if frame_clock.should_draw() {
+            draw_space(&*space_ref.borrow(), &mut proj, &camera_ref.borrow(), &mut out)?;
+            frame_clock.did_draw();
+        }
     }
 }
