@@ -5,7 +5,7 @@
 
 use itertools::Itertools as _;
 use rand::SeedableRng as _;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::collections::binary_heap::BinaryHeap;
 use std::ops::Range;
 use std::time::Duration;
@@ -211,6 +211,8 @@ pub struct Space {
     pub(crate) lighting: Box<[PackedLight]>,
     /// Queue of positions that could really use lighting updates.
     pub(crate) lighting_update_queue: BinaryHeap<crate::lighting::LightUpdateRequest>,
+    /// Set of members of lighting_update_queue, for deduplication.
+    pub(crate) lighting_update_set: HashSet<GridPoint>,
 
     /// Increments every time the space is modified in an externally visible way.
     /// Quick hack of a method to detect changes and redraw. TODO: Replace this, or if we
@@ -252,6 +254,7 @@ impl Space {
             contents: vec![0; volume].into_boxed_slice(),
             lighting: initialize_lighting(grid),
             lighting_update_queue: BinaryHeap::new(),
+            lighting_update_set: HashSet::new(),
             mutation_counter: 0,
             rng: rand_xoshiro::Xoshiro256Plus::seed_from_u64(0),  // deterministic!
         }
@@ -409,9 +412,7 @@ impl Space {
     pub fn step(&mut self, _timestep: Duration) -> SpaceStepInfo {
         // TODO: other world behaviors...
 
-        let (light_update_count, max_light_update_difference) = self.update_lighting_from_queue();
-
-        SpaceStepInfo { light_update_count, max_light_update_difference }
+        self.update_lighting_from_queue()
     }
 
     /// Finds or assigns an index to denote the block.
@@ -466,11 +467,14 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
 pub struct SpaceStepInfo {
     /// Number of blocks whose light data was updated this step.
     pub light_update_count: usize,
+    /// Number of entries in the light update queue.
+    pub light_queue_count: usize,
     pub max_light_update_difference: u8,
 }
 impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     fn add_assign(&mut self, other: Self) {
          self.light_update_count += other.light_update_count;
+         self.light_queue_count += other.light_queue_count;
          self.max_light_update_difference =
              self.max_light_update_difference.max(other.max_light_update_difference);
      }

@@ -139,24 +139,30 @@ impl PartialOrd for LightUpdateRequest {
 
 impl Space {
     pub(crate) fn light_needs_update(&mut self, cube: GridPoint, priority: PackedLightScalar) {
-        if self.grid().contains_cube(cube) {
+        if self.grid().contains_cube(cube) && !self.lighting_update_set.contains(&cube) {
             self.lighting_update_queue.push(LightUpdateRequest {priority, cube});
+            self.lighting_update_set.insert(cube);
         }
     }
 
     /// Do some lighting updates.
-    pub(crate) fn update_lighting_from_queue(&mut self) -> (usize, PackedLightScalar) {
+    pub(crate) fn update_lighting_from_queue(&mut self) -> SpaceStepInfo {
         // Do a finite number of updates.
-        let mut update_count: usize = 0;
-        let mut max_difference: u8 = 0;
+        let mut light_update_count: usize = 0;
+        let mut max_difference: PackedLightScalar = 0;
         while let Some(LightUpdateRequest { cube, .. }) = self.lighting_update_queue.pop() {
-            update_count += 1;
+            self.lighting_update_set.remove(&cube);
+            light_update_count += 1;
             max_difference = max_difference.max(self.update_lighting_now_on(cube));
-            if update_count >= 120 {
+            if light_update_count >= 120 {
                 break;
             }
         }
-        (update_count, max_difference)
+        SpaceStepInfo {
+            light_update_count,
+            light_queue_count: self.lighting_update_queue.len(),
+            max_light_update_difference: max_difference,
+        }
     }
 
     fn update_lighting_now_on(&mut self, cube: GridPoint) -> PackedLightScalar {
