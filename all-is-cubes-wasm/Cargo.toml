@@ -39,6 +39,7 @@ features = [
   "HtmlElement",
   "KeyboardEvent",
   "MouseEvent",
+  "Text",
   "Window",
 ]
 

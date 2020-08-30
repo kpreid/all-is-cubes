@@ -4,7 +4,7 @@
 use js_sys::{Error};
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
-use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, console};
+use web_sys::{AddEventListenerOptions, Document, Event, EventTarget, console};
 
 /// Runs on module load. Does only key Rust environment initialization things;
 /// application logic is separately called from JS.
@@ -43,13 +43,4 @@ pub fn add_event_listener<E, F>(
         options,
     ).expect("addEventListener failure");
     closure.forget();  // TODO: Instead return the closure or some other kind of handle
-}
-
-/// Equivalent of JS `element.textContent += text`.
-/// Note that this is a read-modify-write and as such is not efficient for long text.
-pub fn append_text_content<'a>(element: &Element, text: impl Into<&'a str>) {
-    let text = text.into();
-    // text_content is an Option<String> but always present for Element
-    let existing = element.text_content().unwrap();
-    element.set_text_content(Some((existing + text).as_str()));
 }

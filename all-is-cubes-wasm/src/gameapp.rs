@@ -11,7 +11,7 @@ use luminance_web_sys::{WebSysWebGL2Surface};
 use luminance_windowing::WindowOpt;
 use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
-use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, console};
+use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, Text, console};
 
 use all_is_cubes::camera::{Camera, cursor_raycast};
 use all_is_cubes::demo_content::new_universe_with_stuff;
@@ -21,7 +21,7 @@ use all_is_cubes::universe::{FrameClock, Universe, URef};
 
 use crate::glrender::GLRenderer;
 use crate::js_bindings::{GuiHelpers};
-use crate::web_glue::{add_event_listener, append_text_content, get_mandatory_element};
+use crate::web_glue::{add_event_listener, get_mandatory_element};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
@@ -32,7 +32,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them.
     let static_dom = StaticDom::new(&document)?;
 
-    append_text_content(&static_dom.scene_info_text, "\nRusting...");
+    static_dom.scene_info_text_node.append_data("\nRusting...")?;
 
     let universe = new_universe_with_stuff();
 
@@ -42,7 +42,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper());
     renderer.set_space(Some(universe.get_default_space()));
 
-    append_text_content(&static_dom.scene_info_text, "\nGL ready.");
+    static_dom.scene_info_text_node.append_data("\nGL ready.")?;
 
     let root = WebGameRoot::new(gui_helpers, static_dom, universe, renderer);
 
@@ -191,12 +191,12 @@ impl WebGameRoot {
                 Some(cursor) => Cow::Owned(format!("{}", cursor)),
                 None => Cow::Borrowed("No block"),
             };
-            self.static_dom.scene_info_text.set_text_content(Some(&format!(
+            self.static_dom.scene_info_text_node.set_data(&format!(
                 "{:#?}\n{:#?}\n{:#?}\n\n{}",
                 &*self.camera_ref.borrow(),
                 self.last_step_info,
                 render_info,
-                cursor_result_text)));
+                cursor_result_text));
         }
 
         if self.frame_clock.should_step() && !self.step_callback_scheduled {
@@ -225,13 +225,18 @@ impl WebGameRoot {
 }
 
 struct StaticDom {
-    scene_info_text: HtmlElement,
+    scene_info_text_node: Text,
 }
 
 impl StaticDom {
     fn new(document: &Document) -> Result<Self, Error> {
+        let scene_info_element: HtmlElement = get_mandatory_element(document, "scene-info-text")?;
+        // Ensure element has exactly one text node child.
+        scene_info_element.set_text_content(scene_info_element.text_content().as_deref());
+        let scene_info_text_node = scene_info_element.first_child().unwrap().dyn_into().unwrap();
+
         Ok(Self {
-            scene_info_text: get_mandatory_element(document, "scene-info-text")?,
+            scene_info_text_node,
         })
     }
 }
