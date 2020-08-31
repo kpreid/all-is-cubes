@@ -15,7 +15,7 @@ use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, U
 use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::texture::{
-    Dim2, Dim2Array, GenMipmaps, MagFilter, Sampler, Texture, TextureError, Wrap,
+    Dim2, Dim2Array, Dimensionable, GenMipmaps, MagFilter, Sampler, Texture, TextureError, Wrap,
 };
 use luminance_front::Backend;
 use std::cell::RefCell;
@@ -404,23 +404,34 @@ impl BlockGLRenderData {
     }
 }
 
-/// Manages a block face texture, which is an array texture (each face gets a separate
-/// texture layer).
+/// Manages a block face texture, which is an atlased array texture (to minimize
+/// the chance of hitting any size limits).
 struct BlockGLTexture {
     texture: Texture<Dim2Array, NormRGBA8UI>,
     tile_size: u32,
+    // Number of tiles in texture atlas along one edge (square root of total tiles).
+    atlas_row_length: u32,
+    // Number of array texture layers in use.
     layer_count: u32, // u32 is the type luminance uses
     next_free: u32,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
 }
 #[derive(Clone, Debug)]
 struct GLTile {
-    index: u32,
-    backing: Rc<RefCell<TileBacking>>, // TODO: Instead of runtime interior mutability, can we arrange to enable mutability through having a mutable ref to the allocator?
+    /// Actual storage and metadata about the tile; may be updated as needed by the
+    /// allocator to grow the texture.
+    backing: Rc<RefCell<TileBacking>>,
 }
 #[derive(Debug)]
 struct TileBacking {
+    /// Index in the linear ordering of the texture atlas.
     index: u32,
+    /// Origin of the tile in the texture.
+    ///
+    /// Technically redundant with `index`, but precomputed.
+    origin: Vector3<TextureCoordinate>,
+    /// Scale factor for tile coordinates (0..1) to texture coordinates (some fraction of that).
+    scale: f32,
     data: Option<Box<[Texel]>>,
 }
 
@@ -429,12 +440,16 @@ impl BlockGLTexture {
     where
         C: GraphicsContext<Backend = Backend>,
     {
-        let layer_count = 2048; // TODO implement reallocation
         let tile_size = 16;
+
+        // TODO implement reallocation
+        let atlas_row_length = 16;
+        let texture_edge_length = atlas_row_length * tile_size;
+        let layer_count = 32;
         Ok(Self {
             texture: Texture::new(
                 context,
-                ([tile_size, tile_size], layer_count),
+                ([texture_edge_length, texture_edge_length], layer_count),
                 0, // mipmaps
                 Sampler {
                     wrap_s: Wrap::ClampToEdge,
@@ -444,22 +459,54 @@ impl BlockGLTexture {
                 },
             )?,
             tile_size,
+            atlas_row_length,
             layer_count,
             next_free: 0,
             in_use: Vec::new(),
         })
     }
 
+    fn tiles_in_texture(&self) -> u32 {
+        self.layer_count * self.atlas_row_length * self.atlas_row_length
+    }
+
+    /// Compute location in the atlas of a tile.
+    fn index_to_location(&self, index: u32) -> (u16, u16, u16) {
+        assert!(
+            self.atlas_row_length <= u16::MAX as u32,
+            "can't happen: texture coordinate overflow"
+        );
+        // u16 intermediates prove that we can losslessly convert to TextureCoordinate.
+        // TODO: But do they have a runtime performance impact?
+        let column = (index % self.atlas_row_length) as u16;
+        let row_and_layer = index / self.atlas_row_length;
+        let row = (row_and_layer % self.atlas_row_length) as u16;
+        let layer = (row_and_layer / self.atlas_row_length) as u16;
+        (column, row, layer)
+    }
+
+    /// Compute location in the atlas of a tile, as [0, 1] texture coordinates.
+    fn index_to_origin(&self, index: u32) -> Vector3<TextureCoordinate> {
+        let scale = (self.atlas_row_length as TextureCoordinate).recip();
+        let (column, row, layer) = self.index_to_location(index);
+        Vector3::new(
+            TextureCoordinate::from(column) * scale,
+            TextureCoordinate::from(row) * scale,
+            // Array texture layers are integers, but passed to the shader as float.
+            TextureCoordinate::from(layer),
+        )
+    }
+
     fn flush(&mut self) -> Result<(), TextureError> {
-        let tile_size_in_array = self.tile_size_in_array();
+        // Set up constants for array indexing which wants usize.
+        // These should never fail unless we have less than 32-bit usize.
+        let tile_size: usize = self.tile_size.try_into().unwrap();
+        let row_length_tiles: usize = self.atlas_row_length.try_into().unwrap();
+        let row_length_texels: usize = row_length_tiles * tile_size;
+
         // Allocate contiguous storage for uploading.
-        // TODO: Should we keep this allocated? Probably.
-        let mut texels = vec![
-            (255, 0, 255, 255);
-            (self.layer_count * self.tile_size * self.tile_size)
-                .try_into()
-                .expect("texture too big for memory?!")
-        ];
+        // TODO: Should we keep this allocated? Probably
+        let mut texels = vec![(255, 0, 255, 255); Dim2Array::count(self.texture.size())];
         let mut count_written = 0;
 
         // TODO: Add dirty flags to enable deciding not to upload after all
@@ -468,10 +515,24 @@ impl BlockGLTexture {
             weak_backing.upgrade().map_or(false, |strong_backing| {
                 let backing: &TileBacking = &strong_backing.borrow();
                 if let Some(data) = backing.data.as_ref() {
-                    let tile_index: usize = backing.index as usize;
-                    texels[(tile_index * tile_size_in_array)
-                        ..((tile_index + 1) * tile_size_in_array)]
-                        .copy_from_slice(&*data);
+                    let tile_index: usize = backing.index.try_into().unwrap();
+
+                    // Non-contiguously copy texels;  must skip over all the columns that
+                    // belong to other tiles. We don't care about the distinction between
+                    // rows and layers.
+                    let atlas_memory_column: usize = tile_index % row_length_tiles;
+                    let atlas_memory_row: usize = tile_index / row_length_tiles * tile_size;
+                    let copy_stride = row_length_texels;
+                    let copy_origin =
+                        atlas_memory_row * row_length_texels + atlas_memory_column * tile_size;
+                    for tile_texel_row in 0..tile_size {
+                        texels[copy_origin + tile_texel_row * copy_stride
+                            ..copy_origin + tile_texel_row * copy_stride + tile_size]
+                            .copy_from_slice(
+                                &data[(tile_texel_row * tile_size)
+                                    ..((tile_texel_row + 1) * tile_size)],
+                            );
+                    }
                     count_written += 1;
                 }
                 true // retain in self.in_use
@@ -486,11 +547,6 @@ impl BlockGLTexture {
         )));
         Ok(())
     }
-
-    /// Number of texel array elements a single tile spans.
-    fn tile_size_in_array(&self) -> usize {
-        (self.tile_size * self.tile_size) as usize
-    }
 }
 
 impl TextureAllocator for BlockGLTexture {
@@ -501,24 +557,27 @@ impl TextureAllocator for BlockGLTexture {
     }
 
     fn allocate(&mut self) -> GLTile {
-        if self.next_free == self.layer_count {
+        if self.next_free == self.tiles_in_texture() {
             todo!("ran out of tile space, but reallocation is not implemented");
         }
+        let index = self.next_free;
+        self.next_free += 1;
         let result = GLTile {
-            index: self.next_free,
             backing: Rc::new(RefCell::new(TileBacking {
-                index: self.next_free,
+                index,
+                origin: self.index_to_origin(index),
+                scale: (self.atlas_row_length as TextureCoordinate).recip(),
                 data: None,
             })),
         };
-        self.next_free += 1;
         self.in_use.push(Rc::downgrade(&result.backing));
         result
     }
 }
 impl TextureTile for GLTile {
     fn texcoord(&self, in_tile: Vector2<TextureCoordinate>) -> Vector3<TextureCoordinate> {
-        in_tile.extend(self.index as TextureCoordinate)
+        let backing = self.backing.borrow();
+        (in_tile * backing.scale).extend(0.0) + backing.origin
     }
     fn write(&mut self, data: &[Texel]) {
         self.backing.borrow_mut().data = Some(data.into());
