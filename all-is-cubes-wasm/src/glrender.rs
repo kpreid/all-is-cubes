@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{EuclideanSpace as _, Vector2, Vector3};
+use cgmath::{EuclideanSpace as _, Matrix4, SquareMatrix as _, Vector2, Vector3};
 use luminance_derive::{Semantics, UniformInterface, Vertex};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
@@ -155,6 +155,8 @@ where
             mode: FaceCullingMode::Back,
         });
 
+        // let debug_tess = block_data.texture_allocator.debug_atlas_tess(surface);
+
         let render = surface
             .new_pipeline_gate()
             .pipeline(
@@ -183,7 +185,31 @@ where
                         render_gate.render(&render_state, |mut tess_gate| {
                             info.square_count += ct.render(&mut tess_gate)?;
                             Ok(())
-                        })
+                        })?;
+
+                        if false {
+                            // Reset matrices for screen-aligned debug rendering
+                            let pm: [[f32; 4]; 4] = Matrix4::identity().into();
+                            shader_iface.set(&u.projection_matrix0, pm[0]);
+                            shader_iface.set(&u.projection_matrix1, pm[1]);
+                            shader_iface.set(&u.projection_matrix2, pm[2]);
+                            shader_iface.set(&u.projection_matrix3, pm[3]);
+
+                            let vm: [[f32; 4]; 4] = Matrix4::identity().into();
+                            shader_iface.set(&u.view_matrix0, vm[0]);
+                            shader_iface.set(&u.view_matrix1, vm[1]);
+                            shader_iface.set(&u.view_matrix2, vm[2]);
+                            shader_iface.set(&u.view_matrix3, vm[3]);
+
+                            shader_iface.set(&u.block_texture, bound_block_texture.binding());
+
+                            // render_gate.render(&render_state, |mut tess_gate| {
+                            //     tess_gate.render(&debug_tess)?;
+                            //     Ok(())
+                            // })?;
+                        }
+
+                        Ok(())
                     })
                 },
             )
@@ -263,6 +289,38 @@ struct Vertex {
 
     #[allow(dead_code)] // read by shader
     lighting: VertexLighting,
+}
+
+impl Vertex {
+    /// Make an axis-aligned rectangle. Convenience for debug code.
+    /// Assumes `size` is positive.
+    #[allow(dead_code)]
+    fn rectangle(
+        origin: Vector3<f32>,
+        size: Vector3<f32>,
+        tex_origin: Vector3<f32>,
+        tex_size: Vector3<f32>,
+    ) -> Box<[Self; 6]> {
+        let normal: Vector3<f32> = Vector3::new(0.0, 0.0, 1.0);
+        let dx = Vector3::new(size.x, 0.0, 0.0);
+        let dy = Vector3::new(0.0, size.y, 0.0);
+        let tdx = Vector3::new(tex_size.x, 0.0, 0.0);
+        let tdy = Vector3::new(0.0, tex_size.y, 0.0);
+        let v = |p: Vector3<f32>, t: Vector3<f32>| Vertex {
+            position: VertexPosition::new(p.into()),
+            normal: VertexNormal::new(normal.into()),
+            color_or_texture: VertexColorOrTexture::new(t.extend(-1.0).into()),
+            lighting: VertexLighting::new([1.0, 1.0, 1.0]),
+        };
+        Box::new([
+            v(origin, tex_origin),
+            v(origin + dx, tex_origin + tdx),
+            v(origin + dx + dy, tex_origin + tdx + tdy),
+            v(origin + dx + dy, tex_origin + tdx + tdy),
+            v(origin + dy, tex_origin + tdy),
+            v(origin, tex_origin),
+        ])
+    }
 }
 
 /// Vertex format for `triangulate_blocks` that is as close as possible to
@@ -546,6 +604,30 @@ impl BlockGLTexture {
             self.in_use.len()
         )));
         Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn debug_atlas_tess<C>(&self, context: &mut C) -> Tess<Vertex>
+    where
+        C: GraphicsContext<Backend = Backend>,
+    {
+        let mut vertices = Vec::new();
+        //for layer in 0..self.layer_count {
+        vertices.extend(&*Vertex::rectangle(
+            // position
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 1.0, 0.0),
+            // texture
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 1.0, 0.0),
+        ));
+        //}
+        context
+            .new_tess()
+            .set_vertices(vertices)
+            .set_mode(Mode::Triangle)
+            .build()
+            .expect("failed to construct debug tess")
     }
 }
 
