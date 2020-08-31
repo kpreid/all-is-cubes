@@ -20,19 +20,24 @@ pub enum Block {
     /// A block that is a solid-colored unit cube. (It may still be be transparent or
     /// non-solid.)
     Atom(BlockAttributes, RGBA),
+    /// A block that is composed of smaller blocks, defined by the referenced `Space`.
+    ///
+    /// Renderers are expected to traverse only one recursion level to determine the
+    /// appearance of a block,
     Recur(BlockAttributes, URef<Space>),
 }
 
 impl Block {
-    /// Returns the RGBA color to use for this block when viewed as a single voxel.
+    /// Returns the RGBA color to use for this block when viewed as a single voxel,
+    /// or at full size if `space() == None`.
     pub fn color(&self) -> RGBA {
         match self {
             Block::Atom(_, c) => *c,
-            Block::Recur(_, _) => RGBA::new(0.5, 0.5, 0.5, 1.0),  // TODO: need a solution for memoizing the color
+            Block::Recur(_, _) => RGBA::new(0.5, 0.5, 0.5, 1.0), // TODO: need a solution for memoizing the color
         }
     }
 
-    /// Returns the `BlockAttributes` for this block.
+    /// Returns the `BlockAttributes` for this block, which give properties such as a name.
     pub fn attributes(&self) -> &BlockAttributes {
         match self {
             Block::Atom(a, _) => a,
@@ -88,7 +93,6 @@ impl Default for BlockAttributes {
     }
 }
 
-
 /// Generic 'empty'/'null' block. It is used by `Space` to respond to out-of-bounds requests.
 pub const AIR: Block = Block::Atom(
     BlockAttributes {
@@ -97,4 +101,5 @@ pub const AIR: Block = Block::Atom(
         solid: false,
         light_emission: RGB::ZERO,
     },
-    RGBA::TRANSPARENT);
+    RGBA::TRANSPARENT,
+);
