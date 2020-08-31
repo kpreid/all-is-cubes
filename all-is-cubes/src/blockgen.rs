@@ -5,10 +5,10 @@
 
 use rand::{Rng, SeedableRng as _};
 
-use crate::block::{AIR, Block, BlockAttributes};
+use crate::block::{Block, BlockAttributes, AIR};
 use crate::math::{GridPoint, RGBA};
-use crate::space::{Space};
-use crate::universe::{Universe, UBorrowMut};
+use crate::space::Space;
+use crate::universe::{UBorrowMut, Universe};
 
 /// Utilities for generating blocks that are compatible with each other.
 pub struct BlockGen<'a> {
@@ -30,16 +30,21 @@ impl<'a> BlockGen<'a> {
     }
 
     /// Create a `Block` referring to a `Space` and return the `Space` for modification.
-    pub fn new_recursive_block(&mut self, attributes: BlockAttributes)
-            -> (Block, UBorrowMut<Space>) {
+    pub fn new_recursive_block(
+        &mut self,
+        attributes: BlockAttributes,
+    ) -> (Block, UBorrowMut<Space>) {
         let space_ref = self.universe.insert_anonymous(self.new_block_space());
-        (Block::Recur(attributes, space_ref.clone()), space_ref.borrow_mut())
+        (
+            Block::Recur(attributes, space_ref.clone()),
+            space_ref.borrow_mut(),
+        )
     }
 
     pub fn block_from_function(
         &mut self,
         attributes: BlockAttributes,
-        f: impl Fn(&BlockGen, GridPoint, f32) -> Block
+        f: impl Fn(&BlockGen, GridPoint, f32) -> Block,
     ) -> Block {
         let (block, mut space) = self.new_recursive_block(attributes);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
@@ -54,7 +59,8 @@ pub fn scale_color(block: Block, scalar: f32) -> Block {
     match block {
         Block::Atom(attributes, color) => Block::Atom(
             attributes,
-            (color.to_rgb() * scalar).with_alpha(color.alpha())),
+            (color.to_rgb() * scalar).with_alpha(color.alpha()),
+        ),
         _ => panic!("unimplemented: scale_color({:?})", block),
     }
 }
@@ -79,7 +85,8 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
                 display_name: i.to_string().into(),
                 ..BlockAttributes::default()
             },
-            RGBA::new(luminance, luminance, luminance, 1.0)));
+            RGBA::new(luminance, luminance, luminance, 1.0),
+        ));
     }
     vec
 }
@@ -117,7 +124,8 @@ impl LandscapeBlocks {
                 } else {
                     scale_color(dirt_color.clone(), color_randomization)
                 }
-            });
+            },
+        );
 
         result
     }
@@ -132,9 +140,10 @@ impl Default for LandscapeBlocks {
                     display_name: name.to_owned().into(),
                     ..BlockAttributes::default()
                 },
-                RGBA::new(r, g, b, 1.0))
+                RGBA::new(r, g, b, 1.0),
+            )
         }
-    
+
         LandscapeBlocks {
             air: AIR.clone(),
             grass: color_and_name(0.3, 0.8, 0.3, "Grass"),
@@ -157,7 +166,8 @@ mod tests {
         let ctx = BlockGen::new(&mut universe, 10);
         assert_eq!(
             ctx.new_block_space().grid(),
-            &Grid::new((0, 0, 0), (10, 10, 10)));
+            &Grid::new((0, 0, 0), (10, 10, 10))
+        );
     }
 
     // TODO: test block_from_function

@@ -4,11 +4,11 @@
 //! Top-level game state container.
 
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
-use std::collections::hash_map::{DefaultHasher, HashMap};
 use std::cell::{Ref, RefCell, RefMut};
+use std::collections::hash_map::{DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
-use std::rc::{Rc, Weak};
 use std::ops::{Deref, DerefMut};
+use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
 use crate::camera::Camera;
@@ -20,7 +20,9 @@ pub enum Name {
     Anonym(usize),
 }
 impl From<&str> for Name {
-    fn from(value: &str) -> Self { Self::Specific(value.to_string()) }
+    fn from(value: &str) -> Self {
+        Self::Specific(value.to_string())
+    }
 }
 
 /// A collection of named objects which can refer to each other via `URef`. In the future,
@@ -62,7 +64,10 @@ impl Universe {
         (space_info, ())
     }
 
-    pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T> where Self: UniverseIndex<T> {
+    pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T>
+    where
+        Self: UniverseIndex<T>,
+    {
         // TODO: Names should not be strings, so these can be guaranteed unique.
         let name = Name::Anonym(self.next_anonym);
         self.next_anonym += 1;
@@ -101,7 +106,9 @@ impl UniverseIndex<Camera> for Universe {
 }
 
 impl Default for Universe {
-   fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Type of a strong reference to an entry in a `Universe`. Defined to make types
@@ -119,7 +126,6 @@ pub struct URef<T> {
     // TODO: We're going to want to either track reference counts or implement a garbage
     // collector for the graph of URefs. Reference counts would be an easy way to ensure
     // nothing is deleted while it is in use from a UI perspective.
-
     /// Reference to the object. Weak because we don't want to create reference cycles;
     /// the assumption is that the overall game system will keep the `Universe` alive
     /// and that `Universe` will ensure no entry goes away while referenced.
@@ -130,16 +136,15 @@ pub struct URef<T> {
 impl<T: 'static> URef<T> {
     /// Borrow the value, in the sense of std::RefCell::borrow.
     pub fn borrow(&self) -> UBorrow<T> {
-        UBorrow(OwningRef::new(
-            OwningHandle::new(self.upgrade())
-        ).map(|entry| &entry.data))
+        UBorrow(OwningRef::new(OwningHandle::new(self.upgrade())).map(|entry| &entry.data))
     }
 
     /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut.
     pub fn borrow_mut(&self) -> UBorrowMut<T> {
-        UBorrowMut(OwningRefMut::new(
-            OwningHandle::new_mut(self.upgrade())
-        ).map_mut(|entry| &mut entry.data))
+        UBorrowMut(
+            OwningRefMut::new(OwningHandle::new_mut(self.upgrade()))
+                .map_mut(|entry| &mut entry.data),
+        )
     }
 
     fn upgrade(&self) -> Rc<RefCell<UEntry<T>>> {
@@ -164,28 +169,28 @@ impl<T> Hash for URef<T> {
 
 /// A wrapper type for an immutably borrowed value from an `URef<T>`.
 pub struct UBorrow<T: 'static>(
-    OwningRef<
-        OwningHandle<
-            StrongEntryRef<T>,
-            Ref<'static, UEntry<T>>>,
-        T>);
+    OwningRef<OwningHandle<StrongEntryRef<T>, Ref<'static, UEntry<T>>>, T>,
+);
 /// A wrapper type for a mutably borrowed value from an `URef<T>`.
 pub struct UBorrowMut<T: 'static>(
-    OwningRefMut<
-        OwningHandle<
-            StrongEntryRef<T>,
-            RefMut<'static, UEntry<T>>>,
-        T>);
+    OwningRefMut<OwningHandle<StrongEntryRef<T>, RefMut<'static, UEntry<T>>>, T>,
+);
 impl<T> Deref for UBorrow<T> {
     type Target = T;
-    fn deref(&self) -> &T { self.0.deref() }
+    fn deref(&self) -> &T {
+        self.0.deref()
+    }
 }
 impl<T> Deref for UBorrowMut<T> {
     type Target = T;
-    fn deref(&self) -> &T { self.0.deref() }
+    fn deref(&self) -> &T {
+        self.0.deref()
+    }
 }
 impl<T> DerefMut for UBorrowMut<T> {
-    fn deref_mut(&mut self) -> &mut T { self.0.deref_mut() }
+    fn deref_mut(&mut self) -> &mut T {
+        self.0.deref_mut()
+    }
 }
 
 /// The data of an entry in a `Universe`.
@@ -228,7 +233,7 @@ impl<T> URootRef<T> {
     fn downgrade(&self) -> URef<T> {
         URef {
             weak_ref: Rc::downgrade(&self.strong_ref),
-            hash: self.hash
+            hash: self.hash,
         }
     }
 
@@ -320,7 +325,9 @@ impl FrameClock {
 }
 
 impl Default for FrameClock {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -351,6 +358,9 @@ mod tests {
         ref_a.borrow_mut().set((0, 0, 0), &blocks[0]);
         ref_b.borrow_mut().set((0, 0, 0), &blocks[1]);
         assert!(ref_a != ref_b, "not equal");
-        assert!(ref_a.borrow()[(0, 0, 0)] != ref_b.borrow()[(0, 0, 0)], "different values");
+        assert!(
+            ref_a.borrow()[(0, 0, 0)] != ref_b.borrow()[(0, 0, 0)],
+            "different values"
+        );
     }
 }

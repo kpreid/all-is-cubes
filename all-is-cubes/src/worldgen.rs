@@ -11,7 +11,7 @@ use crate::block::{Block, BlockAttributes};
 use crate::blockgen::LandscapeBlocks;
 use crate::math::{FreeCoordinate, GridCoordinate};
 use crate::raycast::{Face, Raycaster};
-use crate::space::{Space};
+use crate::space::Space;
 
 /// Draw the world axes as lines of blocks centered on (0, 0, 0).
 ///
@@ -33,12 +33,10 @@ pub fn axes(space: &mut Space) {
     for &face in Face::ALL_SIX {
         let axis = face.axis_number();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
-        let raycaster = Raycaster::new(
-            (0.5, 0.5, 0.5),
-            face.normal_vector::<FreeCoordinate>())
+        let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within_grid(*space.grid());
         for step in raycaster {
-            let i = step.cube[axis] * direction;  // always positive
+            let i = step.cube[axis] * direction; // always positive
             let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
             let mut light = Vector3::new(0.0, 0.0, 0.0);
             let mut display_name: Cow<'static, str> = (i % 10).to_string().into();
@@ -53,13 +51,17 @@ pub fn axes(space: &mut Space) {
                 };
             }
             light[axis] = 3.0;
-            space.set(step.cube, &Block::Atom(
-                BlockAttributes {
-                    display_name,
-                    light_emission: light.try_into().unwrap(),
-                    ..BlockAttributes::default()
-                },
-                color.try_into().expect("axes() color generation failed")));
+            space.set(
+                step.cube,
+                &Block::Atom(
+                    BlockAttributes {
+                        display_name,
+                        light_emission: light.try_into().unwrap(),
+                        ..BlockAttributes::default()
+                    },
+                    color.try_into().expect("axes() color generation failed"),
+                ),
+            );
         }
     }
 }
@@ -75,23 +77,19 @@ pub fn axes(space: &mut Space) {
 /// wavy_landscape(&mut space, &LandscapeBlocks::default(), 1.0);
 /// # // TODO: It didn't panic, but how about some assertions?
 /// ```
-pub fn wavy_landscape(
-        space: &mut Space,
-        blocks: &LandscapeBlocks,
-        max_slope: FreeCoordinate) {
+pub fn wavy_landscape(space: &mut Space, blocks: &LandscapeBlocks, max_slope: FreeCoordinate) {
     // TODO: justify this constant (came from cubes v1 code).
     let slope_scaled = max_slope / 0.904087;
     let middle_y = (space.grid().lower_bounds().y + space.grid().upper_bounds().y) / 2;
-    
+
     for x in space.grid().x_range() {
         for z in space.grid().z_range() {
             let fx = x as FreeCoordinate;
             let fz = z as FreeCoordinate;
-            let terrain_variation = slope_scaled * (
-                ((fx/8.0).sin() + (fz/8.0).sin()) * 1.0
-                + ((fx/14.0).sin() + (fz/14.0).sin()) * 3.0
-                + ((fx/2.0).sin() + (fz/2.0).sin()) * 0.6
-            );
+            let terrain_variation = slope_scaled
+                * (((fx / 8.0).sin() + (fz / 8.0).sin()) * 1.0
+                    + ((fx / 14.0).sin() + (fz / 14.0).sin()) * 3.0
+                    + ((fx / 2.0).sin() + (fz / 2.0).sin()) * 0.6);
             let surface_y = middle_y + (terrain_variation as GridCoordinate);
             for y in space.grid().y_range() {
                 let altitude = y - surface_y;

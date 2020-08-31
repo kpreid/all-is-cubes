@@ -3,7 +3,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-mod glrender;
 pub mod gameapp;
+mod glrender;
 mod js_bindings;
 mod web_glue;

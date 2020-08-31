@@ -5,8 +5,8 @@
 
 use itertools::Itertools as _;
 use rand::SeedableRng as _;
-use std::collections::{HashMap, HashSet};
 use std::collections::binary_heap::BinaryHeap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::time::Duration;
 
@@ -22,8 +22,8 @@ pub use crate::lighting::{PackedLight, SKY};
 /// with some additional restrictions.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Grid {
-  lower_bounds: GridPoint,
-  sizes: GridVector,  // checked to be always positive
+    lower_bounds: GridPoint,
+    sizes: GridVector, // checked to be always positive
 }
 
 impl Grid {
@@ -43,8 +43,12 @@ impl Grid {
             assert!(lower_bounds[i].checked_add(sizes[i]).is_some());
         }
         assert!(
-            sizes[0].checked_mul(sizes[1]).map(|xy| xy.checked_mul(sizes[2])).is_some(),
-            "Volume too large");
+            sizes[0]
+                .checked_mul(sizes[1])
+                .map(|xy| xy.checked_mul(sizes[2]))
+                .is_some(),
+            "Volume too large"
+        );
 
         Grid {
             lower_bounds,
@@ -77,7 +81,7 @@ impl Grid {
     /// assert_eq!(grid.index((0, 0, -1)), None);
     /// assert_eq!(grid.index((0, 0, 10)), None);
     /// ```
-    #[inline(always)]  // very hot code
+    #[inline(always)] // very hot code
     pub fn index(&self, point: impl Into<GridPoint>) -> Option<usize> {
         let point = point.into();
         let deoffsetted = point - self.lower_bounds;
@@ -86,10 +90,10 @@ impl Grid {
                 return None;
             }
         }
-        Some((
-            (deoffsetted[0] * self.sizes[1] + deoffsetted[1])
-                * self.sizes[2] + deoffsetted[2]
-        ) as usize)
+        Some(
+            ((deoffsetted[0] * self.sizes[1] + deoffsetted[1]) * self.sizes[2] + deoffsetted[2])
+                as usize,
+        )
     }
 
     /// Inclusive upper bounds on grid coordinates, or the most negative corner of the
@@ -230,7 +234,7 @@ impl std::fmt::Debug for Space {
         fmt.debug_struct("Space")
             .field("grid", &self.grid)
             .field("index_to_block", &self.index_to_block)
-            .finish()  // TODO: use .finish_non_exhaustive() if that stabilizes
+            .finish() // TODO: use .finish_non_exhaustive() if that stabilizes
     }
 }
 
@@ -257,7 +261,7 @@ impl Space {
             lighting_update_queue: BinaryHeap::new(),
             lighting_update_set: HashSet::new(),
             mutation_counter: 0,
-            rng: rand_xoshiro::Xoshiro256Plus::seed_from_u64(0),  // deterministic!
+            rng: rand_xoshiro::Xoshiro256Plus::seed_from_u64(0), // deterministic!
         }
     }
 
@@ -280,7 +284,8 @@ impl Space {
     /// may be renumbered after any mutation.
     #[inline(always)]
     pub(crate) fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
-        self.grid.index(position.into())
+        self.grid
+            .index(position.into())
             .map(|contents_index| self.contents[contents_index])
     }
 
@@ -296,7 +301,10 @@ impl Space {
         for x in subgrid.x_range() {
             for y in subgrid.y_range() {
                 for z in subgrid.z_range() {
-                    let cube_index = self.grid.index((x, y, z)).expect("cannot extract outside of space");
+                    let cube_index = self
+                        .grid
+                        .index((x, y, z))
+                        .expect("cannot extract outside of space");
                     let block_index = self.contents[cube_index];
                     output.push(extractor(
                         block_index,
@@ -325,8 +333,10 @@ impl Space {
     /// made”.
     #[inline(always)]
     pub fn get_lighting(&self, position: impl Into<GridPoint>) -> PackedLight {
-        self.grid.index(position.into())
-            .map(|contents_index| self.lighting[contents_index]).unwrap_or(PackedLight::INITIAL)
+        self.grid
+            .index(position.into())
+            .map(|contents_index| self.lighting[contents_index])
+            .unwrap_or(PackedLight::INITIAL)
     }
 
     /// Replace the block in this space at the given position.
@@ -380,7 +390,8 @@ impl Space {
             for &neighbor in Face::ALL_SIX {
                 self.light_needs_update(
                     position + neighbor.normal_vector(),
-                    PackedLightScalar::MAX);
+                    PackedLightScalar::MAX,
+                );
             }
         } else {
             self.light_needs_update(position, PackedLightScalar::MAX);
@@ -431,17 +442,22 @@ impl Space {
             for new_index in 0..high_mark {
                 if self.index_to_count[new_index] == 0 {
                     self.index_to_block[new_index] = block.clone();
-                    self.block_to_index.insert(block.clone(), new_index as BlockIndex);
+                    self.block_to_index
+                        .insert(block.clone(), new_index as BlockIndex);
                     return new_index as BlockIndex;
                 }
             }
             if high_mark >= BlockIndex::MAX as usize {
-                todo!("more than {} block types is not yet supported", BlockIndex::MAX as usize + 1);
+                todo!(
+                    "more than {} block types is not yet supported",
+                    BlockIndex::MAX as usize + 1
+                );
             }
             // Grow the vector.
             self.index_to_count.push(0);
             self.index_to_block.push(block.clone());
-            self.block_to_index.insert(block.clone(), high_mark as BlockIndex);
+            self.block_to_index
+                .insert(block.clone(), high_mark as BlockIndex);
             high_mark as BlockIndex
         }
     }
@@ -477,25 +493,27 @@ pub struct SpaceStepInfo {
 }
 impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     fn add_assign(&mut self, other: Self) {
-         self.light_update_count += other.light_update_count;
-         self.light_queue_count += other.light_queue_count;
-         self.max_light_update_difference =
-             self.max_light_update_difference.max(other.max_light_update_difference);
-     }
+        self.light_update_count += other.light_update_count;
+        self.light_queue_count += other.light_queue_count;
+        self.max_light_update_difference = self
+            .max_light_update_difference
+            .max(other.max_light_update_difference);
+    }
 }
-
 
 /// A 3-dimensional array with arbitrary element type instead of `Space`'s fixed types.
 ///
 /// TODO: Should we rebuild Space on top of this?
-#[derive(Clone, Debug)]  // TODO: nondefault Debug
+#[derive(Clone, Debug)] // TODO: nondefault Debug
 pub struct GridArray<V> {
     grid: Grid,
     contents: Box<[V]>,
 }
 
 impl<V> GridArray<V> {
-    pub fn grid(&self) -> &Grid { &self.grid }
+    pub fn grid(&self) -> &Grid {
+        &self.grid
+    }
 
     pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
         self.grid.index(position).map(|index| &self.contents[index])
@@ -510,7 +528,10 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
         if let Some(index) = self.grid.index(position) {
             &self.contents[index]
         } else {
-            panic!("GridArray position out of range {:?} in {:?}", position, self.grid)
+            panic!(
+                "GridArray position out of range {:?} in {:?}",
+                position, self.grid
+            )
         }
     }
 }
@@ -518,8 +539,8 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::GridPoint;
     use crate::blockgen::make_some_blocks;
+    use crate::math::GridPoint;
 
     #[test]
     fn it_works() {
@@ -539,10 +560,22 @@ mod tests {
         // TODO: This test depends on block allocation order. distinct_blocks() ought to be stable or explicitly return a HashSet or something.
         assert_eq!(space.distinct_blocks(), vec![AIR.clone()], "step 1");
         space.set(pt1, &blocks[0]);
-        assert_eq!(space.distinct_blocks(), vec![AIR.clone(), blocks[0].clone()], "step 2");
+        assert_eq!(
+            space.distinct_blocks(),
+            vec![AIR.clone(), blocks[0].clone()],
+            "step 2"
+        );
         space.set(pt2, &blocks[1]);
-        assert_eq!(space.distinct_blocks(), vec![blocks[1].clone(), blocks[0].clone()], "step 3");
+        assert_eq!(
+            space.distinct_blocks(),
+            vec![blocks[1].clone(), blocks[0].clone()],
+            "step 3"
+        );
         space.set(pt1, &blocks[2]);
-        assert_eq!(space.distinct_blocks(), vec![blocks[1].clone(), blocks[2].clone()], "step 4");
+        assert_eq!(
+            space.distinct_blocks(),
+            vec![blocks[1].clone(), blocks[2].clone()],
+            "step 4"
+        );
     }
 }

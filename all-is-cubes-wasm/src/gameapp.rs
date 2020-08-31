@@ -2,37 +2,43 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 use cgmath::{Vector2, Zero as _};
+use js_sys::Error;
+use luminance_web_sys::WebSysWebGL2Surface;
+use luminance_windowing::WindowOpt;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
-use js_sys::{Error};
-use luminance_web_sys::{WebSysWebGL2Surface};
-use luminance_windowing::WindowOpt;
-use wasm_bindgen::JsCast;  // dyn_into()
 use wasm_bindgen::prelude::*;
-use web_sys::{AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, Text, console};
+use wasm_bindgen::JsCast; // dyn_into()
+use web_sys::{
+    console, AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, Text,
+};
 
-use all_is_cubes::camera::{Camera, cursor_raycast};
+use all_is_cubes::camera::{cursor_raycast, Camera};
 use all_is_cubes::demo_content::new_universe_with_stuff;
-use all_is_cubes::math::{FreeCoordinate};
+use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::space::{Space, SpaceStepInfo};
-use all_is_cubes::universe::{FrameClock, Universe, URef};
+use all_is_cubes::universe::{FrameClock, URef, Universe};
 
 use crate::glrender::GLRenderer;
-use crate::js_bindings::{GuiHelpers};
+use crate::js_bindings::GuiHelpers;
 use crate::web_glue::{add_event_listener, get_mandatory_element};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
 pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
-    let document = web_sys::window().expect("missing `window`")
-        .document().expect("missing `document`");
+    let document = web_sys::window()
+        .expect("missing `window`")
+        .document()
+        .expect("missing `document`");
 
     // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them.
     let static_dom = StaticDom::new(&document)?;
 
-    static_dom.scene_info_text_node.append_data("\nRusting...")?;
+    static_dom
+        .scene_info_text_node
+        .append_data("\nRusting...")?;
 
     let universe = new_universe_with_stuff();
 
@@ -79,7 +85,12 @@ struct WebGameRoot {
 }
 
 impl WebGameRoot {
-    pub fn new(gui_helpers: GuiHelpers, static_dom: StaticDom, universe: Universe, renderer: GLRenderer<WebSysWebGL2Surface>) -> Rc<RefCell<WebGameRoot>> {
+    pub fn new(
+        gui_helpers: GuiHelpers,
+        static_dom: StaticDom,
+        universe: Universe,
+        renderer: GLRenderer<WebSysWebGL2Surface>,
+    ) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {
             self_ref: Weak::new(),
@@ -94,7 +105,7 @@ impl WebGameRoot {
             step_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
             step_callback_scheduled: false,
             frame_clock: FrameClock::new(),
-            last_raf_timestamp: 0.0,  // TODO better initial value or special case
+            last_raf_timestamp: 0.0, // TODO better initial value or special case
             last_step_info: SpaceStepInfo::default(),
             cursor_ndc_position: Vector2::zero(),
         }));
@@ -106,12 +117,16 @@ impl WebGameRoot {
 
             let self_cell_ref_for_closure = self_cell_ref.clone();
             self_mut.raf_callback = Closure::wrap(Box::new(move |dom_timestamp: f64| {
-                (*self_cell_ref_for_closure).borrow_mut().raf_callback_impl(dom_timestamp);
+                (*self_cell_ref_for_closure)
+                    .borrow_mut()
+                    .raf_callback_impl(dom_timestamp);
             }));
 
             let self_cell_ref_for_closure = self_cell_ref.clone();
             self_mut.step_callback = Closure::wrap(Box::new(move || {
-                (*self_cell_ref_for_closure).borrow_mut().step_callback_impl();
+                (*self_cell_ref_for_closure)
+                    .borrow_mut()
+                    .step_callback_impl();
             }));
         }
         // Other initialization.
@@ -121,6 +136,7 @@ impl WebGameRoot {
     }
 
     /// This method is broken out of new() so we can just use `self`. Well, some of the time.
+    #[rustfmt::skip]
     fn init_dom(&self) {
         // TODO: Replace this with the JS GuiHelpers handling the event processing,
         // because this is messy.
@@ -168,7 +184,9 @@ impl WebGameRoot {
 
     pub fn start_loop(&self) {
         // This strategy from https://rustwasm.github.io/docs/wasm-bindgen/examples/request-animation-frame.html
-        web_sys::window().unwrap().request_animation_frame(self.raf_callback.as_ref().unchecked_ref())
+        web_sys::window()
+            .unwrap()
+            .request_animation_frame(self.raf_callback.as_ref().unchecked_ref())
             .unwrap();
     }
 
@@ -186,7 +204,8 @@ impl WebGameRoot {
 
             // Compute info text.
             // TODO: tidy up cursor result formatting, make it reusable
-            let cursor_result = cursor_raycast(self.renderer.cursor_raycaster(), &*self.space_ref.borrow());
+            let cursor_result =
+                cursor_raycast(self.renderer.cursor_raycaster(), &*self.space_ref.borrow());
             let cursor_result_text = match cursor_result {
                 Some(cursor) => Cow::Owned(format!("{}", cursor)),
                 None => Cow::Borrowed("No block"),
@@ -196,15 +215,19 @@ impl WebGameRoot {
                 &*self.camera_ref.borrow(),
                 self.last_step_info,
                 render_info,
-                cursor_result_text));
+                cursor_result_text
+            ));
         }
 
         if self.frame_clock.should_step() && !self.step_callback_scheduled {
             self.step_callback_scheduled = true;
-            web_sys::window().unwrap().set_timeout_with_callback_and_timeout_and_arguments_0(
-                self.step_callback.as_ref().unchecked_ref(),
-                0,
-            ).unwrap();
+            web_sys::window()
+                .unwrap()
+                .set_timeout_with_callback_and_timeout_and_arguments_0(
+                    self.step_callback.as_ref().unchecked_ref(),
+                    0,
+                )
+                .unwrap();
         }
 
         // Schedule next requestAnimationFrame
@@ -213,7 +236,8 @@ impl WebGameRoot {
 
     fn step_callback_impl(&mut self) {
         self.step_callback_scheduled = false;
-        for _ in 0..2 { // allow finite amount of catch-up or varying timestep
+        // Allow 2 steps of catch-up. TODO: This policy should probably live in FrameClock instead.
+        for _ in 0..2 {
             if self.frame_clock.should_step() {
                 self.frame_clock.did_step();
                 // TODO: Do this in a separate task, not requestAnimationFrame
@@ -233,7 +257,11 @@ impl StaticDom {
         let scene_info_element: HtmlElement = get_mandatory_element(document, "scene-info-text")?;
         // Ensure element has exactly one text node child.
         scene_info_element.set_text_content(scene_info_element.text_content().as_deref());
-        let scene_info_text_node = scene_info_element.first_child().unwrap().dyn_into().unwrap();
+        let scene_info_text_node = scene_info_element
+            .first_child()
+            .unwrap()
+            .dyn_into()
+            .unwrap();
 
         Ok(Self {
             scene_info_text_node,

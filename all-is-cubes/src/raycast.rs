@@ -9,7 +9,7 @@ use num_traits::identities::Zero;
 use crate::math::{FreeCoordinate, GridCoordinate, Modulo};
 use crate::space::Grid;
 
-pub use crate::math::Face;  // necessary for any use of raycast, so let it be used
+pub use crate::math::Face; // necessary for any use of raycast, so let it be used
 
 /// Iterator over grid positions that intersect a given ray.
 ///
@@ -34,7 +34,6 @@ pub struct Raycaster {
     // if we took a step sufficient to cross a cube boundary along that axis
     // (i.e. change the integer part of the coordinate) in the components of
     // t_max.
-
     /// Have we not yet produced the origin cube itself?
     emit_current: bool,
     /// Cube we're in; always the next cube to return from the iterator.
@@ -190,7 +189,7 @@ impl Iterator for Raycaster {
             } else {
                 if !self.valid_for_stepping() {
                     // Can't make progress, and we already have done emit_current duty, so stop.
-                    return None
+                    return None;
                 }
                 self.step();
             }
@@ -261,24 +260,29 @@ impl RaycastStep {
 /// Find the smallest positive t such that s + t * ds is an integer.
 // TODO: Tests!
 fn scale_to_integer_step(s: FreeCoordinate, ds: FreeCoordinate) -> FreeCoordinate {
-  if ds < 0.0 {
-    scale_to_integer_step(-s, -ds)
-  } else {
-    let s = s.modulo(1.0);
-    // problem is now s + t * ds = 1
-    (1.0 - s) / ds
-  }
+    if ds < 0.0 {
+        scale_to_integer_step(-s, -ds)
+    } else {
+        let s = s.modulo(1.0);
+        // problem is now s + t * ds = 1
+        (1.0 - s) / ds
+    }
 }
 
-fn scale_to_integer_step_componentwise(s: Point3<FreeCoordinate>, ds: Vector3<FreeCoordinate>) -> Vector3<FreeCoordinate> {
+fn scale_to_integer_step_componentwise(
+    s: Point3<FreeCoordinate>,
+    ds: Vector3<FreeCoordinate>,
+) -> Vector3<FreeCoordinate> {
     // Note: There is a 'zip' method which does this but hasn't made it to a released version of cgmath yet.
     Vector3::new(
         scale_to_integer_step(s.x, ds.x),
         scale_to_integer_step(s.y, ds.y),
-        scale_to_integer_step(s.z, ds.z))
+        scale_to_integer_step(s.z, ds.z),
+    )
 }
 
 #[cfg(test)]
+#[rustfmt::skip]
 mod tests {
     use super::*;
     use cgmath::Vector3;
@@ -286,18 +290,22 @@ mod tests {
 
     // TODO: Have at least one doc test
 
-
-    fn assert_steps_option<T: IntoIterator<Item = Option<RaycastStep>>>(r: &mut Raycaster, steps: T) {
+    fn assert_steps_option<T: IntoIterator<Item = Option<RaycastStep>>>(
+        r: &mut Raycaster,
+        steps: T,
+    ) {
         for (i, expected_step) in steps.into_iter().enumerate() {
-            let r_backup = r.clone();  // save for diagnostics
+            let r_backup = r.clone(); // save for diagnostics
             let actual_step = r.next();
             if actual_step != expected_step {
-                panic!("step {}\n\
+                panic!(
+                    "step {}\n\
                     expected: {:?}\n\
                     actual:   {:?}\n\
                     before: {:?}\n\
                     after:  {:?}\n",
-                    i, expected_step, actual_step, r_backup, r);
+                    i, expected_step, actual_step, r_backup, r
+                );
             }
         }
     }
@@ -430,15 +438,18 @@ mod tests {
         // Ray oriented diagonally on the -X side of a grid that is short on the X axis.
         let mut r = Raycaster::new(Point3::new(0.0, -0.25, -0.5), Vector3::new(1.0, 1.0, 1.0))
             .within_grid(Grid::new(Point3::new(2, -10, -10), [2, 20, 20]));
-        assert_steps_option(&mut r, vec![
-            Some(step(2, 1, 1, Face::NX)),
-            Some(step(2, 2, 1, Face::NY)),
-            Some(step(2, 2, 2, Face::NZ)),
-            Some(step(3, 2, 2, Face::NX)),
-            Some(step(3, 3, 2, Face::NY)),
-            Some(step(3, 3, 3, Face::NZ)),
-            None,
-        ]);
+        assert_steps_option(
+            &mut r,
+            vec![
+                Some(step(2, 1, 1, Face::NX)),
+                Some(step(2, 2, 1, Face::NY)),
+                Some(step(2, 2, 2, Face::NZ)),
+                Some(step(3, 2, 2, Face::NX)),
+                Some(step(3, 3, 2, Face::NY)),
+                Some(step(3, 3, 3, Face::NZ)),
+                None,
+            ],
+        );
 
         // Verify that extra next()s don't modify the state and potentially cause overflow if continued.
         let mut r2 = r.clone();
@@ -452,7 +463,8 @@ mod tests {
     fn within_grid_twice() {
         let grid = Grid::new(Point3::new(2, -10, -10), [2, 20, 20]);
         Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
-            .within_grid(grid).within_grid(grid);
+            .within_grid(grid)
+            .within_grid(grid);
     }
 
     /// An example of an axis-aligned ray that wasn't working.
@@ -476,9 +488,11 @@ mod tests {
         let grid = Grid::new(Point3::new(0, 0, 0), [10, 10, 10]);
         assert_steps_option(
             &mut Raycaster::new(
-                    Point3::new(18.166666666666668, 4.666666666666666, -3.0),
-                    Vector3::new(0.0, 0.0, 16.0))
-                .within_grid(grid),
-            vec![None]);
+                Point3::new(18.166666666666668, 4.666666666666666, -3.0),
+                Vector3::new(0.0, 0.0, 16.0),
+            )
+            .within_grid(grid),
+            vec![None],
+        );
     }
 }

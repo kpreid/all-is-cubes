@@ -4,8 +4,8 @@
 use cgmath::{Basis2, Deg, InnerSpace as _, Point3, Rotation, Rotation2, Vector2, Vector3};
 use std::time::Duration;
 
-use crate::math::{FreeCoordinate};
-use crate::util::{ConciseDebug as _};
+use crate::math::FreeCoordinate;
+use crate::util::ConciseDebug as _;
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
@@ -15,7 +15,6 @@ const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 #[non_exhaustive]
 pub struct Body {
     // TODO: pub space: Option<URef<Space>>   --- or maybe backwards?
-
     pub position: Point3<FreeCoordinate>,
     pub velocity: Vector3<FreeCoordinate>,
 

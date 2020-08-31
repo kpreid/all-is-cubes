@@ -5,19 +5,20 @@
 
 use cgmath::{EuclideanSpace as _, Point3, Vector2, Vector3};
 use lazy_static::lazy_static;
-use rayon::iter::{ParallelIterator, IntoParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::convert::TryInto;
 use std::io;
-use termion::{color};
+use termion::color;
 use termion::event::{Event, Key};
 use typed_arena::Arena;
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
 use all_is_cubes::raycast::{Face, Raycaster};
-use all_is_cubes::space::{Grid, GridArray, PackedLight, SKY, Space};
+use all_is_cubes::space::{Grid, GridArray, PackedLight, Space, SKY};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
+#[rustfmt::skip]
 pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
     camera.auto_rotate = false;  // stop on any keypress
     match event {
@@ -61,39 +62,49 @@ pub fn draw_space<O: io::Write>(
     // Copy data out of Space (whose access is not thread safe due to contained URefs).
     let grid = *space.grid();
     let recur_arena = Arena::with_capacity(space.distinct_blocks_unfiltered().len());
-    let block_data: Vec<TracingBlock> = space.distinct_blocks_unfiltered().iter()
+    let block_data: Vec<TracingBlock> = space
+        .distinct_blocks_unfiltered()
+        .iter()
         .map(|block| {
-            let character = block.attributes().display_name.chars().next().unwrap_or(' ');
+            let character = block
+                .attributes()
+                .display_name
+                .chars()
+                .next()
+                .unwrap_or(' ');
             if let Some(space_ref) = block.space() {
                 let block_space = space_ref.borrow();
-                TracingBlock::Recur(recur_arena.alloc(
-                    block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
+                TracingBlock::Recur(recur_arena.alloc(block_space.extract(
+                    *block_space.grid(),
+                    |_index, sub_block, _lighting| {
                         // Do not recurse indefinitely, just one level, because that's the
                         // standard visualization. TODO: But maybe it'd be more fun if...?
                         (character, sub_block.color())
-                    })
-                ))
+                    },
+                )))
             } else {
                 TracingBlock::Atom(character, block.color())
             }
         })
         .collect();
-    let space_data: GridArray<TracingCubeData> = space.extract(grid, |index, _block, lighting| {
-        TracingCubeData {
+    let space_data: GridArray<TracingCubeData> =
+        space.extract(grid, |index, _block, lighting| TracingCubeData {
             block: block_data[index as usize],
             lighting,
-        }
-    });
+        });
 
     // Construct iterator over pixel positions.
     let viewport = projection.viewport();
-    let pixel_iterator = (0..viewport.y).into_par_iter().map(move |ych| {
-        let y = -projection.normalize_pixel_y(ych);
-        (0..viewport.x).into_par_iter().map(move |xch| {
-            let x = projection_copy_for_parallel.normalize_pixel_x(xch);
-            (xch, ych, x, y)
+    let pixel_iterator = (0..viewport.y)
+        .into_par_iter()
+        .map(move |ych| {
+            let y = -projection.normalize_pixel_y(ych);
+            (0..viewport.x).into_par_iter().map(move |xch| {
+                let x = projection_copy_for_parallel.normalize_pixel_x(xch);
+                (xch, ych, x, y)
+            })
         })
-    }).flatten();
+        .flatten();
 
     let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
         let (origin, direction) = projection_copy_for_parallel.project_ndc_into_world(x, y);
@@ -110,11 +121,13 @@ pub fn draw_space<O: io::Write>(
         number_of_cubes_examined += count;
         write!(out, "{}", text)?;
     }
-    write!(out,
+    write!(
+        out,
         "{}{}Cubes traced through: {}\r\n",
         *END_OF_LINE,
         termion::clear::AfterCursor,
-        number_of_cubes_examined)?;
+        number_of_cubes_examined
+    )?;
     out.flush()?;
 
     Ok(())
@@ -142,7 +155,8 @@ fn character_from_ray(
                 }
 
                 // Find lighting.
-                let lighting: RGB = space_data.get(hit.previous_cube())
+                let lighting: RGB = space_data
+                    .get(hit.previous_cube())
                     .map(|b| b.lighting.into())
                     .unwrap_or(SKY);
 
@@ -151,7 +165,8 @@ fn character_from_ray(
             TracingBlock::Recur(array) => {
                 // Find lighting.
                 // TODO: duplicated code
-                let lighting: RGB = space_data.get(hit.previous_cube())
+                let lighting: RGB = space_data
+                    .get(hit.previous_cube())
                     .map(|b| b.lighting.into())
                     .unwrap_or(SKY);
 
@@ -159,9 +174,13 @@ fn character_from_ray(
                 // TODO: Raycaster does not efficiently implement advancing from outside a
                 // grid. Fix that to get way more performance.
                 let adjusted_origin = Point3::from_vec(
-                    (origin - hit.cube.cast::<FreeCoordinate>().unwrap()) * (array.grid().size().x as FreeCoordinate));
+                    (origin - hit.cube.cast::<FreeCoordinate>().unwrap())
+                        * (array.grid().size().x as FreeCoordinate),
+                );
 
-                for subcube_hit in Raycaster::new(adjusted_origin, direction).within_grid(*array.grid()) {
+                for subcube_hit in
+                    Raycaster::new(adjusted_origin, direction).within_grid(*array.grid())
+                {
                     if s.count_step_should_stop() {
                         break;
                     }
@@ -216,13 +235,11 @@ impl TracingState {
         }
     }
 
+    #[rustfmt::skip]
     fn finish(mut self) -> TraceResult {
         if self.number_passed == 0 {
             // Didn't intersect the world at all. Draw these as plain background.
-            return (
-                format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)),
-                0,
-            );
+            return (format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)), 0);
         }
 
         // Fill up color buffer with "sky" color. Also use it to visualize the world boundary.
@@ -239,7 +256,8 @@ impl TracingState {
         let converted_color = color::AnsiValue::rgb(
             scale(self.color_accumulator.red()),
             scale(self.color_accumulator.green()),
-            scale(self.color_accumulator.blue()));
+            scale(self.color_accumulator.blue()),
+        );
         let colored_text = if let Some(text) = self.hit_text {
             format!("{}{}{}",
                 color::Bg(converted_color),
@@ -264,15 +282,15 @@ impl TracingState {
         }
         let alpha_for_add = surface_alpha * self.ray_alpha;
         self.ray_alpha *= 1.0 - surface_alpha;
-        self.color_accumulator += fake_lighting_adjustment(surface.to_rgb() * lighting, face)
-             * alpha_for_add;
+        self.color_accumulator +=
+            fake_lighting_adjustment(surface.to_rgb() * lighting, face) * alpha_for_add;
 
-         // Use text of the first non-completely-transparent block.
-         if self.hit_text.is_none() {
-             // TODO: For more Unicode correctness, index by grapheme cluster...
-             // ...and do something clever about double-width characters.
-             self.hit_text = Some(character.to_string());
-         }
+        // Use text of the first non-completely-transparent block.
+        if self.hit_text.is_none() {
+            // TODO: For more Unicode correctness, index by grapheme cluster...
+            // ...and do something clever about double-width characters.
+            self.hit_text = Some(character.to_string());
+        }
     }
 }
 impl Default for TracingState {
@@ -287,7 +305,7 @@ impl Default for TracingState {
 }
 
 fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
-    let one_step = 1.0/5.0;
+    let one_step = 1.0 / 5.0;
     let v = Vector3::new(1.0, 1.0, 1.0);
     let modifier = match face {
         Face::PY => v * one_step * 2.0,
@@ -299,7 +317,6 @@ fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
 }
 
 lazy_static! {
-    static ref END_OF_LINE: String = format!("{}{}\r\n",
-        color::Bg(color::Reset),
-        color::Fg(color::Reset));
+    static ref END_OF_LINE: String =
+        format!("{}{}\r\n", color::Bg(color::Reset), color::Fg(color::Reset));
 }

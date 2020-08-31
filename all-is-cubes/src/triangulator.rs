@@ -15,11 +15,11 @@
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
 use std::convert::TryFrom;
 
-use crate::block::{Block};
-use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
+use crate::block::Block;
 use crate::lighting::PackedLight;
-use crate::space::{Space};
-use crate::util::{ConciseDebug as _};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
+use crate::space::Space;
+use crate::util::ConciseDebug as _;
 
 pub type TextureCoordinate = f32;
 
@@ -29,7 +29,7 @@ pub type TextureCoordinate = f32;
 #[non_exhaustive]
 pub struct BlockVertex {
     pub position: Point3<FreeCoordinate>,
-    pub normal: Vector3<FreeCoordinate>,  // TODO: Use a smaller number type? Storage vs convenience?
+    pub normal: Vector3<FreeCoordinate>, // TODO: Use a smaller number type? Storage vs convenience?
     // TODO: Eventually color will be fully replaced with texture coordinates.
     pub coloring: Coloring,
 }
@@ -42,10 +42,13 @@ pub enum Coloring {
 impl std::fmt::Debug for BlockVertex {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Print compactly on single line even if the formatter is in prettyprint mode.
-        write!(fmt, "{{ p: {:?} n: {:?} c: {:?} }}",
+        write!(
+            fmt,
+            "{{ p: {:?} n: {:?} c: {:?} }}",
             self.position.as_concise_debug(),
-            self.normal.cast::<i8>().unwrap().as_concise_debug(),  // no decimals!
-            self.coloring)
+            self.normal.cast::<i8>().unwrap().as_concise_debug(), // no decimals!
+            self.coloring
+        )
     }
 }
 impl std::fmt::Debug for Coloring {
@@ -138,11 +141,7 @@ const QUAD_VERTICES: &[Point3<FreeCoordinate>; 6] = &[
     Point3::new(1.0, 1.0, 0.0),
 ];
 
-fn push_quad_solid<V: From<BlockVertex>>(
-    vertices: &mut Vec<V>,
-    face: Face,
-    color: RGBA,
-) {
+fn push_quad_solid<V: From<BlockVertex>>(vertices: &mut Vec<V>, face: Face, color: RGBA) {
     let transform = face.matrix();
     for &p in QUAD_VERTICES {
         vertices.push(V::from(BlockVertex {
@@ -164,8 +163,10 @@ fn push_quad_textured<V: From<BlockVertex>>(
         vertices.push(V::from(BlockVertex {
             position: transform.transform_point(p + Vector3::new(0.0, 0.0, depth)),
             normal: face.normal_vector(),
-            coloring: Coloring::Texture(texture_tile.texcoord(
-                Vector2::new(p.x as TextureCoordinate, p.y as TextureCoordinate))),
+            coloring: Coloring::Texture(texture_tile.texcoord(Vector2::new(
+                p.x as TextureCoordinate,
+                p.y as TextureCoordinate,
+            ))),
         }));
     }
 }
@@ -211,7 +212,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // updating WITHIN independently of other faces.
             let mut output_by_face = FaceMap::generate(|face| FaceRenderData {
                 vertices: Vec::new(),
-                // Start assuming opacity; if we find any transparent pixels we'll set 
+                // Start assuming opacity; if we find any transparent pixels we'll set
                 // this to false. WITHIN is always "transparent" because the algorithm
                 // that consumes this structure will say "draw this face if its adjacent
                 // cube's opposing face is not opaque", and WITHIN means the adjacent
@@ -233,7 +234,8 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 for layer in 0..tile_size {
                     // TODO: JS version would detect fully-opaque blocks (a derived property of Block)
                     // and only scan the first and last faces
-                    let mut tile_texels: Vec<(u8, u8, u8, u8)> = Vec::with_capacity((tile_size * tile_size) as usize);
+                    let mut tile_texels: Vec<(u8, u8, u8, u8)> =
+                        Vec::with_capacity((tile_size * tile_size) as usize);
                     let mut layer_is_visible_somewhere = false;
                     for t in 0..tile_size {
                         for s in 0..tile_size {
@@ -241,19 +243,20 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             // While we're at it, also implement the optimization that positive and negative
                             // faces can share a texture sometimes (which requires dropping the property
                             // Face::matrix provides where all transforms contain no mirroring).
-                            let cube: Point3<GridCoordinate> = (
-                                transform.transform_point(
-                                    (Point3::new(
-                                        s as FreeCoordinate,
-                                        t as FreeCoordinate,
-                                        layer as FreeCoordinate
-                                    ) + Vector3::new(0.5, 0.5, 0.5))
-                                    / tile_size as FreeCoordinate
-                                ) * tile_size as FreeCoordinate - Vector3::new(0.5, 0.5, 0.5)
-                            ).cast::<GridCoordinate>().unwrap();
+                            let cube: Point3<GridCoordinate> = (transform.transform_point(
+                                (Point3::new(
+                                    s as FreeCoordinate,
+                                    t as FreeCoordinate,
+                                    layer as FreeCoordinate,
+                                ) + Vector3::new(0.5, 0.5, 0.5))
+                                    / tile_size as FreeCoordinate,
+                            ) * tile_size as FreeCoordinate
+                                - Vector3::new(0.5, 0.5, 0.5))
+                            .cast::<GridCoordinate>()
+                            .unwrap();
 
                             let obscuring_cube = cube + face.normal_vector();
-                            let obscured = space[obscuring_cube].color().alpha() >= 1.0;  // TODO give a standard definition of this
+                            let obscured = space[obscuring_cube].color().alpha() >= 1.0; // TODO give a standard definition of this
                             if !obscured {
                                 layer_is_visible_somewhere = true;
                             }
@@ -280,18 +283,21 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         texture_tile.write(tile_texels.as_ref());
                         push_quad_textured(
                             // Only the surface faces go anywhere but WITHIN.
-                            &mut output_by_face[
-                                if layer == 0 { face } else { Face::WITHIN }
-                            ].vertices,
-                            face, 
+                            &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }]
+                                .vertices,
+                            face,
                             layer as FreeCoordinate / tile_size as FreeCoordinate,
-                            &texture_tile);
+                            &texture_tile,
+                        );
                         textures_used.push(texture_tile);
                     }
                 }
             }
 
-            BlockRenderData { faces: output_by_face, textures_used }
+            BlockRenderData {
+                faces: output_by_face,
+                textures_used,
+            }
         }
     }
 }
@@ -303,7 +309,9 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
 ) -> BlocksRenderData<V, A> {
-    space.distinct_blocks_unfiltered().iter()
+    space
+        .distinct_blocks_unfiltered()
+        .iter()
         .map(|b| triangulate_block(b, texture_allocator))
         .collect()
 }
@@ -338,7 +346,9 @@ pub fn triangulate_space<BV, GV, A>(
     let lookup = |cube| {
         match space.get_block_index(cube) {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one.
-            Some(index) => &blocks_render_data.get(index as usize).unwrap_or(&empty_render),
+            Some(index) => &blocks_render_data
+                .get(index as usize)
+                .unwrap_or(&empty_render),
             None => &empty_render,
         }
     };
@@ -361,8 +371,7 @@ pub fn triangulate_space<BV, GV, A>(
 
             // Copy vertices, offset to the block position and with lighting
             for vertex in precomputed.faces[face].vertices.iter() {
-                output_vertices[face].push(
-                    vertex.instantiate(low_corner.to_vec(), lighting));
+                output_vertices[face].push(vertex.instantiate(low_corner.to_vec(), lighting));
             }
         }
     }
@@ -400,7 +409,9 @@ pub trait TextureTile {
 pub struct NullTextureAllocator;
 impl TextureAllocator for NullTextureAllocator {
     type Tile = ();
-    fn size(&self) -> GridCoordinate { 14 }  // an arbitrary size
+    fn size(&self) -> GridCoordinate {
+        14 // an arbitrary size
+    }
     fn allocate(&mut self) {}
 }
 impl TextureTile for () {
@@ -413,17 +424,18 @@ impl TextureTile for () {
         assert_eq!(
             isize::try_from(data.len()).expect("tile data way too big"),
             NullTextureAllocator.size() * NullTextureAllocator.size(),
-            "tile data did not match tile size");
+            "tile data did not match tile size"
+        );
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cgmath::{MetricSpace as _};
     use crate::block::BlockAttributes;
     use crate::blockgen::make_some_blocks;
-    use crate::universe::{Universe};
+    use crate::universe::Universe;
+    use cgmath::MetricSpace as _;
 
     #[test]
     fn excludes_interior_faces() {
@@ -437,20 +449,28 @@ mod tests {
         triangulate_space::<BlockVertex, BlockVertex, NullTextureAllocator>(
             &space,
             &triangulate_blocks(&space, &mut NullTextureAllocator),
-            &mut rendering);
-        let rendering_flattened: Vec<BlockVertex> = rendering.values().iter().flat_map(|r| (*r).clone()).collect();
+            &mut rendering,
+        );
+        let rendering_flattened: Vec<BlockVertex> = rendering
+            .values()
+            .iter()
+            .flat_map(|r| (*r).clone())
+            .collect();
         assert_eq!(
             Vec::<&BlockVertex>::new(),
-            rendering_flattened.iter()
-                .filter(|vertex|
-                        vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
+            rendering_flattened
+                .iter()
+                .filter(|vertex| vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
                 .collect::<Vec<&BlockVertex>>(),
-            "found an interior point");
-        assert_eq!(rendering_flattened.len(),
+            "found an interior point"
+        );
+        assert_eq!(
+            rendering_flattened.len(),
             6 /* vertices per face */
             * 4 /* block faces per exterior side of space */
-            * 6 /* sides of space */,
-            "wrong number of faces");
+            * 6, /* sides of space */
+            "wrong number of faces"
+        );
     }
 
     #[test]
@@ -459,10 +479,10 @@ mod tests {
         let mut space = Space::empty_positive(2, 1, 1);
         let blocks_render_data: BlocksRenderData<BlockVertex, _> =
             triangulate_blocks(&space, &mut NullTextureAllocator);
-        assert_eq!(blocks_render_data.len(), 1);  // check our assumption
+        assert_eq!(blocks_render_data.len(), 1); // check our assumption
 
         // This should not panic; visual glitches are preferable to failure.
-        space.set((0, 0, 0), &block);  // render data does not know about this
+        space.set((0, 0, 0), &block); // render data does not know about this
         triangulate_space(&space, &blocks_render_data, &mut new_space_buffer());
     }
 
@@ -471,7 +491,10 @@ mod tests {
         let mut u = Universe::new();
         let mut inner_block_space = Space::empty_positive(1, 1, 1);
         inner_block_space.set((0, 0, 0), &make_some_blocks(1)[0]);
-        let inner_block = Block::Recur(BlockAttributes::default(), u.insert_anonymous(inner_block_space));
+        let inner_block = Block::Recur(
+            BlockAttributes::default(),
+            u.insert_anonymous(inner_block_space),
+        );
         let mut outer_space = Space::empty_positive(1, 1, 1);
         outer_space.set((0, 0, 0), &inner_block);
 
@@ -484,7 +507,10 @@ mod tests {
         triangulate_space(&outer_space, &blocks_render_data, &mut space_rendered);
         eprintln!("{:#?}", space_rendered);
 
-        assert_eq!(space_rendered, block_render_data.faces.map(|_, frd| frd.vertices.to_vec()));
+        assert_eq!(
+            space_rendered,
+            block_render_data.faces.map(|_, frd| frd.vertices.to_vec())
+        );
     }
 
     // TODO: more tests

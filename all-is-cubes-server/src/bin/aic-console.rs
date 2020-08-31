@@ -4,14 +4,14 @@
 //! Simple exercise of all_is_cubes::console.
 
 use std::io;
-use std::thread;
 use std::sync::mpsc;
-use std::time::{Instant};
+use std::thread;
+use std::time::Instant;
 use termion::event::{Event, Key};
-use termion::raw::IntoRawMode;
 use termion::input::TermRead;
+use termion::raw::IntoRawMode;
 
-use all_is_cubes::camera::{ProjectionHelper};
+use all_is_cubes::camera::ProjectionHelper;
 use all_is_cubes::demo_content::new_universe_with_stuff;
 use all_is_cubes::universe::FrameClock;
 
@@ -37,7 +37,7 @@ fn main() -> io::Result<()> {
                 Err(err) => {
                     eprintln!("stdin read error: {}", err);
                     break;
-                },
+                }
             }
         }
         eprintln!("read thread exiting");
@@ -50,20 +50,23 @@ fn main() -> io::Result<()> {
         'input: loop {
             match event_rx.try_recv() {
                 Ok(event) => {
-                    if let Some(Event::Key(key)) = controller(&mut *camera_ref.borrow_mut(), event) {
+                    if let Some(Event::Key(key)) = controller(&mut *camera_ref.borrow_mut(), event)
+                    {
                         match key {
                             Key::Esc | Key::Ctrl('c') | Key::Ctrl('d') => {
                                 return Ok(());
-                            },
+                            }
                             _ => {}
                         }
                     }
-                },
+                }
                 Err(mpsc::TryRecvError::Disconnected) => {
                     eprintln!("input disconnected");
                     return Ok(());
                 }
-                Err(mpsc::TryRecvError::Empty) => { break 'input; },
+                Err(mpsc::TryRecvError::Empty) => {
+                    break 'input;
+                }
             }
         }
 
@@ -73,7 +76,12 @@ fn main() -> io::Result<()> {
             frame_clock.did_step();
         }
         if frame_clock.should_draw() {
-            draw_space(&*space_ref.borrow(), &mut proj, &camera_ref.borrow(), &mut out)?;
+            draw_space(
+                &*space_ref.borrow(),
+                &mut proj,
+                &camera_ref.borrow(),
+                &mut out,
+            )?;
             frame_clock.did_draw();
         }
     }

@@ -3,7 +3,9 @@
 
 //! Mathematical utilities and decisions.
 
-use cgmath::{Array, BaseFloat, BaseNum, ElementWise, EuclideanSpace, Matrix4, Point3, Vector3, Vector4};
+use cgmath::{
+    Array, BaseFloat, BaseNum, ElementWise, EuclideanSpace, Matrix4, Point3, Vector3, Vector4,
+};
 use num_traits::identities::Zero;
 use std::convert::{TryFrom, TryInto};
 use std::hash::{Hash, Hasher};
@@ -32,26 +34,31 @@ pub trait Modulo<M = Self> {
 // to providing impls for both Vector3 and the full generality of modulo_impl.
 impl Modulo for f32 {
     type Output = Self;
-    fn modulo(self, modulus: Self) -> Self { modulo_impl(self, modulus) }
+    fn modulo(self, modulus: Self) -> Self {
+        modulo_impl(self, modulus)
+    }
 }
 impl Modulo for f64 {
     type Output = Self;
-    fn modulo(self, modulus: Self) -> Self { modulo_impl(self, modulus) }
+    fn modulo(self, modulus: Self) -> Self {
+        modulo_impl(self, modulus)
+    }
 }
 impl<S: Modulo<S, Output = S> + Copy> Modulo<S> for Vector3<S> {
     type Output = Self;
-    fn modulo(self, modulus: S) -> Self { self.map(|x| x.modulo(modulus)) }
+    fn modulo(self, modulus: S) -> Self {
+        self.map(|x| x.modulo(modulus))
+    }
 }
 impl<S: BaseNum + Modulo<S, Output = S>> Modulo<S> for Point3<S> {
     type Output = Vector3<S>;
-    fn modulo(self, modulus: S) -> Vector3<S> { self.to_vec().modulo(modulus) }
+    fn modulo(self, modulus: S) -> Vector3<S> {
+        self.to_vec().modulo(modulus)
+    }
 }
 
 /// Implement modulo in terms of remainder and addition.
-fn modulo_impl<
-    T: Rem<M, Output = T> + Add<M, Output = T>,
-    M: Copy,
->(value: T, modulus: M) -> T {
+fn modulo_impl<T: Rem<M, Output = T> + Add<M, Output = T>, M: Copy>(value: T, modulus: M) -> T {
     // Remainder, which lies in the range (-modulus, +modulus).
     let remainder: T = value % modulus;
     // Shift the range to (0, 2*modulus).
@@ -66,16 +73,24 @@ fn modulo_impl<
 /// So far, nearly every usage of Face has a use for `WITHIN`, but we should keep an eye
 /// out for uses of the 'true' 6-face version.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[rustfmt::skip]
 pub enum Face {
-    WITHIN, NX, NY, NZ, PX, PY, PZ
+    WITHIN, NX, NY, NZ, PX, PY, PZ,
 }
 
 impl Face {
     pub const ALL_SIX: &'static [Face; 6] =
         &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
-    pub const ALL_SEVEN: &'static [Face; 7] =
-        &[Face::WITHIN, Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
-    
+    pub const ALL_SEVEN: &'static [Face; 7] = &[
+        Face::WITHIN,
+        Face::NX,
+        Face::NY,
+        Face::NZ,
+        Face::PX,
+        Face::PY,
+        Face::PZ,
+    ];
+
     /// Returns which axis this face's normal vector is parallel to, with the numbering
     /// X = 0, Y = 1, Z = 2. Panics if given `Face::WITHIN`.
     pub fn axis_number(&self) -> usize {
@@ -101,8 +116,9 @@ impl Face {
     }
 
     /// Returns the vector normal to this face. `WITHIN` is assigned the zero vector.
-    pub fn normal_vector<S>(&self) -> Vector3<S> where
-        S: BaseNum + std::ops::Neg<Output = S>
+    pub fn normal_vector<S>(&self) -> Vector3<S>
+    where
+        S: BaseNum + std::ops::Neg<Output = S>,
     {
         match self {
             Face::WITHIN => Vector3::new(S::zero(), S::zero(), S::zero()),
@@ -122,6 +138,7 @@ impl Face {
     /// Specifically, `Face::NZ.matrix()` is the identity matrix and all others are
     /// consistent with that. Note that there are arbitrary choices in the rotation
     /// of all other faces. (TODO: Document those choices and test them.)
+    #[rustfmt::skip]
     pub fn matrix<S: BaseFloat>(&self) -> Matrix4<S> {
         // Note: This is not generalized to BaseNum + Neg like normal_vector is because
         // cgmath itself requires BaseFloat for matrices.
@@ -201,6 +218,7 @@ impl<V> FaceMap<V> {
     /// Access all of the values.
     /// TODO: Return an iterator instead; right now the problem is the iterator won't
     /// own the data until we implement a custom iterator.
+    #[rustfmt::skip]
     pub const fn values(&self) -> [&V; 7] {
         [&self.nx, &self.ny, &self.nz, &self.px, &self.py, &self.pz, &self.within]
     }
@@ -288,9 +306,15 @@ impl RGB {
         RGBA::new(self.red(), self.green(), self.blue(), alpha)
     }
 
-    pub const fn red(self) -> f32 { self.0.x }
-    pub const fn green(self) -> f32 { self.0.y }
-    pub const fn blue(self) -> f32 { self.0.z }
+    pub const fn red(self) -> f32 {
+        self.0.x
+    }
+    pub const fn green(self) -> f32 {
+        self.0.y
+    }
+    pub const fn blue(self) -> f32 {
+        self.0.z
+    }
 }
 impl RGBA {
     /// Transparent black (all components zero).
@@ -302,10 +326,18 @@ impl RGBA {
         Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
     }
 
-    pub const fn red(self) -> f32 { self.0.x }
-    pub const fn green(self) -> f32 { self.0.y }
-    pub const fn blue(self) -> f32 { self.0.z }
-    pub const fn alpha(self) -> f32 { self.0.w }
+    pub const fn red(self) -> f32 {
+        self.0.x
+    }
+    pub const fn green(self) -> f32 {
+        self.0.y
+    }
+    pub const fn blue(self) -> f32 {
+        self.0.z
+    }
+    pub const fn alpha(self) -> f32 {
+        self.0.w
+    }
 
     /// Discards the alpha component to produce an RGB color.
     ///
@@ -325,7 +357,9 @@ impl RGBA {
 
     pub fn to_saturating_8bpp(self) -> (u8, u8, u8, u8) {
         // As of Rust 1.45, `as` on float to int is saturating
-        fn convert_component(x: f32) -> u8 { (x * 255.0) as u8 }
+        fn convert_component(x: f32) -> u8 {
+            (x * 255.0) as u8
+        }
         (
             convert_component(self.red()),
             convert_component(self.green()),
@@ -336,17 +370,25 @@ impl RGBA {
 }
 
 impl From<RGB> for Vector3<f32> {
-    fn from(value: RGB) -> Self { value.0 }
+    fn from(value: RGB) -> Self {
+        value.0
+    }
 }
 impl From<RGBA> for Vector4<f32> {
-    fn from(value: RGBA) -> Self { value.0 }
+    fn from(value: RGBA) -> Self {
+        value.0
+    }
 }
 
 impl From<RGB> for [f32; 3] {
-    fn from(value: RGB) -> Self { value.0.into() }
+    fn from(value: RGB) -> Self {
+        value.0.into()
+    }
 }
 impl From<RGBA> for [f32; 4] {
-    fn from(value: RGBA) -> Self { value.0.into() }
+    fn from(value: RGBA) -> Self {
+        value.0.into()
+    }
 }
 
 impl TryFrom<Vector3<f32>> for RGB {
@@ -372,17 +414,25 @@ impl TryFrom<Vector4<f32>> for RGBA {
 
 impl Add<RGB> for RGB {
     type Output = Self;
-    fn add(self, other: Self) -> Self { Self(self.0 + other.0) }
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
 }
 impl Add<RGBA> for RGBA {
     type Output = Self;
-    fn add(self, other: Self) -> Self { Self(self.0 + other.0) }
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
 }
 impl AddAssign<RGB> for RGB {
-    fn add_assign(&mut self, other: Self) { self.0 += other.0; }
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
 }
 impl AddAssign<RGBA> for RGBA {
-    fn add_assign(&mut self, other: Self) { self.0 += other.0; }
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
 }
 impl Mul<RGB> for RGB {
     type Output = Self;
@@ -433,13 +483,25 @@ impl Eq for RGBA {}
 
 impl std::fmt::Debug for RGB {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(fmt, "RGB({:?}, {:?}, {:?})", self.red(), self.green(), self.blue())
+        write!(
+            fmt,
+            "RGB({:?}, {:?}, {:?})",
+            self.red(),
+            self.green(),
+            self.blue()
+        )
     }
 }
 impl std::fmt::Debug for RGBA {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(fmt, "RGBA({:?}, {:?}, {:?}, {:?})",
-            self.red(), self.green(), self.blue(), self.alpha())
+        write!(
+            fmt,
+            "RGBA({:?}, {:?}, {:?}, {:?})",
+            self.red(),
+            self.green(),
+            self.blue(),
+            self.alpha()
+        )
     }
 }
 
@@ -447,12 +509,11 @@ impl std::fmt::Debug for RGBA {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ColorIsNan;
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cgmath::SquareMatrix as _;
     use cgmath::Vector3;
-    use cgmath::SquareMatrix as _;  // determinant()
 
     // Tests for modulo, which is not currently a public function so can't have doc tests.
 
@@ -492,12 +553,15 @@ mod tests {
     fn modulo_of_vector() {
         assert_eq!(
             Vector3::new(1.25 as f64, 2.75, -3.25).modulo(1.0),
-            Vector3::new(0.25, 0.75, 0.75));
+            Vector3::new(0.25, 0.75, 0.75)
+        );
     }
 
     #[test]
     // Note: Not specifically desiring this behavior, just documenting it.
-    fn modulo_zero_float() { assert!((3.0 as f64).modulo(0.0).is_nan()); }
+    fn modulo_zero_float() {
+        assert!((3.0 as f64).modulo(0.0).is_nan());
+    }
 
     #[test]
     fn face_matrix_does_not_scale_or_reflect() {
@@ -511,18 +575,30 @@ mod tests {
     // TODO: Tests of FaceMap
 
     // TODO: Add tests of the color not-NaN mechanisms.
-    
+
     #[test]
     fn rgba_to_saturating_8bpp() {
-        assert_eq!(RGBA::new(0.125, 0.25, 0.5, 0.75).to_saturating_8bpp(), (31, 63, 127, 191));
+        assert_eq!(
+            RGBA::new(0.125, 0.25, 0.5, 0.75).to_saturating_8bpp(),
+            (31, 63, 127, 191)
+        );
 
         // Test saturation
-        assert_eq!(RGBA::new(0.5, -1.0, 10.0, 1.0).to_saturating_8bpp(), (127, 0, 255, 255));
+        assert_eq!(
+            RGBA::new(0.5, -1.0, 10.0, 1.0).to_saturating_8bpp(),
+            (127, 0, 255, 255)
+        );
     }
 
     #[test]
     fn rgb_rgba_debug() {
-        assert_eq!(format!("{:#?}", RGB::new(0.1, 0.2, 0.3)), "RGB(0.1, 0.2, 0.3)");
-        assert_eq!(format!("{:#?}", RGBA::new(0.1, 0.2, 0.3, 0.4)), "RGBA(0.1, 0.2, 0.3, 0.4)");
+        assert_eq!(
+            format!("{:#?}", RGB::new(0.1, 0.2, 0.3)),
+            "RGB(0.1, 0.2, 0.3)"
+        );
+        assert_eq!(
+            format!("{:#?}", RGBA::new(0.1, 0.2, 0.3, 0.4)),
+            "RGBA(0.1, 0.2, 0.3, 0.4)"
+        );
     }
 }

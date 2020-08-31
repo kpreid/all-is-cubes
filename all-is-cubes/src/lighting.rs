@@ -6,7 +6,7 @@
 
 use cgmath::{Transform as _, Vector3};
 use lazy_static::lazy_static;
-use std::convert::{TryInto as _};
+use std::convert::TryInto as _;
 
 use crate::math::*;
 use crate::raycast::Raycaster;
@@ -80,7 +80,6 @@ impl From<PackedLight> for RGB {
     }
 }
 
-
 /// Fixed configuration of light rays to use for light tracing.
 #[derive(Clone, Copy, Debug)]
 struct FaceRayData {
@@ -104,11 +103,18 @@ lazy_static! {
                 for rayy in -1..=1 {
                     rays.push(LightRay {
                         origin,
-                        direction: face.matrix().transform_vector(Vector3::new(rayx as FreeCoordinate, rayy as FreeCoordinate, 1.0)),
+                        direction: face.matrix().transform_vector(Vector3::new(
+                            rayx as FreeCoordinate,
+                            rayy as FreeCoordinate,
+                            1.0,
+                        )),
                     });
                 }
             }
-            ray_data.push(FaceRayData {reflect_face, rays: (*rays).try_into().unwrap()});
+            ray_data.push(FaceRayData {
+                reflect_face,
+                rays: (*rays).try_into().unwrap(),
+            });
         }
         (*ray_data).try_into().unwrap()
     };
@@ -125,7 +131,8 @@ pub(crate) struct LightUpdateRequest {
 }
 impl Ord for LightUpdateRequest {
     fn cmp(&self, other: &LightUpdateRequest) -> std::cmp::Ordering {
-        self.priority.cmp(&other.priority)
+        self.priority
+            .cmp(&other.priority)
             .then_with(|| self.cube[0].cmp(&other.cube[0]))
             .then_with(|| self.cube[1].cmp(&other.cube[1]))
             .then_with(|| self.cube[2].cmp(&other.cube[2]))
@@ -140,7 +147,8 @@ impl PartialOrd for LightUpdateRequest {
 impl Space {
     pub(crate) fn light_needs_update(&mut self, cube: GridPoint, priority: PackedLightScalar) {
         if self.grid().contains_cube(cube) && !self.lighting_update_set.contains(&cube) {
-            self.lighting_update_queue.push(LightUpdateRequest {priority, cube});
+            self.lighting_update_queue
+                .push(LightUpdateRequest { priority, cube });
             self.lighting_update_set.insert(cube);
         }
     }
@@ -168,7 +176,7 @@ impl Space {
     fn update_lighting_now_on(&mut self, cube: GridPoint) -> PackedLightScalar {
         let mut total_rays = 0;
         let mut incoming_light: RGB = RGB::ZERO;
-        let mut dependencies: Vec<GridPoint> = Vec::new();  // TODO: reuse buffer instead of allocating every time
+        let mut dependencies: Vec<GridPoint> = Vec::new(); // TODO: reuse buffer instead of allocating every time
 
         if self[cube].opaque_to_light() {
             // Opaque blocks are always dark inside
@@ -181,19 +189,19 @@ impl Space {
                     // TODO this is wrong it is not the nested algorithm
                     total_rays += 1;
                     let raycaster = Raycaster::new(
-                            cube.cast::<FreeCoordinate>().unwrap() + ray.origin,
-                            ray.direction)
-                        .within_grid(*self.grid());
+                        cube.cast::<FreeCoordinate>().unwrap() + ray.origin,
+                        ray.direction,
+                    )
+                    .within_grid(*self.grid());
                     // TODO tracing variables ...
                     let mut found = false;
                     for hit in raycaster {
                         let block = &self[hit.cube];
-                        if !block.opaque_to_light() {  // TODO wrong test?
-                            // Do nothing for now. TODO: Implement passing through transparency and transparent light sources
+                        if !block.opaque_to_light() { // TODO wrong test?
+                             // Do nothing for now. TODO: Implement passing through transparency and transparent light sources
                         } else {
                             let light_cube = hit.previous_cube();
-                            let light_from_struck_face =
-                                block.attributes().light_emission
+                            let light_from_struck_face = block.attributes().light_emission
                                 + self.get_lighting(light_cube).into();
                             incoming_light += light_from_struck_face;
                             dependencies.push(light_cube);
@@ -202,7 +210,7 @@ impl Space {
                         }
                     }
                     if !found {
-                        incoming_light += PackedLight::SKY.into();  // TODO silly conversion
+                        incoming_light += PackedLight::SKY.into(); // TODO silly conversion
                     }
                 }
             }
