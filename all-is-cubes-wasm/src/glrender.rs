@@ -466,11 +466,7 @@ impl BlockGLRenderData {
 /// the chance of hitting any size limits).
 struct BlockGLTexture {
     texture: Texture<Dim2Array, NormRGBA8UI>,
-    tile_size: u32,
-    // Number of tiles in texture atlas along one edge (square root of total tiles).
-    atlas_row_length: u32,
-    // Number of array texture layers in use.
-    layer_count: u32, // u32 is the type luminance uses
+    layout: AtlasLayout,
     next_free: u32,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
 }
@@ -498,16 +494,16 @@ impl BlockGLTexture {
     where
         C: GraphicsContext<Backend = Backend>,
     {
-        let tile_size = 16;
+        let layout = AtlasLayout {
+            tile_size: 16,
+            row_length: 16,
+            layer_count: 32,
+        };
 
-        // TODO implement reallocation
-        let atlas_row_length = 16;
-        let texture_edge_length = atlas_row_length * tile_size;
-        let layer_count = 32;
         Ok(Self {
             texture: Texture::new(
                 context,
-                ([texture_edge_length, texture_edge_length], layer_count),
+                layout.dimensions(),
                 0, // mipmaps
                 Sampler {
                     wrap_s: Wrap::ClampToEdge,
@@ -516,50 +512,17 @@ impl BlockGLTexture {
                     ..Sampler::default()
                 },
             )?,
-            tile_size,
-            atlas_row_length,
-            layer_count,
+            layout,
             next_free: 0,
             in_use: Vec::new(),
         })
     }
 
-    fn tiles_in_texture(&self) -> u32 {
-        self.layer_count * self.atlas_row_length * self.atlas_row_length
-    }
-
-    /// Compute location in the atlas of a tile.
-    fn index_to_location(&self, index: u32) -> (u16, u16, u16) {
-        assert!(
-            self.atlas_row_length <= u16::MAX as u32,
-            "can't happen: texture coordinate overflow"
-        );
-        // u16 intermediates prove that we can losslessly convert to TextureCoordinate.
-        // TODO: But do they have a runtime performance impact?
-        let column = (index % self.atlas_row_length) as u16;
-        let row_and_layer = index / self.atlas_row_length;
-        let row = (row_and_layer % self.atlas_row_length) as u16;
-        let layer = (row_and_layer / self.atlas_row_length) as u16;
-        (column, row, layer)
-    }
-
-    /// Compute location in the atlas of a tile, as [0, 1] texture coordinates.
-    fn index_to_origin(&self, index: u32) -> Vector3<TextureCoordinate> {
-        let scale = (self.atlas_row_length as TextureCoordinate).recip();
-        let (column, row, layer) = self.index_to_location(index);
-        Vector3::new(
-            TextureCoordinate::from(column) * scale,
-            TextureCoordinate::from(row) * scale,
-            // Array texture layers are integers, but passed to the shader as float.
-            TextureCoordinate::from(layer),
-        )
-    }
-
     fn flush(&mut self) -> Result<(), TextureError> {
         // Set up constants for array indexing which wants usize.
         // These should never fail unless we have less than 32-bit usize.
-        let tile_size: usize = self.tile_size.try_into().unwrap();
-        let row_length_tiles: usize = self.atlas_row_length.try_into().unwrap();
+        let tile_size: usize = self.layout.tile_size.try_into().unwrap();
+        let row_length_tiles: usize = self.layout.row_length.try_into().unwrap();
         let row_length_texels: usize = row_length_tiles * tile_size;
 
         // Allocate contiguous storage for uploading.
@@ -635,11 +598,14 @@ impl TextureAllocator for BlockGLTexture {
     type Tile = GLTile;
 
     fn size(&self) -> GridCoordinate {
-        self.tile_size as GridCoordinate
+        self.layout
+            .tile_size
+            .try_into()
+            .expect("probably bogus tile size")
     }
 
     fn allocate(&mut self) -> GLTile {
-        if self.next_free == self.tiles_in_texture() {
+        if self.next_free == self.layout.tile_count() {
             todo!("ran out of tile space, but reallocation is not implemented");
         }
         let index = self.next_free;
@@ -647,8 +613,8 @@ impl TextureAllocator for BlockGLTexture {
         let result = GLTile {
             backing: Rc::new(RefCell::new(TileBacking {
                 index,
-                origin: self.index_to_origin(index),
-                scale: (self.atlas_row_length as TextureCoordinate).recip(),
+                origin: self.layout.index_to_origin(index),
+                scale: self.layout.texcoord_scale(),
                 data: None,
             })),
         };
@@ -663,5 +629,84 @@ impl TextureTile for GLTile {
     }
     fn write(&mut self, data: &[Texel]) {
         self.backing.borrow_mut().data = Some(data.into());
+    }
+}
+
+/// Values are stored as u16 because this is all that is necessary for typical GPU limits,
+/// and doing so gives lets us use guaranteed lossless numeric conversions in the
+/// arithmetic (whereas e.g. u32 to f32 is not).
+type AtlasCoord = u16;
+type AtlasIndex = u32; // TODO: Review whether this will be more convenient as usize
+
+/// Does the coordinate math for a texture atlas of uniform tiles.
+struct AtlasLayout {
+    /// Edge length of a tile.
+    tile_size: AtlasCoord,
+    /// Number of tiles in texture atlas along one edge (square root of total tiles in one
+    /// layer).
+    row_length: AtlasCoord,
+    /// Number of array texture layers in use.
+    layer_count: AtlasCoord,
+}
+
+impl AtlasLayout {
+    /// Type of linear tile indices. (Maybe it should be `usize`?)
+    /// Texture size in the format used by `luminance`.
+    fn dimensions(&self) -> <Dim2Array as Dimensionable>::Size {
+        let texture_edge_length =
+            AtlasIndex::from(self.row_length) * AtlasIndex::from(self.tile_size);
+        (
+            [texture_edge_length, texture_edge_length],
+            self.layer_count.into(),
+        )
+    }
+
+    #[inline]
+    fn tile_count(&self) -> AtlasIndex {
+        AtlasIndex::from(self.layer_count)
+            .saturating_mul(AtlasIndex::from(self.row_length))
+            .saturating_mul(AtlasIndex::from(self.row_length))
+    }
+
+    /// Compute location in the atlas of a tile, in (s, t, layer) order.
+    ///
+    /// Panics if `index >= self.tile_count()`.
+    #[inline]
+    fn index_to_location(&self, index: AtlasIndex) -> (AtlasCoord, AtlasCoord, AtlasCoord) {
+        let row_length: AtlasIndex = self.row_length.into();
+        let column = index % row_length;
+        let row_and_layer = index / row_length;
+        let row = row_and_layer % row_length;
+        let layer = row_and_layer / row_length;
+        assert!(
+            layer <= self.layer_count as AtlasIndex,
+            "Atlas tile index {} out of range",
+            index
+        );
+        // Given the above modulos and assert, these conversions can't be lossy
+        // because the bounds themselves fit in AtlasCoord.
+        (column as AtlasCoord, row as AtlasCoord, layer as AtlasCoord)
+    }
+
+    /// Compute location in the atlas of a tile, as [0, 1] texture coordinates.
+    ///
+    /// Panics if `index >= self.tile_count()`.
+    /// TODO: Return Option instead, which the caller can handle as choosing aa missing-texture
+    /// tile, so data mismatches are only graphical glitches.
+    #[inline]
+    fn index_to_origin(&self, index: AtlasIndex) -> Vector3<TextureCoordinate> {
+        let scale = self.texcoord_scale();
+        let (column, row, layer) = self.index_to_location(index);
+        Vector3::new(
+            TextureCoordinate::from(column) * scale,
+            TextureCoordinate::from(row) * scale,
+            // Array texture layers are integers, but passed to the shader as float.
+            TextureCoordinate::from(layer),
+        )
+    }
+
+    #[inline]
+    fn texcoord_scale(&self) -> TextureCoordinate {
+        (self.row_length as TextureCoordinate).recip()
     }
 }
