@@ -114,15 +114,10 @@ impl BlockGLTexture {
     }
 
     fn flush(&mut self) -> Result<(), TextureError> {
-        // Set up constants for array indexing which wants usize.
-        // These should never fail unless we have less than 32-bit usize.
-        let tile_size: usize = self.layout.tile_size.try_into().unwrap();
-        let row_length_tiles: usize = self.layout.row_length.try_into().unwrap();
-        let row_length_texels: usize = row_length_tiles * tile_size;
-
+        let layout = self.layout;
         // Allocate contiguous storage for uploading.
         // TODO: Should we keep this allocated? Probably
-        let mut texels = vec![(255, 0, 255, 255); Dim2Array::count(self.texture.size())];
+        let mut texels = vec![(255, 0, 255, 255); layout.texel_count()];
         let mut count_written = 0;
 
         // TODO: Add dirty flags to enable deciding not to upload after all
@@ -131,24 +126,7 @@ impl BlockGLTexture {
             weak_backing.upgrade().map_or(false, |strong_backing| {
                 let backing: &TileBacking = &strong_backing.borrow();
                 if let Some(data) = backing.data.as_ref() {
-                    let tile_index: usize = backing.index.try_into().unwrap();
-
-                    // Non-contiguously copy texels;  must skip over all the columns that
-                    // belong to other tiles. We don't care about the distinction between
-                    // rows and layers.
-                    let atlas_memory_column: usize = tile_index % row_length_tiles;
-                    let atlas_memory_row: usize = tile_index / row_length_tiles * tile_size;
-                    let copy_stride = row_length_texels;
-                    let copy_origin =
-                        atlas_memory_row * row_length_texels + atlas_memory_column * tile_size;
-                    for tile_texel_row in 0..tile_size {
-                        texels[copy_origin + tile_texel_row * copy_stride
-                            ..copy_origin + tile_texel_row * copy_stride + tile_size]
-                            .copy_from_slice(
-                                &data[(tile_texel_row * tile_size)
-                                    ..((tile_texel_row + 1) * tile_size)],
-                            );
-                    }
+                    layout.copy_to_atlas(backing.index, &mut texels, data);
                     count_written += 1;
                 }
                 true // retain in self.in_use
@@ -156,7 +134,7 @@ impl BlockGLTexture {
         });
 
         self.texture.upload(GenMipmaps::Yes, &texels)?;
-        
+
         // TODO: Platform-neutral logging.
         #[cfg(target_arch = "wasm32")]
         console::info_1(&JsValue::from_str(&format!(
@@ -231,6 +209,7 @@ impl TextureTile for GLTile {
 }
 
 /// Does the coordinate math for a texture atlas of uniform tiles.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct AtlasLayout {
     /// Edge length of a tile.
     tile_size: AtlasCoord,
@@ -264,6 +243,11 @@ impl AtlasLayout {
         AtlasIndex::from(self.layer_count)
             .saturating_mul(AtlasIndex::from(self.row_length))
             .saturating_mul(AtlasIndex::from(self.row_length))
+    }
+
+    #[inline]
+    fn texel_count(&self) -> usize {
+        Dim2Array::count(self.dimensions())
     }
 
     /// Compute location in the atlas of a tile, in (s, t, layer) order.
@@ -307,6 +291,34 @@ impl AtlasLayout {
     fn texcoord_scale(&self) -> TextureCoordinate {
         (self.row_length as TextureCoordinate).recip()
     }
+
+    /// Copy texels for one tile into an array arranged according to this layout
+    /// (which requires non-contiguous copies).
+    #[inline]
+    fn copy_to_atlas<T: Copy>(&self, index: AtlasIndex, target: &mut [T], source: &[T]) {
+        // Do our math as usize since we're about to do array indexing anyway.
+        // Conversions should not be able to fail unless we're on a platform where usize
+        // is smaller than 32 bits, which would probably not work anyway.
+        let index: usize = index.try_into().unwrap();
+        let tile_size: usize = self.tile_size.try_into().unwrap();
+
+        // Notice that the memory layout means that there is no difference between layers;
+        // it suffices to divide the index by the number of rows.
+        let row_length_tiles: usize = self.row_length.try_into().unwrap();
+        let row_length_texels: usize = row_length_tiles * tile_size;
+        let column = index % row_length_tiles;
+        let memory_row = index / row_length_tiles * tile_size;
+
+        let copy_stride = row_length_texels;
+        let copy_origin = memory_row * row_length_texels + column * tile_size;
+        for tile_texel_row in 0..tile_size {
+            target[copy_origin + tile_texel_row * copy_stride
+                ..copy_origin + tile_texel_row * copy_stride + tile_size]
+                .copy_from_slice(
+                    &source[(tile_texel_row * tile_size)..((tile_texel_row + 1) * tile_size)],
+                );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -334,7 +346,38 @@ mod tests {
                 u16::try_from(large_index_large % row_length_large).unwrap(),
                 u16::try_from(large_index_large % size_of_layer / row_length_large).unwrap(),
                 u16::try_from(large_index_large / size_of_layer).unwrap(),
-            ), 
-            layout.index_to_location(large_index));
+            ),
+            layout.index_to_location(large_index)
+        );
+    }
+
+    #[test]
+    fn atlas_layout_copy() {
+        let layout = AtlasLayout {
+            tile_size: 2,
+            row_length: 3,
+            layer_count: 2,
+        };
+        let mut output: Vec<char> = vec!['.'; layout.texel_count()];
+        let input: Vec<char> = "abcd".chars().collect();
+        // Index should be column 1, row 0, layer 1.
+        layout.copy_to_atlas(10, &mut output, &input);
+        assert_eq!(
+            output.into_iter().collect::<String>(),
+            "\
+                ......\
+                ......\
+                ......\
+                ......\
+                ......\
+                ......\
+                ..ab..\
+                ..cd..\
+                ......\
+                ......\
+                ......\
+                ......\
+            ",
+        );
     }
 }
