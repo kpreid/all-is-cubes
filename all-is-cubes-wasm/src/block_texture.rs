@@ -156,6 +156,8 @@ impl BlockGLTexture {
         });
 
         self.texture.upload(GenMipmaps::Yes, &texels)?;
+        
+        // TODO: Platform-neutral logging.
         #[cfg(target_arch = "wasm32")]
         console::info_1(&JsValue::from_str(&format!(
             "flushed block texture with {:?} tiles out of {:?}",
@@ -304,5 +306,35 @@ impl AtlasLayout {
     #[inline]
     fn texcoord_scale(&self) -> TextureCoordinate {
         (self.row_length as TextureCoordinate).recip()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::convert::TryFrom;
+
+    /// This shouldn't happen, but if it does, this is how we handle it.
+    #[test]
+    fn atlas_layout_no_overflow() {
+        let layout = AtlasLayout {
+            tile_size: 0xFFFF,
+            row_length: 0xFFFF,
+            layer_count: 0xFFFF,
+        };
+        assert_eq!(0xFFFFFFFF, layout.tile_count());
+
+        // Do the arithmetic with plenty of bits, to compare with the internal result.
+        let row_length_large: u64 = 0xFFFF;
+        let size_of_layer: u64 = 0xFFFF * row_length_large;
+        let large_index: AtlasIndex = 0xFFFFFFFF;
+        let large_index_large: u64 = large_index.into();
+        assert_eq!(
+            (
+                u16::try_from(large_index_large % row_length_large).unwrap(),
+                u16::try_from(large_index_large % size_of_layer / row_length_large).unwrap(),
+                u16::try_from(large_index_large / size_of_layer).unwrap(),
+            ), 
+            layout.index_to_location(large_index));
     }
 }
