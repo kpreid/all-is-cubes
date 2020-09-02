@@ -41,9 +41,15 @@ impl Grid {
         // TODO: Replace assert! with nice error reporting and then test it
         for i in 0..3 {
             assert!(sizes[i] > 0);
-            assert!(lower_bounds[i].checked_add(sizes[i]).is_some(), "lower_bounds too large for sizes");
+            assert!(
+                lower_bounds[i].checked_add(sizes[i]).is_some(),
+                "lower_bounds too large for sizes"
+            );
         }
-        assert!(Self::checked_volume_helper(sizes).is_ok(), "Volume too large");
+        assert!(
+            Self::checked_volume_helper(sizes).is_ok(),
+            "Volume too large"
+        );
 
         Grid {
             lower_bounds,
@@ -53,12 +59,12 @@ impl Grid {
 
     /// Compute volume with checked arithmetic. In a function solely for the convenience
     /// of the `?` operator without which this is even worse.
-    fn checked_volume_helper(sizes :GridVector) -> Result<usize, ()> {
+    fn checked_volume_helper(sizes: GridVector) -> Result<usize, ()> {
         let mut volume: usize = 1;
         for i in 0..3 {
-            volume = volume.checked_mul(
-                usize::try_from(sizes[i]).map_err(|_| ())?
-            ).ok_or(())?;
+            volume = volume
+                .checked_mul(usize::try_from(sizes[i]).map_err(|_| ())?)
+                .ok_or(())?;
         }
         Ok(volume)
     }

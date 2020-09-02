@@ -245,13 +245,14 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             // Face::matrix provides where all transforms contain no mirroring).
                             let cube: Point3<GridCoordinate> = (transform.transform_point(
                                 (Point3::new(
-                                    s as FreeCoordinate,
-                                    t as FreeCoordinate,
-                                    layer as FreeCoordinate,
+                                    FreeCoordinate::from(s),
+                                    FreeCoordinate::from(t),
+                                    FreeCoordinate::from(layer),
                                 ) + Vector3::new(0.5, 0.5, 0.5))
-                                    / tile_size as FreeCoordinate,
-                            ) * tile_size as FreeCoordinate
-                                - Vector3::new(0.5, 0.5, 0.5))
+                                    / FreeCoordinate::from(tile_size),
+                            ) * FreeCoordinate::from(
+                                tile_size,
+                            ) - Vector3::new(0.5, 0.5, 0.5))
                             .cast::<GridCoordinate>()
                             .unwrap();
 
@@ -286,7 +287,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }]
                                 .vertices,
                             face,
-                            layer as FreeCoordinate / tile_size as FreeCoordinate,
+                            FreeCoordinate::from(layer) / FreeCoordinate::from(tile_size),
                             &texture_tile,
                         );
                         textures_used.push(texture_tile);

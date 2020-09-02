@@ -175,7 +175,7 @@ fn character_from_ray(
                 // grid. Fix that to get way more performance.
                 let adjusted_origin = Point3::from_vec(
                     (origin - hit.cube.cast::<FreeCoordinate>().unwrap())
-                        * (array.grid().size().x as FreeCoordinate),
+                        * FreeCoordinate::from(array.grid().size().x),
                 );
 
                 for subcube_hit in

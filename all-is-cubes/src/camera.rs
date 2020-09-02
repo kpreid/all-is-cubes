@@ -46,7 +46,7 @@ impl Camera {
             body: Body {
                 // TODO: this starting point is pretty arbitrary, but we'll be replacing it with persistent character position tied into worldgen.
                 position: ((grid.lower_bounds() + grid.upper_bounds().to_vec()) / 2)
-                    .map(|x| x as FreeCoordinate)
+                    .map(FreeCoordinate::from)
                     + Vector3::new(-3.0, 3.0, -3.0),
                 velocity: Vector3::zero(),
                 yaw: 00.0,

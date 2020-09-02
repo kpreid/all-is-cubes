@@ -42,28 +42,19 @@ where
     for<'a> &'a D: Drawable<Rgb888>,
     D: Dimensions + Transform,
 {
-    let block_size: i32 = ctx
-        .size
-        .try_into()
-        .expect("block size too big for embedded_graphics");
+    let block_size: i32 = ctx.size;
     let top_left_2d = object.top_left();
     let bottom_right_2d = object.bottom_right();
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
     // for text drawing, embedded_graphics assumes a Y-down coordinate system.
     let low_block = GridPoint::new(
-        floor_divide(top_left_2d.x, block_size).try_into().unwrap(),
-        floor_divide(-bottom_right_2d.y, block_size)
-            .try_into()
-            .unwrap(),
+        floor_divide(top_left_2d.x, block_size),
+        floor_divide(-bottom_right_2d.y, block_size),
         0,
     );
     let high_block = GridPoint::new(
-        (ceil_divide(bottom_right_2d.x, block_size))
-            .try_into()
-            .unwrap(),
-        (ceil_divide(-top_left_2d.y, block_size))
-            .try_into()
-            .unwrap(),
+        ceil_divide(bottom_right_2d.x, block_size),
+        ceil_divide(-top_left_2d.y, block_size),
         1,
     );
     let block_grid = Grid::new(low_block, high_block - low_block);

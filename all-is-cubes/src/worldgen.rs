@@ -84,8 +84,8 @@ pub fn wavy_landscape(space: &mut Space, blocks: &LandscapeBlocks, max_slope: Fr
 
     for x in space.grid().x_range() {
         for z in space.grid().z_range() {
-            let fx = x as FreeCoordinate;
-            let fz = z as FreeCoordinate;
+            let fx = FreeCoordinate::from(x);
+            let fz = FreeCoordinate::from(z);
             let terrain_variation = slope_scaled
                 * (((fx / 8.0).sin() + (fz / 8.0).sin()) * 1.0
                     + ((fx / 14.0).sin() + (fz / 14.0).sin()) * 3.0
