@@ -224,10 +224,10 @@ struct AtlasLayout {
 /// and doing so gives lets us use guaranteed lossless numeric conversions in the
 /// arithmetic (whereas e.g. u32 to f32 is not).
 type AtlasCoord = u16;
+/// Type of linear tile indices. (Maybe it should be `usize`?)
 type AtlasIndex = u32; // TODO: Review whether this will be more convenient as usize
 
 impl AtlasLayout {
-    /// Type of linear tile indices. (Maybe it should be `usize`?)
     /// Texture size in the format used by `luminance`.
     fn dimensions(&self) -> <Dim2Array as Dimensionable>::Size {
         let texture_edge_length =
