@@ -93,6 +93,7 @@ impl BlockGLTexture {
             tile_size: 16,
             row_length: 8,
             layer_count: 32,
+            border: 3,
         };
 
         Ok(Self {
@@ -219,6 +220,9 @@ struct AtlasLayout {
     row_length: AtlasCoord,
     /// Number of array texture layers in use.
     layer_count: AtlasCoord,
+    /// Number of extra texels to add around the edge of each tile to avoid "texture bleeding"
+    /// artifacts.
+    border: AtlasCoord,
 }
 
 /// Type of texel indices (coordinates) and single-row (-column/-layer) tile positions.
@@ -231,8 +235,7 @@ type AtlasCoord = u16;
 type AtlasIndex = u32; // TODO: Review whether this will be more convenient as usize
 
 impl AtlasLayout {
-    /// Width of the anti-bleeding border.
-    const BORDER: AtlasCoord = 3;
+    // TODO: Add a constructor which sanity checks the size parameters.
 
     /// Texture size in the format used by `luminance`.
     fn dimensions(&self) -> <Dim2Array as Dimensionable>::Size {
@@ -252,8 +255,8 @@ impl AtlasLayout {
 
     #[inline]
     fn texel_edge_length(&self) -> u32 {
-        u32::from(self.row_length) * u32::from(self.tile_size + Self::BORDER * 2)
-            - u32::from(Self::BORDER * 2)
+        u32::from(self.row_length) * u32::from(self.tile_size + self.border * 2)
+            - u32::from(self.border * 2)
     }
 
     #[inline]
@@ -289,7 +292,7 @@ impl AtlasLayout {
     /// tile, so data mismatches are only graphical glitches.
     #[inline]
     fn index_to_origin(&self, index: AtlasIndex) -> Vector3<TextureCoordinate> {
-        let step = TextureCoordinate::from(self.tile_size + Self::BORDER * 2)
+        let step = TextureCoordinate::from(self.tile_size + self.border * 2)
             / (self.texel_edge_length() as TextureCoordinate);
         let (column, row, layer) = self.index_to_location(index);
         Vector3::new(
@@ -312,7 +315,7 @@ impl AtlasLayout {
         // .try_into().unwrap() because we require that usize is at least as big as u32,
         // but infallible into() conversions don't assume that's true.
         let tile_size_i32 = i32::from(self.tile_size);
-        let bordered_tile_size = tile_size_i32 + i32::from(Self::BORDER) * 2;
+        let bordered_tile_size = tile_size_i32 + i32::from(self.border) * 2;
         let edge_length: usize = self.texel_edge_length().try_into().unwrap();
         let layer_texels: usize = edge_length * edge_length;
 
@@ -339,7 +342,7 @@ impl AtlasLayout {
         )
         .unwrap();
 
-        for b in 1_i32..=Self::BORDER.into() {
+        for b in 1_i32..=self.border.into() {
             // Duplicate first column of tile for border.
             blit_with_clipping(
                 blit_target,
@@ -478,6 +481,7 @@ mod tests {
             tile_size: 0xFFFF,
             row_length: 0xFFFF,
             layer_count: 0xFFFF,
+            border: 0xFFFF,
         };
         assert_eq!(0xFFFFFFFF, layout.tile_count());
 
@@ -502,26 +506,36 @@ mod tests {
             tile_size: 2,
             row_length: 3,
             layer_count: 2,
+            border: 1,
         };
         let mut output: Vec<char> = vec!['.'; layout.texel_count()];
         let input: Vec<char> = "abcd".chars().collect();
         // Index should be column 1, row 0, layer 1.
         layout.copy_to_atlas(10, &mut output, &input);
+        layout.copy_to_atlas(8, &mut output, &input);
         assert_eq!(
             output.into_iter().collect::<String>(),
             "\
-                ......\
-                ......\
-                ......\
-                ......\
-                ......\
-                ......\
-                ..ab..\
-                ..cd..\
-                ......\
-                ......\
-                ......\
-                ......\
+                ..........\
+                ..........\
+                ..........\
+                ..........\
+                ..........\
+                ..........\
+                ..........\
+                .......aab\
+                .......aab\
+                .......ccd\
+                ...aabb...\
+                ...ccdd...\
+                ...ccdd...\
+                ..........\
+                ..........\
+                ..........\
+                ..........\
+                ..........\
+                ..........\
+                ..........\
             ",
         );
     }
