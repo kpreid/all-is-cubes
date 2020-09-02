@@ -7,6 +7,7 @@ use itertools::Itertools as _;
 use rand::SeedableRng as _;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::ops::Range;
 use std::time::Duration;
 
@@ -40,20 +41,26 @@ impl Grid {
         // TODO: Replace assert! with nice error reporting and then test it
         for i in 0..3 {
             assert!(sizes[i] > 0);
-            assert!(lower_bounds[i].checked_add(sizes[i]).is_some());
+            assert!(lower_bounds[i].checked_add(sizes[i]).is_some(), "lower_bounds too large for sizes");
         }
-        assert!(
-            sizes[0]
-                .checked_mul(sizes[1])
-                .map(|xy| xy.checked_mul(sizes[2]))
-                .is_some(),
-            "Volume too large"
-        );
+        assert!(Self::checked_volume_helper(sizes).is_ok(), "Volume too large");
 
         Grid {
             lower_bounds,
             sizes,
         }
+    }
+
+    /// Compute volume with checked arithmetic. In a function solely for the convenience
+    /// of the `?` operator without which this is even worse.
+    fn checked_volume_helper(sizes :GridVector) -> Result<usize, ()> {
+        let mut volume: usize = 1;
+        for i in 0..3 {
+            volume = volume.checked_mul(
+                usize::try_from(sizes[i]).map_err(|_| ())?
+            ).ok_or(())?;
+        }
+        Ok(volume)
     }
 
     /// Computes the volume of this space in blocks, i.e. the sum of all sizes.
@@ -63,7 +70,7 @@ impl Grid {
     /// assert_eq!(grid.volume(), 6_000_000);
     /// ```
     pub fn volume(&self) -> usize {
-        (self.sizes[0] * self.sizes[1] * self.sizes[2]) as usize
+        Self::checked_volume_helper(self.sizes).unwrap()
     }
 
     /// Determines whether a point lies within the grid and, if it does, returns the flattened
@@ -267,7 +274,7 @@ impl Space {
 
     /// Constructs a `Space` that is entirely empty and whose coordinate system
     /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
-    pub fn empty_positive(wx: isize, wy: isize, wz: isize) -> Space {
+    pub fn empty_positive(wx: GridCoordinate, wy: GridCoordinate, wz: GridCoordinate) -> Space {
         Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)))
     }
 

@@ -136,8 +136,8 @@ impl DrawTarget<Rgb888> for VoxelDisplayAdapter<'_> {
         let size = self.space.grid().size();
         Size {
             // TODO: Surely there's a better way to write a saturating cast?
-            width: size.x.min(u32::MAX as isize) as u32,
-            height: size.y.min(u32::MAX as isize) as u32,
+            width: size.x.try_into().unwrap_or(u32::MAX),
+            height: size.y.try_into().unwrap_or(u32::MAX),
         }
     }
 }

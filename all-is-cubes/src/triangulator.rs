@@ -422,7 +422,7 @@ impl TextureTile for () {
     fn write(&mut self, data: &[(u8, u8, u8, u8)]) {
         // Validate data size.
         assert_eq!(
-            isize::try_from(data.len()).expect("tile data way too big"),
+            GridCoordinate::try_from(data.len()).expect("tile data way too big"),
             NullTextureAllocator.size() * NullTextureAllocator.size(),
             "tile data did not match tile size"
         );

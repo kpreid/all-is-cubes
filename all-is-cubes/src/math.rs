@@ -12,7 +12,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Rem};
 
 /// Coordinates that are locked to the cube grid.
-pub type GridCoordinate = isize;
+pub type GridCoordinate = i32;
 /// Positions that are locked to the cube grid.
 pub type GridPoint = Point3<GridCoordinate>;
 /// Vectors that are locked to the cube grid.

@@ -6,7 +6,7 @@
 use rand::{Rng, SeedableRng as _};
 
 use crate::block::{Block, BlockAttributes, AIR};
-use crate::math::{GridPoint, RGBA};
+use crate::math::{GridCoordinate, GridPoint, RGBA};
 use crate::space::Space;
 use crate::universe::{UBorrowMut, Universe};
 
@@ -15,11 +15,11 @@ pub struct BlockGen<'a> {
     /// The `Universe` in which block spaces live.
     pub universe: &'a mut Universe,
     /// The side length of block spaces.
-    pub size: isize,
+    pub size: GridCoordinate,
 }
 
 impl<'a> BlockGen<'a> {
-    pub fn new(universe: &'a mut Universe, size: isize) -> Self {
+    pub fn new(universe: &'a mut Universe, size: GridCoordinate) -> Self {
         assert!(size > 0);
         Self { universe, size }
     }
@@ -119,7 +119,7 @@ impl LandscapeBlocks {
                 // Discrete randomization so that we don't generate too many distinct
                 // block types. TODO: Better strategy, perhaps palette-based.
                 let color_randomization = 1.0 + ((random * 5.0).floor() - 2.0) * 0.05;
-                if point.y >= ctx.size - (random * 3.0 + 1.0) as isize {
+                if point.y >= ctx.size - (random * 3.0 + 1.0) as GridCoordinate {
                     scale_color(grass_color.clone(), color_randomization)
                 } else {
                     scale_color(dirt_color.clone(), color_randomization)
