@@ -109,6 +109,7 @@ pub struct ProjectionHelper {
     inverse_projection_view: M,
 }
 
+#[allow(clippy::cast_lossless)]
 impl ProjectionHelper {
     /// pixel_aspect_ratio is the width divided by the height
     pub fn new(pixel_aspect_ratio: FreeCoordinate, viewport: Vector2<usize>) -> Self {

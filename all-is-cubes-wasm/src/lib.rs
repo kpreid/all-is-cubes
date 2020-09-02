@@ -6,6 +6,8 @@
 //! If this documentation looks strangely blank, it's because non-wasm32 builds have
 //! most of the modules excluded from compilation.
 
+#![warn(clippy::cast_lossless)]
+
 mod block_texture;
 #[cfg(target_arch = "wasm32")]
 pub mod gameapp;

@@ -2,6 +2,7 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 #![allow(clippy::collapsible_if)]
+#![warn(clippy::cast_lossless)]
 
 // TODO: consider exporting individual symbols instead of the modules, because
 // the modules are mostly per-data-type rather than being convenient usage bundles.
