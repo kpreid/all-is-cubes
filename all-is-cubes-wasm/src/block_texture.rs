@@ -12,7 +12,7 @@ use luminance_front::texture::{
 };
 use luminance_front::Backend;
 use std::cell::RefCell;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::rc::{Rc, Weak};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::JsValue;
@@ -30,7 +30,7 @@ use crate::types::{GLBlockVertex, Vertex};
 #[allow(dead_code)] // used in conditionally compiled wasm32 code
 pub struct BlockGLRenderData {
     pub block_render_data: BlocksRenderData<GLBlockVertex, BlockGLTexture>,
-    texture_allocator: BlockGLTexture,
+    pub(crate) texture_allocator: BlockGLTexture,
 }
 
 impl BlockGLRenderData {
@@ -91,7 +91,7 @@ impl BlockGLTexture {
     {
         let layout = AtlasLayout {
             tile_size: 16,
-            row_length: 16,
+            row_length: 8,
             layer_count: 32,
         };
 
@@ -146,19 +146,20 @@ impl BlockGLTexture {
     }
 
     #[allow(dead_code)]
-    fn debug_atlas_tess<C>(&self, context: &mut C) -> Tess<Vertex>
+    pub(crate) fn debug_atlas_tess<C>(&self, context: &mut C) -> Tess<Vertex>
     where
         C: GraphicsContext<Backend = Backend>,
     {
         let mut vertices = Vec::new();
         //for layer in 0..self.layer_count {
+        let layer = 0;
         vertices.extend(&*Vertex::rectangle(
             // position
             Vector3::new(0.0, 0.0, 0.0),
             Vector3::new(1.0, 1.0, 0.0),
             // texture
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 1.0, 0.0),
+            Vector3::new(0.0, 0.0, layer as TextureCoordinate),
+            Vector3::new(1.0, 1.0, layer as TextureCoordinate),
         ));
         //}
         context
@@ -220,6 +221,8 @@ struct AtlasLayout {
     layer_count: AtlasCoord,
 }
 
+/// Type of texel indices (coordinates) and single-row (-column/-layer) tile positions.
+///
 /// Values are stored as u16 because this is all that is necessary for typical GPU limits,
 /// and doing so gives lets us use guaranteed lossless numeric conversions in the
 /// arithmetic (whereas e.g. u32 to f32 is not).
@@ -228,12 +231,15 @@ type AtlasCoord = u16;
 type AtlasIndex = u32; // TODO: Review whether this will be more convenient as usize
 
 impl AtlasLayout {
+    /// Width of the anti-bleeding border.
+    const BORDER: AtlasCoord = 3;
+    const BORDER_USIZE: usize = 3;
+
     /// Texture size in the format used by `luminance`.
     fn dimensions(&self) -> <Dim2Array as Dimensionable>::Size {
-        let texture_edge_length =
-            AtlasIndex::from(self.row_length) * AtlasIndex::from(self.tile_size);
+        let texel_edge_length = self.texel_edge_length();
         (
-            [texture_edge_length, texture_edge_length],
+            [texel_edge_length, texel_edge_length],
             self.layer_count.into(),
         )
     }
@@ -246,11 +252,18 @@ impl AtlasLayout {
     }
 
     #[inline]
+    fn texel_edge_length(&self) -> u32 {
+        u32::from(self.row_length) * u32::from(self.tile_size + Self::BORDER * 2)
+            - u32::from(Self::BORDER * 2)
+    }
+
+    #[inline]
     fn texel_count(&self) -> usize {
         Dim2Array::count(self.dimensions())
     }
 
     /// Compute location in the atlas of a tile, in (s, t, layer) order.
+    /// Units are tiles, not texels.
     ///
     /// Panics if `index >= self.tile_count()`.
     #[inline]
@@ -277,11 +290,12 @@ impl AtlasLayout {
     /// tile, so data mismatches are only graphical glitches.
     #[inline]
     fn index_to_origin(&self, index: AtlasIndex) -> Vector3<TextureCoordinate> {
-        let scale = self.texcoord_scale();
+        let step = TextureCoordinate::from(self.tile_size + Self::BORDER * 2)
+            / (self.texel_edge_length() as TextureCoordinate);
         let (column, row, layer) = self.index_to_location(index);
         Vector3::new(
-            TextureCoordinate::from(column) * scale,
-            TextureCoordinate::from(row) * scale,
+            TextureCoordinate::from(column) * step,
+            TextureCoordinate::from(row) * step,
             // Array texture layers are integers, but passed to the shader as float.
             TextureCoordinate::from(layer),
         )
@@ -289,36 +303,131 @@ impl AtlasLayout {
 
     #[inline]
     fn texcoord_scale(&self) -> TextureCoordinate {
-        TextureCoordinate::from(self.row_length).recip()
+        TextureCoordinate::from(self.tile_size) / (self.texel_edge_length() as TextureCoordinate)
     }
 
     /// Copy texels for one tile into an array arranged according to this layout
     /// (which requires non-contiguous copies).
     #[inline]
     fn copy_to_atlas<T: Copy>(&self, index: AtlasIndex, target: &mut [T], source: &[T]) {
-        // Do our math as usize since we're about to do array indexing anyway.
-        // Conversions should not be able to fail unless we're on a platform where usize
-        // is smaller than 32 bits, which would probably not work anyway.
-        let index: usize = index.try_into().unwrap();
+        // .try_into().unwrap() because we require that usize is at least as big as u32,
+        // but infallible into() conversions don't assume that's true.
         let tile_size: usize = self.tile_size.try_into().unwrap();
+        let bordered_tile_size = tile_size + Self::BORDER_USIZE * 2;
+        let edge_length: usize = self.texel_edge_length().try_into().unwrap();
+        let layer_texels: usize = edge_length * edge_length;
 
-        // Notice that the memory layout means that there is no difference between layers;
-        // it suffices to divide the index by the number of rows.
-        let row_length_tiles: usize = self.row_length.try_into().unwrap();
-        let row_length_texels: usize = row_length_tiles * tile_size;
-        let column = index % row_length_tiles;
-        let memory_row = index / row_length_tiles * tile_size;
+        // Convert tile position to units of texels.
+        let (column, row, layer) = self.index_to_location(index);
+        let column_texel = usize::from(column) * bordered_tile_size;
+        let row_texel = usize::from(row) * bordered_tile_size;
+        let row_in_layer_texel = usize::from(layer) * edge_length + row_texel;
+        let layer_usize: usize = layer.into();
 
-        let copy_stride = row_length_texels;
-        let copy_origin = memory_row * row_length_texels + column * tile_size;
+        // Compute copy location in flat array.
+        let copy_origin =
+            row_in_layer_texel * edge_length + column_texel;
+        let copy_stride = edge_length;
+
         for tile_texel_row in 0..tile_size {
-            target[copy_origin + tile_texel_row * copy_stride
-                ..copy_origin + tile_texel_row * copy_stride + tile_size]
-                .copy_from_slice(
-                    &source[(tile_texel_row * tile_size)..((tile_texel_row + 1) * tile_size)],
-                );
+            let source_offset = tile_texel_row * tile_size;
+            let target_offset = copy_origin + tile_texel_row * copy_stride;
+            let source_row = &source[source_offset..source_offset + tile_size];
+            target[target_offset..target_offset + tile_size].copy_from_slice(source_row);
+        }
+        
+        let blit_data_size = Vector2::new(edge_length, edge_length).cast::<i32>().unwrap(); //  TODO unmess
+        let blit_origin = Vector2::new(column_texel, row_texel).cast::<i32>().unwrap();
+        let tile_size_i32 = i32::from(self.tile_size);
+        let blit_target = &mut target[layer_usize * layer_texels..(layer_usize + 1) * layer_texels];
+        for b in 1_i32..=Self::BORDER.into() {
+            // Duplicate first column of tile for border.
+            blit_with_clipping(
+                blit_target,
+                blit_data_size,
+                blit_origin + Vector2::new(-(b - 1), -(b - 1)),
+                /* copy_size */ Vector2::new(1, tile_size_i32 + b * 2),
+                /* offset */ Vector2::new(-1, 0),
+            ).unwrap();
+            // Duplicate last column of tile for border.
+            blit_with_clipping(
+                blit_target,
+                blit_data_size,
+                blit_origin + Vector2::new(tile_size_i32 - 1 + (b - 1), -{b - 1}),
+                /* copy_size */ Vector2::new(1, tile_size_i32 + b * 2),
+                /* offset */ Vector2::new(1, 0),
+            ).unwrap();
+            // Duplicate first row of tile for border, including the pixels we just duplicated above.
+            blit_with_clipping(
+                blit_target,
+                blit_data_size,
+                blit_origin + Vector2::new(-b, -(b - 1)),
+                /* copy_size */ Vector2::new(tile_size_i32 + b * 2, 1),
+                /* offset */ Vector2::new(0, -1),
+            ).unwrap();
+            // Duplicate last row of tile for border.
+            blit_with_clipping(
+                blit_target,
+                blit_data_size,
+                blit_origin + Vector2::new(-b, tile_size_i32 - 1 + (b - 1)),
+                /* copy_size */ Vector2::new(tile_size_i32 + b * 2, 1),
+                /* offset */ Vector2::new(0, 1),
+            ).unwrap();
         }
     }
+}
+
+/// Copy a rectangle inside a 2D image, excluding pixels which fall out of bounds.
+/// The coordinate type `C` must be signed.
+#[inline]
+fn blit_with_clipping<T, C>(
+    data: &mut [T],
+    data_size: Vector2<C>,
+    mut from_low: Vector2<C>,
+    mut copy_size: Vector2<C>,
+    offset: Vector2<C>,
+) -> Result<(), std::num::TryFromIntError>
+where
+    T: Copy,
+    C: cgmath::BaseNum + std::ops::Neg<Output = C> + std::cmp::Ord + cgmath::Zero,
+    usize: TryFrom<C, Error = std::num::TryFromIntError>,  // TODO should be TryInto
+{
+    // Find rectangle corners
+    let mut from_high = from_low + copy_size;
+    let mut to_low = from_low + offset;
+    let mut to_high = to_low + copy_size;
+
+    // Clip to edges. First, compute how much either from or to fall out of bounds.
+    let low_clip = Vector2::new(
+        (-from_low.x).max(-to_low.x).max(C::zero()),
+        (-from_low.y).max(-to_low.y).max(C::zero()),
+    );
+    let high_clip = Vector2::new(
+        (from_high.x - data_size.x).max(to_high.x - data_size.x).max(C::zero()),
+        (from_high.y - data_size.y).max(to_high.y - data_size.y).max(C::zero()),
+    );
+    // Adjust coordinates.
+    from_low += low_clip;
+    to_low += low_clip;
+    from_high -= high_clip;
+    to_high -= high_clip;
+    copy_size -= low_clip + high_clip;
+    // Short-circuit degenerate rectangles.
+    if copy_size.x <= C::zero() || copy_size.y <= C::zero() {
+        return Ok(());
+    }
+
+    // Perform copy. Now working in usize because we're multiplying and doing array indexing.
+    let data_row_length = usize::try_from(data_size.x)?;
+    let copy_row_length = usize::try_from(copy_size.x)?;
+    let from_low_index = usize::try_from(from_low.y)? * data_row_length + usize::try_from(from_low.x)?;
+    let to_low_index = usize::try_from(to_low.y)? * data_row_length + usize::try_from(to_low.x)?;
+    for y in 0..usize::try_from(copy_size.y)? {
+        let from_row_index = from_low_index + y * data_row_length;
+        let to_row_index = to_low_index + y * data_row_length;
+        data.copy_within(from_row_index..from_row_index + copy_row_length, to_row_index);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
