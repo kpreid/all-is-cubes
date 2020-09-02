@@ -322,7 +322,9 @@ impl AtlasLayout {
         let row_texel = i32::from(row) * bordered_tile_size;
         let layer_usize: usize = layer.into();
 
-        let blit_data_size = Vector2::new(edge_length, edge_length).cast::<i32>().unwrap(); //  TODO unmess
+        let blit_data_size = Vector2::new(edge_length, edge_length)
+            .cast::<i32>()
+            .unwrap(); //  TODO unmess
         let blit_origin = Vector2::new(column_texel, row_texel).cast::<i32>().unwrap();
         let blit_target = &mut target[layer_usize * layer_texels..(layer_usize + 1) * layer_texels];
         let tile_square = Vector2::new(tile_size_i32, tile_size_i32);
@@ -331,9 +333,11 @@ impl AtlasLayout {
             blit_target,
             blit_data_size,
             Some((source, tile_square)),
-            Vector2::zero(),
-            blit_origin,
-            tile_square).unwrap();
+            /* from_low */ Vector2::zero(),
+            /* to_low */ blit_origin,
+            /* copy_size */ tile_square,
+        )
+        .unwrap();
 
         for b in 1_i32..=Self::BORDER.into() {
             // Duplicate first column of tile for border.
@@ -342,36 +346,41 @@ impl AtlasLayout {
                 blit_data_size,
                 None,
                 /* from_low */ blit_origin + Vector2::new(-(b - 1), -(b - 1)),
-                /* to_low */ blit_origin + Vector2::new(-(b - 1), -(b - 1)) + Vector2::new(-1, 0),
+                /* to_low */ blit_origin + Vector2::new(-b, -(b - 1)),
                 /* copy_size */ Vector2::new(1, tile_size_i32 + b * 2),
-            ).unwrap();
+            )
+            .unwrap();
             // Duplicate last column of tile for border.
             blit_with_clipping(
                 blit_target,
                 blit_data_size,
                 None,
-                /* from_low */ blit_origin + Vector2::new(tile_size_i32 - 1 + (b - 1), -{b - 1}),
-                /* to_low */ blit_origin + Vector2::new(tile_size_i32 - 1 + (b - 1), -{b - 1}) + Vector2::new(1, 0),
+                /* from_low */
+                blit_origin + Vector2::new(tile_size_i32 - 1 + (b - 1), -{ b - 1 }),
+                /* to_low */ blit_origin + Vector2::new(tile_size_i32 + (b - 1), -{ b - 1 }),
                 /* copy_size */ Vector2::new(1, tile_size_i32 + b * 2),
-            ).unwrap();
+            )
+            .unwrap();
             // Duplicate first row of tile for border, including the pixels we just duplicated above.
             blit_with_clipping(
                 blit_target,
                 blit_data_size,
                 None,
                 /* from_low */ blit_origin + Vector2::new(-b, -(b - 1)),
-                /* to_low */ blit_origin + Vector2::new(-b, -(b - 1)) + Vector2::new(0, -1),
+                /* to_low */ blit_origin + Vector2::new(-b, -b),
                 /* copy_size */ Vector2::new(tile_size_i32 + b * 2, 1),
-            ).unwrap();
+            )
+            .unwrap();
             // Duplicate last row of tile for border.
             blit_with_clipping(
                 blit_target,
                 blit_data_size,
                 None,
                 /* from_low */ blit_origin + Vector2::new(-b, tile_size_i32 - 1 + (b - 1)),
-                /* to_low */ blit_origin + Vector2::new(-b, tile_size_i32 - 1 + (b - 1)) + Vector2::new(0, 1),
+                /* to_low */ blit_origin + Vector2::new(-b, tile_size_i32 + (b - 1)),
                 /* copy_size */ Vector2::new(tile_size_i32 + b * 2, 1),
-            ).unwrap();
+            )
+            .unwrap();
         }
     }
 }
@@ -381,6 +390,7 @@ impl AtlasLayout {
 ///
 /// If `source` is given it is the array and dimensions to use as the copy source,
 /// otherwise `dest` is used as source and destination.
+// TODO: parameter names are not very consistent
 #[inline]
 fn blit_with_clipping<T, C>(
     dest: &mut [T],
@@ -393,14 +403,14 @@ fn blit_with_clipping<T, C>(
 where
     T: Copy,
     C: cgmath::BaseNum + std::ops::Neg<Output = C> + std::cmp::Ord + cgmath::Zero,
-    usize: TryFrom<C, Error = std::num::TryFromIntError>,  // TODO should be TryInto
+    usize: TryFrom<C, Error = std::num::TryFromIntError>, // TODO should be TryInto
 {
     let source_size = if let Some((_, source_size)) = source {
         source_size
     } else {
         dest_size
     };
-    
+
     // Find rectangle corners
     let mut from_high = from_low + copy_size;
     let mut to_high = to_low + copy_size;
@@ -411,8 +421,12 @@ where
         (-from_low.y).max(-to_low.y).max(C::zero()),
     );
     let high_clip = Vector2::new(
-        (from_high.x - source_size.x).max(to_high.x - dest_size.x).max(C::zero()),
-        (from_high.y - source_size.y).max(to_high.y - dest_size.y).max(C::zero()),
+        (from_high.x - source_size.x)
+            .max(to_high.x - dest_size.x)
+            .max(C::zero()),
+        (from_high.y - source_size.y)
+            .max(to_high.y - dest_size.y)
+            .max(C::zero()),
     );
     // Adjust coordinates.
     from_low += low_clip;
@@ -429,20 +443,24 @@ where
     let source_row_length = usize::try_from(source_size.x)?;
     let dest_row_length = usize::try_from(dest_size.x)?;
     let copy_row_length = usize::try_from(copy_size.x)?;
-    let from_low_index = usize::try_from(from_low.y)? * source_row_length + usize::try_from(from_low.x)?;
+    let from_low_index =
+        usize::try_from(from_low.y)? * source_row_length + usize::try_from(from_low.x)?;
     let to_low_index = usize::try_from(to_low.y)? * dest_row_length + usize::try_from(to_low.x)?;
 
     // Copy.
     // TODO: This isn't being used for overlapping copies, but if it ever is, we need to potentially
-    // reverse the order of iteration. 
+    // reverse the order of iteration.
     for y in 0..usize::try_from(copy_size.y)? {
         let from_row_index = from_low_index + y * source_row_length;
         let to_row_index = to_low_index + y * dest_row_length;
         if let Some((source_slice, _)) = source {
-            dest[to_row_index..to_row_index + copy_row_length].copy_from_slice(
-                &source_slice[from_row_index..from_row_index + copy_row_length]);
+            dest[to_row_index..to_row_index + copy_row_length]
+                .copy_from_slice(&source_slice[from_row_index..from_row_index + copy_row_length]);
         } else {
-            dest.copy_within(from_row_index..from_row_index + copy_row_length, to_row_index);
+            dest.copy_within(
+                from_row_index..from_row_index + copy_row_length,
+                to_row_index,
+            );
         }
     }
     Ok(())
