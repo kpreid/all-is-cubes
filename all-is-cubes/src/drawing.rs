@@ -146,9 +146,9 @@ impl DrawTarget<Rgb888> for VoxelDisplayAdapter<'_> {
 impl From<Rgb888> for RGB {
     fn from(color: Rgb888) -> RGB {
         RGB::new(
-            color.r() as f32 / 255.0,
-            color.g() as f32 / 255.0,
-            color.b() as f32 / 255.0,
+            f32::from(color.r()) / 255.0,
+            f32::from(color.g()) / 255.0,
+            f32::from(color.b()) / 255.0,
         )
     }
 }

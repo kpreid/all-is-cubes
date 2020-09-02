@@ -33,12 +33,17 @@ pub struct PackedLight(Vector3<PackedLightScalar>);
 // Also consider whether we should have gamma -- or even a logarithmic representation.
 
 impl PackedLight {
+    /// Unit value of these fixed-point color components.
     const UNIT: PackedLightScalar = 64;
+    /// `UNIT` as a f32 value, for use in conversions in and out.
+    const UNIT_F32: f32 = 64.0;
+
     pub const INITIAL: PackedLight = PackedLight(Vector3::new(
         PackedLight::UNIT,
         PackedLight::UNIT,
         PackedLight::UNIT,
     ));
+
     /// Light that is considered to exist in all directions outside the world.
     pub const SKY: PackedLight = PackedLight::INITIAL;
 
@@ -55,27 +60,27 @@ impl PackedLight {
 impl From<RGB> for PackedLight {
     fn from(value: RGB) -> Self {
         PackedLight(Vector3::new(
-            (value.red() * PackedLight::UNIT as f32) as PackedLightScalar,
-            (value.green() * PackedLight::UNIT as f32) as PackedLightScalar,
-            (value.blue() * PackedLight::UNIT as f32) as PackedLightScalar,
+            (value.red() * PackedLight::UNIT_F32) as PackedLightScalar,
+            (value.green() * PackedLight::UNIT_F32) as PackedLightScalar,
+            (value.blue() * PackedLight::UNIT_F32) as PackedLightScalar,
         ))
     }
 }
 impl From<PackedLight> for [f32; 3] {
     fn from(value: PackedLight) -> Self {
         [
-            value.0[0] as f32 / PackedLight::UNIT as f32,
-            value.0[1] as f32 / PackedLight::UNIT as f32,
-            value.0[2] as f32 / PackedLight::UNIT as f32,
+            f32::from(value.0[0]) / PackedLight::UNIT_F32,
+            f32::from(value.0[1]) / PackedLight::UNIT_F32,
+            f32::from(value.0[2]) / PackedLight::UNIT_F32,
         ]
     }
 }
 impl From<PackedLight> for RGB {
     fn from(value: PackedLight) -> Self {
         RGB::new(
-            value.0[0] as f32 / PackedLight::UNIT as f32,
-            value.0[1] as f32 / PackedLight::UNIT as f32,
-            value.0[2] as f32 / PackedLight::UNIT as f32,
+            f32::from(value.0[0]) / PackedLight::UNIT_F32,
+            f32::from(value.0[1]) / PackedLight::UNIT_F32,
+            f32::from(value.0[2]) / PackedLight::UNIT_F32,
         )
     }
 }
@@ -104,8 +109,8 @@ lazy_static! {
                     rays.push(LightRay {
                         origin,
                         direction: face.matrix().transform_vector(Vector3::new(
-                            rayx as FreeCoordinate,
-                            rayy as FreeCoordinate,
+                            rayx.into(),
+                            rayy.into(),
                             1.0,
                         )),
                     });

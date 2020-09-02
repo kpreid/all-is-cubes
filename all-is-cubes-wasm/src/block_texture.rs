@@ -261,7 +261,7 @@ impl AtlasLayout {
         let row = row_and_layer % row_length;
         let layer = row_and_layer / row_length;
         assert!(
-            layer <= self.layer_count as AtlasIndex,
+            layer <= AtlasIndex::from(self.layer_count),
             "Atlas tile index {} out of range",
             index
         );
@@ -289,7 +289,7 @@ impl AtlasLayout {
 
     #[inline]
     fn texcoord_scale(&self) -> TextureCoordinate {
-        (self.row_length as TextureCoordinate).recip()
+        TextureCoordinate::from(self.row_length).recip()
     }
 
     /// Copy texels for one tile into an array arranged according to this layout
