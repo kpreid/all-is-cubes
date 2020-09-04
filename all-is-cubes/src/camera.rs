@@ -4,8 +4,8 @@
 //! Basic camera. TODO: This will eventually become 'character', probably, but for now we have static worlds and want to move a viewpoint around.
 
 use cgmath::{
-    Deg, EuclideanSpace, Matrix3, Matrix4, Point3, SquareMatrix, Transform, Vector2, Vector3,
-    Vector4,
+    Deg, EuclideanSpace, Matrix3, Matrix4, Point2, Point3, SquareMatrix, Transform, Vector2,
+    Vector3, Vector4,
 };
 use num_traits::identities::Zero;
 use std::time::Duration;
@@ -107,6 +107,11 @@ pub struct ProjectionHelper {
     // Derived data
     projection: M,
     inverse_projection_view: M,
+
+    /// Position of mouse pointer or other input device in normalized device coordinates
+    /// (range -1 to 1 upward and rightward). If there is no such input device, zero will
+    /// be the center of the screen.
+    pub cursor_ndc_position: Vector2<FreeCoordinate>,
 }
 
 #[allow(clippy::cast_lossless)]
@@ -125,6 +130,7 @@ impl ProjectionHelper {
             projection: M::identity(), // overwritten immediately
             view: M::identity(),
             inverse_projection_view: M::identity(), // overwritten immediately
+            cursor_ndc_position: Vector2::zero(),
         };
         new_self.compute_matrices();
         new_self
@@ -141,6 +147,14 @@ impl ProjectionHelper {
         }
     }
 
+    /// Set the current cursor position. In the same pixel units as `set_viewport`.
+    pub fn set_cursor_position(&mut self, position: Point2<usize>) {
+        self.cursor_ndc_position = Vector2::new(
+            self.normalize_pixel_x(position.x),
+            self.normalize_pixel_y(position.y),
+        );
+    }
+
     pub fn set_view_matrix(&mut self, view: M) {
         if view != self.view {
             self.view = view;
@@ -155,7 +169,7 @@ impl ProjectionHelper {
 
     /// As per OpenGL normalized device coordinates, output ranges from -1 to 1.
     pub fn normalize_pixel_y(&self, y: usize) -> FreeCoordinate {
-        (y as FreeCoordinate + 0.5) / (self.viewport.y as FreeCoordinate) * 2.0 - 1.0
+        -((y as FreeCoordinate + 0.5) / (self.viewport.y as FreeCoordinate) * 2.0 - 1.0)
     }
 
     /// Returns a projection matrix suitable for OpenGL use.
@@ -177,6 +191,12 @@ impl ProjectionHelper {
             origin: world_near,
             direction,
         }
+    }
+
+    /// Convert the cursor position into a ray in world space.
+    /// Uses the view transformation given by `set_view_matrix`.
+    pub fn project_cursor_into_world(&self) -> Ray {
+        self.project_ndc_into_world(self.cursor_ndc_position.x, self.cursor_ndc_position.y)
     }
 
     fn compute_matrices(&mut self) {

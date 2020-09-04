@@ -98,7 +98,7 @@ pub fn draw_space<O: io::Write>(
     let pixel_iterator = (0..viewport.y)
         .into_par_iter()
         .map(move |ych| {
-            let y = -projection.normalize_pixel_y(ych);
+            let y = projection.normalize_pixel_y(ych);
             (0..viewport.x).into_par_iter().map(move |xch| {
                 let x = projection_copy_for_parallel.normalize_pixel_x(xch);
                 (xch, ych, x, y)

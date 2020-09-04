@@ -1,7 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-use cgmath::{Vector2, Zero as _};
+use cgmath::Point2;
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
 use luminance_windowing::WindowOpt;
@@ -17,7 +17,6 @@ use web_sys::{
 
 use all_is_cubes::camera::{cursor_raycast, Camera};
 use all_is_cubes::demo_content::new_universe_with_stuff;
-use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::space::{Space, SpaceStepInfo};
 use all_is_cubes::universe::{FrameClock, URef, Universe};
 
@@ -81,7 +80,6 @@ struct WebGameRoot {
     frame_clock: FrameClock,
     last_raf_timestamp: f64,
     last_step_info: SpaceStepInfo,
-    cursor_ndc_position: Vector2<FreeCoordinate>,
 }
 
 impl WebGameRoot {
@@ -107,7 +105,6 @@ impl WebGameRoot {
             frame_clock: FrameClock::new(),
             last_raf_timestamp: 0.0, // TODO better initial value or special case
             last_step_info: SpaceStepInfo::default(),
-            cursor_ndc_position: Vector2::zero(),
         }));
 
         // Add the self-references.
@@ -175,9 +172,9 @@ impl WebGameRoot {
             if let Some(refcell_ref) = self_ref.upgrade() {
                 let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
 
-                self2.cursor_ndc_position = Vector2::new(
-                    event.client_x().into(),
-                    event.client_y().into());
+                self2.renderer.set_cursor_position(Point2::new(
+                    event.client_x() as usize,
+                    event.client_y() as usize));
             }
         }, &AddEventListenerOptions::new().passive(true));
     }
@@ -205,7 +202,7 @@ impl WebGameRoot {
             // Compute info text.
             // TODO: tidy up cursor result formatting, make it reusable
             let cursor_result =
-                cursor_raycast(self.renderer.cursor_raycaster(), &*self.space_ref.borrow());
+                cursor_raycast(self.renderer.cursor_ray().cast(), &*self.space_ref.borrow());
             let cursor_result_text = match cursor_result {
                 Some(cursor) => Cow::Owned(format!("{}", cursor)),
                 None => Cow::Borrowed("No block"),

@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Matrix4, SquareMatrix as _};
+use cgmath::{Matrix4, Point2, SquareMatrix as _};
 use luminance_derive::UniformInterface;
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
@@ -21,7 +21,7 @@ use web_sys::console;
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{Face, FaceMap};
-use all_is_cubes::raycast::Raycaster;
+use all_is_cubes::raycast::Ray;
 use all_is_cubes::space::Space;
 use all_is_cubes::triangulator::{triangulate_space, BlocksRenderData};
 use all_is_cubes::universe::URef;
@@ -216,8 +216,12 @@ where
         info
     }
 
-    pub fn cursor_raycaster(&self /* TODO: offset ... or move this function */) -> Raycaster {
-        self.proj.project_ndc_into_world(0.0, 0.0).cast()
+    // TODO: These two functions are a workaround for self.proj being private; arguably this stuff doesn't even belong there or here. Find a better structure.
+    pub fn set_cursor_position(&mut self, position: Point2<usize>) {
+        self.proj.set_cursor_position(position);
+    }
+    pub fn cursor_ray(&self) -> Ray {
+        self.proj.project_cursor_into_world()
     }
 }
 
