@@ -8,7 +8,8 @@ use luminance_front::context::GraphicsContext;
 use luminance_front::pixel::NormRGBA8UI;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::texture::{
-    Dim2Array, Dimensionable, GenMipmaps, MagFilter, Sampler, Texture, TextureError, Wrap,
+    Dim2Array, Dimensionable, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, TextureError,
+    Wrap,
 };
 use luminance_front::Backend;
 use std::cell::RefCell;
@@ -105,6 +106,7 @@ impl BlockGLTexture {
                     wrap_s: Wrap::ClampToEdge,
                     wrap_t: Wrap::ClampToEdge,
                     mag_filter: MagFilter::Nearest,
+                    min_filter: MinFilter::Nearest,
                     ..Sampler::default()
                 },
             )?,
@@ -134,7 +136,7 @@ impl BlockGLTexture {
             })
         });
 
-        self.texture.upload(GenMipmaps::Yes, &texels)?;
+        self.texture.upload(GenMipmaps::No, &texels)?;
 
         // TODO: Platform-neutral logging.
         #[cfg(target_arch = "wasm32")]
