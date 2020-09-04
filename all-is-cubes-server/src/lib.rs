@@ -4,3 +4,4 @@
 #![warn(clippy::cast_lossless)]
 
 pub mod console;
+pub mod webserver;

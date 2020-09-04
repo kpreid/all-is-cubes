@@ -5,7 +5,7 @@
 # bundled together with conventional names rather than a collection of shell
 # scripts.
 
-.PHONY: all lint test run-server update
+.PHONY: all lint test run-dev run-game-server update
 
 all:
 	cargo build  # ignores wasm-only code
@@ -20,8 +20,13 @@ test:
 	cargo test  # ignores wasm-only code
 	(cd all-is-cubes-wasm && npm test)
 
-run-server:
+run-dev:
+	# Live-reloading webpack dev server; not a game server
 	(cd all-is-cubes-wasm && npm start)
+
+run-game-server: all
+	# Game server
+	cargo run --bin aic-server
 
 update:
 	cargo update

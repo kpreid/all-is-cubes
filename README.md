@@ -20,11 +20,11 @@ Because of the complication of having some wasm-specific code, some commands for
 
 *   Lint: `make lint`
 
-*   Development server: `make run-server`
+*   Development server: `make run-dev`
 
     Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-wasm/`.*
 
-*   Run the terminal raytracer version: `cargo run`
+*   Run the terminal raytracer version: `cargo run --bin aic-console`
 
 License
 -------
