@@ -8,8 +8,10 @@
 .PHONY: all lint test run-dev run-game-server update
 
 all:
-	cargo build  # ignores wasm-only code
+	cargo build --package all-is-cubes
 	(cd all-is-cubes-wasm && npm run-script build)
+	# Server statically embeds results of wasm build, so it must be run last to be fresh.
+	cargo build --package all-is-cubes-server
 
 lint:
 	cargo clippy  # ignores wasm-only code
