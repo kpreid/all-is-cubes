@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::block::Block;
 use crate::math::FreeCoordinate;
 use crate::physics::Body;
-use crate::raycast::{RaycastStep, Raycaster};
+use crate::raycast::{Ray, RaycastStep, Raycaster};
 use crate::space::{Grid, Space};
 use crate::util::ConciseDebug as _;
 
@@ -166,18 +166,17 @@ impl ProjectionHelper {
     /// Convert a screen position in normalized device coordinates (as produced by
     /// `normalize_pixel_x` & `normalize_pixel_y`) into a ray in world space.
     /// Uses the view transformation given by `set_view_matrix`.
-    pub fn project_ndc_into_world(
-        &self,
-        ndc_x: FreeCoordinate,
-        ndc_y: FreeCoordinate,
-    ) -> (Point3<FreeCoordinate>, Vector3<FreeCoordinate>) {
+    pub fn project_ndc_into_world(&self, ndc_x: FreeCoordinate, ndc_y: FreeCoordinate) -> Ray {
         let ndc_near = Vector4::new(ndc_x, ndc_y, -1.0, 1.0);
         let ndc_far = Vector4::new(ndc_x, ndc_y, 1.0, 1.0);
         // World-space endpoints of the ray.
         let world_near = Point3::from_homogeneous(self.inverse_projection_view * ndc_near);
         let world_far = Point3::from_homogeneous(self.inverse_projection_view * ndc_far);
         let direction = world_far - world_near;
-        (world_near, direction)
+        Ray {
+            origin: world_near,
+            direction,
+        }
     }
 
     fn compute_matrices(&mut self) {

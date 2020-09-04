@@ -217,8 +217,7 @@ where
     }
 
     pub fn cursor_raycaster(&self /* TODO: offset ... or move this function */) -> Raycaster {
-        let (origin, direction) = self.proj.project_ndc_into_world(0.0, 0.0);
-        Raycaster::new(origin, direction)
+        self.proj.project_ndc_into_world(0.0, 0.0).cast()
     }
 }
 

@@ -14,7 +14,7 @@ use typed_arena::Arena;
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
-use all_is_cubes::raycast::{Face, Raycaster};
+use all_is_cubes::raycast::{Face, Ray};
 use all_is_cubes::space::{Grid, GridArray, PackedLight, Space, SKY};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
@@ -107,8 +107,8 @@ pub fn draw_space<O: io::Write>(
         .flatten();
 
     let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
-        let (origin, direction) = projection_copy_for_parallel.project_ndc_into_world(x, y);
-        let (text, count) = character_from_ray(origin, direction, grid, &space_data);
+        let ray = projection_copy_for_parallel.project_ndc_into_world(x, y);
+        let (text, count) = character_from_ray(ray, grid, &space_data);
         (xch, ych, text, count)
     });
 
@@ -135,13 +135,12 @@ pub fn draw_space<O: io::Write>(
 
 /// Compute a colored character corresponding to what one ray hits.
 fn character_from_ray(
-    origin: Point3<FreeCoordinate>,
-    direction: Vector3<FreeCoordinate>,
+    ray: Ray,
     grid: Grid,
     space_data: &GridArray<TracingCubeData>,
 ) -> TraceResult {
     let mut s: TracingState = TracingState::default();
-    for hit in Raycaster::new(origin, direction).within_grid(grid) {
+    for hit in ray.cast().within_grid(grid) {
         if s.count_step_should_stop() {
             break;
         }
@@ -173,14 +172,15 @@ fn character_from_ray(
                 // Find where the origin in the space's coordinate system is.
                 // TODO: Raycaster does not efficiently implement advancing from outside a
                 // grid. Fix that to get way more performance.
-                let adjusted_origin = Point3::from_vec(
-                    (origin - hit.cube.cast::<FreeCoordinate>().unwrap())
-                        * FreeCoordinate::from(array.grid().size().x),
-                );
+                let adjusted_ray = Ray {
+                    origin: Point3::from_vec(
+                        (ray.origin - hit.cube.cast::<FreeCoordinate>().unwrap())
+                            * FreeCoordinate::from(array.grid().size().x),
+                    ),
+                    ..ray
+                };
 
-                for subcube_hit in
-                    Raycaster::new(adjusted_origin, direction).within_grid(*array.grid())
-                {
+                for subcube_hit in adjusted_ray.cast().within_grid(*array.grid()) {
                     if s.count_step_should_stop() {
                         break;
                     }

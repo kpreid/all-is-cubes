@@ -5,11 +5,42 @@
 
 use cgmath::{Point3, Vector3};
 use num_traits::identities::Zero;
+use std::ops::Add;
 
 use crate::math::{FreeCoordinate, GridCoordinate, Modulo};
 use crate::space::Grid;
 
 pub use crate::math::Face; // necessary for any use of raycast, so let it be used
+
+/// A ray; a half-infinite line segment.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Ray {
+    /// The sole endpoint of the ray.
+    pub origin: Point3<FreeCoordinate>,
+
+    /// The direction in which the ray extends infinitely.
+    ///
+    /// The meaning, if any, of the magnitude of this vector depends on context.
+    pub direction: Vector3<FreeCoordinate>,
+}
+
+impl Ray {
+    /// Construct a `Raycaster` initialized with this ray.
+    pub fn cast(&self) -> Raycaster {
+        Raycaster::new(self.origin, self.direction)
+    }
+}
+
+impl Add<Vector3<FreeCoordinate>> for Ray {
+    type Output = Self;
+    /// Translate this ray; add the argument to its origin.
+    fn add(self, offset: Vector3<FreeCoordinate>) -> Self {
+        Self {
+            origin: self.origin + offset,
+            ..self
+        }
+    }
+}
 
 /// Iterator over grid positions that intersect a given ray.
 ///

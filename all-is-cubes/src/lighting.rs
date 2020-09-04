@@ -4,12 +4,12 @@
 //! Lighting algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
-use cgmath::{Transform as _, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
 use lazy_static::lazy_static;
 use std::convert::TryInto as _;
 
 use crate::math::*;
-use crate::raycast::Raycaster;
+use crate::raycast::Ray;
 use crate::space::*;
 
 pub(crate) type PackedLightScalar = u8;
@@ -89,24 +89,19 @@ impl From<PackedLight> for RGB {
 #[derive(Clone, Copy, Debug)]
 struct FaceRayData {
     reflect_face: Vector3<GridCoordinate>,
-    rays: [LightRay; 3 * 3],
-}
-#[derive(Clone, Copy, Debug)]
-struct LightRay {
-    origin: Vector3<FreeCoordinate>,
-    direction: Vector3<FreeCoordinate>,
+    rays: [Ray; 3 * 3],
 }
 
 lazy_static! {
     static ref LIGHT_RAYS: [FaceRayData; 6] = {
         let mut ray_data = Vec::new();
         for &face in Face::ALL_SIX {
-            let origin = Vector3::new(0.5, 0.5, 0.5) + face.normal_vector() * -0.25;
+            let origin = Point3::new(0.5, 0.5, 0.5) + face.normal_vector() * -0.25;
             let reflect_face = Vector3::new(0, 0, 0) + face.normal_vector() * -1;
             let mut rays = Vec::new();
             for rayx in -1..=1 {
                 for rayy in -1..=1 {
-                    rays.push(LightRay {
+                    rays.push(Ray {
                         origin,
                         direction: face.matrix().transform_vector(Vector3::new(
                             rayx.into(),
@@ -193,11 +188,9 @@ impl Space {
                 for ray in &face_ray_data.rays {
                     // TODO this is wrong it is not the nested algorithm
                     total_rays += 1;
-                    let raycaster = Raycaster::new(
-                        cube.cast::<FreeCoordinate>().unwrap() + ray.origin,
-                        ray.direction,
-                    )
-                    .within_grid(*self.grid());
+                    let raycaster = (*ray + cube.cast::<FreeCoordinate>().unwrap().to_vec())
+                        .cast()
+                        .within_grid(*self.grid());
                     // TODO tracing variables ...
                     let mut found = false;
                     for hit in raycaster {
