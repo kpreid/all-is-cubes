@@ -43,7 +43,9 @@ pub fn new_universe_with_stuff() -> Universe {
     let (axis_block, mut axis_space) = bg.new_recursive_block(BlockAttributes::default());
     axes(&mut *axis_space);
 
-    let grid = Grid::new((-16, -16, -16), (33, 33, 33));
+    let radius = 16;
+    let diameter = radius * 2 + 1;
+    let grid = Grid::new((-radius, -radius, -radius), (diameter, diameter, diameter));
     let mut space = Space::empty(grid);
     wavy_landscape(&mut space, &blocks, 1.0);
     axes(&mut space);
