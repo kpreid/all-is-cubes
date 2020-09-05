@@ -32,6 +32,12 @@ pub trait Modulo<M = Self> {
 
 // Implementing Modulo on a case-by-case basis because the compiler objected
 // to providing impls for both Vector3 and the full generality of modulo_impl.
+impl Modulo for usize {
+    type Output = Self;
+    fn modulo(self, modulus: Self) -> Self {
+        modulo_impl(self, modulus)
+    }
+}
 impl Modulo for f32 {
     type Output = Self;
     fn modulo(self, modulus: Self) -> Self {
@@ -319,6 +325,7 @@ impl RGB {
 impl RGBA {
     /// Transparent black (all components zero).
     pub const TRANSPARENT: RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 0.0));
+    pub const BLACK: RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 1.0));
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.

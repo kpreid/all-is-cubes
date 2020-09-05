@@ -3,9 +3,10 @@
 
 //! Key data types for graphics code to use.
 
-use cgmath::{EuclideanSpace as _, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Vector3};
 use luminance_derive::{Semantics, Vertex};
 
+use all_is_cubes::math::{FreeCoordinate, RGBA};
 use all_is_cubes::space::PackedLight;
 use all_is_cubes::triangulator::{BlockVertex, Coloring, ToGfxVertex};
 
@@ -47,6 +48,28 @@ pub struct Vertex {
 }
 
 impl Vertex {
+    /// A vertex which will not be rendered.
+    pub const DUMMY: Vertex = Vertex {
+        position: VertexPosition::new([f32::INFINITY, f32::INFINITY, f32::INFINITY]),
+        normal: VertexNormal::new([0.0, 0.0, 0.0]),
+        color_or_texture: VertexColorOrTexture::new([0.0, 0.0, 0.0, 0.0]),
+        lighting: VertexLighting::new([0.0, 0.0, 0.0]),
+    };
+
+    /// Constructor taking our natural types instead of luminance specialized types.
+    pub fn new_colored(
+        position: Point3<FreeCoordinate>,
+        normal: Vector3<FreeCoordinate>,
+        color: RGBA,
+    ) -> Self {
+        Self {
+            position: VertexPosition::new(position.cast::<f32>().unwrap().into()),
+            normal: VertexNormal::new(normal.cast::<f32>().unwrap().into()),
+            color_or_texture: VertexColorOrTexture::new(color.into()),
+            lighting: VertexLighting::new([1.0, 1.0, 1.0]),
+        }
+    }
+
     /// Make an axis-aligned rectangle. Convenience for debug code.
     /// Assumes `size` is positive.
     #[allow(dead_code)]

@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Matrix4, Point2, SquareMatrix as _};
+use cgmath::{Matrix4, Point2, SquareMatrix as _, Vector3, Zero as _};
 use luminance_derive::UniformInterface;
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
@@ -19,9 +19,8 @@ use luminance_front::Backend;
 use wasm_bindgen::prelude::JsValue;
 use web_sys::console;
 
-use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::{Face, FaceMap};
-use all_is_cubes::raycast::Ray;
+use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
+use all_is_cubes::math::{Face, FaceMap, GridCoordinate, Modulo as _, RGBA};
 use all_is_cubes::space::Space;
 use all_is_cubes::triangulator::{triangulate_space, BlocksRenderData};
 use all_is_cubes::universe::URef;
@@ -52,6 +51,7 @@ where
     // Miscellaneous
     canvas_helper: CanvasHelper,
     proj: ProjectionHelper,
+    pub(crate) cursor_result: Option<Cursor>,
 }
 
 impl<C> GLRenderer<C>
@@ -104,6 +104,7 @@ where
             chunk: Chunk::new(),
             canvas_helper,
             proj,
+            cursor_result: None,
         }
     }
 
@@ -122,10 +123,6 @@ where
 
     pub fn render_frame(&mut self, camera: &Camera) -> RenderInfo {
         let mut info = RenderInfo::default();
-
-        // Not used directly for rendering, but used for cursor.
-        self.proj.set_view_matrix(camera.view());
-
         let space: &Space = &*(if let Some(space_ref) = &self.space {
             space_ref.borrow()
         } else {
@@ -134,6 +131,12 @@ where
         let surface = &mut self.surface;
         let block_program = &mut self.block_program;
         let projection_matrix = self.proj.projection();
+
+        // Update cursor state. This is, strictly speaking, not rendering, but it is closely
+        // related in that the cursor should match the pixels being drawn.
+        // TODO: Figure out how to lay this out with more separation of concerns, though.
+        self.proj.set_view_matrix(camera.view());
+        self.cursor_result = cursor_raycast(self.proj.project_cursor_into_world().cast(), space);
 
         // TODO: quick hack; we need actual invalidation, not memoization
         let block_data = self.block_data_cache.get_or_insert_with(|| {
@@ -150,6 +153,9 @@ where
         });
 
         // let debug_tess = block_data.texture_allocator.debug_atlas_tess(surface);
+
+        // TODO: cache
+        let cursor_tess = make_cursor_tess(surface, &self.cursor_result);
 
         let render = surface
             .new_pipeline_gate()
@@ -177,6 +183,7 @@ where
 
                         render_gate.render(&render_state, |mut tess_gate| {
                             info.square_count += ct.render(&mut tess_gate)?;
+                            tess_gate.render(&cursor_tess)?;
                             Ok(())
                         })?;
 
@@ -216,12 +223,9 @@ where
         info
     }
 
-    // TODO: These two functions are a workaround for self.proj being private; arguably this stuff doesn't even belong there or here. Find a better structure.
+    // TODO: This is a workaround for self.proj being private; arguably doesn't even belong there or here. Find a better structure.
     pub fn set_cursor_position(&mut self, position: Point2<usize>) {
         self.proj.set_cursor_position(position);
-    }
-    pub fn cursor_ray(&self) -> Ray {
-        self.proj.project_cursor_into_world()
     }
 }
 
@@ -326,4 +330,48 @@ impl Chunk {
         }
         Ok(count)
     }
+}
+
+fn make_cursor_tess<C>(context: &mut C, cursor_result: &Option<Cursor>) -> Tess<Vertex>
+where
+    C: GraphicsContext<Backend = Backend>,
+{
+    // TODO: reuse instead of building anew
+    let mut vertices = Vec::with_capacity(3 /* axes */ * 4 /* lines */ * 2 /* vertices */);
+    if let Some(cursor) = cursor_result {
+        let origin = cursor.place.cube;
+        let cursor_vertex = |v: Vector3<GridCoordinate>| {
+            Vertex::new_colored(
+                (origin + v).cast::<f64>().unwrap(),
+                Vector3::zero(),
+                RGBA::BLACK,
+            )
+        };
+        for axis in 0..3 {
+            let mut offset = Vector3::zero();
+            // Walk from (0, 0, 0) to (1, 1, 1) in a helix.
+            vertices.push(cursor_vertex(offset));
+            offset[axis] = 1;
+            vertices.push(cursor_vertex(offset));
+            vertices.push(cursor_vertex(offset));
+            offset[(axis + 1).modulo(3)] = 1;
+            vertices.push(cursor_vertex(offset));
+            vertices.push(cursor_vertex(offset));
+            offset[(axis + 2).modulo(3)] = 1;
+            vertices.push(cursor_vertex(offset));
+            // Go back and fill in the remaining bar.
+            offset[(axis + 2).modulo(3)] = 0;
+            vertices.push(cursor_vertex(offset));
+            offset[axis] = 0;
+            vertices.push(cursor_vertex(offset));
+        }
+    } else {
+        vertices.push(Vertex::DUMMY);
+    };
+    context
+        .new_tess()
+        .set_vertices(vertices)
+        .set_mode(Mode::Line)
+        .build()
+        .unwrap()
 }

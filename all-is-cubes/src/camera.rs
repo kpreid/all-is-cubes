@@ -232,8 +232,8 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
-    place: RaycastStep,
-    block: Block,
+    pub place: RaycastStep,
+    pub block: Block,
 }
 
 impl std::fmt::Display for Cursor {

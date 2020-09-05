@@ -15,9 +15,9 @@ use web_sys::{
     console, AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, Text,
 };
 
-use all_is_cubes::camera::{cursor_raycast, Camera};
+use all_is_cubes::camera::Camera;
 use all_is_cubes::demo_content::new_universe_with_stuff;
-use all_is_cubes::space::{Space, SpaceStepInfo};
+use all_is_cubes::space::SpaceStepInfo;
 use all_is_cubes::universe::{FrameClock, URef, Universe};
 
 use crate::glrender::GLRenderer;
@@ -71,7 +71,6 @@ struct WebGameRoot {
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
     universe: Universe,
-    space_ref: URef<Space>,
     camera_ref: URef<Camera>,
     renderer: GLRenderer<WebSysWebGL2Surface>,
     raf_callback: Closure<dyn FnMut(f64)>,
@@ -95,7 +94,6 @@ impl WebGameRoot {
 
             gui_helpers,
             static_dom,
-            space_ref: universe.get_default_space(),
             camera_ref: universe.get_default_camera(),
             universe,
             renderer,
@@ -201,9 +199,7 @@ impl WebGameRoot {
 
             // Compute info text.
             // TODO: tidy up cursor result formatting, make it reusable
-            let cursor_result =
-                cursor_raycast(self.renderer.cursor_ray().cast(), &*self.space_ref.borrow());
-            let cursor_result_text = match cursor_result {
+            let cursor_result_text = match &self.renderer.cursor_result {
                 Some(cursor) => Cow::Owned(format!("{}", cursor)),
                 None => Cow::Borrowed("No block"),
             };
