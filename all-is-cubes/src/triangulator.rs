@@ -26,7 +26,6 @@ pub type TextureCoordinate = f32;
 /// Generic structure of output from triangulator. Implement `GfxVertex`
 /// to provide a specialized version.
 #[derive(Clone, Copy, PartialEq)]
-#[non_exhaustive]
 pub struct BlockVertex {
     pub position: Point3<FreeCoordinate>,
     pub normal: Vector3<FreeCoordinate>, // TODO: Use a smaller number type? Storage vs convenience?

@@ -140,3 +140,46 @@ impl ToGfxVertex<Vertex> for GLBlockVertex {
         }
     }
 }
+
+#[cfg(test)]
+#[rustfmt::skip]
+mod tests {
+    use super::*;
+    use cgmath::Vector3;
+
+    #[test]
+    fn vertex_dummy() {
+        assert!(!Vertex::DUMMY.position.repr[0].is_finite());
+    }
+
+    #[test]
+    fn vertex_new_colored() {
+        let vertex = Vertex::new_colored(
+            Point3::new(1.0, 2.0, 3.0),
+            Vector3::new(4.0, 5.0, 6.0),
+            RGBA::new(7.0, 8.0, 9.0, 0.5),
+        );
+        assert_eq!(vertex.position.repr, [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.normal.repr, [4.0, 5.0, 6.0]);
+        assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 0.5]);
+        assert_eq!(vertex.lighting.repr, [1.0, 1.0, 1.0]);
+    }
+
+    /// Full path used by normal rendering.
+    #[test]
+    fn vertex_from_block_vertex() {
+        let block_vertex = BlockVertex {
+            position: Point3::new(1.0, 2.0, 3.0),
+            normal: Vector3::new(4.0, 5.0, 6.0),
+            coloring: Coloring::Solid(RGBA::new(7.0, 8.0, 9.0, 0.5)),
+        };
+        let vertex = GLBlockVertex::from(block_vertex).instantiate(
+            Vector3::new(0.1, 0.2, 0.3),
+            PackedLight::INITIAL,
+        );
+        assert_eq!(vertex.position.repr, [1.1, 2.2, 3.3]);
+        assert_eq!(vertex.normal.repr, [4.0, 5.0, 6.0]);
+        assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 1.0]);  // alpha is currently locked to 1
+        assert_eq!(vertex.lighting.repr, [1.0, 1.0, 1.0]);
+    }
+}
