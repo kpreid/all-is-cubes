@@ -11,9 +11,14 @@
 // Construct all GUI helper objects that refer to elements defined in the HTML
 // rather than created dynamically.
 export function makeAllStaticGuiHelpers(window, document) {
-  return {
+  const result = {
     canvasHelper: new CanvasHelper(document.getElementById('view-canvas')),
   };
+
+  // Set up initial focus
+  result.canvasHelper.canvas.focus();
+
+  return result;
 }
 
 // Manages a <canvas> element; particularly, resizing it to have 1:1 pixel resolution.
