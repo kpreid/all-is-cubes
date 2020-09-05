@@ -61,9 +61,9 @@ pub fn new_universe_with_stuff() -> Universe {
         space.set(cube + GridVector::new(-16, 3, -14), &text_blocks[cube]);
     }
 
-    universe.insert("space".into(), space);
+    let space_ref = universe.insert("space".into(), space);
 
-    let camera = Camera::for_grid(&grid);
+    let camera = Camera::for_space(space_ref);
     universe.insert("camera".into(), camera);
     universe
 }
@@ -77,7 +77,8 @@ mod tests {
     #[test]
     pub fn new_universe_smoke_test() {
         let mut u = new_universe_with_stuff();
-        u.get_default_space();
+        let _ = u.get_default_camera().borrow();
+        let _ = u.get_default_space().borrow();
         u.step(Duration::from_millis(10));
     }
 }

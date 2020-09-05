@@ -22,7 +22,6 @@ use all_is_cubes_server::console::{controller, draw_space, viewport_from_termina
 fn main() -> io::Result<()> {
     let mut universe = new_universe_with_stuff();
     let camera_ref = universe.get_default_camera();
-    let space_ref = universe.get_default_space();
     let mut proj: ProjectionHelper = ProjectionHelper::new(0.5, viewport_from_terminal_size()?);
     let mut out = io::stdout().into_raw_mode()?;
 
@@ -76,12 +75,7 @@ fn main() -> io::Result<()> {
             frame_clock.did_step();
         }
         if frame_clock.should_draw() {
-            draw_space(
-                &*space_ref.borrow(),
-                &mut proj,
-                &camera_ref.borrow(),
-                &mut out,
-            )?;
+            draw_space(&mut proj, &camera_ref.borrow(), &mut out)?;
             frame_clock.did_draw();
         }
     }

@@ -45,7 +45,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
     let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper());
-    renderer.set_space(Some(universe.get_default_space()));
+    renderer.set_camera(Some(universe.get_default_camera()));
 
     static_dom.scene_info_text_node.append_data("\nGL ready.")?;
 
@@ -195,7 +195,7 @@ impl WebGameRoot {
             self.renderer.update_viewport();
 
             // Do graphics
-            let render_info = self.renderer.render_frame(&*self.camera_ref.borrow());
+            let render_info = self.renderer.render_frame();
 
             // Compute info text.
             // TODO: tidy up cursor result formatting, make it reusable

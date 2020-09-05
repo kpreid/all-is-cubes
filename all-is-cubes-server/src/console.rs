@@ -15,7 +15,7 @@ use typed_arena::Arena;
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
 use all_is_cubes::raycast::{Face, Ray};
-use all_is_cubes::space::{Grid, GridArray, PackedLight, Space, SKY};
+use all_is_cubes::space::{Grid, GridArray, PackedLight, SKY};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
 #[rustfmt::skip]
@@ -45,14 +45,13 @@ pub fn viewport_from_terminal_size() -> io::Result<Vector2<usize>> {
     Ok(Vector2::new(w.max(1) as usize, (h - 5).max(1) as usize))
 }
 
-// Draw the space to an ANSI terminal using raytracing.
+// Draw the camera's space to an ANSI terminal using raytracing.
 pub fn draw_space<O: io::Write>(
-    space: &Space,
     projection: &mut ProjectionHelper,
     camera: &Camera,
     out: &mut O,
 ) -> io::Result<()> {
-    // TODO: consider refactoring so that we don't need &mut Camera
+    let space = &*camera.space.borrow_mut();
     projection.set_view_matrix(camera.view());
     let projection_copy_for_parallel: ProjectionHelper = *projection;
 

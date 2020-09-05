@@ -1,7 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! Basic camera. TODO: This will eventually become 'character', probably, but for now we have static worlds and want to move a viewpoint around.
+//! Miscellaneous display and player-character stuff.
 
 use cgmath::{
     Deg, EuclideanSpace, Matrix3, Matrix4, Point2, Point3, SquareMatrix, Transform, Vector2,
@@ -15,6 +15,7 @@ use crate::math::FreeCoordinate;
 use crate::physics::Body;
 use crate::raycast::{Ray, RaycastStep, Raycaster};
 use crate::space::{Grid, Space};
+use crate::universe::URef;
 use crate::util::ConciseDebug as _;
 
 // Control characteristics.
@@ -26,6 +27,10 @@ pub struct Camera {
     // TODO: This is now less about rendering and more about hanging an input controller on a Body.
     // Rename!
     pub body: Body,
+    // TODO: the space ref is here instead of on Body on a notion that it might be useful to have
+    // Body be a pure data structure with no refs. Dubious; revisit.
+    pub space: URef<Space>,
+
     pub auto_rotate: bool,
     velocity_input: Vector3<FreeCoordinate>,
 }
@@ -41,7 +46,8 @@ impl std::fmt::Debug for Camera {
 }
 
 impl Camera {
-    pub fn for_grid(grid: &Grid) -> Self {
+    pub fn for_space(space: URef<Space>) -> Self {
+        let grid: Grid = *space.borrow().grid();
         Self {
             body: Body {
                 // TODO: this starting point is pretty arbitrary, but we'll be replacing it with persistent character position tied into worldgen.
@@ -52,6 +58,7 @@ impl Camera {
                 yaw: 00.0,
                 pitch: 15.0,
             },
+            space,
             auto_rotate: false,
             velocity_input: Vector3::zero(),
         }

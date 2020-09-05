@@ -44,7 +44,7 @@ where
     block_program: Program<VertexSemantics, (), ShaderInterface>,
 
     // Rendering state
-    space: Option<URef<Space>>,
+    camera: Option<URef<Camera>>,
     block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
 
@@ -99,7 +99,7 @@ where
             surface,
             back_buffer,
             block_program,
-            space: None,
+            camera: None,
             block_data_cache: None,
             chunk: Chunk::new(),
             canvas_helper,
@@ -117,17 +117,18 @@ where
         .unwrap(); // TODO error handling
     }
 
-    pub fn set_space(&mut self, space: Option<URef<Space>>) {
-        self.space = space;
+    pub fn set_camera(&mut self, camera: Option<URef<Camera>>) {
+        self.camera = camera;
     }
 
-    pub fn render_frame(&mut self, camera: &Camera) -> RenderInfo {
+    pub fn render_frame(&mut self) -> RenderInfo {
         let mut info = RenderInfo::default();
-        let space: &Space = &*(if let Some(space_ref) = &self.space {
-            space_ref.borrow()
+        let camera: &Camera = &*(if let Some(camera_ref) = &self.camera {
+            camera_ref.borrow()
         } else {
             return info;
         });
+        let space: &Space = &*camera.space.borrow();
         let surface = &mut self.surface;
         let block_program = &mut self.block_program;
         let projection_matrix = self.proj.projection();
