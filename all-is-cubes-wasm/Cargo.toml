@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes-wasm"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
 description = "Web client for the recursive voxel game All is Cubes."
@@ -16,7 +16,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.1.0" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.1.1" }
 cgmath = "0.17.0"
 console_error_panic_hook = "0.1.5"
 js-sys = "0.3.44"
