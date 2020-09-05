@@ -14,7 +14,7 @@ This repository is divided into three packages (crates):
 * `all-is-cubes-wasm/` is the web UI/renderer which will only run in the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`.
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains code to render worlds as colored ASCII art (which is in this category because it depends on the `termion` package which will not compile to WebAssembly).
 
-Because of the complication of having some wasm-specific code, some commands for building, testing, and running the entire project are collected in the `Makefile` for convenience:
+Because of the complication of having some wasm-specific code, some commands for building, testing, and running the entire project are collected in the `Makefile` for convenience and to ensure all non-Rust files are built when needed:
 
 *   Test: `make test`
 
@@ -24,7 +24,9 @@ Because of the complication of having some wasm-specific code, some commands for
 
     Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-wasm/`.*
 
-*   Run the terminal raytracer version: `cargo run --bin aic-console`
+*   Run the standalone game server: `make run-server`
+
+*   Run the terminal raytracer version: `make run-console`
 
 License
 -------

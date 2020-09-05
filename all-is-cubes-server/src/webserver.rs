@@ -9,7 +9,7 @@ use static_dir::static_dir;
 pub async fn server_main() {
     // TODO: configurability of ports, etc.
 
-    warp::serve(static_dir!("../all-is-cubes-wasm/dist/"))
+    warp::serve(static_dir!("./static-all-is-cubes-wasm/"))
         .run(([127, 0, 0, 1], 8833))
         .await;
 }
