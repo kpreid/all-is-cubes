@@ -10,7 +10,7 @@ use cgmath::{
 use num_traits::identities::Zero;
 use std::time::Duration;
 
-use crate::block::Block;
+use crate::block::{AIR, Block};
 use crate::math::FreeCoordinate;
 use crate::physics::Body;
 use crate::raycast::{Ray, RaycastStep, Raycaster};
@@ -94,6 +94,12 @@ impl Camera {
     /// Maximum range for normal keyboard input should be -1 to 1
     pub fn set_velocity_input(&mut self, velocity: impl Into<Vector3<FreeCoordinate>>) {
         self.velocity_input = velocity.into();
+    }
+
+    /// Handle a click/tool-use on the view.
+    pub fn click(&mut self, cursor: &Cursor) {
+        // Delete block
+        self.space.borrow_mut().set(cursor.place.cube, &AIR);
     }
 }
 

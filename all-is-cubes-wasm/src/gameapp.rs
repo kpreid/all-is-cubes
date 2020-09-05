@@ -175,6 +175,20 @@ impl WebGameRoot {
                     event.client_y() as usize));
             }
         }, &AddEventListenerOptions::new().passive(true));
+
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"click", move |event: MouseEvent| {
+            if let Some(refcell_ref) = self_ref.upgrade() {
+                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+
+                self2.renderer.set_cursor_position(Point2::new(
+                    event.client_x() as usize,
+                    event.client_y() as usize));
+                    if let Some(cursor) = &self2.renderer.cursor_result {
+                        self2.camera_ref.borrow_mut().click(cursor);
+                    }
+            }
+        }, &AddEventListenerOptions::new().passive(true));
     }
 
     pub fn start_loop(&self) {
