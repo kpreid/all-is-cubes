@@ -10,7 +10,7 @@ use cgmath::{
 use num_traits::identities::Zero;
 use std::time::Duration;
 
-use crate::block::{AIR, Block};
+use crate::block::{Block, AIR};
 use crate::math::FreeCoordinate;
 use crate::physics::Body;
 use crate::raycast::{Ray, RaycastStep, Raycaster};

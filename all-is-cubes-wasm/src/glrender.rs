@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::JsValue;
 use web_sys::console;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
-use all_is_cubes::math::{Face, FaceMap, GridCoordinate, Modulo as _, RGBA};
+use all_is_cubes::math::{Face, FaceMap, GridCoordinate, RGBA};
 use all_is_cubes::space::Space;
 use all_is_cubes::triangulator::{triangulate_space, BlocksRenderData};
 use all_is_cubes::universe::URef;
@@ -355,13 +355,13 @@ where
             offset[axis] = 1;
             vertices.push(cursor_vertex(offset));
             vertices.push(cursor_vertex(offset));
-            offset[(axis + 1).modulo(3)] = 1;
+            offset[(axis + 1).rem_euclid(3)] = 1;
             vertices.push(cursor_vertex(offset));
             vertices.push(cursor_vertex(offset));
-            offset[(axis + 2).modulo(3)] = 1;
+            offset[(axis + 2).rem_euclid(3)] = 1;
             vertices.push(cursor_vertex(offset));
             // Go back and fill in the remaining bar.
-            offset[(axis + 2).modulo(3)] = 0;
+            offset[(axis + 2).rem_euclid(3)] = 0;
             vertices.push(cursor_vertex(offset));
             offset[axis] = 0;
             vertices.push(cursor_vertex(offset));

@@ -7,7 +7,7 @@ use cgmath::{Point3, Vector3};
 use num_traits::identities::Zero;
 use std::ops::Add;
 
-use crate::math::{FreeCoordinate, GridCoordinate, Modulo};
+use crate::math::{FreeCoordinate, GridCoordinate};
 use crate::space::Grid;
 
 pub use crate::math::Face; // necessary for any use of raycast, so let it be used
@@ -294,7 +294,7 @@ fn scale_to_integer_step(s: FreeCoordinate, ds: FreeCoordinate) -> FreeCoordinat
     if ds < 0.0 {
         scale_to_integer_step(-s, -ds)
     } else {
-        let s = s.modulo(1.0);
+        let s = s.rem_euclid(1.0);
         // problem is now s + t * ds = 1
         (1.0 - s) / ds
     }
