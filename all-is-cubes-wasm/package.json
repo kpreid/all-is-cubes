@@ -2,7 +2,7 @@
   "//": "Derived from the template at https://github.com/rustwasm/rust-webpack-template/blob/24f3af83206b52e0241d95ee10cebf930ec8bf08/template/package.json",
   "author": "Kevin Reid <kpreid@switchb.org>",
   "name": "all-is-cubes",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "scripts": {
     "build": "rimraf dist pkg && webpack",
     "start": "rimraf dist pkg && webpack-dev-server -d",
