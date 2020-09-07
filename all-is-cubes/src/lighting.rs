@@ -222,7 +222,7 @@ impl Space {
         if difference_magnitude > 0 {
             // TODO: compute index only once
             self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
-            self.mutation_counter += 1;
+            self.notifier.notify(SpaceChange::Lighting(cube));
             // TODO: push ray block hits onto lighting update queue for recursive relighting
             for cube in dependencies {
                 self.light_needs_update(cube, difference_magnitude);

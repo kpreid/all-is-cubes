@@ -3,6 +3,7 @@
 
 //! Top-level game state container.
 
+use indexmap::IndexSet;
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::{DefaultHasher, HashMap};
@@ -121,7 +122,7 @@ type StrongEntryRef<T> = Rc<RefCell<UEntry<T>>>;
 /// that they will remain valid (in which case using the `URef` will panic).
 /// To ensure an object does not vanish while operating on it, `.borrow()` it.
 /// (TODO: Should there be an operation in the style of `Weak::upgrade`?)
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct URef<T> {
     // TODO: We're going to want to either track reference counts or implement a garbage
     // collector for the graph of URefs. Reference counts would be an easy way to ensure
@@ -164,6 +165,16 @@ impl<T> Eq for URef<T> {}
 impl<T> Hash for URef<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hash.hash(state);
+    }
+}
+
+/// Manual implementation of Clone that does not require T to be Clone.
+impl<T> Clone for URef<T> {
+    fn clone(&self) -> Self {
+        URef {
+            weak_ref: self.weak_ref.clone(),
+            hash: self.hash,
+        }
     }
 }
 
@@ -240,6 +251,70 @@ impl<T> URootRef<T> {
     /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut.
     fn borrow_mut(&self) -> UBorrowMut<T> {
         self.downgrade().borrow_mut()
+    }
+}
+
+/// Mechanism for observing changes to objects. A `Notifier` delivers messages
+/// to `Listener`s, and each `Listener` stores a **set** of unprocessed messages.
+#[derive(Debug)]
+pub struct Notifier<T>
+where
+    T: Eq + Hash + Clone,
+{
+    listeners: Vec<Weak<ListenerGuts<T>>>,
+}
+pub struct Listener<T> {
+    guts: Rc<ListenerGuts<T>>,
+}
+type ListenerGuts<T> = RefCell<IndexSet<T>>;
+
+impl<T> Notifier<T>
+where
+    T: Eq + Hash + Clone,
+{
+    pub fn new() -> Self {
+        Self {
+            listeners: Vec::new(),
+        }
+    }
+
+    // TODO: Allow the caller to provide a filter on messages.
+    pub fn listen(&mut self) -> Listener<T> {
+        let guts = Rc::new(RefCell::new(IndexSet::new()));
+        self.cleanup();
+        self.listeners.push(Rc::downgrade(&guts));
+        Listener { guts }
+    }
+
+    pub fn notify(&self, message: T) {
+        for weak in self.listeners.iter() {
+            if let Some(refcell) = weak.upgrade() {
+                refcell.borrow_mut().insert(message.clone());
+            }
+        }
+    }
+
+    /// Discard all dead weak pointers in `self.listeners`.
+    fn cleanup(&mut self) {
+        let mut i = 0;
+        while i < self.listeners.len() {
+            if self.listeners[i].upgrade().is_some() {
+                i += 1;
+            } else {
+                self.listeners.swap_remove(i);
+            }
+        }
+    }
+}
+
+/// As an Iterator, yields all messages currently waiting.
+impl<T> Iterator for Listener<T>
+where
+    T: Eq + Hash + Clone,
+{
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        self.guts.borrow_mut().pop()
     }
 }
 
@@ -336,7 +411,7 @@ mod tests {
     use crate::blockgen::make_some_blocks;
 
     #[test]
-    pub fn uref_equality_is_pointer_equality() {
+    fn uref_equality_is_pointer_equality() {
         let root_a = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
         let root_b = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
         let ref_a_1 = root_a.downgrade();
@@ -350,7 +425,7 @@ mod tests {
     // TODO: more tests of the hairy reference logic
 
     #[test]
-    pub fn insert_anonymous_makes_distinct_names() {
+    fn insert_anonymous_makes_distinct_names() {
         let blocks = make_some_blocks(2);
         let mut u = Universe::new();
         let ref_a = u.insert_anonymous(Space::empty_positive(1, 1, 1));
@@ -362,5 +437,18 @@ mod tests {
             ref_a.borrow()[(0, 0, 0)] != ref_b.borrow()[(0, 0, 0)],
             "different values"
         );
+    }
+
+    #[test]
+    fn change_notifier() {
+        let mut cn: Notifier<u8> = Notifier::new();
+        cn.notify(0);
+        let mut listener = cn.listen();
+        assert_eq!(None, listener.next());
+        cn.notify(1);
+        cn.notify(2);
+        assert_eq!(Some(2), listener.next());
+        assert_eq!(Some(1), listener.next());
+        assert_eq!(None, listener.next());
     }
 }

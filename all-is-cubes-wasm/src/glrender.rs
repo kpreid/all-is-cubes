@@ -9,21 +9,21 @@ use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
 use luminance_front::pipeline::{PipelineState, TextureBinding};
-use luminance_front::pixel::NormUnsigned;
+use luminance_front::pixel::{NormRGBA8UI, NormUnsigned};
 use luminance_front::render_state::RenderState;
 use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
 use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
-use luminance_front::texture::{Dim2, Dim2Array};
+use luminance_front::texture::{Dim2, Dim2Array, Texture};
 use luminance_front::Backend;
 use wasm_bindgen::prelude::JsValue;
 use web_sys::console;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
 use all_is_cubes::math::{Face, FaceMap, GridCoordinate, RGBA};
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::triangulator::{triangulate_space, BlocksRenderData};
-use all_is_cubes::universe::URef;
+use all_is_cubes::universe::{Listener, URef};
 
 use crate::block_texture::{BlockGLRenderData, BlockGLTexture};
 use crate::js_bindings::CanvasHelper;
@@ -45,8 +45,7 @@ where
 
     // Rendering state
     camera: Option<URef<Camera>>,
-    block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
-    chunk: Chunk,
+    space_renderer: Option<SpaceRenderer>,
 
     // Miscellaneous
     canvas_helper: CanvasHelper,
@@ -100,8 +99,7 @@ where
             back_buffer,
             block_program,
             camera: None,
-            block_data_cache: None,
-            chunk: Chunk::new(),
+            space_renderer: None,
             canvas_helper,
             proj,
             cursor_result: None,
@@ -128,7 +126,6 @@ where
         } else {
             return info;
         });
-        let space: &Space = &*camera.space.borrow();
         let surface = &mut self.surface;
         let block_program = &mut self.block_program;
         let projection_matrix = self.proj.projection();
@@ -137,16 +134,16 @@ where
         // related in that the cursor should match the pixels being drawn.
         // TODO: Figure out how to lay this out with more separation of concerns, though.
         self.proj.set_view_matrix(camera.view());
-        self.cursor_result = cursor_raycast(self.proj.project_cursor_into_world().cast(), space);
+        self.cursor_result = cursor_raycast(
+            self.proj.project_cursor_into_world().cast(),
+            &*camera.space.borrow(),
+        );
 
-        // TODO: quick hack; we need actual invalidation, not memoization
-        let block_data = self.block_data_cache.get_or_insert_with(|| {
-            BlockGLRenderData::prepare(surface, space).expect("texture failure")
-        });
-
-        self.chunk
-            .update(surface, &space, &block_data.block_render_data);
-        let ct = &self.chunk;
+        if self.space_renderer.as_ref().map(|sr| &sr.space) != Some(&camera.space) {
+            self.space_renderer = Some(SpaceRenderer::new(camera.space.clone()));
+        }
+        let space_renderer = self.space_renderer.as_mut().unwrap();
+        let (block_texture, chunks) = space_renderer.prepare_frame(surface);
 
         let render_state = RenderState::default().set_face_culling(FaceCulling {
             order: FaceCullingOrder::CCW,
@@ -165,7 +162,7 @@ where
                 // TODO: port skybox cube map code
                 &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
                 |pipeline, mut shading_gate| {
-                    let bound_block_texture = pipeline.bind_texture(block_data.texture())?;
+                    let bound_block_texture = pipeline.bind_texture(block_texture)?;
 
                     shading_gate.shade(block_program, |mut shader_iface, u, mut render_gate| {
                         let pm: [[f32; 4]; 4] = projection_matrix.cast::<f32>().unwrap().into();
@@ -183,7 +180,9 @@ where
                         shader_iface.set(&u.block_texture, bound_block_texture.binding());
 
                         render_gate.render(&render_state, |mut tess_gate| {
-                            info.square_count += ct.render(&mut tess_gate)?;
+                            for chunk in chunks {
+                                info.square_count += chunk.render(&mut tess_gate)?;
+                            }
                             tess_gate.render(&cursor_tess)?;
                             Ok(())
                         })?;
@@ -254,13 +253,54 @@ struct ShaderInterface {
     #[uniform(unbound)] block_texture: Uniform<TextureBinding<Dim2Array, NormUnsigned>>,
 }
 
+/// All data to render a particular Space.
+struct SpaceRenderer {
+    space: URef<Space>,
+    listener: Listener<SpaceChange>,
+    block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
+    chunk: Chunk,
+}
+
+impl SpaceRenderer {
+    fn new(space: URef<Space>) -> Self {
+        let listener = space.borrow_mut().listen();
+        Self {
+            space,
+            listener,
+            block_data_cache: None,
+            chunk: Chunk::new(),
+        }
+    }
+
+    fn prepare_frame<C>(
+        &mut self,
+        context: &mut C,
+    ) -> (&mut Texture<Dim2Array, NormRGBA8UI>, Vec<&Chunk>)
+    where
+        C: GraphicsContext<Backend = Backend>,
+    {
+        let space = &*self.space.borrow();
+        // TODO: quick hack; we need actual invalidation, not memoization
+        let block_data = self.block_data_cache.get_or_insert_with(|| {
+            BlockGLRenderData::prepare(context, space).expect("texture failure")
+        });
+
+        if self.listener.next().is_some() {
+            for _ in &mut self.listener {}
+            self.chunk
+                .update(context, &space, &block_data.block_render_data);
+        }
+
+        (block_data.texture(), vec![&self.chunk])
+    }
+}
+
 /// Not yet actually chunked rendering, but bundles the data that would be used in one.
 struct Chunk {
     // bounds: Grid,
     /// Vertices grouped by the direction they face
     vertices: FaceMap<Vec<Vertex>>,
     tesses: FaceMap<Option<Tess<Vertex>>>,
-    last_valid_counter: u32,
 }
 
 impl Chunk {
@@ -268,7 +308,6 @@ impl Chunk {
         Chunk {
             vertices: FaceMap::default(),
             tesses: FaceMap::default(),
-            last_valid_counter: 0,
         }
     }
 
@@ -278,13 +317,6 @@ impl Chunk {
         space: &Space,
         blocks_render_data: &BlocksRenderData<GLBlockVertex, BlockGLTexture>,
     ) {
-        // TODO: quick hack to avoid rerendering unnecessarily.
-        // Doesn't account for block render data changes.
-        if space.mutation_counter == self.last_valid_counter {
-            return;
-        }
-        self.last_valid_counter = space.mutation_counter;
-
         triangulate_space(space, blocks_render_data, &mut self.vertices);
 
         for &face in Face::ALL_SEVEN {

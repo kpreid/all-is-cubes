@@ -14,6 +14,7 @@ use std::time::Duration;
 use crate::block::*;
 use crate::lighting::*;
 use crate::math::*;
+use crate::universe::{Listener, Notifier};
 
 pub use crate::lighting::{PackedLight, SKY};
 
@@ -205,8 +206,6 @@ impl Grid {
 }
 
 /// Container for blocks arranged in three-dimensional space.
-#[derive(Clone)]
-// TODO: implement Debug
 pub struct Space {
     grid: Grid,
 
@@ -235,7 +234,7 @@ pub struct Space {
     /// Increments every time the space is modified in an externally visible way.
     /// Quick hack of a method to detect changes and redraw. TODO: Replace this, or if we
     /// decide to make it more robust, give it a getter method.
-    pub mutation_counter: u32,
+    pub(crate) notifier: Notifier<SpaceChange>,
 
     /// Random number generator used for random behavior.
     rng: rand_xoshiro::Xoshiro256Plus,
@@ -273,7 +272,7 @@ impl Space {
             lighting: initialize_lighting(grid),
             lighting_update_queue: BinaryHeap::new(),
             lighting_update_set: HashSet::new(),
-            mutation_counter: 0,
+            notifier: Notifier::new(),
             rng: rand_xoshiro::Xoshiro256Plus::seed_from_u64(0), // deterministic!
         }
     }
@@ -282,6 +281,10 @@ impl Space {
     /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
     pub fn empty_positive(wx: GridCoordinate, wy: GridCoordinate, wz: GridCoordinate) -> Space {
         Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)))
+    }
+
+    pub fn listen(&mut self) -> Listener<SpaceChange> {
+        self.notifier.listen()
     }
 
     /// Returns the `Grid` describing the bounds of this `Space`; no blocks may exist
@@ -409,7 +412,7 @@ impl Space {
         } else {
             self.light_needs_update(position, PackedLightScalar::MAX);
         }
-        self.mutation_counter += 1;
+        self.notifier.notify(SpaceChange::Block(position));
     }
 
     /// Returns all distinct block types found in the space.
@@ -490,6 +493,13 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
             &AIR
         }
     }
+}
+
+/// Description of a change to a `Space` for use in listeners.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SpaceChange {
+    Block(GridPoint),
+    Lighting(GridPoint),
 }
 
 /// Performance data returned by `Space::step`. The exact contents of this structure
@@ -590,5 +600,22 @@ mod tests {
             vec![blocks[1].clone(), blocks[2].clone()],
             "step 4"
         );
+    }
+
+    #[test]
+    pub fn change_listener() {
+        let blocks = make_some_blocks(2);
+        let mut space = Space::empty_positive(1, 1, 1);
+        let mut listener = space.listen();
+        space.set((0, 0, 0), &blocks[0]);
+        assert_eq!(
+            Some(SpaceChange::Block(GridPoint::new(0, 0, 0))),
+            listener.next()
+        );
+        assert_eq!(None, listener.next());
+
+        // No change, no notification
+        space.set((0, 0, 0), &blocks[0]);
+        assert_eq!(None, listener.next());
     }
 }
