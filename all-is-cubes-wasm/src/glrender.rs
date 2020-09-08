@@ -21,9 +21,9 @@ use web_sys::console;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
 use all_is_cubes::math::{Face, FaceMap, GridCoordinate, RGBA};
-use all_is_cubes::space::{Space, SpaceChange};
+use all_is_cubes::space::Space;
 use all_is_cubes::triangulator::{triangulate_space, BlocksRenderData};
-use all_is_cubes::universe::{Listener, URef};
+use all_is_cubes::universe::{DirtyFlag, URef};
 
 use crate::block_texture::{BlockGLRenderData, BlockGLTexture};
 use crate::js_bindings::CanvasHelper;
@@ -256,17 +256,18 @@ struct ShaderInterface {
 /// All data to render a particular Space.
 struct SpaceRenderer {
     space: URef<Space>,
-    listener: Listener<SpaceChange>,
+    dirty_chunks: DirtyFlag,
     block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
 }
 
 impl SpaceRenderer {
     fn new(space: URef<Space>) -> Self {
-        let listener = space.borrow_mut().listen();
+        let dirty_chunks = DirtyFlag::new();
+        space.borrow_mut().listen(dirty_chunks.listener());
         Self {
             space,
-            listener,
+            dirty_chunks,
             block_data_cache: None,
             chunk: Chunk::new(),
         }
@@ -285,8 +286,7 @@ impl SpaceRenderer {
             BlockGLRenderData::prepare(context, space).expect("texture failure")
         });
 
-        if self.listener.next().is_some() {
-            for _ in &mut self.listener {}
+        if self.dirty_chunks.get_and_clear() {
             self.chunk
                 .update(context, &space, &block_data.block_render_data);
         }

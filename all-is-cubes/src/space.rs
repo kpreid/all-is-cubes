@@ -283,8 +283,8 @@ impl Space {
         Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)))
     }
 
-    pub fn listen(&mut self) -> Listener<SpaceChange> {
-        self.notifier.listen()
+    pub fn listen(&mut self, listener: impl Listener<SpaceChange> + 'static) {
+        self.notifier.listen(listener)
     }
 
     /// Returns the `Grid` describing the bounds of this `Space`; no blocks may exist
@@ -564,6 +564,7 @@ mod tests {
     use super::*;
     use crate::blockgen::make_some_blocks;
     use crate::math::GridPoint;
+    use crate::universe::Sink;
 
     #[test]
     fn it_works() {
@@ -606,16 +607,17 @@ mod tests {
     pub fn change_listener() {
         let blocks = make_some_blocks(2);
         let mut space = Space::empty_positive(1, 1, 1);
-        let mut listener = space.listen();
+        let mut sink = Sink::new();
+        space.listen(sink.listener());
         space.set((0, 0, 0), &blocks[0]);
         assert_eq!(
             Some(SpaceChange::Block(GridPoint::new(0, 0, 0))),
-            listener.next()
+            sink.next()
         );
-        assert_eq!(None, listener.next());
+        assert_eq!(None, sink.next());
 
         // No change, no notification
         space.set((0, 0, 0), &blocks[0]);
-        assert_eq!(None, listener.next());
+        assert_eq!(None, sink.next());
     }
 }

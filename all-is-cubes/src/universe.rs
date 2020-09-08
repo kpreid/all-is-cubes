@@ -5,7 +5,7 @@
 
 use indexmap::IndexSet;
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::hash_map::{DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
@@ -255,22 +255,18 @@ impl<T> URootRef<T> {
 }
 
 /// Mechanism for observing changes to objects. A `Notifier` delivers messages
-/// to `Listener`s, and each `Listener` stores a **set** of unprocessed messages.
-#[derive(Debug)]
-pub struct Notifier<T>
+/// to a set of listeners which implement some form of weak-reference semantics
+/// to allow cleanup.
+pub struct Notifier<M>
 where
-    T: Eq + Hash + Clone,
+    M: Clone,
 {
-    listeners: Vec<Weak<ListenerGuts<T>>>,
+    listeners: Vec<Box<dyn Listener<M>>>,
 }
-pub struct Listener<T> {
-    guts: Rc<ListenerGuts<T>>,
-}
-type ListenerGuts<T> = RefCell<IndexSet<T>>;
 
-impl<T> Notifier<T>
+impl<M> Notifier<M>
 where
-    T: Eq + Hash + Clone,
+    M: Clone,
 {
     pub fn new() -> Self {
         Self {
@@ -279,18 +275,14 @@ where
     }
 
     // TODO: Allow the caller to provide a filter on messages.
-    pub fn listen(&mut self) -> Listener<T> {
-        let guts = Rc::new(RefCell::new(IndexSet::new()));
+    pub fn listen<L: Listener<M> + 'static>(&mut self, listener: L) {
         self.cleanup();
-        self.listeners.push(Rc::downgrade(&guts));
-        Listener { guts }
+        self.listeners.push(Box::new(listener));
     }
 
-    pub fn notify(&self, message: T) {
-        for weak in self.listeners.iter() {
-            if let Some(refcell) = weak.upgrade() {
-                refcell.borrow_mut().insert(message.clone());
-            }
+    pub fn notify(&self, message: M) {
+        for listener in self.listeners.iter() {
+            listener.receive(message.clone());
         }
     }
 
@@ -298,7 +290,7 @@ where
     fn cleanup(&mut self) {
         let mut i = 0;
         while i < self.listeners.len() {
-            if self.listeners[i].upgrade().is_some() {
+            if self.listeners[i].alive() {
                 i += 1;
             } else {
                 self.listeners.swap_remove(i);
@@ -306,15 +298,133 @@ where
         }
     }
 }
-
-/// As an Iterator, yields all messages currently waiting.
-impl<T> Iterator for Listener<T>
+impl<M> Default for Notifier<M>
 where
-    T: Eq + Hash + Clone,
+    M: Clone,
 {
-    type Item = T;
-    fn next(&mut self) -> Option<T> {
-        self.guts.borrow_mut().pop()
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A receiver of messages which can indicate when it is no longer interested in
+/// them (typically because the associated recipient has been dropped). Note that
+/// a Listener must use interior mutability to store the message. As a Listener
+/// may be called from various places, that mutability should in general be limited
+/// to setting dirty flags or inserting into message queues — not triggering any
+/// state changes of more general interest.
+pub trait Listener<M> {
+    fn receive(&self, message: M);
+    fn alive(&self) -> bool;
+}
+
+/// A `Listener` which stores all the messages it receives, deduplicated.
+pub struct Sink<M> {
+    messages: Rc<RefCell<IndexSet<M>>>,
+}
+struct SinkListener<M> {
+    weak_messages: Weak<RefCell<IndexSet<M>>>,
+}
+impl<M> Sink<M>
+where
+    M: Eq + Hash + Clone,
+{
+    pub fn new() -> Self {
+        Self {
+            messages: Rc::new(RefCell::new(IndexSet::new())),
+        }
+    }
+    pub fn listener(&self) -> impl Listener<M> {
+        SinkListener {
+            weak_messages: Rc::downgrade(&self.messages),
+        }
+    }
+}
+/// As an Iterator, yields all messages currently waiting.
+impl<M> Iterator for Sink<M>
+where
+    M: Eq + Hash + Clone,
+{
+    type Item = M;
+    fn next(&mut self) -> Option<M> {
+        self.messages.borrow_mut().pop()
+    }
+}
+impl<M: Eq + Hash + Clone> Listener<M> for SinkListener<M> {
+    fn receive(&self, message: M) {
+        if let Some(cell) = self.weak_messages.upgrade() {
+            cell.borrow_mut().insert(message);
+        }
+    }
+    fn alive(&self) -> bool {
+        self.weak_messages.upgrade().is_some()
+    }
+}
+impl<M> Default for Sink<M>
+where
+    M: Eq + Hash + Clone,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A `Listener` which only stores a single flag indicating if any messages were
+/// received.
+pub struct DirtyFlag {
+    flag: Rc<Cell<bool>>,
+}
+pub struct DirtyFlagListener {
+    weak_flag: Weak<Cell<bool>>,
+}
+impl DirtyFlag {
+    pub fn new() -> Self {
+        Self {
+            flag: Rc::new(Cell::new(false)),
+        }
+    }
+    pub fn listener<M>(&self) -> impl Listener<M> {
+        DirtyFlagListener {
+            weak_flag: Rc::downgrade(&self.flag),
+        }
+    }
+    pub fn get_and_clear(&self) -> bool {
+        self.flag.replace(false)
+    }
+}
+impl<M> Listener<M> for DirtyFlagListener {
+    fn receive(&self, _message: M) {
+        if let Some(cell) = self.weak_flag.upgrade() {
+            cell.set(true);
+        }
+    }
+    fn alive(&self) -> bool {
+        self.weak_flag.upgrade().is_some()
+    }
+}
+impl Default for DirtyFlag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A `Listener` which transforms messages before passing them on.
+///
+/// This may be used to drop uninteresting messages or reduce their granularity.
+///
+/// TODO: add doc test
+pub struct Filter<MI, MO> {
+    function: Box<dyn Fn(MI) -> Option<MO>>,
+    target: Box<dyn Listener<MO>>,
+}
+impl<MI, MO> Listener<MI> for Filter<MI, MO> {
+    fn receive(&self, message: MI) {
+        if let Some(filtered_message) = (self.function)(message) {
+            self.target.receive(filtered_message);
+        }
+    }
+    fn alive(&self) -> bool {
+        self.target.alive()
     }
 }
 
@@ -440,15 +550,16 @@ mod tests {
     }
 
     #[test]
-    fn change_notifier() {
+    fn notifier() {
         let mut cn: Notifier<u8> = Notifier::new();
         cn.notify(0);
-        let mut listener = cn.listen();
-        assert_eq!(None, listener.next());
+        let mut sink = Sink::new();
+        cn.listen(sink.listener());
+        assert_eq!(None, sink.next());
         cn.notify(1);
         cn.notify(2);
-        assert_eq!(Some(2), listener.next());
-        assert_eq!(Some(1), listener.next());
-        assert_eq!(None, listener.next());
+        assert_eq!(Some(2), sink.next());
+        assert_eq!(Some(1), sink.next());
+        assert_eq!(None, sink.next());
     }
 }
