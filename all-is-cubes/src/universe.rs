@@ -341,6 +341,8 @@ where
     }
 }
 /// As an Iterator, yields all messages currently waiting.
+/// TODO: A singular Iterator is not the best way to express polling.
+/// Generate independent Iterators (that can be consumed) or use something else.
 impl<M> Iterator for Sink<M>
 where
     M: Eq + Hash + Clone,

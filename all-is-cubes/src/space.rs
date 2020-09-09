@@ -460,6 +460,8 @@ impl Space {
                     self.index_to_block[new_index] = block.clone();
                     self.block_to_index
                         .insert(block.clone(), new_index as BlockIndex);
+                    self.notifier
+                        .notify(SpaceChange::Number(new_index as BlockIndex));
                     return new_index as BlockIndex;
                 }
             }
@@ -474,6 +476,8 @@ impl Space {
             self.index_to_block.push(block.clone());
             self.block_to_index
                 .insert(block.clone(), high_mark as BlockIndex);
+            self.notifier
+                .notify(SpaceChange::Number(high_mark as BlockIndex));
             high_mark as BlockIndex
         }
     }
@@ -498,8 +502,12 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
 /// Description of a change to a `Space` for use in listeners.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SpaceChange {
+    /// The block at the given location was replaced.
     Block(GridPoint),
+    /// The light level value at the given location changed.
     Lighting(GridPoint),
+    /// The given numerical block ID was reassigned.
+    Number(BlockIndex),
 }
 
 /// Performance data returned by `Space::step`. The exact contents of this structure
@@ -606,14 +614,17 @@ mod tests {
     #[test]
     pub fn change_listener() {
         let blocks = make_some_blocks(2);
-        let mut space = Space::empty_positive(1, 1, 1);
+        let mut space = Space::empty_positive(2, 1, 1);
         let mut sink = Sink::new();
         space.listen(sink.listener());
         space.set((0, 0, 0), &blocks[0]);
+        //panic!("{:?}", sink.collect::<Vec<_>>());
+        // Note: Sink currently reports things in reverse of insertion order.
         assert_eq!(
             Some(SpaceChange::Block(GridPoint::new(0, 0, 0))),
             sink.next()
         );
+        assert_eq!(Some(SpaceChange::Number(1)), sink.next());
         assert_eq!(None, sink.next());
 
         // No change, no notification
