@@ -16,12 +16,15 @@ use std::cell::RefCell;
 use std::convert::{TryFrom, TryInto};
 use std::rc::{Rc, Weak};
 
-use super::types::{GLBlockVertex, Vertex};
+use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::GridCoordinate;
 use crate::space::Space;
 use crate::triangulator::{
     triangulate_blocks, BlocksRenderData, Texel, TextureAllocator, TextureCoordinate, TextureTile,
 };
+
+/// Alias for the concrete type of the block texture.
+pub type BlockTexture = Texture<Dim2Array, NormRGBA8UI>;
 
 #[allow(dead_code)] // used in conditionally compiled wasm32 code
 pub struct BlockGLRenderData {
@@ -53,8 +56,11 @@ impl BlockGLRenderData {
 
 /// Manages a block face texture, which is an atlased array texture (to minimize
 /// the chance of hitting any size limits).
+///
+/// TODO: Rename this for acciracy (luminance is theoretically abstract) and to
+/// distinguish it from `BlockTexture`.
 pub struct BlockGLTexture {
-    texture: Texture<Dim2Array, NormRGBA8UI>,
+    texture: BlockTexture,
     layout: AtlasLayout,
     next_free: u32,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
