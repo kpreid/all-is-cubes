@@ -14,6 +14,7 @@ pub mod camera;
 pub mod demo_content;
 pub mod drawing;
 mod lighting;
+pub mod lum;
 pub mod math;
 mod physics;
 pub mod raycast;

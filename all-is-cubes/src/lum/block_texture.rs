@@ -15,18 +15,13 @@ use luminance_front::Backend;
 use std::cell::RefCell;
 use std::convert::{TryFrom, TryInto};
 use std::rc::{Rc, Weak};
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::JsValue;
-#[cfg(target_arch = "wasm32")]
-use web_sys::console;
 
-use all_is_cubes::math::GridCoordinate;
-use all_is_cubes::space::Space;
-use all_is_cubes::triangulator::{
+use super::types::{GLBlockVertex, Vertex};
+use crate::math::GridCoordinate;
+use crate::space::Space;
+use crate::triangulator::{
     triangulate_blocks, BlocksRenderData, Texel, TextureAllocator, TextureCoordinate, TextureTile,
 };
-
-use crate::types::{GLBlockVertex, Vertex};
 
 #[allow(dead_code)] // used in conditionally compiled wasm32 code
 pub struct BlockGLRenderData {
@@ -35,8 +30,7 @@ pub struct BlockGLRenderData {
 }
 
 impl BlockGLRenderData {
-    #[allow(dead_code)] // used in conditionally compiled wasm32 code
-    pub fn prepare<C>(context: &mut C, space: &Space) -> Result<Self, TextureError>
+    pub fn prepare<C>(context: &mut C, space: &Space) -> Result<(Self, String), TextureError>
     where
         C: GraphicsContext<Backend = Backend>,
     {
@@ -45,11 +39,10 @@ impl BlockGLRenderData {
             block_render_data: triangulate_blocks(space, &mut texture_allocator),
             texture_allocator,
         };
-        result.texture_allocator.flush()?;
-        Ok(result)
+        let flush_info = result.texture_allocator.flush()?;
+        Ok((result, flush_info))
     }
 
-    #[allow(dead_code)] // used in conditionally compiled wasm32 code
     /// Returns the texture to bind for rendering blocks.
     ///
     /// Mutable because `luminance` considers binding a mutation.
@@ -116,7 +109,7 @@ impl BlockGLTexture {
         })
     }
 
-    fn flush(&mut self) -> Result<(), TextureError> {
+    fn flush(&mut self) -> Result<String, TextureError> {
         let layout = self.layout;
         // Allocate contiguous storage for uploading.
         // TODO: Should we keep this allocated? Probably
@@ -138,14 +131,12 @@ impl BlockGLTexture {
 
         self.texture.upload(GenMipmaps::No, &texels)?;
 
-        // TODO: Platform-neutral logging.
-        #[cfg(target_arch = "wasm32")]
-        console::info_1(&JsValue::from_str(&format!(
+        // TODO: refactoring temporary: String is a bad return format
+        Ok(format!(
             "flushed block texture with {:?} tiles out of {:?}",
             count_written,
             self.in_use.len()
-        )));
-        Ok(())
+        ))
     }
 
     #[allow(dead_code)]

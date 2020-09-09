@@ -20,14 +20,14 @@ use wasm_bindgen::prelude::JsValue;
 use web_sys::console;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
+use all_is_cubes::lum::block_texture::{BlockGLRenderData, BlockGLTexture};
+use all_is_cubes::lum::types::{GLBlockVertex, Vertex, VertexSemantics};
 use all_is_cubes::math::{Face, FaceMap, GridCoordinate, RGBA};
 use all_is_cubes::space::Space;
 use all_is_cubes::triangulator::{triangulate_space, BlocksRenderData};
 use all_is_cubes::universe::{DirtyFlag, URef};
 
-use crate::block_texture::{BlockGLRenderData, BlockGLTexture};
 use crate::js_bindings::CanvasHelper;
-use crate::types::{GLBlockVertex, Vertex, VertexSemantics};
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
 const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
@@ -283,7 +283,10 @@ impl SpaceRenderer {
         let space = &*self.space.borrow();
         // TODO: quick hack; we need actual invalidation, not memoization
         let block_data = self.block_data_cache.get_or_insert_with(|| {
-            BlockGLRenderData::prepare(context, space).expect("texture failure")
+            let (block_data, info) =
+                BlockGLRenderData::prepare(context, space).expect("texture failure");
+            console::info_1(&JsValue::from_str(info.as_ref()));
+            block_data
         });
 
         if self.dirty_chunks.get_and_clear() {
