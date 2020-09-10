@@ -11,25 +11,29 @@ use luminance_front::Backend;
 use crate::lum::block_texture::{BlockGLRenderData, BlockGLTexture, BlockTexture};
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap};
-use crate::space::Space;
+use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::triangulator::{triangulate_space, BlocksRenderData};
-use crate::universe::{DirtyFlag, URef};
+use crate::universe::{ListenerHelper, Sink, URef};
 
 /// Manages cached data and GPU resources for drawing a single `Space`.
 pub struct SpaceRenderer {
     space: URef<Space>,
-    dirty_chunks: DirtyFlag,
+    todo: Sink<SpaceRendererDirty>,
     block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
     chunk: Chunk,
 }
 
 impl SpaceRenderer {
     pub fn new(space: URef<Space>) -> Self {
-        let dirty_chunks = DirtyFlag::new();
-        space.borrow_mut().listen(dirty_chunks.listener());
+        let todo = Sink::new();
+        space.borrow_mut().listen(todo.listener().filter(|m| Some(match m {
+            SpaceChange::Block(_) => SpaceRendererDirty::Chunk,
+            SpaceChange::Lighting(_) => SpaceRendererDirty::Chunk,
+            SpaceChange::Number(n) => SpaceRendererDirty::Block(n),
+        })));
         Self {
             space,
-            dirty_chunks,
+            todo,
             block_data_cache: None,
             chunk: Chunk::new(),
         }
@@ -52,13 +56,19 @@ impl SpaceRenderer {
             block_data
         });
 
-        if self.dirty_chunks.get_and_clear() {
+        if self.todo.take_equal(SpaceRendererDirty::Chunk) {
             self.chunk
                 .update(context, &space, &block_data.block_render_data);
         }
 
         (block_data.texture(), vec![&self.chunk])
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+enum SpaceRendererDirty {
+    Block(BlockIndex),
+    Chunk, // TODO: once we have specific chunks
 }
 
 /// Not yet actually chunked rendering, but bundles the data that would be used in one.

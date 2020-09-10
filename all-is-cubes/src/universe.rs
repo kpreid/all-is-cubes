@@ -318,6 +318,21 @@ pub trait Listener<M> {
     fn alive(&self) -> bool;
 }
 
+/// Methods for adapting listeners that are not object-safe.
+pub trait ListenerHelper<M> where Self: Sized {
+    /// Apply a map/filter function to incoming messages.
+    fn filter<MI, F>(self, function: F) -> Filter<F, Self>
+    where
+        F: Fn(MI) -> Option<M>,
+    {
+        Filter {
+            function,
+            target: self,
+        }
+    }
+}
+impl<M, L: Listener<M> + Sized> ListenerHelper<M> for L {}
+
 /// A `Listener` which stores all the messages it receives, deduplicated.
 pub struct Sink<M> {
     messages: Rc<RefCell<IndexSet<M>>>,
@@ -334,13 +349,29 @@ where
             messages: Rc::new(RefCell::new(IndexSet::new())),
         }
     }
+
     pub fn listener(&self) -> impl Listener<M> {
         SinkListener {
             weak_messages: Rc::downgrade(&self.messages),
         }
     }
+
+    /// If the given message was received, remove it and return true.
+    ///
+    /// ```
+    /// use all_is_cubes::universe::{Listener, Sink};
+    ///
+    /// let sink = Sink::new();
+    /// sink.listener().receive(2);
+    /// assert!(!sink.take_equal(1));  // No match
+    /// assert!(sink.take_equal(2));   // Match
+    /// assert!(!sink.take_equal(2));  // Now removed
+    /// ```
+    pub fn take_equal(&self, message: M) -> bool {
+        self.messages.borrow_mut().swap_remove(&message)
+    }
 }
-/// As an Iterator, yields all messages currently waiting.
+/// As an Iterator, yields all messages currently waiting in arbitrary order.
 /// TODO: A singular Iterator is not the best way to express polling.
 /// Generate independent Iterators (that can be consumed) or use something else.
 impl<M> Iterator for Sink<M>
@@ -415,11 +446,15 @@ impl Default for DirtyFlag {
 /// This may be used to drop uninteresting messages or reduce their granularity.
 ///
 /// TODO: add doc test
-pub struct Filter<MI, MO> {
-    function: Box<dyn Fn(MI) -> Option<MO>>,
-    target: Box<dyn Listener<MO>>,
+pub struct Filter<F, T> {
+    pub function: F,
+    pub target: T,
 }
-impl<MI, MO> Listener<MI> for Filter<MI, MO> {
+impl<MI, MO, F, T> Listener<MI> for Filter<F, T>
+where
+    F: Fn(MI) -> Option<MO>,
+    T: Listener<MO>
+{
     fn receive(&self, message: MI) {
         if let Some(filtered_message) = (self.function)(message) {
             self.target.receive(filtered_message);
