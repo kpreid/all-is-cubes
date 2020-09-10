@@ -48,7 +48,26 @@ impl SpaceRenderer {
         C: GraphicsContext<Backend = Backend>,
     {
         let space = &*self.space.borrow();
-        // TODO: quick hack; we need actual invalidation, not memoization
+
+        let mut dirty_blocks = false;
+        let mut dirty_chunk = false;
+        while let Some(m) = self.todo.next() {
+            match m {
+                SpaceRendererDirty::Chunk => { dirty_chunk = true; },
+                SpaceRendererDirty::Block(_id) => {
+                    // TODO: update individual blocks
+                    dirty_blocks = true;
+                    // Vertices may have changed.
+                    // TODO: Implement recognizing texture-only updates, and
+                    // (once chunking exists) only updating chunks that need it
+                    dirty_chunk = true;
+                }
+            }
+        }
+
+        if dirty_blocks {
+            self.block_data_cache = None;
+        }
         let block_data = self.block_data_cache.get_or_insert_with(|| {
             let (block_data, _info) =
                 BlockGLRenderData::prepare(context, space).expect("texture failure");
@@ -56,7 +75,7 @@ impl SpaceRenderer {
             block_data
         });
 
-        if self.todo.take_equal(SpaceRendererDirty::Chunk) {
+        if dirty_chunk {
             self.chunk
                 .update(context, &space, &block_data.block_render_data);
         }
@@ -140,3 +159,5 @@ impl Chunk {
         Ok(count)
     }
 }
+
+// TODO: Could really use some tests of this logic, but how to have a GraphicsContext...?
