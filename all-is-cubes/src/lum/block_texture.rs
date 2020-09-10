@@ -5,6 +5,7 @@
 
 use cgmath::{Vector2, Vector3, Zero as _};
 use luminance_front::context::GraphicsContext;
+use luminance_front::pipeline::BoundTexture;
 use luminance_front::pixel::NormRGBA8UI;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::texture::{
@@ -25,6 +26,7 @@ use crate::triangulator::{
 
 /// Alias for the concrete type of the block texture.
 pub type BlockTexture = Texture<Dim2Array, NormRGBA8UI>;
+pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim2Array, NormRGBA8UI>;
 
 #[allow(dead_code)] // used in conditionally compiled wasm32 code
 pub struct BlockGLRenderData {

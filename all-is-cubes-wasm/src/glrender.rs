@@ -140,7 +140,7 @@ where
             self.space_renderer = Some(SpaceRenderer::new(camera.space.clone()));
         }
         let space_renderer = self.space_renderer.as_mut().unwrap();
-        let (block_texture, chunks) = space_renderer.prepare_frame(surface);
+        let space_output = space_renderer.prepare_frame(surface, camera.view());
 
         let render_state = RenderState::default().set_face_culling(FaceCulling {
             order: FaceCullingOrder::CCW,
@@ -159,7 +159,7 @@ where
                 // TODO: port skybox cube map code
                 &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
                 |pipeline, mut shading_gate| {
-                    let bound_block_texture = pipeline.bind_texture(block_texture)?;
+                    let space_output_bound = space_output.bind(&pipeline)?;
 
                     shading_gate.shade(block_program, |mut shader_iface, u, mut render_gate| {
                         let pm: [[f32; 4]; 4] = projection_matrix.cast::<f32>().unwrap().into();
@@ -168,18 +168,15 @@ where
                         shader_iface.set(&u.projection_matrix2, pm[2]);
                         shader_iface.set(&u.projection_matrix3, pm[3]);
 
-                        let vm: [[f32; 4]; 4] = camera.view().cast::<f32>().unwrap().into();
+                        // Render space (and cursor). TODO: Reduce awkward code.
+                        let vm: [[f32; 4]; 4] = space_output_bound.view_matrix.cast::<f32>().unwrap().into();
                         shader_iface.set(&u.view_matrix0, vm[0]);
                         shader_iface.set(&u.view_matrix1, vm[1]);
                         shader_iface.set(&u.view_matrix2, vm[2]);
                         shader_iface.set(&u.view_matrix3, vm[3]);
-
-                        shader_iface.set(&u.block_texture, bound_block_texture.binding());
-
+                        shader_iface.set(&u.block_texture, space_output_bound.bound_block_texture.binding());
                         render_gate.render(&render_state, |mut tess_gate| {
-                            for chunk in chunks {
-                                info.square_count += chunk.render(&mut tess_gate)?;
-                            }
+                            info.square_count += space_output_bound.render(&mut tess_gate)?;
                             tess_gate.render(&cursor_tess)?;
                             Ok(())
                         })?;
@@ -198,7 +195,7 @@ where
                             shader_iface.set(&u.view_matrix2, vm[2]);
                             shader_iface.set(&u.view_matrix3, vm[3]);
 
-                            shader_iface.set(&u.block_texture, bound_block_texture.binding());
+                            shader_iface.set(&u.block_texture, space_output_bound.bound_block_texture.binding());
 
                             // render_gate.render(&render_state, |mut tess_gate| {
                             //     tess_gate.render(&debug_tess)?;

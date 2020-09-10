@@ -3,14 +3,16 @@
 
 //! Get from `Space` to `luminance::tess::Tess`.
 
+use cgmath::Matrix4;
 use luminance_front::context::GraphicsContext;
+use luminance_front::pipeline::{Pipeline, PipelineError};
 use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::Backend;
 
-use crate::lum::block_texture::{BlockGLRenderData, BlockGLTexture, BlockTexture};
+use crate::lum::block_texture::{BlockGLRenderData, BlockGLTexture, BlockTexture, BoundBlockTexture};
 use crate::lum::types::{GLBlockVertex, Vertex};
-use crate::math::{Face, FaceMap};
+use crate::math::{Face, FaceMap, FreeCoordinate};
 use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::triangulator::{triangulate_space, BlocksRenderData};
 use crate::universe::{ListenerHelper, Sink, URef};
@@ -43,7 +45,7 @@ impl SpaceRenderer {
         &self.space
     }
 
-    pub fn prepare_frame<C>(&mut self, context: &mut C) -> (&mut BlockTexture, Vec<&Chunk>)
+    pub fn prepare_frame<'a, C>(&'a mut self, context: &mut C, view_matrix: Matrix4<FreeCoordinate>) -> SpaceRendererOutput<'a>
     where
         C: GraphicsContext<Backend = Backend>,
     {
@@ -80,7 +82,45 @@ impl SpaceRenderer {
                 .update(context, &space, &block_data.block_render_data);
         }
 
-        (block_data.texture(), vec![&self.chunk])
+        SpaceRendererOutput {
+            block_texture: block_data.texture(),
+            chunks: vec![&self.chunk],
+            view_matrix
+        }
+    }
+}
+
+/// Ingredients to actually draw the Space inside a luminance pipeline, produced by
+/// `prepare_frame`.
+pub struct SpaceRendererOutput<'a> {
+    block_texture: &'a mut BlockTexture,
+    /// Chunks are handy wrappers around some Tesses
+    chunks: Vec<&'a Chunk>,
+    view_matrix: Matrix4<FreeCoordinate>,
+}
+/// As `SpaceRendererBound`, but past the texture-binding stage of the pipeline.
+pub struct SpaceRendererBound<'a> {
+    pub bound_block_texture: BoundBlockTexture<'a>,
+    pub chunks: Vec<&'a Chunk>,
+    pub view_matrix: Matrix4<FreeCoordinate>,
+}
+
+impl<'a> SpaceRendererOutput<'a> {
+    pub fn bind(self, pipeline: &'a Pipeline<'a>) -> Result<SpaceRendererBound<'a>, PipelineError> {
+        Ok(SpaceRendererBound {
+            bound_block_texture: pipeline.bind_texture(self.block_texture)?,
+            chunks: self.chunks,
+            view_matrix: self.view_matrix,
+        })
+    }
+}
+impl<'a> SpaceRendererBound<'a> {
+    pub fn render<E>(&self, tess_gate: &mut TessGate) -> Result<usize, E> {
+        let mut square_count = 0;
+        for chunk in &self.chunks {
+            square_count += chunk.render(tess_gate)?;
+        }
+        Ok(square_count)
     }
 }
 
