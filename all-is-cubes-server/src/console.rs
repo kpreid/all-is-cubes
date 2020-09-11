@@ -4,7 +4,7 @@
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
 use cgmath::{EuclideanSpace as _, Point3, Vector2, Vector3};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::convert::TryInto;
 use std::io;
@@ -315,7 +315,5 @@ fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
     rgb + modifier.try_into().unwrap()
 }
 
-lazy_static! {
-    static ref END_OF_LINE: String =
-        format!("{}{}\r\n", color::Bg(color::Reset), color::Fg(color::Reset));
-}
+static END_OF_LINE: Lazy<String> =
+    Lazy::new(|| format!("{}{}\r\n", color::Bg(color::Reset), color::Fg(color::Reset)));

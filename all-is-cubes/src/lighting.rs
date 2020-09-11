@@ -5,7 +5,7 @@
 //! and separated out for readability, not modularity.
 
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::convert::TryInto as _;
 
 use crate::math::*;
@@ -92,33 +92,31 @@ struct FaceRayData {
     rays: [Ray; 3 * 3],
 }
 
-lazy_static! {
-    static ref LIGHT_RAYS: [FaceRayData; 6] = {
-        let mut ray_data = Vec::new();
-        for &face in Face::ALL_SIX {
-            let origin = Point3::new(0.5, 0.5, 0.5) + face.normal_vector() * -0.25;
-            let reflect_face = Vector3::new(0, 0, 0) + face.normal_vector() * -1;
-            let mut rays = Vec::new();
-            for rayx in -1..=1 {
-                for rayy in -1..=1 {
-                    rays.push(Ray {
-                        origin,
-                        direction: face.matrix().transform_vector(Vector3::new(
-                            rayx.into(),
-                            rayy.into(),
-                            1.0,
-                        )),
-                    });
-                }
+static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
+    let mut ray_data = Vec::new();
+    for &face in Face::ALL_SIX {
+        let origin = Point3::new(0.5, 0.5, 0.5) + face.normal_vector() * -0.25;
+        let reflect_face = Vector3::new(0, 0, 0) + face.normal_vector() * -1;
+        let mut rays = Vec::new();
+        for rayx in -1..=1 {
+            for rayy in -1..=1 {
+                rays.push(Ray {
+                    origin,
+                    direction: face.matrix().transform_vector(Vector3::new(
+                        rayx.into(),
+                        rayy.into(),
+                        1.0,
+                    )),
+                });
             }
-            ray_data.push(FaceRayData {
-                reflect_face,
-                rays: (*rays).try_into().unwrap(),
-            });
         }
-        (*ray_data).try_into().unwrap()
-    };
-}
+        ray_data.push(FaceRayData {
+            reflect_face,
+            rays: (*rays).try_into().unwrap(),
+        });
+    }
+    (*ray_data).try_into().unwrap()
+});
 
 pub(crate) fn initialize_lighting(grid: Grid) -> Box<[PackedLight]> {
     vec![PackedLight::INITIAL; grid.volume()].into_boxed_slice()
