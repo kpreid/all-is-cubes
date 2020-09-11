@@ -319,7 +319,10 @@ pub trait Listener<M> {
 }
 
 /// Methods for adapting listeners that are not object-safe.
-pub trait ListenerHelper<M> where Self: Sized {
+pub trait ListenerHelper<M>
+where
+    Self: Sized,
+{
     /// Apply a map/filter function to incoming messages.
     fn filter<MI, F>(self, function: F) -> Filter<F, Self>
     where
@@ -453,7 +456,7 @@ pub struct Filter<F, T> {
 impl<MI, MO, F, T> Listener<MI> for Filter<F, T>
 where
     F: Fn(MI) -> Option<MO>,
-    T: Listener<MO>
+    T: Listener<MO>,
 {
     fn receive(&self, message: MI) {
         if let Some(filtered_message) = (self.function)(message) {

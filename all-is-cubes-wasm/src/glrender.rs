@@ -169,12 +169,16 @@ where
                         shader_iface.set(&u.projection_matrix3, pm[3]);
 
                         // Render space (and cursor). TODO: Reduce awkward code.
-                        let vm: [[f32; 4]; 4] = space_output_bound.view_matrix.cast::<f32>().unwrap().into();
+                        let vm: [[f32; 4]; 4] =
+                            space_output_bound.view_matrix.cast::<f32>().unwrap().into();
                         shader_iface.set(&u.view_matrix0, vm[0]);
                         shader_iface.set(&u.view_matrix1, vm[1]);
                         shader_iface.set(&u.view_matrix2, vm[2]);
                         shader_iface.set(&u.view_matrix3, vm[3]);
-                        shader_iface.set(&u.block_texture, space_output_bound.bound_block_texture.binding());
+                        shader_iface.set(
+                            &u.block_texture,
+                            space_output_bound.bound_block_texture.binding(),
+                        );
                         render_gate.render(&render_state, |mut tess_gate| {
                             info.square_count += space_output_bound.render(&mut tess_gate)?;
                             tess_gate.render(&cursor_tess)?;
@@ -195,7 +199,10 @@ where
                             shader_iface.set(&u.view_matrix2, vm[2]);
                             shader_iface.set(&u.view_matrix3, vm[3]);
 
-                            shader_iface.set(&u.block_texture, space_output_bound.bound_block_texture.binding());
+                            shader_iface.set(
+                                &u.block_texture,
+                                space_output_bound.bound_block_texture.binding(),
+                            );
 
                             // render_gate.render(&render_state, |mut tess_gate| {
                             //     tess_gate.render(&debug_tess)?;

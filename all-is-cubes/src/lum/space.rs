@@ -10,7 +10,9 @@ use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::Backend;
 
-use crate::lum::block_texture::{BlockGLRenderData, BlockGLTexture, BlockTexture, BoundBlockTexture};
+use crate::lum::block_texture::{
+    BlockGLRenderData, BlockGLTexture, BlockTexture, BoundBlockTexture,
+};
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate};
 use crate::space::{BlockIndex, Space, SpaceChange};
@@ -28,11 +30,13 @@ pub struct SpaceRenderer {
 impl SpaceRenderer {
     pub fn new(space: URef<Space>) -> Self {
         let todo = Sink::new();
-        space.borrow_mut().listen(todo.listener().filter(|m| Some(match m {
-            SpaceChange::Block(_) => SpaceRendererDirty::Chunk,
-            SpaceChange::Lighting(_) => SpaceRendererDirty::Chunk,
-            SpaceChange::Number(n) => SpaceRendererDirty::Block(n),
-        })));
+        space.borrow_mut().listen(todo.listener().filter(|m| {
+            Some(match m {
+                SpaceChange::Block(_) => SpaceRendererDirty::Chunk,
+                SpaceChange::Lighting(_) => SpaceRendererDirty::Chunk,
+                SpaceChange::Number(n) => SpaceRendererDirty::Block(n),
+            })
+        }));
         Self {
             space,
             todo,
@@ -45,7 +49,11 @@ impl SpaceRenderer {
         &self.space
     }
 
-    pub fn prepare_frame<'a, C>(&'a mut self, context: &mut C, view_matrix: Matrix4<FreeCoordinate>) -> SpaceRendererOutput<'a>
+    pub fn prepare_frame<'a, C>(
+        &'a mut self,
+        context: &mut C,
+        view_matrix: Matrix4<FreeCoordinate>,
+    ) -> SpaceRendererOutput<'a>
     where
         C: GraphicsContext<Backend = Backend>,
     {
@@ -55,7 +63,9 @@ impl SpaceRenderer {
         let mut dirty_chunk = false;
         while let Some(m) = self.todo.next() {
             match m {
-                SpaceRendererDirty::Chunk => { dirty_chunk = true; },
+                SpaceRendererDirty::Chunk => {
+                    dirty_chunk = true;
+                }
                 SpaceRendererDirty::Block(_id) => {
                     // TODO: update individual blocks
                     dirty_blocks = true;
@@ -85,7 +95,7 @@ impl SpaceRenderer {
         SpaceRendererOutput {
             block_texture: block_data.texture(),
             chunks: vec![&self.chunk],
-            view_matrix
+            view_matrix,
         }
     }
 }
