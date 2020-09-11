@@ -28,7 +28,7 @@ fn main() -> io::Result<()> {
     (*camera_ref.borrow_mut()).auto_rotate = true;
 
     // Park stdin blocking reads on another thread.
-    let (event_tx, event_rx) = mpsc::channel();
+    let (event_tx, event_rx) = mpsc::sync_channel(0);
     thread::spawn(move || {
         for event_result in io::stdin().lock().events() {
             match event_result {
