@@ -28,7 +28,7 @@ run-dev:
 	# Live-reloading webpack dev server; not a game server
 	(cd all-is-cubes-wasm && npm start)
 
-run-console: all
+run-console:
 	cargo run --bin aic-console
 
 run-game-server: all
