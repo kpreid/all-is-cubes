@@ -4,7 +4,6 @@
 //! That which contains many blocks.
 
 use itertools::Itertools as _;
-use rand::SeedableRng as _;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -235,9 +234,6 @@ pub struct Space {
     /// Quick hack of a method to detect changes and redraw. TODO: Replace this, or if we
     /// decide to make it more robust, give it a getter method.
     pub(crate) notifier: Notifier<SpaceChange>,
-
-    /// Random number generator used for random behavior.
-    rng: rand_xoshiro::Xoshiro256Plus,
 }
 
 impl std::fmt::Debug for Space {
@@ -273,7 +269,6 @@ impl Space {
             lighting_update_queue: BinaryHeap::new(),
             lighting_update_set: HashSet::new(),
             notifier: Notifier::new(),
-            rng: rand_xoshiro::Xoshiro256Plus::seed_from_u64(0), // deterministic!
         }
     }
 
