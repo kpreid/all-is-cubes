@@ -1,7 +1,8 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! Procedural block generation.
+//! Procedural block generation. See the `worldgen` module for code that uses the results
+//! of this.
 
 use rand::{Rng, SeedableRng as _};
 
@@ -41,6 +42,8 @@ impl<'a> BlockGen<'a> {
         )
     }
 
+    /// Create a `Block` referring to a `Space` filled with sub-blocks chosen by the
+    /// given function. The third argument to the function is a random value in [0.0, 1.0).
     pub fn block_from_function(
         &mut self,
         attributes: BlockAttributes,
@@ -55,6 +58,7 @@ impl<'a> BlockGen<'a> {
     }
 }
 
+/// Generate a copy of a `Block::Atom` with its color scaled by the given scalar.
 pub fn scale_color(block: Block, scalar: f32) -> Block {
     match block {
         Block::Atom(attributes, color) => Block::Atom(

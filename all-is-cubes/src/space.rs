@@ -122,7 +122,7 @@ impl Grid {
     }
 
     /// Size of the grid in each axis; equivalent to
-    /// `self.upper_bounds() = self.lower_bounds()`.
+    /// `self.upper_bounds() - self.lower_bounds()`.
     pub fn size(&self) -> GridVector {
         self.sizes
     }
@@ -185,7 +185,7 @@ impl Grid {
         self.index(point).is_some()
     }
 
-    /// Returns a random point within the cube.
+    /// Returns a random cube contained by the grid.
     ///
     /// ```
     /// use rand::SeedableRng;
@@ -204,7 +204,8 @@ impl Grid {
     }
 }
 
-/// Container for blocks arranged in three-dimensional space.
+/// Container for `Block`s arranged in three-dimensional space. The main “game world”
+/// data structure.
 pub struct Space {
     grid: Grid,
 
@@ -289,7 +290,8 @@ impl Space {
     }
 
     /// Returns the internal unstable numeric ID for the block at the given position,
-    /// which may be mapped to a `Block` by `.distinct_blocks_unfiltered()`.
+    /// which may be mapped to a `Block` by `.distinct_blocks_unfiltered()`. If you are
+    /// looking for *simple* access, use `space[position]` (the `Index` trait) instead.
     ///
     /// These IDs may be used to perform efficient processing of many blocks, but they
     /// may be renumbered after any mutation.
@@ -337,7 +339,7 @@ impl Space {
     /// This value may be considered as representing the average of the light reflecting
     /// off of all surfaces within, or immediately adjacent to and facing toward, this cube.
     /// If there are no such surfaces, or if the given position is out of bounds, the result
-    /// is arbitrary. If the position is within an opaque block, the result will be black.
+    /// is arbitrary. If the position is within an opaque block, the result is black.
     ///
     /// Lighting is updated asynchronously after modifications, so all above claims about
     /// the meaning of this value are actually “will eventually be, if no more changes are

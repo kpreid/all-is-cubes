@@ -13,12 +13,15 @@ use crate::universe::URef;
 /// A `Block` is something that can exist in the grid of a `Space`; it occupies one unit
 /// cube of space and has a specified appearance and behavior.
 ///
-/// TODO: Wrote an explanation about cloning and mutability versus game mechanics.
+/// In general, when a block appears multiple times from an in-game perspective, that may
+/// or may not be the the same copy; `Block`s are "by value". However, some blocks are
+/// defined by reference to shared mutable data, in which case changes to that data should
+/// take effect everywhere a `Block` having that same reference occurs.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Block {
-    /// A block that is a solid-colored unit cube. (It may still be be transparent or
-    /// non-solid.)
+    /// A block that is a single-colored unit cube. (It may still be be transparent or
+    /// non-solid to physics.)
     Atom(BlockAttributes, RGBA),
     /// A block that is composed of smaller blocks, defined by the referenced `Space`.
     ///
@@ -29,7 +32,7 @@ pub enum Block {
 
 impl Block {
     /// Returns the RGBA color to use for this block when viewed as a single voxel,
-    /// or at full size if `space() == None`.
+    /// and additionally at full size if `space() == None`.
     pub fn color(&self) -> RGBA {
         match self {
             Block::Atom(_, c) => *c,
@@ -57,7 +60,7 @@ impl Block {
     }
 
     /// Returns whether this block should be considered a total obstruction to light
-    // propagation.
+    /// propagation.
     pub fn opaque_to_light(&self) -> bool {
         // TODO account for complex shapes (probably need some memoization instead of defining it here... and also an interface that is per-face)
         self.color().alpha() > 0.99

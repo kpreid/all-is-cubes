@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 use crate::camera::Camera;
 use crate::space::{Space, SpaceStepInfo};
 
+/// Name/key of an object in a `Universe`.
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Name {
     Specific(String),
@@ -27,8 +28,7 @@ impl From<&str> for Name {
 }
 
 /// A collection of named objects which can refer to each other via `URef`. In the future,
-/// it will enable multiple references, garbage collection, change notification, and
-/// inter-object invariants.
+/// it will enable garbage collection and inter-object invariants.
 pub struct Universe {
     spaces: HashMap<Name, URootRef<Space>>,
     cameras: HashMap<Name, URootRef<Camera>>,
@@ -469,7 +469,8 @@ where
 }
 
 /// Algorithm for deciding how to execute simulation and rendering frames.
-/// Platform-independent; only returns decisions given provided information.
+/// Platform-independent; does not consult any clocks, only makes decisions
+/// given the provided information.
 pub struct FrameClock {
     last_absolute_time: Option<Instant>,
     /// Whether there was a step and we should therefore draw a frame.
@@ -503,7 +504,7 @@ impl FrameClock {
     }
 
     /// Reacts to a callback from the environment requesting drawing a frame ASAP if
-    /// we're going to (i.e. requestAnimationFrame on the web). Drives the simulation
+    /// we're going to (i.e. `requestAnimationFrame` on the web). Drives the simulation
     /// clock based on this input (it will not advance if no requests are made).
     ///
     /// Returns whether a frame should actually be rendered now. The caller should also
@@ -533,13 +534,13 @@ impl FrameClock {
         self.accumulated_step_time >= Self::STEP_LENGTH
     }
 
-    pub fn step_length(&self) -> Duration {
-        Self::STEP_LENGTH
-    }
-
     pub fn did_step(&mut self) {
         self.accumulated_step_time -= Self::STEP_LENGTH;
         self.render_dirty = true;
+    }
+
+    pub fn step_length(&self) -> Duration {
+        Self::STEP_LENGTH
     }
 
     fn cap_step_time(&mut self) {

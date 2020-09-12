@@ -7,8 +7,8 @@
 //! All of the algorithms here are independent of graphics API but may presume that
 //! one exists and has specific data types to specialize in.
 //!
-//! Note: Some sources say that “tesselation” would be a better name for this
-//! operation than “triangulation”. However, “tesselation” means a specific
+//! Note on terminology: Some sources say that “tesselation” would be a better name
+//! for this operation than “triangulation”. However, “tesselation” means a specific
 //! other operation in OpenGL graphics programming, and “triangulation” seems to
 //! be the more commonly used terms.
 
@@ -23,8 +23,8 @@ use crate::util::ConciseDebug as _;
 
 pub type TextureCoordinate = f32;
 
-/// Generic structure of output from triangulator. Implement `GfxVertex`
-/// to provide a specialized version.
+/// Generic structure of output from triangulator. Implement `From<BlockVertex>`
+/// to provide a specialized version fit for the target graphics API.
 #[derive(Clone, Copy, PartialEq)]
 pub struct BlockVertex {
     pub position: Point3<FreeCoordinate>,
@@ -32,6 +32,7 @@ pub struct BlockVertex {
     // TODO: Eventually color will be fully replaced with texture coordinates.
     pub coloring: Coloring,
 }
+/// Describes the two ways a `BlockVertex` may be colored; by a solid color or by a texture.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Coloring {
     Solid(RGBA),
@@ -316,7 +317,7 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
         .collect()
 }
 
-/// Allocate an output buffer for `triangulate_space`.
+/// Allocate an empty output buffer for `triangulate_space` to write into.
 pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
     FaceMap::generate(|_| Vec::new())
 }
@@ -379,7 +380,8 @@ pub fn triangulate_space<BV, GV, A>(
 
 pub type Texel = (u8, u8, u8, u8);
 
-/// Allocator of 2D textures to paint block faces into.
+/// Allocator of 2D textures (or rather, typically regions in a texture atlas) to paint
+/// block faces into. Implement this trait using the target graphics API's texture type.
 pub trait TextureAllocator {
     type Tile: TextureTile;
 

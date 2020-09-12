@@ -1,6 +1,13 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
+//! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks
+//! are themselves made of “smaller” blocks that define their appearance and behavior.
+//!
+//! This crate defines the world model, simulation rules and some utilities; for concrete
+//! rendering and user interface, see the `all-is-cubes-server` crate.
+
+
 #![allow(clippy::collapsible_if)]
 #![warn(clippy::cast_lossless)]
 

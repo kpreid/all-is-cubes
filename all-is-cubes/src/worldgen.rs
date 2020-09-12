@@ -17,8 +17,9 @@ use crate::space::Space;
 ///
 /// ```
 /// use all_is_cubes::block::AIR;
-/// use all_is_cubes::space::*;
+/// use all_is_cubes::space::{Grid, Space};
 /// use all_is_cubes::worldgen::axes;
+///
 /// let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));
 /// axes(&mut space);
 ///
@@ -73,6 +74,7 @@ pub fn axes(space: &mut Space) {
 /// use all_is_cubes::space::Space;
 /// use all_is_cubes::blockgen::LandscapeBlocks;
 /// use all_is_cubes::worldgen::wavy_landscape;
+///
 /// let mut space = Space::empty_positive(10, 10, 10);
 /// wavy_landscape(&mut space, &LandscapeBlocks::default(), 1.0);
 /// # // TODO: It didn't panic, but how about some assertions?

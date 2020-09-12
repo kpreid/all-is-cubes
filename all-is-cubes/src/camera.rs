@@ -227,6 +227,8 @@ impl ProjectionHelper {
     }
 }
 
+/// Find the first selectable block the ray strikes and express the result in a `Cursor`
+/// value, or `None` if nothing was struck.
 pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
     let ray = ray.within_grid(*space.grid());
     // TODO: implement 'reach' radius limit
@@ -245,7 +247,10 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
+    /// The cube the cursor is at, as defined by a raycast result (thus including the
+    /// face touched).
     pub place: RaycastStep,
+    /// The block that was found in the given cube.
     pub block: Block,
 }
 

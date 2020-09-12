@@ -14,15 +14,13 @@ use crate::space::*;
 
 pub(crate) type PackedLightScalar = u8;
 
-/// RGB color for lighting from outside the space. Defined to be consistent with
-/// `PackedLight::SKY`.
+/// Light that is considered to exist in all directions outside the world.
+/// (This may stop being a global constant if `Space` gets a configurable
+/// lighting environment.)
 pub const SKY: RGB = RGB::ONE;
 
-/// Lighting within a `Space`.
-///
-/// Each component is essentially a fixed-point value; `PackedLight::UNIT` is the
-/// value to think of as "normal full brightness" and higher values represent
-/// the bright light of light sources.
+/// Lighting within a `Space`; an `all_is_cubes::math::RGB` value stored with reduced
+/// precision and range.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PackedLight(Vector3<PackedLightScalar>);
 // TODO: Once we've built out the rest of the game, do some performance testing and
@@ -38,6 +36,8 @@ impl PackedLight {
     /// `UNIT` as a f32 value, for use in conversions in and out.
     const UNIT_F32: f32 = 64.0;
 
+    /// Equivalent to `PackedLight::from(RGB::ONE)`. Used as the light value for
+    /// cubes in a newly created `Space` whose lighting has not yet been reevaluated.
     pub const INITIAL: PackedLight = PackedLight(Vector3::new(
         PackedLight::UNIT,
         PackedLight::UNIT,
@@ -45,6 +45,7 @@ impl PackedLight {
     ));
 
     /// Light that is considered to exist in all directions outside the world.
+    /// Equivalent to `space::PackedLight::from(space::SKY)`.
     pub const SKY: PackedLight = PackedLight::INITIAL;
 
     fn difference_magnitude(self, other: PackedLight) -> PackedLightScalar {

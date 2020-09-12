@@ -91,6 +91,20 @@ impl Raycaster {
     ///
     /// Note that this is an infinite iterator by default. Use `.within_grid()` to
     /// restrict it.
+    ///
+    /// ```
+    /// use all_is_cubes::math::GridPoint;
+    /// use all_is_cubes::raycast::Raycaster;
+    ///
+    /// let mut r = Raycaster::new((0.5, 0.5, 0.5), (1.0, 0.5, 0.0));
+    /// let mut next = || r.next().unwrap();
+    ///
+    /// // The cube containing the origin point is always the first cube reported.
+    /// assert_eq!(next().cube, GridPoint::new(0, 0, 0));
+    /// assert_eq!(next().cube, GridPoint::new(1, 0, 0));
+    /// assert_eq!(next().cube, GridPoint::new(1, 1, 0));
+    /// assert_eq!(next().cube, GridPoint::new(2, 1, 0));
+    /// ```
     pub fn new(
         origin: impl Into<Point3<FreeCoordinate>>,
         direction: impl Into<Vector3<FreeCoordinate>>,
