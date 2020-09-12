@@ -58,10 +58,16 @@ impl Universe {
     pub fn step(&mut self, timestep: Duration) -> (SpaceStepInfo, ()) {
         let mut space_info = SpaceStepInfo::default();
         for space in self.spaces.values() {
-            space_info += space.borrow_mut().step(timestep);
+            space_info += space
+                .try_borrow_mut()
+                .expect("space borrowed during universe.step()")
+                .step(timestep);
         }
         for camera in self.cameras.values() {
-            let _camera_info = camera.borrow_mut().step(timestep);
+            let _camera_info = camera
+                .try_borrow_mut()
+                .expect("camera borrowed during universe.step()")
+                .step(timestep);
         }
         (space_info, ())
     }
@@ -326,9 +332,9 @@ impl<T> URootRef<T> {
         }
     }
 
-    /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut.
-    fn borrow_mut(&self) -> UBorrowMut<T> {
-        self.downgrade().borrow_mut()
+    /// Borrow the value mutably, in the sense of std::RefCell::try_borrow_mut.
+    fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, RefError> {
+        self.downgrade().try_borrow_mut()
     }
 }
 

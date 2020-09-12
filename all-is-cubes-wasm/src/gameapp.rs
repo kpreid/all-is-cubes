@@ -185,7 +185,7 @@ impl WebGameRoot {
                     event.client_x() as usize,
                     event.client_y() as usize));
                     if let Some(cursor) = &self2.renderer.cursor_result {
-                        self2.camera_ref.borrow_mut().click(cursor);
+                        let _ = self2.camera_ref.borrow_mut().click(cursor);
                     }
             }
         }, &AddEventListenerOptions::new().passive(true));

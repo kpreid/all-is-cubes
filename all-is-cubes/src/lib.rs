@@ -7,7 +7,6 @@
 //! This crate defines the world model, simulation rules and some utilities; for concrete
 //! rendering and user interface, see the `all-is-cubes-server` crate.
 
-
 #![allow(clippy::collapsible_if)]
 #![warn(clippy::cast_lossless)]
 

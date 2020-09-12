@@ -15,7 +15,7 @@ use crate::math::FreeCoordinate;
 use crate::physics::Body;
 use crate::raycast::{Ray, RaycastStep, Raycaster};
 use crate::space::{Grid, Space};
-use crate::universe::URef;
+use crate::universe::{RefError, URef};
 use crate::util::ConciseDebug as _;
 
 // Control characteristics.
@@ -97,9 +97,12 @@ impl Camera {
     }
 
     /// Handle a click/tool-use on the view.
-    pub fn click(&mut self, cursor: &Cursor) {
+    pub fn click(&mut self, cursor: &Cursor) -> Result<(), RefError> {
         // Delete block
-        self.space.borrow_mut().set(cursor.place.cube, &AIR);
+        self.space.try_borrow_mut()?.set(cursor.place.cube, &AIR);
+        // TODO: Eventually we may want to report results like "set outside of world"
+        // so that the UI can give "can't do that" cues instead of no visible effect.
+        Ok(())
     }
 }
 

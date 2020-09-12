@@ -207,7 +207,9 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             }
         }
         Block::Recur(_attributes, space_ref) => {
-            let space = &*space_ref.borrow();
+            let space = &*space_ref
+                .try_borrow()
+                .expect("TODO: generate a failure-indicating BlockRenderData");
             // Construct empty output to mutate, because inside the loops we'll be
             // updating WITHIN independently of other faces.
             let mut output_by_face = FaceMap::generate(|face| FaceRenderData {

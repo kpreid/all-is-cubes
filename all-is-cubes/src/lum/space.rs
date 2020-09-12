@@ -57,7 +57,10 @@ impl SpaceRenderer {
     where
         C: GraphicsContext<Backend = Backend>,
     {
-        let space = &*self.space.borrow();
+        let space = &*self
+            .space
+            .try_borrow()
+            .expect("TODO: return a trivial result instead of panic.");
 
         let mut dirty_blocks = false;
         let mut dirty_chunk = false;
