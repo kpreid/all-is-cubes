@@ -96,7 +96,7 @@ where
 ///
 /// The coordinate system is currently fixed to map X to X, Y to -Y, and a constant to Z.
 /// The vertical flip is because embedded_graphics assumes Y-down coordinates for text.
-struct VoxelDisplayAdapter<'a> {
+pub struct VoxelDisplayAdapter<'a> {
     space: &'a mut Space,
     // TODO: allow input pixel color to control z, or even thickness/patterning,
     // by providing a custom type instead of Rgb888. (Unfortunately, pixel color types
