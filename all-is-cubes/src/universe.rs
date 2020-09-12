@@ -7,6 +7,7 @@ use indexmap::IndexSet;
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::hash_map::{DefaultHasher, HashMap};
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
@@ -69,41 +70,76 @@ impl Universe {
     where
         Self: UniverseIndex<T>,
     {
-        // TODO: Names should not be strings, so these can be guaranteed unique.
         let name = Name::Anonym(self.next_anonym);
         self.next_anonym += 1;
         self.insert(name, value)
     }
 }
 
-/// Trait implemented once for each type of object that can be stored in a `Universe`.
+/// Trait implemented once for each type of object that can be stored in a `Universe`
+/// that internally provides the table for that type. This trait differs from
+/// `UniverseIndex` in that it is not public.
+trait UniverseTable<T> {
+    fn table(&self) -> &HashMap<Name, URootRef<T>>;
+    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<T>>;
+}
+impl UniverseTable<Space> for Universe {
+    fn table(&self) -> &HashMap<Name, URootRef<Space>> {
+        &self.spaces
+    }
+    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Space>> {
+        &mut self.spaces
+    }
+}
+impl UniverseTable<Camera> for Universe {
+    fn table(&self) -> &HashMap<Name, URootRef<Camera>> {
+        &self.cameras
+    }
+    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Camera>> {
+        &mut self.cameras
+    }
+}
+
+/// Trait implemented once for each type of object that can be stored in a `Universe`
+/// that permits lookups of that type.
 pub trait UniverseIndex<T> {
     fn get(&self, name: &Name) -> Option<URef<T>>;
     fn insert(&mut self, name: Name, value: T) -> URef<T>;
 }
 impl UniverseIndex<Space> for Universe {
     fn get(&self, name: &Name) -> Option<URef<Space>> {
-        self.spaces.get(name).map(URootRef::downgrade)
+        index_get(self, name)
     }
     fn insert(&mut self, name: Name, value: Space) -> URef<Space> {
-        // TODO: prohibit existing names under any type
-        let root_ref = URootRef::new(name.clone(), value);
-        let returned_ref = root_ref.downgrade();
-        self.spaces.insert(name, root_ref);
-        returned_ref
+        index_insert(self, name, value)
     }
 }
 impl UniverseIndex<Camera> for Universe {
     fn get(&self, name: &Name) -> Option<URef<Camera>> {
-        self.cameras.get(name).map(URootRef::downgrade)
+        index_get(self, name)
     }
     fn insert(&mut self, name: Name, value: Camera) -> URef<Camera> {
-        // TODO: prohibit existing names under any type
-        let root_ref = URootRef::new(name.clone(), value);
-        let returned_ref = root_ref.downgrade();
-        self.cameras.insert(name, root_ref);
-        returned_ref
+        index_insert(self, name, value)
     }
+}
+
+// Helper functions to implement UniverseIndex. Can't be trait provided methods
+// because UniverseTable is private
+fn index_get<T>(this: &Universe, name: &Name) -> Option<URef<T>>
+where
+    Universe: UniverseTable<T>,
+{
+    this.table().get(name).map(URootRef::downgrade)
+}
+fn index_insert<T>(this: &mut Universe, name: Name, value: T) -> URef<T>
+where
+    Universe: UniverseTable<T>,
+{
+    // TODO: prohibit existing names under any type
+    let root_ref = URootRef::new(name.clone(), value);
+    let returned_ref = root_ref.downgrade();
+    this.table_mut().insert(name, root_ref);
+    returned_ref
 }
 
 impl Default for Universe {
@@ -135,21 +171,42 @@ pub struct URef<T> {
 }
 
 impl<T: 'static> URef<T> {
-    /// Borrow the value, in the sense of std::RefCell::borrow.
+    /// Borrow the value, in the sense of std::RefCell::borrow, and panic on failure.
     pub fn borrow(&self) -> UBorrow<T> {
-        UBorrow(OwningRef::new(OwningHandle::new(self.upgrade())).map(|entry| &entry.data))
+        self.try_borrow().unwrap()
+    }
+
+    /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut, and panic on failure.
+    pub fn borrow_mut(&self) -> UBorrowMut<T> {
+        self.try_borrow_mut().unwrap()
+    }
+
+    /// Borrow the value, in the sense of std::RefCell::borrow.
+    pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
+        let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
+
+        // Kludge: OwningHandle doesn't let us try_borrow, so waste one to check.
+        strong.try_borrow().map_err(|_| RefError::InUse)?;
+
+        Ok(UBorrow(
+            OwningRef::new(OwningHandle::new(strong)).map(|entry| &entry.data),
+        ))
     }
 
     /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut.
-    pub fn borrow_mut(&self) -> UBorrowMut<T> {
-        UBorrowMut(
-            OwningRefMut::new(OwningHandle::new_mut(self.upgrade()))
-                .map_mut(|entry| &mut entry.data),
-        )
+    pub fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, RefError> {
+        let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
+
+        // Kludge: OwningHandle doesn't let us try_borrow, so waste one to check.
+        strong.try_borrow_mut().map_err(|_| RefError::InUse)?;
+
+        Ok(UBorrowMut(
+            OwningRefMut::new(OwningHandle::new_mut(strong)).map_mut(|entry| &mut entry.data),
+        ))
     }
 
-    fn upgrade(&self) -> Rc<RefCell<UEntry<T>>> {
-        self.weak_ref.upgrade().expect("stale URef")
+    fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {
+        self.weak_ref.upgrade().ok_or(RefError::Gone)
     }
 }
 
@@ -178,6 +235,16 @@ impl<T> Clone for URef<T> {
     }
 }
 
+/// Errors resulting from attempting to borrow/dereference a `URef`.
+// TODO: implement Error
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RefError {
+    /// Target was deleted.
+    Gone,
+    /// Target is currently incompatibly borrowed.
+    InUse,
+}
+
 /// A wrapper type for an immutably borrowed value from an `URef<T>`.
 pub struct UBorrow<T: 'static>(
     OwningRef<OwningHandle<StrongEntryRef<T>, Ref<'static, UEntry<T>>>, T>,
@@ -201,6 +268,17 @@ impl<T> Deref for UBorrowMut<T> {
 impl<T> DerefMut for UBorrowMut<T> {
     fn deref_mut(&mut self) -> &mut T {
         self.0.deref_mut()
+    }
+}
+
+impl<T: Debug> Debug for UBorrow<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "UBorrow({:?})", **self)
+    }
+}
+impl<T: Debug> Debug for UBorrowMut<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "UBorrowMut({:?})", **self)
     }
 }
 
@@ -560,6 +638,22 @@ impl Default for FrameClock {
 mod tests {
     use super::*;
     use crate::blockgen::make_some_blocks;
+
+    #[test]
+    fn uref_try_borrow_in_use() {
+        let mut u = Universe::new();
+        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let _borrow_1 = r.borrow_mut();
+        assert_eq!(r.try_borrow().unwrap_err(), RefError::InUse);
+    }
+
+    #[test]
+    fn uref_try_borrow_mut_in_use() {
+        let mut u = Universe::new();
+        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let _borrow_1 = r.borrow();
+        assert_eq!(r.try_borrow_mut().unwrap_err(), RefError::InUse);
+    }
 
     #[test]
     fn uref_equality_is_pointer_equality() {
