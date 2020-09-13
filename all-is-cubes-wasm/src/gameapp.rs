@@ -15,7 +15,7 @@ use web_sys::{
     console, AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, Text,
 };
 
-use all_is_cubes::camera::Camera;
+use all_is_cubes::camera::{Camera, InputProcessor, Key};
 use all_is_cubes::demo_content::new_universe_with_stuff;
 use all_is_cubes::space::SpaceStepInfo;
 use all_is_cubes::universe::{FrameClock, URef, Universe};
@@ -70,6 +70,7 @@ struct WebGameRoot {
 
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
+    input_processor: InputProcessor,
     universe: Universe,
     camera_ref: URef<Camera>,
     renderer: GLRenderer<WebSysWebGL2Surface>,
@@ -94,6 +95,7 @@ impl WebGameRoot {
 
             gui_helpers,
             static_dom,
+            input_processor: InputProcessor::default(),
             camera_ref: universe.get_default_camera(),
             universe,
             renderer,
@@ -141,27 +143,30 @@ impl WebGameRoot {
             // (There are two parts of it: The `Weak` reference might have gone away,
             // and we also need to runtime borrow the `RefCell`)
             if let Some(refcell_ref) = self_ref.upgrade() {
-                let self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
-                let camera = &mut *self2.camera_ref.borrow_mut();
-                if event.alt_key() || event.ctrl_key() || event.meta_key() {
-                    return;
+                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+                if let Some(key) = map_keyboard_event(&event) {
+                    self2.input_processor.key_down(key);
+
+                    // TODO: return for keys we don't bind
+                    let event: &Event = event.as_ref();
+                    event.stop_propagation();  // only if we didn't return already
+                    event.prevent_default();
                 }
-                match event.key_code() as u8 as char {
-                    'w' | 'W' => { camera.set_velocity_input(( 0.0,  0.0, -1.0)); },
-                    'a' | 'A' => { camera.set_velocity_input((-1.0,  0.0,  0.0)); },
-                    's' | 'S' => { camera.set_velocity_input(( 0.0,  0.0,  1.0)); },
-                    'd' | 'D' => { camera.set_velocity_input(( 1.0,  0.0,  0.0)); },
-                    'e' | 'E' => { camera.set_velocity_input(( 0.0,  1.0,  0.0)); },
-                    'c' | 'C' => { camera.set_velocity_input(( 0.0, -1.0,  0.0)); },
-                    '\x25' => { camera.body.yaw -= 5.0; },
-                    '\x26' => { camera.body.pitch += 5.0; },
-                    '\x27' => { camera.body.yaw += 5.0; },
-                    '\x28' => { camera.body.pitch -= 5.0; },
-                    _ => { return; },
+            }
+        }, &AddEventListenerOptions::new());
+
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"keyup", move |event: KeyboardEvent| {
+            if let Some(refcell_ref) = self_ref.upgrade() {
+                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+                if let Some(key) = map_keyboard_event(&event) {
+                    self2.input_processor.key_up(key);
+
+                    // TODO: return for keys we don't bind
+                    let event: &Event = event.as_ref();
+                    event.stop_propagation();  // only if we didn't return already
+                    event.prevent_default();
                 }
-                let event: &Event = event.as_ref();
-                event.stop_propagation();  // only if we didn't return already
-                event.prevent_default();
             }
         }, &AddEventListenerOptions::new());
 
@@ -246,9 +251,15 @@ impl WebGameRoot {
         // Allow 2 steps of catch-up. TODO: This policy should probably live in FrameClock instead.
         for _ in 0..2 {
             if self.frame_clock.should_step() {
+                let timestep = self.frame_clock.step_length();
                 self.frame_clock.did_step();
-                // TODO: Do this in a separate task, not requestAnimationFrame
-                let (space_step_info, _) = self.universe.step(self.frame_clock.step_length());
+
+                {
+                    let camera = &mut *self.camera_ref.borrow_mut();
+                    self.input_processor.apply_input(camera, timestep);
+                }
+
+                let (space_step_info, _) = self.universe.step(timestep);
                 self.last_step_info = space_step_info;
             }
         }
@@ -274,4 +285,18 @@ impl StaticDom {
             scene_info_text_node,
         })
     }
+}
+
+fn map_keyboard_event(event: &KeyboardEvent) -> Option<Key> {
+    if event.alt_key() || event.ctrl_key() || event.meta_key() {
+        return None;
+    }
+    Some(match event.key_code() as u8 as char {
+        '\x25' => Key::Left,
+        '\x26' => Key::Up,
+        '\x27' => Key::Right,
+        '\x28' => Key::Down,
+        c @ '\x20'..='\x7e' => Key::Character(c.to_ascii_lowercase()),
+        _ => { return None; }
+    })
 }

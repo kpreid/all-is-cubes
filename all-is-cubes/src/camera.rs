@@ -8,6 +8,7 @@ use cgmath::{
     Vector3, Vector4,
 };
 use num_traits::identities::Zero;
+use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::block::{Block, AIR};
@@ -84,6 +85,7 @@ impl Camera {
         self.body.step(duration);
 
         // TODO: temporary placeholder while we change over to continuous movement controls
+        // This will have no effect if velocity input is set every frame
         self.velocity_input *= (0.1 as FreeCoordinate).powf(dt);
 
         if self.auto_rotate {
@@ -265,5 +267,80 @@ impl std::fmt::Display for Cursor {
             self.block.attributes().display_name,
             self.place.cube.as_concise_debug()
         )
+    }
+}
+
+/// Parse input events, particularly key-down/up pairs, into camera control and such.
+pub struct InputProcessor {
+    keys_held: HashSet<Key>,
+}
+
+impl InputProcessor {
+    pub fn key_down(&mut self, key: Key) {
+        self.keys_held.insert(key);
+    }
+
+    pub fn key_up(&mut self, key: Key) {
+        self.keys_held.remove(&key);
+    }
+
+    pub fn movement(&self) -> Vector3<FreeCoordinate> {
+        Vector3::new(
+            self.net_movement(Key::Character('a'), Key::Character('d')),
+            self.net_movement(Key::Character('c'), Key::Character('e')),
+            self.net_movement(Key::Character('w'), Key::Character('s')),
+        )
+    }
+
+    pub fn apply_input(&self, camera: &mut Camera, timestep: Duration) {
+        camera.set_velocity_input(self.movement());
+
+        let turning_step = 80.0 * timestep.as_secs_f64();
+        camera.body.yaw += turning_step * self.net_movement(Key::Left, Key::Right);
+        camera.body.pitch += turning_step * self.net_movement(Key::Up, Key::Down);
+    }
+
+    fn net_movement(&self, negative: Key, positive: Key) -> FreeCoordinate {
+        match (self.keys_held.contains(&negative), self.keys_held.contains(&positive)) {
+            (true, false) => -1.0,
+            (false, true) => 1.0,
+            _ => 0.0,
+        }
+    }
+}
+
+impl Default for InputProcessor {
+    fn default() -> Self {
+        InputProcessor {
+            keys_held: HashSet::new(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Key {
+    /// Letters should be lowercase.
+    Character(char),
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn input_movement() {
+        let mut input = InputProcessor::default();
+        assert_eq!(input.movement(), Vector3::new(0.0, 0.0, 0.0));
+        input.key_down(Key::Character('d'));
+        assert_eq!(input.movement(), Vector3::new(1.0, 0.0, 0.0));
+        input.key_down(Key::Character('a'));
+        assert_eq!(input.movement(), Vector3::new(0.0, 0.0, 0.0));
+        input.key_up(Key::Character('d'));
+        assert_eq!(input.movement(), Vector3::new(-1.0, 0.0, 0.0));
     }
 }
