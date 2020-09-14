@@ -277,9 +277,6 @@ pub struct Space {
     /// Set of members of lighting_update_queue, for deduplication.
     pub(crate) lighting_update_set: HashSet<GridPoint>,
 
-    /// Increments every time the space is modified in an externally visible way.
-    /// Quick hack of a method to detect changes and redraw. TODO: Replace this, or if we
-    /// decide to make it more robust, give it a getter method.
     pub(crate) notifier: Notifier<SpaceChange>,
 }
 
