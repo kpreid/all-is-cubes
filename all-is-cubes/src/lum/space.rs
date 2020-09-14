@@ -4,44 +4,53 @@
 //! Get from `Space` to `luminance::tess::Tess`.
 
 use cgmath::Matrix4;
+use indexmap::IndexSet;
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::{Pipeline, PipelineError};
 use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::Backend;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::{Rc, Weak};
 
 use crate::lum::block_texture::{
     BlockGLRenderData, BlockGLTexture, BlockTexture, BoundBlockTexture,
 };
 use crate::lum::types::{GLBlockVertex, Vertex};
-use crate::math::{Face, FaceMap, FreeCoordinate};
-use crate::space::{BlockIndex, Space, SpaceChange};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint};
+use crate::space::{Grid, Space, SpaceChange};
 use crate::triangulator::{triangulate_space, BlocksRenderData};
-use crate::universe::{ListenerHelper, Sink, URef};
+use crate::universe::{Listener, URef};
+
+const CHUNK_SIZE: GridCoordinate = 16;
 
 /// Manages cached data and GPU resources for drawing a single `Space`.
 pub struct SpaceRenderer {
     space: URef<Space>,
-    todo: Sink<SpaceRendererDirty>,
+    todo: Rc<RefCell<SpaceRendererTodo>>,
     block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
-    chunk: Chunk,
+    /// Indexed by coordinate divided by CHUNK_SIZE
+    chunks: HashMap<GridPoint, Chunk>,
 }
 
 impl SpaceRenderer {
     pub fn new(space: URef<Space>) -> Self {
-        let todo = Sink::new();
-        space.borrow_mut().listen(todo.listener().filter(|m| {
-            Some(match m {
-                SpaceChange::Block(_) => SpaceRendererDirty::Chunk,
-                SpaceChange::Lighting(_) => SpaceRendererDirty::Chunk,
-                SpaceChange::Number(n) => SpaceRendererDirty::Block(n),
-            })
-        }));
+        let mut space_borrowed = space.borrow_mut();
+
+        let mut todo = SpaceRendererTodo::default();
+        // TODO: Eventually we will want to draw only in-view-range chunks
+        for chunk_pos in space_borrowed.grid().divide(CHUNK_SIZE).interior_iter() {
+            todo.chunks.insert(chunk_pos);
+        }
+        let todo_rc = Rc::new(RefCell::new(todo));
+        space_borrowed.listen(TodoListener(Rc::downgrade(&todo_rc)));
+
         Self {
             space,
-            todo,
+            todo: todo_rc,
             block_data_cache: None,
-            chunk: Chunk::new(),
+            chunks: HashMap::new(),
         }
     }
 
@@ -62,25 +71,10 @@ impl SpaceRenderer {
             .try_borrow()
             .expect("TODO: return a trivial result instead of panic.");
 
-        let mut dirty_blocks = false;
-        let mut dirty_chunk = false;
-        while let Some(m) = self.todo.next() {
-            match m {
-                SpaceRendererDirty::Chunk => {
-                    dirty_chunk = true;
-                }
-                SpaceRendererDirty::Block(_id) => {
-                    // TODO: update individual blocks
-                    dirty_blocks = true;
-                    // Vertices may have changed.
-                    // TODO: Implement recognizing texture-only updates, and
-                    // (once chunking exists) only updating chunks that need it
-                    dirty_chunk = true;
-                }
-            }
-        }
+        let mut todo = self.todo.borrow_mut();
 
-        if dirty_blocks {
+        if todo.blocks {
+            todo.blocks = false;
             self.block_data_cache = None;
         }
         let block_data = self.block_data_cache.get_or_insert_with(|| {
@@ -90,15 +84,31 @@ impl SpaceRenderer {
             block_data
         });
 
-        if dirty_chunk {
-            self.chunk
-                .update(context, &space, &block_data.block_render_data);
+        // Update some chunk geometry.
+        // TODO: tune max update count
+        let mut chunk_update_count = 0;
+        while chunk_update_count < 10 {
+            // TODO: We want to add chunks if they are _in the view range_, not unconditionally
+            if let Some(p) = todo.chunks.pop() {
+                self.chunks
+                    .entry(p)
+                    .or_insert_with(|| Chunk::new(p))
+                    .update(context, &space, &block_data.block_render_data);
+                chunk_update_count += 1;
+            } else {
+                break;
+            }
         }
 
         SpaceRendererOutput {
             block_texture: block_data.texture(),
-            chunks: vec![&self.chunk],
+            chunks: self.chunks.values().collect(), // TODO visibility culling, and don't allocate every frame
             view_matrix,
+            info: SpaceRenderInfo {
+                chunk_queue_count: todo.chunks.len(),
+                chunk_update_count,
+                square_count: 0, // filled later
+            },
         }
     }
 }
@@ -110,12 +120,14 @@ pub struct SpaceRendererOutput<'a> {
     /// Chunks are handy wrappers around some Tesses
     chunks: Vec<&'a Chunk>,
     view_matrix: Matrix4<FreeCoordinate>,
+    info: SpaceRenderInfo,
 }
 /// As `SpaceRendererBound`, but past the texture-binding stage of the pipeline.
 pub struct SpaceRendererBound<'a> {
     pub bound_block_texture: BoundBlockTexture<'a>,
     pub chunks: Vec<&'a Chunk>,
     pub view_matrix: Matrix4<FreeCoordinate>,
+    info: SpaceRenderInfo,
 }
 
 impl<'a> SpaceRendererOutput<'a> {
@@ -124,36 +136,52 @@ impl<'a> SpaceRendererOutput<'a> {
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
             chunks: self.chunks,
             view_matrix: self.view_matrix,
+            info: self.info,
         })
     }
 }
 impl<'a> SpaceRendererBound<'a> {
-    pub fn render<E>(&self, tess_gate: &mut TessGate) -> Result<usize, E> {
+    pub fn render<E>(&self, tess_gate: &mut TessGate) -> Result<SpaceRenderInfo, E> {
         let mut square_count = 0;
         for chunk in &self.chunks {
             square_count += chunk.render(tess_gate)?;
         }
-        Ok(square_count)
+        Ok(SpaceRenderInfo {
+            square_count,
+            ..self.info
+        })
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-enum SpaceRendererDirty {
-    Block(BlockIndex),
-    Chunk, // TODO: once we have specific chunks
+/// Performance info from a `SpaceRenderer`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SpaceRenderInfo {
+    pub chunk_queue_count: usize,
+    pub chunk_update_count: usize,
+    pub square_count: usize,
 }
 
-/// Not yet actually chunked rendering, but bundles the data that would be used in one.
+/// Divide a cube position to obtain a chunk position.
+fn chunkify(cube: GridPoint) -> GridPoint {
+    GridPoint::new(
+        cube.x.div_euclid(CHUNK_SIZE),
+        cube.y.div_euclid(CHUNK_SIZE),
+        cube.z.div_euclid(CHUNK_SIZE),
+    )
+}
+
+/// Storage for rendering of part of a `Space`.
 pub struct Chunk {
-    // bounds: Grid,
+    bounds: Grid,
     /// Vertices grouped by the direction they face
     vertices: FaceMap<Vec<Vertex>>,
     tesses: FaceMap<Option<Tess<Vertex>>>,
 }
 
 impl Chunk {
-    fn new() -> Self {
+    fn new(chunk_pos: GridPoint) -> Self {
         Chunk {
+            bounds: Grid::new(chunk_pos * CHUNK_SIZE, (CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE)),
             vertices: FaceMap::default(),
             tesses: FaceMap::default(),
         }
@@ -165,7 +193,7 @@ impl Chunk {
         space: &Space,
         blocks_render_data: &BlocksRenderData<GLBlockVertex, BlockGLTexture>,
     ) {
-        triangulate_space(space, blocks_render_data, &mut self.vertices);
+        triangulate_space(space, &self.bounds, blocks_render_data, &mut self.vertices);
 
         for &face in Face::ALL_SEVEN {
             let tess_option = &mut self.tesses[face];
@@ -210,6 +238,56 @@ impl Chunk {
             }
         }
         Ok(count)
+    }
+}
+
+/// `SpaceRenderer`'s set of things that need recomputing.
+#[derive(Default)]
+struct SpaceRendererTodo {
+    blocks: bool,
+    // TODO: Organize chunks as a priority queue ordered by distance from camera.
+    chunks: IndexSet<GridPoint>,
+}
+
+impl SpaceRendererTodo {
+    fn insert_block_and_adjacent(&mut self, cube: GridPoint) {
+        // Mark adjacent blocks to account for opaque faces hiding adjacent
+        // blocks' faces. We don't need to bother with the current block since
+        // the adjacent chunks will always include it (presuming that the chunk
+        // size is greater than 1).
+        for axis in 0..3 {
+            for offset in &[0, 1] {
+                let mut adjacent = cube;
+                adjacent[axis] += offset;
+                self.chunks.insert(chunkify(adjacent));
+            }
+        }
+    }
+}
+
+/// `Listener` adapter for `SpaceRendererTodo`.
+struct TodoListener(Weak<RefCell<SpaceRendererTodo>>);
+
+impl Listener<SpaceChange> for TodoListener {
+    fn receive(&self, message: SpaceChange) {
+        if let Some(cell) = self.0.upgrade() {
+            let mut todo = cell.borrow_mut();
+            match message {
+                SpaceChange::Block(p) => {
+                    todo.insert_block_and_adjacent(p);
+                }
+                SpaceChange::Lighting(p) => {
+                    todo.insert_block_and_adjacent(p);
+                }
+                SpaceChange::Number(_) => {
+                    todo.blocks = true;
+                }
+            }
+        }
+    }
+
+    fn alive(&self) -> bool {
+        self.0.upgrade().is_some()
     }
 }
 

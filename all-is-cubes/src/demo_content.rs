@@ -43,18 +43,21 @@ pub fn new_universe_with_stuff() -> Universe {
     let (axis_block, mut axis_space) = bg.new_recursive_block(BlockAttributes::default());
     axes(&mut *axis_space);
 
-    let radius = 16;
-    let diameter = radius * 2 + 1;
-    let grid = Grid::new((-radius, -radius, -radius), (diameter, diameter, diameter));
+    let radius_xz = 45;
+    let diameter_xz = radius_xz * 2 + 1;
+    let grid = Grid::new(
+        (-radius_xz, -16, -radius_xz),
+        (diameter_xz, 33, diameter_xz),
+    );
     let mut space = Space::empty(grid);
     wavy_landscape(&mut space, &blocks, 1.0);
     axes(&mut space);
     draw_text(
         &mut space,
-        Rgb888::new(120, 100, 200),
-        GridPoint::new(-16, -16, -16),
+        Rgb888::new(200, 50, 120),
+        GridPoint::new(-radius_xz, -16, -radius_xz),
         Font8x16,
-        "Hi!",
+        "All is Cubes",
     );
     space.set((-1, 3, -1), &axis_block);
     for cube in text_blocks.grid().interior_iter() {

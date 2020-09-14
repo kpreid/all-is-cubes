@@ -18,7 +18,7 @@ use std::convert::TryFrom;
 use crate::block::Block;
 use crate::lighting::PackedLight;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
-use crate::space::Space;
+use crate::space::{Grid, Space};
 use crate::util::ConciseDebug as _;
 
 pub type TextureCoordinate = f32;
@@ -337,14 +337,13 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 /// vectors.
 pub fn triangulate_space<BV, GV, A>(
     space: &Space,
+    bounds: &Grid,
     blocks_render_data: &BlocksRenderData<BV, A>,
     output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
     BV: ToGfxVertex<GV>,
     A: TextureAllocator,
 {
-    // TODO: take a Grid parameter for chunked rendering
-
     let empty_render = BlockRenderData::<BV, A>::default();
     let lookup = |cube| {
         match space.get_block_index(cube) {
@@ -360,7 +359,7 @@ pub fn triangulate_space<BV, GV, A>(
         // use the buffer but not the existing data
         output_vertices[face].clear();
     }
-    for cube in space.grid().interior_iter() {
+    for cube in bounds.interior_iter() {
         let precomputed = lookup(cube);
         let low_corner = cube.cast::<BV::Coordinate>().unwrap();
         for &face in Face::ALL_SEVEN {
@@ -452,6 +451,7 @@ mod tests {
         let mut rendering = new_space_buffer();
         triangulate_space::<BlockVertex, BlockVertex, NullTextureAllocator>(
             &space,
+            &space.grid(),
             &triangulate_blocks(&space, &mut NullTextureAllocator),
             &mut rendering,
         );
@@ -487,7 +487,12 @@ mod tests {
 
         // This should not panic; visual glitches are preferable to failure.
         space.set((0, 0, 0), &block); // render data does not know about this
-        triangulate_space(&space, &blocks_render_data, &mut new_space_buffer());
+        triangulate_space(
+            &space,
+            &space.grid(),
+            &blocks_render_data,
+            &mut new_space_buffer(),
+        );
     }
 
     #[test]
@@ -508,7 +513,12 @@ mod tests {
 
         eprintln!("{:#?}", blocks_render_data);
         let mut space_rendered = new_space_buffer();
-        triangulate_space(&outer_space, &blocks_render_data, &mut space_rendered);
+        triangulate_space(
+            &outer_space,
+            &outer_space.grid(),
+            &blocks_render_data,
+            &mut space_rendered,
+        );
         eprintln!("{:#?}", space_rendered);
 
         assert_eq!(

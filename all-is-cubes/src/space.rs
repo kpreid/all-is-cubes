@@ -34,6 +34,8 @@ impl Grid {
     /// then the positions where blocks can exist are numbered 5 through 14
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 15.
+    ///
+    /// TODO: Rename this to be parallel with from_lower_upper
     pub fn new(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridVector>) -> Grid {
         let lower_bounds = lower_bounds.into();
         let sizes = sizes.into();
@@ -55,6 +57,14 @@ impl Grid {
             lower_bounds,
             sizes,
         }
+    }
+
+    pub fn from_lower_upper(
+        lower_bounds: impl Into<GridPoint>,
+        upper_bounds: impl Into<GridPoint>,
+    ) -> Grid {
+        let lower_bounds = lower_bounds.into();
+        Grid::new(lower_bounds, upper_bounds.into() - lower_bounds)
     }
 
     /// Compute volume with checked arithmetic. In a function solely for the convenience
@@ -196,10 +206,46 @@ impl Grid {
     /// }
     /// ```
     pub fn random_cube(&self, rng: &mut impl rand::Rng) -> GridPoint {
+        let upper_bounds = self.upper_bounds();
         GridPoint::new(
-            rng.gen_range(self.lower_bounds()[0], self.upper_bounds()[0]),
-            rng.gen_range(self.lower_bounds()[1], self.upper_bounds()[1]),
-            rng.gen_range(self.lower_bounds()[2], self.upper_bounds()[2]),
+            rng.gen_range(self.lower_bounds[0], upper_bounds[0]),
+            rng.gen_range(self.lower_bounds[1], upper_bounds[1]),
+            rng.gen_range(self.lower_bounds[2], upper_bounds[2]),
+        )
+    }
+
+    /// Scales the grid down by the given factor, rounding outward.
+    ///
+    /// ```
+    /// use all_is_cubes::space::Grid;
+    ///
+    /// assert_eq!(
+    ///     Grid::new((-10, -10, -10), (20, 20, 20)).divide(10),
+    ///     Grid::new((-1, -1, -1), (2, 2, 2)),
+    /// );
+    /// assert_eq!(
+    ///     Grid::new((-10, -10, -10), (21, 21, 21)).divide(10),
+    ///     Grid::new((-1, -1, -1), (3, 3, 3)),
+    /// );
+    /// assert_eq!(
+    ///     Grid::new((-11, -11, -11), (20, 20, 20)).divide(10),
+    ///     Grid::new((-2, -2, -2), (3, 3, 3)),
+    /// );
+    /// ```
+    #[inline]
+    pub fn divide(&self, divisor: GridCoordinate) -> Self {
+        let upper_bounds = self.upper_bounds();
+        Grid::from_lower_upper(
+            (
+                self.lower_bounds.x.div_euclid(divisor),
+                self.lower_bounds.y.div_euclid(divisor),
+                self.lower_bounds.z.div_euclid(divisor),
+            ),
+            (
+                (upper_bounds.x + divisor - 1).div_euclid(divisor),
+                (upper_bounds.y + divisor - 1).div_euclid(divisor),
+                (upper_bounds.z + divisor - 1).div_euclid(divisor),
+            ),
         )
     }
 }

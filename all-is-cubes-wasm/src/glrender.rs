@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::JsValue;
 use web_sys::console;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
-use all_is_cubes::lum::space::SpaceRenderer;
+use all_is_cubes::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use all_is_cubes::lum::types::{Vertex, VertexSemantics};
 use all_is_cubes::math::{GridCoordinate, RGBA};
 use all_is_cubes::universe::URef;
@@ -180,7 +180,8 @@ where
                             space_output_bound.bound_block_texture.binding(),
                         );
                         render_gate.render(&render_state, |mut tess_gate| {
-                            info.square_count += space_output_bound.render(&mut tess_gate)?;
+                            // TODO: should be `info.space += ...`
+                            info.space = space_output_bound.render(&mut tess_gate)?;
                             tess_gate.render(&cursor_tess)?;
                             Ok(())
                         })?;
@@ -233,7 +234,7 @@ where
 /// Information about render performance
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RenderInfo {
-    square_count: usize,
+    space: SpaceRenderInfo,
 }
 
 #[derive(Debug, UniformInterface)]
