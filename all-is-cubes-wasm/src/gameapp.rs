@@ -297,6 +297,8 @@ fn map_keyboard_event(event: &KeyboardEvent) -> Option<Key> {
         '\x27' => Key::Right,
         '\x28' => Key::Down,
         c @ '\x20'..='\x7e' => Key::Character(c.to_ascii_lowercase()),
-        _ => { return None; }
+        _ => {
+            return None;
+        }
     })
 }

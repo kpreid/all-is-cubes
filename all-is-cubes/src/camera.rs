@@ -301,7 +301,10 @@ impl InputProcessor {
     }
 
     fn net_movement(&self, negative: Key, positive: Key) -> FreeCoordinate {
-        match (self.keys_held.contains(&negative), self.keys_held.contains(&positive)) {
+        match (
+            self.keys_held.contains(&negative),
+            self.keys_held.contains(&positive),
+        ) {
             (true, false) => -1.0,
             (false, true) => 1.0,
             _ => 0.0,
@@ -326,7 +329,6 @@ pub enum Key {
     Up,
     Down,
 }
-
 
 #[cfg(test)]
 mod tests {
