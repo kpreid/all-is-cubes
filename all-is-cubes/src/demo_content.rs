@@ -12,10 +12,10 @@ use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
 
-use crate::block::BlockAttributes;
+use crate::block::{Block, BlockAttributes};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
-use crate::drawing::{draw_text, draw_to_blocks};
+use crate::drawing::{draw_text, draw_to_blocks, VoxelBrush};
 use crate::math::{GridPoint, GridVector};
 use crate::space::{Grid, Space};
 use crate::universe::{Universe, UniverseIndex};
@@ -43,7 +43,7 @@ pub fn new_universe_with_stuff() -> Universe {
     let (axis_block, mut axis_space) = bg.new_recursive_block(BlockAttributes::default());
     axes(&mut *axis_space);
 
-    let radius_xz = 45;
+    let radius_xz = 50;
     let diameter_xz = radius_xz * 2 + 1;
     let grid = Grid::new(
         (-radius_xz, -16, -radius_xz),
@@ -52,14 +52,26 @@ pub fn new_universe_with_stuff() -> Universe {
     let mut space = Space::empty(grid);
     wavy_landscape(&mut space, &blocks, 1.0);
     axes(&mut space);
+    space.set((-1, 3, -1), &axis_block);
+
+    // Large banner text
+    let foreground_text_block: Block = Rgb888::new(200, 50, 120).into();
+    let background_text_block: Block = Rgb888::new(50, 50, 50).into();
     draw_text(
         &mut space,
-        Rgb888::new(200, 50, 120),
-        GridPoint::new(-radius_xz, -16, -radius_xz),
+        VoxelBrush::new(vec![
+            ((0, 0, 1), &foreground_text_block),
+            ((1, 0, 0), &background_text_block),
+            ((-1, 0, 0), &background_text_block),
+            ((0, 1, 0), &background_text_block),
+            ((0, -1, 0), &background_text_block),
+        ]),
+        GridPoint::new(-radius_xz + 3, -16, -radius_xz),
         Font8x16,
         "All is Cubes",
     );
-    space.set((-1, 3, -1), &axis_block);
+
+    // Small test text
     for cube in text_blocks.grid().interior_iter() {
         space.set(cube + GridVector::new(-16, 3, -14), &text_blocks[cube]);
     }

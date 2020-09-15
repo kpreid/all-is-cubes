@@ -4,10 +4,11 @@
 //! Draw 2D graphics into spaces and blocks, including text, using an adapter for the
 //! `embedded_graphics` crate.
 
+use cgmath::Vector3;
 use embedded_graphics::drawable::{Drawable, Pixel};
 use embedded_graphics::fonts::{Font, Text};
 use embedded_graphics::geometry::{Dimensions, Point, Size};
-use embedded_graphics::pixelcolor::{Rgb888, RgbColor};
+use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::style::TextStyleBuilder;
 use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
@@ -19,13 +20,15 @@ use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
 use crate::space::{Grid, Space};
 
 /// Draw text into a `Space`, extending in the +X and -Y directions from `origin`.
-pub fn draw_text<F>(
+pub fn draw_text<F, C>(
     space: &mut Space,
-    color: Rgb888,
+    color: C,
     origin: GridPoint,
     font: F,
     text: impl AsRef<str>,
 ) where
+    C: PixelColor,
+    for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = Infallible>,
     F: Font + Copy,
 {
     let style = TextStyleBuilder::new(font).text_color(color).build();
@@ -37,10 +40,12 @@ pub fn draw_text<F>(
 
 /// Generate a set of blocks which together display the given `Drawable` which may be
 /// larger than one block. The Z position is always the middle of the block.
-pub fn draw_to_blocks<D>(ctx: &mut BlockGen, object: D) -> Space
+pub fn draw_to_blocks<D, C>(ctx: &mut BlockGen, object: D) -> Space
 where
-    for<'a> &'a D: Drawable<Rgb888>,
+    for<'a> &'a D: Drawable<C>,
     D: Dimensions + Transform,
+    C: PixelColor,
+    for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = Infallible>,
 {
     let block_size: i32 = ctx.size;
     let top_left_2d = object.top_left();
@@ -110,20 +115,17 @@ impl<'a> VoxelDisplayAdapter<'a> {
     }
 }
 
-impl DrawTarget<Rgb888> for VoxelDisplayAdapter<'_> {
-    type Error = Infallible;
-
-    fn draw_pixel(&mut self, pixel: Pixel<Rgb888>) -> Result<(), Self::Error> {
-        let Pixel(Point { x, y }, color) = pixel;
-        self.space.set(
-            (x as GridCoordinate, -y as GridCoordinate, self.z),
-            // TODO: Allow attribute alteration.
-            &Block::Atom(BlockAttributes::default(), RGB::from(color).with_alpha(1.0)),
-        );
-        Ok(())
+impl VoxelDisplayAdapter<'_> {
+    fn convert_point(&self, point: Point) -> GridPoint {
+        GridPoint::new(
+            point.x as GridCoordinate,
+            -point.y as GridCoordinate,
+            self.z,
+        )
     }
 
-    fn size(&self) -> Size {
+    /// Common implementation for the DrawTarget size methods
+    fn size_for_eg(&self) -> Size {
         let size = self.space.grid().size();
         Size {
             // TODO: Surely there's a better way to write a saturating cast?
@@ -133,7 +135,50 @@ impl DrawTarget<Rgb888> for VoxelDisplayAdapter<'_> {
     }
 }
 
-/// Adapt embedded_graphics's color type to ours.
+/// A `VoxelDisplayAdapter` accepts any color type provided that there is a conversion
+/// from colors to `Block`s.
+impl<C> DrawTarget<C> for VoxelDisplayAdapter<'_>
+where
+    C: Into<Block> + PixelColor,
+{
+    type Error = Infallible;
+
+    fn draw_pixel(&mut self, pixel: Pixel<C>) -> Result<(), Self::Error> {
+        let Pixel(point, color) = pixel;
+        // TODO: Allow customizing block attributes.
+        self.space.set(self.convert_point(point), &color.into());
+        Ok(())
+    }
+
+    fn size(&self) -> Size {
+        self.size_for_eg()
+    }
+}
+
+/// A `VoxelBrush` may be used to draw multiple layers of blocks from a single 2D
+/// graphic, producing shadow or outline effects.
+impl DrawTarget<VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
+    type Error = Infallible;
+
+    fn draw_pixel(&mut self, pixel: Pixel<VoxelBrush>) -> Result<(), Self::Error> {
+        let Pixel(point, brush) = pixel;
+        let point = self.convert_point(point);
+        for bristle in &brush.0 {
+            if let Some((offset, block)) = bristle {
+                let offset = offset.cast::<GridCoordinate>().unwrap();
+                self.space.set(point + offset, block);
+            }
+        }
+        Ok(())
+    }
+
+    fn size(&self) -> Size {
+        self.size_for_eg()
+    }
+}
+
+/// Adapt embedded_graphics's most general color type to ours.
+// TODO: Also adapt the other types, so that if someone wants to use them they can.
 impl From<Rgb888> for RGB {
     fn from(color: Rgb888) -> RGB {
         RGB::new(
@@ -142,6 +187,41 @@ impl From<Rgb888> for RGB {
             f32::from(color.b()) / 255.0,
         )
     }
+}
+
+/// Perform the conversion to Block used by our `DrawTarget`, alone so that
+/// it can be matched if desired.
+impl From<Rgb888> for Block {
+    fn from(color: Rgb888) -> Block {
+        Block::Atom(BlockAttributes::default(), RGB::from(color).with_alpha(1.0))
+    }
+}
+
+/// A "color" that is a set of independently colored and offset layers.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VoxelBrush<'a>([Option<(Vector3<i8>, &'a Block)>; VoxelBrush::MAX_COUNT]);
+
+impl<'a> VoxelBrush<'a> {
+    /// 7 is chosen as being enough cubes to draw a "+" shape, creating a border and
+    /// depth.
+    const MAX_COUNT: usize = 7;
+
+    /// Makes a `VoxelBrush` which paints the specified blocks at the specified offsets
+    /// from each pixel position.
+    // TODO: is there a good way to generalize the argument type more than Vec, given that we want
+    // owned input?
+    pub fn new<V: Into<Vector3<i8>>>(blocks: Vec<(V, &'a Block)>) -> Self {
+        assert!(blocks.len() <= Self::MAX_COUNT);
+        let mut result = VoxelBrush([None; Self::MAX_COUNT]);
+        for (i, (offset, block)) in blocks.into_iter().enumerate() {
+            result.0[i] = Some((offset.into(), block));
+        }
+        result
+    }
+}
+
+impl<'a> PixelColor for VoxelBrush<'a> {
+    type Raw = ();
 }
 
 // TODO: dig up a crate that does this?
@@ -165,6 +245,7 @@ fn floor_divide(a: i32, b: i32) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockgen::make_some_blocks;
     use crate::math::RGBA;
     use crate::universe::Universe;
     use embedded_graphics::primitives::{Primitive, Rectangle};
@@ -182,6 +263,24 @@ mod tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn draw_with_brush() -> Result<(), Infallible> {
+        let blocks = make_some_blocks(2);
+        let mut space = Space::empty_positive(100, 100, 100);
+
+        let brush = VoxelBrush::new(vec![((0, 0, 0), &blocks[0]), ((0, 1, 1), &blocks[1])]);
+        Pixel(Point::new(2, -3), brush).draw(&mut VoxelDisplayAdapter::new(&mut space, 4))?;
+
+        assert_eq!(&space[(2, 3, 4)], &blocks[0]);
+        assert_eq!(&space[(2, 4, 5)], &blocks[1]);
+        Ok(())
+    }
+
+    //#[test]
+    //fn voxel_brush_size_sanity_check() {
+    //    assert_eq!(64, std::mem::size_of::<VoxelBrush>());
+    //}
 
     fn a_primitive_style() -> PrimitiveStyle<Rgb888> {
         PrimitiveStyleBuilder::new()

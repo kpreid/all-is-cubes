@@ -271,6 +271,7 @@ impl RGBA {
     /// Transparent black (all components zero).
     pub const TRANSPARENT: RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 0.0));
     pub const BLACK: RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 1.0));
+    pub const WHITE: RGBA = RGBA(Vector4::new(1.0, 1.0, 1.0, 1.0));
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.
