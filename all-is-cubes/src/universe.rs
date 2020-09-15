@@ -358,8 +358,10 @@ where
         }
     }
 
-    // TODO: Allow the caller to provide a filter on messages.
     pub fn listen<L: Listener<M> + 'static>(&mut self, listener: L) {
+        if !listener.alive() {
+            return;
+        }
         self.cleanup();
         self.listeners.push(Box::new(listener));
     }
@@ -419,6 +421,17 @@ where
     }
 }
 impl<M, L: Listener<M> + Sized> ListenerHelper<M> for L {}
+
+/// A `Listener` which discards all messages and is suitable for filling
+/// listener parameters when no listener is needed.
+pub struct NullListener;
+
+impl<M> Listener<M> for NullListener {
+    fn receive(&self, _message: M) {}
+    fn alive(&self) -> bool {
+        false
+    }
+}
 
 /// A `Listener` which stores all the messages it receives, deduplicated.
 pub struct Sink<M> {
