@@ -6,8 +6,8 @@
 
 use std::borrow::Cow;
 
-use crate::math::{RGB, RGBA};
-use crate::space::Space;
+use crate::math::{GridCoordinate, GridVector, RGB, RGBA};
+use crate::space::{Grid, GridArray, Space};
 use crate::universe::URef;
 
 /// A `Block` is something that can exist in the grid of a `Space`; it occupies one unit
@@ -62,8 +62,46 @@ impl Block {
     /// Returns whether this block should be considered a total obstruction to light
     /// propagation.
     pub fn opaque_to_light(&self) -> bool {
-        // TODO account for complex shapes (probably need some memoization instead of defining it here... and also an interface that is per-face)
+        // TODO this is wrong for recursive blocks; delete this method in favor of evaluate()
         self.color().alpha() > 0.99
+    }
+
+    /// Converts this `Block` into a “flattened” and snapshotted form which contains all
+    /// information needed for rendering and physics, and does not require `URef` access
+    /// to other objects.
+    pub fn evaluate(&self, voxel_scale: GridCoordinate) -> EvaluatedBlock {
+        assert!(voxel_scale > 0);
+
+        let color = self.color(); // TODO replace this with the proper voxel test
+
+        let voxels = self.space().map(|space_ref| {
+            let block_space = space_ref.borrow();
+            block_space.extract(
+                Grid::new((0, 0, 0), GridVector::new(1, 1, 1) * voxel_scale),
+                |_index, sub_block, _lighting| {
+                    // TODO: need to also extract solidity info once we start doing collision
+                    sub_block.color()
+                },
+            )
+        });
+
+        let opaque = if let Some(array) = &voxels {
+            // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
+            array
+                .grid()
+                .interior_iter()
+                .all(|p| array[p].alpha() > 0.99)
+        } else {
+            color.alpha() > 0.99
+        };
+
+        // TODO: need to track which things we need change notifications on
+        EvaluatedBlock {
+            attributes: self.attributes().clone(),
+            color,
+            voxels,
+            opaque,
+        }
     }
 }
 
@@ -106,3 +144,115 @@ pub const AIR: Block = Block::Atom(
     },
     RGBA::TRANSPARENT,
 );
+
+/// A “flattened” and snapshotted form of `Block` which contains all information needed
+/// for rendering and physics, and does not require `URef` access to other objects.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvaluatedBlock {
+    pub attributes: BlockAttributes,
+    pub color: RGBA,
+    pub voxels: Option<GridArray<RGBA>>,
+    // TODO: generalize opaque to multiple faces and partial opacity, for better light transport
+    pub opaque: bool,
+}
+
+/// Type of notification when an `EvaluatedBlock` result changes.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct BlockChange;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::blockgen::BlockGen;
+    use crate::math::GridPoint;
+    use crate::universe::Universe;
+    use std::borrow::Cow;
+
+    #[test]
+    fn evaluate_opaque_atom_and_attributes() {
+        let color = RGBA::new(1.0, 2.0, 3.0, 1.0);
+        let block = Block::Atom(
+            BlockAttributes {
+                display_name: Cow::Borrowed(&"hello world"),
+                selectable: false,
+                solid: false,
+                light_emission: RGB::ONE,
+                ..BlockAttributes::default()
+            },
+            color,
+        );
+        let e = block.evaluate(16);
+        assert_eq!(&e.attributes, block.attributes());
+        assert_eq!(e.color, block.color());
+        assert!(e.voxels.is_none());
+        assert_eq!(e.opaque, true);
+    }
+
+    #[test]
+    fn evaluate_transparent_atom() {
+        let color = RGBA::new(1.0, 2.0, 3.0, 0.5);
+        let block = Block::Atom(BlockAttributes::default(), color);
+        let e = block.evaluate(16);
+        assert_eq!(&e.attributes, block.attributes());
+        assert_eq!(e.color, block.color());
+        assert!(e.voxels.is_none());
+        assert_eq!(e.opaque, false);
+    }
+
+    #[test]
+    fn evaluate_voxels_checked_individually() {
+        let voxel_scale = 4;
+        let mut universe = Universe::new();
+        let mut bg: BlockGen = BlockGen::new(&mut universe, voxel_scale);
+
+        let block = bg.block_from_function(BlockAttributes::default(), |_ctx, point, _random| {
+            let point = point.cast::<f32>().unwrap();
+            Block::Atom(
+                BlockAttributes::default(),
+                RGBA::new(point.x, point.y, point.z, 1.0),
+            )
+        });
+
+        let e = block.evaluate(voxel_scale);
+        assert_eq!(&e.attributes, block.attributes());
+        assert_eq!(e.color, block.color());
+        assert_eq!(
+            e.voxels,
+            Some(GridArray::generate(
+                Grid::new((0, 0, 0), (voxel_scale, voxel_scale, voxel_scale)),
+                |point| {
+                    let point = point.cast::<f32>().unwrap();
+                    RGBA::new(point.x, point.y, point.z, 1.0)
+                }
+            ))
+        );
+        assert_eq!(e.opaque, true);
+    }
+
+    #[test]
+    fn evaluate_transparent_voxels() {
+        let voxel_scale = 4;
+        let mut universe = Universe::new();
+        let mut bg: BlockGen = BlockGen::new(&mut universe, voxel_scale);
+        let block = bg.block_from_function(BlockAttributes::default(), |_ctx, point, _random| {
+            Block::Atom(
+                BlockAttributes::default(),
+                RGBA::new(
+                    0.0,
+                    0.0,
+                    0.0,
+                    if point == GridPoint::new(0, 0, 0) {
+                        0.5
+                    } else {
+                        1.0
+                    },
+                ),
+            )
+        });
+
+        let e = block.evaluate(voxel_scale);
+        assert_eq!(e.opaque, false);
+    }
+
+    // TODO: test of evaluate where the block's space is the wrong size
+}
