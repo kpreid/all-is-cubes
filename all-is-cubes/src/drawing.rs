@@ -32,7 +32,7 @@ pub fn draw_text<F, C>(
     F: Font + Copy,
 {
     let style = TextStyleBuilder::new(font).text_color(color).build();
-    Text::new(text.as_ref(), Point::new(origin.x as i32, origin.y as i32))
+    Text::new(text.as_ref(), Point::new(origin.x as i32, -origin.y as i32))
         .into_styled(style)
         .draw(&mut VoxelDisplayAdapter::new(space, origin.z))
         .unwrap(); // cannot fail

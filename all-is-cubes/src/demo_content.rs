@@ -66,7 +66,7 @@ pub fn new_universe_with_stuff() -> Universe {
             ((0, 1, 0), &background_text_block),
             ((0, -1, 0), &background_text_block),
         ]),
-        GridPoint::new(-radius_xz + 3, -16, -radius_xz),
+        GridPoint::new(-radius_xz + 3, 16, -radius_xz),
         Font8x16,
         "All is Cubes",
     );
