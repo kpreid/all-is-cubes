@@ -21,7 +21,7 @@ pub use crate::lighting::{PackedLight, SKY};
 ///
 /// TODO: Wait, we're going to have other uses for an axis-aligned-box and this is that
 /// with some additional restrictions.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Grid {
     lower_bounds: GridPoint,
     sizes: GridVector, // checked to be always positive
@@ -195,6 +195,30 @@ impl Grid {
         self.index(point).is_some()
     }
 
+    /// Returns whether this grid includes every cube in the other grid.
+    ///
+    /// ```
+    /// use all_is_cubes::space::Grid;
+    /// assert!(Grid::new((4, 4, 4), (6, 6, 6)).contains_grid(
+    ///     &Grid::new((4, 4, 4), (6, 6, 6))));
+    /// assert!(!Grid::new((4, 4, 4), (6, 6, 6)).contains_grid(
+    ///     &Grid::new((4, 4, 4), (7, 6, 6))));
+    /// assert!(!Grid::new((0, 0, 0), (6, 6, 6)).contains_grid(
+    ///     &Grid::new((4, 4, 4), (6, 6, 6))));
+    /// ```
+    pub fn contains_grid(&self, other: &Grid) -> bool {
+        let self_upper = self.upper_bounds();
+        let other_upper = other.upper_bounds();
+        for axis in 0..3 {
+            if other.lower_bounds[axis] < self.lower_bounds[axis]
+                || other_upper[axis] > self_upper[axis]
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Returns a random cube contained by the grid.
     ///
     /// ```
@@ -351,16 +375,18 @@ impl Space {
         subgrid: Grid,
         extractor: impl Fn(BlockIndex, &Block, PackedLight) -> V,
     ) -> GridArray<V> {
-        // assert!(self.grid.contains_grid(subgrid), "cannot extract outside of space");
+        assert!(
+            self.grid.contains_grid(&subgrid),
+            "space.extract({:?}) out of range {:?}",
+            subgrid,
+            &self.grid,
+        );
         let mut output: Vec<V> = Vec::with_capacity(subgrid.volume());
         // TODO: Implement optimized index calculation, maybe as an iterator
         for x in subgrid.x_range() {
             for y in subgrid.y_range() {
                 for z in subgrid.z_range() {
-                    let cube_index = self
-                        .grid
-                        .index((x, y, z))
-                        .expect("cannot extract outside of space");
+                    let cube_index = self.grid.index((x, y, z)).unwrap(); // already checked, should not fail
                     let block_index = self.contents[cube_index];
                     output.push(extractor(
                         block_index,
@@ -575,13 +601,34 @@ impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
 /// A 3-dimensional array with arbitrary element type instead of `Space`'s fixed types.
 ///
 /// TODO: Should we rebuild Space on top of this?
-#[derive(Clone, Debug)] // TODO: nondefault Debug
+#[derive(Clone, Debug, Eq, Hash, PartialEq)] // TODO: nondefault Debug
 pub struct GridArray<V> {
     grid: Grid,
     contents: Box<[V]>,
 }
 
 impl<V> GridArray<V> {
+    /// Constructs a `GridArray` from a function choosing the value at each point.
+    pub fn generate<F>(grid: Grid, f: F) -> Self
+    where
+        F: Fn(GridPoint) -> V,
+    {
+        let mut contents: Vec<V> = Vec::with_capacity(grid.volume());
+        // TODO: Implement optimized index calculation, maybe as an iterator
+        for x in grid.x_range() {
+            for y in grid.y_range() {
+                for z in grid.z_range() {
+                    contents.push(f(GridPoint::new(x, y, z)));
+                }
+            }
+        }
+
+        GridArray {
+            grid,
+            contents: contents.into_boxed_slice(),
+        }
+    }
+
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
