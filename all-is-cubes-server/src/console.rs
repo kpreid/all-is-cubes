@@ -60,10 +60,9 @@ pub fn draw_space<O: io::Write>(
 
     // Copy data out of Space (whose access is not thread safe due to contained URefs).
     let grid = *space.grid();
-    let recur_arena = Arena::with_capacity(space.distinct_blocks_unfiltered().len());
+    let recur_arena = Arena::with_capacity(space.distinct_blocks_unfiltered_iter().len());
     let block_data: Vec<TracingBlock> = space
-        .distinct_blocks_unfiltered()
-        .iter()
+        .distinct_blocks_unfiltered_iter()
         .map(|block| {
             let character = block
                 .attributes()

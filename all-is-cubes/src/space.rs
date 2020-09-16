@@ -282,16 +282,13 @@ pub struct Space {
     /// Lookup from `Block` value to the index by which it is represented in
     /// the array.
     block_to_index: HashMap<Block, BlockIndex>,
-    /// Lookup from arbitrarily assigned indices (used in `contents`) to block.
-    index_to_block: Vec<Block>,
-    /// Lookup from arbitrarily assigned indices (used in `contents`) to number
-    /// of uses of this index.
-    index_to_count: Vec<usize>,
+    /// Lookup from arbitrarily assigned indices (used in `contents`) to data for them.
+    block_data: Vec<SpaceBlockData>,
 
     /// The blocks in the space, stored compactly:
     ///
     /// * Coordinates are transformed to indices by `Grid::index`.
-    /// * Each element is an index into `self.index_to_block`.
+    /// * Each element is an index into `self.block_data`.
     contents: Box<[BlockIndex]>,
 
     /// Parallel array to `contents` for lighting data.
@@ -304,12 +301,21 @@ pub struct Space {
     pub(crate) notifier: Notifier<SpaceChange>,
 }
 
+/// Info about the interpretation of a block index.
+#[derive(Debug)]
+struct SpaceBlockData {
+    /// The block itself.
+    block: Block,
+    /// Number of uses of this block in the space.
+    count: usize,
+}
+
 impl std::fmt::Debug for Space {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Make the assumption that a Space is too big to print in its entirety.
         fmt.debug_struct("Space")
             .field("grid", &self.grid)
-            .field("index_to_block", &self.index_to_block)
+            .field("block_data", &self.block_data)
             .finish() // TODO: use .finish_non_exhaustive() if that stabilizes
     }
 }
@@ -330,8 +336,10 @@ impl Space {
                 map.insert(AIR.clone(), 0);
                 map
             },
-            index_to_block: vec![AIR.clone()],
-            index_to_count: vec![volume],
+            block_data: vec![SpaceBlockData {
+                block: AIR.clone(),
+                count: volume,
+            }],
             contents: vec![0; volume].into_boxed_slice(),
             lighting: initialize_lighting(grid),
             lighting_update_queue: BinaryHeap::new(),
@@ -390,7 +398,7 @@ impl Space {
                     let block_index = self.contents[cube_index];
                     output.push(extractor(
                         block_index,
-                        &self.index_to_block[block_index as usize],
+                        &self.block_data[block_index as usize].block,
                         self.lighting[cube_index],
                     ));
                 }
@@ -440,24 +448,25 @@ impl Space {
         let position: GridPoint = position.into();
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
-            let old_block = &self.index_to_block[old_block_index as usize];
+            let old_block = &self.block_data[old_block_index as usize].block;
             if *old_block == *block {
                 // No change.
                 return;
             }
 
             // Decrement count of old block.
-            self.index_to_count[old_block_index as usize] -= 1;
-            if self.index_to_count[old_block_index as usize] == 0 {
+            let old_data: &mut SpaceBlockData = &mut self.block_data[old_block_index as usize];
+            old_data.count -= 1;
+            if old_data.count == 0 {
                 // Canonicalize dead entry.
                 // TODO: Depend less on AIR by having a canonical empty-entry value that doesn't appear normally.
-                self.index_to_block[old_block_index as usize] = AIR.clone();
+                old_data.block = AIR.clone();
             }
 
             // Increment count of new block.
             // TODO: Optimize replacements of unique blocks by picking the just-freed index if possible.
             let new_block_index = self.ensure_block_index(block);
-            self.index_to_count[new_block_index as usize] += 1;
+            self.block_data[new_block_index as usize].count += 1;
 
             // Write actual space change
             self.contents[contents_index] = new_block_index;
@@ -486,10 +495,10 @@ impl Space {
     /// TODO: This was invented for testing the indexing of blocks and should
     /// be replaced with something else *if* it only gets used for testing.
     pub fn distinct_blocks(&self) -> Vec<Block> {
-        let mut blocks = Vec::new();
-        for (block, count) in self.index_to_block.iter().zip(self.index_to_count.iter()) {
-            if *count > 0 {
-                blocks.push(block.clone());
+        let mut blocks = Vec::with_capacity(self.block_data.len());
+        for data in &self.block_data {
+            if data.count > 0 {
+                blocks.push(data.block.clone());
             }
         }
         blocks
@@ -498,10 +507,10 @@ impl Space {
     /// Returns all the blocks assigned internal IDs in the space, which may be a
     /// superset of all blocks which actually exist in the space.
     ///
-    /// The indices of the returned vector are the internal IDs, and match the results
-    /// of `.get_block_index()`.
-    pub fn distinct_blocks_unfiltered(&self) -> &Vec<Block> {
-        &self.index_to_block
+    /// The ordering of the iterated items corresponds to the internal IDs, and match
+    /// the results of `.get_block_index()`.
+    pub fn distinct_blocks_unfiltered_iter(&self) -> impl Iterator<Item = &Block> + ExactSizeIterator {
+        self.block_data.iter().map(|data| &data.block)
     }
 
     /// Advance time in the space.
@@ -513,17 +522,17 @@ impl Space {
 
     /// Finds or assigns an index to denote the block.
     ///
-    /// The caller is responsible for incrementing `self.index_to_count`.
+    /// The caller is responsible for incrementing `self.block_data[index].count`.
     fn ensure_block_index(&mut self, block: &Block) -> BlockIndex {
         if let Some(&old_index) = self.block_to_index.get(&block) {
             old_index
         } else {
             // Look for if there is a previously used index to take.
             // TODO: more efficient free index finding
-            let high_mark = self.index_to_count.len();
+            let high_mark = self.block_data.len();
             for new_index in 0..high_mark {
-                if self.index_to_count[new_index] == 0 {
-                    self.index_to_block[new_index] = block.clone();
+                if self.block_data[new_index].count == 0 {
+                    self.block_data[new_index].block = block.clone();
                     self.block_to_index
                         .insert(block.clone(), new_index as BlockIndex);
                     self.notifier
@@ -538,12 +547,12 @@ impl Space {
                 );
             }
             // Grow the vector.
-            self.index_to_count.push(0);
-            self.index_to_block.push(block.clone());
-            self.block_to_index
-                .insert(block.clone(), high_mark as BlockIndex);
-            self.notifier
-                .notify(SpaceChange::Number(high_mark as BlockIndex));
+            self.block_data.push(SpaceBlockData {
+                block: block.clone(),
+                count: 0,
+            });
+            self.block_to_index.insert(block.clone(), high_mark as BlockIndex);
+            self.notifier.notify(SpaceChange::Number(high_mark as BlockIndex));
             high_mark as BlockIndex
         }
     }
@@ -558,7 +567,7 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
         if let Some(index) = self.grid.index(position) {
-            &self.index_to_block[self.contents[index] as usize]
+            &self.block_data[self.contents[index] as usize].block
         } else {
             &AIR
         }
