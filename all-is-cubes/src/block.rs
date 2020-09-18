@@ -4,6 +4,7 @@
 //! Definition of blocks, which are game objects which live in the grid of a
 //! `Space`. See `block::Block` for details.
 
+use once_cell::sync::Lazy;
 use std::borrow::Cow;
 
 use crate::math::{RGB, RGBA};
@@ -139,6 +140,8 @@ pub const AIR: Block = Block::Atom(
     },
     RGBA::TRANSPARENT,
 );
+
+pub static AIR_EVALUATED: Lazy<EvaluatedBlock> = Lazy::new(|| AIR.evaluate());
 
 /// A “flattened” and snapshotted form of `Block` which contains all information needed
 /// for rendering and physics, and does not require `URef` access to other objects.

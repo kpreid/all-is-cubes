@@ -413,6 +413,16 @@ impl Space {
         }
     }
 
+    /// Get the `EvaluatedBlock` of the block in this space at the given position.
+    #[inline(always)]
+    pub fn get_evaluated(&self, position: impl Into<GridPoint>) -> &EvaluatedBlock {
+        if let Some(index) = self.grid.index(position) {
+            &self.block_data[self.contents[index] as usize].evaluated
+        } else {
+            &*AIR_EVALUATED
+        }
+    }
+
     /// Returns the light occupying the given cube.
     ///
     /// This value may be considered as representing the average of the light reflecting
@@ -681,6 +691,8 @@ mod tests {
         // TODO: Replace this with something meaningful
         assert!(grid.volume() == 1000_000);
     }
+
+    // TODO: test consistency between the index and get_* methods
 
     #[test]
     fn removed_blocks_are_forgotten() {
