@@ -177,7 +177,8 @@ impl Space {
         let mut incoming_light: RGB = RGB::ZERO;
         let mut dependencies: Vec<GridPoint> = Vec::new(); // TODO: reuse buffer instead of allocating every time
 
-        if self[cube].opaque_to_light() {
+        let ev_origin = self.get_evaluated(cube);
+        if ev_origin.opaque {
             // Opaque blocks are always dark inside
             total_rays = 1;
         } else {
@@ -193,12 +194,12 @@ impl Space {
                     // TODO tracing variables ...
                     let mut found = false;
                     for hit in raycaster {
-                        let block = &self[hit.cube];
-                        if !block.opaque_to_light() { // TODO wrong test?
+                        let ev_hit = self.get_evaluated(hit.cube);
+                        if !ev_hit.opaque { // TODO wrong test?
                              // Do nothing for now. TODO: Implement passing through transparency and transparent light sources
                         } else {
                             let light_cube = hit.previous_cube();
-                            let light_from_struck_face = block.attributes().light_emission
+                            let light_from_struck_face = ev_hit.attributes.light_emission
                                 + self.get_lighting(light_cube).into();
                             incoming_light += light_from_struck_face;
                             dependencies.push(light_cube);
