@@ -178,11 +178,13 @@ pub struct URef<T> {
 
 impl<T: 'static> URef<T> {
     /// Borrow the value, in the sense of std::RefCell::borrow, and panic on failure.
+    #[track_caller]
     pub fn borrow(&self) -> UBorrow<T> {
         self.try_borrow().unwrap()
     }
 
     /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut, and panic on failure.
+    #[track_caller]
     pub fn borrow_mut(&self) -> UBorrowMut<T> {
         self.try_borrow_mut().unwrap()
     }

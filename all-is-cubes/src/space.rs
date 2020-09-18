@@ -308,6 +308,7 @@ struct SpaceBlockData {
     block: Block,
     /// Number of uses of this block in the space.
     count: usize,
+    evaluated: EvaluatedBlock,
 }
 
 impl std::fmt::Debug for Space {
@@ -339,6 +340,7 @@ impl Space {
             block_data: vec![SpaceBlockData {
                 block: AIR.clone(),
                 count: volume,
+                evaluated: AIR.evaluate(),
             }],
             contents: vec![0; volume].into_boxed_slice(),
             lighting: initialize_lighting(grid),
@@ -550,6 +552,7 @@ impl Space {
             self.block_data.push(SpaceBlockData {
                 block: block.clone(),
                 count: 0,
+                evaluated: block.evaluate(),
             });
             self.block_to_index.insert(block.clone(), high_mark as BlockIndex);
             self.notifier.notify(SpaceChange::Number(high_mark as BlockIndex));

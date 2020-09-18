@@ -40,8 +40,11 @@ pub fn new_universe_with_stuff() -> Universe {
         ),
     );
 
-    let (axis_block, mut axis_space) = bg.new_recursive_block(BlockAttributes::default());
-    axes(&mut *axis_space);
+    let axis_block = {
+        let (axis_block, mut axis_space) = bg.new_recursive_block(BlockAttributes::default());
+        axes(&mut *axis_space);
+        axis_block
+    };
 
     let radius_xz = 50;
     let diameter_xz = radius_xz * 2 + 1;
