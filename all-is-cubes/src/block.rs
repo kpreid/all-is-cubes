@@ -6,8 +6,8 @@
 
 use std::borrow::Cow;
 
-use crate::math::{GridCoordinate, GridVector, RGB, RGBA};
-use crate::space::{Grid, GridArray, Space};
+use crate::math::{RGB, RGBA};
+use crate::space::{GridArray, Space};
 use crate::universe::URef;
 
 /// A `Block` is something that can exist in the grid of a `Space`; it occupies one unit
@@ -69,20 +69,15 @@ impl Block {
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require `URef` access
     /// to other objects.
-    pub fn evaluate(&self, voxel_scale: GridCoordinate) -> EvaluatedBlock {
-        assert!(voxel_scale > 0);
-
+    pub fn evaluate(&self) -> EvaluatedBlock {
         let color = self.color(); // TODO replace this with the proper voxel test
 
         let voxels = self.space().map(|space_ref| {
             let block_space = space_ref.borrow();
-            block_space.extract(
-                Grid::new((0, 0, 0), GridVector::new(1, 1, 1) * voxel_scale),
-                |_index, sub_block, _lighting| {
-                    // TODO: need to also extract solidity info once we start doing collision
-                    sub_block.color()
-                },
-            )
+            block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
+                // TODO: need to also extract solidity info once we start doing collision
+                sub_block.color()
+            })
         });
 
         let opaque = if let Some(array) = &voxels {
@@ -165,6 +160,7 @@ mod tests {
     use super::*;
     use crate::blockgen::BlockGen;
     use crate::math::GridPoint;
+    use crate::space::Grid;
     use crate::universe::Universe;
     use std::borrow::Cow;
 
@@ -181,7 +177,7 @@ mod tests {
             },
             color,
         );
-        let e = block.evaluate(16);
+        let e = block.evaluate();
         assert_eq!(&e.attributes, block.attributes());
         assert_eq!(e.color, block.color());
         assert!(e.voxels.is_none());
@@ -192,7 +188,7 @@ mod tests {
     fn evaluate_transparent_atom() {
         let color = RGBA::new(1.0, 2.0, 3.0, 0.5);
         let block = Block::Atom(BlockAttributes::default(), color);
-        let e = block.evaluate(16);
+        let e = block.evaluate();
         assert_eq!(&e.attributes, block.attributes());
         assert_eq!(e.color, block.color());
         assert!(e.voxels.is_none());
@@ -213,7 +209,7 @@ mod tests {
             )
         });
 
-        let e = block.evaluate(voxel_scale);
+        let e = block.evaluate();
         assert_eq!(&e.attributes, block.attributes());
         assert_eq!(e.color, block.color());
         assert_eq!(
@@ -231,9 +227,8 @@ mod tests {
 
     #[test]
     fn evaluate_transparent_voxels() {
-        let voxel_scale = 4;
         let mut universe = Universe::new();
-        let mut bg: BlockGen = BlockGen::new(&mut universe, voxel_scale);
+        let mut bg: BlockGen = BlockGen::new(&mut universe, 4);
         let block = bg.block_from_function(BlockAttributes::default(), |_ctx, point, _random| {
             Block::Atom(
                 BlockAttributes::default(),
@@ -250,7 +245,7 @@ mod tests {
             )
         });
 
-        let e = block.evaluate(voxel_scale);
+        let e = block.evaluate();
         assert_eq!(e.opaque, false);
     }
 
