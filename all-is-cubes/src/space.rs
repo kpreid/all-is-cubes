@@ -521,7 +521,9 @@ impl Space {
     ///
     /// The ordering of the iterated items corresponds to the internal IDs, and match
     /// the results of `.get_block_index()`.
-    pub fn distinct_blocks_unfiltered_iter(&self) -> impl Iterator<Item = &Block> + ExactSizeIterator {
+    pub fn distinct_blocks_unfiltered_iter(
+        &self,
+    ) -> impl Iterator<Item = &Block> + ExactSizeIterator {
         self.block_data.iter().map(|data| &data.block)
     }
 
@@ -564,8 +566,10 @@ impl Space {
                 count: 0,
                 evaluated: block.evaluate(),
             });
-            self.block_to_index.insert(block.clone(), high_mark as BlockIndex);
-            self.notifier.notify(SpaceChange::Number(high_mark as BlockIndex));
+            self.block_to_index
+                .insert(block.clone(), high_mark as BlockIndex);
+            self.notifier
+                .notify(SpaceChange::Number(high_mark as BlockIndex));
             high_mark as BlockIndex
         }
     }
