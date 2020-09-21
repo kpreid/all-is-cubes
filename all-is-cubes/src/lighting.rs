@@ -231,3 +231,30 @@ impl Space {
         difference_magnitude
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::blockgen::BlockGen;
+    use crate::space::Space;
+    use crate::universe::{Universe, URef};
+
+    fn new_lighting_test_universe() -> (Universe, URef<Space>) {
+        let mut universe = Universe::new();
+        // {
+        //     let mut ctx: BlockGen = BlockGen::new(&mut universe, 16);
+        // }
+
+        let space = Space::empty_positive(9, 9, 9);
+        // TODO: fill space with opaque black blocks so it defaults to no light propagation
+
+        let space_ref = universe.insert_anonymous(space);
+        (universe, space_ref)
+    }
+
+    #[test]
+    #[ignore]
+    fn transparent_block_lighting() {
+        let _ = new_lighting_test_universe();
+        // TODO: Actually write this test: a single semi-transparent block should receive and diffuse light
+    }
+}
