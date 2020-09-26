@@ -401,6 +401,13 @@ impl Mul<f32> for RGB {
         (self.0 * scalar).try_into().expect("multiplication by NaN")
     }
 }
+impl Mul<f64> for RGB {
+    type Output = Self;
+    /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
+    fn mul(self, scalar: f64) -> Self {
+        (self.0 * scalar as f32).try_into().expect("multiplication by NaN")
+    }
+}
 impl Div<f32> for RGB {
     type Output = Self;
     /// Divides this color value by a scalar. Panics if the scalar is zero.
@@ -408,6 +415,15 @@ impl Div<f32> for RGB {
         // TODO: On further thought, why don't we provide only multiplication
         // Or even better, use ordered_float::NotNan as the argument?
         (self.0 / scalar).try_into().expect("division by zero")
+    }
+}
+impl Div<f64> for RGB {
+    type Output = Self;
+    /// Divides this color value by a scalar. Panics if the scalar is zero.
+    fn div(self, scalar: f64) -> Self {
+        // TODO: On further thought, why don't we provide only multiplication
+        // Or even better, use ordered_float::NotNan as the argument?
+        (self.0 / scalar as f32).try_into().expect("division by zero")
     }
 }
 
