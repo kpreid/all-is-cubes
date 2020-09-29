@@ -12,5 +12,6 @@
 #![cfg(feature = "lum")]
 
 pub mod block_texture;
+pub mod shading;
 pub mod space;
 pub mod types;

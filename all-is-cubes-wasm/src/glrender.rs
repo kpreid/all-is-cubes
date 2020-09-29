@@ -4,32 +4,25 @@
 //! OpenGL-based graphics rendering.
 
 use cgmath::{Matrix4, Point2, SquareMatrix as _, Vector3, Zero as _};
-use luminance_derive::UniformInterface;
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
-use luminance_front::pipeline::{PipelineState, TextureBinding};
-use luminance_front::pixel::NormUnsigned;
+use luminance_front::pipeline::PipelineState;
 use luminance_front::render_state::RenderState;
-use luminance_front::shader::{BuiltProgram, Program, ProgramError, StageError, Uniform};
 use luminance_front::tess::{Mode, Tess};
-use luminance_front::texture::{Dim2, Dim2Array};
+use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 use wasm_bindgen::prelude::JsValue;
 use web_sys::console;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
+use all_is_cubes::lum::shading::{BlockProgram, prepare_block_program};
 use all_is_cubes::lum::space::{SpaceRenderInfo, SpaceRenderer};
-use all_is_cubes::lum::types::{Vertex, VertexSemantics};
+use all_is_cubes::lum::types::Vertex;
 use all_is_cubes::math::{GridCoordinate, RGBA};
 use all_is_cubes::universe::URef;
 
 use crate::js_bindings::CanvasHelper;
-
-const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
-const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
-const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
-const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 
 pub struct GLRenderer<C>
 where
@@ -38,7 +31,7 @@ where
     // Graphics objects
     surface: C,
     back_buffer: Framebuffer<Dim2, (), ()>,
-    block_program: Program<VertexSemantics, (), ShaderInterface>,
+    block_program: BlockProgram,
 
     // Rendering state
     camera: Option<URef<Camera>>,
@@ -55,29 +48,7 @@ where
     C: GraphicsContext<Backend = Backend>,
 {
     pub fn new(mut surface: C, canvas_helper: CanvasHelper) -> Self {
-        let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = surface
-            .new_shader_program::<VertexSemantics, (), ShaderInterface>()
-            .from_strings(
-                &(SHADER_COMMON.to_owned()
-                    + "#line 1 1\n"
-                    + SHADER_VERTEX_COMMON
-                    + "#line 1 2\n"
-                    + SHADER_VERTEX_BLOCK),
-                None,
-                None,
-                &(SHADER_COMMON.to_owned() + "#line 1 1\n" + SHADER_FRAGMENT),
-            );
-        let BuiltProgram {
-            program: block_program,
-            warnings,
-        } = program_attempt.unwrap_or_else(|error| {
-            // Extract text and send to console so we get less quoting
-            let error_text = match error {
-                ProgramError::CreationFailed(text) => text,
-                ProgramError::StageError(StageError::CompilationFailed(_, text)) => text,
-                ProgramError::LinkFailed(text) => text,
-                _ => format!("{:?}", error),
-            };
+        let (block_program, warnings) = prepare_block_program(&mut surface, |error_text| {
             console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error_text)));
             panic!("shader compilation failed");
         });
@@ -235,24 +206,6 @@ where
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RenderInfo {
     space: SpaceRenderInfo,
-}
-
-#[derive(Debug, UniformInterface)]
-#[rustfmt::skip]
-struct ShaderInterface {
-    // TODO: Passing matrices as four vectors due to bug
-    //     https://github.com/phaazon/luminance-rs/issues/434
-    #[uniform(unbound)] projection_matrix0: Uniform<[f32; 4]>,
-    #[uniform(unbound)] projection_matrix1: Uniform<[f32; 4]>,
-    #[uniform(unbound)] projection_matrix2: Uniform<[f32; 4]>,
-    #[uniform(unbound)] projection_matrix3: Uniform<[f32; 4]>,
-
-    #[uniform(unbound)] view_matrix0: Uniform<[f32; 4]>,
-    #[uniform(unbound)] view_matrix1: Uniform<[f32; 4]>,
-    #[uniform(unbound)] view_matrix2: Uniform<[f32; 4]>,
-    #[uniform(unbound)] view_matrix3: Uniform<[f32; 4]>,
-
-    #[uniform(unbound)] block_texture: Uniform<TextureBinding<Dim2Array, NormUnsigned>>,
 }
 
 fn make_cursor_tess<C>(context: &mut C, cursor_result: &Option<Cursor>) -> Tess<Vertex>
