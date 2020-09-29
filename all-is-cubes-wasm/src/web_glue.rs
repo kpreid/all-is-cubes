@@ -13,7 +13,9 @@ pub fn wasm_module_start_js() -> Result<(), JsValue> {
     #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
 
-    console::log_1(&JsValue::from_str("Rust startup hook ran."));
+    console::log_1(&JsValue::from_str(
+        "WebAssembly module load hook completed.",
+    ));
 
     Ok(())
 }

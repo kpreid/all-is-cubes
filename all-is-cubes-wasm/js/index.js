@@ -5,10 +5,6 @@
 
 document.getElementById('scene-info-text').innerText = 'Loading code...';
 import("../js/bootstrap.js").then(module => {
-  // Global variable for debug use only
-  window.aic_mod = module;
-  console.log("Module: ", module);
-  
   module.bootstrap();
 }).catch(error => {
   document.getElementById('scene-info-text').innerText +=

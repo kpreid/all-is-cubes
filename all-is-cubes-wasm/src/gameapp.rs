@@ -55,7 +55,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     // Explicitly keep the game loop alive.
     Box::leak(Box::new(root));
 
-    console::log_1(&JsValue::from_str("start_game() completed"));
+    console::log_1(&JsValue::from_str("start_game() completed."));
     Ok(())
 }
 
