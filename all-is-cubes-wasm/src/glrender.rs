@@ -132,23 +132,14 @@ where
                 |pipeline, mut shading_gate| {
                     let space_output_bound = space_output.bind(&pipeline)?;
 
-                    shading_gate.shade(block_program, |mut shader_iface, u, mut render_gate| {
-                        let pm: [[f32; 4]; 4] = projection_matrix.cast::<f32>().unwrap().into();
-                        shader_iface.set(&u.projection_matrix0, pm[0]);
-                        shader_iface.set(&u.projection_matrix1, pm[1]);
-                        shader_iface.set(&u.projection_matrix2, pm[2]);
-                        shader_iface.set(&u.projection_matrix3, pm[3]);
+                    shading_gate.shade(block_program, |mut program_iface, u, mut render_gate| {
+                        u.set_projection_matrix(&mut program_iface, projection_matrix);
 
-                        // Render space (and cursor). TODO: Reduce awkward code.
-                        let vm: [[f32; 4]; 4] =
-                            space_output_bound.view_matrix.cast::<f32>().unwrap().into();
-                        shader_iface.set(&u.view_matrix0, vm[0]);
-                        shader_iface.set(&u.view_matrix1, vm[1]);
-                        shader_iface.set(&u.view_matrix2, vm[2]);
-                        shader_iface.set(&u.view_matrix3, vm[3]);
-                        shader_iface.set(
-                            &u.block_texture,
-                            space_output_bound.bound_block_texture.binding(),
+                        // Render space (and cursor).
+                        u.set_view_matrix(&mut program_iface, space_output_bound.view_matrix);
+                        u.set_block_texture(
+                            &mut program_iface,
+                            &space_output_bound.bound_block_texture,
                         );
                         render_gate.render(&render_state, |mut tess_gate| {
                             // TODO: should be `info.space += ...`
@@ -159,22 +150,9 @@ where
 
                         if false {
                             // Reset matrices for screen-aligned debug rendering
-                            let pm: [[f32; 4]; 4] = Matrix4::identity().into();
-                            shader_iface.set(&u.projection_matrix0, pm[0]);
-                            shader_iface.set(&u.projection_matrix1, pm[1]);
-                            shader_iface.set(&u.projection_matrix2, pm[2]);
-                            shader_iface.set(&u.projection_matrix3, pm[3]);
-
-                            let vm: [[f32; 4]; 4] = Matrix4::identity().into();
-                            shader_iface.set(&u.view_matrix0, vm[0]);
-                            shader_iface.set(&u.view_matrix1, vm[1]);
-                            shader_iface.set(&u.view_matrix2, vm[2]);
-                            shader_iface.set(&u.view_matrix3, vm[3]);
-
-                            shader_iface.set(
-                                &u.block_texture,
-                                space_output_bound.bound_block_texture.binding(),
-                            );
+                            u.set_projection_matrix(&mut program_iface, Matrix4::identity());
+                            u.set_view_matrix(&mut program_iface, Matrix4::identity());
+                            // already set block texture
 
                             // render_gate.render(&render_state, |mut tess_gate| {
                             //     tess_gate.render(&debug_tess)?;
@@ -186,7 +164,7 @@ where
                     })
                 },
             )
-            .assume(); // TODO error handlint
+            .assume(); // TODO error handling
 
         if !render.is_ok() {
             panic!("not ok"); // TODO what good error handling goes here?
