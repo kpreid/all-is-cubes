@@ -236,7 +236,7 @@ impl Space {
 mod tests {
     use crate::blockgen::BlockGen;
     use crate::space::Space;
-    use crate::universe::{Universe, URef};
+    use crate::universe::{URef, Universe};
 
     fn new_lighting_test_universe() -> (Universe, URef<Space>) {
         let mut universe = Universe::new();
