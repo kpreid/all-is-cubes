@@ -81,6 +81,7 @@ impl<S: fmt::Debug> ConciseDebug for Vector4<S> {
 pub type WarningsResult<T, E, W> = Result<(T, Vec<W>), (E, Vec<W>)>;
 
 /// Helper trait to provide methods for the `WarningsResult` type.
+#[allow(clippy::type_complexity)]
 pub trait Warnings: Sized {
     type T;
     type E;

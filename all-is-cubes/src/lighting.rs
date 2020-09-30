@@ -234,7 +234,6 @@ impl Space {
 
 #[cfg(test)]
 mod tests {
-    use crate::blockgen::BlockGen;
     use crate::space::Space;
     use crate::universe::{URef, Universe};
 

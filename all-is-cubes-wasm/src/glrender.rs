@@ -14,7 +14,7 @@ use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
-use all_is_cubes::lum::shading::{BlockProgram, prepare_block_program};
+use all_is_cubes::lum::shading::{prepare_block_program, BlockProgram};
 use all_is_cubes::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use all_is_cubes::lum::types::Vertex;
 use all_is_cubes::math::{GridCoordinate, RGBA};
