@@ -256,7 +256,7 @@ impl SpaceRendererTodo {
         // the adjacent chunks will always include it (presuming that the chunk
         // size is greater than 1).
         for axis in 0..3 {
-            for offset in &[0, 1] {
+            for offset in &[-1, 1] {
                 let mut adjacent = cube;
                 adjacent[axis] += offset;
                 self.chunks.insert(chunkify(adjacent));
@@ -291,4 +291,31 @@ impl Listener<SpaceChange> for TodoListener {
     }
 }
 
-// TODO: Could really use some tests of this logic, but how to have a GraphicsContext...?
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: Arrange, somehow, to test the parts that need a GraphicsContext
+
+    #[test]
+    fn update_adjacent_chunk_positive() {
+        let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
+        let listener = TodoListener(Rc::downgrade(&todo));
+        listener.receive(SpaceChange::Block(GridPoint::new(CHUNK_SIZE - 1, CHUNK_SIZE / 2, CHUNK_SIZE / 2)));
+        assert_eq!(
+            todo.borrow().chunks,
+            vec![GridPoint::new(0, 0, 0), GridPoint::new(1, 0, 0)].into_iter().collect::<IndexSet<_>>(),
+        );
+    }
+
+    #[test]
+    fn update_adjacent_chunk_negative() {
+        let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
+        let listener = TodoListener(Rc::downgrade(&todo));
+        listener.receive(SpaceChange::Block(GridPoint::new(0, CHUNK_SIZE / 2, CHUNK_SIZE / 2)));
+        assert_eq!(
+            todo.borrow().chunks,
+            vec![GridPoint::new(0, 0, 0), GridPoint::new(-1, 0, 0)].into_iter().collect::<IndexSet<_>>(),
+        );
+    }
+}
