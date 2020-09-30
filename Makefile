@@ -36,7 +36,7 @@ run-game-server: all
 
 update:
 	cargo update
-	(cd all-is-cubes-wasm && npm update)
+	(cd all-is-cubes-wasm && npm -depth 9 update)
 
 # This depends on `all` to ensure the server's static files are up to date.
 try-publish-all: all
