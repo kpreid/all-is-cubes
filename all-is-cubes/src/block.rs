@@ -60,13 +60,6 @@ impl Block {
         }
     }
 
-    /// Returns whether this block should be considered a total obstruction to light
-    /// propagation.
-    pub fn opaque_to_light(&self) -> bool {
-        // TODO this is wrong for recursive blocks; delete this method in favor of evaluate()
-        self.color().alpha() > 0.99
-    }
-
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require `URef` access
     /// to other objects.
