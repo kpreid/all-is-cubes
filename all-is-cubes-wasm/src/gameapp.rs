@@ -19,6 +19,7 @@ use all_is_cubes::camera::{Camera, InputProcessor, Key};
 use all_is_cubes::demo_content::new_universe_with_stuff;
 use all_is_cubes::space::SpaceStepInfo;
 use all_is_cubes::universe::{FrameClock, URef, Universe};
+use all_is_cubes::util::Warnings;
 
 use crate::glrender::GLRenderer;
 use crate::js_bindings::GuiHelpers;
@@ -44,7 +45,14 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id(), WindowOpt::default())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
-    let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper());
+    let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper())
+        .handle_warnings(|warning| {
+            console::warn_1(&JsValue::from_str(&format!("GLSL warning:\n{}", warning)));
+        })
+        .map_err(|error| {
+            console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error)));
+            JsValue::from_str(&*error)
+        })?;
     renderer.set_camera(Some(universe.get_default_camera()));
 
     static_dom.scene_info_text_node.append_data("\nGL ready.")?;

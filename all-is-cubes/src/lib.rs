@@ -27,5 +27,5 @@ pub mod raycast;
 pub mod space;
 pub mod triangulator;
 pub mod universe;
-mod util;
+pub mod util;
 pub mod worldgen;

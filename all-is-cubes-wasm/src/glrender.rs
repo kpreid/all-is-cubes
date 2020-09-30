@@ -12,8 +12,6 @@ use luminance_front::render_state::RenderState;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
-use wasm_bindgen::prelude::JsValue;
-use web_sys::console;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
 use all_is_cubes::lum::shading::{BlockProgram, prepare_block_program};
@@ -21,6 +19,7 @@ use all_is_cubes::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use all_is_cubes::lum::types::Vertex;
 use all_is_cubes::math::{GridCoordinate, RGBA};
 use all_is_cubes::universe::URef;
+use all_is_cubes::util::WarningsResult;
 
 use crate::js_bindings::CanvasHelper;
 
@@ -47,14 +46,12 @@ impl<C> GLRenderer<C>
 where
     C: GraphicsContext<Backend = Backend>,
 {
-    pub fn new(mut surface: C, canvas_helper: CanvasHelper) -> Self {
-        let (block_program, warnings) = prepare_block_program(&mut surface, |error_text| {
-            console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error_text)));
-            panic!("shader compilation failed");
-        });
-        for warning in warnings {
-            console::warn_1(&JsValue::from_str(&format!("GLSL warning: {:?}", warning)));
-        }
+    pub fn new(
+        mut surface: C,
+        canvas_helper: CanvasHelper,
+    ) -> WarningsResult<Self, String, String> {
+        // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
+        let (block_program, warnings) = prepare_block_program(&mut surface)?;
 
         let proj = ProjectionHelper::new(1.0, canvas_helper.viewport_px());
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
@@ -62,16 +59,19 @@ where
             canvas_helper.viewport_dev(),
         )
         .unwrap(); // TODO error handling
-        Self {
-            surface,
-            back_buffer,
-            block_program,
-            camera: None,
-            space_renderer: None,
-            canvas_helper,
-            proj,
-            cursor_result: None,
-        }
+        Ok((
+            Self {
+                surface,
+                back_buffer,
+                block_program,
+                camera: None,
+                space_renderer: None,
+                canvas_helper,
+                proj,
+                cursor_result: None,
+            },
+            warnings,
+        ))
     }
 
     pub fn update_viewport(&mut self) {

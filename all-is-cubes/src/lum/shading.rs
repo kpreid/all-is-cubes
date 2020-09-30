@@ -8,26 +8,21 @@ use luminance_derive::UniformInterface;
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::TextureBinding;
 use luminance_front::pixel::NormUnsigned;
-use luminance_front::shader::{
-    BuiltProgram, Program, ProgramError, ProgramInterface, StageError, Uniform,
-};
+use luminance_front::shader::{BuiltProgram, Program, ProgramError, ProgramInterface, Uniform};
 use luminance_front::texture::Dim2Array;
 use luminance_front::Backend;
 
 use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::types::VertexSemantics;
 use crate::math::FreeCoordinate;
+use crate::util::WarningsResult;
 
 pub type BlockProgram = Program<VertexSemantics, (), BlockUniformInterface>;
 
 // TODO: Make higher-level abstractions such that this doesn't need to be public
-pub fn prepare_block_program<C, EH>(
-    context: &mut C,
-    error_handler: EH,
-) -> (BlockProgram, Vec<luminance_front::shader::ProgramError>)
+pub fn prepare_block_program<C>(context: &mut C) -> WarningsResult<BlockProgram, String, String>
 where
     C: GraphicsContext<Backend = Backend>,
-    EH: FnOnce(&str),
 {
     let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = context
         .new_shader_program::<VertexSemantics, (), BlockUniformInterface>()
@@ -41,22 +36,16 @@ where
             None,
             &(SHADER_COMMON.to_owned() + "#line 1 1\n" + SHADER_FRAGMENT),
         );
-    let BuiltProgram {
-        program: block_program,
-        warnings,
-    } = program_attempt.unwrap_or_else(|error| {
-        // Extract text so we get a form that's not quoted
-        let error_text = match error {
-            ProgramError::CreationFailed(text) => text,
-            ProgramError::StageError(StageError::CompilationFailed(_, text)) => text,
-            ProgramError::LinkFailed(text) => text,
-            _ => format!("{:?}", error),
-        };
-        error_handler(error_text.as_ref());
-        panic!(error_text);
-    });
-
-    (block_program, warnings)
+    match program_attempt {
+        Err(error) => Err((format!("{}", error), vec![])),
+        Ok(BuiltProgram {
+            program: block_program,
+            warnings,
+        }) => Ok((
+            block_program,
+            warnings.into_iter().map(|w| format!("{}", w)).collect(),
+        )),
+    }
 }
 
 const SHADER_COMMON: &str = include_str!("shaders/common.glsl");

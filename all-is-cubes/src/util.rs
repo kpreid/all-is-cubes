@@ -2,6 +2,8 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 //! Dumping ground for stuff that hasn't gotten big enough to put in a well-named module yet.
+//!
+//! also somewhat themed around “things that we could imagine being in the standard library”.
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::fmt;
@@ -67,6 +69,46 @@ impl<S: fmt::Debug> ConciseDebug for Vector4<S> {
             "({:+.3?}, {:+.3?}, {:+.3?}, {:+.3?})",
             self.x, self.y, self.z, self.w
         )
+    }
+}
+
+/// A type for "return a result or errors, with possible warnings".
+///
+/// In order to preserve compatibility with the `?` operator and other idioms,
+/// it is an alias for `Result` instead of a new type.
+///
+/// Use the trait `Warnings` for helpful methods.
+pub type WarningsResult<T, E, W> = Result<(T, Vec<W>), (E, Vec<W>)>;
+
+/// Helper trait to provide methods for the `WarningsResult` type.
+pub trait Warnings: Sized {
+    type T;
+    type E;
+    type W;
+    fn split_warnings(self) -> (Vec<Self::W>, Result<Self::T, Self::E>);
+
+    /// Call the `handler` with all warnings and return a `Result` stripped of the warnings.
+    fn handle_warnings<H>(self, handler: H) -> Result<Self::T, Self::E>
+    where
+        H: Fn(Self::W),
+    {
+        let (warnings, r) = self.split_warnings();
+        for warning in warnings {
+            handler(warning);
+        }
+        r
+    }
+}
+
+impl<T, E, W> Warnings for WarningsResult<T, E, W> {
+    type T = T;
+    type E = E;
+    type W = W;
+    fn split_warnings(self) -> (Vec<W>, Result<T, E>) {
+        match self {
+            Ok((v, w)) => (w, Ok(v)),
+            Err((v, w)) => (w, Err(v)),
+        }
     }
 }
 
