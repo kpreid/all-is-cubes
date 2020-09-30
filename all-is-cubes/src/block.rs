@@ -83,6 +83,14 @@ impl Block {
         } else {
             color.alpha() > 0.99
         };
+        let visible = if let Some(array) = &voxels {
+            array
+                .grid()
+                .interior_iter()
+                .all(|p| array[p].alpha() > 0.0)
+        } else {
+            color.alpha() > 0.0
+        };
 
         // TODO: need to track which things we need change notifications on
         EvaluatedBlock {
@@ -90,6 +98,7 @@ impl Block {
             color,
             voxels,
             opaque,
+            visible,
         }
     }
 }
@@ -143,8 +152,15 @@ pub struct EvaluatedBlock {
     pub attributes: BlockAttributes,
     pub color: RGBA,
     pub voxels: Option<GridArray<RGBA>>,
+    /// Whether the block is known to be completely opaque to light on all six faces.
+    ///
+    /// Currently, this is defined to be that each of the surfaces of the block are
+    /// fully opaque, but in the future it might be refined to permit concave surfaces.
     // TODO: generalize opaque to multiple faces and partial opacity, for better light transport
     pub opaque: bool,
+    /// Whether the block has any voxels/color at all that make it visible; that is, this
+    /// is false if the block is completely transparent.
+    pub visible: bool,
 }
 
 /// Type of notification when an `EvaluatedBlock` result changes.
@@ -178,6 +194,7 @@ mod tests {
         assert_eq!(e.color, block.color());
         assert!(e.voxels.is_none());
         assert_eq!(e.opaque, true);
+        assert_eq!(e.visible, true);
     }
 
     #[test]
@@ -185,10 +202,20 @@ mod tests {
         let color = RGBA::new(1.0, 2.0, 3.0, 0.5);
         let block = Block::Atom(BlockAttributes::default(), color);
         let e = block.evaluate();
-        assert_eq!(&e.attributes, block.attributes());
         assert_eq!(e.color, block.color());
         assert!(e.voxels.is_none());
         assert_eq!(e.opaque, false);
+        assert_eq!(e.visible, true);
+    }
+
+    #[test]
+    fn evaluate_invisible_atom() {
+        let block = Block::Atom(BlockAttributes::default(), RGBA::TRANSPARENT);
+        let e = block.evaluate();
+        assert_eq!(e.color, RGBA::TRANSPARENT);
+        assert!(e.voxels.is_none());
+        assert_eq!(e.opaque, false);
+        assert_eq!(e.visible, false);
     }
 
     #[test]
@@ -219,6 +246,7 @@ mod tests {
             ))
         );
         assert_eq!(e.opaque, true);
+        assert_eq!(e.visible, true);
     }
 
     #[test]
@@ -243,6 +271,7 @@ mod tests {
 
         let e = block.evaluate();
         assert_eq!(e.opaque, false);
+        assert_eq!(e.visible, true);
     }
 
     // TODO: test of evaluate where the block's space is the wrong size

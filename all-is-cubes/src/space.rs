@@ -489,17 +489,19 @@ impl Space {
 
     /// Implement the consequences of changing a block.
     fn side_effects_of_set(&mut self, block_index: BlockIndex, position: GridPoint) {
-        let block_data = &self.block_data[block_index as usize];
-        if block_data.evaluated.opaque {  // TODO this should be explicitly the same predicate the lighting algorithm uses
-            for &neighbor in Face::ALL_SIX {
-                self.light_needs_update(
-                    position + neighbor.normal_vector(),
-                    PackedLightScalar::MAX,
-                );
-            }
-        } else {
+        // TODO: Move this into a function in the lighting module since it is so tied to lighting
+        let opaque = self.block_data[block_index as usize].evaluated.opaque;
+        if !opaque {
             self.light_needs_update(position, PackedLightScalar::MAX);
         }
+        for &face in Face::ALL_SIX {
+            let neighbor = position + face.normal_vector();
+            // Skip neighbor light updates in the definitely-black-inside case.
+            if !self.get_evaluated(neighbor).opaque {
+                self.light_needs_update(neighbor, PackedLightScalar::MAX);
+            }
+        }
+
         self.notifier.notify(SpaceChange::Block(position));
     }
 
