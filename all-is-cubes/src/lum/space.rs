@@ -301,10 +301,16 @@ mod tests {
     fn update_adjacent_chunk_positive() {
         let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
         let listener = TodoListener(Rc::downgrade(&todo));
-        listener.receive(SpaceChange::Block(GridPoint::new(CHUNK_SIZE - 1, CHUNK_SIZE / 2, CHUNK_SIZE / 2)));
+        listener.receive(SpaceChange::Block(GridPoint::new(
+            CHUNK_SIZE - 1,
+            CHUNK_SIZE / 2,
+            CHUNK_SIZE / 2,
+        )));
         assert_eq!(
             todo.borrow().chunks,
-            vec![GridPoint::new(0, 0, 0), GridPoint::new(1, 0, 0)].into_iter().collect::<IndexSet<_>>(),
+            vec![GridPoint::new(0, 0, 0), GridPoint::new(1, 0, 0)]
+                .into_iter()
+                .collect::<IndexSet<_>>(),
         );
     }
 
@@ -312,10 +318,16 @@ mod tests {
     fn update_adjacent_chunk_negative() {
         let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
         let listener = TodoListener(Rc::downgrade(&todo));
-        listener.receive(SpaceChange::Block(GridPoint::new(0, CHUNK_SIZE / 2, CHUNK_SIZE / 2)));
+        listener.receive(SpaceChange::Block(GridPoint::new(
+            0,
+            CHUNK_SIZE / 2,
+            CHUNK_SIZE / 2,
+        )));
         assert_eq!(
             todo.borrow().chunks,
-            vec![GridPoint::new(0, 0, 0), GridPoint::new(-1, 0, 0)].into_iter().collect::<IndexSet<_>>(),
+            vec![GridPoint::new(0, 0, 0), GridPoint::new(-1, 0, 0)]
+                .into_iter()
+                .collect::<IndexSet<_>>(),
         );
     }
 }

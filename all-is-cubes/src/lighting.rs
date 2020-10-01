@@ -200,8 +200,8 @@ impl Space {
                         }
                         // TODO: Finish implementing passing through transparency and transparent light sources
                         let light_cube = hit.previous_cube();
-                        let light_from_struck_face = ev_hit.attributes.light_emission
-                            + self.get_lighting(light_cube).into();
+                        let light_from_struck_face =
+                            ev_hit.attributes.light_emission + self.get_lighting(light_cube).into();
                         incoming_light += light_from_struck_face;
                         dependencies.push(light_cube);
                         found = true;

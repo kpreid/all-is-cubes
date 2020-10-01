@@ -84,10 +84,7 @@ impl Block {
             color.alpha() > 0.99
         };
         let visible = if let Some(array) = &voxels {
-            array
-                .grid()
-                .interior_iter()
-                .all(|p| array[p].alpha() > 0.0)
+            array.grid().interior_iter().all(|p| array[p].alpha() > 0.0)
         } else {
             color.alpha() > 0.0
         };
