@@ -475,6 +475,7 @@ impl Space {
             old_data.count -= 1;
             if old_data.count == 0 {
                 // Free data of old entry.
+                self.block_to_index.remove(&old_data.block);
                 *old_data = SpaceBlockData::tombstone();
             }
 
@@ -807,10 +808,18 @@ mod tests {
             vec![blocks[1].clone(), blocks[2].clone()],
             "step 4"
         );
+
+        // Make sure that reinserting an old block correctly allocates an index rather than using the old one.
+        space.set(pt2, &blocks[0]).unwrap();
+        assert_eq!(
+            space.distinct_blocks(),
+            vec![blocks[0].clone(), blocks[2].clone()],
+            "step 4"
+        );
     }
 
     #[test]
-    pub fn change_listener() {
+    fn change_listener() {
         let blocks = make_some_blocks(2);
         let mut space = Space::empty_positive(2, 1, 1);
         let mut sink = Sink::new();
