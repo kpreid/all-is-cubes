@@ -474,9 +474,8 @@ impl Space {
             let old_data: &mut SpaceBlockData = &mut self.block_data[old_block_index as usize];
             old_data.count -= 1;
             if old_data.count == 0 {
-                // Canonicalize dead entry.
-                // TODO: Depend less on AIR by having a canonical empty-entry value that doesn't appear normally.
-                old_data.block = AIR.clone();
+                // Free data of old entry.
+                *old_data = SpaceBlockData::tombstone();
             }
 
             // Increment count of new block.
@@ -556,11 +555,7 @@ impl Space {
             let high_mark = self.block_data.len();
             for new_index in 0..high_mark {
                 if self.block_data[new_index].count == 0 {
-                    self.block_data[new_index] = SpaceBlockData {
-                        block: block.clone(),
-                        count: 0,
-                        evaluated: block.evaluate(),
-                    };
+                    self.block_data[new_index] = SpaceBlockData::new(block);
                     self.block_to_index
                         .insert(block.clone(), new_index as BlockIndex);
                     self.notifier
@@ -575,11 +570,7 @@ impl Space {
                 );
             }
             // Grow the vector.
-            self.block_data.push(SpaceBlockData {
-                block: block.clone(),
-                count: 0,
-                evaluated: block.evaluate(),
-            });
+            self.block_data.push(SpaceBlockData::new(block));
             self.block_to_index
                 .insert(block.clone(), high_mark as BlockIndex);
             self.notifier
@@ -601,6 +592,25 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
             &self.block_data[self.contents[index] as usize].block
         } else {
             &AIR
+        }
+    }
+}
+
+impl SpaceBlockData {
+    /// Value used to fill empty entries in the block data vector.
+    fn tombstone() -> Self {
+        Self {
+            block: AIR.clone(),
+            count: 0,
+            evaluated: AIR_EVALUATED.clone(),
+        }
+    }
+
+    fn new(block: &Block) -> Self {
+        Self {
+            block: block.clone(),
+            count: 0,
+            evaluated: block.evaluate(),
         }
     }
 }
