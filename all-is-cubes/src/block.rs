@@ -9,7 +9,7 @@ use std::borrow::Cow;
 
 use crate::math::{RGB, RGBA};
 use crate::space::{GridArray, Space};
-use crate::universe::URef;
+use crate::universe::{RefError, URef};
 
 /// A `Block` is something that can exist in the grid of a `Space`; it occupies one unit
 /// cube of space and has a specified appearance and behavior.
@@ -63,11 +63,11 @@ impl Block {
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require `URef` access
     /// to other objects.
-    pub fn evaluate(&self) -> EvaluatedBlock {
+    pub fn evaluate(&self) -> Result<EvaluatedBlock, RefError> {
         let color = self.color(); // TODO replace this with the proper voxel test
 
         let voxels = if let Some(space_ref) = self.space() {
-            let block_space = space_ref.borrow();
+            let block_space = space_ref.try_borrow()?;
             Some(
                 block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
                     // TODO: need to also extract solidity info once we start doing collision
@@ -94,13 +94,13 @@ impl Block {
         };
 
         // TODO: need to track which things we need change notifications on
-        EvaluatedBlock {
+        Ok(EvaluatedBlock {
             attributes: self.attributes().clone(),
             color,
             voxels,
             opaque,
             visible,
-        }
+        })
     }
 }
 
@@ -144,7 +144,7 @@ pub const AIR: Block = Block::Atom(
     RGBA::TRANSPARENT,
 );
 
-pub static AIR_EVALUATED: Lazy<EvaluatedBlock> = Lazy::new(|| AIR.evaluate());
+pub static AIR_EVALUATED: Lazy<EvaluatedBlock> = Lazy::new(|| AIR.evaluate().unwrap());
 
 /// A “flattened” and snapshotted form of `Block` which contains all information needed
 /// for rendering and physics, and does not require `URef` access to other objects.
@@ -190,7 +190,7 @@ mod tests {
             },
             color,
         );
-        let e = block.evaluate();
+        let e = block.evaluate().unwrap();
         assert_eq!(&e.attributes, block.attributes());
         assert_eq!(e.color, block.color());
         assert!(e.voxels.is_none());
@@ -202,7 +202,7 @@ mod tests {
     fn evaluate_transparent_atom() {
         let color = RGBA::new(1.0, 2.0, 3.0, 0.5);
         let block = Block::Atom(BlockAttributes::default(), color);
-        let e = block.evaluate();
+        let e = block.evaluate().unwrap();
         assert_eq!(e.color, block.color());
         assert!(e.voxels.is_none());
         assert_eq!(e.opaque, false);
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn evaluate_invisible_atom() {
         let block = Block::Atom(BlockAttributes::default(), RGBA::TRANSPARENT);
-        let e = block.evaluate();
+        let e = block.evaluate().unwrap();
         assert_eq!(e.color, RGBA::TRANSPARENT);
         assert!(e.voxels.is_none());
         assert_eq!(e.opaque, false);
@@ -233,7 +233,7 @@ mod tests {
             )
         });
 
-        let e = block.evaluate();
+        let e = block.evaluate().unwrap();
         assert_eq!(&e.attributes, block.attributes());
         assert_eq!(e.color, block.color());
         assert_eq!(
@@ -270,7 +270,7 @@ mod tests {
             )
         });
 
-        let e = block.evaluate();
+        let e = block.evaluate().unwrap();
         assert_eq!(e.opaque, false);
         assert_eq!(e.visible, true);
     }

@@ -13,7 +13,7 @@ use std::time::Duration;
 use crate::block::*;
 use crate::lighting::*;
 use crate::math::*;
-use crate::universe::{Listener, Notifier};
+use crate::universe::{Listener, Notifier, RefError};
 
 pub use crate::lighting::{PackedLight, SKY};
 
@@ -470,6 +470,38 @@ impl Space {
                 return Ok(false);
             }
 
+            if self.block_data[old_block_index as usize].count == 1 {
+                // Replacing one unique block with a new one.
+                //
+                // This special case is worth having because it means that if a block is
+                // *modified* (read-modify-write) then the entry is preserved, and rendering
+                // may be able to optimize that case.
+                //
+                // It also means that the externally observable block index behavior is easier
+                // to characterize and won't create unnecessary holes.
+
+                // Swap out the block_data entry.
+                let old_block = {
+                    let mut data = SpaceBlockData::new(block)?;
+                    data.count = 1;
+                    std::mem::swap(&mut data, &mut self.block_data[old_block_index as usize]);
+                    data.block
+                };
+
+                // Update block_to_index.
+                self.block_to_index.remove(&old_block);
+                self.block_to_index.insert(block.clone(), old_block_index);
+
+                // Side effects.
+                self.notifier
+                    .notify(SpaceChange::Number(old_block_index as BlockIndex));
+                self.side_effects_of_set(old_block_index, position);
+                return Ok(true);
+            }
+
+            // Find or allocate index for new block. This must be done before other mutations since it can fail.
+            let new_block_index = self.ensure_block_index(block)?;
+
             // Decrement count of old block.
             let old_data: &mut SpaceBlockData = &mut self.block_data[old_block_index as usize];
             old_data.count -= 1;
@@ -480,8 +512,6 @@ impl Space {
             }
 
             // Increment count of new block.
-            // TODO: Optimize replacements of unique blocks by picking the just-freed index if possible.
-            let new_block_index = self.ensure_block_index(block);
             self.block_data[new_block_index as usize].count += 1;
 
             // Write actual space change.
@@ -547,21 +577,22 @@ impl Space {
     /// Finds or assigns an index to denote the block.
     ///
     /// The caller is responsible for incrementing `self.block_data[index].count`.
-    fn ensure_block_index(&mut self, block: &Block) -> BlockIndex {
+    #[inline]
+    fn ensure_block_index(&mut self, block: &Block) -> Result<BlockIndex, SetCubeError> {
         if let Some(&old_index) = self.block_to_index.get(&block) {
-            old_index
+            Ok(old_index)
         } else {
             // Look for if there is a previously used index to take.
             // TODO: more efficient free index finding
             let high_mark = self.block_data.len();
             for new_index in 0..high_mark {
                 if self.block_data[new_index].count == 0 {
-                    self.block_data[new_index] = SpaceBlockData::new(block);
+                    self.block_data[new_index] = SpaceBlockData::new(block)?;
                     self.block_to_index
                         .insert(block.clone(), new_index as BlockIndex);
                     self.notifier
                         .notify(SpaceChange::Number(new_index as BlockIndex));
-                    return new_index as BlockIndex;
+                    return Ok(new_index as BlockIndex);
                 }
             }
             if high_mark >= BlockIndex::MAX as usize {
@@ -570,13 +601,15 @@ impl Space {
                     BlockIndex::MAX as usize + 1
                 );
             }
+            // Evaluate the new block type. Can fail, but we haven't done any mutation yet.
+            let new_data = SpaceBlockData::new(block)?;
             // Grow the vector.
-            self.block_data.push(SpaceBlockData::new(block));
+            self.block_data.push(new_data);
             self.block_to_index
                 .insert(block.clone(), high_mark as BlockIndex);
             self.notifier
                 .notify(SpaceChange::Number(high_mark as BlockIndex));
-            high_mark as BlockIndex
+            Ok(high_mark as BlockIndex)
         }
     }
 }
@@ -607,12 +640,12 @@ impl SpaceBlockData {
         }
     }
 
-    fn new(block: &Block) -> Self {
-        Self {
+    fn new(block: &Block) -> Result<Self, SetCubeError> {
+        Ok(Self {
             block: block.clone(),
             count: 0,
-            evaluated: block.evaluate(),
-        }
+            evaluated: block.evaluate().map_err(SetCubeError::BlockDataAccess)?,
+        })
     }
 }
 
@@ -623,6 +656,8 @@ impl SpaceBlockData {
 pub enum SetCubeError {
     /// The given cube is out of the bounds of this Space.
     OutOfBounds,
+    /// The block data could not be read.
+    BlockDataAccess(RefError),
 }
 
 /// Description of a change to a `Space` for use in listeners.
@@ -720,7 +755,7 @@ mod tests {
     use crate::block::AIR;
     use crate::blockgen::make_some_blocks;
     use crate::math::GridPoint;
-    use crate::universe::Sink;
+    use crate::universe::{Sink, Universe};
     use cgmath::EuclideanSpace as _;
 
     #[test]
@@ -757,6 +792,22 @@ mod tests {
         assert_eq!(Err(SetCubeError::OutOfBounds), space.set(pt, &AIR));
     }
 
+    /// This test case should also cover `RefError::Gone`.
+    #[test]
+    fn set_failure_borrow() {
+        let mut u = Universe::new();
+        let inner_space_ref = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let block = Block::Recur(BlockAttributes::default(), inner_space_ref.clone());
+        let mut outer_space = Space::empty_positive(1, 1, 1);
+
+        let borrow = inner_space_ref.borrow_mut();
+        assert_eq!(
+            Err(SetCubeError::BlockDataAccess(RefError::InUse)),
+            outer_space.set((0, 0, 0), &block)
+        );
+        drop(borrow);
+    }
+
     /// EvaluatedBlock data is updated when a new block index is allocated.
     #[test]
     fn set_updates_evaluated_on_added_block() {
@@ -767,7 +818,10 @@ mod tests {
         assert_eq!(Some(1), space.get_block_index((0, 0, 0)));
         assert_eq!(Some(0), space.get_block_index((1, 0, 0)));
         // Confirm the data is correct
-        assert_eq!(space.get_evaluated((0, 0, 0)), &blocks[0].evaluate());
+        assert_eq!(
+            space.get_evaluated((0, 0, 0)),
+            &blocks[0].evaluate().unwrap()
+        );
     }
 
     /// EvaluatedBlock data is updated when a block index is reused.
@@ -779,7 +833,10 @@ mod tests {
         // Confirm the expected indices
         assert_eq!(Some(0), space.get_block_index((0, 0, 0)));
         // Confirm the data is correct
-        assert_eq!(space.get_evaluated((0, 0, 0)), &blocks[0].evaluate());
+        assert_eq!(
+            space.get_evaluated((0, 0, 0)),
+            &blocks[0].evaluate().unwrap()
+        );
     }
 
     #[test]

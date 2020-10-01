@@ -134,7 +134,6 @@ impl VoxelDisplayAdapter<'_> {
             Ok(_) => Ok(()),
             // Drawing out of bounds is not an error.
             Err(SetCubeError::OutOfBounds) => Ok(()),
-            #[allow(unreachable_patterns)] // expecting expansion
             Err(e) => Err(e),
         }
     }
