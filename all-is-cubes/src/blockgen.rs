@@ -52,7 +52,9 @@ impl<'a> BlockGen<'a> {
         let (block, mut space) = self.new_recursive_block(attributes);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for point in space.grid().interior_iter() {
-            space.set(point, &f(self, point, rng.gen_range(0.0, 1.0)));
+            space
+                .set(point, &f(self, point, rng.gen_range(0.0, 1.0)))
+                .unwrap();
         }
         block
     }

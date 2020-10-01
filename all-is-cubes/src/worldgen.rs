@@ -52,17 +52,19 @@ pub fn axes(space: &mut Space) {
                 };
             }
             light[axis] = 3.0;
-            space.set(
-                step.cube,
-                &Block::Atom(
-                    BlockAttributes {
-                        display_name,
-                        light_emission: light.try_into().unwrap(),
-                        ..BlockAttributes::default()
-                    },
-                    color.try_into().expect("axes() color generation failed"),
-                ),
-            );
+            space
+                .set(
+                    step.cube,
+                    &Block::Atom(
+                        BlockAttributes {
+                            display_name,
+                            light_emission: light.try_into().unwrap(),
+                            ..BlockAttributes::default()
+                        },
+                        color.try_into().expect("axes() color generation failed"),
+                    ),
+                )
+                .unwrap();
         }
     }
 }
@@ -105,7 +107,7 @@ pub fn wavy_landscape(space: &mut Space, blocks: &LandscapeBlocks, max_slope: Fr
                 } else {
                     &blocks.stone
                 };
-                space.set((x, y, z), block);
+                space.set((x, y, z), block).unwrap();
                 // TODO: Add various decorations on the ground. And trees.
             }
         }

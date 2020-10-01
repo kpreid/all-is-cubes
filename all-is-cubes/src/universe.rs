@@ -245,7 +245,7 @@ impl<T> Clone for URef<T> {
 
 /// Errors resulting from attempting to borrow/dereference a `URef`.
 // TODO: implement Error
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum RefError {
     /// Target was deleted.
     Gone,
@@ -696,8 +696,8 @@ mod tests {
         let mut u = Universe::new();
         let ref_a = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let ref_b = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        ref_a.borrow_mut().set((0, 0, 0), &blocks[0]);
-        ref_b.borrow_mut().set((0, 0, 0), &blocks[1]);
+        ref_a.borrow_mut().set((0, 0, 0), &blocks[0]).unwrap();
+        ref_b.borrow_mut().set((0, 0, 0), &blocks[1]).unwrap();
         assert!(ref_a != ref_b, "not equal");
         assert!(
             ref_a.borrow()[(0, 0, 0)] != ref_b.borrow()[(0, 0, 0)],

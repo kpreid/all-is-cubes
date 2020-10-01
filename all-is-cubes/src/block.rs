@@ -66,13 +66,17 @@ impl Block {
     pub fn evaluate(&self) -> EvaluatedBlock {
         let color = self.color(); // TODO replace this with the proper voxel test
 
-        let voxels = self.space().map(|space_ref| {
+        let voxels = if let Some(space_ref) = self.space() {
             let block_space = space_ref.borrow();
-            block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
-                // TODO: need to also extract solidity info once we start doing collision
-                sub_block.color()
-            })
-        });
+            Some(
+                block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
+                    // TODO: need to also extract solidity info once we start doing collision
+                    sub_block.color()
+                }),
+            )
+        } else {
+            None
+        };
 
         let opaque = if let Some(array) = &voxels {
             // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows

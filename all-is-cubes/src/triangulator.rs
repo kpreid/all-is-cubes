@@ -444,7 +444,7 @@ mod tests {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 2, 2);
         for cube in space.grid().interior_iter() {
-            space.set(cube, &block);
+            space.set(cube, &block).unwrap();
         }
 
         let mut rendering = new_space_buffer();
@@ -485,7 +485,7 @@ mod tests {
         assert_eq!(blocks_render_data.len(), 1); // check our assumption
 
         // This should not panic; visual glitches are preferable to failure.
-        space.set((0, 0, 0), &block); // render data does not know about this
+        space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
         triangulate_space(
             &space,
             &space.grid(),
@@ -498,13 +498,15 @@ mod tests {
     fn trivial_subcube_rendering() {
         let mut u = Universe::new();
         let mut inner_block_space = Space::empty_positive(1, 1, 1);
-        inner_block_space.set((0, 0, 0), &make_some_blocks(1)[0]);
+        inner_block_space
+            .set((0, 0, 0), &make_some_blocks(1)[0])
+            .unwrap();
         let inner_block = Block::Recur(
             BlockAttributes::default(),
             u.insert_anonymous(inner_block_space),
         );
         let mut outer_space = Space::empty_positive(1, 1, 1);
-        outer_space.set((0, 0, 0), &inner_block);
+        outer_space.set((0, 0, 0), &inner_block).unwrap();
 
         let blocks_render_data: BlocksRenderData<BlockVertex, _> =
             triangulate_blocks(&outer_space, &mut NullTextureAllocator);

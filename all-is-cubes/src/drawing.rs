@@ -12,12 +12,12 @@ use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::style::TextStyleBuilder;
 use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
-use std::convert::{Infallible, TryInto};
+use std::convert::TryInto;
 
 use crate::block::{Block, BlockAttributes};
 use crate::blockgen::BlockGen;
 use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
-use crate::space::{Grid, Space};
+use crate::space::{Grid, SetCubeError, Space};
 
 /// Draw text into a `Space`, extending in the +X and -Y directions from `origin`.
 pub fn draw_text<F, C>(
@@ -26,26 +26,28 @@ pub fn draw_text<F, C>(
     origin: GridPoint,
     font: F,
     text: impl AsRef<str>,
-) where
+) -> Result<(), SetCubeError>
+where
     C: PixelColor,
-    for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = Infallible>,
+    for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
     F: Font + Copy,
 {
     let style = TextStyleBuilder::new(font).text_color(color).build();
     Text::new(text.as_ref(), Point::new(origin.x as i32, -origin.y as i32))
         .into_styled(style)
         .draw(&mut VoxelDisplayAdapter::new(space, origin.z))
-        .unwrap(); // cannot fail
+    // Note: unwrap() is currently safe because there's no way for setting an atom cube
+    // to fail, but if we generalize that later then we might need more error handling.
 }
 
 /// Generate a set of blocks which together display the given `Drawable` which may be
 /// larger than one block. The Z position is always the middle of the block.
-pub fn draw_to_blocks<D, C>(ctx: &mut BlockGen, object: D) -> Space
+pub fn draw_to_blocks<D, C>(ctx: &mut BlockGen, object: D) -> Result<Space, SetCubeError>
 where
     for<'a> &'a D: Drawable<C>,
     D: Dimensions + Transform,
     C: PixelColor,
-    for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = Infallible>,
+    for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
 {
     let block_size: i32 = ctx.size;
     let top_left_2d = object.top_left();
@@ -71,10 +73,12 @@ where
         if false {
             // For debugging block bounds chosen for the graphic. TODO: Keep this around
             // as an option but draw a full bounding box instead.
-            block_space.set(
-                (0, 0, 0),
-                &Block::Atom(BlockAttributes::default(), RGBA::new(1.0, 0.0, 0.0, 1.0)),
-            );
+            block_space
+                .set(
+                    (0, 0, 0),
+                    &Block::Atom(BlockAttributes::default(), RGBA::new(1.0, 0.0, 0.0, 1.0)),
+                )
+                .expect("can't happen: draw_to_blocks failed to write to its own block space");
         }
 
         let offset = Point::new(-cube.x as i32 * block_size, cube.y as i32 * block_size);
@@ -83,18 +87,19 @@ where
             .draw(&mut VoxelDisplayAdapter::new(
                 &mut block_space,
                 ctx.size / 2,
-            ))
-            .unwrap(); // cannot fail
-        output_space.set(
-            cube,
-            // TODO: Allow attribute alteration.
-            &Block::Recur(
-                BlockAttributes::default(),
-                ctx.universe.insert_anonymous(block_space),
-            ),
-        );
+            ))?;
+        output_space
+            .set(
+                cube,
+                // TODO: Allow attribute alteration.
+                &Block::Recur(
+                    BlockAttributes::default(),
+                    ctx.universe.insert_anonymous(block_space),
+                ),
+            )
+            .expect("can't happen: draw_to_blocks failed to write to its own output space");
     }
-    output_space
+    Ok(output_space)
 }
 
 /// Adapter to use a `Space` as a `embedded_graphics::DrawTarget`.
@@ -124,6 +129,16 @@ impl VoxelDisplayAdapter<'_> {
         )
     }
 
+    fn handle_set_result(result: Result<bool, SetCubeError>) -> Result<(), SetCubeError> {
+        match result {
+            Ok(_) => Ok(()),
+            // Drawing out of bounds is not an error.
+            Err(SetCubeError::OutOfBounds) => Ok(()),
+            #[allow(unreachable_patterns)] // expecting expansion
+            Err(e) => Err(e),
+        }
+    }
+
     /// Common implementation for the DrawTarget size methods
     fn size_for_eg(&self) -> Size {
         let size = self.space.grid().size();
@@ -141,13 +156,12 @@ impl<C> DrawTarget<C> for VoxelDisplayAdapter<'_>
 where
     C: Into<Block> + PixelColor,
 {
-    type Error = Infallible;
+    type Error = SetCubeError;
 
     fn draw_pixel(&mut self, pixel: Pixel<C>) -> Result<(), Self::Error> {
         let Pixel(point, color) = pixel;
         // TODO: Allow customizing block attributes.
-        self.space.set(self.convert_point(point), &color.into());
-        Ok(())
+        Self::handle_set_result(self.space.set(self.convert_point(point), &color.into()))
     }
 
     fn size(&self) -> Size {
@@ -158,7 +172,7 @@ where
 /// A `VoxelBrush` may be used to draw multiple layers of blocks from a single 2D
 /// graphic, producing shadow or outline effects.
 impl DrawTarget<VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
-    type Error = Infallible;
+    type Error = SetCubeError;
 
     fn draw_pixel(&mut self, pixel: Pixel<VoxelBrush>) -> Result<(), Self::Error> {
         let Pixel(point, brush) = pixel;
@@ -166,7 +180,7 @@ impl DrawTarget<VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
         for bristle in &brush.0 {
             if let Some((offset, block)) = bristle {
                 let offset = offset.cast::<GridCoordinate>().unwrap();
-                self.space.set(point + offset, block);
+                Self::handle_set_result(self.space.set(point + offset, block))?;
             }
         }
         Ok(())
@@ -252,7 +266,7 @@ mod tests {
     use embedded_graphics::style::{PrimitiveStyle, PrimitiveStyleBuilder};
 
     #[test]
-    fn drawing_adapter_works() -> Result<(), Infallible> {
+    fn drawing_adapter_works() -> Result<(), SetCubeError> {
         let mut space = Space::empty_positive(100, 100, 100);
 
         Pixel(Point::new(2, -3), Rgb888::new(0, 127, 255))
@@ -265,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn draw_with_brush() -> Result<(), Infallible> {
+    fn draw_with_brush() -> Result<(), SetCubeError> {
         let blocks = make_some_blocks(2);
         let mut space = Space::empty_positive(100, 100, 100);
 
@@ -275,6 +289,22 @@ mod tests {
         assert_eq!(&space[(2, 3, 4)], &blocks[0]);
         assert_eq!(&space[(2, 4, 5)], &blocks[1]);
         Ok(())
+    }
+
+    #[test]
+    fn draw_out_of_bounds_is_ok() -> Result<(), SetCubeError> {
+        let mut space = Space::empty_positive(100, 100, 100);
+
+        // This should not fail with SetCubeError::OutOfBounds
+        Pixel(Point::new(-10, 0), Rgb888::new(0, 127, 255))
+            .draw(&mut VoxelDisplayAdapter::new(&mut space, 4))?;
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn draw_set_failure() {
+        todo!("test a case where a SetCubeError is propagated");
     }
 
     //#[test]
@@ -298,7 +328,7 @@ mod tests {
         let mut ctx: BlockGen = BlockGen::new(&mut universe, 16);
         let drawable =
             Rectangle::new(Point::new(0, 0), Point::new(2, 3)).into_styled(a_primitive_style());
-        let space = draw_to_blocks(&mut ctx, drawable);
+        let space = draw_to_blocks(&mut ctx, drawable).unwrap();
         // Output is at negative Y because coordinate system is flipped.
         assert_eq!(*space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
         let ref block_space_ref = space[(0, -1, 0)].space().expect("not a recursive block");
@@ -314,7 +344,7 @@ mod tests {
         let mut ctx: BlockGen = BlockGen::new(&mut universe, 16);
         let drawable =
             Rectangle::new(Point::new(-3, -2), Point::new(0, 0)).into_styled(a_primitive_style());
-        let space = draw_to_blocks(&mut ctx, drawable);
+        let space = draw_to_blocks(&mut ctx, drawable).unwrap();
         assert_eq!(*space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
         let ref block_space_ref = space[(-1, 0, 0)].space().expect("not a recursive block");
         assert_eq!(

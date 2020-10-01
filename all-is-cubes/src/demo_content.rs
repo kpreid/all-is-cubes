@@ -38,7 +38,8 @@ pub fn new_universe_with_stuff() -> Universe {
                 .text_color(Rgb888::new(120, 100, 200))
                 .build(),
         ),
-    );
+    )
+    .unwrap();
 
     let axis_block = {
         let (axis_block, mut axis_space) = bg.new_recursive_block(BlockAttributes::default());
@@ -55,7 +56,7 @@ pub fn new_universe_with_stuff() -> Universe {
     let mut space = Space::empty(grid);
     wavy_landscape(&mut space, &blocks, 1.0);
     axes(&mut space);
-    space.set((-1, 3, -1), &axis_block);
+    let _ = space.set((-1, 3, -1), &axis_block);
 
     // Large banner text
     let foreground_text_block: Block = Rgb888::new(200, 50, 120).into();
@@ -72,11 +73,12 @@ pub fn new_universe_with_stuff() -> Universe {
         GridPoint::new(-radius_xz + 3, 16, -radius_xz),
         Font8x16,
         "All is Cubes",
-    );
+    )
+    .unwrap();
 
     // Small test text
     for cube in text_blocks.grid().interior_iter() {
-        space.set(cube + GridVector::new(-16, 3, -14), &text_blocks[cube]);
+        let _ = space.set(cube + GridVector::new(-16, 3, -14), &text_blocks[cube]);
     }
 
     let space_ref = universe.insert("space".into(), space);

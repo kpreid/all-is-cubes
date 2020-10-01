@@ -340,7 +340,7 @@ impl Space {
             block_data: vec![SpaceBlockData {
                 block: AIR.clone(),
                 count: volume,
-                evaluated: AIR.evaluate(),
+                evaluated: AIR_EVALUATED.clone(),
             }],
             contents: vec![0; volume].into_boxed_slice(),
             lighting: initialize_lighting(grid),
@@ -456,14 +456,18 @@ impl Space {
     /// space.set((0, 0, 0), &a_block);
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// ```
-    pub fn set(&mut self, position: impl Into<GridPoint>, block: &Block) {
+    pub fn set(
+        &mut self,
+        position: impl Into<GridPoint>,
+        block: &Block,
+    ) -> Result<bool, SetCubeError> {
         let position: GridPoint = position.into();
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
             let old_block = &self.block_data[old_block_index as usize].block;
             if *old_block == *block {
                 // No change.
-                return;
+                return Ok(false);
             }
 
             // Decrement count of old block.
@@ -480,10 +484,13 @@ impl Space {
             let new_block_index = self.ensure_block_index(block);
             self.block_data[new_block_index as usize].count += 1;
 
-            // Write actual space change
+            // Write actual space change.
             self.contents[contents_index] = new_block_index;
 
             self.side_effects_of_set(new_block_index, position);
+            Ok(true)
+        } else {
+            Err(SetCubeError::OutOfBounds)
         }
     }
 
@@ -598,6 +605,15 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     }
 }
 
+/// Ways that Space::set can fail to make a change.
+///
+/// Note that "already contained the given block" is considered a success.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SetCubeError {
+    /// The given cube is out of the bounds of this Space.
+    OutOfBounds,
+}
+
 /// Description of a change to a `Space` for use in listeners.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SpaceChange {
@@ -690,9 +706,11 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::AIR;
     use crate::blockgen::make_some_blocks;
     use crate::math::GridPoint;
     use crate::universe::Sink;
+    use cgmath::EuclideanSpace as _;
 
     #[test]
     fn it_works() {
@@ -705,12 +723,35 @@ mod tests {
 
     // TODO: test consistency between the index and get_* methods
 
+    /// set() returns Ok when the cube was changed or already equal.
+    #[test]
+    fn set_success() {
+        let blocks = make_some_blocks(2);
+        let mut space = Space::empty_positive(1, 1, 1);
+        let pt = GridPoint::origin();
+        assert_eq!(Ok(true), space.set(pt, &blocks[0]));
+        assert_eq!(&space[pt], &blocks[0]);
+        assert_eq!(Ok(false), space.set(pt, &blocks[0]));
+        assert_eq!(&space[pt], &blocks[0]);
+        assert_eq!(Ok(true), space.set(pt, &blocks[1]));
+        assert_eq!(&space[pt], &blocks[1]);
+    }
+
+    #[test]
+    fn set_failure_out_of_bounds() {
+        let blocks = make_some_blocks(1);
+        let pt = GridPoint::new(1, 0, 0);
+        let mut space = Space::empty_positive(1, 1, 1);
+        assert_eq!(Err(SetCubeError::OutOfBounds), space.set(pt, &blocks[0]));
+        assert_eq!(Err(SetCubeError::OutOfBounds), space.set(pt, &AIR));
+    }
+
     /// EvaluatedBlock data is updated when a new block index is allocated.
     #[test]
     fn set_updates_evaluated_on_added_block() {
         let blocks = make_some_blocks(1);
         let mut space = Space::empty_positive(2, 1, 1);
-        space.set((0, 0, 0), &blocks[0]);
+        space.set((0, 0, 0), &blocks[0]).unwrap();
         // Confirm the expected indices
         assert_eq!(Some(1), space.get_block_index((0, 0, 0)));
         assert_eq!(Some(0), space.get_block_index((1, 0, 0)));
@@ -723,7 +764,7 @@ mod tests {
     fn set_updates_evaluated_on_replaced_block() {
         let blocks = make_some_blocks(1);
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &blocks[0]);
+        space.set((0, 0, 0), &blocks[0]).unwrap();
         // Confirm the expected indices
         assert_eq!(Some(0), space.get_block_index((0, 0, 0)));
         // Confirm the data is correct
@@ -738,19 +779,19 @@ mod tests {
         let pt2 = GridPoint::new(1, 0, 0);
         // TODO: This test depends on block allocation order. distinct_blocks() ought to be stable or explicitly return a HashSet or something.
         assert_eq!(space.distinct_blocks(), vec![AIR.clone()], "step 1");
-        space.set(pt1, &blocks[0]);
+        space.set(pt1, &blocks[0]).unwrap();
         assert_eq!(
             space.distinct_blocks(),
             vec![AIR.clone(), blocks[0].clone()],
             "step 2"
         );
-        space.set(pt2, &blocks[1]);
+        space.set(pt2, &blocks[1]).unwrap();
         assert_eq!(
             space.distinct_blocks(),
             vec![blocks[1].clone(), blocks[0].clone()],
             "step 3"
         );
-        space.set(pt1, &blocks[2]);
+        space.set(pt1, &blocks[2]).unwrap();
         assert_eq!(
             space.distinct_blocks(),
             vec![blocks[1].clone(), blocks[2].clone()],
@@ -764,7 +805,8 @@ mod tests {
         let mut space = Space::empty_positive(2, 1, 1);
         let mut sink = Sink::new();
         space.listen(sink.listener());
-        space.set((0, 0, 0), &blocks[0]);
+
+        assert_eq!(Ok(true), space.set((0, 0, 0), &blocks[0]));
         //panic!("{:?}", sink.collect::<Vec<_>>());
         // Note: Sink currently reports things in reverse of insertion order.
         assert_eq!(
@@ -775,7 +817,7 @@ mod tests {
         assert_eq!(None, sink.next());
 
         // No change, no notification
-        space.set((0, 0, 0), &blocks[0]);
+        assert_eq!(Ok(false), space.set((0, 0, 0), &blocks[0]));
         assert_eq!(None, sink.next());
     }
 }
