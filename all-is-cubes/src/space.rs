@@ -549,7 +549,11 @@ impl Space {
             let high_mark = self.block_data.len();
             for new_index in 0..high_mark {
                 if self.block_data[new_index].count == 0 {
-                    self.block_data[new_index].block = block.clone();
+                    self.block_data[new_index] = SpaceBlockData {
+                        block: block.clone(),
+                        count: 0,
+                        evaluated: block.evaluate(),
+                    };
                     self.block_to_index
                         .insert(block.clone(), new_index as BlockIndex);
                     self.notifier
@@ -700,6 +704,31 @@ mod tests {
     }
 
     // TODO: test consistency between the index and get_* methods
+
+    /// EvaluatedBlock data is updated when a new block index is allocated.
+    #[test]
+    fn set_updates_evaluated_on_added_block() {
+        let blocks = make_some_blocks(1);
+        let mut space = Space::empty_positive(2, 1, 1);
+        space.set((0, 0, 0), &blocks[0]);
+        // Confirm the expected indices
+        assert_eq!(Some(1), space.get_block_index((0, 0, 0)));
+        assert_eq!(Some(0), space.get_block_index((1, 0, 0)));
+        // Confirm the data is correct
+        assert_eq!(space.get_evaluated((0, 0, 0)), &blocks[0].evaluate());
+    }
+
+    /// EvaluatedBlock data is updated when a block index is reused.
+    #[test]
+    fn set_updates_evaluated_on_replaced_block() {
+        let blocks = make_some_blocks(1);
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set((0, 0, 0), &blocks[0]);
+        // Confirm the expected indices
+        assert_eq!(Some(0), space.get_block_index((0, 0, 0)));
+        // Confirm the data is correct
+        assert_eq!(space.get_evaluated((0, 0, 0)), &blocks[0].evaluate());
+    }
 
     #[test]
     fn removed_blocks_are_forgotten() {
