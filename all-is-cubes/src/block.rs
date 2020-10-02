@@ -32,31 +32,22 @@ pub enum Block {
 }
 
 impl Block {
-    /// Returns the RGBA color to use for this block when viewed as a single voxel,
-    /// and additionally at full size if `space() == None`.
+    /// Returns the RGBA color to use for this block when viewed as a single voxel.
+    // TODO: This cannot work for recursive blocks and should be removed or redesigned.
     pub fn color(&self) -> RGBA {
         match self {
             Block::Atom(_, c) => *c,
-            Block::Recur(_, _) => RGBA::new(0.5, 0.5, 0.5, 1.0), // TODO: need a solution for memoizing the color
+            Block::Recur(_, _) => RGBA::new(0.5, 0.5, 0.5, 1.0),
         }
     }
 
     /// Returns the `BlockAttributes` for this block, which give properties such as a name.
+    // TODO: We're going to want to remove this in favor of evaluate() so that we can
+    // have block attributes through indirection so that they can be updated.
     pub fn attributes(&self) -> &BlockAttributes {
         match self {
             Block::Atom(a, _) => a,
             Block::Recur(a, _) => a,
-        }
-    }
-
-    /// Returns the space which defines the shape and behavior of this block, if there is one.
-    ///
-    /// TODO: there needs to be the concept of read-only derived spaces to make this work
-    /// as intended.
-    pub fn space(&self) -> Option<&URef<Space>> {
-        match self {
-            Block::Atom(_, _) => None,
-            Block::Recur(_, space_ref) => Some(&space_ref),
         }
     }
 
@@ -66,16 +57,17 @@ impl Block {
     pub fn evaluate(&self) -> Result<EvaluatedBlock, RefError> {
         let color = self.color(); // TODO replace this with the proper voxel test
 
-        let voxels = if let Some(space_ref) = self.space() {
-            let block_space = space_ref.try_borrow()?;
-            Some(
-                block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
-                    // TODO: need to also extract solidity info once we start doing collision
-                    sub_block.color()
-                }),
-            )
-        } else {
-            None
+        let voxels = match self {
+            Block::Atom(_, _) => None,
+            Block::Recur(_, space_ref) => {
+                let block_space = space_ref.try_borrow()?;
+                Some(
+                    block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
+                        // TODO: need to also extract solidity info once we start doing collision
+                        sub_block.color()
+                    }),
+                )
+            },
         };
 
         let opaque = if let Some(array) = &voxels {

@@ -12,6 +12,7 @@ use termion::color;
 use termion::event::{Event, Key};
 use typed_arena::Arena;
 
+use all_is_cubes::block::Block;
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
 use all_is_cubes::raycast::{Face, Ray};
@@ -70,7 +71,7 @@ pub fn draw_space<O: io::Write>(
                 .chars()
                 .next()
                 .unwrap_or(' ');
-            if let Some(space_ref) = block.space() {
+            if let Block::Recur(_, space_ref) = block {
                 let block_space = space_ref.borrow();
                 TracingBlock::Recur(recur_arena.alloc(block_space.extract(
                     *block_space.grid(),
