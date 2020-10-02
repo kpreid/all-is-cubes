@@ -3,21 +3,19 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Matrix4, Point2, SquareMatrix as _, Vector3, Zero as _};
+use cgmath::{Matrix4, Point2, SquareMatrix as _};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
 use luminance_front::pipeline::PipelineState;
 use luminance_front::render_state::RenderState;
-use luminance_front::tess::{Mode, Tess};
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
 use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
 use all_is_cubes::lum::shading::{prepare_block_program, BlockProgram};
 use all_is_cubes::lum::space::{SpaceRenderInfo, SpaceRenderer};
-use all_is_cubes::lum::types::Vertex;
-use all_is_cubes::math::{GridCoordinate, RGBA};
+use all_is_cubes::lum::make_cursor_tess;
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::WarningsResult;
 
@@ -186,46 +184,3 @@ pub struct RenderInfo {
     space: SpaceRenderInfo,
 }
 
-fn make_cursor_tess<C>(context: &mut C, cursor_result: &Option<Cursor>) -> Tess<Vertex>
-where
-    C: GraphicsContext<Backend = Backend>,
-{
-    // TODO: reuse instead of building anew
-    let mut vertices = Vec::with_capacity(3 /* axes */ * 4 /* lines */ * 2 /* vertices */);
-    if let Some(cursor) = cursor_result {
-        let origin = cursor.place.cube;
-        let cursor_vertex = |v: Vector3<GridCoordinate>| {
-            Vertex::new_colored(
-                (origin + v).cast::<f64>().unwrap(),
-                Vector3::zero(),
-                RGBA::BLACK,
-            )
-        };
-        for axis in 0..3 {
-            let mut offset = Vector3::zero();
-            // Walk from (0, 0, 0) to (1, 1, 1) in a helix.
-            vertices.push(cursor_vertex(offset));
-            offset[axis] = 1;
-            vertices.push(cursor_vertex(offset));
-            vertices.push(cursor_vertex(offset));
-            offset[(axis + 1).rem_euclid(3)] = 1;
-            vertices.push(cursor_vertex(offset));
-            vertices.push(cursor_vertex(offset));
-            offset[(axis + 2).rem_euclid(3)] = 1;
-            vertices.push(cursor_vertex(offset));
-            // Go back and fill in the remaining bar.
-            offset[(axis + 2).rem_euclid(3)] = 0;
-            vertices.push(cursor_vertex(offset));
-            offset[axis] = 0;
-            vertices.push(cursor_vertex(offset));
-        }
-    } else {
-        vertices.push(Vertex::DUMMY);
-    };
-    context
-        .new_tess()
-        .set_vertices(vertices)
-        .set_mode(Mode::Line)
-        .build()
-        .unwrap()
-}
