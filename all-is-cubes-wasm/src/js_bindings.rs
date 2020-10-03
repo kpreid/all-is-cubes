@@ -8,6 +8,8 @@ use web_sys::HtmlCanvasElement;
 
 use all_is_cubes::math::FreeCoordinate;
 
+use crate::glrender::Viewport;
+
 #[wasm_bindgen(raw_module = "gui")]
 extern "C" {
     pub type GuiHelpers;
@@ -38,6 +40,14 @@ impl CanvasHelper {
         let raw = self.viewport_dev_raw();
         [raw[0] as u32, raw[1] as u32]
     }
+
+    pub fn viewport(&self) -> Viewport {
+        Viewport {
+            viewport_px: self.viewport_px(),
+            viewport_dev: self.viewport_dev(),
+        }
+    }
+
 
     // TODO: return type is at the whim of what's useful for luminance right now
     pub fn normalize_position(&self) -> Vector2<FreeCoordinate> {

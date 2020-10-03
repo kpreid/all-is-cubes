@@ -45,7 +45,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id(), WindowOpt::default())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
-    let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper())
+    let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper().viewport())
         .handle_warnings(|warning| {
             console::warn_1(&JsValue::from_str(&format!("GLSL warning:\n{}", warning)));
         })
@@ -219,7 +219,7 @@ impl WebGameRoot {
 
         if should_draw {
             // TODO do projection updates only when needed
-            self.renderer.update_viewport();
+            self.renderer.set_viewport(self.gui_helpers.canvas_helper().viewport());
 
             // Do graphics
             let render_info = self.renderer.render_frame();

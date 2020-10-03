@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Matrix4, Point2, SquareMatrix as _};
+use cgmath::{Vector2, Matrix4, Point2, SquareMatrix as _};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
@@ -19,7 +19,14 @@ use all_is_cubes::lum::make_cursor_tess;
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::WarningsResult;
 
-use crate::js_bindings::CanvasHelper;
+/// Viewport dimensions for `GLRenderer`.
+/// Field types at the whim of what's useful for the code that uses it.
+pub struct Viewport {
+    /// Viewport dimensions to use for aspect ratio and click calculations.
+    pub viewport_px: Vector2<usize>,
+    /// Viewport dimensions to use for framebuffer configuration.
+    pub viewport_dev: [u32; 2],
+}
 
 pub struct GLRenderer<C>
 where
@@ -35,7 +42,6 @@ where
     space_renderer: Option<SpaceRenderer>,
 
     // Miscellaneous
-    canvas_helper: CanvasHelper,
     proj: ProjectionHelper,
     pub(crate) cursor_result: Option<Cursor>,
 }
@@ -46,15 +52,15 @@ where
 {
     pub fn new(
         mut surface: C,
-        canvas_helper: CanvasHelper,
+        viewport: Viewport,
     ) -> WarningsResult<Self, String, String> {
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
         let (block_program, warnings) = prepare_block_program(&mut surface)?;
 
-        let proj = ProjectionHelper::new(1.0, canvas_helper.viewport_px());
+        let proj = ProjectionHelper::new(1.0, viewport.viewport_px);
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut surface,
-            canvas_helper.viewport_dev(),
+            viewport.viewport_dev,
         )
         .unwrap(); // TODO error handling
         Ok((
@@ -64,7 +70,6 @@ where
                 block_program,
                 camera: None,
                 space_renderer: None,
-                canvas_helper,
                 proj,
                 cursor_result: None,
             },
@@ -72,11 +77,11 @@ where
         ))
     }
 
-    pub fn update_viewport(&mut self) {
-        self.proj.set_viewport(self.canvas_helper.viewport_px());
+    pub fn set_viewport(&mut self, viewport: Viewport) {
+        self.proj.set_viewport(viewport.viewport_px);
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut self.surface,
-            self.canvas_helper.viewport_dev(),
+            viewport.viewport_dev,
         )
         .unwrap(); // TODO error handling
     }
