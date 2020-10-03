@@ -129,6 +129,7 @@ pub enum ToolError {
 pub struct ProjectionHelper {
     // Caller-provided data
     viewport: Vector2<usize>,
+    /// Width divided by height of a single pixel.
     pixel_aspect_ratio: FreeCoordinate,
     view: M,
 
