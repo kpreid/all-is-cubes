@@ -6,9 +6,8 @@ use cgmath::Vector2;
 use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
+use all_is_cubes::lum::glrender::Viewport;
 use all_is_cubes::math::FreeCoordinate;
-
-use crate::glrender::Viewport;
 
 #[wasm_bindgen(raw_module = "gui")]
 extern "C" {

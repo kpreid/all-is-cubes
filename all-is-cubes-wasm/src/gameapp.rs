@@ -17,11 +17,11 @@ use web_sys::{
 
 use all_is_cubes::camera::{Camera, InputProcessor, Key};
 use all_is_cubes::demo_content::new_universe_with_stuff;
+use all_is_cubes::lum::glrender::GLRenderer;
 use all_is_cubes::space::SpaceStepInfo;
 use all_is_cubes::universe::{FrameClock, URef, Universe};
 use all_is_cubes::util::Warnings;
 
-use crate::glrender::GLRenderer;
 use crate::js_bindings::GuiHelpers;
 use crate::web_glue::{add_event_listener, get_mandatory_element};
 

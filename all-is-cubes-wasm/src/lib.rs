@@ -11,8 +11,6 @@
 #[cfg(target_arch = "wasm32")]
 pub mod gameapp;
 #[cfg(target_arch = "wasm32")]
-mod glrender;
-#[cfg(target_arch = "wasm32")]
 mod js_bindings;
 #[cfg(target_arch = "wasm32")]
 mod web_glue;

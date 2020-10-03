@@ -21,6 +21,7 @@ use crate::lum::types::Vertex;
 use crate::math::{GridCoordinate, RGBA};
 
 pub mod block_texture;
+pub mod glrender;
 pub mod shading;
 pub mod space;
 pub mod types;

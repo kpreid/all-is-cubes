@@ -12,12 +12,12 @@ use luminance_front::render_state::RenderState;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
-use all_is_cubes::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
-use all_is_cubes::lum::shading::{prepare_block_program, BlockProgram};
-use all_is_cubes::lum::space::{SpaceRenderInfo, SpaceRenderer};
-use all_is_cubes::lum::make_cursor_tess;
-use all_is_cubes::universe::URef;
-use all_is_cubes::util::WarningsResult;
+use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
+use crate::lum::shading::{prepare_block_program, BlockProgram};
+use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
+use crate::lum::make_cursor_tess;
+use crate::universe::URef;
+use crate::util::WarningsResult;
 
 /// Viewport dimensions for `GLRenderer`.
 /// Field types at the whim of what's useful for the code that uses it.
@@ -28,6 +28,7 @@ pub struct Viewport {
     pub viewport_dev: [u32; 2],
 }
 
+// TODO: give this and its module a better name
 pub struct GLRenderer<C>
 where
     C: GraphicsContext<Backend = Backend>,
@@ -43,7 +44,7 @@ where
 
     // Miscellaneous
     proj: ProjectionHelper,
-    pub(crate) cursor_result: Option<Cursor>,
+    pub cursor_result: Option<Cursor>,  // TODO: give this an accessor
 }
 
 impl<C> GLRenderer<C>
