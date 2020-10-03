@@ -1,0 +1,21 @@
+[package]
+name = "all-is-cubes-desktop"
+version = "0.1.2"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+edition = "2018"
+# TODO description = ""
+readme = "../README.md"
+# TODO: add homepage = "..." when we have one
+repository = "https://github.com/kpreid/all-is-cubes"
+license = "MIT"
+# TODO: revisit categories once it's more settled what's in this package
+categories = ["games", "rendering"]
+
+[dependencies]
+all-is-cubes = { path = "../all-is-cubes", version = "0.1.2" }
+cgmath = "0.18.0"
+luminance = "0.43.1"
+luminance-front = "0.3.1"
+luminance-glfw = "0.14"
+luminance-windowing = "0.9"
+glfw = "0.41"

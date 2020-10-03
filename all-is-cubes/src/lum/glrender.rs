@@ -45,7 +45,7 @@ where
     C: GraphicsContext<Backend = Backend>,
 {
     // Graphics objects
-    surface: C,
+    pub surface: C,
     back_buffer: Framebuffer<Dim2, (), ()>,
     block_program: BlockProgram,
 
