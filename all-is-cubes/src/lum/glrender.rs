@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Vector2, Matrix4, Point2, SquareMatrix as _};
+use cgmath::{Matrix4, Point2, SquareMatrix as _, Vector2};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
@@ -13,9 +13,9 @@ use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
 use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
+use crate::lum::make_cursor_tess;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
-use crate::lum::make_cursor_tess;
 use crate::universe::URef;
 use crate::util::WarningsResult;
 
@@ -44,26 +44,21 @@ where
 
     // Miscellaneous
     proj: ProjectionHelper,
-    pub cursor_result: Option<Cursor>,  // TODO: give this an accessor
+    pub cursor_result: Option<Cursor>, // TODO: give this an accessor
 }
 
 impl<C> GLRenderer<C>
 where
     C: GraphicsContext<Backend = Backend>,
 {
-    pub fn new(
-        mut surface: C,
-        viewport: Viewport,
-    ) -> WarningsResult<Self, String, String> {
+    pub fn new(mut surface: C, viewport: Viewport) -> WarningsResult<Self, String, String> {
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
         let (block_program, warnings) = prepare_block_program(&mut surface)?;
 
         let proj = ProjectionHelper::new(1.0, viewport.viewport_px);
-        let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
-            &mut surface,
-            viewport.viewport_dev,
-        )
-        .unwrap(); // TODO error handling
+        let back_buffer =
+            luminance::framebuffer::Framebuffer::back_buffer(&mut surface, viewport.viewport_dev)
+                .unwrap(); // TODO error handling
         Ok((
             Self {
                 surface,

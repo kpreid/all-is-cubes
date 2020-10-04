@@ -67,7 +67,7 @@ impl Block {
                         sub_block.color()
                     }),
                 )
-            },
+            }
         };
 
         let opaque = if let Some(array) = &voxels {

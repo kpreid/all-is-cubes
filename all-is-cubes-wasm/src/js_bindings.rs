@@ -47,7 +47,6 @@ impl CanvasHelper {
         }
     }
 
-
     // TODO: return type is at the whim of what's useful for luminance right now
     pub fn normalize_position(&self) -> Vector2<FreeCoordinate> {
         let raw = self.normalize_position_raw();

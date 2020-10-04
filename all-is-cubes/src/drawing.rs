@@ -74,10 +74,7 @@ where
             // For debugging block bounds chosen for the graphic. TODO: Keep this around
             // as an option but draw a full bounding box instead.
             block_space
-                .set(
-                    (0, 0, 0),
-                    &RGBA::new(1.0, 0.0, 0.0, 1.0).into(),
-                )
+                .set((0, 0, 0), &RGBA::new(1.0, 0.0, 0.0, 1.0).into())
                 .expect("can't happen: draw_to_blocks failed to write to its own block space");
         }
 

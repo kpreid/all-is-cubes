@@ -219,7 +219,8 @@ impl WebGameRoot {
 
         if should_draw {
             // TODO do projection updates only when needed
-            self.renderer.set_viewport(self.gui_helpers.canvas_helper().viewport());
+            self.renderer
+                .set_viewport(self.gui_helpers.canvas_helper().viewport());
 
             // Do graphics
             let render_info = self.renderer.render_frame();
