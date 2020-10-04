@@ -96,7 +96,20 @@ impl Block {
     }
 }
 
-/// Collection of miscellaneous attribute data for blocks.
+/// Convert a color to a block with default attributes.
+impl From<RGB> for Block {
+    fn from(color: RGB) -> Block {
+        Block::from(color.with_alpha(1.0))
+    }
+}
+/// Convert a color to a block with default attributes.
+impl From<RGBA> for Block {
+    fn from(color: RGBA) -> Block {
+        Block::Atom(BlockAttributes::default(), color)
+    }
+}
+
+/// Collection of miscellaneous attribute data for blocks that doesn't come in variants.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct BlockAttributes {

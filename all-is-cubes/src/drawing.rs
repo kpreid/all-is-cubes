@@ -76,7 +76,7 @@ where
             block_space
                 .set(
                     (0, 0, 0),
-                    &Block::Atom(BlockAttributes::default(), RGBA::new(1.0, 0.0, 0.0, 1.0)),
+                    &RGBA::new(1.0, 0.0, 0.0, 1.0).into(),
                 )
                 .expect("can't happen: draw_to_blocks failed to write to its own block space");
         }
@@ -206,7 +206,7 @@ impl From<Rgb888> for RGB {
 /// it can be matched if desired.
 impl From<Rgb888> for Block {
     fn from(color: Rgb888) -> Block {
-        Block::Atom(BlockAttributes::default(), RGB::from(color).with_alpha(1.0))
+        Block::from(RGB::from(color))
     }
 }
 

@@ -67,7 +67,7 @@ pub fn scale_color(block: Block, scalar: f32) -> Block {
             attributes,
             (color.to_rgb() * scalar).with_alpha(color.alpha()),
         ),
-        _ => panic!("unimplemented: scale_color({:?})", block),
+        _ => unimplemented!("scale_color({:?})", block),
     }
 }
 
