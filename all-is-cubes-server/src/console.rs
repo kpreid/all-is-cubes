@@ -16,7 +16,7 @@ use all_is_cubes::block::Block;
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
 use all_is_cubes::raycast::{Face, Ray};
-use all_is_cubes::space::{Grid, GridArray, PackedLight, SKY};
+use all_is_cubes::space::{Grid, GridArray, PackedLight};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
 #[rustfmt::skip]
@@ -91,6 +91,7 @@ pub fn draw_space<O: io::Write>(
             block: block_data[index as usize],
             lighting,
         });
+    let sky = space.sky_color();
 
     // Construct iterator over pixel positions.
     let viewport = projection.viewport();
@@ -107,7 +108,7 @@ pub fn draw_space<O: io::Write>(
 
     let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
         let ray = projection_copy_for_parallel.project_ndc_into_world(x, y);
-        let (text, count) = character_from_ray(ray, grid, &space_data);
+        let (text, count) = character_from_ray(ray, grid, &space_data, sky);
         (xch, ych, text, count)
     });
 
@@ -137,6 +138,7 @@ fn character_from_ray(
     ray: Ray,
     grid: Grid,
     space_data: &GridArray<TracingCubeData>,
+    sky: RGB,
 ) -> TraceResult {
     let mut s: TracingState = TracingState::default();
     for hit in ray.cast().within_grid(grid) {
@@ -156,7 +158,7 @@ fn character_from_ray(
                 let lighting: RGB = space_data
                     .get(hit.previous_cube())
                     .map(|b| b.lighting.into())
-                    .unwrap_or(SKY);
+                    .unwrap_or(sky);
 
                 s.trace_through_surface(*character, *color, lighting, hit.face);
             }
@@ -166,7 +168,7 @@ fn character_from_ray(
                 let lighting: RGB = space_data
                     .get(hit.previous_cube())
                     .map(|b| b.lighting.into())
-                    .unwrap_or(SKY);
+                    .unwrap_or(sky);
 
                 // Find where the origin in the space's coordinate system is.
                 // TODO: Raycaster does not efficiently implement advancing from outside a
@@ -189,7 +191,7 @@ fn character_from_ray(
             }
         }
     }
-    s.finish()
+    s.finish(sky)
 }
 
 #[derive(Clone, Debug)]
@@ -235,15 +237,13 @@ impl TracingState {
     }
 
     #[rustfmt::skip]
-    fn finish(mut self) -> TraceResult {
+    fn finish(mut self, sky_color: RGB) -> TraceResult {
         if self.number_passed == 0 {
             // Didn't intersect the world at all. Draw these as plain background.
+            // TODO: Switch to using the sky color, unless debugging options are set.
             return (format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)), 0);
         }
 
-        // Fill up color buffer with "sky" color. Also use it to visualize the world boundary.
-        let sky_vary = 1.0 - (self.number_passed.min(3) as f32 - 1.0) / 5.0;
-        let sky_color = RGB::new(sky_vary, sky_vary, 1.0);
         self.color_accumulator += sky_color * self.ray_alpha;
         self.ray_alpha = 0.0;
 

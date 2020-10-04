@@ -132,7 +132,8 @@ where
             .pipeline(
                 &self.back_buffer,
                 // TODO: port skybox cube map code
-                &PipelineState::default().set_clear_color([0.6, 0.7, 1.0, 1.]),
+                &PipelineState::default()
+                    .set_clear_color(space_output.sky_color.with_alpha(1.0).into()),
                 |pipeline, mut shading_gate| {
                     let space_output_bound = space_output.bind(&pipeline)?;
 
@@ -189,4 +190,3 @@ where
 pub struct RenderInfo {
     space: SpaceRenderInfo,
 }
-

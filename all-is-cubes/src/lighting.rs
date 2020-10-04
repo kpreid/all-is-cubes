@@ -14,11 +14,6 @@ use crate::space::*;
 
 pub(crate) type PackedLightScalar = u8;
 
-/// Light that is considered to exist in all directions outside the world.
-/// (This may stop being a global constant if `Space` gets a configurable
-/// lighting environment.)
-pub const SKY: RGB = RGB::ONE;
-
 /// Lighting within a `Space`; an `all_is_cubes::math::RGB` value stored with reduced
 /// precision and range.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,22 +26,8 @@ pub struct PackedLight(Vector3<PackedLightScalar>);
 // Also consider whether we should have gamma -- or even a logarithmic representation.
 
 impl PackedLight {
-    /// Unit value of these fixed-point color components.
-    const UNIT: PackedLightScalar = 64;
-    /// `UNIT` as a f32 value, for use in conversions in and out.
+    /// Unit value of these fixed-point color components, as a f32 for conversion calculations.
     const UNIT_F32: f32 = 64.0;
-
-    /// Equivalent to `PackedLight::from(RGB::ONE)`. Used as the light value for
-    /// cubes in a newly created `Space` whose lighting has not yet been reevaluated.
-    pub const INITIAL: PackedLight = PackedLight(Vector3::new(
-        PackedLight::UNIT,
-        PackedLight::UNIT,
-        PackedLight::UNIT,
-    ));
-
-    /// Light that is considered to exist in all directions outside the world.
-    /// Equivalent to `space::PackedLight::from(space::SKY)`.
-    pub const SKY: PackedLight = PackedLight::INITIAL;
 
     fn difference_magnitude(self, other: PackedLight) -> PackedLightScalar {
         fn dm(a: PackedLightScalar, b: PackedLightScalar) -> PackedLightScalar {
@@ -119,8 +100,8 @@ static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
     (*ray_data).try_into().unwrap()
 });
 
-pub(crate) fn initialize_lighting(grid: Grid) -> Box<[PackedLight]> {
-    vec![PackedLight::INITIAL; grid.volume()].into_boxed_slice()
+pub(crate) fn initialize_lighting(grid: Grid, color: PackedLight) -> Box<[PackedLight]> {
+    vec![color; grid.volume()].into_boxed_slice()
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -208,7 +189,7 @@ impl Space {
                         break;
                     }
                     if !found {
-                        incoming_light += PackedLight::SKY.into(); // TODO silly conversion
+                        incoming_light += self.sky_color();
                     }
                 }
             }
@@ -234,6 +215,7 @@ impl Space {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::space::Space;
     use crate::universe::{URef, Universe};
 
@@ -249,6 +231,26 @@ mod tests {
         let space_ref = universe.insert_anonymous(space);
         (universe, space_ref)
     }
+
+    #[test]
+    fn initial_lighting_value() {
+        let space = Space::empty_positive(1, 1, 1);
+        assert_eq!(
+            PackedLight::from(space.sky_color()),
+            space.get_lighting((0, 0, 0))
+        );
+    }
+
+    #[test]
+    fn out_of_bounds_lighting_value() {
+        let space = Space::empty_positive(1, 1, 1);
+        assert_eq!(
+            PackedLight::from(space.sky_color()),
+            space.get_lighting((-1, 0, 0))
+        );
+    }
+
+    // TODO: test sky lighting propagation onto blocks after quiescing
 
     #[test]
     #[ignore]

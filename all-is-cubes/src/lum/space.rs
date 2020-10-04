@@ -18,7 +18,7 @@ use crate::lum::block_texture::{
     BlockGLRenderData, BlockGLTexture, BlockTexture, BoundBlockTexture,
 };
 use crate::lum::types::{GLBlockVertex, Vertex};
-use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, RGB};
 use crate::space::{Grid, Space, SpaceChange};
 use crate::triangulator::{triangulate_space, BlocksRenderData};
 use crate::universe::{Listener, URef};
@@ -103,6 +103,7 @@ impl SpaceRenderer {
         SpaceRendererOutput {
             block_texture: block_data.texture(),
             chunks: self.chunks.values().collect(), // TODO visibility culling, and don't allocate every frame
+            sky_color: space.sky_color(),
             view_matrix,
             info: SpaceRenderInfo {
                 chunk_queue_count: todo.chunks.len(),
@@ -119,6 +120,7 @@ pub struct SpaceRendererOutput<'a> {
     block_texture: &'a mut BlockTexture,
     /// Chunks are handy wrappers around some Tesses
     chunks: Vec<&'a Chunk>,
+    pub sky_color: RGB,
     view_matrix: Matrix4<FreeCoordinate>,
     info: SpaceRenderInfo,
 }

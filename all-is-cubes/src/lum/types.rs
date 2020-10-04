@@ -146,6 +146,7 @@ impl ToGfxVertex<Vertex> for GLBlockVertex {
 mod tests {
     use super::*;
     use cgmath::Vector3;
+    use crate::math::RGB;
 
     #[test]
     fn vertex_dummy() {
@@ -175,11 +176,11 @@ mod tests {
         };
         let vertex = GLBlockVertex::from(block_vertex).instantiate(
             Vector3::new(0.1, 0.2, 0.3),
-            PackedLight::INITIAL,
+            RGB::new(1.0, 0.0, 2.0).into(),
         );
         assert_eq!(vertex.position.repr, [1.1, 2.2, 3.3]);
         assert_eq!(vertex.normal.repr, [4.0, 5.0, 6.0]);
         assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 1.0]);  // alpha is currently locked to 1
-        assert_eq!(vertex.lighting.repr, [1.0, 1.0, 1.0]);
+        assert_eq!(vertex.lighting.repr, [1.0, 0.0, 2.0]);
     }
 }

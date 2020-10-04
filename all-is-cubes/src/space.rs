@@ -15,7 +15,7 @@ use crate::lighting::*;
 use crate::math::*;
 use crate::universe::{Listener, Notifier, RefError};
 
-pub use crate::lighting::{PackedLight, SKY};
+pub use crate::lighting::PackedLight;
 
 /// Specifies the coordinate extent of a `Space`.
 ///
@@ -298,6 +298,17 @@ pub struct Space {
     /// Set of members of lighting_update_queue, for deduplication.
     pub(crate) lighting_update_set: HashSet<GridPoint>,
 
+    /// Color of light arriving from outside the space.
+    ///
+    /// This is used for the lighting algorithm and for rendering.
+    // Architecture note: If we get any more fields like this, that are more 'game
+    // mechanics' than the core of what Space's job is, then we should probably
+    // either bundle them all into one struct field, or move them *outside* the
+    // Space into some higher-level concept. (For example, block spaces arguably
+    // should be "abstract" and not have either lighting or a sky color.)
+    sky_color: RGB,
+    packed_sky_color: PackedLight,
+
     pub(crate) notifier: Notifier<SpaceChange>,
 }
 
@@ -329,6 +340,7 @@ impl Space {
     pub fn empty(grid: Grid) -> Space {
         // TODO: Might actually be worth checking for memory allocation failure here...?
         let volume = grid.volume();
+        let sky_color = RGB::new(0.9, 0.9, 1.4); // TODO: customizability
 
         Space {
             grid,
@@ -343,9 +355,11 @@ impl Space {
                 evaluated: AIR_EVALUATED.clone(),
             }],
             contents: vec![0; volume].into_boxed_slice(),
-            lighting: initialize_lighting(grid),
+            lighting: initialize_lighting(grid, sky_color.into()),
             lighting_update_queue: BinaryHeap::new(),
             lighting_update_set: HashSet::new(),
+            sky_color,
+            packed_sky_color: sky_color.into(),
             notifier: Notifier::new(),
         }
     }
@@ -438,7 +452,7 @@ impl Space {
         self.grid
             .index(position.into())
             .map(|contents_index| self.lighting[contents_index])
-            .unwrap_or(PackedLight::INITIAL)
+            .unwrap_or(self.packed_sky_color)
     }
 
     /// Replace the block in this space at the given position.
@@ -572,6 +586,10 @@ impl Space {
         // TODO: other world behaviors...
 
         self.update_lighting_from_queue()
+    }
+
+    pub fn sky_color(&self) -> RGB {
+        self.sky_color
     }
 
     /// Finds or assigns an index to denote the block.
