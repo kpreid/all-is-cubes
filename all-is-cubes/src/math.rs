@@ -403,18 +403,28 @@ impl AddAssign<RGBA> for RGBA {
         self.0 += other.0;
     }
 }
+/// Multiplies two color values componentwise.
 impl Mul<RGB> for RGB {
     type Output = Self;
-    /// Multiplies this color value componentwise.
+    /// Multiplies two color values componentwise.
     fn mul(self, other: RGB) -> Self {
         Self(self.0.mul_element_wise(other.0))
     }
 }
+/// Multiplies this color value by a scalar.
 impl Mul<NotNan<f32>> for RGB {
     type Output = Self;
-    /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
+    /// Multiplies this color value by a scalar.
     fn mul(self, scalar: NotNan<f32>) -> Self {
         Self(self.0 * scalar)
+    }
+}
+/// Multiplies this color value by a scalar. Panics if the scalar is NaN.
+impl Mul<f32> for RGB {
+    type Output = Self;
+    /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
+    fn mul(self, scalar: f32) -> Self {
+        Self(self.0 * NotNan::new(scalar).unwrap())
     }
 }
 

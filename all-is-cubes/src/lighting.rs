@@ -5,7 +5,6 @@
 //! and separated out for readability, not modularity.
 
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3, Zero as _};
-use num_traits::One;
 use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use std::convert::TryInto as _;
@@ -168,50 +167,73 @@ impl Space {
     }
 
     fn update_lighting_now_on(&mut self, cube: GridPoint) -> PackedLightScalar {
-        let mut total_rays = 0;
+        // Accumulator of incoming light encountered.
         let mut incoming_light: RGB = RGB::ZERO;
+        // Number of rays contributing to incoming_light.
+        let mut total_rays = 0;
+        // Cubes whose lighting value contributed to the incoming_light value.
         let mut dependencies: Vec<GridPoint> = Vec::new(); // TODO: reuse buffer instead of allocating every time
 
         let ev_origin = self.get_evaluated(cube);
         if ev_origin.opaque {
-            // Opaque blocks are always dark inside
-            total_rays = 1;
+            // Opaque blocks are always dark inside.
         } else {
             for face_ray_data in &*LIGHT_RAYS {
-                // TODO port over the empty space test here
-
                 for ray in &face_ray_data.rays[..] {
-                    // TODO this is wrong it is not the nested algorithm
-                    total_rays += 1;
                     let raycaster = (*ray + cube.cast::<FreeCoordinate>().unwrap().to_vec())
                         .cast()
                         .within_grid(*self.grid());
-                    // TODO tracing variables ...
-                    let mut found = false;
+
+                    // Fraction of the light value that is to be determined by future, rather than past,
+                    // tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
+                    let mut ray_alpha = 1.0_f32;
+
                     for hit in raycaster {
                         let ev_hit = self.get_evaluated(hit.cube);
                         if !ev_hit.visible {
+                            // Completely transparent block is passed through.
                             continue;
                         }
-                        // TODO: Finish implementing passing through transparency and transparent light sources
-                        let light_cube = hit.previous_cube();
-                        let light_from_struck_face =
-                            ev_hit.attributes.light_emission + self.get_lighting(light_cube).into();
-                        incoming_light += light_from_struck_face;
-                        dependencies.push(light_cube);
-                        found = true;
-                        break;
+
+                        // TODO: Implement blocks with some faces opaque.
+                        if ev_hit.opaque {
+                            // On striking a fully opaque block, we use the light value from its
+                            // adjacent cube as the light falling on that face.
+                            let light_cube = hit.previous_cube();
+                            let light_from_struck_face = ev_hit.attributes.light_emission
+                                + self.get_lighting(light_cube).into();
+                            incoming_light += light_from_struck_face * ray_alpha;
+                            dependencies.push(light_cube);
+                            // This terminates the raycast; we don't bounce rays
+                            // (diffuse reflections, not specular/mirror).
+                            ray_alpha = 0.0;
+                            break;
+                        } else {
+                            // Block is partly transparent and light should pass through.
+                            // 'coverage' is what fraction of the light ray we assume to hit this block,
+                            // as opposed to passing through it.
+                            // TODO: Compute coverage in EvaluatedBlock.
+                            let coverage = 0.25;
+                            incoming_light += (ev_hit.attributes.light_emission * ray_alpha
+                                + self.get_lighting(hit.cube).into())
+                                * coverage;
+                            ray_alpha *= 1.0 - coverage;
+                            dependencies.push(hit.cube);
+                        }
                     }
-                    if !found {
-                        incoming_light += self.sky_color();
-                    }
+                    // Note that if ray_alpha has reached zero, this has no effect.
+                    incoming_light += self.sky_color() * ray_alpha;
+                    total_rays += 1;
                 }
             }
         }
 
         // Compare and set new value. Note that we MUST compare the packed value so that
         // changes are detected in terms of the low-resolution values.
-        let scale = NotNan::new(1.0 / total_rays as f32).unwrap_or_else(|_| NotNan::one());
+
+        // if total_rays is zero then incoming_light is zero so the result will be zero.
+        // We just need to avoid dividing by zero.
+        let scale = NotNan::new(1.0 / total_rays.max(1) as f32).unwrap();
         let new_light_value: PackedLight = (incoming_light * scale).into();
         let old_light_value: PackedLight = self.get_lighting(cube);
         let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
@@ -219,7 +241,6 @@ impl Space {
             // TODO: compute index only once
             self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
             self.notifier.notify(SpaceChange::Lighting(cube));
-            // TODO: push ray block hits onto lighting update queue for recursive relighting
             for cube in dependencies {
                 self.light_needs_update(cube, difference_magnitude);
             }
