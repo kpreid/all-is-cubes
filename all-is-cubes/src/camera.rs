@@ -82,7 +82,11 @@ impl Camera {
 
         self.body.velocity += (velocity_target - self.body.velocity) * stiffness * dt;
 
-        self.body.step(duration);
+        if let Ok(space) = self.space.try_borrow() {
+            self.body.step(duration, Some(&*space));
+        } else {
+            // TODO: set a warning flag
+        }
 
         // TODO: temporary placeholder while we change over to continuous movement controls
         // This will have no effect if velocity input is set every frame

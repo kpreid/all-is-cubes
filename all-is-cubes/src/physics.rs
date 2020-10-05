@@ -4,7 +4,8 @@
 use cgmath::{Basis2, Deg, InnerSpace as _, Point3, Rotation, Rotation2, Vector2, Vector3};
 use std::time::Duration;
 
-use crate::math::FreeCoordinate;
+use crate::math::{FreeCoordinate, GridCoordinate};
+use crate::space::Space;
 use crate::util::ConciseDebug as _;
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
@@ -34,7 +35,7 @@ impl std::fmt::Debug for Body {
 }
 
 impl Body {
-    pub fn step(&mut self, duration: Duration) {
+    pub fn step(&mut self, duration: Duration, colliding_space: Option<&Space>) {
         let dt = duration.as_secs_f64();
 
         // TODO: Reset any non-finite values found to allow recovery from glitches.
@@ -44,9 +45,22 @@ impl Body {
             return;
         }
 
-        let next_position = self.position + self.velocity * dt;
+        let mut next_position = self.position + self.velocity * dt;
 
-        // TODO: collision physics
+        // Do collision detection and resolution.
+        if let Some(space) = colliding_space {
+            // Test just the block (collide like we're a point).
+            // TODO: Axis-aligned box collision volume.
+            let old_ev = space.get_evaluated(self.position.map(|x| x.floor() as GridCoordinate));
+            let new_ev = space.get_evaluated(next_position.map(|x| x.floor() as GridCoordinate));
+
+            // Simply stop.
+            // TODO: Stop at intersection point, and allow sliding along walls.
+            // Intersection should be approachable by using raycasting.
+            if new_ev.attributes.solid && !old_ev.attributes.solid {
+                next_position = self.position;
+            }
+        }
 
         // TODO: falling-below-the-world protection
 
@@ -61,6 +75,7 @@ impl Body {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,9 +88,11 @@ mod tests {
             yaw: 0.0,
             pitch: 0.0,
         };
-        body.step(Duration::from_secs(2));
+        body.step(Duration::from_secs(2), None);
         assert_eq!(body.position, Point3::new(4.0, 1.0, 0.0));
     }
+
+    // TODO: test collision
 
     // TODO: more tests
 }
