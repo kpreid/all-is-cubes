@@ -186,7 +186,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     return FaceRenderData::default();
                 }
 
-                let fully_opaque = color.binary_opaque();
+                let fully_opaque = color.fully_opaque();
                 FaceRenderData {
                     // TODO: Port over pseudo-transparency mechanism, then change this to a
                     // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
@@ -259,7 +259,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             .unwrap();
 
                             let obscuring_cube = cube + face.normal_vector();
-                            let obscured = space[obscuring_cube].color().alpha() >= 1.0; // TODO give a standard definition of this
+                            let obscured = space[obscuring_cube].color().fully_opaque();
                             if !obscured {
                                 layer_is_visible_somewhere = true;
                             }
@@ -272,7 +272,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 RGBA::new(1.0, 1.0, 0.0, 1.0)
                             };
 
-                            if layer == 0 && color.alpha() < 1.0 {
+                            if layer == 0 && !color.fully_opaque() {
                                 // If the first layer is transparent somewhere...
                                 output_by_face[face].fully_opaque = false;
                             }

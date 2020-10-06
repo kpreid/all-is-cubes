@@ -4,6 +4,7 @@
 //! Procedural block generation. See the `worldgen` module for code that uses the results
 //! of this.
 
+use ordered_float::NotNan;
 use rand::{Rng, SeedableRng as _};
 
 use crate::block::{Block, BlockAttributes, AIR};
@@ -61,7 +62,7 @@ impl<'a> BlockGen<'a> {
 }
 
 /// Generate a copy of a `Block::Atom` with its color scaled by the given scalar.
-pub fn scale_color(block: Block, scalar: f32) -> Block {
+pub fn scale_color(block: Block, scalar: NotNan<f32>) -> Block {
     match block {
         Block::Atom(attributes, color) => Block::Atom(
             attributes,
@@ -124,7 +125,8 @@ impl LandscapeBlocks {
             |ctx, point, random| {
                 // Discrete randomization so that we don't generate too many distinct
                 // block types. TODO: Better strategy, perhaps palette-based.
-                let color_randomization = 1.0 + ((random * 5.0).floor() - 2.0) * 0.05;
+                let color_randomization =
+                    NotNan::new(1.0 + ((random * 5.0).floor() - 2.0) * 0.05).unwrap();
                 if point.y >= ctx.size - (random * 3.0 + 1.0) as GridCoordinate {
                     scale_color(grass_color.clone(), color_randomization)
                 } else {

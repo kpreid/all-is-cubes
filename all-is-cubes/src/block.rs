@@ -75,14 +75,17 @@ impl Block {
             array
                 .grid()
                 .interior_iter()
-                .all(|p| array[p].alpha() > 0.99)
+                .all(|p| array[p].fully_opaque())
         } else {
-            color.alpha() > 0.99
+            color.fully_opaque()
         };
         let visible = if let Some(array) = &voxels {
-            array.grid().interior_iter().all(|p| array[p].alpha() > 0.0)
+            array
+                .grid()
+                .interior_iter()
+                .all(|p| !array[p].fully_transparent())
         } else {
-            color.alpha() > 0.0
+            !color.fully_transparent()
         };
 
         // TODO: need to track which things we need change notifications on
@@ -99,7 +102,7 @@ impl Block {
 /// Convert a color to a block with default attributes.
 impl From<RGB> for Block {
     fn from(color: RGB) -> Block {
-        Block::from(color.with_alpha(1.0))
+        Block::from(color.with_alpha_one())
     }
 }
 /// Convert a color to a block with default attributes.

@@ -3,10 +3,9 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::{EuclideanSpace as _, Point3, Vector2, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Vector2, Vector3, Zero};
 use once_cell::sync::Lazy;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::convert::TryInto;
 use std::io;
 use termion::color;
 use termion::event::{Event, Key};
@@ -149,7 +148,7 @@ fn character_from_ray(
         let cube_data = &space_data[hit.cube];
         match &cube_data.block {
             TracingBlock::Atom(character, color) => {
-                if color.alpha() <= 0.0 {
+                if color.fully_transparent() {
                     // Skip lighting lookup
                     continue;
                 }
@@ -216,7 +215,9 @@ struct TracingState {
     hit_text: Option<String>,
     /// Color buffer, in “premultiplied alpha” format (each contribution is scaled by
     /// the current `ray_alpha`).
-    color_accumulator: RGB,
+    ///
+    /// Note: Not using the `RGB` type to skip NaN checks.
+    color_accumulator: Vector3<f32>,
     /// Fraction of the color value that is to be determined by future, rather than past,
     /// tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
     ray_alpha: f32,
@@ -227,7 +228,7 @@ impl TracingState {
         if self.number_passed > 1000 {
             // Abort excessively long traces.
             self.hit_text = Some("X".to_string());
-            self.color_accumulator = RGB::new(1.0, 0.0, 0.0);
+            self.color_accumulator = Vector3::new(1.0, 0.0, 0.0);
             self.ray_alpha = 0.0;
             true
         } else {
@@ -244,7 +245,7 @@ impl TracingState {
             return (format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)), 0);
         }
 
-        self.color_accumulator += sky_color * self.ray_alpha;
+        self.color_accumulator += <Vector3<f32>>::from(sky_color) * self.ray_alpha;
         self.ray_alpha = 0.0;
 
         // TODO: Pick 8/256/truecolor based on what the terminal supports.
@@ -253,9 +254,9 @@ impl TracingState {
             (x * scale).max(0.0).min(scale) as u8
         }
         let converted_color = color::AnsiValue::rgb(
-            scale(self.color_accumulator.red()),
-            scale(self.color_accumulator.green()),
-            scale(self.color_accumulator.blue()),
+            scale(self.color_accumulator.x),
+            scale(self.color_accumulator.y),
+            scale(self.color_accumulator.z),
         );
         let colored_text = if let Some(text) = self.hit_text {
             format!("{}{}{}",
@@ -275,14 +276,14 @@ impl TracingState {
     /// Note this is not true volumetric ray tracing: we're considering each
     /// voxel s to be discrete.
     fn trace_through_surface(&mut self, character: char, surface: RGBA, lighting: RGB, face: Face) {
-        let surface_alpha = surface.alpha();
-        if surface_alpha <= 0.0 {
+        if surface.fully_transparent() {
             return;
         }
+        let surface_alpha = surface.alpha().into_inner();
         let alpha_for_add = surface_alpha * self.ray_alpha;
         self.ray_alpha *= 1.0 - surface_alpha;
         self.color_accumulator +=
-            fake_lighting_adjustment(surface.to_rgb() * lighting, face) * alpha_for_add;
+            fake_lighting_adjustment((surface.to_rgb() * lighting).into(), face) * alpha_for_add;
 
         // Use text of the first non-completely-transparent block.
         if self.hit_text.is_none() {
@@ -297,13 +298,13 @@ impl Default for TracingState {
         Self {
             number_passed: 0,
             hit_text: None,
-            color_accumulator: RGB::ZERO,
+            color_accumulator: Vector3::zero(),
             ray_alpha: 1.0,
         }
     }
 }
 
-fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
+fn fake_lighting_adjustment(rgb: Vector3<f32>, face: Face) -> Vector3<f32> {
     let one_step = 1.0 / 5.0;
     let v = Vector3::new(1.0, 1.0, 1.0);
     let modifier = match face {
@@ -312,7 +313,7 @@ fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
         Face::NX | Face::PX => v * one_step * 1.0,
         _ => v * 0.0,
     };
-    rgb + modifier.try_into().unwrap()
+    rgb + modifier
 }
 
 static END_OF_LINE: Lazy<String> =

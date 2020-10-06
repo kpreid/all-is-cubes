@@ -29,6 +29,7 @@ dependencies = [
  "luminance-front",
  "num-traits",
  "once_cell",
+ "ordered-float",
  "owning_ref",
  "rand 0.7.3",
  "rand_xoshiro",
@@ -43,6 +44,7 @@ dependencies = [
  "itertools",
  "num-traits",
  "once_cell",
+ "ordered-float",
  "rayon",
  "static_dir",
  "termion",
@@ -1122,6 +1124,15 @@ name = "opaque-debug"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
+
+[[package]]
+name = "ordered-float"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fe9037165d7023b1228bc4ae9a2fa1a2b0095eca6c2998c624723dfd01314a5"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "owning_ref"

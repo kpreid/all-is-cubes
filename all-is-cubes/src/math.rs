@@ -3,11 +3,11 @@
 
 //! Mathematical utilities and decisions.
 
-use cgmath::{Array, BaseFloat, BaseNum, ElementWise, Matrix4, Point3, Vector3, Vector4};
+use cgmath::{BaseFloat, BaseNum, ElementWise, Matrix4, Point3, Vector3, Vector4};
 use num_traits::identities::Zero;
+use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
-use std::hash::{Hash, Hasher};
-use std::ops::{Add, AddAssign, Div, Index, IndexMut, Mul};
+use std::ops::{Add, AddAssign, Index, IndexMut, Mul};
 
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = i32;
@@ -224,27 +224,29 @@ impl<V> IndexMut<Face> for FaceMap<V> {
 /// A floating-point RGB color value.
 ///
 /// * Nominal range 0 to 1, but permitting out of range values.
-/// * NaN is banned with runtime checks so that `Eq` may be implemented.
-///   (Infinities are permitted.)
+/// * NaN is banned so that `Eq` may be implemented. (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
-#[derive(Clone, Copy, PartialEq)]
-pub struct RGB(Vector3<f32>);
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct RGB(Vector3<NotNan<f32>>);
 
 /// A floating-point RGBA color value.
 ///
 /// * Nominal range 0 to 1, but permitting out of range values.
-/// * NaN is banned with runtime checks so that `Eq` may be implemented.
-///   (Infinities are permitted.)
+/// * NaN is banned so that `Eq` may be implemented. (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
 /// * The alpha is not premultiplied.
-#[derive(Clone, Copy, PartialEq)]
-pub struct RGBA(Vector4<f32>);
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct RGBA(Vector4<NotNan<f32>>);
+
+// NotNan::zero() and one() exist, but only via traits, which can't be used in const
+const NN0: NotNan<f32> = unsafe { NotNan::unchecked_new(0.0) };
+const NN1: NotNan<f32> = unsafe { NotNan::unchecked_new(1.0) };
 
 impl RGB {
     /// Black.
-    pub const ZERO: RGB = RGB(Vector3::new(0.0, 0.0, 0.0));
+    pub const ZERO: RGB = RGB(Vector3::new(NN0, NN0, NN0));
     /// White (unity brightness.)
-    pub const ONE: RGB = RGB(Vector3::new(1.0, 1.0, 1.0));
+    pub const ONE: RGB = RGB(Vector3::new(NN1, NN1, NN1));
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.
@@ -253,25 +255,28 @@ impl RGB {
     }
 
     /// Adds an alpha component to produce an RGBA color.
-    pub fn with_alpha(self, alpha: f32) -> RGBA {
-        RGBA::new(self.red(), self.green(), self.blue(), alpha)
+    pub const fn with_alpha(self, alpha: NotNan<f32>) -> RGBA {
+        RGBA(Vector4::new(self.0.x, self.0.y, self.0.z, alpha))
+    }
+    pub const fn with_alpha_one(self) -> RGBA {
+        self.with_alpha(NN1)
     }
 
-    pub const fn red(self) -> f32 {
+    pub const fn red(self) -> NotNan<f32> {
         self.0.x
     }
-    pub const fn green(self) -> f32 {
+    pub const fn green(self) -> NotNan<f32> {
         self.0.y
     }
-    pub const fn blue(self) -> f32 {
+    pub const fn blue(self) -> NotNan<f32> {
         self.0.z
     }
 }
 impl RGBA {
     /// Transparent black (all components zero).
-    pub const TRANSPARENT: RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 0.0));
-    pub const BLACK: RGBA = RGBA(Vector4::new(0.0, 0.0, 0.0, 1.0));
-    pub const WHITE: RGBA = RGBA(Vector4::new(1.0, 1.0, 1.0, 1.0));
+    pub const TRANSPARENT: RGBA = RGBA(Vector4::new(NN0, NN0, NN0, NN0));
+    pub const BLACK: RGBA = RGBA(Vector4::new(NN0, NN0, NN0, NN1));
+    pub const WHITE: RGBA = RGBA(Vector4::new(NN1, NN1, NN1, NN1));
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.
@@ -279,17 +284,24 @@ impl RGBA {
         Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
     }
 
-    pub const fn red(self) -> f32 {
+    pub const fn red(self) -> NotNan<f32> {
         self.0.x
     }
-    pub const fn green(self) -> f32 {
+    pub const fn green(self) -> NotNan<f32> {
         self.0.y
     }
-    pub const fn blue(self) -> f32 {
+    pub const fn blue(self) -> NotNan<f32> {
         self.0.z
     }
-    pub const fn alpha(self) -> f32 {
+    pub const fn alpha(self) -> NotNan<f32> {
         self.0.w
+    }
+
+    pub fn fully_transparent(self) -> bool {
+        self.alpha() <= NN0
+    }
+    pub fn fully_opaque(self) -> bool {
+        self.alpha() >= NN1
     }
 
     /// Discards the alpha component to produce an RGB color.
@@ -300,18 +312,10 @@ impl RGBA {
         RGB(self.0.truncate())
     }
 
-    /// Renderers which can only consider a block to be opaque or not may use this value
-    /// as their decision.
-    ///
-    /// TODO: This no longer belongs here, in the generic color type, or does it?
-    pub fn binary_opaque(self) -> bool {
-        self.alpha() > 0.5
-    }
-
     pub fn to_saturating_8bpp(self) -> (u8, u8, u8, u8) {
-        // As of Rust 1.45, `as` on float to int is saturating
-        fn convert_component(x: f32) -> u8 {
-            (x * 255.0) as u8
+        fn convert_component(x: NotNan<f32>) -> u8 {
+            // As of Rust 1.45, `as` on float to int is saturating
+            (x.into_inner() * 255.0) as u8
         }
         (
             convert_component(self.red()),
@@ -322,46 +326,58 @@ impl RGBA {
     }
 }
 
+impl From<Vector3<NotNan<f32>>> for RGB {
+    fn from(value: Vector3<NotNan<f32>>) -> Self {
+        Self(value)
+    }
+}
+impl From<Vector4<NotNan<f32>>> for RGBA {
+    fn from(value: Vector4<NotNan<f32>>) -> Self {
+        Self(value)
+    }
+}
+
 impl From<RGB> for Vector3<f32> {
     fn from(value: RGB) -> Self {
-        value.0
+        value.0.map(NotNan::into_inner)
     }
 }
 impl From<RGBA> for Vector4<f32> {
     fn from(value: RGBA) -> Self {
-        value.0
+        value.0.map(NotNan::into_inner)
     }
 }
 
 impl From<RGB> for [f32; 3] {
     fn from(value: RGB) -> Self {
-        value.0.into()
+        value.0.map(NotNan::into_inner).into()
     }
 }
 impl From<RGBA> for [f32; 4] {
     fn from(value: RGBA) -> Self {
-        value.0.into()
+        value.0.map(NotNan::into_inner).into()
     }
 }
 
 impl TryFrom<Vector3<f32>> for RGB {
-    type Error = ColorIsNan;
+    type Error = FloatIsNan;
     fn try_from(value: Vector3<f32>) -> Result<Self, Self::Error> {
-        if value.sum().is_nan() {
-            Err(ColorIsNan)
-        } else {
-            Ok(RGB(value))
-        }
+        Ok(Self(Vector3::new(
+            value.x.try_into()?,
+            value.y.try_into()?,
+            value.z.try_into()?,
+        )))
     }
 }
 impl TryFrom<Vector4<f32>> for RGBA {
-    type Error = ColorIsNan;
+    type Error = FloatIsNan;
     fn try_from(value: Vector4<f32>) -> Result<Self, Self::Error> {
-        if value.sum().is_nan() {
-            Err(ColorIsNan)
-        } else {
-            Ok(RGBA(value))
-        }
+        Ok(Self(Vector4::new(
+            value.x.try_into()?,
+            value.y.try_into()?,
+            value.z.try_into()?,
+            value.w.try_into()?,
+        )))
     }
 }
 
@@ -391,77 +407,25 @@ impl Mul<RGB> for RGB {
     type Output = Self;
     /// Multiplies this color value componentwise.
     fn mul(self, other: RGB) -> Self {
-        (self.0.mul_element_wise(other.0)).try_into().unwrap()
+        Self(self.0.mul_element_wise(other.0))
     }
 }
-impl Mul<f32> for RGB {
+impl Mul<NotNan<f32>> for RGB {
     type Output = Self;
     /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
-    fn mul(self, scalar: f32) -> Self {
-        (self.0 * scalar).try_into().expect("multiplication by NaN")
+    fn mul(self, scalar: NotNan<f32>) -> Self {
+        Self(self.0 * scalar)
     }
 }
-impl Mul<f64> for RGB {
-    type Output = Self;
-    /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
-    fn mul(self, scalar: f64) -> Self {
-        (self.0 * scalar as f32)
-            .try_into()
-            .expect("multiplication by NaN")
-    }
-}
-impl Div<f32> for RGB {
-    type Output = Self;
-    /// Divides this color value by a scalar. Panics if the scalar is zero.
-    fn div(self, scalar: f32) -> Self {
-        // TODO: On further thought, why don't we provide only multiplication
-        // Or even better, use ordered_float::NotNan as the argument?
-        (self.0 / scalar).try_into().expect("division by zero")
-    }
-}
-impl Div<f64> for RGB {
-    type Output = Self;
-    /// Divides this color value by a scalar. Panics if the scalar is zero.
-    fn div(self, scalar: f64) -> Self {
-        // TODO: On further thought, why don't we provide only multiplication
-        // Or even better, use ordered_float::NotNan as the argument?
-        (self.0 / scalar as f32)
-            .try_into()
-            .expect("division by zero")
-    }
-}
-
-#[allow(clippy::derive_hash_xor_eq)]
-impl Hash for RGB {
-    // Hash implementation that works given that we have no NaNs.
-    // (In IEEE floating point, there are several representations of NaN, but
-    // only one representation of all other values.)
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for i in 0..3 {
-            self.0[i].to_ne_bytes().hash(state);
-        }
-    }
-}
-#[allow(clippy::derive_hash_xor_eq)]
-impl Hash for RGBA {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for i in 0..4 {
-            self.0[i].to_ne_bytes().hash(state);
-        }
-    }
-}
-// Constructor check ensures that it will satisfy Eq
-impl Eq for RGB {}
-impl Eq for RGBA {}
 
 impl std::fmt::Debug for RGB {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             fmt,
             "RGB({:?}, {:?}, {:?})",
-            self.red(),
-            self.green(),
-            self.blue()
+            self.red().into_inner(),
+            self.green().into_inner(),
+            self.blue().into_inner()
         )
     }
 }
@@ -470,17 +434,13 @@ impl std::fmt::Debug for RGBA {
         write!(
             fmt,
             "RGBA({:?}, {:?}, {:?}, {:?})",
-            self.red(),
-            self.green(),
-            self.blue(),
-            self.alpha()
+            self.red().into_inner(),
+            self.green().into_inner(),
+            self.blue().into_inner(),
+            self.alpha().into_inner()
         )
     }
 }
-
-/// Error reported when a color type is given a NaN value.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ColorIsNan;
 
 #[cfg(test)]
 mod tests {

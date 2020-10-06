@@ -5,7 +5,9 @@
 //! and separated out for readability, not modularity.
 
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3, Zero as _};
+use num_traits::One;
 use once_cell::sync::Lazy;
+use ordered_float::NotNan;
 use std::convert::TryInto as _;
 
 use crate::math::*;
@@ -42,9 +44,9 @@ impl PackedLight {
 impl From<RGB> for PackedLight {
     fn from(value: RGB) -> Self {
         PackedLight(Vector3::new(
-            (value.red() * PackedLight::UNIT_F32) as PackedLightScalar,
-            (value.green() * PackedLight::UNIT_F32) as PackedLightScalar,
-            (value.blue() * PackedLight::UNIT_F32) as PackedLightScalar,
+            (value.red().into_inner() * PackedLight::UNIT_F32) as PackedLightScalar,
+            (value.green().into_inner() * PackedLight::UNIT_F32) as PackedLightScalar,
+            (value.blue().into_inner() * PackedLight::UNIT_F32) as PackedLightScalar,
         ))
     }
 }
@@ -209,7 +211,8 @@ impl Space {
 
         // Compare and set new value. Note that we MUST compare the packed value so that
         // changes are detected in terms of the low-resolution values.
-        let new_light_value: PackedLight = (incoming_light / total_rays as f32).into();
+        let scale = NotNan::new(1.0 / total_rays as f32).unwrap_or_else(|_| NotNan::one());
+        let new_light_value: PackedLight = (incoming_light * scale).into();
         let old_light_value: PackedLight = self.get_lighting(cube);
         let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
         if difference_magnitude > 0 {
