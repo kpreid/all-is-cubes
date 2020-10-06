@@ -79,6 +79,9 @@ pub struct Raycaster {
     t_delta: Vector3<FreeCoordinate>,
     /// Last face we passed through.
     last_face: Face,
+    /// The t_max value used in the previous step; thus, the position along the
+    /// ray where we passed through last_face.
+    last_t_distance: FreeCoordinate,
     /// Grid to filter our outputs to. This makes the iteration finite.
     grid: Option<Grid>,
 }
@@ -86,8 +89,9 @@ pub struct Raycaster {
 impl Raycaster {
     /// Construct a `Raycaster` for a ray with the given `origin` and `direction` vector.
     ///
-    /// The magnitude of `direction` has no observable effect but may affect calculation
-    /// precision, so should not be especially large or small.
+    /// The magnitude of `direction` has no effect on the sequence of cubes traversed
+    /// but may affect calculation precision, so should not be especially large or small.
+    /// It also appears as the scale of the output field `RaycastStep::t_distance`.
     ///
     /// Note that this is an infinite iterator by default. Use `.within_grid()` to
     /// restrict it.
@@ -127,6 +131,7 @@ impl Raycaster {
             t_max: scale_to_integer_step_componentwise(origin, direction),
             t_delta: direction.map(|x| x.abs().recip()),
             last_face: Face::WITHIN,
+            last_t_distance: 0.0,
             grid: None,
         }
     }
@@ -167,6 +172,13 @@ impl Raycaster {
     #[inline(always)]
     fn step_on_axis(&mut self, axis: usize) {
         assert!(self.step[axis] != 0);
+
+        // Save t position before we update it.
+        // We could back-compute this instead as
+        //     let axis = self.last_face.axis_number();
+        //     self.t_max[axis] - self.t_delta[axis]
+        // but that seems an excessive computation to save a field.
+        self.last_t_distance = self.t_max[axis];
 
         // Move into the new cube.
         self.cube[axis] += self.step[axis];
@@ -256,6 +268,7 @@ impl Iterator for Raycaster {
             return Some(RaycastStep {
                 cube: self.cube,
                 face: self.last_face,
+                t_distance: self.last_t_distance,
             });
         }
     }
@@ -276,6 +289,8 @@ pub struct RaycastStep {
     /// Which face of the cube the ray struck to enter it.
     /// If the ray's origin was within the cube, is `Face::WITHIN`.
     pub face: Face,
+    /// The distance traversed, as measured in multiples of the supplied direction vector.
+    pub t_distance: FreeCoordinate,
 }
 
 impl RaycastStep {
@@ -335,6 +350,7 @@ mod tests {
 
     // TODO: Have at least one doc test
 
+    #[track_caller]
     fn assert_steps_option<T: IntoIterator<Item = Option<RaycastStep>>>(
         r: &mut Raycaster,
         steps: T,
@@ -354,18 +370,21 @@ mod tests {
             }
         }
     }
+    #[track_caller]
     fn assert_steps<T: IntoIterator<Item = RaycastStep>>(r: &mut Raycaster, steps: T) {
         assert_steps_option(r, steps.into_iter().map(Some))
     }
+    #[track_caller]
     fn assert_only_one_step(r: &mut Raycaster, step: RaycastStep) {
         assert_steps_option(r, vec![Some(step), None, None]);
     }
 
     /// Helper to construct steps
-    fn step(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate, face: Face) -> RaycastStep {
+    fn step(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate, face: Face, t_distance: FreeCoordinate) -> RaycastStep {
         RaycastStep {
             cube: Point3::new(x, y, z),
             face,
+            t_distance,
         }
     }
 
@@ -377,54 +396,54 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.01, 0.0001, 0.0001)),
             vec![
-                step(10, 20, 30, Face::WITHIN),
-                step(11, 20, 30, Face::NX),
-                step(12, 20, 30, Face::NX),
+                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(11, 20, 30, Face::NX, 50.0),
+                step(12, 20, 30, Face::NX, 150.0),
             ]);
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(-0.01, 0.0001, 0.0001)),
             vec![
-                step(10, 20, 30, Face::WITHIN),
-                step(9, 20, 30, Face::PX),
-                step(8, 20, 30, Face::PX),
+                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(9, 20, 30, Face::PX, 50.0),
+                step(8, 20, 30, Face::PX, 150.0),
             ]);
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.0001, 0.01, 0.0001)),
             vec![
-                step(10, 20, 30, Face::WITHIN),
-                step(10, 21, 30, Face::NY),
-                step(10, 22, 30, Face::NY),
+                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 21, 30, Face::NY, 50.0),
+                step(10, 22, 30, Face::NY, 150.0),
             ]);
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.0001, -0.01, 0.0001)),
             vec![
-                step(10, 20, 30, Face::WITHIN),
-                step(10, 19, 30, Face::PY),
-                step(10, 18, 30, Face::PY),
+                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 19, 30, Face::PY, 50.0),
+                step(10, 18, 30, Face::PY, 150.0),
             ]);
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.0001, 0.0001, 0.01)),
             vec![
-                step(10, 20, 30, Face::WITHIN),
-                step(10, 20, 31, Face::NZ),
-                step(10, 20, 32, Face::NZ),
+                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 31, Face::NZ, 50.0),
+                step(10, 20, 32, Face::NZ, 150.0),
             ]);
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.0001, 0.0001, -0.01)),
             vec![
-                step(10, 20, 30, Face::WITHIN),
-                step(10, 20, 29, Face::PZ),
-                step(10, 20, 28, Face::PZ),
+                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 29, Face::PZ, 50.0),
+                step(10, 20, 28, Face::PZ, 150.0),
             ]);
     }
 
@@ -436,18 +455,18 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.01, 0.0, 0.0)),
             vec![
-                step(10, 20, 30, Face::WITHIN),
-                step(11, 20, 30, Face::NX),
-                step(12, 20, 30, Face::NX),
+                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(11, 20, 30, Face::NX, 50.0),
+                step(12, 20, 30, Face::NX, 150.0),
             ]);
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(-0.01, 0.0, 0.0)),
             vec![
-                step(10, 20, 30, Face::WITHIN),
-                step(9, 20, 30, Face::PX),
-                step(8, 20, 30, Face::PX),
+                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(9, 20, 30, Face::PX, 50.0),
+                step(8, 20, 30, Face::PX, 150.0),
             ]);
     }
 
@@ -457,7 +476,7 @@ mod tests {
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::zero()),
-            step(10, 20, 30, Face::WITHIN));
+            step(10, 20, 30, Face::WITHIN, 0.0));
     }
 
     #[test]
@@ -466,7 +485,7 @@ mod tests {
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::zero()),
-            step(10, 20, 30, Face::WITHIN));
+            step(10, 20, 30, Face::WITHIN, 0.0));
     }
 
     #[test]
@@ -475,7 +494,7 @@ mod tests {
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(1.0, 2.0, FreeCoordinate::NAN)),
-            step(10, 20, 30, Face::WITHIN));
+            step(10, 20, 30, Face::WITHIN, 0.0));
     }
 
     #[test]
@@ -486,12 +505,12 @@ mod tests {
         assert_steps_option(
             &mut r,
             vec![
-                Some(step(2, 1, 1, Face::NX)),
-                Some(step(2, 2, 1, Face::NY)),
-                Some(step(2, 2, 2, Face::NZ)),
-                Some(step(3, 2, 2, Face::NX)),
-                Some(step(3, 3, 2, Face::NY)),
-                Some(step(3, 3, 3, Face::NZ)),
+                Some(step(2, 1, 1, Face::NX, 2.0)),
+                Some(step(2, 2, 1, Face::NY, 2.25)),
+                Some(step(2, 2, 2, Face::NZ, 2.5)),
+                Some(step(3, 2, 2, Face::NX, 3.0)),
+                Some(step(3, 3, 2, Face::NY, 3.25)),
+                Some(step(3, 3, 3, Face::NZ, 3.5)),
                 None,
             ],
         );
@@ -520,9 +539,9 @@ mod tests {
                 Point3::new(4.833333333333334, 4.666666666666666, -3.0),
                 Vector3::new(0.0, 0.0, 10.0)),
             vec![
-                step(4, 4, -3, Face::WITHIN),
-                step(4, 4, -2, Face::NZ),
-                step(4, 4, -1, Face::NZ),
+                step(4, 4, -3, Face::WITHIN, 0.0),
+                step(4, 4, -2, Face::NZ, 0.1),
+                step(4, 4, -1, Face::NZ, 0.2),
             ]);
     }
 
