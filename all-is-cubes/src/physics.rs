@@ -2,12 +2,16 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 use cgmath::{Basis2, Deg, InnerSpace as _, Point3, Rotation, Rotation2, Vector2, Vector3};
+use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::math::{FreeCoordinate, GridCoordinate};
+use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint};
+use crate::raycast::Raycaster;
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
 
+/// Close-but-not-intersecting objects are set to this separation.
+const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 
@@ -45,26 +49,39 @@ impl Body {
             return;
         }
 
-        let mut next_position = self.position + self.velocity * dt;
+        let mut delta_position = self.velocity * dt;
 
         // Do collision detection and resolution.
         if let Some(space) = colliding_space {
             // Test just the block (collide like we're a point).
             // TODO: Axis-aligned box collision volume.
-            let old_ev = space.get_evaluated(self.position.map(|x| x.floor() as GridCoordinate));
-            let new_ev = space.get_evaluated(next_position.map(|x| x.floor() as GridCoordinate));
 
-            // Simply stop.
-            // TODO: Stop at intersection point, and allow sliding along walls.
-            // Intersection should be approachable by using raycasting.
-            if new_ev.attributes.solid && !old_ev.attributes.solid {
-                next_position = self.position;
+            // TODO: already_colliding will need to be a list of blocks
+            let mut already_colliding: HashSet<GridPoint> = HashSet::new();
+            for hit in Raycaster::new(self.position, delta_position).within_grid(*space.grid()) {
+                if hit.t_distance >= 1.0 {
+                    // This is as far as we go in this timestep.
+                    break;
+                }
+                if hit.face == Face::WITHIN {
+                    already_colliding.insert(hit.cube);
+                    continue;
+                }
+                if space.get_evaluated(hit.cube).attributes.solid
+                    && !already_colliding.contains(&hit.cube)
+                {
+                    // hit something, stop at that distance.
+                    // TODO: implement sliding movement by retrying after deleting the velocity towards which face we hit.
+                    delta_position = self.velocity * dt * hit.t_distance
+                        + hit.face.normal_vector() * POSITION_EPSILON;
+                    break;
+                }
             }
         }
 
-        // TODO: falling-below-the-world protection
+        // TODO: after gravity, falling-below-the-world protection
 
-        self.position = next_position;
+        self.position += delta_position;
     }
 
     pub fn walk(&mut self, x: FreeCoordinate, z: FreeCoordinate) {
