@@ -94,7 +94,7 @@ static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
             }; RAYS_PER_FACE],
         };
         // RAYS_PER_FACE is too big to use convenience traits, so we have to
-        // explicitly index it to write into it.
+        // explicitly index it to write into it. TODO: no longer true in rust 1.47
         let mut i = 0;
         for rayx in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
             for rayy in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
