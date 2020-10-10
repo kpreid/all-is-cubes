@@ -12,6 +12,10 @@ license = "MIT"
 categories = ["games", "rendering"]
 include = ["static-all-is-cubes-wasm/**", "src/**"]
 
+[lib]
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
+
 [[bin]]
 name = "aic-console"
 
