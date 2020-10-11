@@ -8,7 +8,9 @@ use all_is_cubes::universe::{Universe, UniverseIndex as _};
 use all_is_cubes::worldgen::{axes, wavy_landscape};
 
 pub fn lighting_bench(c: &mut Criterion) {
-    c.bench_function("lighting: new_universe_with_stuff()", |b| {
+    let mut group = c.benchmark_group("slow");
+    group.sample_size(20);
+    group.bench_function("lighting: new_universe_with_stuff()", |b| {
         b.iter_batched(
             universe_for_lighting_test,
             |universe| {
@@ -25,6 +27,7 @@ pub fn lighting_bench(c: &mut Criterion) {
             BatchSize::SmallInput,
         )
     });
+    group.finish();
 }
 
 fn universe_for_lighting_test() -> Universe {
