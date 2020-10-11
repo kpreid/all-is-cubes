@@ -172,7 +172,7 @@ impl Space {
         // Number of rays contributing to incoming_light.
         let mut total_rays = 0;
         // Cubes whose lighting value contributed to the incoming_light value.
-        let mut dependencies: Vec<GridPoint> = Vec::new(); // TODO: reuse buffer instead of allocating every time
+        let mut dependencies: Vec<GridPoint> = Vec::new();
 
         let ev_origin = self.get_evaluated(cube);
         if ev_origin.opaque {
