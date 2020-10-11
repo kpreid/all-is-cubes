@@ -12,8 +12,8 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::block::{Block, AIR};
-use crate::math::{FreeCoordinate, GridPoint};
-use crate::physics::Body;
+use crate::math::{AAB, FreeCoordinate, GridPoint};
+use crate::physics::{Body};
 use crate::raycast::{Ray, RaycastStep, Raycaster};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::{RefError, URef};
@@ -66,6 +66,7 @@ impl Camera {
                     .map(FreeCoordinate::from)
                     + Vector3::new(-3.0, 3.0, -3.0),
                 velocity: Vector3::zero(),
+                collision_box: AAB::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
                 yaw: 00.0,
                 pitch: 15.0,
             },

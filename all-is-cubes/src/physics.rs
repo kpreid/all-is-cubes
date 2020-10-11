@@ -5,7 +5,7 @@ use cgmath::{Basis2, Deg, InnerSpace as _, Point3, Rotation, Rotation2, Vector2,
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::math::{Face, FreeCoordinate, GridPoint};
+use crate::math::{AAB, Face, FreeCoordinate, GridPoint};
 use crate::raycast::Raycaster;
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
@@ -22,6 +22,10 @@ pub struct Body {
     // TODO: pub space: Option<URef<Space>>   --- or maybe backwards?
     pub position: Point3<FreeCoordinate>,
     pub velocity: Vector3<FreeCoordinate>,
+
+    // Thought for the future: switching to a "cylinder" representation (height + radius)
+    // would allow for simultaneous collision with multiple spaces with different axes.
+    pub collision_box: AAB,
 
     pub yaw: FreeCoordinate,
     pub pitch: FreeCoordinate,
@@ -149,6 +153,7 @@ mod tests {
         let mut body = Body {
             position: Point3::new(0.0, 1.0, 0.0),
             velocity: Vector3::new(2.0, 0.0, 0.0),
+            collision_box: AAB::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5),
             yaw: 0.0,
             pitch: 0.0,
         };
