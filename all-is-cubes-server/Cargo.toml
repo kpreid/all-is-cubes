@@ -19,10 +19,12 @@ bench = false
 [[bin]]
 name = "aic-console"
 bench = false
+test = false # any testable code will be in lib
 
 [[bin]]
 name = "aic-server"
 bench = false
+test = false # any testable code will be in lib
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.1.2" }
