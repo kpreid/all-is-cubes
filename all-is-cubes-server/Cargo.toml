@@ -18,9 +18,11 @@ bench = false
 
 [[bin]]
 name = "aic-console"
+bench = false
 
 [[bin]]
 name = "aic-server"
+bench = false
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.1.2" }
