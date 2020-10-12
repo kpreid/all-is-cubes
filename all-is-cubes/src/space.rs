@@ -592,6 +592,13 @@ impl Space {
         self.sky_color
     }
 
+    pub fn set_sky_color(&mut self, color: RGB) {
+        self.sky_color = color;
+        self.packed_sky_color = self.sky_color.into();
+        // TODO: set up rerunning lighting for everything, preferably not
+        // by queueing every single block for a lighting update.
+    }
+
     /// Finds or assigns an index to denote the block.
     ///
     /// The caller is responsible for incrementing `self.block_data[index].count`.
