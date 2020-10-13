@@ -17,7 +17,7 @@ use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
 
 use crate::camera::Cursor;
-use crate::lum::types::Vertex;
+use crate::lum::types::{empty_tess, Vertex};
 use crate::math::{FreeCoordinate, AAB, RGBA};
 
 pub mod block_texture;
@@ -71,19 +71,6 @@ where
         .new_tess()
         .set_vertices(vertices)
         .set_mode(Mode::Line)
-        .build()
-        .unwrap()
-}
-
-/// Constructs a `Tess` that renders nothing but does not provoke an error.
-pub fn empty_tess<C>(context: &mut C) -> Tess<Vertex>
-where
-    C: GraphicsContext<Backend = Backend>,
-{
-    context
-        .new_tess()
-        .set_vertices(vec![Vertex::DUMMY])
-        .set_mode(Mode::Triangle)
         .build()
         .unwrap()
 }

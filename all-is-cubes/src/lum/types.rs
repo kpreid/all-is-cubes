@@ -5,6 +5,9 @@
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 use luminance_derive::{Semantics, Vertex};
+use luminance_front::context::GraphicsContext;
+use luminance_front::tess::{Mode, Tess};
+use luminance_front::Backend;
 
 use crate::math::{FreeCoordinate, RGBA};
 use crate::space::PackedLight;
@@ -139,6 +142,19 @@ impl ToGfxVertex<Vertex> for GLBlockVertex {
             lighting: VertexLighting::new(lighting.into()),
         }
     }
+}
+
+/// Constructs a `Tess<Vertex>` that renders nothing but does not provoke a runtime error.
+pub fn empty_tess<C>(context: &mut C) -> Tess<Vertex>
+where
+    C: GraphicsContext<Backend = Backend>,
+{
+    context
+        .new_tess()
+        .set_vertices(vec![Vertex::DUMMY])
+        .set_mode(Mode::Triangle)
+        .build()
+        .unwrap()
 }
 
 #[cfg(test)]
