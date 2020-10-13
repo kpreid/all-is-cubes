@@ -39,7 +39,20 @@ impl std::fmt::Debug for Body {
 }
 
 impl Body {
-    pub fn step(&mut self, duration: Duration, colliding_space: Option<&Space>) {
+    /// Advances time for the body.
+    ///
+    /// If `colliding_space` is present then the body may collide with blocks in that space
+    /// (constraining possible movement) and `collision_callback` will be called with all
+    /// such blocks. It is not guaranteed that `collision_callback` will be called only once
+    /// per block.
+    pub fn step<CC>(
+        &mut self,
+        duration: Duration,
+        colliding_space: Option<&Space>,
+        mut collision_callback: CC,
+    ) where
+        CC: FnMut(GridPoint),
+    {
         let dt = duration.as_secs_f64();
 
         // TODO: Reset any non-finite values found to allow recovery from glitches.
@@ -60,7 +73,8 @@ impl Body {
                 n += 1;
                 // Each call to collide_and_advance will zero at least one axis of delta_position.
                 // The nonzero axes are for sliding movement.
-                delta_position = self.collide_and_advance(space, delta_position);
+                delta_position =
+                    self.collide_and_advance(space, &mut collision_callback, delta_position);
             }
         } else {
             self.position += delta_position;
@@ -71,11 +85,15 @@ impl Body {
 
     /// Perform a single straight-line position change, stopping at the first obstacle.
     /// Returns the remainder of `delta_position` that should be retried for sliding movement.
-    fn collide_and_advance(
+    fn collide_and_advance<CC>(
         &mut self,
         space: &Space,
+        collision_callback: &mut CC,
         mut delta_position: Vector3<FreeCoordinate>,
-    ) -> Vector3<FreeCoordinate> {
+    ) -> Vector3<FreeCoordinate>
+    where
+        CC: FnMut(GridPoint),
+    {
         let mut already_colliding: HashSet<GridPoint> = HashSet::new();
         for hit in Raycaster::new(self.position, delta_position).within_grid(*space.grid()) {
             if hit.t_distance >= 1.0 {
@@ -94,6 +112,8 @@ impl Body {
                 && !already_colliding.contains(&hit.cube)
             {
                 // We hit something.
+                collision_callback(hit.cube);
+
                 // Advance however much straight-line distance is available.
                 let unobstructed_delta_position =
                     delta_position * hit.t_distance + hit.face.normal_vector() * POSITION_EPSILON;
@@ -102,6 +122,7 @@ impl Body {
                 delta_position -= unobstructed_delta_position;
                 // Convert it to sliding movement for the axes we didn't collide in.
                 delta_position[hit.face.axis_number()] = 0.0;
+
                 return delta_position;
             }
         }
@@ -131,7 +152,7 @@ mod tests {
             yaw: 0.0,
             pitch: 0.0,
         };
-        body.step(Duration::from_secs(2), None);
+        body.step(Duration::from_secs(2), None, |_| ());
         assert_eq!(body.position, Point3::new(4.0, 1.0, 0.0));
     }
 

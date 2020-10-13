@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::block::{Block, AIR};
-use crate::math::FreeCoordinate;
+use crate::math::{FreeCoordinate, GridPoint};
 use crate::physics::Body;
 use crate::raycast::{Ray, RaycastStep, Raycaster};
 use crate::space::{Grid, SetCubeError, Space};
@@ -34,6 +34,8 @@ pub struct Camera {
 
     pub auto_rotate: bool,
     velocity_input: Vector3<FreeCoordinate>,
+    // TODO: actually render (for debug) colliding_cubes. Also, y'know, it should be in the Space perhaps.
+    colliding_cubes: HashSet<GridPoint>,
 }
 
 impl std::fmt::Debug for Camera {
@@ -42,6 +44,14 @@ impl std::fmt::Debug for Camera {
             .field("body", &self.body)
             .field("auto_rotate", &self.auto_rotate)
             .field("velocity_input", &self.velocity_input.as_concise_debug())
+            .field(
+                "colliding_cubes",
+                &self
+                    .colliding_cubes
+                    .iter()
+                    .map(|p| p.as_concise_debug())
+                    .collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -62,6 +72,7 @@ impl Camera {
             space,
             auto_rotate: false,
             velocity_input: Vector3::zero(),
+            colliding_cubes: HashSet::new(),
         }
     }
 
@@ -83,7 +94,11 @@ impl Camera {
         self.body.velocity += (velocity_target - self.body.velocity) * stiffness * dt;
 
         if let Ok(space) = self.space.try_borrow() {
-            self.body.step(duration, Some(&*space));
+            let colliding_cubes = &mut self.colliding_cubes;
+            colliding_cubes.clear();
+            self.body.step(duration, Some(&*space), |cube| {
+                colliding_cubes.insert(cube);
+            });
         } else {
             // TODO: set a warning flag
         }
