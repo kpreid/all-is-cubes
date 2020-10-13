@@ -32,7 +32,11 @@ where
     C: GraphicsContext<Backend = Backend>,
 {
     if let Some(cursor) = cursor_result {
-        aab_to_wireframe(context, AAB::from_cube(cursor.place.cube).enlarge(0.01), RGBA::BLACK)
+        aab_to_wireframe(
+            context,
+            AAB::from_cube(cursor.place.cube).enlarge(0.01),
+            RGBA::BLACK,
+        )
     } else {
         empty_tess(context)
     }

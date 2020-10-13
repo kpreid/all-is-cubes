@@ -537,7 +537,7 @@ impl AAB {
     ///
     /// ```
     /// use all_is_cubes::math::AAB;
-    /// 
+    ///
     /// assert_eq!(
     ///     AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(0.25),
     ///     AAB::new(0.75, 2.25, 2.75, 4.25, 4.75, 6.25)
@@ -546,11 +546,15 @@ impl AAB {
     pub fn enlarge(self, distance: FreeCoordinate) -> Self {
         // We could imagine a non-uniform version of this, but the fully general one
         // looks a lot like generally constructing a new AAB.
-        assert!(distance >= 0.0, "distance must be nonnegative, not {}", distance);
+        assert!(
+            distance >= 0.0,
+            "distance must be nonnegative, not {}",
+            distance
+        );
         let distance_vec = Vector3::new(1.0, 1.0, 1.0) * distance;
         AAB::from_lower_upper(
             self.lower_bounds - distance_vec,
-            self.upper_bounds + distance_vec
+            self.upper_bounds + distance_vec,
         )
     }
 }
