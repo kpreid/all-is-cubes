@@ -3,7 +3,9 @@
 
 //! Mathematical utilities and decisions.
 
-use cgmath::{BaseFloat, BaseNum, ElementWise, Matrix4, Point3, Vector3, Vector4};
+use cgmath::{
+    BaseFloat, BaseNum, ElementWise as _, EuclideanSpace as _, Matrix4, Point3, Vector3, Vector4,
+};
 use num_traits::identities::Zero;
 use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
@@ -449,6 +451,82 @@ impl std::fmt::Debug for RGBA {
             self.blue().into_inner(),
             self.alpha().into_inner()
         )
+    }
+}
+
+/// Axis-Aligned Box data type.
+///
+/// Note that this has continuous coordinates, and a discrete analogue exists as
+/// `all_is_cubes::space::Grid`.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct AAB {
+    // TODO: Should we be using NotNan coordinates?
+    // The upper > lower checks will reject NaNs anyway.
+    lower_bounds: Point3<FreeCoordinate>,
+    upper_bounds: Point3<FreeCoordinate>,
+}
+
+impl AAB {
+    #[track_caller]
+    pub fn new(
+        lx: FreeCoordinate,
+        hx: FreeCoordinate,
+        ly: FreeCoordinate,
+        hy: FreeCoordinate,
+        lz: FreeCoordinate,
+        hz: FreeCoordinate,
+    ) -> Self {
+        Self::from_lower_upper(Point3::new(lx, ly, lz), Point3::new(hx, hy, hz))
+    }
+
+    #[track_caller]
+    #[rustfmt::skip]
+    pub fn from_lower_upper(
+        lower_bounds: impl Into<Point3<FreeCoordinate>>,
+        upper_bounds: impl Into<Point3<FreeCoordinate>>,
+    ) -> Self {
+        let lower_bounds = lower_bounds.into();
+        let upper_bounds = upper_bounds.into();
+        assert!(lower_bounds.x <= upper_bounds.x, "lower_bounds.x must be <= upper_bounds.x");
+        assert!(lower_bounds.y <= upper_bounds.y, "lower_bounds.y must be <= upper_bounds.y");
+        assert!(lower_bounds.z <= upper_bounds.z, "lower_bounds.z must be <= upper_bounds.z");
+        Self { lower_bounds, upper_bounds }
+    }
+
+    /// Returns the AAB of a given cube in the interpretation used by `Grid` and `Space`;
+    /// that is, a unit cube extending in the positive directions from the given point.
+    ///
+    /// ```
+    /// use all_is_cubes::math::{AAB, GridPoint};
+    ///
+    /// assert_eq!(
+    ///     AAB::from_cube(GridPoint::new(10, 20, -30)),
+    ///     AAB::new(10.0, 11.0, 20.0, 21.0, -30.0, -29.0)
+    /// );
+    /// ```
+    pub fn from_cube(cube: GridPoint) -> Self {
+        let lower = cube.cast::<FreeCoordinate>().unwrap();
+        Self::from_lower_upper(lower, lower + Vector3::new(1.0, 1.0, 1.0))
+    }
+
+    /// The most negative corner of the box, as a `Point3`.
+    pub const fn lower_bounds_p(&self) -> Point3<FreeCoordinate> {
+        self.lower_bounds
+    }
+
+    /// The most positive corner of the box, as a `Point3`.
+    pub const fn upper_bounds_p(&self) -> Point3<FreeCoordinate> {
+        self.upper_bounds
+    }
+
+    /// The most negative corner of the box, as a `Vector3`.
+    pub fn lower_bounds_v(&self) -> Vector3<FreeCoordinate> {
+        self.lower_bounds.to_vec()
+    }
+
+    /// The most positive corner of the box, as a `Vector3`.
+    pub fn upper_bounds_v(&self) -> Vector3<FreeCoordinate> {
+        self.upper_bounds.to_vec()
     }
 }
 
