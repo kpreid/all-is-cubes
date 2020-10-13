@@ -528,6 +528,31 @@ impl AAB {
     pub fn upper_bounds_v(&self) -> Vector3<FreeCoordinate> {
         self.upper_bounds.to_vec()
     }
+
+    /// Enlarges the AAB by moving each face outward by the specified distance.
+    ///
+    /// Panics if the distance is negative or NaN.
+    /// (Shrinking requires considering the error case of shrinking to zero, so that
+    /// will be a separate operation).
+    ///
+    /// ```
+    /// use all_is_cubes::math::AAB;
+    /// 
+    /// assert_eq!(
+    ///     AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(0.25),
+    ///     AAB::new(0.75, 2.25, 2.75, 4.25, 4.75, 6.25)
+    /// );
+    /// ````
+    pub fn enlarge(self, distance: FreeCoordinate) -> Self {
+        // We could imagine a non-uniform version of this, but the fully general one
+        // looks a lot like generally constructing a new AAB.
+        assert!(distance >= 0.0, "distance must be nonnegative, not {}", distance);
+        let distance_vec = Vector3::new(1.0, 1.0, 1.0) * distance;
+        AAB::from_lower_upper(
+            self.lower_bounds - distance_vec,
+            self.upper_bounds + distance_vec
+        )
+    }
 }
 
 #[cfg(test)]
@@ -571,6 +596,27 @@ mod tests {
         assert_eq!(
             format!("{:#?}", RGBA::new(0.1, 0.2, 0.3, 0.4)),
             "RGBA(0.1, 0.2, 0.3, 0.4)"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn aab_enlarge_nan() {
+        AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(FreeCoordinate::NAN);
+    }
+
+    #[test]
+    #[should_panic]
+    fn aab_enlarge_negative() {
+        AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(-0.1);
+    }
+
+    #[test]
+    fn aab_enlarge_inf() {
+        const INF: FreeCoordinate = FreeCoordinate::INFINITY;
+        assert_eq!(
+            AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(INF),
+            AAB::new(-INF, INF, -INF, INF, -INF, INF),
         );
     }
 }
