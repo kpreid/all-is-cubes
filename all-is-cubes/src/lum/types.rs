@@ -34,7 +34,7 @@ pub enum VertexSemantics {
 }
 
 /// Vertex type sent to GPU. See also `GLBlockVertex`
-#[derive(Clone, Copy, Debug, Vertex)]
+#[derive(Clone, Copy, Debug, PartialEq, Vertex)]
 #[vertex(sem = "VertexSemantics")]
 pub struct Vertex {
     #[allow(dead_code)] // read by shader

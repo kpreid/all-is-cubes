@@ -75,3 +75,20 @@ pub fn aab_to_wireframe(aab: AAB, color: RGBA) -> [Vertex; 3 /* axes */ * 4 /* l
     }
     vertices
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cgmath::Point3;
+
+    #[test]
+    fn aab_to_wireframe_smoke_test() {
+        let aab = AAB::from_cube(Point3::new(1, 2, 3));
+        let wireframe = aab_to_wireframe(aab, RGBA::new(0.1, 0.2, 0.3, 0.4));
+        for vertex in &wireframe {
+            // TODO: Write a better test. This just checks none are uninitialized.
+            // Vertex's fields are not public, so we'd need accessors.
+            assert!(*vertex != Vertex::DUMMY);
+        }
+    }
+}
