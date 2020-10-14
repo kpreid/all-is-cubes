@@ -12,8 +12,8 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::block::{Block, AIR};
-use crate::math::{AAB, FreeCoordinate, GridPoint};
-use crate::physics::{Body};
+use crate::math::{FreeCoordinate, GridPoint, AAB};
+use crate::physics::Body;
 use crate::raycast::{Ray, RaycastStep, Raycaster};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::{RefError, URef};

@@ -11,14 +11,14 @@
 
 #![cfg(feature = "lum")]
 
-use cgmath::{Point3, Vector3, Zero as _};
+use cgmath::{Vector3, Zero as _};
 use luminance_front::context::GraphicsContext;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
 
 use crate::camera::Cursor;
 use crate::lum::types::{empty_tess, Vertex};
-use crate::math::{FreeCoordinate, AAB, RGBA};
+use crate::math::{AAB, RGBA};
 
 pub mod block_texture;
 pub mod glrender;
@@ -26,55 +26,52 @@ pub mod shading;
 pub mod space;
 pub mod types;
 
-/// Draw a `Cursor` as a wireframe cube.
+/// Creates a `Tess` to draw a `Cursor` as a wireframe cube.
 pub fn make_cursor_tess<C>(context: &mut C, cursor_result: &Option<Cursor>) -> Tess<Vertex>
 where
     C: GraphicsContext<Backend = Backend>,
 {
     if let Some(cursor) = cursor_result {
-        aab_to_wireframe(
-            context,
-            AAB::from_cube(cursor.place.cube).enlarge(0.01),
-            RGBA::BLACK,
-        )
+        context
+            .new_tess()
+            .set_vertices(aab_to_wireframe(
+                AAB::from_cube(cursor.place.cube).enlarge(0.01),
+                RGBA::BLACK,
+            ))
+            .set_mode(Mode::Line)
+            .build()
+            .unwrap()
     } else {
         empty_tess(context)
     }
 }
 
-pub fn aab_to_wireframe<C>(context: &mut C, aab: AAB, color: RGBA) -> Tess<Vertex>
-where
-    C: GraphicsContext<Backend = Backend>,
-{
-    let mut vertices = Vec::with_capacity(3 /* axes */ * 4 /* lines */ * 2 /* vertices */);
-    let mut put =
-        |v: Point3<FreeCoordinate>| vertices.push(Vertex::new_colored(v, Vector3::zero(), color));
+/// Computes vertices for an `AAB` as a wireframe cube.
+pub fn aab_to_wireframe(aab: AAB, color: RGBA) -> [Vertex; 3 /* axes */ * 4 /* lines */ * 2] {
+    let mut vertices = [Vertex::DUMMY; 24];
+    let vertex = |p| Vertex::new_colored(p, Vector3::zero(), color);
     let l = aab.lower_bounds_p();
     let u = aab.upper_bounds_p();
     for axis_0 in 0..3_usize {
+        let vbase = axis_0 * 8;
         let axis_1 = (axis_0 + 1).rem_euclid(3);
         let axis_2 = (axis_0 + 2).rem_euclid(3);
-        let mut v = l;
+        let mut p = l;
         // Walk from lower to upper in a helix.
-        put(v);
-        v[axis_0] = u[axis_0];
-        put(v);
-        put(v);
-        v[axis_1] = u[axis_1];
-        put(v);
-        put(v);
-        v[axis_2] = u[axis_2];
-        put(v);
+        vertices[vbase + 0] = vertex(p);
+        p[axis_0] = u[axis_0];
+        vertices[vbase + 1] = vertex(p);
+        vertices[vbase + 2] = vertex(p);
+        p[axis_1] = u[axis_1];
+        vertices[vbase + 3] = vertex(p);
+        vertices[vbase + 4] = vertex(p);
+        p[axis_2] = u[axis_2];
+        vertices[vbase + 5] = vertex(p);
         // Go back and fill in the remaining bar.
-        v[axis_2] = l[axis_2];
-        put(v);
-        v[axis_0] = l[axis_0];
-        put(v);
+        p[axis_2] = l[axis_2];
+        vertices[vbase + 6] = vertex(p);
+        p[axis_0] = l[axis_0];
+        vertices[vbase + 7] = vertex(p);
     }
-    context
-        .new_tess()
-        .set_vertices(vertices)
-        .set_mode(Mode::Line)
-        .build()
-        .unwrap()
+    vertices
 }

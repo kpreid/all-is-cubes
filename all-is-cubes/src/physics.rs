@@ -5,7 +5,7 @@ use cgmath::{Basis2, Deg, InnerSpace as _, Point3, Rotation, Rotation2, Vector2,
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::math::{AAB, Face, FreeCoordinate, GridPoint};
+use crate::math::{Face, FreeCoordinate, GridPoint, AAB};
 use crate::raycast::Raycaster;
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
