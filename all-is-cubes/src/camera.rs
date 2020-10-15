@@ -35,7 +35,7 @@ pub struct Camera {
     pub auto_rotate: bool,
     velocity_input: Vector3<FreeCoordinate>,
     // TODO: actually render (for debug) colliding_cubes. Also, y'know, it should be in the Space perhaps.
-    colliding_cubes: HashSet<GridPoint>,
+    pub(crate) colliding_cubes: HashSet<GridPoint>,
 }
 
 impl std::fmt::Debug for Camera {

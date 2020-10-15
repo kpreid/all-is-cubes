@@ -9,13 +9,16 @@ use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrd
 use luminance_front::framebuffer::Framebuffer;
 use luminance_front::pipeline::PipelineState;
 use luminance_front::render_state::RenderState;
+use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
 use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
-use crate::lum::make_cursor_tess;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
+use crate::lum::types::Vertex;
+use crate::lum::{aab_to_wireframe, make_cursor_tess};
+use crate::math::{AAB, RGBA};
 use crate::universe::URef;
 use crate::util::WarningsResult;
 
@@ -106,11 +109,31 @@ where
             &*camera.space.borrow(),
         );
 
+        // Prepare Tess and Texture for space.
         if self.space_renderer.as_ref().map(|sr| sr.space()) != Some(&camera.space) {
             self.space_renderer = Some(SpaceRenderer::new(camera.space.clone()));
         }
         let space_renderer = self.space_renderer.as_mut().unwrap();
         let space_output = space_renderer.prepare_frame(surface, camera.view());
+
+        let debug_lines_tess = {
+            let mut v: Vec<Vertex> = Vec::new();
+            for cube in &camera.colliding_cubes {
+                v.extend(aab_to_wireframe(AAB::from_cube(*cube), RGBA::WHITE).iter());
+            }
+            if v.is_empty() {
+                None
+            } else {
+                Some(
+                    surface
+                        .new_tess()
+                        .set_vertices(v)
+                        .set_mode(Mode::Line)
+                        .build()
+                        .unwrap(),
+                )
+            }
+        };
 
         let render_state = RenderState::default().set_face_culling(FaceCulling {
             order: FaceCullingOrder::CCW,
@@ -142,7 +165,13 @@ where
                         render_gate.render(&render_state, |mut tess_gate| {
                             // TODO: should be `info.space += ...`
                             info.space = space_output_bound.render(&mut tess_gate)?;
+
                             tess_gate.render(&cursor_tess)?;
+
+                            if let Some(tess) = debug_lines_tess {
+                                tess_gate.render(&tess)?;
+                            }
+
                             Ok(())
                         })?;
 
