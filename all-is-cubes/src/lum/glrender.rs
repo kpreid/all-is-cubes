@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Matrix4, Point2, SquareMatrix as _, Vector2};
+use cgmath::{Point2, Vector2};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
@@ -117,8 +117,6 @@ where
             mode: FaceCullingMode::Back,
         });
 
-        // let debug_tess = block_data.texture_allocator.debug_atlas_tess(surface);
-
         // TODO: cache
         let cursor_tess = make_cursor_tess(surface, &self.cursor_result);
 
@@ -147,18 +145,6 @@ where
                             tess_gate.render(&cursor_tess)?;
                             Ok(())
                         })?;
-
-                        if false {
-                            // Reset matrices for screen-aligned debug rendering
-                            u.set_projection_matrix(&mut program_iface, Matrix4::identity());
-                            u.set_view_matrix(&mut program_iface, Matrix4::identity());
-                            // already set block texture
-
-                            // render_gate.render(&render_state, |mut tess_gate| {
-                            //     tess_gate.render(&debug_tess)?;
-                            //     Ok(())
-                            // })?;
-                        }
 
                         Ok(())
                     })
