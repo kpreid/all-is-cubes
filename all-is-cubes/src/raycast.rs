@@ -171,7 +171,8 @@ impl Raycaster {
 
     #[inline(always)]
     fn step_on_axis(&mut self, axis: usize) {
-        assert!(self.step[axis] != 0);
+        assert!(self.step[axis] != 0,
+            "step_on_axis on axis {} which is zero; state = {:#?}", axis, self);
 
         // Save t position before we update it.
         // We could back-compute this instead as
