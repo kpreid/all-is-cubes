@@ -99,36 +99,36 @@ impl Body {
         CC: FnMut(GridPoint),
     {
         let mut already_colliding: HashSet<GridPoint> = HashSet::new();
-        for hit in Raycaster::new(self.position, delta_position).within_grid(*space.grid()) {
-            if hit.t_distance >= 1.0 {
+        for ray_step in Raycaster::new(self.position, delta_position).within_grid(*space.grid()) {
+            if ray_step.t_distance >= 1.0 {
                 // Movement is unobstructed in this timestep.
                 break;
             }
-            if hit.face == Face::WITHIN {
+            if ray_step.face == Face::WITHIN {
                 // If we are intersecting a block, we are allowed to leave it; pretend
                 // it doesn't exist.
                 // TODO: already_colliding is currently useless but will become useful
                 // when we generalize to colliding as a box instead of a point.
-                already_colliding.insert(hit.cube);
+                already_colliding.insert(ray_step.cube);
                 continue;
             }
-            if space.get_evaluated(hit.cube).attributes.solid
-                && !already_colliding.contains(&hit.cube)
+            if space.get_evaluated(ray_step.cube).attributes.solid
+                && !already_colliding.contains(&ray_step.cube)
             {
                 // We hit something.
-                collision_callback(hit.cube);
+                collision_callback(ray_step.cube);
 
                 // Advance however much straight-line distance is available.
-                let unobstructed_delta_position =
-                    delta_position * hit.t_distance + hit.face.normal_vector() * POSITION_EPSILON;
+                let unobstructed_delta_position = delta_position * ray_step.t_distance
+                    + ray_step.face.normal_vector() * POSITION_EPSILON;
                 self.position += unobstructed_delta_position;
                 // Figure the distance we have have left.
                 delta_position -= unobstructed_delta_position;
                 // Convert it to sliding movement for the axes we didn't collide in.
-                delta_position[hit.face.axis_number()] = 0.0;
+                delta_position[ray_step.face.axis_number()] = 0.0;
 
                 // Absorb velocity in that direction.
-                self.velocity[hit.face.axis_number()] = 0.0;
+                self.velocity[ray_step.face.axis_number()] = 0.0;
 
                 return delta_position;
             }
