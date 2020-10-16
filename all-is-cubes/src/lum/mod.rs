@@ -58,7 +58,7 @@ pub fn aab_to_wireframe(aab: AAB, color: RGBA) -> [Vertex; 3 /* axes */ * 4 /* l
         let axis_2 = (axis_0 + 2).rem_euclid(3);
         let mut p = l;
         // Walk from lower to upper in a helix.
-        vertices[vbase + 0] = vertex(p);
+        vertices[vbase] = vertex(p);
         p[axis_0] = u[axis_0];
         vertices[vbase + 1] = vertex(p);
         vertices[vbase + 2] = vertex(p);
