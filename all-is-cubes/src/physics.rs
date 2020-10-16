@@ -127,6 +127,9 @@ impl Body {
                 // Convert it to sliding movement for the axes we didn't collide in.
                 delta_position[hit.face.axis_number()] = 0.0;
 
+                // Absorb velocity in that direction.
+                self.velocity[hit.face.axis_number()] = 0.0;
+
                 return delta_position;
             }
         }
