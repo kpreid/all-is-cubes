@@ -238,6 +238,23 @@ impl Grid {
         )
     }
 
+    /// Moves the grid to anoter location with unchanged size and orientation.
+    ///
+    /// ```
+    /// use all_is_cubes::space::Grid;
+    ///
+    /// assert_eq!(
+    ///     Grid::new((0, 0, 0), (10, 20, 30)).translate((-10, 0, 0)),
+    ///     Grid::new((-10, 0, 0), (10, 20, 30)),
+    /// );
+    /// ```
+    pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
+        Self {
+            lower_bounds: self.lower_bounds + offset.into(),
+            sizes: self.sizes,
+        }
+    }
+
     /// Scales the grid down by the given factor, rounding outward.
     ///
     /// ```
@@ -257,9 +274,9 @@ impl Grid {
     /// );
     /// ```
     #[inline]
-    pub fn divide(&self, divisor: GridCoordinate) -> Self {
+    pub fn divide(self, divisor: GridCoordinate) -> Self {
         let upper_bounds = self.upper_bounds();
-        Grid::from_lower_upper(
+        Self::from_lower_upper(
             (
                 self.lower_bounds.x.div_euclid(divisor),
                 self.lower_bounds.y.div_euclid(divisor),
