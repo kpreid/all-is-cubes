@@ -7,6 +7,7 @@
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::fmt;
+use std::marker::PhantomData;
 
 /// Objects for which alternate `Debug` representations can be generated.
 pub trait ConciseDebug: Sized {
@@ -110,6 +111,45 @@ impl<T, E, W> Warnings for WarningsResult<T, E, W> {
             Ok((v, w)) => (w, Ok(v)),
             Err((v, w)) => (w, Err(v)),
         }
+    }
+}
+
+/// Equivalent of `Iterator::map` but applied to an `Extend` instead, transforming
+/// the incoming elements.
+pub(crate) struct MapExtend<'a, A, B, T, F>
+where
+    T: Extend<B>,
+    F: Fn(A) -> B,
+{
+    target: &'a mut T,
+    function: F,
+    _input: PhantomData<fn(A)>,
+}
+
+impl<'a, A, B, T, F> MapExtend<'a, A, B, T, F>
+where
+    T: Extend<B>,
+    F: Fn(A) -> B,
+{
+    pub(crate) fn new(target: &'a mut T, function: F) -> Self {
+        Self {
+            target,
+            function,
+            _input: PhantomData,
+        }
+    }
+}
+
+impl<'a, A, B, T, F> Extend<A> for MapExtend<'a, A, B, T, F>
+where
+    T: Extend<B>,
+    F: Fn(A) -> B,
+{
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = A>,
+    {
+        self.target.extend(iter.into_iter().map(&self.function));
     }
 }
 

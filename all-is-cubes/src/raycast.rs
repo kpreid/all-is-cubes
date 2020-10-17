@@ -5,9 +5,8 @@
 
 use cgmath::{Point3, Vector3};
 use num_traits::identities::Zero;
-use std::ops::Add;
 
-use crate::math::{FreeCoordinate, GridCoordinate};
+use crate::math::{FreeCoordinate, Geometry, GridCoordinate};
 use crate::space::Grid;
 
 pub use crate::math::Face; // necessary for any use of raycast, so let it be used
@@ -31,14 +30,22 @@ impl Ray {
     }
 }
 
-impl Add<Vector3<FreeCoordinate>> for Ray {
-    type Output = Self;
-    /// Translate this ray; add the argument to its origin.
-    fn add(self, offset: Vector3<FreeCoordinate>) -> Self {
+impl Geometry for Ray {
+    type Coord = FreeCoordinate;
+
+    fn translate(self, offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
         Self {
-            origin: self.origin + offset,
+            origin: self.origin + offset.into(),
             ..self
         }
+    }
+
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<Point3<FreeCoordinate>>,
+    {
+        // TODO: add an arrowhead
+        output.extend([self.origin, self.origin + self.direction].iter().copied());
     }
 }
 

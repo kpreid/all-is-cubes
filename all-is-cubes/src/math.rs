@@ -20,6 +20,24 @@ pub type GridVector = Vector3<GridCoordinate>;
 /// Coordinates that are not locked to the cube grid.
 pub type FreeCoordinate = f64;
 
+/// Common features of objects that have a location and shape in space.
+pub trait Geometry {
+    /// Type of coordinates; generally determines whether this object can be translated by a
+    /// non-integer amount.
+    type Coord;
+
+    /// Translate (move) this object by the specified offset.
+    fn translate(self, offset: impl Into<Vector3<Self::Coord>>) -> Self;
+
+    /// Represent this object as a line drawing, or wireframe.
+    ///
+    /// The returned points should be in pairs, each pair defining a line segment.
+    /// If there are an odd number of vertices, the caller should ignore the last.
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<Point3<FreeCoordinate>>;
+}
+
 /// Identifies a face of a cube or an orthogonal unit vector, except for `WITHIN` meaning
 /// "zero distance and undefined direction".
 ///
@@ -559,6 +577,46 @@ impl AAB {
     }
 }
 
+impl Geometry for AAB {
+    type Coord = FreeCoordinate;
+
+    fn translate(self, offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
+        let offset = offset.into();
+        Self::from_lower_upper(self.lower_bounds + offset, self.upper_bounds + offset)
+    }
+
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<Point3<FreeCoordinate>>,
+    {
+        let mut vertices = [Point3::origin(); 24];
+        let l = self.lower_bounds_p();
+        let u = self.upper_bounds_p();
+        for axis_0 in 0..3_usize {
+            let vbase = axis_0 * 8;
+            let axis_1 = (axis_0 + 1).rem_euclid(3);
+            let axis_2 = (axis_0 + 2).rem_euclid(3);
+            let mut p = l;
+            // Walk from lower to upper in a helix.
+            vertices[vbase] = p;
+            p[axis_0] = u[axis_0];
+            vertices[vbase + 1] = p;
+            vertices[vbase + 2] = p;
+            p[axis_1] = u[axis_1];
+            vertices[vbase + 3] = p;
+            vertices[vbase + 4] = p;
+            p[axis_2] = u[axis_2];
+            vertices[vbase + 5] = p;
+            // Go back and fill in the remaining bar.
+            p[axis_2] = l[axis_2];
+            vertices[vbase + 6] = p;
+            p[axis_0] = l[axis_0];
+            vertices[vbase + 7] = p;
+        }
+        output.extend(vertices.iter().copied());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -622,5 +680,17 @@ mod tests {
             AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(INF),
             AAB::new(-INF, INF, -INF, INF, -INF, INF),
         );
+    }
+
+    #[test]
+    fn aab_wireframe_smoke_test() {
+        let aab = AAB::from_cube(Point3::new(1, 2, 3));
+        let mut wireframe: Vec<Point3<FreeCoordinate>> = Vec::new();
+        aab.wireframe_points(&mut wireframe);
+        for vertex in wireframe {
+            assert!(vertex.x == 1.0 || vertex.x == 2.0);
+            assert!(vertex.y == 2.0 || vertex.y == 3.0);
+            assert!(vertex.z == 3.0 || vertex.z == 4.0);
+        }
     }
 }

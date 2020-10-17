@@ -17,7 +17,7 @@ use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::Vertex;
-use crate::lum::{aab_to_wireframe, make_cursor_tess};
+use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{AAB, RGBA};
 use crate::universe::URef;
 use crate::util::WarningsResult;
@@ -119,7 +119,7 @@ where
         let debug_lines_tess = {
             let mut v: Vec<Vertex> = Vec::new();
             for cube in &camera.colliding_cubes {
-                v.extend(aab_to_wireframe(AAB::from_cube(*cube), RGBA::WHITE).iter());
+                wireframe_vertices(&mut v, RGBA::WHITE, AAB::from_cube(*cube));
             }
             if v.is_empty() {
                 None

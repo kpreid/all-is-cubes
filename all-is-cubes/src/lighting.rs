@@ -180,7 +180,8 @@ impl Space {
         } else {
             for face_ray_data in &*LIGHT_RAYS {
                 for ray in &face_ray_data.rays[..] {
-                    let raycaster = (*ray + cube.cast::<FreeCoordinate>().unwrap().to_vec())
+                    let raycaster = ray
+                        .translate(cube.cast::<FreeCoordinate>().unwrap().to_vec())
                         .cast()
                         .within_grid(*self.grid());
 
