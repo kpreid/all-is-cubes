@@ -118,8 +118,17 @@ where
 
         let debug_lines_tess = {
             let mut v: Vec<Vertex> = Vec::new();
+            wireframe_vertices(
+                &mut v,
+                RGBA::new(0.0, 0.0, 1.0, 1.0),
+                camera.body.collision_box_abs(),
+            );
             for cube in &camera.colliding_cubes {
-                wireframe_vertices(&mut v, RGBA::WHITE, AAB::from_cube(*cube));
+                wireframe_vertices(
+                    &mut v,
+                    RGBA::new(1.0, 0.0, 0.0, 1.0),
+                    AAB::from_cube(*cube).enlarge(0.005),
+                );
             }
             if v.is_empty() {
                 None

@@ -22,7 +22,7 @@ pub mod drawing;
 mod lighting;
 pub mod lum;
 pub mod math;
-mod physics;
+pub mod physics;
 pub mod raycast;
 pub mod space;
 pub mod triangulator;

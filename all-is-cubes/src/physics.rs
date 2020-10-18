@@ -1,11 +1,14 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-use cgmath::{Basis2, Deg, InnerSpace as _, Point3, Rotation, Rotation2, Vector2, Vector3, Zero};
+use cgmath::{
+    Basis2, Deg, EuclideanSpace as _, InnerSpace as _, Point3, Rotation, Rotation2, Vector2,
+    Vector3, Zero,
+};
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::math::{Face, FreeCoordinate, GridPoint, AAB};
+use crate::math::{Face, FreeCoordinate, Geometry as _, GridPoint, AAB};
 use crate::raycast::Raycaster;
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
@@ -43,6 +46,17 @@ impl std::fmt::Debug for Body {
 }
 
 impl Body {
+    /// Constructs a `Body` requiring only information that can't be reasonably defaulted.
+    pub fn new_minimal(position: impl Into<Point3<FreeCoordinate>>, collision_box: impl Into<AAB>) -> Self {
+        Self {
+            position: position.into(),
+            velocity: Vector3::zero(),
+            collision_box: collision_box.into(),
+            yaw: 0.0,
+            pitch: 0.0,
+        }
+    }
+
     /// Advances time for the body.
     ///
     /// If `colliding_space` is present then the body may collide with blocks in that space
@@ -144,6 +158,23 @@ impl Body {
         let dir = Vector2::new(x, z);
         let dir = rotation.rotate_vector(dir);
         self.position += Vector3::new(dir.x, 0.0, dir.y);
+    }
+
+    /// Returns the body's collision box in world coordinates
+    /// (`collision_box` translated by `position`).
+    ///
+    /// ```
+    /// use all_is_cubes::math::AAB;
+    /// use all_is_cubes::physics::Body;
+    ///
+    /// let body = Body::new_minimal(
+    ///     (0.0, 20.0, 0.0),
+    ///     AAB::new(-1.0, 1.0, -2.0, 2.0, -3.0, 3.0)
+    /// );
+    /// assert_eq!(body.collision_box_abs(), AAB::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
+    /// ```
+    pub fn collision_box_abs(&self) -> AAB {
+        self.collision_box.translate(self.position.to_vec())
     }
 }
 
