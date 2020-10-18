@@ -11,6 +11,8 @@ use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
 use std::ops::{Add, AddAssign, Index, IndexMut, Mul};
 
+use crate::space::Grid;
+
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = i32;
 /// Positions that are locked to the cube grid.
@@ -482,6 +484,8 @@ pub struct AAB {
     // The upper > lower checks will reject NaNs anyway.
     lower_bounds: Point3<FreeCoordinate>,
     upper_bounds: Point3<FreeCoordinate>,
+    // TODO: revisit which things we should be precalculating
+    sizes: Vector3<FreeCoordinate>,
 }
 
 impl AAB {
@@ -508,7 +512,8 @@ impl AAB {
         assert!(lower_bounds.x <= upper_bounds.x, "lower_bounds.x must be <= upper_bounds.x");
         assert!(lower_bounds.y <= upper_bounds.y, "lower_bounds.y must be <= upper_bounds.y");
         assert!(lower_bounds.z <= upper_bounds.z, "lower_bounds.z must be <= upper_bounds.z");
-        Self { lower_bounds, upper_bounds }
+        let sizes = upper_bounds - lower_bounds;
+        Self { lower_bounds, upper_bounds, sizes }
     }
 
     /// Returns the AAB of a given cube in the interpretation used by `Grid` and `Space`;
@@ -547,6 +552,12 @@ impl AAB {
         self.upper_bounds.to_vec()
     }
 
+    /// Size of the box in each axis; equivalent to
+    /// `self.upper_bounds() - self.lower_bounds()`.
+    pub fn size(&self) -> Vector3<FreeCoordinate> {
+        self.sizes
+    }
+
     /// Enlarges the AAB by moving each face outward by the specified distance.
     ///
     /// Panics if the distance is negative or NaN.
@@ -570,9 +581,36 @@ impl AAB {
             distance
         );
         let distance_vec = Vector3::new(1.0, 1.0, 1.0) * distance;
-        AAB::from_lower_upper(
+        Self::from_lower_upper(
             self.lower_bounds - distance_vec,
             self.upper_bounds + distance_vec,
+        )
+    }
+
+    #[inline]
+    // Not public because this is an odd interface that primarily helps with collision.
+    pub(crate) fn leading_corner_trailing_box(
+        &self,
+        direction: Vector3<FreeCoordinate>,
+    ) -> (Vector3<FreeCoordinate>, Grid) {
+        let mut leading_corner = Vector3::zero();
+        let mut trailing_box_lower = Point3::origin();
+        let mut trailing_box_upper = Point3::origin();
+        for axis in 0..3 {
+            let rounded_size = self.sizes[axis].ceil() as GridCoordinate;
+            if direction[axis] >= 0.0 {
+                leading_corner[axis] = self.upper_bounds[axis];
+                trailing_box_lower[axis] = -rounded_size;
+                trailing_box_upper[axis] = 0;
+            } else {
+                leading_corner[axis] = self.lower_bounds[axis];
+                trailing_box_lower[axis] = 0;
+                trailing_box_upper[axis] = rounded_size;
+            }
+        }
+        (
+            leading_corner,
+            Grid::from_lower_upper(trailing_box_lower, trailing_box_upper),
         )
     }
 }
@@ -691,6 +729,27 @@ mod tests {
             assert!(vertex.x == 1.0 || vertex.x == 2.0);
             assert!(vertex.y == 2.0 || vertex.y == 3.0);
             assert!(vertex.z == 3.0 || vertex.z == 4.0);
+        }
+    }
+
+    #[test]
+    fn aab_leading_corner_consistency() {
+        let aab = AAB::new(-1.1, 2.2, -3.3, 4.4, -5.5, 6.6);
+        let expected_size = aab.leading_corner_trailing_box(Vector3::zero()).1.size();
+        for direction in (-1..=1)
+            .zip(-1..=1)
+            .zip(-1..=1)
+            .map(|((x, y), z)| Vector3::new(x, y, z).cast::<FreeCoordinate>().unwrap())
+        {
+            let (leading_corner, trailing_box) = aab.leading_corner_trailing_box(direction);
+
+            for axis in 0..3 {
+                // Note that this condition is not true in general, but only if the AAB
+                // contains the origin.
+                assert_eq!(leading_corner[axis].signum(), direction[axis].signum());
+            }
+
+            assert_eq!(expected_size, trailing_box.size());
         }
     }
 }
