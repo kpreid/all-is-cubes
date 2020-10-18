@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::math::{Face, FreeCoordinate, Geometry as _, GridPoint, AAB};
-use crate::raycast::{RaycastStep, Raycaster};
+use crate::raycast::{Ray, RaycastStep};
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
 
@@ -18,6 +18,7 @@ const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 
 /// An object with a position, velocity, and collision volume.
+/// What it collides with is determined externally.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Body {
@@ -149,7 +150,20 @@ impl Body {
         CC: FnMut(GridPoint),
     {
         let mut already_colliding: HashSet<GridPoint> = HashSet::new();
-        for ray_step in Raycaster::new(self.position, delta_position).within_grid(*space.grid()) {
+        let (leading_corner, trailing_box) = self
+            .collision_box
+            .leading_corner_trailing_box(delta_position);
+
+        let collision_iter = |point: Point3<FreeCoordinate>| {
+            trailing_box
+                .translate(point.to_vec())
+                .round_up_to_grid()
+                .interior_iter()
+        };
+
+        let leading_corner_abs = self.position + leading_corner;
+        let ray = Ray::new(leading_corner_abs, delta_position);
+        for ray_step in ray.cast().within_grid(*space.grid()) {
             if ray_step.t_distance >= 1.0 {
                 // Movement is unobstructed in this timestep.
                 break;
@@ -157,17 +171,32 @@ impl Body {
             if ray_step.face == Face::WITHIN {
                 // If we are intersecting a block, we are allowed to leave it; pretend
                 // it doesn't exist.
-                // TODO: already_colliding is currently useless but will become useful
-                // when we generalize to colliding as a box instead of a point.
-                already_colliding.insert(ray_step.cube);
+                // TODO: Implement pushing out of shallow collisions.
+                for box_cube in collision_iter(ray_step.intersection_point(ray)) {
+                    already_colliding.insert(box_cube);
+                }
                 continue;
             }
-            if space.get_evaluated(ray_step.cube).attributes.solid
-                && !already_colliding.contains(&ray_step.cube)
-            {
-                // We hit something.
-                collision_callback(ray_step.cube);
 
+            // Loop over all the cubes that our AAB is just now intersecting and check if
+            // any of them are solid.
+            let mut hit_something = false;
+            // TODO: The + POSITION_EPSILON is a quick kludge to get a result that
+            // *includes* the cubes we are advancing towards. Replace it with something
+            // more precisely what we need.
+            for box_cube in
+                collision_iter(ray_step.intersection_point(ray) + delta_position * POSITION_EPSILON)
+            {
+                if space.get_evaluated(box_cube).attributes.solid
+                    && !already_colliding.contains(&box_cube)
+                {
+                    hit_something = true;
+                    collision_callback(box_cube);
+                }
+            }
+
+            // Now that we've found _all_ the contacts, handle the collision.
+            if hit_something {
                 // Advance however much straight-line distance is available.
                 // But a little bit back from that, to avoid floating point error pushing us
                 // into being already colliding next frame.

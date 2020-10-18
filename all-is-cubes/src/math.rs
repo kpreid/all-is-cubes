@@ -11,6 +11,8 @@ pub use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
 use std::ops::{Add, AddAssign, Index, IndexMut, Mul, Sub};
 
+use crate::space::Grid;
+
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = i32;
 /// Positions that are locked to the cube grid.
@@ -697,6 +699,13 @@ impl AAB {
         (
             leading_corner,
             AAB::from_lower_upper(trailing_box_lower, trailing_box_upper),
+        )
+    }
+
+    pub(crate) fn round_up_to_grid(self) -> Grid {
+        Grid::from_lower_upper(
+            self.lower_bounds.map(|c| c.floor() as GridCoordinate),
+            self.upper_bounds.map(|c| c.ceil() as GridCoordinate),
         )
     }
 }
