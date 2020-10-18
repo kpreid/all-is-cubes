@@ -47,7 +47,10 @@ impl std::fmt::Debug for Body {
 
 impl Body {
     /// Constructs a `Body` requiring only information that can't be reasonably defaulted.
-    pub fn new_minimal(position: impl Into<Point3<FreeCoordinate>>, collision_box: impl Into<AAB>) -> Self {
+    pub fn new_minimal(
+        position: impl Into<Point3<FreeCoordinate>>,
+        collision_box: impl Into<AAB>,
+    ) -> Self {
         Self {
             position: position.into(),
             velocity: Vector3::zero(),
