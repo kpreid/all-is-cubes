@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::math::{Face, FreeCoordinate, Geometry as _, GridPoint, AAB};
-use crate::raycast::Raycaster;
+use crate::raycast::{RaycastStep, Raycaster};
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
 
@@ -71,37 +71,54 @@ impl Body {
         duration: Duration,
         colliding_space: Option<&Space>,
         mut collision_callback: CC,
-    ) where
+    ) -> BodyStepInfo
+    where
         CC: FnMut(GridPoint),
     {
         let dt = duration.as_secs_f64();
+        let mut move_segments = [MoveSegment::default(); 3];
 
         // TODO: Reset any non-finite values found to allow recovery from glitches.
 
         // TODO: this.velocity += GRAVITY * dt;
         if self.velocity.magnitude2() <= VELOCITY_EPSILON_SQUARED {
-            return;
+            return BodyStepInfo {
+                quiescent: true,
+                move_segments,
+            };
         }
 
-        let mut delta_position = self.velocity * dt;
+        let unobstructed_delta_position = self.velocity * dt;
 
         // Do collision detection and resolution.
         if let Some(space) = colliding_space {
             // TODO: Axis-aligned box collision volume.
-            let mut n = 0;
+            let mut i = 0;
+            let mut delta_position = unobstructed_delta_position;
             while delta_position != Vector3::zero() {
-                assert!(n < 3, "sliding collision loop did not finish");
-                n += 1;
+                assert!(i < 3, "sliding collision loop did not finish");
+                i += 1;
                 // Each call to collide_and_advance will zero at least one axis of delta_position.
                 // The nonzero axes are for sliding movement.
-                delta_position =
+                let (new_delta_position, segment) =
                     self.collide_and_advance(space, &mut collision_callback, delta_position);
+                delta_position = new_delta_position;
+                move_segments[i] = segment;
             }
         } else {
-            self.position += delta_position;
+            self.position += unobstructed_delta_position;
+            move_segments[0] = MoveSegment {
+                delta_position: unobstructed_delta_position,
+                stopped_by: None,
+            };
         }
 
         // TODO: after gravity, falling-below-the-world protection
+
+        BodyStepInfo {
+            quiescent: false,
+            move_segments,
+        }
     }
 
     /// Perform a single straight-line position change, stopping at the first obstacle.
@@ -111,7 +128,7 @@ impl Body {
         space: &Space,
         collision_callback: &mut CC,
         mut delta_position: Vector3<FreeCoordinate>,
-    ) -> Vector3<FreeCoordinate>
+    ) -> (Vector3<FreeCoordinate>, MoveSegment)
     where
         CC: FnMut(GridPoint),
     {
@@ -147,13 +164,25 @@ impl Body {
                 // Absorb velocity in that direction.
                 self.velocity[ray_step.face.axis_number()] = 0.0;
 
-                return delta_position;
+                return (
+                    delta_position,
+                    MoveSegment {
+                        delta_position: unobstructed_delta_position,
+                        stopped_by: Some(ray_step),
+                    },
+                );
             }
         }
 
         // We did not hit anything for the length of the raycast. Proceed unobstructed.
         self.position += delta_position;
-        Vector3::zero()
+        (
+            Vector3::zero(),
+            MoveSegment {
+                delta_position,
+                stopped_by: None,
+            },
+        )
     }
 
     pub fn walk(&mut self, x: FreeCoordinate, z: FreeCoordinate) {
@@ -178,6 +207,33 @@ impl Body {
     /// ```
     pub fn collision_box_abs(&self) -> AAB {
         self.collision_box.translate(self.position.to_vec())
+    }
+}
+
+/// Diagnostic data returned by `Body::step`. The exact contents of this structure
+/// are unstable; use only `Debug` formatting to examine its contents unless you have
+/// a specific need for one of the values.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct BodyStepInfo {
+    pub quiescent: bool,
+    pub move_segments: [MoveSegment; 3],
+}
+
+/// One of the individual straight-line movement segments of a `BodyStepInfo`.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct MoveSegment {
+    pub delta_position: Vector3<FreeCoordinate>,
+    pub stopped_by: Option<RaycastStep>,
+}
+
+impl Default for MoveSegment {
+    fn default() -> Self {
+        Self {
+            delta_position: Vector3::zero(),
+            stopped_by: None,
+        }
     }
 }
 
