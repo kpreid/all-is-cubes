@@ -23,12 +23,11 @@ use crate::worldgen::{axes, wavy_landscape};
 
 /// Creates a Universe with some content for a "new game", as much as that can exist.
 pub fn new_universe_with_stuff() -> Universe {
-    let mut universe = Universe::new();
+    new_universe_with_space_setup(new_landscape_space)
+}
 
-    let mut bg = BlockGen {
-        universe: &mut universe,
-        size: 16,
-    };
+fn new_landscape_space(universe: &mut Universe) -> Space {
+    let mut bg = BlockGen { universe, size: 16 };
     let blocks = LandscapeBlocks::new(&mut bg);
 
     let text_blocks: Space = draw_to_blocks(
@@ -81,8 +80,16 @@ pub fn new_universe_with_stuff() -> Universe {
         let _ = space.set(cube + GridVector::new(-16, 3, -14), &text_blocks[cube]);
     }
 
-    let space_ref = universe.insert("space".into(), space);
+    space
+}
 
+fn new_universe_with_space_setup<F>(space_fn: F) -> Universe
+where
+    F: FnOnce(&mut Universe) -> Space,
+{
+    let mut universe = Universe::new();
+    let space: Space = space_fn(&mut universe);
+    let space_ref = universe.insert("space".into(), space);
     let camera = Camera::for_space(space_ref);
     universe.insert("camera".into(), camera);
     universe
