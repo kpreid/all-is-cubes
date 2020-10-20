@@ -30,6 +30,7 @@ impl PackedLight {
     /// Unit value of these fixed-point color components, as a f32 for conversion calculations.
     const UNIT_F32: f32 = 64.0;
 
+    #[inline]
     fn difference_magnitude(self, other: PackedLight) -> PackedLightScalar {
         fn dm(a: PackedLightScalar, b: PackedLightScalar) -> PackedLightScalar {
             a.max(b) - a.min(b)
@@ -41,6 +42,7 @@ impl PackedLight {
 }
 
 impl From<RGB> for PackedLight {
+    #[inline]
     fn from(value: RGB) -> Self {
         PackedLight(Vector3::new(
             (value.red().into_inner() * PackedLight::UNIT_F32) as PackedLightScalar,
@@ -50,6 +52,7 @@ impl From<RGB> for PackedLight {
     }
 }
 impl From<PackedLight> for [f32; 3] {
+    #[inline]
     fn from(value: PackedLight) -> Self {
         [
             f32::from(value.0[0]) / PackedLight::UNIT_F32,
@@ -59,6 +62,7 @@ impl From<PackedLight> for [f32; 3] {
     }
 }
 impl From<PackedLight> for RGB {
+    #[inline]
     fn from(value: PackedLight) -> Self {
         RGB::new(
             f32::from(value.0[0]) / PackedLight::UNIT_F32,
@@ -166,6 +170,7 @@ impl Space {
         }
     }
 
+    #[inline]
     fn update_lighting_now_on(&mut self, cube: GridPoint) -> PackedLightScalar {
         // Accumulator of incoming light encountered.
         let mut incoming_light: RGB = RGB::ZERO;
