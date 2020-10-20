@@ -7,8 +7,19 @@ members = [
 
 [profile.dev]
 # Enable some optimization to improve interactive performance in manual testing/experimenting.
+# In particular, inlining is crucial.
 opt-level = 2
+# Yes, this is the default for dev, but I want to be precise here: overflow checks are enabled
+# for ALL profiles. (Because not catching overflows in release mode is unwise when this is
+# precisely where the program is *likely to encounter bigger numbers than in testing*.)
+overflow-checks = true
 
 [profile.release]
 # TODO: review recommended options for wasm releases
+overflow-checks = true
+
+[profile.test]
+overflow-checks = true
+
+[profile.bench]
 overflow-checks = true
