@@ -12,6 +12,13 @@ use crate::math::*;
 use crate::raycast::Ray;
 use crate::space::*;
 
+/// This parameter determines to what degree absorption of light due to a block surface's
+/// color is taken into account. At zero, it is not (all surfaces are perfectly
+/// reflective); at one, light values are simply multiplied by the surface color (e.g.
+/// a red surface will reflect no green or blue light), which is the idealized physical
+/// model.
+const SURFACE_ABSORPTION: f32 = 0.75;
+
 /// One component of a `PackedLight`.
 pub(crate) type PackedLightScalar = u8;
 
@@ -277,8 +284,11 @@ impl Space {
                                 continue 'each_ray;
                             }
                             let stored_light = self.get_lighting(light_cube);
-                            let light_from_struck_face =
-                                ev_hit.attributes.light_emission + stored_light.into();
+
+                            let surface_color = ev_hit.color.to_rgb() * SURFACE_ABSORPTION
+                                + RGB::ONE * (1. - SURFACE_ABSORPTION);
+                            let light_from_struck_face = ev_hit.attributes.light_emission
+                                + RGB::from(stored_light) * surface_color;
                             incoming_light += light_from_struck_face * ray_alpha;
                             dependencies.push(light_cube);
                             // This terminates the raycast; we don't bounce rays
