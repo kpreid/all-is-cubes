@@ -97,13 +97,14 @@ impl Body {
             let mut delta_position = unobstructed_delta_position;
             while delta_position != Vector3::zero() {
                 assert!(i < 3, "sliding collision loop did not finish");
-                i += 1;
                 // Each call to collide_and_advance will zero at least one axis of delta_position.
                 // The nonzero axes are for sliding movement.
                 let (new_delta_position, segment) =
                     self.collide_and_advance(space, &mut collision_callback, delta_position);
                 delta_position = new_delta_position;
                 move_segments[i] = segment;
+
+                i += 1;
             }
         } else {
             self.position += unobstructed_delta_position;
@@ -253,6 +254,8 @@ mod tests {
         body.step(Duration::from_secs(2), None, |_| ());
         assert_eq!(body.position, Point3::new(4.0, 1.0, 0.0));
     }
+
+    // TODO: test having all 3 move segments
 
     // TODO: test collision
 
