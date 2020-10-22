@@ -173,7 +173,33 @@ impl Space {
     }
 
     #[inline]
-    fn update_lighting_now_on(&mut self, cube: GridPoint) -> (PackedLightScalar, LightingUpdateInfo) {
+    fn update_lighting_now_on(
+        &mut self,
+        cube: GridPoint,
+    ) -> (PackedLightScalar, LightingUpdateInfo) {
+        let (new_light_value, dependencies, info) = self.compute_lighting(cube);
+        let old_light_value: PackedLight = self.get_lighting(cube);
+        let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
+        if difference_magnitude > 0 {
+            // TODO: compute index only once
+            self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
+            self.notifier.notify(SpaceChange::Lighting(cube));
+            for cube in dependencies {
+                self.light_needs_update(cube, difference_magnitude);
+            }
+        }
+        (difference_magnitude, info)
+    }
+
+    /// Compute the new lighting value for a cube.
+    ///
+    /// The returned vector of points lists those cubes which the computed value depends on
+    /// (imprecisely; empty cubes passed through are not listed).
+    #[inline]
+    fn compute_lighting(
+        &self,
+        cube: GridPoint,
+    ) -> (PackedLight, Vec<GridPoint>, LightingUpdateInfo) {
         // Accumulator of incoming light encountered.
         let mut incoming_light: RGB = RGB::ZERO;
         // Number of rays contributing to incoming_light.
@@ -213,8 +239,8 @@ impl Space {
                             // adjacent cube as the light falling on that face.
                             let light_cube = hit.previous_cube();
                             let stored_light = self.get_lighting(light_cube);
-                            let light_from_struck_face = ev_hit.attributes.light_emission
-                                + stored_light.into();
+                            let light_from_struck_face =
+                                ev_hit.attributes.light_emission + stored_light.into();
                             incoming_light += light_from_struck_face * ray_alpha;
                             dependencies.push(light_cube);
                             // This terminates the raycast; we don't bounce rays
@@ -247,7 +273,7 @@ impl Space {
                         }
                     }
                     // TODO: set *info even if we hit the sky
-                    
+
                     // Note that if ray_alpha has reached zero, this has no effect.
                     incoming_light += self.sky_color() * ray_alpha;
                     total_rays += 1;
@@ -262,21 +288,15 @@ impl Space {
         // We just need to avoid dividing by zero.
         let scale = NotNan::new(1.0 / total_rays.max(1) as f32).unwrap();
         let new_light_value: PackedLight = (incoming_light * scale).into();
-        let old_light_value: PackedLight = self.get_lighting(cube);
-        let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
-        if difference_magnitude > 0 {
-            // TODO: compute index only once
-            self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
-            self.notifier.notify(SpaceChange::Lighting(cube));
-            for cube in dependencies {
-                self.light_needs_update(cube, difference_magnitude);
-            }
-        }
-        (difference_magnitude, LightingUpdateInfo {
-            cube,
-            result: new_light_value,
-            rays: info_rays,
-        })
+        (
+            new_light_value,
+            dependencies,
+            LightingUpdateInfo {
+                cube,
+                result: new_light_value,
+                rays: info_rays,
+            },
+        )
     }
 }
 
