@@ -74,6 +74,7 @@ impl From<PackedLight> for RGB {
 
 const RAY_DIRECTION_STEP: isize = 2;
 const RAYS_PER_FACE: usize = ((1 + RAY_DIRECTION_STEP * 2) * (1 + RAY_DIRECTION_STEP * 2)) as usize;
+const ALL_RAYS_COUNT: usize = RAYS_PER_FACE * 6;
 
 /// Fixed configuration of light rays to use for light tracing.
 #[derive(Clone, Copy)]
@@ -158,7 +159,11 @@ impl Space {
         while let Some(LightUpdateRequest { cube, .. }) = self.lighting_update_queue.pop() {
             self.lighting_update_set.remove(&cube);
             light_update_count += 1;
-            max_difference = max_difference.max(self.update_lighting_now_on(cube));
+            // Note: For performance, it is key that this call site ignores the info value
+            // and the functions are inlined. Thus, the info calculation can be
+            // optimized away.
+            let (difference, _) = self.update_lighting_now_on(cube);
+            max_difference = max_difference.max(difference);
             if light_update_count >= 120 {
                 break;
             }
@@ -171,13 +176,41 @@ impl Space {
     }
 
     #[inline]
-    fn update_lighting_now_on(&mut self, cube: GridPoint) -> PackedLightScalar {
+    fn update_lighting_now_on(
+        &mut self,
+        cube: GridPoint,
+    ) -> (PackedLightScalar, LightingUpdateInfo) {
+        let (new_light_value, dependencies, info) = self.compute_lighting(cube);
+        let old_light_value: PackedLight = self.get_lighting(cube);
+        let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
+        if difference_magnitude > 0 {
+            // TODO: compute index only once
+            self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
+            self.notifier.notify(SpaceChange::Lighting(cube));
+            for cube in dependencies {
+                self.light_needs_update(cube, difference_magnitude);
+            }
+        }
+        (difference_magnitude, info)
+    }
+
+    /// Compute the new lighting value for a cube.
+    ///
+    /// The returned vector of points lists those cubes which the computed value depends on
+    /// (imprecisely; empty cubes passed through are not listed).
+    #[inline]
+    fn compute_lighting(
+        &self,
+        cube: GridPoint,
+    ) -> (PackedLight, Vec<GridPoint>, LightingUpdateInfo) {
         // Accumulator of incoming light encountered.
         let mut incoming_light: RGB = RGB::ZERO;
         // Number of rays contributing to incoming_light.
         let mut total_rays = 0;
         // Cubes whose lighting value contributed to the incoming_light value.
         let mut dependencies: Vec<GridPoint> = Vec::new();
+        // Diagnostics. TODO not written yet
+        let mut info_rays: [Option<LightingUpdateRayInfo>; ALL_RAYS_COUNT] = [None; ALL_RAYS_COUNT];
 
         let ev_origin = self.get_evaluated(cube);
         if ev_origin.opaque {
@@ -194,6 +227,8 @@ impl Space {
                     // tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
                     let mut ray_alpha = 1.0_f32;
 
+                    let info = &mut info_rays[total_rays];
+
                     for hit in raycaster {
                         let ev_hit = self.get_evaluated(hit.cube);
                         if !ev_hit.visible {
@@ -206,13 +241,26 @@ impl Space {
                             // On striking a fully opaque block, we use the light value from its
                             // adjacent cube as the light falling on that face.
                             let light_cube = hit.previous_cube();
-                            let light_from_struck_face = ev_hit.attributes.light_emission
-                                + self.get_lighting(light_cube).into();
+                            let stored_light = self.get_lighting(light_cube);
+                            let light_from_struck_face =
+                                ev_hit.attributes.light_emission + stored_light.into();
                             incoming_light += light_from_struck_face * ray_alpha;
                             dependencies.push(light_cube);
                             // This terminates the raycast; we don't bounce rays
                             // (diffuse reflections, not specular/mirror).
                             ray_alpha = 0.0;
+
+                            // Diagnostics. TODO: Track transparency to some extent.
+                            *info = Some(LightingUpdateRayInfo {
+                                ray: Ray {
+                                    origin: ray.origin,
+                                    direction: ray.direction * 10.0, // TODO: translate hit position into ray
+                                },
+                                trigger_cube: hit.cube,
+                                value_cube: light_cube,
+                                value: stored_light,
+                            });
+
                             break;
                         } else {
                             // Block is partly transparent and light should pass through.
@@ -227,6 +275,8 @@ impl Space {
                             dependencies.push(hit.cube);
                         }
                     }
+                    // TODO: set *info even if we hit the sky
+
                     // Note that if ray_alpha has reached zero, this has no effect.
                     incoming_light += self.sky_color() * ray_alpha;
                     total_rays += 1;
@@ -241,18 +291,33 @@ impl Space {
         // We just need to avoid dividing by zero.
         let scale = NotNan::new(1.0 / total_rays.max(1) as f32).unwrap();
         let new_light_value: PackedLight = (incoming_light * scale).into();
-        let old_light_value: PackedLight = self.get_lighting(cube);
-        let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
-        if difference_magnitude > 0 {
-            // TODO: compute index only once
-            self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
-            self.notifier.notify(SpaceChange::Lighting(cube));
-            for cube in dependencies {
-                self.light_needs_update(cube, difference_magnitude);
-            }
-        }
-        difference_magnitude
+        (
+            new_light_value,
+            dependencies,
+            LightingUpdateInfo {
+                cube,
+                result: new_light_value,
+                rays: info_rays,
+            },
+        )
     }
+}
+
+/// Diagnostic data returned by lighting updates.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct LightingUpdateInfo {
+    cube: GridPoint,
+    result: PackedLight,
+    rays: [Option<LightingUpdateRayInfo>; ALL_RAYS_COUNT],
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct LightingUpdateRayInfo {
+    ray: Ray,
+    trigger_cube: GridPoint,
+    value_cube: GridPoint,
+    value: PackedLight,
 }
 
 #[cfg(test)]
