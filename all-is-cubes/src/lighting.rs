@@ -159,6 +159,9 @@ impl Space {
         while let Some(LightUpdateRequest { cube, .. }) = self.lighting_update_queue.pop() {
             self.lighting_update_set.remove(&cube);
             light_update_count += 1;
+            // Note: For performance, it is key that this call site ignores the info value
+            // and the functions are inlined. Thus, the info calculation can be
+            // optimized away.
             let (difference, _) = self.update_lighting_now_on(cube);
             max_difference = max_difference.max(difference);
             if light_update_count >= 120 {
