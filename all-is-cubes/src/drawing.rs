@@ -16,7 +16,7 @@ use std::convert::TryInto;
 
 use crate::block::{Block, BlockAttributes};
 use crate::blockgen::BlockGen;
-use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
+use crate::math::{GridCoordinate, GridPoint, GridVector, RGB, RGBA};
 use crate::space::{Grid, SetCubeError, Space};
 
 /// Draw text into a `Space`, extending in the +X and -Y directions from `origin`.
@@ -33,9 +33,9 @@ where
     F: Font + Copy,
 {
     let style = TextStyleBuilder::new(font).text_color(color).build();
-    Text::new(text.as_ref(), Point::new(origin.x as i32, -origin.y as i32))
+    Text::new(text.as_ref(), Point::new(0, 0))
         .into_styled(style)
-        .draw(&mut VoxelDisplayAdapter::new(space, origin.z))
+        .draw(&mut VoxelDisplayAdapter::new(space, origin))
     // Note: unwrap() is currently safe because there's no way for setting an atom cube
     // to fail, but if we generalize that later then we might need more error handling.
 }
@@ -78,13 +78,10 @@ where
                 .expect("can't happen: draw_to_blocks failed to write to its own block space");
         }
 
-        let offset = Point::new(-cube.x as i32 * block_size, cube.y as i32 * block_size);
-        object
-            .translate(offset)
-            .draw(&mut VoxelDisplayAdapter::new(
-                &mut block_space,
-                ctx.size / 2,
-            ))?;
+        object.draw(&mut VoxelDisplayAdapter::new(
+            &mut block_space,
+            GridPoint::new(-cube.x * block_size, -cube.y * block_size, ctx.size / 2),
+        ))?;
         output_space
             .set(
                 cube,
@@ -105,27 +102,23 @@ where
 /// The vertical flip is because embedded_graphics assumes Y-down coordinates for text.
 pub struct VoxelDisplayAdapter<'a> {
     space: &'a mut Space,
-    // TODO: allow input pixel color to control z, or even thickness/patterning,
-    // by providing a custom type instead of Rgb888. (Unfortunately, pixel color types
-    // are required to be Copy so we cannot just use Block.)
-    z: GridCoordinate,
+    origin: GridPoint,
 }
 
 impl<'a> VoxelDisplayAdapter<'a> {
-    fn new(space: &'a mut Space, z: GridCoordinate) -> Self {
-        Self { space, z }
+    fn new(space: &'a mut Space, origin: GridPoint) -> Self {
+        Self { space, origin }
     }
 }
 
 impl VoxelDisplayAdapter<'_> {
+    /// Converts 2D point to 3D point. Helper for multiple `impl DrawTarget`s.
     fn convert_point(&self, point: Point) -> GridPoint {
-        GridPoint::new(
-            point.x as GridCoordinate,
-            -point.y as GridCoordinate,
-            self.z,
-        )
+        self.origin + GridVector::new(point.x, -point.y, 0)
     }
 
+    /// Converts the return value of `Space::set` to the return value of
+    /// `DrawTarget::draw_pixel`, by making out-of-bounds not an error.
     fn handle_set_result(result: Result<bool, SetCubeError>) -> Result<(), SetCubeError> {
         match result {
             Ok(_) => Ok(()),
@@ -265,10 +258,12 @@ mod tests {
     fn drawing_adapter_works() -> Result<(), SetCubeError> {
         let mut space = Space::empty_positive(100, 100, 100);
 
-        Pixel(Point::new(2, -3), Rgb888::new(0, 127, 255))
-            .draw(&mut VoxelDisplayAdapter::new(&mut space, 4))?;
+        Pixel(Point::new(2, -3), Rgb888::new(0, 127, 255)).draw(&mut VoxelDisplayAdapter::new(
+            &mut space,
+            GridPoint::new(1, 2, 4),
+        ))?;
         assert_eq!(
-            space[(2, 3, 4)].color(),
+            space[(3, 5, 4)].color(),
             RGBA::new(0.0, 127.0 / 255.0, 1.0, 1.0)
         );
         Ok(())
@@ -280,7 +275,10 @@ mod tests {
         let mut space = Space::empty_positive(100, 100, 100);
 
         let brush = VoxelBrush::new(vec![((0, 0, 0), &blocks[0]), ((0, 1, 1), &blocks[1])]);
-        Pixel(Point::new(2, -3), brush).draw(&mut VoxelDisplayAdapter::new(&mut space, 4))?;
+        Pixel(Point::new(2, -3), brush).draw(&mut VoxelDisplayAdapter::new(
+            &mut space,
+            GridPoint::new(0, 0, 4),
+        ))?;
 
         assert_eq!(&space[(2, 3, 4)], &blocks[0]);
         assert_eq!(&space[(2, 4, 5)], &blocks[1]);
@@ -292,8 +290,10 @@ mod tests {
         let mut space = Space::empty_positive(100, 100, 100);
 
         // This should not fail with SetCubeError::OutOfBounds
-        Pixel(Point::new(-10, 0), Rgb888::new(0, 127, 255))
-            .draw(&mut VoxelDisplayAdapter::new(&mut space, 4))?;
+        Pixel(Point::new(-10, 0), Rgb888::new(0, 127, 255)).draw(&mut VoxelDisplayAdapter::new(
+            &mut space,
+            GridPoint::new(0, 0, 4),
+        ))?;
         Ok(())
     }
 
