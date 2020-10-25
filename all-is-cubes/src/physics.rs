@@ -1,10 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-use cgmath::{
-    Basis2, Deg, EuclideanSpace as _, InnerSpace as _, Point3, Rotation, Rotation2, Vector2,
-    Vector3, Zero,
-};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use std::collections::HashSet;
 use std::time::Duration;
 
