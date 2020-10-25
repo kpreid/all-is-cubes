@@ -327,8 +327,13 @@ impl InputProcessor {
         camera.set_velocity_input(self.movement());
 
         let turning_step = 80.0 * timestep.as_secs_f64();
-        camera.body.yaw += turning_step * self.net_movement(Key::Left, Key::Right);
-        camera.body.pitch += turning_step * self.net_movement(Key::Up, Key::Down);
+        camera.body.yaw = (camera.body.yaw
+            + turning_step * self.net_movement(Key::Left, Key::Right))
+        .rem_euclid(360.0);
+        camera.body.pitch = (camera.body.pitch
+            + turning_step * self.net_movement(Key::Up, Key::Down))
+        .min(90.0)
+        .max(-90.0);
     }
 
     fn net_movement(&self, negative: Key, positive: Key) -> FreeCoordinate {
