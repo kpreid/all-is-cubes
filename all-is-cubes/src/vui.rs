@@ -6,10 +6,15 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
+use embedded_graphics::geometry::Point;
+use embedded_graphics::prelude::{Drawable, Primitive};
+use embedded_graphics::primitives::Rectangle;
+use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
-use crate::block::{Block, AIR};
-use crate::math::{FreeCoordinate, RGBA};
+use crate::block::{Block, BlockAttributes, AIR};
+use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
+use crate::math::{FreeCoordinate, GridPoint, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
@@ -74,6 +79,33 @@ fn draw_hud_space(universe: &mut Universe) -> URef<Space> {
     universe.insert_anonymous(space)
 }
 
+#[allow(unused)] // TODO: not yet used for real
+pub(crate) fn draw_background(space: &mut Space) {
+    let grid = *space.grid();
+    let background_rect = Rectangle::new(
+        Point::new(grid.lower_bounds().x, -grid.upper_bounds().y + 1),
+        Point::new(grid.upper_bounds().x - 1, -grid.lower_bounds().y),
+    );
+
+    let display = &mut VoxelDisplayAdapter::new(space, GridPoint::new(0, 0, grid.lower_bounds().z));
+
+    let background_block = Block::Atom(BlockAttributes::default(), RGBA::new(0.5, 0.5, 0.5, 1.0));
+    let background = VoxelBrush::single(&background_block);
+    let frame_block = Block::Atom(BlockAttributes::default(), RGBA::new(0.95, 0.95, 0.95, 1.0));
+    let frame = VoxelBrush::single(&frame_block).translate((0, 0, 1));
+
+    background_rect
+        .into_styled(
+            PrimitiveStyleBuilder::new()
+                .stroke_width(1)
+                .stroke_color(frame)
+                .fill_color(background)
+                .build(),
+        )
+        .draw(display)
+        .unwrap();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +113,11 @@ mod tests {
     #[test]
     fn vui_smoke_test() {
         let _ = Vui::new();
+    }
+
+    #[test]
+    fn background_smoke_test() {
+        let mut space = Space::empty_positive(100, 100, 10);
+        draw_background(&mut space);
     }
 }
