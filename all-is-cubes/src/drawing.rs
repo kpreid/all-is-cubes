@@ -109,7 +109,8 @@ pub struct VoxelDisplayAdapter<'a> {
 }
 
 impl<'a> VoxelDisplayAdapter<'a> {
-    fn new(space: &'a mut Space, origin: GridPoint) -> Self {
+    // TODO: need public interface to construct it, possibly a method on Space.
+    pub(crate) fn new(space: &'a mut Space, origin: GridPoint) -> Self {
         Self { space, origin }
     }
 }
