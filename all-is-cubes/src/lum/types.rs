@@ -4,7 +4,7 @@
 //! Key data types for graphics code to use.
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
-use luminance_derive::{Semantics, Vertex};
+use luminance::{Semantics, Vertex};
 use luminance_front::context::GraphicsContext;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;

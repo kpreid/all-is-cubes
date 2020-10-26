@@ -4,7 +4,6 @@
 use cgmath::Point2;
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
-use luminance_windowing::WindowOpt;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
@@ -42,7 +41,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     let universe = new_universe_with_stuff();
 
-    let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id(), WindowOpt::default())
+    let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
     let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper().viewport())

@@ -4,7 +4,7 @@
 // Shaders, uniforms, etc.
 
 use cgmath::Matrix4;
-use luminance_derive::UniformInterface;
+use luminance::UniformInterface;
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::TextureBinding;
 use luminance_front::pixel::NormUnsigned;
@@ -54,21 +54,15 @@ const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
 const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 
 #[derive(Debug, UniformInterface)]
-#[rustfmt::skip]
 pub struct BlockUniformInterface {
-    // TODO: Passing matrices as four vectors due to bug
-    //     https://github.com/phaazon/luminance-rs/issues/434
-    #[uniform(unbound)] projection_matrix0: Uniform<[f32; 4]>,
-    #[uniform(unbound)] projection_matrix1: Uniform<[f32; 4]>,
-    #[uniform(unbound)] projection_matrix2: Uniform<[f32; 4]>,
-    #[uniform(unbound)] projection_matrix3: Uniform<[f32; 4]>,
+    #[uniform(unbound)]
+    projection_matrix: Uniform<[[f32; 4]; 4]>,
 
-    #[uniform(unbound)] view_matrix0: Uniform<[f32; 4]>,
-    #[uniform(unbound)] view_matrix1: Uniform<[f32; 4]>,
-    #[uniform(unbound)] view_matrix2: Uniform<[f32; 4]>,
-    #[uniform(unbound)] view_matrix3: Uniform<[f32; 4]>,
+    #[uniform(unbound)]
+    view_matrix: Uniform<[[f32; 4]; 4]>,
 
-    #[uniform(unbound)] block_texture: Uniform<TextureBinding<Dim2Array, NormUnsigned>>,
+    #[uniform(unbound)]
+    block_texture: Uniform<TextureBinding<Dim2Array, NormUnsigned>>,
 }
 
 impl BlockUniformInterface {
@@ -77,11 +71,10 @@ impl BlockUniformInterface {
         program_iface: &mut ProgramInterface,
         projection_matrix: Matrix4<FreeCoordinate>,
     ) {
-        let pm: [[f32; 4]; 4] = projection_matrix.cast::<f32>().unwrap().into();
-        program_iface.set(&self.projection_matrix0, pm[0]);
-        program_iface.set(&self.projection_matrix1, pm[1]);
-        program_iface.set(&self.projection_matrix2, pm[2]);
-        program_iface.set(&self.projection_matrix3, pm[3]);
+        program_iface.set(
+            &self.projection_matrix,
+            projection_matrix.cast::<f32>().unwrap().into(),
+        );
     }
 
     pub fn set_view_matrix(
@@ -89,11 +82,7 @@ impl BlockUniformInterface {
         program_iface: &mut ProgramInterface,
         view_matrix: Matrix4<FreeCoordinate>,
     ) {
-        let pm: [[f32; 4]; 4] = view_matrix.cast::<f32>().unwrap().into();
-        program_iface.set(&self.view_matrix0, pm[0]);
-        program_iface.set(&self.view_matrix1, pm[1]);
-        program_iface.set(&self.view_matrix2, pm[2]);
-        program_iface.set(&self.view_matrix3, pm[3]);
+        program_iface.set(&self.view_matrix, view_matrix.cast::<f32>().unwrap().into());
     }
 
     pub fn set_block_texture(
