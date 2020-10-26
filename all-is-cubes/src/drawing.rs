@@ -159,7 +159,7 @@ where
 }
 
 /// A `VoxelBrush` may be used to draw multiple layers of blocks from a single 2D
-/// graphic, producing shadow or outline effects.
+/// graphic, producing shadow or outline effects, or simply changing the depth/layer.
 impl DrawTarget<VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
     type Error = SetCubeError;
 
@@ -220,6 +220,24 @@ impl<'a> VoxelBrush<'a> {
             result.0[i] = Some((offset.into(), block));
         }
         result
+    }
+
+    /// Makes a `VoxelBrush` which paints the specified block with no offset.
+    pub fn single(block: &'a Block) -> Self {
+        Self::new(vec![((0, 0, 0), block)])
+    }
+
+    /// Add the given offset to the offset of each blocks, offsetting everything drawn.
+    ///
+    /// Caution: Since the coordinates are `i8`, this cannot be used for the full
+    /// `GridPoint` range.
+    pub fn translate<V: Into<Vector3<i8>>>(mut self, offset: V) -> Self {
+        let offset = offset.into();
+        for (block_offset, _) in self.0.iter_mut().flatten() {
+            // TODO: use explicitly checked add for a good error?
+            *block_offset += offset;
+        }
+        self
     }
 }
 
@@ -353,5 +371,23 @@ mod tests {
         } else {
             panic!("not a recursive block");
         }
+    }
+
+    #[test]
+    fn voxel_brush_single() {
+        let block = make_some_blocks(1).swap_remove(0);
+        assert_eq!(
+            VoxelBrush::single(&block),
+            VoxelBrush::new(vec![((0, 0, 0), &block)]),
+        );
+    }
+
+    #[test]
+    fn voxel_brush_translate() {
+        let block = make_some_blocks(1).swap_remove(0);
+        assert_eq!(
+            VoxelBrush::new(vec![((1, 2, 3), &block)]).translate((10, 20, 30)),
+            VoxelBrush::new(vec![((11, 22, 33), &block)]),
+        );
     }
 }
