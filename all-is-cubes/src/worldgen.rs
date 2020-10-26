@@ -3,15 +3,15 @@
 
 //! Procedural world generation.
 
-use cgmath::{Vector3, Vector4};
+use cgmath::{Point3, Vector3, Vector4};
 use std::borrow::Cow;
 use std::convert::TryInto;
 
 use crate::block::{Block, BlockAttributes};
 use crate::blockgen::LandscapeBlocks;
-use crate::math::{FreeCoordinate, GridCoordinate};
+use crate::math::{FreeCoordinate, GridCoordinate, RGBA};
 use crate::raycast::{Face, Raycaster};
-use crate::space::Space;
+use crate::space::{Grid, Space};
 
 /// Draw the world axes as lines of blocks centered on (0, 0, 0).
 ///
@@ -112,4 +112,80 @@ pub fn wavy_landscape(space: &mut Space, blocks: &LandscapeBlocks, max_slope: Fr
             }
         }
     }
+}
+
+/// Generate a space which is both completely enclosed and has a convenient flat surface
+/// for adding stuff to and, as the name suggests, testing physics.
+///
+/// TODO: This is not actually used yet. Don't declare it "stable" until we've proven
+/// that this design is useful.
+/// TODO: Add some lights.
+/// TODO: Define exactly what the radii mean so users can build things on surfaces.
+#[allow(unused)]
+fn physics_lab(shell_radius: u16, planet_radius: u16) -> Space {
+    assert!(shell_radius > planet_radius);
+    let space_radius = shell_radius + 1; // TODO check off-by-one consistency
+    let mut space = Space::empty(Grid::new(
+        Point3::new(-1, -1, -1) * space_radius.into(),
+        Vector3::new(1, 1, 1) * (space_radius * 2 + 1).into(),
+    ));
+    let shell_radius: GridCoordinate = shell_radius.into();
+    let planet_radius: GridCoordinate = planet_radius.into();
+
+    let outer_wall_block = Block::Atom(
+        BlockAttributes {
+            display_name: "Celestial Cube".into(),
+            ..BlockAttributes::default()
+        },
+        RGBA::new(0.2, 0.2, 0.2, 1.0),
+    );
+    let floor_1 = Block::Atom(
+        BlockAttributes {
+            display_name: "Floor".into(),
+            ..BlockAttributes::default()
+        },
+        RGBA::new(0.5, 0.5, 0.5, 1.0),
+    );
+    let floor_2 = Block::Atom(
+        BlockAttributes {
+            display_name: "Floor".into(),
+            ..BlockAttributes::default()
+        },
+        RGBA::new(0.95, 0.95, 0.95, 1.0),
+    );
+
+    // Outer walls
+    // TODO: Build some utilities for symmetric systematic constructions so we don't have to handcode this.
+    let mut place_outer_wall = |p| {
+        // TODO: add some random stars
+        space.set(p, &outer_wall_block).unwrap();
+    };
+    for x in -shell_radius..=shell_radius {
+        for y in -shell_radius..=shell_radius {
+            if x.abs() == shell_radius || y.abs() == shell_radius {
+                for z in -shell_radius..=shell_radius {
+                    place_outer_wall((x, y, z));
+                }
+            } else {
+                place_outer_wall((x, y, shell_radius));
+                place_outer_wall((x, y, -shell_radius));
+            }
+        }
+    }
+
+    // Inner surface.
+    for x in -planet_radius..=planet_radius {
+        for y in -planet_radius..=planet_radius {
+            for z in -planet_radius..=planet_radius {
+                let block = if (x + y + z).rem_euclid(2) == 0 {
+                    &floor_1
+                } else {
+                    &floor_2
+                };
+                space.set((x, y, z), block).unwrap();
+            }
+        }
+    }
+
+    space
 }
