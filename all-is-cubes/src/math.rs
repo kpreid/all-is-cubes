@@ -45,7 +45,7 @@ pub trait Geometry {
 ///
 /// So far, nearly every usage of Face has a use for `WITHIN`, but we should keep an eye
 /// out for uses of the 'true' 6-face version.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 #[rustfmt::skip]
 pub enum Face {
     WITHIN, NX, NY, NZ, PX, PY, PZ,
