@@ -55,48 +55,41 @@ impl Block {
     /// information needed for rendering and physics, and does not require `URef` access
     /// to other objects.
     pub fn evaluate(&self) -> Result<EvaluatedBlock, RefError> {
-        let color = self.color(); // TODO replace this with the proper voxel test
+        match self {
+            Block::Atom(attributes, color) => Ok(EvaluatedBlock {
+                attributes: attributes.clone(),
+                color: color.clone(),
+                voxels: None,
+                opaque: color.fully_opaque(),
+                visible: !color.fully_transparent(),
+            }),
 
-        let voxels = match self {
-            Block::Atom(_, _) => None,
-            Block::Recur(_, space_ref) => {
+            Block::Recur(attributes, space_ref) => {
                 let block_space = space_ref.try_borrow()?;
-                Some(block_space.extract(
-                    *block_space.grid(),
-                    |_index, sub_block_data, _lighting| {
+                let voxels =
+                    block_space.extract(*block_space.grid(), |_index, sub_block_data, _lighting| {
                         // TODO: need to also extract solidity info once we start doing collision
                         sub_block_data.evaluated().color
-                    },
-                ))
+                    });
+                Ok(EvaluatedBlock {
+                    attributes: attributes.clone(),
+                    color: RGBA::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels
+                    // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
+
+                    opaque: voxels
+                        .grid()
+                        .interior_iter()
+                        .all(|p| voxels[p].fully_opaque()),
+                    visible: voxels
+                        .grid()
+                        .interior_iter()
+                        .all(|p| !voxels[p].fully_transparent()),
+
+                    voxels: Some(voxels),
+                })
             }
-        };
-
-        let opaque = if let Some(array) = &voxels {
-            // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
-            array
-                .grid()
-                .interior_iter()
-                .all(|p| array[p].fully_opaque())
-        } else {
-            color.fully_opaque()
-        };
-        let visible = if let Some(array) = &voxels {
-            array
-                .grid()
-                .interior_iter()
-                .all(|p| !array[p].fully_transparent())
-        } else {
-            !color.fully_transparent()
-        };
-
+        }
         // TODO: need to track which things we need change notifications on
-        Ok(EvaluatedBlock {
-            attributes: self.attributes().clone(),
-            color,
-            voxels,
-            opaque,
-            visible,
-        })
     }
 }
 
