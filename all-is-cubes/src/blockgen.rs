@@ -119,7 +119,12 @@ impl LandscapeBlocks {
         // TODO: this needs to become a lot shorter
         result.grass = ctx.block_from_function(
             BlockAttributes {
-                display_name: grass_color.attributes().display_name.clone(),
+                display_name: grass_color
+                    .evaluate()
+                    .unwrap()
+                    .attributes
+                    .display_name
+                    .clone(),
                 ..BlockAttributes::default()
             },
             |ctx, point, random| {

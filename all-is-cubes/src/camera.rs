@@ -11,7 +11,7 @@ use num_traits::identities::Zero;
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::block::{Block, AIR};
+use crate::block::{Block, EvaluatedBlock, AIR};
 use crate::math::{FreeCoordinate, GridPoint, AAB};
 use crate::physics::Body;
 use crate::raycast::{Ray, RaycastStep, Raycaster};
@@ -270,11 +270,12 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
     // TODO: implement 'reach' radius limit
     // Note: it may become the cse in the future that we want to pass something more specialized than a RaycastStep, but for now RaycastStep is exactly the right structure.
     for step in ray {
-        let block = &space[step.cube];
-        if block.attributes().selectable {
+        let evaluated = space.get_evaluated(step.cube);
+        if evaluated.attributes.selectable {
             return Some(Cursor {
                 place: step,
-                block: block.clone(),
+                block: space[step.cube].clone(),
+                evaluated: evaluated.clone(),
             });
         }
     }
@@ -288,6 +289,8 @@ pub struct Cursor {
     pub place: RaycastStep,
     /// The block that was found in the given cube.
     pub block: Block,
+    /// The EvaluatedBlock data for the block.
+    pub evaluated: EvaluatedBlock,
 }
 
 impl std::fmt::Display for Cursor {
@@ -295,7 +298,7 @@ impl std::fmt::Display for Cursor {
         write!(
             f,
             "Block: {}\n   at: {:?}",
-            self.block.attributes().display_name,
+            self.evaluated.attributes.display_name,
             self.place.cube.as_concise_debug()
         )
     }
