@@ -60,34 +60,34 @@ pub fn draw_space<O: io::Write>(
 
     // Copy data out of Space (whose access is not thread safe due to contained URefs).
     let grid = *space.grid();
-    let recur_arena = Arena::with_capacity(space.distinct_blocks_unfiltered_iter().len());
-    let block_data: Vec<TracingBlock> = space
-        .distinct_blocks_unfiltered_iter()
-        .map(|block| {
-            let character = block
-                .attributes()
+    let blocks_iter = space.distinct_blocks_unfiltered_iter();
+    let recur_arena = Arena::with_capacity(blocks_iter.len());
+    let indexed_block_data: Vec<TracingBlock> = blocks_iter
+        .map(|block_data| {
+            let character = block_data
+                .evaluated()
+                .attributes
                 .display_name
                 .chars()
                 .next()
                 .unwrap_or(' ');
-            if let Block::Recur(_, space_ref) = block {
+            // TODO: Should use EvaluatedBlock instead of unpacking ourselves
+            if let Block::Recur(_, space_ref) = block_data.block() {
                 let block_space = space_ref.borrow();
                 TracingBlock::Recur(recur_arena.alloc(block_space.extract(
                     *block_space.grid(),
-                    |_index, sub_block, _lighting| {
-                        // Do not recurse indefinitely, just one level, because that's the
-                        // standard visualization. TODO: But maybe it'd be more fun if...?
-                        (character, sub_block.color())
+                    |_index, sub_block_data, _lighting| {
+                        (character, sub_block_data.evaluated().color)
                     },
                 )))
             } else {
-                TracingBlock::Atom(character, block.color())
+                TracingBlock::Atom(character, block_data.evaluated().color)
             }
         })
         .collect();
     let space_data: GridArray<TracingCubeData> =
         space.extract(grid, |index, _block, lighting| TracingCubeData {
-            block: block_data[index as usize],
+            block: indexed_block_data[index as usize],
             lighting,
         });
     let sky = space.sky_color();

@@ -314,7 +314,7 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
 ) -> BlocksRenderData<V, A> {
     space
         .distinct_blocks_unfiltered_iter()
-        .map(|b| triangulate_block(b, texture_allocator))
+        .map(|block_data| triangulate_block(block_data.block(), texture_allocator))
         .collect()
 }
 

@@ -329,9 +329,12 @@ pub struct Space {
     pub(crate) notifier: Notifier<SpaceChange>,
 }
 
-/// Info about the interpretation of a block index.
+/// Information about the interpretation of a block index.
+///
+/// Design note: This is primarily an internal data structure, but it happens to be
+/// convenient to expose it as a read-only view of exactly this information.
 #[derive(Debug)]
-struct SpaceBlockData {
+pub struct SpaceBlockData {
     /// The block itself.
     block: Block,
     /// Number of uses of this block in the space.
@@ -414,7 +417,7 @@ impl Space {
     pub fn extract<V>(
         &self,
         subgrid: Grid,
-        extractor: impl Fn(BlockIndex, &Block, PackedLight) -> V,
+        extractor: impl Fn(BlockIndex, &SpaceBlockData, PackedLight) -> V,
     ) -> GridArray<V> {
         assert!(
             self.grid.contains_grid(&subgrid),
@@ -431,7 +434,7 @@ impl Space {
                     let block_index = self.contents[cube_index];
                     output.push(extractor(
                         block_index,
-                        &self.block_data[block_index as usize].block,
+                        &self.block_data[block_index as usize],
                         self.lighting[cube_index],
                     ));
                 }
@@ -594,8 +597,8 @@ impl Space {
     /// the results of `.get_block_index()`.
     pub fn distinct_blocks_unfiltered_iter(
         &self,
-    ) -> impl Iterator<Item = &Block> + ExactSizeIterator {
-        self.block_data.iter().map(|data| &data.block)
+    ) -> impl Iterator<Item = &SpaceBlockData> + ExactSizeIterator {
+        self.block_data.iter()
     }
 
     /// Advance time in the space.
@@ -689,6 +692,20 @@ impl SpaceBlockData {
             evaluated: block.evaluate().map_err(SetCubeError::BlockDataAccess)?,
         })
     }
+
+    // Public accessors follow. We do this instead of making public fields so that
+    // the data structure can be changed should a need arise.
+
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
+    pub fn evaluated(&self) -> &EvaluatedBlock {
+        &self.evaluated
+    }
+
+    // TODO: Expose the count field? It is the most like an internal bookkeeping field,
+    // but might be interesting 'statistics'.
 }
 
 /// Ways that Space::set can fail to make a change.

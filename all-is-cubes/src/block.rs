@@ -61,12 +61,13 @@ impl Block {
             Block::Atom(_, _) => None,
             Block::Recur(_, space_ref) => {
                 let block_space = space_ref.try_borrow()?;
-                Some(
-                    block_space.extract(*block_space.grid(), |_index, sub_block, _lighting| {
+                Some(block_space.extract(
+                    *block_space.grid(),
+                    |_index, sub_block_data, _lighting| {
                         // TODO: need to also extract solidity info once we start doing collision
-                        sub_block.color()
-                    }),
-                )
+                        sub_block_data.evaluated().color
+                    },
+                ))
             }
         };
 
