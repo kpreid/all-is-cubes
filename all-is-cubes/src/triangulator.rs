@@ -259,7 +259,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             .unwrap();
 
                             let obscuring_cube = cube + face.normal_vector();
-                            let obscured = space[obscuring_cube].color().fully_opaque();
+                            let obscured = space.get_evaluated(obscuring_cube).opaque;
                             if !obscured {
                                 layer_is_visible_somewhere = true;
                             }
@@ -267,7 +267,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             // Diagnose out-of-space accesses. TODO: Tidy this up and document it, or remove it:
                             // it will happen whenever the space is the wrong size for the textures.
                             let color = if space.grid().contains_cube(cube) {
-                                space[cube].color()
+                                space.get_evaluated(cube).color
                             } else {
                                 RGBA::new(1.0, 1.0, 0.0, 1.0)
                             };
