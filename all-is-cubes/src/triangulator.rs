@@ -15,7 +15,7 @@
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
 use std::convert::TryFrom;
 
-use crate::block::Block;
+use crate::block::EvaluatedBlock;
 use crate::lighting::PackedLight;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
 use crate::space::{Grid, Space};
@@ -175,24 +175,24 @@ fn push_quad_textured<V: From<BlockVertex>>(
 fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // TODO: Arrange to pass in a buffer of old data such that we can reuse existing textures.
     // This will allow for efficient implementation of animated blocks.
-    block: &Block,
+    block: &EvaluatedBlock,
     texture_allocator: &mut A,
 ) -> BlockRenderData<V, A> {
-    match block {
-        Block::Atom(_attributes, color) => {
+    match &block.voxels {
+        None => {
             let faces = FaceMap::generate(|face| {
                 if face == Face::WITHIN {
                     // No interior detail for atom blocks.
                     return FaceRenderData::default();
                 }
 
-                let fully_opaque = color.fully_opaque();
+                let fully_opaque = block.color.fully_opaque();
                 FaceRenderData {
                     // TODO: Port over pseudo-transparency mechanism, then change this to a
                     // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
                     vertices: if fully_opaque {
                         let mut face_vertices: Vec<V> = Vec::with_capacity(6);
-                        push_quad_solid(&mut face_vertices, face, *color);
+                        push_quad_solid(&mut face_vertices, face, block.color);
                         face_vertices
                     } else {
                         Vec::new()
@@ -206,10 +206,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 textures_used: vec![],
             }
         }
-        Block::Recur(_attributes, space_ref) => {
-            let space = &*space_ref
-                .try_borrow()
-                .expect("TODO: generate a failure-indicating BlockRenderData");
+        Some(voxels) => {
             // Construct empty output to mutate, because inside the loops we'll be
             // updating WITHIN independently of other faces.
             let mut output_by_face = FaceMap::generate(|face| FaceRenderData {
@@ -227,6 +224,8 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // because this won't panic and the other strategy will. TODO: Implement
             // dynamic choice of texture size.
             let tile_size: GridCoordinate = texture_allocator.size();
+
+            let out_of_bounds_color = RGBA::new(1.0, 1.0, 0.0, 1.0);
 
             for &face in Face::ALL_SIX {
                 let transform = face.matrix();
@@ -259,18 +258,17 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             .unwrap();
 
                             let obscuring_cube = cube + face.normal_vector();
-                            let obscured = space.get_evaluated(obscuring_cube).opaque;
+                            let obscured = voxels
+                                .get(obscuring_cube)
+                                .map(|c| c.fully_opaque())
+                                .unwrap_or(false);
                             if !obscured {
                                 layer_is_visible_somewhere = true;
                             }
 
                             // Diagnose out-of-space accesses. TODO: Tidy this up and document it, or remove it:
                             // it will happen whenever the space is the wrong size for the textures.
-                            let color = if space.grid().contains_cube(cube) {
-                                space.get_evaluated(cube).color
-                            } else {
-                                RGBA::new(1.0, 1.0, 0.0, 1.0)
-                            };
+                            let color = voxels.get(cube).unwrap_or(&out_of_bounds_color);
 
                             if layer == 0 && !color.fully_opaque() {
                                 // If the first layer is transparent somewhere...
@@ -314,7 +312,7 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
 ) -> BlocksRenderData<V, A> {
     space
         .distinct_blocks_unfiltered_iter()
-        .map(|block_data| triangulate_block(block_data.block(), texture_allocator))
+        .map(|block_data| triangulate_block(block_data.evaluated(), texture_allocator))
         .collect()
 }
 
@@ -434,7 +432,7 @@ impl TextureTile for () {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::BlockAttributes;
+    use crate::block::{Block, BlockAttributes};
     use crate::blockgen::make_some_blocks;
     use crate::universe::Universe;
     use cgmath::MetricSpace as _;

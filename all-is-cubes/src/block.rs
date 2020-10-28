@@ -40,7 +40,7 @@ impl Block {
         match self {
             Block::Atom(attributes, color) => Ok(EvaluatedBlock {
                 attributes: attributes.clone(),
-                color: color.clone(),
+                color: *color,
                 voxels: None,
                 opaque: color.fully_opaque(),
                 visible: !color.fully_transparent(),
@@ -182,9 +182,9 @@ mod tests {
             light_emission: RGB::ONE,
             ..BlockAttributes::default()
         };
-        let block = Block::Atom(attributes, color);
+        let block = Block::Atom(attributes.clone(), color);
         let e = block.evaluate().unwrap();
-        assert_eq!(&e.attributes, attributes);
+        assert_eq!(e.attributes, attributes);
         assert_eq!(e.color, block.color());
         assert!(e.voxels.is_none());
         assert_eq!(e.opaque, true);
@@ -222,7 +222,7 @@ mod tests {
             display_name: Cow::Borrowed(&"hello world"),
             ..BlockAttributes::default()
         };
-        let block = bg.block_from_function(attributes, |_ctx, point, _random| {
+        let block = bg.block_from_function(attributes.clone(), |_ctx, point, _random| {
             let point = point.cast::<f32>().unwrap();
             Block::Atom(
                 BlockAttributes::default(),
@@ -231,7 +231,7 @@ mod tests {
         });
 
         let e = block.evaluate().unwrap();
-        assert_eq!(&e.attributes, attributes);
+        assert_eq!(e.attributes, attributes);
         assert_eq!(
             e.voxels,
             Some(GridArray::generate(
