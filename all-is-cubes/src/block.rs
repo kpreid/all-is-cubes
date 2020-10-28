@@ -24,6 +24,7 @@ pub enum Block {
     /// A block that is a single-colored unit cube. (It may still be be transparent or
     /// non-solid to physics.)
     Atom(BlockAttributes, RGBA),
+
     /// A block that is composed of smaller blocks, defined by the referenced `Space`.
     ///
     /// Renderers are expected to traverse only one recursion level to determine the
@@ -32,15 +33,6 @@ pub enum Block {
 }
 
 impl Block {
-    /// Returns the RGBA color to use for this block when viewed as a single voxel.
-    // TODO: This cannot work for recursive blocks and should be removed or redesigned.
-    pub fn color(&self) -> RGBA {
-        match self {
-            Block::Atom(_, c) => *c,
-            Block::Recur(_, _) => RGBA::new(0.5, 0.5, 0.5, 1.0),
-        }
-    }
-
     /// Returns the `BlockAttributes` for this block, which give properties such as a name.
     // TODO: We're going to want to remove this in favor of evaluate() so that we can
     // have block attributes through indirection so that they can be updated.
@@ -90,6 +82,16 @@ impl Block {
             }
         }
         // TODO: need to track which things we need change notifications on
+    }
+
+    /// Returns the single RGBA color of this block, or panics if it does not have a
+    /// single color. For use in tests only.
+    #[cfg(test)]
+    pub fn color(&self) -> RGBA {
+        match self {
+            Block::Atom(_, c) => *c,
+            _ => panic!("Block::color not defined for non-atom blocks"),
+        }
     }
 }
 
@@ -237,7 +239,6 @@ mod tests {
 
         let e = block.evaluate().unwrap();
         assert_eq!(&e.attributes, block.attributes());
-        assert_eq!(e.color, block.color());
         assert_eq!(
             e.voxels,
             Some(GridArray::generate(
