@@ -4,14 +4,14 @@
 //! Definition of blocks, which are game objects which live in the grid of a
 //! [`Space`]. See [`Block`] for details.
 
-use cgmath::EuclideanSpace as _;
+use cgmath::{EuclideanSpace as _, Transform as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
-use crate::math::{GridCoordinate, GridPoint, Rgb, Rgba};
+use crate::math::{GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
 use crate::universe::{Name, RefError, URef, Universe, UniverseIndex as _};
 use crate::util::ConciseDebug;
@@ -55,6 +55,14 @@ pub enum Block {
         resolution: u8,
         space: URef<Space>,
     },
+
+    /// Identical to another block, but with rotated coordinates.
+    ///
+    /// Specifically, the given rotation specifies how the given block's coordinate
+    /// system is rotated into this block's.
+    // TODO: Hmm, it'd be nice if this common case wasn't another allocation — should we
+    // have an outer struct with a rotation field instead??
+    Rotated(GridRotation, Box<Block>),
 }
 
 impl Block {
@@ -119,6 +127,22 @@ impl Block {
                     voxels: Some(voxels),
                 })
             }
+
+            // TODO: this has no unit tests
+            Block::Rotated(rotation, block) => {
+                let base = block.evaluate()?;
+                Ok(EvaluatedBlock {
+                    voxels: base.voxels.map(|voxels| {
+                        let resolution = voxels.grid().size().x;
+                        let matrix = rotation.to_positive_octant_matrix(resolution);
+                        // TODO: Use a rotated grid on the output, which will prevent the function from panicking if the grid size is incorrect
+                        GridArray::generate(voxels.grid(), |cube| {
+                            voxels[matrix.transform_point(cube)]
+                        })
+                    }),
+                    ..base
+                })
+            }
         }
         // TODO: need to track which things we need change notifications on
     }
@@ -163,6 +187,9 @@ impl Block {
                             SpaceChange::Number(_) => None,
                         }
                     }));
+            }
+            Block::Rotated(_, base) => {
+                base.listen(listener)?;
             }
         }
         Ok(())
