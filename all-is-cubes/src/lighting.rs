@@ -219,7 +219,7 @@ impl Space {
             // Opaque blocks are always dark inside.
         } else {
             for face_ray_data in &*LIGHT_RAYS {
-                for ray in &face_ray_data.rays[..] {
+                'each_ray: for ray in &face_ray_data.rays[..] {
                     let raycaster = ray
                         .translate(cube.cast::<FreeCoordinate>().unwrap().to_vec())
                         .cast()
@@ -231,11 +231,11 @@ impl Space {
 
                     let info = &mut info_rays[total_rays];
 
-                    for hit in raycaster {
+                    'raycast: for hit in raycaster {
                         let ev_hit = self.get_evaluated(hit.cube);
                         if !ev_hit.visible {
                             // Completely transparent block is passed through.
-                            continue;
+                            continue 'raycast;
                         }
 
                         // TODO: Implement blocks with some faces opaque.
@@ -243,6 +243,11 @@ impl Space {
                             // On striking a fully opaque block, we use the light value from its
                             // adjacent cube as the light falling on that face.
                             let light_cube = hit.previous_cube();
+                            if light_cube == cube {
+                                // Don't read the value we're trying to recalculate.
+                                // We hit an opaque block, so this ray is stopping.
+                                continue 'each_ray;
+                            }
                             let stored_light = self.get_lighting(light_cube);
                             let light_from_struck_face =
                                 ev_hit.attributes.light_emission + stored_light.into();
@@ -266,12 +271,17 @@ impl Space {
                             break;
                         } else {
                             // Block is partly transparent and light should pass through.
+                            let light_cube = hit.cube;
+                            if light_cube == cube {
+                                // Don't read the value we're trying to recalculate.
+                                continue 'raycast;
+                            }
                             // 'coverage' is what fraction of the light ray we assume to hit this block,
                             // as opposed to passing through it.
                             // TODO: Compute coverage in EvaluatedBlock.
                             let coverage = 0.25;
                             incoming_light += (ev_hit.attributes.light_emission * ray_alpha
-                                + self.get_lighting(hit.cube).into())
+                                + self.get_lighting(light_cube).into())
                                 * coverage;
                             ray_alpha *= 1.0 - coverage;
                             dependencies.push(hit.cube);
@@ -366,9 +376,9 @@ mod tests {
         assert_eq!(
             info,
             SpaceStepInfo {
-                light_update_count: 3,
+                light_update_count: 1,
                 light_queue_count: 0,
-                max_light_update_difference: 84,
+                max_light_update_difference: new_sky_light.difference_magnitude(former_sky_light),
                 ..SpaceStepInfo::default()
             }
         );
