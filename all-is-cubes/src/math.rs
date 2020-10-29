@@ -9,7 +9,7 @@ use cgmath::{
 use num_traits::identities::Zero;
 use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
-use std::ops::{Add, AddAssign, Index, IndexMut, Mul};
+use std::ops::{Add, AddAssign, Index, IndexMut, Mul, Sub};
 
 use crate::space::Grid;
 
@@ -423,6 +423,18 @@ impl AddAssign<RGB> for RGB {
 impl AddAssign<RGBA> for RGBA {
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
+    }
+}
+impl Sub<RGB> for RGB {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0)
+    }
+}
+impl Sub<RGBA> for RGBA {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0)
     }
 }
 /// Multiplies two color values componentwise.

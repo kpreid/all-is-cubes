@@ -30,6 +30,8 @@ impl PackedLight {
     /// Unit value of these fixed-point color components, as a f32 for conversion calculations.
     const UNIT_F32: f32 = 64.0;
 
+    pub(crate) const ZERO: PackedLight = PackedLight(Vector3 { x: 0, y: 0, z: 0 });
+
     #[inline]
     fn difference_magnitude(self, other: PackedLight) -> PackedLightScalar {
         fn dm(a: PackedLightScalar, b: PackedLightScalar) -> PackedLightScalar {
@@ -324,6 +326,7 @@ pub struct LightingUpdateRayInfo {
 mod tests {
     use super::*;
     use crate::space::Space;
+    use std::time::Duration;
 
     #[test]
     fn initial_lighting_value() {
@@ -344,8 +347,35 @@ mod tests {
     }
 
     #[test]
-    fn quiesce() {
-        
+    fn step() {
+        let mut space = Space::empty_positive(3, 1, 1);
+        let former_sky_light = PackedLight::from(space.sky_color());
+        space.set_sky_color(RGB::new(1.0, 0.0, 0.0));
+        // subtraction compensates for an apparent rounding error; I haven't looked into whether
+        // it's bug-like
+        let new_sky_light = PackedLight::from(space.sky_color() - RGB::new(1.0 / 64.0, 0.0, 0.0));
+
+        space.set((0, 0, 0), &RGB::ONE.into()).unwrap();
+        // Not changed yet... except for the now-opaque block
+        assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::ZERO);
+        assert_eq!(space.get_lighting((1, 0, 0)), former_sky_light);
+        assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light);
+
+        // Duration doesn't currently matter
+        let info = space.step(Duration::from_millis(10));
+        assert_eq!(
+            info,
+            SpaceStepInfo {
+                light_update_count: 3,
+                light_queue_count: 0,
+                max_light_update_difference: 84,
+                ..SpaceStepInfo::default()
+            }
+        );
+
+        assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::ZERO); // opaque
+        assert_eq!(space.get_lighting((1, 0, 0)), new_sky_light); // updated
+        assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light); // not updated
     }
 
     // TODO: test sky lighting propagation onto blocks after quiescing

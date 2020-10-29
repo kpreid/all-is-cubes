@@ -529,7 +529,7 @@ impl Space {
                 // Side effects.
                 self.notifier
                     .notify(SpaceChange::Number(old_block_index as BlockIndex));
-                self.side_effects_of_set(old_block_index, position);
+                self.side_effects_of_set(old_block_index, position, contents_index);
                 return Ok(true);
             }
 
@@ -551,7 +551,7 @@ impl Space {
             // Write actual space change.
             self.contents[contents_index] = new_block_index;
 
-            self.side_effects_of_set(new_block_index, position);
+            self.side_effects_of_set(new_block_index, position, contents_index);
             Ok(true)
         } else {
             Err(SetCubeError::OutOfBounds)
@@ -559,11 +559,26 @@ impl Space {
     }
 
     /// Implement the consequences of changing a block.
-    fn side_effects_of_set(&mut self, block_index: BlockIndex, position: GridPoint) {
+    ///
+    /// `content_index` is redundant with `position` but saves computation.
+    #[inline]
+    fn side_effects_of_set(
+        &mut self,
+        block_index: BlockIndex,
+        position: GridPoint,
+        contents_index: usize,
+    ) {
         // TODO: Move this into a function in the lighting module since it is so tied to lighting
         let opaque = self.block_data[block_index as usize].evaluated.opaque;
         if !opaque {
             self.light_needs_update(position, PackedLightScalar::MAX);
+        } else {
+            // Since we already have the information, immediately update light value
+            // to zero rather than putting it in the queue.
+            // (It would be mostly okay to skip doing this entirely, but doing it gives
+            // more determinism, and the old value could be temporarily revealed when
+            // the block is removed.)
+            self.lighting[contents_index] = PackedLight::ZERO;
         }
         for &face in Face::ALL_SIX {
             let neighbor = position + face.normal_vector();
@@ -733,7 +748,7 @@ pub enum SpaceChange {
 /// Performance data returned by `Space::step`. The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct SpaceStepInfo {
     /// Number of blocks whose light data was updated this step.
