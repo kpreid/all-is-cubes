@@ -24,6 +24,7 @@ pub mod lum;
 pub mod math;
 pub mod physics;
 pub mod raycast;
+pub mod raytracer;
 pub mod space;
 pub mod triangulator;
 pub mod universe;
