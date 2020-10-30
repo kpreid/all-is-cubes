@@ -6,6 +6,7 @@
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
+use std::borrow::Cow;
 use std::convert::TryFrom;
 
 use crate::camera::ProjectionHelper;
@@ -197,10 +198,8 @@ impl<P: PixelBuf> TracingState<P> {
         if self.number_passed > 1000 {
             // Abort excessively long traces.
             self.pixel_buf = Default::default();
-            self.pixel_buf.add(
-                RGBA::new(1.0, 1.0, 1.0, 1.0),
-                &P::error_block_data(),
-            );
+            self.pixel_buf
+                .add(RGBA::new(1.0, 1.0, 1.0, 1.0), &P::error_block_data());
             true
         } else {
             self.pixel_buf.opaque()
@@ -214,10 +213,8 @@ impl<P: PixelBuf> TracingState<P> {
             self.pixel_buf.hit_nothing();
         }
 
-        self.pixel_buf.add(
-            sky_color.with_alpha_one(),
-            &P::sky_block_data(),
-        );
+        self.pixel_buf
+            .add(sky_color.with_alpha_one(), &P::sky_block_data());
 
         (self.pixel_buf.result(), self.number_passed)
     }
@@ -241,6 +238,18 @@ impl<P: PixelBuf> TracingState<P> {
         self.pixel_buf
             .add(adjusted_rgb.with_alpha(surface.alpha()), block_data);
     }
+}
+
+fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
+    // TODO: notion of "one step" is less coherent ...
+    let one_step = 1.0 / 5.0;
+    let modifier = match face {
+        Face::PY => RGB::ONE * one_step * 2.0,
+        Face::NY => RGB::ONE * one_step * -1.0,
+        Face::NX | Face::PX => RGB::ONE * one_step * 1.0,
+        _ => RGB::ONE * 0.0,
+    };
+    rgb + modifier
 }
 
 /// Representation of a single output pixel being computed.
@@ -353,16 +362,58 @@ impl Default for ColorBuf {
     }
 }
 
-fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
-    // TODO: notion of "one step" is less coherent ...
-    let one_step = 1.0 / 5.0;
-    let modifier = match face {
-        Face::PY => RGB::ONE * one_step * 2.0,
-        Face::NY => RGB::ONE * one_step * -1.0,
-        Face::NX | Face::PX => RGB::ONE * one_step * 1.0,
-        _ => RGB::ONE * 0.0,
-    };
-    rgb + modifier
+/// Implements `PixelBuf` for text output: captures block names rather than
+/// colors.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CharacterBuf {
+    /// Text to draw, if determined yet.
+    hit_text: Option<String>,
+}
+
+impl PixelBuf for CharacterBuf {
+    type Pixel = String;
+    type BlockData = Cow<'static, str>;
+
+    fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
+        // TODO: For more Unicode correctness, index by grapheme cluster...
+        // ...and do something clever about double-width characters.
+        s.evaluated()
+            .attributes
+            .display_name
+            .chars()
+            .next()
+            .map(|c| Cow::Owned(c.to_string()))
+            .unwrap_or(Cow::Borrowed(&" "))
+    }
+
+    fn error_block_data() -> Self::BlockData {
+        Cow::Borrowed(&"X")
+    }
+
+    fn sky_block_data() -> Self::BlockData {
+        Cow::Borrowed(&" ")
+    }
+
+    #[inline]
+    fn opaque(&self) -> bool {
+        self.hit_text.is_some()
+    }
+
+    #[inline]
+    fn result(self) -> String {
+        self.hit_text.unwrap_or_else(|| ".".to_owned())
+    }
+
+    #[inline]
+    fn add(&mut self, _surface_color: RGBA, text: &Self::BlockData) {
+        if self.hit_text.is_none() {
+            self.hit_text = Some(text.to_owned().to_string());
+        }
+    }
+
+    fn hit_nothing(&mut self) {
+        self.hit_text = Some(".".to_owned());
+    }
 }
 
 #[cfg(test)]

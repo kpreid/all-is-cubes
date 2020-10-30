@@ -13,7 +13,7 @@ use termion::event::{Event, Key};
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::RGBA;
-use all_is_cubes::raytracer::{raytrace_space, ColorBuf, PixelBuf};
+use all_is_cubes::raytracer::{raytrace_space, CharacterBuf, ColorBuf, PixelBuf};
 use all_is_cubes::space::SpaceBlockData;
 
 /// Processes events for moving a camera. Returns all those events it does not process.
@@ -57,7 +57,7 @@ pub fn draw_space<O: io::Write>(
     let mut number_of_cubes_examined: usize = 0;
 
     write!(out, "{}", termion::cursor::Goto(1, 1))?;
-    for (xch, ych, text, count) in raytrace_space::<CharacterBuf>(projection, space) {
+    for (xch, ych, text, count) in raytrace_space::<ColorCharacterBuf>(projection, space) {
         if xch == 0 && ych != 0 {
             write!(out, "{}", *END_OF_LINE)?;
         }
@@ -76,40 +76,30 @@ pub fn draw_space<O: io::Write>(
     Ok(())
 }
 
-/// Implements `PixelBuf` for text output.
+/// Implements `PixelBuf` for colored text output using `termion`.
 #[derive(Clone, Debug, Default, PartialEq)]
-struct CharacterBuf {
+struct ColorCharacterBuf {
     color: ColorBuf,
-
-    /// Text to draw, if determined yet.
-    hit_text: Option<String>,
+    text: CharacterBuf,
 
     /// Disables normal colorization.
     override_color: bool,
 }
 
-impl PixelBuf for CharacterBuf {
+impl PixelBuf for ColorCharacterBuf {
     type Pixel = String;
-    type BlockData = Cow<'static, str>;
+    type BlockData = <CharacterBuf as PixelBuf>::BlockData;
 
     fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
-        // TODO: For more Unicode correctness, index by grapheme cluster...
-        // ...and do something clever about double-width characters.
-        s.evaluated()
-            .attributes
-            .display_name
-            .chars()
-            .next()
-            .map(|c| Cow::Owned(c.to_string()))
-            .unwrap_or(Cow::Borrowed(&" "))
+        CharacterBuf::compute_block_data(s)
     }
 
     fn error_block_data() -> Self::BlockData {
-        Cow::Borrowed(&"X")
+        CharacterBuf::error_block_data()
     }
 
     fn sky_block_data() -> Self::BlockData {
-        Cow::Borrowed(&" ")
+        CharacterBuf::sky_block_data()
     }
 
     #[inline]
@@ -120,7 +110,7 @@ impl PixelBuf for CharacterBuf {
     #[inline]
     fn result(self) -> String {
         if self.override_color {
-            return self.hit_text.unwrap();
+            return self.text.result();
         }
 
         let final_rgb = self.color.result().to_rgb();
@@ -134,12 +124,12 @@ impl PixelBuf for CharacterBuf {
             scale(final_rgb.green()),
             scale(final_rgb.blue()),
         );
-        if let Some(text) = self.hit_text {
+        if self.text.opaque() {
             format!(
                 "{}{}{}",
                 color::Bg(converted_color),
                 color::Fg(color::Black),
-                text
+                self.text.result()
             )
         } else {
             format!(
@@ -157,18 +147,18 @@ impl PixelBuf for CharacterBuf {
         }
 
         self.color.add(surface_color, &());
-
-        if self.hit_text.is_none() {
-            self.hit_text = Some(text.to_owned().to_string());
-        }
+        self.text.add(surface_color, text);
     }
 
     fn hit_nothing(&mut self) {
-        self.hit_text = Some(format!(
-            "{}{} ",
-            color::Bg(color::Reset),
-            color::Fg(color::Reset)
-        ));
+        self.text.add(
+            RGBA::TRANSPARENT,
+            &Cow::Owned(format!(
+                "{}{} ",
+                color::Bg(color::Reset),
+                color::Fg(color::Reset)
+            )),
+        );
         self.override_color = true;
     }
 }
