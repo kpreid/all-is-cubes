@@ -11,10 +11,10 @@ use std::convert::TryFrom;
 use crate::camera::ProjectionHelper;
 use crate::math::{Face, FreeCoordinate, RGB, RGBA};
 use crate::raycast::Ray;
-use crate::space::{Grid, GridArray, PackedLight, Space};
+use crate::space::{GridArray, PackedLight, Space};
 
-// TODO: don't use a tuple result
-// TODO: implement non-parallel version
+// TODO: Reduce code duplication between parallel and non-parallel versions.
+
 #[cfg(feature = "rayon")]
 pub fn raytrace_space<P>(
     projection: &ProjectionHelper,
@@ -22,6 +22,74 @@ pub fn raytrace_space<P>(
 ) -> Vec<(usize, usize, P::Pixel, usize)>
 where
     P: PixelBuf,
+{
+    with_space_tracing(space, |space_data, sky| {
+        // Construct iterator over pixel positions.
+        // TODO: Make this pluggable so we can use incremental rendering strategies.
+        let viewport = projection.viewport();
+        let pixel_iterator = (0..viewport.y)
+            .into_par_iter()
+            .map(move |ych| {
+                let y = projection.normalize_pixel_y(ych);
+                (0..viewport.x).into_par_iter().map(move |xch| {
+                    let x = projection.normalize_pixel_x(xch);
+                    (xch, ych, x, y)
+                })
+            })
+            .flatten();
+
+        // Do the actual tracing.
+        let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
+            let ray = projection.project_ndc_into_world(x, y);
+            let (buf, count) = pixel_from_ray::<P>(ray, &space_data, sky);
+            (xch, ych, buf, count)
+        });
+
+        // Collect into a concrete, non-parallel result. TODO: This can probably be better API
+        output_iterator.collect()
+    })
+}
+
+#[cfg(not(feature = "rayon"))]
+pub fn raytrace_space<P>(
+    projection: &ProjectionHelper,
+    space: &Space,
+) -> Vec<(usize, usize, P::Pixel, usize)>
+where
+    P: PixelBuf,
+{
+    with_space_tracing(space, |space_data, sky| {
+        // Construct iterator over pixel positions.
+        // TODO: Make this pluggable so we can use incremental rendering strategies.
+        let viewport = projection.viewport();
+        let pixel_iterator = (0..viewport.y)
+            .map(move |ych| {
+                let y = projection.normalize_pixel_y(ych);
+                (0..viewport.x).map(move |xch| {
+                    let x = projection.normalize_pixel_x(xch);
+                    (xch, ych, x, y)
+                })
+            })
+            .flatten();
+
+        // Do the actual tracing.
+        let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
+            let ray = projection.project_ndc_into_world(x, y);
+            let (buf, count) = pixel_from_ray::<P>(ray, &space_data, sky);
+            (xch, ych, buf, count)
+        });
+
+        output_iterator.collect()
+    })
+}
+
+/// Call a function with `TracingCubeData` computed from the given `Space`.
+///
+/// This takes a callback so that it can pass borrows of temporaries.
+#[inline]
+fn with_space_tracing<'a, F, R>(space: &'a Space, f: F) -> R
+where
+    F: FnOnce(GridArray<TracingCubeData<'a>>, RGB) -> R,
 {
     // Preprocess data out of Space (whose access is not thread safe due to contained URefs).
     // TODO: Make this pluggable so we're not doing text-specific things.
@@ -47,40 +115,17 @@ where
         });
     let sky = space.sky_color();
 
-    // Construct iterator over pixel positions.
-    // TODO: Make this pluggable so we can use incremental rendering strategies.
-    let viewport = projection.viewport();
-    let pixel_iterator = (0..viewport.y)
-        .into_par_iter()
-        .map(move |ych| {
-            let y = projection.normalize_pixel_y(ych);
-            (0..viewport.x).into_par_iter().map(move |xch| {
-                let x = projection.normalize_pixel_x(xch);
-                (xch, ych, x, y)
-            })
-        })
-        .flatten();
-
-    // Do the actual tracing.
-    let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
-        let ray = projection.project_ndc_into_world(x, y);
-        let (buf, count) = pixel_from_ray::<P>(ray, grid, &space_data, sky);
-        (xch, ych, buf, count)
-    });
-
-    // Collect into a concrete, non-parallel result. TODO: This can probably be better API
-    output_iterator.collect()
+    f(space_data, sky)
 }
 
 #[inline]
 fn pixel_from_ray<P: PixelBuf>(
     ray: Ray,
-    grid: Grid,
     space_data: &GridArray<TracingCubeData>,
     sky: RGB,
 ) -> (P::Pixel, usize) {
     let mut s: TracingState<P> = TracingState::default();
-    for hit in ray.cast().within_grid(grid) {
+    for hit in ray.cast().within_grid(*space_data.grid()) {
         if s.count_step_should_stop() {
             break;
         }
