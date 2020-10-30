@@ -16,7 +16,11 @@ categories = ["games", "graphics"]
 bench = false
 
 [[bench]]
-name = "lighting"
+name = "lighting_bench"
+harness = false
+
+[[bench]]
+name = "raycast_bench"
 harness = false
 
 [features]
