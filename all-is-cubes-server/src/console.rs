@@ -3,19 +3,16 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::{EuclideanSpace as _, Point3, Vector2};
+use cgmath::Vector2;
 use once_cell::sync::Lazy;
 use ordered_float::NotNan;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::io;
 use termion::color;
 use termion::event::{Event, Key};
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
-use all_is_cubes::raycast::{Face, Ray};
-use all_is_cubes::raytracer::{ColorBuf, PixelBuf};
-use all_is_cubes::space::{Grid, GridArray, PackedLight};
+use all_is_cubes::math::RGBA;
+use all_is_cubes::raytracer::{raytrace_space, ColorBuf, PixelBuf};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
 #[rustfmt::skip]
@@ -53,56 +50,12 @@ pub fn draw_space<O: io::Write>(
 ) -> io::Result<()> {
     let space = &*camera.space.borrow_mut();
     projection.set_view_matrix(camera.view());
-    let projection_copy_for_parallel: ProjectionHelper = *projection;
 
     // Diagnostic info accumulators
     let mut number_of_cubes_examined: usize = 0;
 
-    // Copy data out of Space (whose access is not thread safe due to contained URefs).
-    let grid = *space.grid();
-    let indexed_block_data: Vec<TracingBlock> = space
-        .distinct_blocks_unfiltered_iter()
-        .map(|block_data| {
-            let evaluated = block_data.evaluated();
-            // TODO: For more Unicode correctness, index by grapheme cluster...
-            // ...and do something clever about double-width characters.
-            let character: &str = evaluated.attributes.display_name.get(0..1).unwrap_or(&" ");
-            if let Some(ref voxels) = evaluated.voxels {
-                TracingBlock::Recur(character, voxels)
-            } else {
-                TracingBlock::Atom(character, block_data.evaluated().color)
-            }
-        })
-        .collect();
-    let space_data: GridArray<TracingCubeData> =
-        space.extract(grid, |index, _block, lighting| TracingCubeData {
-            block: indexed_block_data[index as usize],
-            lighting,
-        });
-    let sky = space.sky_color();
-
-    // Construct iterator over pixel positions.
-    let viewport = projection.viewport();
-    let pixel_iterator = (0..viewport.y)
-        .into_par_iter()
-        .map(move |ych| {
-            let y = projection.normalize_pixel_y(ych);
-            (0..viewport.x).into_par_iter().map(move |xch| {
-                let x = projection_copy_for_parallel.normalize_pixel_x(xch);
-                (xch, ych, x, y)
-            })
-        })
-        .flatten();
-
-    let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
-        let ray = projection_copy_for_parallel.project_ndc_into_world(x, y);
-        let (text, count) = character_from_ray(ray, grid, &space_data, sky);
-        (xch, ych, text, count)
-    });
-
-    // The actual output writing must be done serially, so collect() the results.
     write!(out, "{}", termion::cursor::Goto(1, 1))?;
-    for (xch, ych, text, count) in output_iterator.collect::<Vec<_>>() {
+    for (xch, ych, text, count) in raytrace_space::<CharacterBuf>(projection, space) {
         if xch == 0 && ych != 0 {
             write!(out, "{}", *END_OF_LINE)?;
         }
@@ -121,139 +74,6 @@ pub fn draw_space<O: io::Write>(
     Ok(())
 }
 
-/// Compute a colored character corresponding to what one ray hits.
-fn character_from_ray(
-    ray: Ray,
-    grid: Grid,
-    space_data: &GridArray<TracingCubeData>,
-    sky: RGB,
-) -> TraceResult {
-    let mut s: TracingState = TracingState::default();
-    for hit in ray.cast().within_grid(grid) {
-        if s.count_step_should_stop() {
-            break;
-        }
-
-        let cube_data = &space_data[hit.cube];
-        match &cube_data.block {
-            TracingBlock::Atom(character, color) => {
-                if color.fully_transparent() {
-                    // Skip lighting lookup
-                    continue;
-                }
-
-                // Find lighting.
-                let lighting: RGB = space_data
-                    .get(hit.previous_cube())
-                    .map(|b| b.lighting.into())
-                    .unwrap_or(sky);
-
-                s.trace_through_surface(*character, *color, lighting, hit.face);
-            }
-            TracingBlock::Recur(character, array) => {
-                // Find lighting.
-                // TODO: duplicated code
-                let lighting: RGB = space_data
-                    .get(hit.previous_cube())
-                    .map(|b| b.lighting.into())
-                    .unwrap_or(sky);
-
-                // Find where the origin in the space's coordinate system is.
-                // TODO: Raycaster does not efficiently implement advancing from outside a
-                // grid. Fix that to get way more performance.
-                let adjusted_ray = Ray {
-                    origin: Point3::from_vec(
-                        (ray.origin - hit.cube.cast::<FreeCoordinate>().unwrap())
-                            * FreeCoordinate::from(array.grid().size().x),
-                    ),
-                    ..ray
-                };
-
-                for subcube_hit in adjusted_ray.cast().within_grid(*array.grid()) {
-                    if s.count_step_should_stop() {
-                        break;
-                    }
-                    let color = array[subcube_hit.cube];
-                    s.trace_through_surface(*character, color, lighting, subcube_hit.face);
-                }
-            }
-        }
-    }
-    s.finish(sky)
-}
-
-#[derive(Clone, Debug)]
-struct TracingCubeData<'a> {
-    block: TracingBlock<'a>,
-    lighting: PackedLight,
-}
-#[derive(Clone, Copy, Debug)]
-enum TracingBlock<'a> {
-    Atom(&'a str, RGBA),
-    Recur(&'a str, &'a GridArray<RGBA>),
-}
-
-type TraceResult = (String, usize);
-
-#[derive(Clone, Debug, Default)]
-struct TracingState {
-    /// Number of cubes traced through -- controlled by the caller, so not necessarily
-    /// equal to the number of calls to trace_through_surface().
-    number_passed: usize,
-    pixel_buf: CharacterBuf,
-}
-impl TracingState {
-    fn count_step_should_stop(&mut self) -> bool {
-        self.number_passed += 1;
-        if self.number_passed > 1000 {
-            // Abort excessively long traces.
-            self.pixel_buf = Default::default();
-            self.pixel_buf.add(RGBA::new(1.0, 1.0, 1.0, 1.0), "X");
-            true
-        } else {
-            self.pixel_buf.opaque()
-        }
-    }
-
-    #[rustfmt::skip]
-    fn finish(mut self, sky_color: RGB) -> TraceResult {
-        if self.number_passed == 0 {
-            // Didn't intersect the world at all. Draw these as plain background.
-            // TODO: Switch to using the sky color, unless debugging options are set.
-            return (format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)), 0);
-        }
-
-        self.pixel_buf.add(sky_color.with_alpha_one(), &" ");
-
-        (self.pixel_buf.result(), self.number_passed)
-    }
-
-    /// Apply the effect of a given surface color.
-    ///
-    /// Note this is not true volumetric ray tracing: we're considering each
-    /// voxel surface to be discrete.
-    fn trace_through_surface(&mut self, character: &str, surface: RGBA, lighting: RGB, face: Face) {
-        if surface.fully_transparent() {
-            return;
-        }
-        let adjusted_rgb = fake_lighting_adjustment(surface.to_rgb() * lighting, face);
-        self.pixel_buf
-            .add(adjusted_rgb.with_alpha(surface.alpha()), character);
-    }
-}
-
-fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
-    // TODO: notion of "one step" is less coherent ...
-    let one_step = 1.0 / 5.0;
-    let modifier = match face {
-        Face::PY => RGB::ONE * one_step * 2.0,
-        Face::NY => RGB::ONE * one_step * -1.0,
-        Face::NX | Face::PX => RGB::ONE * one_step * 1.0,
-        _ => RGB::ONE * 0.0,
-    };
-    rgb + modifier
-}
-
 /// Implements `PixelBuf` for text output.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct CharacterBuf {
@@ -261,10 +81,23 @@ struct CharacterBuf {
 
     /// Character to draw, if determined yet.
     hit_text: Option<String>,
+
+    /// Disables normal colorization.
+    override_color: bool,
 }
 
-impl CharacterBuf {
+impl PixelBuf for CharacterBuf {
+    type Pixel = String;
+
+    fn opaque(&self) -> bool {
+        self.color.opaque()
+    }
+
     fn result(self) -> String {
+        if self.override_color {
+            return self.hit_text.unwrap();
+        }
+
         let final_rgb = self.color.result().to_rgb();
         // TODO: Pick 8/256/truecolor based on what the terminal supports.
         fn scale(x: NotNan<f32>) -> u8 {
@@ -291,10 +124,12 @@ impl CharacterBuf {
             )
         }
     }
-}
 
-impl PixelBuf for CharacterBuf {
     fn add(&mut self, surface_color: RGBA, character: &str) {
+        if self.override_color {
+            return;
+        }
+        
         self.color.add(surface_color, character);
 
         if self.hit_text.is_none() {
@@ -302,8 +137,13 @@ impl PixelBuf for CharacterBuf {
         }
     }
 
-    fn opaque(&self) -> bool {
-        self.color.opaque()
+    fn hit_nothing(&mut self) {
+        self.hit_text = Some(format!(
+            "{}{} ",
+            color::Bg(color::Reset),
+            color::Fg(color::Reset)
+        ));
+        self.override_color = true;
     }
 }
 

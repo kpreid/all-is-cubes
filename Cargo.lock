@@ -33,6 +33,7 @@ dependencies = [
  "owning_ref",
  "rand 0.7.3",
  "rand_xoshiro",
+ "rayon",
 ]
 
 [[package]]
@@ -45,7 +46,6 @@ dependencies = [
  "num-traits",
  "once_cell",
  "ordered-float",
- "rayon",
  "static_dir",
  "termion",
  "tokio",
