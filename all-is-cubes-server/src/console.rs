@@ -9,9 +9,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::io;
 use termion::color;
 use termion::event::{Event, Key};
-use typed_arena::Arena;
 
-use all_is_cubes::block::Block;
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
 use all_is_cubes::raycast::{Face, Ray};
@@ -60,26 +58,18 @@ pub fn draw_space<O: io::Write>(
 
     // Copy data out of Space (whose access is not thread safe due to contained URefs).
     let grid = *space.grid();
-    let blocks_iter = space.distinct_blocks_unfiltered_iter();
-    let recur_arena = Arena::with_capacity(blocks_iter.len());
-    let indexed_block_data: Vec<TracingBlock> = blocks_iter
+    let indexed_block_data: Vec<TracingBlock> = space
+        .distinct_blocks_unfiltered_iter()
         .map(|block_data| {
-            let character = block_data
-                .evaluated()
+            let evaluated = block_data.evaluated();
+            let character = evaluated
                 .attributes
                 .display_name
                 .chars()
                 .next()
                 .unwrap_or(' ');
-            // TODO: Should use EvaluatedBlock instead of unpacking ourselves
-            if let Block::Recur(_, space_ref) = block_data.block() {
-                let block_space = space_ref.borrow();
-                TracingBlock::Recur(recur_arena.alloc(block_space.extract(
-                    *block_space.grid(),
-                    |_index, sub_block_data, _lighting| {
-                        (character, sub_block_data.evaluated().color)
-                    },
-                )))
+            if let Some(ref voxels) = evaluated.voxels {
+                TracingBlock::Recur(character, voxels)
             } else {
                 TracingBlock::Atom(character, block_data.evaluated().color)
             }
@@ -161,7 +151,7 @@ fn character_from_ray(
 
                 s.trace_through_surface(*character, *color, lighting, hit.face);
             }
-            TracingBlock::Recur(array) => {
+            TracingBlock::Recur(character, array) => {
                 // Find lighting.
                 // TODO: duplicated code
                 let lighting: RGB = space_data
@@ -184,8 +174,8 @@ fn character_from_ray(
                     if s.count_step_should_stop() {
                         break;
                     }
-                    let (character, color) = array[subcube_hit.cube];
-                    s.trace_through_surface(character, color, lighting, subcube_hit.face);
+                    let color = array[subcube_hit.cube];
+                    s.trace_through_surface(*character, color, lighting, subcube_hit.face);
                 }
             }
         }
@@ -201,7 +191,7 @@ struct TracingCubeData<'a> {
 #[derive(Clone, Copy, Debug)]
 enum TracingBlock<'a> {
     Atom(char, RGBA),
-    Recur(&'a GridArray<(char, RGBA)>),
+    Recur(char, &'a GridArray<RGBA>),
 }
 
 type TraceResult = (String, usize);
