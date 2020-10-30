@@ -112,10 +112,12 @@ impl PixelBuf for CharacterBuf {
         Cow::Borrowed(&" ")
     }
 
+    #[inline]
     fn opaque(&self) -> bool {
         self.color.opaque()
     }
 
+    #[inline]
     fn result(self) -> String {
         if self.override_color {
             return self.hit_text.unwrap();
@@ -148,6 +150,7 @@ impl PixelBuf for CharacterBuf {
         }
     }
 
+    #[inline]
     fn add(&mut self, surface_color: RGBA, text: &Self::BlockData) {
         if self.override_color {
             return;
