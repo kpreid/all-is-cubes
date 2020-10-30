@@ -6,6 +6,7 @@
 use cgmath::Vector2;
 use once_cell::sync::Lazy;
 use ordered_float::NotNan;
+use std::borrow::Cow;
 use std::io;
 use termion::color;
 use termion::event::{Event, Key};
@@ -13,6 +14,7 @@ use termion::event::{Event, Key};
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::RGBA;
 use all_is_cubes::raytracer::{raytrace_space, ColorBuf, PixelBuf};
+use all_is_cubes::space::SpaceBlockData;
 
 /// Processes events for moving a camera. Returns all those events it does not process.
 #[rustfmt::skip]
@@ -79,7 +81,7 @@ pub fn draw_space<O: io::Write>(
 struct CharacterBuf {
     color: ColorBuf,
 
-    /// Character to draw, if determined yet.
+    /// Text to draw, if determined yet.
     hit_text: Option<String>,
 
     /// Disables normal colorization.
@@ -88,6 +90,27 @@ struct CharacterBuf {
 
 impl PixelBuf for CharacterBuf {
     type Pixel = String;
+    type BlockData = Cow<'static, str>;
+
+    fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
+        // TODO: For more Unicode correctness, index by grapheme cluster...
+        // ...and do something clever about double-width characters.
+        s.evaluated()
+            .attributes
+            .display_name
+            .chars()
+            .next()
+            .map(|c| Cow::Owned(c.to_string()))
+            .unwrap_or(Cow::Borrowed(&" "))
+    }
+
+    fn error_block_data() -> Self::BlockData {
+        Cow::Borrowed(&"X")
+    }
+
+    fn sky_block_data() -> Self::BlockData {
+        Cow::Borrowed(&" ")
+    }
 
     fn opaque(&self) -> bool {
         self.color.opaque()
@@ -125,15 +148,15 @@ impl PixelBuf for CharacterBuf {
         }
     }
 
-    fn add(&mut self, surface_color: RGBA, character: &str) {
+    fn add(&mut self, surface_color: RGBA, text: &Self::BlockData) {
         if self.override_color {
             return;
         }
-        
-        self.color.add(surface_color, character);
+
+        self.color.add(surface_color, &());
 
         if self.hit_text.is_none() {
-            self.hit_text = Some(character.to_owned());
+            self.hit_text = Some(text.to_owned().to_string());
         }
     }
 
