@@ -3,8 +3,9 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::{EuclideanSpace as _, Point3, Vector2, Vector3, Zero};
+use cgmath::{EuclideanSpace as _, Point3, Vector2};
 use once_cell::sync::Lazy;
+use ordered_float::NotNan;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::io;
 use termion::color;
@@ -13,6 +14,7 @@ use termion::event::{Event, Key};
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::{FreeCoordinate, RGB, RGBA};
 use all_is_cubes::raycast::{Face, Ray};
+use all_is_cubes::raytracer::{ColorBuf, PixelBuf};
 use all_is_cubes::space::{Grid, GridArray, PackedLight};
 
 /// Processes events for moving a camera. Returns all those events it does not process.
@@ -62,12 +64,9 @@ pub fn draw_space<O: io::Write>(
         .distinct_blocks_unfiltered_iter()
         .map(|block_data| {
             let evaluated = block_data.evaluated();
-            let character = evaluated
-                .attributes
-                .display_name
-                .chars()
-                .next()
-                .unwrap_or(' ');
+            // TODO: For more Unicode correctness, index by grapheme cluster...
+            // ...and do something clever about double-width characters.
+            let character: &str = evaluated.attributes.display_name.get(0..1).unwrap_or(&" ");
             if let Some(ref voxels) = evaluated.voxels {
                 TracingBlock::Recur(character, voxels)
             } else {
@@ -190,40 +189,29 @@ struct TracingCubeData<'a> {
 }
 #[derive(Clone, Copy, Debug)]
 enum TracingBlock<'a> {
-    Atom(char, RGBA),
-    Recur(char, &'a GridArray<RGBA>),
+    Atom(&'a str, RGBA),
+    Recur(&'a str, &'a GridArray<RGBA>),
 }
 
 type TraceResult = (String, usize);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct TracingState {
     /// Number of cubes traced through -- controlled by the caller, so not necessarily
     /// equal to the number of calls to trace_through_surface().
     number_passed: usize,
-    /// Character to draw, if determined yet.
-    hit_text: Option<String>,
-    /// Color buffer, in “premultiplied alpha” format (each contribution is scaled by
-    /// the current `ray_alpha`).
-    ///
-    /// Note: Not using the `RGB` type to skip NaN checks.
-    color_accumulator: Vector3<f32>,
-    /// Fraction of the color value that is to be determined by future, rather than past,
-    /// tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
-    ray_alpha: f32,
+    pixel_buf: CharacterBuf,
 }
 impl TracingState {
     fn count_step_should_stop(&mut self) -> bool {
         self.number_passed += 1;
         if self.number_passed > 1000 {
             // Abort excessively long traces.
-            self.hit_text = Some("X".to_string());
-            self.color_accumulator = Vector3::new(1.0, 0.0, 0.0);
-            self.ray_alpha = 0.0;
+            self.pixel_buf = Default::default();
+            self.pixel_buf.add(RGBA::new(1.0, 1.0, 1.0, 1.0), "X");
             true
         } else {
-            // Check if we've passed through essentially full opacity.
-            self.ray_alpha <= 1e-3
+            self.pixel_buf.opaque()
         }
     }
 
@@ -235,75 +223,88 @@ impl TracingState {
             return (format!("{}{} ", color::Bg(color::Reset), color::Fg(color::Reset)), 0);
         }
 
-        self.color_accumulator += <Vector3<f32>>::from(sky_color) * self.ray_alpha;
-        self.ray_alpha = 0.0;
+        self.pixel_buf.add(sky_color.with_alpha_one(), &" ");
 
-        // TODO: Pick 8/256/truecolor based on what the terminal supports.
-        fn scale(x: f32) -> u8 {
-            let scale = 5.0;
-            (x * scale).max(0.0).min(scale) as u8
-        }
-        let converted_color = color::AnsiValue::rgb(
-            scale(self.color_accumulator.x),
-            scale(self.color_accumulator.y),
-            scale(self.color_accumulator.z),
-        );
-        let colored_text = if let Some(text) = self.hit_text {
-            format!("{}{}{}",
-                color::Bg(converted_color),
-                color::Fg(color::Black),
-                text)
-        } else {
-            format!("{}{}.",
-                color::Bg(converted_color),
-                color::Fg(color::AnsiValue::rgb(5, 5, 5)))
-        };
-        (colored_text, self.number_passed)
+        (self.pixel_buf.result(), self.number_passed)
     }
 
     /// Apply the effect of a given surface color.
     ///
     /// Note this is not true volumetric ray tracing: we're considering each
-    /// voxel s to be discrete.
-    fn trace_through_surface(&mut self, character: char, surface: RGBA, lighting: RGB, face: Face) {
+    /// voxel surface to be discrete.
+    fn trace_through_surface(&mut self, character: &str, surface: RGBA, lighting: RGB, face: Face) {
         if surface.fully_transparent() {
             return;
         }
-        let surface_alpha = surface.alpha().into_inner();
-        let alpha_for_add = surface_alpha * self.ray_alpha;
-        self.ray_alpha *= 1.0 - surface_alpha;
-        self.color_accumulator +=
-            fake_lighting_adjustment((surface.to_rgb() * lighting).into(), face) * alpha_for_add;
-
-        // Use text of the first non-completely-transparent block.
-        if self.hit_text.is_none() {
-            // TODO: For more Unicode correctness, index by grapheme cluster...
-            // ...and do something clever about double-width characters.
-            self.hit_text = Some(character.to_string());
-        }
-    }
-}
-impl Default for TracingState {
-    fn default() -> Self {
-        Self {
-            number_passed: 0,
-            hit_text: None,
-            color_accumulator: Vector3::zero(),
-            ray_alpha: 1.0,
-        }
+        let adjusted_rgb = fake_lighting_adjustment(surface.to_rgb() * lighting, face);
+        self.pixel_buf
+            .add(adjusted_rgb.with_alpha(surface.alpha()), character);
     }
 }
 
-fn fake_lighting_adjustment(rgb: Vector3<f32>, face: Face) -> Vector3<f32> {
+fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
+    // TODO: notion of "one step" is less coherent ...
     let one_step = 1.0 / 5.0;
-    let v = Vector3::new(1.0, 1.0, 1.0);
     let modifier = match face {
-        Face::PY => v * one_step * 2.0,
-        Face::NY => v * one_step * -1.0,
-        Face::NX | Face::PX => v * one_step * 1.0,
-        _ => v * 0.0,
+        Face::PY => RGB::ONE * one_step * 2.0,
+        Face::NY => RGB::ONE * one_step * -1.0,
+        Face::NX | Face::PX => RGB::ONE * one_step * 1.0,
+        _ => RGB::ONE * 0.0,
     };
     rgb + modifier
+}
+
+/// Implements `PixelBuf` for text output.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct CharacterBuf {
+    color: ColorBuf,
+
+    /// Character to draw, if determined yet.
+    hit_text: Option<String>,
+}
+
+impl CharacterBuf {
+    fn result(self) -> String {
+        let final_rgb = self.color.result().to_rgb();
+        // TODO: Pick 8/256/truecolor based on what the terminal supports.
+        fn scale(x: NotNan<f32>) -> u8 {
+            let scale = 5.0;
+            (x.into_inner() * scale).max(0.0).min(scale) as u8
+        }
+        let converted_color = color::AnsiValue::rgb(
+            scale(final_rgb.red()),
+            scale(final_rgb.green()),
+            scale(final_rgb.blue()),
+        );
+        if let Some(text) = self.hit_text {
+            format!(
+                "{}{}{}",
+                color::Bg(converted_color),
+                color::Fg(color::Black),
+                text
+            )
+        } else {
+            format!(
+                "{}{}.",
+                color::Bg(converted_color),
+                color::Fg(color::AnsiValue::rgb(5, 5, 5))
+            )
+        }
+    }
+}
+
+impl PixelBuf for CharacterBuf {
+    fn add(&mut self, surface_color: RGBA, character: &str) {
+        self.color.add(surface_color, character);
+
+        if self.hit_text.is_none() {
+            self.hit_text = Some(character.to_owned());
+        }
+    }
+
+    fn opaque(&self) -> bool {
+        self.color.opaque()
+    }
 }
 
 static END_OF_LINE: Lazy<String> =
