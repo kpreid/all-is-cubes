@@ -919,9 +919,9 @@ dependencies = [
 
 [[package]]
 name = "luminance-gl"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c8937245566274ccaf6fa81551ae66b9581a285fce09938b4ac0937abf31385"
+checksum = "9ec6224c577c680462316d3106170cc33949384aca8abe7e5c0496d2d333e1eb"
 dependencies = [
  "gl",
  "luminance",
@@ -942,9 +942,9 @@ dependencies = [
 
 [[package]]
 name = "luminance-webgl"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4ca8ebbb3888593dd1abaa51703721ee72e8519490a5a63af2f585a18550406"
+checksum = "ab3dd52005a9a099177f7e1f9ce0ec27003e5bf16164f42441b38fdb1d27216f"
 dependencies = [
  "js-sys",
  "luminance",
