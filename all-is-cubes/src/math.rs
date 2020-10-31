@@ -501,6 +501,25 @@ pub struct AAB {
 }
 
 impl AAB {
+    /// The AAB of zero size at the origin.
+    pub const ZERO: AAB = AAB {
+        lower_bounds: Point3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+        upper_bounds: Point3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+        sizes: Vector3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+    };
+
     #[track_caller]
     pub fn new(
         lx: FreeCoordinate,
