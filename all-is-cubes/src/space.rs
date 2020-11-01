@@ -3,6 +3,7 @@
 
 //! That which contains many blocks.
 
+use cgmath::Point3;
 use itertools::Itertools as _;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
@@ -150,6 +151,20 @@ impl Grid {
     /// The range of Z coordinates for cubes within the grid.
     pub fn z_range(&self) -> Range<GridCoordinate> {
         self.axis_range(2)
+    }
+
+    /// The center of the enclosed volume. Returns `FreeCoordinate` since the center
+    /// may be at a half-block position.
+    ///
+    /// ```
+    /// use all_is_cubes::space::Grid;
+    /// use cgmath::Point3;
+    ///
+    /// let grid = Grid::new((0, 0, -2), (10, 3, 4));
+    /// assert_eq!(grid.center(), Point3::new(5.0, 1.5, 0.0));
+    /// ```
+    pub fn center(&self) -> Point3<FreeCoordinate> {
+        self.lower_bounds.map(FreeCoordinate::from) + self.sizes.map(FreeCoordinate::from) / 2.0
     }
 
     /// Iterate over all cubes.
