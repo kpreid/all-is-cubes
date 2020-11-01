@@ -4,15 +4,98 @@
 //! Raytracer for `Space`s.
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
+use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
 use crate::camera::ProjectionHelper;
-use crate::math::{Face, FreeCoordinate, RGB, RGBA};
+use crate::math::{Face, FreeCoordinate, GridPoint, RGB, RGBA};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
+
+/// Precomputed data for raytracing a single frame of a single Space.
+pub struct SpaceRaytracer<P: PixelBuf>(SpaceRaytracerImpl<P>);
+
+/// Helper struct for `SpaceRaytracer` so the details of `ouroboros::self_referencing`
+/// aren't exposed.
+#[self_referencing]
+struct SpaceRaytracerImpl<P: PixelBuf> {
+    blocks: Box<[TracingBlock<P::BlockData>]>,
+    #[borrows(blocks)]
+    cubes: GridArray<TracingCubeData<'this, P::BlockData>>,
+    sky_color: RGB,
+}
+
+impl<P: PixelBuf> SpaceRaytracer<P> {
+    /// Snapshots the given `Space` to prepare for raytracing it.
+    pub fn new(space: &Space) -> Self {
+        SpaceRaytracer(SpaceRaytracerImplBuilder {
+            blocks: prepare_blocks::<P>(space),
+            cubes_builder: |blocks: &[TracingBlock<P::BlockData>]| prepare_cubes::<P>(blocks, space),
+            sky_color: space.sky_color(),
+        }.build())
+    }
+
+    /// Computes a single image pixel from the given ray.
+    pub fn trace_ray(&self, ray: Ray) -> (P::Pixel, usize) {
+        self.0.with(|impl_fields| {
+            let cubes = impl_fields.cubes;
+            let mut s: TracingState<P> = TracingState::default();
+            for hit in ray.cast().within_grid(*cubes.grid()) {
+                if s.count_step_should_stop() {
+                    break;
+                }
+
+                match &cubes[hit.cube].block {
+                    TracingBlock::Atom(pixel_block_data, color) => {
+                        if color.fully_transparent() {
+                            continue;
+                        }
+                        s.trace_through_surface(pixel_block_data, *color, self.get_lighting(hit.previous_cube()), hit.face);
+                    }
+                    TracingBlock::Recur(pixel_block_data, array) => {
+                        // Find where the origin in the space's coordinate system is.
+                        // TODO: Raycaster does not efficiently implement advancing from outside a
+                        // grid. Fix that to get way more performance.
+                        let adjusted_ray = Ray {
+                            origin: Point3::from_vec(
+                                (ray.origin - hit.cube.cast::<FreeCoordinate>().unwrap())
+                                    * FreeCoordinate::from(array.grid().size().x),
+                            ),
+                            ..ray
+                        };
+                        let lighting = self.get_lighting(hit.previous_cube());
+                        for subcube_hit in adjusted_ray.cast().within_grid(*array.grid()) {
+                            if s.count_step_should_stop() {
+                                break;
+                            }
+                            let color = array[subcube_hit.cube];
+                            s.trace_through_surface(pixel_block_data, color, lighting, subcube_hit.face);
+                        }
+                    }
+                }
+            }
+            s.finish(*impl_fields.sky_color)
+        })
+    }
+
+    /// Computes a single image pixel from the given normalized device coordinates and projection.
+    pub fn trace_pixel(&self, projection: &ProjectionHelper, x: FreeCoordinate, y: FreeCoordinate) -> (P::Pixel, usize) {
+        self.trace_ray(projection.project_ndc_into_world(x, y))
+    }
+
+    #[inline]
+    fn get_lighting(&self, cube: GridPoint) -> RGB {
+        self.0.with(|impl_fields| {
+            impl_fields.cubes
+               .get(cube)
+               .map(|b| b.lighting.into())
+               .unwrap_or(*impl_fields.sky_color)
+        })
+    }
+}
 
 // TODO: Reduce code duplication between parallel and non-parallel versions.
 
@@ -21,9 +104,7 @@ pub fn raytrace_space<P: PixelBuf>(
     projection: &ProjectionHelper,
     space: &Space,
 ) -> Vec<(usize, usize, P::Pixel, usize)> {
-    let indexed_block_data = prepare_blocks::<P>(space);
-    let space_data = prepare_cubes::<P>(&indexed_block_data, space);
-    let sky = space.sky_color();
+    let t = SpaceRaytracer::<P>::new(space);
 
     // Construct iterator over pixel positions.
     // TODO: Make this pluggable so we can use incremental rendering strategies.
@@ -41,8 +122,7 @@ pub fn raytrace_space<P: PixelBuf>(
 
     // Do the actual tracing.
     let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
-        let ray = projection.project_ndc_into_world(x, y);
-        let (pixel, count) = pixel_from_ray::<P>(ray, &space_data, sky);
+        let (pixel, count) = t.trace_ray(projection.project_ndc_into_world(x, y));
         (xch, ych, pixel, count)
     });
 
@@ -55,9 +135,7 @@ pub fn raytrace_space<P: PixelBuf>(
     projection: &ProjectionHelper,
     space: &Space,
 ) -> Vec<(usize, usize, P::Pixel, usize)> {
-    let indexed_block_data = prepare_blocks::<P>(space);
-    let space_data = prepare_cubes::<P>(&indexed_block_data, space);
-    let sky = space.sky_color();
+    let t = SpaceRaytracer::<P>::new(space);
 
     // Construct iterator over pixel positions.
     // TODO: Make this pluggable so we can use incremental rendering strategies.
@@ -74,8 +152,7 @@ pub fn raytrace_space<P: PixelBuf>(
 
     // Do the actual tracing.
     let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
-        let ray = projection.project_ndc_into_world(x, y);
-        let (pixel, count) = pixel_from_ray::<P>(ray, &space_data, sky);
+        let (pixel, count) = t.trace(projection.project_ndc_into_world(x, y));
         (xch, ych, pixel, count)
     });
 
@@ -84,7 +161,7 @@ pub fn raytrace_space<P: PixelBuf>(
 
 /// Get block data out of `Space` (which is not `Sync`, and not specialized for our efficient use).
 #[inline]
-fn prepare_blocks<P: PixelBuf>(space: &Space) -> Vec<TracingBlock<P::BlockData>> {
+fn prepare_blocks<P: PixelBuf>(space: &Space) -> Box<[TracingBlock<P::BlockData>]> {
     space
         .distinct_blocks_unfiltered_iter()
         .map(|block_data| {
@@ -103,7 +180,7 @@ fn prepare_blocks<P: PixelBuf>(space: &Space) -> Vec<TracingBlock<P::BlockData>>
 #[inline]
 #[allow(clippy::ptr_arg)] // no benefit
 fn prepare_cubes<'a, P: PixelBuf>(
-    indexed_block_data: &'a Vec<TracingBlock<P::BlockData>>,
+    indexed_block_data: &'a [TracingBlock<P::BlockData>],
     space: &Space,
 ) -> GridArray<TracingCubeData<'a, P::BlockData>> {
     space.extract(*space.grid(), |index, _block, lighting| TracingCubeData {
@@ -112,65 +189,7 @@ fn prepare_cubes<'a, P: PixelBuf>(
     })
 }
 
-#[inline]
-fn pixel_from_ray<P: PixelBuf>(
-    ray: Ray,
-    space_data: &GridArray<TracingCubeData<P::BlockData>>,
-    sky: RGB,
-) -> (P::Pixel, usize) {
-    let mut s: TracingState<P> = TracingState::default();
-    for hit in ray.cast().within_grid(*space_data.grid()) {
-        if s.count_step_should_stop() {
-            break;
-        }
 
-        let cube_data = &space_data[hit.cube];
-        match &cube_data.block {
-            TracingBlock::Atom(pixel_block_data, color) => {
-                if color.fully_transparent() {
-                    // Skip lighting lookup
-                    continue;
-                }
-
-                // Find lighting.
-                let lighting: RGB = space_data
-                    .get(hit.previous_cube())
-                    .map(|b| b.lighting.into())
-                    .unwrap_or(sky);
-
-                s.trace_through_surface(pixel_block_data, *color, lighting, hit.face);
-            }
-            TracingBlock::Recur(pixel_block_data, array) => {
-                // Find lighting.
-                // TODO: duplicated code
-                let lighting: RGB = space_data
-                    .get(hit.previous_cube())
-                    .map(|b| b.lighting.into())
-                    .unwrap_or(sky);
-
-                // Find where the origin in the space's coordinate system is.
-                // TODO: Raycaster does not efficiently implement advancing from outside a
-                // grid. Fix that to get way more performance.
-                let adjusted_ray = Ray {
-                    origin: Point3::from_vec(
-                        (ray.origin - hit.cube.cast::<FreeCoordinate>().unwrap())
-                            * FreeCoordinate::from(array.grid().size().x),
-                    ),
-                    ..ray
-                };
-
-                for subcube_hit in adjusted_ray.cast().within_grid(*array.grid()) {
-                    if s.count_step_should_stop() {
-                        break;
-                    }
-                    let color = array[subcube_hit.cube];
-                    s.trace_through_surface(pixel_block_data, color, lighting, subcube_hit.face);
-                }
-            }
-        }
-    }
-    s.finish(sky)
-}
 
 #[derive(Clone, Debug)]
 struct TracingCubeData<'a, B: 'static> {
