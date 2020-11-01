@@ -2,7 +2,6 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::time::Duration;
 
 use all_is_cubes::blockgen::{BlockGen, LandscapeBlocks};
-use all_is_cubes::camera::Camera;
 use all_is_cubes::space::{Grid, Space, SpaceStepInfo};
 use all_is_cubes::universe::{Universe, UniverseIndex as _};
 use all_is_cubes::worldgen::{axes, wavy_landscape};
@@ -49,10 +48,7 @@ fn universe_for_lighting_test() -> Universe {
     wavy_landscape(&mut space, &blocks, 1.0);
     axes(&mut space);
 
-    let space_ref = universe.insert("space".into(), space);
-
-    let camera = Camera::for_space(space_ref);
-    universe.insert("camera".into(), camera);
+    universe.insert("space".into(), space);
     universe
 }
 

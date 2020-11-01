@@ -1,7 +1,6 @@
-use cgmath::{Point3, Vector3};
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use all_is_cubes::raycast::{Ray, Raycaster};
+use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::Grid;
 
 pub fn raycast_bench(c: &mut Criterion) {
