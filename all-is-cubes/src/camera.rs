@@ -4,8 +4,8 @@
 //! Miscellaneous display and player-character stuff.
 
 use cgmath::{
-    Deg, EuclideanSpace, Matrix3, Matrix4, Point2, Point3, SquareMatrix, Transform, Vector2,
-    Vector3, Vector4,
+    Deg, EuclideanSpace, InnerSpace, Matrix3, Matrix4, Point2, Point3, SquareMatrix, Transform,
+    Vector2, Vector3, Vector4,
 };
 use num_traits::identities::Zero;
 use std::collections::HashSet;
@@ -57,19 +57,33 @@ impl std::fmt::Debug for Camera {
 }
 
 impl Camera {
-    pub fn for_space(space: URef<Space>) -> Self {
+    /// Constructs a `Camera` located outside the `Space` and with its bounds in frame.
+    ///
+    /// `direction` gives the direction in which the camera will lie relative to the
+    /// center of the space.
+    pub fn looking_at_space(space: URef<Space>, direction: Vector3<FreeCoordinate>) -> Self {
         let grid: Grid = *space.borrow().grid();
+
+        let center_point = grid.center();
+        let mut space_radius: FreeCoordinate = 0.0;
+        for axis in 0..3 {
+            space_radius = space_radius.max(grid.size()[axis].into());
+        }
+        let offset = direction.normalize() * space_radius; // TODO: allow for camera FoV
+
+        let mut camera = Self::new(space, center_point + offset);
+        camera.body.look_at(center_point);
+
+        camera
+    }
+
+    /// Constructs a `Camera` with specified position.
+    pub fn new(space: URef<Space>, position: impl Into<Point3<FreeCoordinate>>) -> Self {
         Self {
-            body: Body {
-                // TODO: this starting point is pretty arbitrary, but we'll be replacing it with persistent character position tied into worldgen.
-                position: ((grid.lower_bounds() + grid.upper_bounds().to_vec()) / 2)
-                    .map(FreeCoordinate::from)
-                    + Vector3::new(-3.0, 3.0, -3.0),
-                velocity: Vector3::zero(),
-                collision_box: AAB::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
-                yaw: 00.0,
-                pitch: 15.0,
-            },
+            body: Body::new_minimal(
+                position.into(),
+                AAB::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
+            ),
             space,
             auto_rotate: false,
             velocity_input: Vector3::zero(),

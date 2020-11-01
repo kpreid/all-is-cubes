@@ -6,6 +6,7 @@
 //! This is split out into its own module so that test data tinkering doesn't
 //! touch the same files as the engine code.
 
+use cgmath::Vector3;
 use embedded_graphics::fonts::Font8x16;
 use embedded_graphics::fonts::Text;
 use embedded_graphics::geometry::Point;
@@ -89,8 +90,10 @@ where
 {
     let mut universe = Universe::new();
     let space: Space = space_fn(&mut universe);
+    let position = space.grid().center() + Vector3::new(-3.0, 3.0, -3.0);
     let space_ref = universe.insert("space".into(), space);
-    let camera = Camera::for_space(space_ref);
+    //let camera = Camera::looking_at_space(space_ref, Vector3::new(0.5, 0.5, 1.0));
+    let camera = Camera::new(space_ref, position);
     universe.insert("camera".into(), camera);
     universe
 }
