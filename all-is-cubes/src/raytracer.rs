@@ -31,11 +31,16 @@ struct SpaceRaytracerImpl<P: PixelBuf> {
 impl<P: PixelBuf> SpaceRaytracer<P> {
     /// Snapshots the given `Space` to prepare for raytracing it.
     pub fn new(space: &Space) -> Self {
-        SpaceRaytracer(SpaceRaytracerImplBuilder {
-            blocks: prepare_blocks::<P>(space),
-            cubes_builder: |blocks: &[TracingBlock<P::BlockData>]| prepare_cubes::<P>(blocks, space),
-            sky_color: space.sky_color(),
-        }.build())
+        SpaceRaytracer(
+            SpaceRaytracerImplBuilder {
+                blocks: prepare_blocks::<P>(space),
+                cubes_builder: |blocks: &[TracingBlock<P::BlockData>]| {
+                    prepare_cubes::<P>(blocks, space)
+                },
+                sky_color: space.sky_color(),
+            }
+            .build(),
+        )
     }
 
     /// Computes a single image pixel from the given ray.
@@ -53,7 +58,12 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         if color.fully_transparent() {
                             continue;
                         }
-                        s.trace_through_surface(pixel_block_data, *color, self.get_lighting(hit.previous_cube()), hit.face);
+                        s.trace_through_surface(
+                            pixel_block_data,
+                            *color,
+                            self.get_lighting(hit.previous_cube()),
+                            hit.face,
+                        );
                     }
                     TracingBlock::Recur(pixel_block_data, array) => {
                         // Find where the origin in the space's coordinate system is.
@@ -72,7 +82,12 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                                 break;
                             }
                             let color = array[subcube_hit.cube];
-                            s.trace_through_surface(pixel_block_data, color, lighting, subcube_hit.face);
+                            s.trace_through_surface(
+                                pixel_block_data,
+                                color,
+                                lighting,
+                                subcube_hit.face,
+                            );
                         }
                     }
                 }
@@ -81,82 +96,70 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         })
     }
 
-    /// Computes a single image pixel from the given normalized device coordinates and projection.
-    pub fn trace_pixel(&self, projection: &ProjectionHelper, x: FreeCoordinate, y: FreeCoordinate) -> (P::Pixel, usize) {
-        self.trace_ray(projection.project_ndc_into_world(x, y))
-    }
-
     #[inline]
     fn get_lighting(&self, cube: GridPoint) -> RGB {
         self.0.with(|impl_fields| {
-            impl_fields.cubes
-               .get(cube)
-               .map(|b| b.lighting.into())
-               .unwrap_or(*impl_fields.sky_color)
+            impl_fields
+                .cubes
+                .get(cube)
+                .map(|b| b.lighting.into())
+                .unwrap_or(*impl_fields.sky_color)
         })
     }
 }
 
-// TODO: Reduce code duplication between parallel and non-parallel versions.
-
-#[cfg(feature = "rayon")]
-pub fn raytrace_space<P: PixelBuf>(
-    projection: &ProjectionHelper,
-    space: &Space,
-) -> Vec<(usize, usize, P::Pixel, usize)> {
-    let t = SpaceRaytracer::<P>::new(space);
-
-    // Construct iterator over pixel positions.
-    // TODO: Make this pluggable so we can use incremental rendering strategies.
-    let viewport = projection.viewport();
-    let pixel_iterator = (0..viewport.y)
-        .into_par_iter()
-        .map(move |ych| {
-            let y = projection.normalize_pixel_y(ych);
-            (0..viewport.x).into_par_iter().map(move |xch| {
-                let x = projection.normalize_pixel_x(xch);
-                (xch, ych, x, y)
+impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
+    #[cfg(feature = "rayon")]
+    pub fn trace_scene_to_text<O: std::io::Write>(
+        &self,
+        projection: &ProjectionHelper,
+        line_ending: &str,
+        out: &mut O,
+    ) -> std::io::Result<usize> {
+        let viewport = projection.viewport();
+        let output_iterator = (0..viewport.y)
+            .into_par_iter()
+            .map(move |ych| {
+                let y = projection.normalize_pixel_y(ych);
+                (0..viewport.x)
+                    .into_par_iter()
+                    .map(move |xch| {
+                        let x = projection.normalize_pixel_x(xch);
+                        self.trace_ray(projection.project_ndc_into_world(x, y))
+                    })
+                    .chain(Some((line_ending.to_owned(), 0)).into_par_iter())
             })
-        })
-        .flatten();
+            .flatten();
 
-    // Do the actual tracing.
-    let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
-        let (pixel, count) = t.trace_ray(projection.project_ndc_into_world(x, y));
-        (xch, ych, pixel, count)
-    });
+        let (text, total_count): (String, Vec<usize>) = output_iterator.unzip();
+        write!(out, "{}", text)?;
 
-    // Collect into a concrete, non-parallel result. TODO: This can probably be better API
-    output_iterator.collect()
-}
+        Ok(total_count.into_iter().sum())
+    }
 
-#[cfg(not(feature = "rayon"))]
-pub fn raytrace_space<P: PixelBuf>(
-    projection: &ProjectionHelper,
-    space: &Space,
-) -> Vec<(usize, usize, P::Pixel, usize)> {
-    let t = SpaceRaytracer::<P>::new(space);
+    #[cfg(not(feature = "rayon"))]
+    pub fn trace_scene_to_text<O: std::io::Write>(
+        &self,
+        projection: &ProjectionHelper,
+        line_ending: &str,
+        out: &mut O,
+    ) -> std::io::Result<usize> {
+        let mut total_count = 0;
 
-    // Construct iterator over pixel positions.
-    // TODO: Make this pluggable so we can use incremental rendering strategies.
-    let viewport = projection.viewport();
-    let pixel_iterator = (0..viewport.y)
-        .map(move |ych| {
+        let viewport = projection.viewport();
+        for ych in 0..viewport.y {
             let y = projection.normalize_pixel_y(ych);
-            (0..viewport.x).map(move |xch| {
+            for xch in 0..viewport.x {
                 let x = projection.normalize_pixel_x(xch);
-                (xch, ych, x, y)
-            })
-        })
-        .flatten();
+                let (text, count) = self.trace_ray(projection.project_ndc_into_world(x, y));
+                total_count += count;
+                write!(out, "{}", text)?;
+            }
+            write!(out, "{}", line_ending)?;
+        }
 
-    // Do the actual tracing.
-    let output_iterator = pixel_iterator.map(move |(xch, ych, x, y)| {
-        let (pixel, count) = t.trace(projection.project_ndc_into_world(x, y));
-        (xch, ych, pixel, count)
-    });
-
-    output_iterator.collect()
+        Ok(total_count)
+    }
 }
 
 /// Get block data out of `Space` (which is not `Sync`, and not specialized for our efficient use).
@@ -188,8 +191,6 @@ fn prepare_cubes<'a, P: PixelBuf>(
         lighting,
     })
 }
-
-
 
 #[derive(Clone, Debug)]
 struct TracingCubeData<'a, B: 'static> {

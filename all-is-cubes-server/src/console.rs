@@ -13,7 +13,7 @@ use termion::event::{Event, Key};
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::math::RGBA;
-use all_is_cubes::raytracer::{raytrace_space, CharacterBuf, ColorBuf, PixelBuf};
+use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
 /// Processes events for moving a camera. Returns all those events it does not process.
@@ -53,17 +53,9 @@ pub fn draw_space<O: io::Write>(
     let space = &*camera.space.borrow_mut();
     projection.set_view_matrix(camera.view());
 
-    // Diagnostic info accumulators
-    let mut number_of_cubes_examined: usize = 0;
-
     write!(out, "{}", termion::cursor::Goto(1, 1))?;
-    for (xch, ych, text, count) in raytrace_space::<ColorCharacterBuf>(projection, space) {
-        if xch == 0 && ych != 0 {
-            write!(out, "{}", *END_OF_LINE)?;
-        }
-        number_of_cubes_examined += count;
-        write!(out, "{}", text)?;
-    }
+    let number_of_cubes_examined = SpaceRaytracer::<ColorCharacterBuf>::new(space)
+        .trace_scene_to_text(projection, &*END_OF_LINE, out)?;
     write!(
         out,
         "{}{}Cubes traced through: {}\r\n",
