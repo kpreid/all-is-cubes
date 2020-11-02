@@ -20,10 +20,11 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
-use crate::camera::ProjectionHelper;
+use crate::camera::{Camera, ProjectionHelper};
 use crate::math::{Face, FreeCoordinate, GridPoint, RGB, RGBA};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
+use crate::universe::URef;
 
 /// Precomputed data for raytracing a single frame of a single Space, and bearer of the
 /// methods for actually performing raytracing.
@@ -171,6 +172,32 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
 
         Ok(total_count)
     }
+}
+
+/// Write an image of the given space as “ASCII art”. Intended for use in tests, to
+/// visualize the results in case of failure.
+///
+/// `direction` specifies the direction from which the camera will be looking towards
+/// the center of the space. The text output will be 80 columns wide.
+pub fn print_space<O: std::io::Write>(
+    out: &mut O,
+    space: URef<Space>,
+    direction: impl Into<Vector3<FreeCoordinate>>,
+) -> Result<(), std::io::Error> {
+    // TODO: The only reason we need a `URef` is to construct a `Camera`.
+    // This is a possible sign of design issues. Possibly Camera should be more
+    // flexible, or possibly the look-at algorithms should be extracted from
+    // where they live now.
+
+    let raytracer = SpaceRaytracer::<CharacterBuf>::new(&*space.borrow());
+
+    let camera = Camera::looking_at_space(space, direction.into());
+    // TODO: optimize height for the shape of the space
+    let mut projection = ProjectionHelper::new(0.5, (80, 40));
+    projection.set_view_matrix(camera.view());
+
+    raytracer.trace_scene_to_text(&projection, &"\n", out)?;
+    Ok(())
 }
 
 /// Get block data out of `Space` (which is not `Sync`, and not specialized for our efficient use).
@@ -501,6 +528,8 @@ mod rayon_helper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockgen::make_some_blocks;
+    use crate::universe::Universe;
     // use ordered_float::NotNan;
 
     #[test]
@@ -537,4 +566,66 @@ mod tests {
     }
 
     // TODO: test actual raytracer
+
+    #[test]
+    fn print_space_test() {
+        let mut space = Space::empty_positive(3, 1, 1);
+        let blocks = make_some_blocks(3);
+        space.set((0, 0, 0), &blocks[0]).unwrap();
+        space.set((1, 0, 0), &blocks[1]).unwrap();
+        space.set((2, 0, 0), &blocks[2]).unwrap();
+
+        let mut u = Universe::new();
+        let space_ref = u.insert_anonymous(space);
+
+        let mut output = Vec::<u8>::new();
+        print_space(&mut output, space_ref, (1., 1., 1.)).unwrap();
+        let output = String::from_utf8(output).unwrap();
+        print!("{}", output);
+        assert_eq!(
+            output,
+            "\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ...........................0000000000...........................................\n\
+            .......................0000000000000001111......................................\n\
+            ........................000000001111111111111111................................\n\
+            ........................00000011111111111111111112222...........................\n\
+            .........................0000011111111111111122222222222222.....................\n\
+            .........................000001111111111112222222222222222222222................\n\
+            ...........................000011111111122222222222222222222222222..............\n\
+            .............................001111111112222222222222222222222222...............\n\
+            ...............................111111111222222222222222222222222................\n\
+            ..................................11111122222222222222222222222.................\n\
+            ....................................11112222222222222222222222..................\n\
+            .......................................1222222222222222222222...................\n\
+            .........................................2222222222222222222....................\n\
+            ............................................222222222222222.....................\n\
+            ..............................................22222222222.......................\n\
+            ................................................22222222........................\n\
+            ...................................................2222.........................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+            ................................................................................\n\
+        "
+        );
+    }
 }

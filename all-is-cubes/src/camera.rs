@@ -180,7 +180,8 @@ pub struct ProjectionHelper {
 #[allow(clippy::cast_lossless)]
 impl ProjectionHelper {
     /// pixel_aspect_ratio is the width divided by the height
-    pub fn new(pixel_aspect_ratio: FreeCoordinate, viewport: Vector2<usize>) -> Self {
+    pub fn new(pixel_aspect_ratio: FreeCoordinate, viewport: impl Into<Vector2<usize>>) -> Self {
+        let viewport = viewport.into();
         assert!(
             pixel_aspect_ratio.is_finite(),
             "pixel_aspect_ratio must be finite"
