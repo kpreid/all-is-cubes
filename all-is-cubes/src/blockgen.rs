@@ -194,13 +194,40 @@ mod tests {
     fn make_some_blocks_1() {
         // should succeed even though the color range collapses range
         let blocks = make_some_blocks(1);
-        assert_eq!(blocks[0].color(), RGBA::new(0.5, 0.5, 0.5, 1.0));
+        assert_eq!(
+            blocks[0],
+            Block::Atom(
+                BlockAttributes {
+                    display_name: "0".into(),
+                    ..BlockAttributes::default()
+                },
+                RGBA::new(0.5, 0.5, 0.5, 1.0)
+            )
+        );
     }
 
     #[test]
     fn make_some_blocks_2() {
         let blocks = make_some_blocks(2);
-        assert_eq!(blocks[0].color(), RGBA::new(0.0, 0.0, 0.0, 1.0));
-        assert_eq!(blocks[1].color(), RGBA::new(1.0, 1.0, 1.0, 1.0));
+        assert_eq!(
+            blocks[0],
+            Block::Atom(
+                BlockAttributes {
+                    display_name: "0".into(),
+                    ..BlockAttributes::default()
+                },
+                RGBA::new(0.0, 0.0, 0.0, 1.0)
+            )
+        );
+        assert_eq!(
+            blocks[1],
+            Block::Atom(
+                BlockAttributes {
+                    display_name: "1".into(),
+                    ..BlockAttributes::default()
+                },
+                RGBA::new(1.0, 1.0, 1.0, 1.0)
+            )
+        );
     }
 }
