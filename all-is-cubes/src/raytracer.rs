@@ -131,10 +131,10 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
             })
             .flatten();
 
-        let (text, total_count): (String, Vec<usize>) = output_iterator.unzip();
+        let (text, count_sum): (String, rayon_helper::ParExtSum<usize>) = output_iterator.unzip();
         write!(out, "{}", text)?;
 
-        Ok(total_count.into_iter().sum())
+        Ok(count_sum.result())
     }
 
     #[cfg(not(feature = "rayon"))]
@@ -433,6 +433,41 @@ impl PixelBuf for CharacterBuf {
 
     fn hit_nothing(&mut self) {
         self.hit_text = Some(".".to_owned());
+    }
+}
+
+#[cfg(feature = "rayon")]
+mod rayon_helper {
+    use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator as _};
+    use std::iter::{empty, once, Sum};
+
+    /// Implements `ParallelExtend` to just sum things, so that `ParallelIterator::unzip`
+    /// can produce a sum.
+    #[cfg(feature = "rayon")]
+    #[derive(Clone, Copy, Debug, Default)]
+    pub struct ParExtSum<T>(Option<T>);
+
+    #[cfg(feature = "rayon")]
+    impl<T: Sum> ParExtSum<T> {
+        pub fn result(self) -> T {
+            self.0.unwrap_or_else(|| empty().sum())
+        }
+    }
+
+    #[cfg(feature = "rayon")]
+    impl<T: Sum + Send> ParallelExtend<T> for ParExtSum<T> {
+        fn par_extend<I>(&mut self, par_iter: I)
+        where
+            I: IntoParallelIterator<Item = T>,
+        {
+            let new = par_iter.into_par_iter().sum();
+            // The reason we use an `Option` at all is to make it possible to move the current
+            // value.
+            self.0 = Some(match self.0.take() {
+                None => new,
+                Some(previous) => once(previous).chain(once(new)).sum(),
+            });
+        }
     }
 }
 
