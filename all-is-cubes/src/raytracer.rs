@@ -2,6 +2,16 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 //! Raytracer for `Space`s.
+//!
+//! ## Why?
+//!
+//! The original reason this exists is that I thought “we have `all_is_cubes::raycast`,
+//! and that's nearly all the work, so why not?” Secondarily, it was written before
+//! the mesh-based renderer `all_is_cubes::lum`, and was useful as a cross-check since
+//! it is much simpler.
+//!
+//! In the future (or currently, if I forgot to update this comment), it will be used
+//! as a means to display the state of `Space`s used for testing inline in test output.
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
 use ouroboros::self_referencing;
@@ -15,7 +25,8 @@ use crate::math::{Face, FreeCoordinate, GridPoint, RGB, RGBA};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
 
-/// Precomputed data for raytracing a single frame of a single Space.
+/// Precomputed data for raytracing a single frame of a single Space, and bearer of the
+/// methods for actually performing raytracing.
 pub struct SpaceRaytracer<P: PixelBuf>(SpaceRaytracerImpl<P>);
 
 /// Helper struct for `SpaceRaytracer` so the details of `ouroboros::self_referencing`
@@ -272,38 +283,54 @@ fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
     rgb + modifier
 }
 
-/// Representation of a single output pixel being computed.
+/// Implementations of `PixelBuf` define output formats of the raytracer, by being
+/// responsible for accumulating the color (and/or other information) for each image
+/// pixel.
 ///
-/// This should be an efficiently updatable buffer able to accumulate partial values,
+/// They should be an efficiently updatable buffer able to accumulate partial values,
 /// and it must represent the transparency so as to be able to signal when to stop
 /// tracing.
 ///
 /// The implementation of the `Default` trait must provide a suitable initial state,
 /// i.e. fully transparent/no light accumulated.
 pub trait PixelBuf: Default {
-    /// Type of the pixels in the output image.
+    /// Type of the pixel value this `PixelBuf` produces; the value that will be
+    /// returned by tracing a single ray.
+    ///
+    /// This trait does not define how multiple pixels are combined into an image.
     type Pixel: Send + Sync + 'static;
 
-    /// Type of the data precomputed for each distinct block.
+    /// Type of the data precomputed for each distinct block by `compute_block_data()`.
+    ///
+    /// If no data beyond color is needed, this may be `()`.
     // Note: I tried letting BlockData contain references but I couldn't satisfy
     // the borrow checker.
     type BlockData: Send + Sync + 'static;
 
+    /// Computes whatever data the `PixelBuf` wishes to have available in `add(p)`,
+    /// for a given block.
     fn compute_block_data(block: &SpaceBlockData) -> Self::BlockData;
 
+    /// Computes whatever value should be passed to `add` when the raytracer encounters
+    /// an error.
     fn error_block_data() -> Self::BlockData;
 
+    /// Computes whatever value should be passed to `add` when the raytracer encounters
+    /// the sky (background behind all blocks).
     fn sky_block_data() -> Self::BlockData;
 
     /// Returns whether `self` has recorded an opaque surface and therefore will not
     /// be affected by future calls to `add`.
     fn opaque(&self) -> bool;
 
-    /// Compute the final result.
+    /// Computes the value the raytracer should return for this pixel when tracing is
+    /// complete.
     fn result(self) -> Self::Pixel;
 
     /// Adds the color of a surface to the buffer. The provided color should already
     /// have the effect of lighting applied.
+    ///
+    /// You should probably give this method the `#[inline]` attribute.
     ///
     /// TODO: this interface might want even more information; generalize it to be
     /// more future-proof.
@@ -315,7 +342,7 @@ pub trait PixelBuf: Default {
     fn hit_nothing(&mut self) {}
 }
 
-/// Implements `PixelBuf` in the straightforward fashion for RGB(A) color.
+/// Implements `PixelBuf` for RGB(A) color with `f32` components.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ColorBuf {
     /// Color buffer.
@@ -382,8 +409,8 @@ impl Default for ColorBuf {
     }
 }
 
-/// Implements `PixelBuf` for text output: captures block names rather than
-/// colors.
+/// Implements `PixelBuf` for text output: captures the first characters of block names
+/// rather than colors.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CharacterBuf {
     /// Text to draw, if determined yet.
