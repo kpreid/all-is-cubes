@@ -189,18 +189,32 @@ impl WebGameRoot {
         }, &AddEventListenerOptions::new().passive(true));
 
         let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"click", move |event: MouseEvent| {
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mousedown", move |event: MouseEvent| {
             if let Some(refcell_ref) = self_ref.upgrade() {
                 let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
 
                 self2.renderer.set_cursor_position(Point2::new(
                     event.client_x() as usize,
                     event.client_y() as usize));
-                    if let Some(cursor) = &self2.renderer.cursor_result {
-                        let _ = self2.camera_ref.borrow_mut().click(cursor);
-                    }
+                let mapped_button: usize = match event.button() {
+                    0 => 0,
+                    2 => 1,
+                    1 => 2,
+                    x => x as usize,
+                };
+                if let Some(cursor) = &self2.renderer.cursor_result {
+                    let result = self2.camera_ref.borrow_mut().click(cursor, mapped_button);
+                    console::log_1(&JsValue::from_str(&format!("click {}: {:?}", mapped_button, result)));
+                } else {
+                    console::log_1(&JsValue::from_str(&format!("click {}: no cursor", mapped_button)));
+                }
             }
         }, &AddEventListenerOptions::new().passive(true));
+
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"contextmenu", move |event: MouseEvent| {
+            // Inhibits context menu so that we can use right-click as a game action.
+            event.prevent_default();
+        }, &AddEventListenerOptions::new());
     }
 
     pub fn start_loop(&self) {

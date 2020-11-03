@@ -140,8 +140,12 @@ impl Camera {
     }
 
     /// Handle a click/tool-use on the view.
-    pub fn click(&mut self, cursor: &Cursor) -> Result<(), ToolError> {
-        self.tools[0].use_tool(&self.space, cursor)
+    pub fn click(&mut self, cursor: &Cursor, button: usize) -> Result<(), ToolError> {
+        if let Some(tool) = self.tools.get_mut(button) {
+            tool.use_tool(&self.space, cursor)
+        } else {
+            Ok(())  // TODO: should be an error?
+        }
     }
 }
 
