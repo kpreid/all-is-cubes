@@ -5,6 +5,7 @@
 
 use crate::block::{Block, AIR};
 use crate::camera::Cursor;
+use crate::math::GridPoint;
 use crate::space::{SetCubeError, Space};
 use crate::universe::{RefError, URef};
 
@@ -26,24 +27,20 @@ impl Tool {
     pub fn use_tool(&mut self, space: &URef<Space>, cursor: &Cursor) -> Result<(), ToolError> {
         match self {
             Self::None => Err(ToolError::NotUsable),
-            Self::DeleteBlock => {
-                space
-                    .try_borrow_mut()
-                    .map_err(ToolError::SpaceRef)?
-                    .set(cursor.place.cube, &AIR)
-                    .map_err(ToolError::SetCube)?;
-                Ok(())
-            },
-            Self::PlaceBlock(block) => {
-                space
-                    .try_borrow_mut()
-                    .map_err(ToolError::SpaceRef)?
-                    .set(cursor.place.previous_cube(), block)
-                    .map_err(ToolError::SetCube)?;
-                Ok(())
-            }
+            Self::DeleteBlock => tool_set_cube(space, cursor.place.cube, &AIR),
+            Self::PlaceBlock(block) => tool_set_cube(space, cursor.place.previous_cube(), block),
         }
     }
+}
+
+// Generic handler for a tool that replaces one cube.
+fn tool_set_cube(space: &URef<Space>, cube: GridPoint, block: &Block) -> Result<(), ToolError> {
+    space
+        .try_borrow_mut()
+        .map_err(ToolError::SpaceRef)?
+        .set(cube, block)
+        .map_err(ToolError::SetCube)?;
+    Ok(())
 }
 
 /// Ways that a tool can fail.
