@@ -22,9 +22,10 @@ pub enum Tool {
 
 impl Tool {
     // TODO: This should probably get a `ToolContext` struct or something so as to provide extensibility
+    // TODO: It shouldn't be mandatory to have a valid cursor input.
     pub fn use_tool(&mut self, space: &URef<Space>, cursor: &Cursor) -> Result<(), ToolError> {
         match self {
-            Self::None => Ok(()), // TODO: Should be an error?
+            Self::None => Err(ToolError::NotUsable),
             Self::DeleteBlock => {
                 space
                     .try_borrow_mut()
@@ -45,10 +46,16 @@ impl Tool {
     }
 }
 
-/// Way that a tool can fail.
+/// Ways that a tool can fail.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ToolError {
+    /// The tool cannot currently be used or does not apply to the target.
+    NotUsable,
+    /// The tool requires a target cube and none was present.
+    NothingSelected,
+    /// The cube to be modified could not be modified; see the inner error for why.
     SetCube(SetCubeError),
+    /// The space to be modified could not be accessed.
     SpaceRef(RefError),
 }
 

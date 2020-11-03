@@ -144,7 +144,7 @@ impl Camera {
         if let Some(tool) = self.tools.get_mut(button) {
             tool.use_tool(&self.space, cursor)
         } else {
-            Ok(())  // TODO: should be an error?
+            Err(ToolError::NotUsable)
         }
     }
 }
