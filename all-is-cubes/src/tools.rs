@@ -59,4 +59,61 @@ pub enum ToolError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockgen::make_some_blocks;
+    use crate::camera::cursor_raycast;
+    use crate::raycast::Raycaster;
+    use crate::universe::Universe;
+
+    fn setup<F: FnOnce(&mut Space)>(f: F) -> (Universe, URef<Space>, Cursor) {
+        let mut universe = Universe::new();
+        let mut space = Space::empty_positive(10, 10, 10);
+        f(&mut space);
+        let space_ref = universe.insert_anonymous(space);
+
+        let cursor = cursor_raycast(
+            Raycaster::new((0., 0.5, 0.5), (1., 0., 0.)),
+            &*space_ref.borrow(),
+        )
+        .unwrap();
+
+        (universe, space_ref, cursor)
+    }
+
+    // TODO: Work on making these tests less verbose.
+
+    #[test]
+    fn use_none() {
+        let blocks = make_some_blocks(1);
+        let (_universe, space_ref, cursor) = setup(|space| {
+            space.set((1, 0, 0), &blocks[0]).unwrap();
+        });
+        assert_eq!(
+            Tool::None.use_tool(&space_ref, &cursor),
+            Err(ToolError::NotUsable)
+        );
+    }
+
+    #[test]
+    fn use_delete_block() {
+        let blocks = make_some_blocks(1);
+        let (_universe, space_ref, cursor) = setup(|space| {
+            space.set((1, 0, 0), &blocks[0]).unwrap();
+        });
+        assert_eq!(Tool::DeleteBlock.use_tool(&space_ref, &cursor), Ok(()));
+        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &AIR);
+    }
+
+    #[test]
+    fn use_place_block() {
+        let blocks = make_some_blocks(2);
+        let (_universe, space_ref, cursor) = setup(|space| {
+            space.set((1, 0, 0), &blocks[0]).unwrap();
+        });
+        assert_eq!(
+            Tool::PlaceBlock(blocks[1].clone()).use_tool(&space_ref, &cursor),
+            Ok(())
+        );
+        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &blocks[0]);
+        assert_eq!(&space_ref.borrow()[(0, 0, 0)], &blocks[1]);
+    }
 }
