@@ -11,12 +11,13 @@ use num_traits::identities::Zero;
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::block::{Block, EvaluatedBlock, AIR};
+use crate::block::{Block, EvaluatedBlock};
 use crate::math::{FreeCoordinate, GridPoint, AAB};
 use crate::physics::Body;
 use crate::raycast::{Ray, RaycastStep, Raycaster};
-use crate::space::{Grid, SetCubeError, Space};
-use crate::universe::{RefError, URef};
+use crate::space::{Grid, Space};
+use crate::tools::{Tool, ToolError};
+use crate::universe::URef;
 use crate::util::ConciseDebug as _;
 
 // Control characteristics.
@@ -36,6 +37,8 @@ pub struct Camera {
     velocity_input: Vector3<FreeCoordinate>,
     // TODO: actually render (for debug) colliding_cubes. Also, y'know, it should be in the Space perhaps.
     pub(crate) colliding_cubes: HashSet<GridPoint>,
+
+    tools: [Tool; 2],
 }
 
 impl std::fmt::Debug for Camera {
@@ -88,6 +91,10 @@ impl Camera {
             auto_rotate: false,
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
+            tools: [
+                Tool::DeleteBlock,
+                Tool::PlaceBlock(crate::math::RGBA::new(1.0, 0.0, 0.5, 1.0).into()), // TODO placeholder
+            ],
         }
     }
 
@@ -134,25 +141,11 @@ impl Camera {
 
     /// Handle a click/tool-use on the view.
     pub fn click(&mut self, cursor: &Cursor) -> Result<(), ToolError> {
-        // Delete block
-        self.space
-            .try_borrow_mut()
-            .map_err(ToolError::SpaceRef)?
-            .set(cursor.place.cube, &AIR)
-            .map_err(ToolError::SetCube)?;
-        // TODO: Once we have more tools we will probably have cases for using the "already set" result of Space::set
-        Ok(())
+        self.tools[0].use_tool(&self.space, cursor)
     }
 }
 
 type M = Matrix4<FreeCoordinate>;
-
-/// Way that a click/tool-use can fail.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum ToolError {
-    SetCube(SetCubeError),
-    SpaceRef(RefError),
-}
 
 /// Tool for setting up and using a projection matrix. Stores viewport dimensions
 /// and aspect ratio, and derives a projection matrix.
