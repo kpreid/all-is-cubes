@@ -13,12 +13,11 @@ use web_sys::{
     console, AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, Text,
 };
 
-use all_is_cubes::camera::{Camera, InputProcessor, Key};
+use all_is_cubes::apps::AllIsCubesAppState;
+use all_is_cubes::camera::{InputProcessor, Key};
 use all_is_cubes::cgmath::Point2;
-use all_is_cubes::demo_content::new_universe_with_stuff;
 use all_is_cubes::lum::glrender::GLRenderer;
 use all_is_cubes::space::SpaceStepInfo;
-use all_is_cubes::universe::{FrameClock, URef, Universe};
 use all_is_cubes::util::Warnings;
 
 use crate::js_bindings::GuiHelpers;
@@ -44,7 +43,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .scene_info_text_node
         .append_data("\nRusting...")?;
 
-    let universe = new_universe_with_stuff();
+    let app = AllIsCubesAppState::new();
 
     let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
@@ -57,11 +56,11 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
             console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error)));
             JsValue::from_str(&*error)
         })?;
-    renderer.set_camera(Some(universe.get_default_camera()));
+    renderer.set_camera(Some(app.camera().clone()));
 
     static_dom.scene_info_text_node.append_data("\nGL ready.")?;
 
-    let root = WebGameRoot::new(gui_helpers, static_dom, universe, renderer);
+    let root = WebGameRoot::new(gui_helpers, static_dom, app, renderer);
 
     root.borrow().start_loop();
     // Explicitly keep the game loop alive.
@@ -83,13 +82,11 @@ struct WebGameRoot {
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
     input_processor: InputProcessor,
-    universe: Universe,
-    camera_ref: URef<Camera>,
+    app: AllIsCubesAppState,
     renderer: GLRenderer<WebSysWebGL2Surface>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
     step_callback_scheduled: bool,
-    frame_clock: FrameClock,
     last_raf_timestamp: f64,
     last_step_info: SpaceStepInfo,
 }
@@ -98,7 +95,7 @@ impl WebGameRoot {
     pub fn new(
         gui_helpers: GuiHelpers,
         static_dom: StaticDom,
-        universe: Universe,
+        app: AllIsCubesAppState,
         renderer: GLRenderer<WebSysWebGL2Surface>,
     ) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
@@ -108,13 +105,11 @@ impl WebGameRoot {
             gui_helpers,
             static_dom,
             input_processor: InputProcessor::default(),
-            camera_ref: universe.get_default_camera(),
-            universe,
+            app,
             renderer,
             raf_callback: Closure::wrap(Box::new(|_| { /* dummy no-op for initialization */ })),
             step_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
             step_callback_scheduled: false,
-            frame_clock: FrameClock::new(),
             last_raf_timestamp: 0.0, // TODO better initial value or special case
             last_step_info: SpaceStepInfo::default(),
         }));
@@ -208,7 +203,7 @@ impl WebGameRoot {
                     x => x as usize,
                 };
                 if let Some(cursor) = &self2.renderer.cursor_result {
-                    let result = self2.camera_ref.borrow_mut().click(cursor, mapped_button);
+                    let result = self2.app.camera().borrow_mut().click(cursor, mapped_button);
                     console::log_1(&JsValue::from_str(&format!("click {}: {:?}", mapped_button, result)));
                 } else {
                     console::log_1(&JsValue::from_str(&format!("click {}: no cursor", mapped_button)));
@@ -233,7 +228,7 @@ impl WebGameRoot {
     fn raf_callback_impl(&mut self, dom_timestamp: f64) {
         let delta = Duration::from_secs_f64((dom_timestamp - self.last_raf_timestamp) / 1000.0);
         self.last_raf_timestamp = dom_timestamp;
-        let should_draw = self.frame_clock.request_frame(delta);
+        let should_draw = self.app.frame_clock.request_frame(delta);
 
         if should_draw {
             // TODO do projection updates only when needed
@@ -251,14 +246,14 @@ impl WebGameRoot {
             };
             self.static_dom.scene_info_text_node.set_data(&format!(
                 "{:#?}\n{:#?}\n{:#?}\n\n{}",
-                &*self.camera_ref.borrow(),
+                &*self.app.camera().borrow(),
                 self.last_step_info,
                 render_info,
                 cursor_result_text
             ));
         }
 
-        if self.frame_clock.should_step() && !self.step_callback_scheduled {
+        if self.app.frame_clock.should_step() && !self.step_callback_scheduled {
             self.step_callback_scheduled = true;
             web_sys::window()
                 .unwrap()
@@ -277,16 +272,17 @@ impl WebGameRoot {
         self.step_callback_scheduled = false;
         // Allow 2 steps of catch-up. TODO: This policy should probably live in FrameClock instead.
         for _ in 0..2 {
-            if self.frame_clock.should_step() {
-                let timestep = self.frame_clock.step_length();
-                self.frame_clock.did_step();
+            // TODO: All of this should be app.maybe_step_universe() but that interface doesn't leave room for the input processing work...
+            if self.app.frame_clock.should_step() {
+                let timestep = self.app.frame_clock.step_length();
+                self.app.frame_clock.did_step();
 
                 {
-                    let camera = &mut *self.camera_ref.borrow_mut();
+                    let camera = &mut *self.app.camera().borrow_mut();
                     self.input_processor.apply_input(camera, timestep);
                 }
 
-                let (space_step_info, _) = self.universe.step(timestep);
+                let (space_step_info, _) = self.app.universe_mut().step(timestep);
                 self.last_step_info = space_step_info;
             }
         }

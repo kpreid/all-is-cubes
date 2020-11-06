@@ -14,6 +14,7 @@
 // the modules are mostly per-data-type rather than being convenient usage bundles.
 // Or have modules reexport by API consumer (world-builder versus renderer etc.)
 
+pub mod apps;
 pub mod block;
 pub mod blockgen;
 pub mod camera;

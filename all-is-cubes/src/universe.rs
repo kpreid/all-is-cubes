@@ -34,6 +34,7 @@ impl From<&str> for Name {
 /// it will enable garbage collection and inter-object invariants.
 ///
 /// See also the `UniverseIndex` trait for methods for adding and removing objects.
+#[derive(Debug)] // TODO: impl Debug with a less verbose result
 pub struct Universe {
     spaces: HashMap<Name, URootRef<Space>>,
     cameras: HashMap<Name, URootRef<Camera>>,
@@ -610,6 +611,7 @@ where
 /// Algorithm for deciding how to execute simulation and rendering frames.
 /// Platform-independent; does not consult any clocks, only makes decisions
 /// given the provided information.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FrameClock {
     last_absolute_time: Option<Instant>,
     /// Whether there was a step and we should therefore draw a frame.

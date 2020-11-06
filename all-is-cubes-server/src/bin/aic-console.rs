@@ -11,21 +11,19 @@ use termion::event::{Event, Key};
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
+use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::ProjectionHelper;
-use all_is_cubes::demo_content::new_universe_with_stuff;
-use all_is_cubes::universe::FrameClock;
 
 use all_is_cubes_server::console::{controller, draw_space, viewport_from_terminal_size};
 
 /// TODO: break this up into testable library code insofar as feasible.
 
 fn main() -> io::Result<()> {
-    let mut universe = new_universe_with_stuff();
-    let camera_ref = universe.get_default_camera();
+    let mut app = AllIsCubesAppState::new();
+    app.camera().borrow_mut().auto_rotate = true;
+
     let mut proj: ProjectionHelper = ProjectionHelper::new(0.5, viewport_from_terminal_size()?);
     let mut out = io::stdout().into_raw_mode()?;
-
-    (*camera_ref.borrow_mut()).auto_rotate = true;
 
     // Park stdin blocking reads on another thread.
     let (event_tx, event_rx) = mpsc::sync_channel(0);
@@ -44,12 +42,12 @@ fn main() -> io::Result<()> {
 
     print!("{}", termion::clear::All);
 
-    let mut frame_clock = FrameClock::new();
     loop {
         'input: loop {
             match event_rx.try_recv() {
                 Ok(event) => {
-                    if let Some(Event::Key(key)) = controller(&mut *camera_ref.borrow_mut(), event)
+                    if let Some(Event::Key(key)) =
+                        controller(&mut *app.camera().borrow_mut(), event)
                     {
                         match key {
                             Key::Esc | Key::Ctrl('c') | Key::Ctrl('d') => {
@@ -69,14 +67,11 @@ fn main() -> io::Result<()> {
             }
         }
 
-        frame_clock.advance_to(Instant::now());
-        if frame_clock.should_step() {
-            universe.step(frame_clock.step_length());
-            frame_clock.did_step();
-        }
-        if frame_clock.should_draw() {
-            draw_space(&mut proj, &camera_ref.borrow(), &mut out)?;
-            frame_clock.did_draw();
+        app.frame_clock.advance_to(Instant::now());
+        app.maybe_step_universe();
+        if app.frame_clock.should_draw() {
+            draw_space(&mut proj, &*app.camera().borrow(), &mut out)?;
+            app.frame_clock.did_draw();
         }
     }
 }
