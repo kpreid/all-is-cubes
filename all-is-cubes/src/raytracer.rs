@@ -121,8 +121,19 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
 }
 
 impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
-    #[cfg(feature = "rayon")]
     pub fn trace_scene_to_text<O: std::io::Write>(
+        &self,
+        projection: &ProjectionHelper,
+        line_ending: &str,
+        out: &mut O,
+    ) -> std::io::Result<RaytraceInfo> {
+        // This wrapper function ensures that the two implementations have consistent
+        // signatures.
+        self.trace_scene_to_text_impl(projection, line_ending, out)
+    }
+
+    #[cfg(feature = "rayon")]
+    fn trace_scene_to_text_impl<O: std::io::Write>(
         &self,
         projection: &ProjectionHelper,
         line_ending: &str,
@@ -151,7 +162,7 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
     }
 
     #[cfg(not(feature = "rayon"))]
-    pub fn trace_scene_to_text<O: std::io::Write>(
+    fn trace_scene_to_text_impl<O: std::io::Write>(
         &self,
         projection: &ProjectionHelper,
         line_ending: &str,
