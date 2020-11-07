@@ -121,24 +121,37 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
 }
 
 impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
-    pub fn trace_scene_to_text<O: std::io::Write>(
+    /// Raytrace to text, using any `PixelBuf` whose output is `String`.
+    ///
+    /// `F` is the function accepting the output, and `E` is the type of error it may
+    /// produce. This function-based interface is intended to abstract over the
+    /// inconvenient difference between `std::io::Write` and `std::fmt::Write`.
+    ///
+    /// After each line (row) of the image, `write(line_ending)` will be called.
+    pub fn trace_scene_to_text<F, E>(
         &self,
         projection: &ProjectionHelper,
         line_ending: &str,
-        out: &mut O,
-    ) -> std::io::Result<RaytraceInfo> {
+        write: F,
+    ) -> Result<RaytraceInfo, E>
+    where
+        F: FnMut(&str) -> Result<(), E>,
+    {
         // This wrapper function ensures that the two implementations have consistent
         // signatures.
-        self.trace_scene_to_text_impl(projection, line_ending, out)
+        self.trace_scene_to_text_impl(projection, line_ending, write)
     }
 
     #[cfg(feature = "rayon")]
-    fn trace_scene_to_text_impl<O: std::io::Write>(
+    fn trace_scene_to_text_impl<F, E>(
         &self,
         projection: &ProjectionHelper,
         line_ending: &str,
-        out: &mut O,
-    ) -> std::io::Result<RaytraceInfo> {
+        mut write: F,
+    ) -> Result<RaytraceInfo, E>
+    where
+        F: FnMut(&str) -> Result<(), E>,
+    {
         let viewport = projection.viewport();
         let output_iterator = (0..viewport.y)
             .into_par_iter()
@@ -156,18 +169,21 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
 
         let (text, info_sum): (String, rayon_helper::ParExtSum<RaytraceInfo>) =
             output_iterator.unzip();
-        write!(out, "{}", text)?;
+        write(text.as_ref())?;
 
         Ok(info_sum.result())
     }
 
     #[cfg(not(feature = "rayon"))]
-    fn trace_scene_to_text_impl<O: std::io::Write>(
+    fn trace_scene_to_text_impl<F, E>(
         &self,
         projection: &ProjectionHelper,
         line_ending: &str,
-        out: &mut O,
-    ) -> std::io::Result<RaytraceInfo> {
+        mut write: F,
+    ) -> Result<RaytraceInfo, E>
+    where
+        F: FnMut(&str) -> Result<(), E>,
+    {
         let mut total_info = RaytraceInfo::default();
 
         let viewport = projection.viewport();
@@ -177,9 +193,9 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
                 let x = projection.normalize_pixel_x(xch);
                 let (text, info) = self.trace_ray(projection.project_ndc_into_world(x, y));
                 total_info += info;
-                write!(out, "{}", text)?;
+                write(text.as_ref())?;
             }
-            write!(out, "{}", line_ending)?;
+            write(line_ending)?;
         }
 
         Ok(total_info)
@@ -213,30 +229,43 @@ impl std::iter::Sum for RaytraceInfo {
     }
 }
 
-/// Write an image of the given space as “ASCII art”. Intended for use in tests, to
-/// visualize the results in case of failure.
+/// Print an image of the given space as “ASCII art”.
+///
+/// Intended for use in tests, to visualize the results in case of failure.
+/// Accordingly, it always writes to the same destination as `print!` (which is redirected
+/// when tests are run).
 ///
 /// `direction` specifies the direction from which the camera will be looking towards
 /// the center of the space. The text output will be 80 columns wide.
-pub fn print_space<O: std::io::Write>(
-    out: &mut O,
-    space: URef<Space>,
+pub fn print_space(space_ref: &URef<Space>, direction: impl Into<Vector3<FreeCoordinate>>) {
+    print_space_impl(space_ref, direction, |s| {
+        print!("{}", s);
+    });
+}
+
+/// Version of `print_space` that takes a destination, for testing.
+fn print_space_impl<F: FnMut(&str)>(
+    space_ref: &URef<Space>,
     direction: impl Into<Vector3<FreeCoordinate>>,
-) -> Result<(), std::io::Error> {
+    mut write: F,
+) -> RaytraceInfo {
     // TODO: The only reason we need a `URef` is to construct a `Camera`.
     // This is a possible sign of design issues. Possibly Camera should be more
     // flexible, or possibly the look-at algorithms should be extracted from
     // where they live now.
 
-    let raytracer = SpaceRaytracer::<CharacterBuf>::new(&*space.borrow());
-
-    let camera = Camera::looking_at_space(space, direction.into());
+    let camera = Camera::looking_at_space(space_ref.clone(), direction.into());
     // TODO: optimize height for the shape of the space
     let mut projection = ProjectionHelper::new(0.5, (80, 40));
     projection.set_view_matrix(camera.view());
 
-    raytracer.trace_scene_to_text(&projection, &"\n", out)?;
-    Ok(())
+    SpaceRaytracer::<CharacterBuf>::new(&*space_ref.borrow())
+        .trace_scene_to_text(&projection, &"\n", move |s| {
+            write(s);
+            let r: Result<(), ()> = Ok(());
+            r
+        })
+        .unwrap()
 }
 
 /// Get block data out of `Space` (which is not `Sync`, and not specialized for our efficient use).
@@ -622,9 +651,8 @@ mod tests {
         let mut u = Universe::new();
         let space_ref = u.insert_anonymous(space);
 
-        let mut output = Vec::<u8>::new();
-        print_space(&mut output, space_ref, (1., 1., 1.)).unwrap();
-        let output = String::from_utf8(output).unwrap();
+        let mut output = String::new();
+        print_space_impl(&space_ref, (1., 1., 1.), |s| output += s);
         print!("{}", output);
         assert_eq!(
             output,

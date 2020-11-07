@@ -57,7 +57,7 @@ pub fn draw_space<O: io::Write>(
     let info = SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_text(
         projection,
         &*END_OF_LINE,
-        out,
+        |s| write!(out, "{}", s),
     )?;
     write!(
         out,
