@@ -54,14 +54,17 @@ pub fn draw_space<O: io::Write>(
     projection.set_view_matrix(camera.view());
 
     write!(out, "{}", termion::cursor::Goto(1, 1))?;
-    let number_of_cubes_examined = SpaceRaytracer::<ColorCharacterBuf>::new(space)
-        .trace_scene_to_text(projection, &*END_OF_LINE, out)?;
+    let info = SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_text(
+        projection,
+        &*END_OF_LINE,
+        out,
+    )?;
     write!(
         out,
-        "{}{}Cubes traced through: {}\r\n",
+        "{}{}{:?}\r\n",
         *END_OF_LINE,
         termion::clear::AfterCursor,
-        number_of_cubes_examined
+        info
     )?;
     out.flush()?;
 

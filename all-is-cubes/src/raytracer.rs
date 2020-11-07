@@ -56,7 +56,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 
     /// Computes a single image pixel from the given ray.
-    pub fn trace_ray(&self, ray: Ray) -> (P::Pixel, usize) {
+    pub fn trace_ray(&self, ray: Ray) -> (P::Pixel, RaytraceInfo) {
         self.0.with(|impl_fields| {
             let cubes = impl_fields.cubes;
             let mut s: TracingState<P> = TracingState::default();
@@ -127,7 +127,7 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
         projection: &ProjectionHelper,
         line_ending: &str,
         out: &mut O,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<RaytraceInfo> {
         let viewport = projection.viewport();
         let output_iterator = (0..viewport.y)
             .into_par_iter()
@@ -139,14 +139,15 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
                         let x = projection.normalize_pixel_x(xch);
                         self.trace_ray(projection.project_ndc_into_world(x, y))
                     })
-                    .chain(Some((line_ending.to_owned(), 0)).into_par_iter())
+                    .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
             })
             .flatten();
 
-        let (text, count_sum): (String, rayon_helper::ParExtSum<usize>) = output_iterator.unzip();
+        let (text, info_sum): (String, rayon_helper::ParExtSum<RaytraceInfo>) =
+            output_iterator.unzip();
         write!(out, "{}", text)?;
 
-        Ok(count_sum.result())
+        Ok(info_sum.result())
     }
 
     #[cfg(not(feature = "rayon"))]
@@ -155,22 +156,49 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
         projection: &ProjectionHelper,
         line_ending: &str,
         out: &mut O,
-    ) -> std::io::Result<usize> {
-        let mut total_count = 0;
+    ) -> std::io::Result<RaytraceInfo> {
+        let mut total_info = RaytraceInfo::default();
 
         let viewport = projection.viewport();
         for ych in 0..viewport.y {
             let y = projection.normalize_pixel_y(ych);
             for xch in 0..viewport.x {
                 let x = projection.normalize_pixel_x(xch);
-                let (text, count) = self.trace_ray(projection.project_ndc_into_world(x, y));
-                total_count += count;
+                let (text, info) = self.trace_ray(projection.project_ndc_into_world(x, y));
+                total_info += info;
                 write!(out, "{}", text)?;
             }
             write!(out, "{}", line_ending)?;
         }
 
-        Ok(total_count)
+        Ok(total_info)
+    }
+}
+
+/// Performance info from a `SpaceRaytracer` operation.
+///
+/// The contents of this structure are subject to change; use `Debug` to view it.
+/// The `Default` value is the zero value.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct RaytraceInfo {
+    cubes_traced: usize,
+}
+impl std::ops::AddAssign<RaytraceInfo> for RaytraceInfo {
+    fn add_assign(&mut self, other: Self) {
+        self.cubes_traced += other.cubes_traced;
+    }
+}
+impl std::iter::Sum for RaytraceInfo {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
+        let mut sum = Self::default();
+        for part in iter {
+            sum += part;
+        }
+        sum
     }
 }
 
@@ -246,14 +274,14 @@ enum TracingBlock<B: 'static> {
 struct TracingState<P: PixelBuf> {
     /// Number of cubes traced through -- controlled by the caller, so not necessarily
     /// equal to the number of calls to trace_through_surface().
-    number_passed: usize,
+    cubes_traced: usize,
     pixel_buf: P,
 }
 impl<P: PixelBuf> TracingState<P> {
     #[inline]
     fn count_step_should_stop(&mut self) -> bool {
-        self.number_passed += 1;
-        if self.number_passed > 1000 {
+        self.cubes_traced += 1;
+        if self.cubes_traced > 1000 {
             // Abort excessively long traces.
             self.pixel_buf = Default::default();
             self.pixel_buf
@@ -264,8 +292,8 @@ impl<P: PixelBuf> TracingState<P> {
         }
     }
 
-    fn finish(mut self, sky_color: RGB) -> (P::Pixel, usize) {
-        if self.number_passed == 0 {
+    fn finish(mut self, sky_color: RGB) -> (P::Pixel, RaytraceInfo) {
+        if self.cubes_traced == 0 {
             // Didn't intersect the world at all. Draw these as plain background.
             // TODO: Switch to using the sky color, unless debugging options are set.
             self.pixel_buf.hit_nothing();
@@ -274,7 +302,12 @@ impl<P: PixelBuf> TracingState<P> {
         self.pixel_buf
             .add(sky_color.with_alpha_one(), &P::sky_block_data());
 
-        (self.pixel_buf.result(), self.number_passed)
+        (
+            self.pixel_buf.result(),
+            RaytraceInfo {
+                cubes_traced: self.cubes_traced,
+            },
+        )
     }
 
     /// Apply the effect of a given surface color.
