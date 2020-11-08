@@ -7,7 +7,7 @@
 
 .PHONY: all lint test run-dev run-console run-game-server update try-publish-all
 
-all:
+all: all-is-cubes-wasm/node_modules/.bin/webpack
 	cargo build --package all-is-cubes
 	(cd all-is-cubes-wasm && npm run-script build)
 	# Server statically embeds results of wasm build, so it must be run last to be fresh, and
@@ -43,3 +43,7 @@ try-publish-all: all
 	(cd all-is-cubes && cargo publish --dry-run)
 	# static-all-is-cubes-wasm counts as dirty despite .gitignore so we must use --allow-dirty
 	(cd all-is-cubes-server && cargo publish --dry-run --allow-dirty)
+
+# Run npm install if needed to get build commands
+all-is-cubes-wasm/node_modules/.bin/webpack:
+	(cd all-is-cubes-wasm && npm install)
