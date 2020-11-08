@@ -1,4 +1,4 @@
-name: Rust
+name: AIC Build & Test
 
 on:
   push:
@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Install tools
+      run: cargo install wasm-pack
     - name: Build
       run: make
     - name: Run tests
