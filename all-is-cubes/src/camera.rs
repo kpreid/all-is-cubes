@@ -60,26 +60,6 @@ impl std::fmt::Debug for Camera {
 }
 
 impl Camera {
-    /// Constructs a `Camera` located outside the `Space` and with its bounds in frame.
-    ///
-    /// `direction` gives the direction in which the camera will lie relative to the
-    /// center of the space.
-    pub fn looking_at_space(space: URef<Space>, direction: Vector3<FreeCoordinate>) -> Self {
-        let grid: Grid = *space.borrow().grid();
-
-        let center_point = grid.center();
-        let mut space_radius: FreeCoordinate = 0.0;
-        for axis in 0..3 {
-            space_radius = space_radius.max(grid.size()[axis].into());
-        }
-        let offset = direction.normalize() * space_radius; // TODO: allow for camera FoV
-
-        let mut camera = Self::new(space, center_point + offset);
-        camera.body.look_at(center_point);
-
-        camera
-    }
-
     /// Constructs a `Camera` with specified position.
     pub fn new(space: URef<Space>, position: impl Into<Point3<FreeCoordinate>>) -> Self {
         Self {
@@ -96,6 +76,19 @@ impl Camera {
                 Tool::PlaceBlock(crate::math::RGBA::new(1.0, 0.0, 0.5, 1.0).into()), // TODO placeholder
             ],
         }
+    }
+
+    /// Constructs a `Camera` located outside the `Space` and with its bounds in frame.
+    ///
+    /// `direction` gives the direction in which the camera will lie relative to the
+    /// center of the space.
+    pub fn looking_at_space(space: URef<Space>, direction: Vector3<FreeCoordinate>) -> Self {
+        let grid: Grid = *space.borrow().grid();
+
+        let mut camera = Self::new(space, eye_for_look_at(&grid, direction));
+        camera.body.look_at(grid.center());
+
+        camera
     }
 
     pub fn view(&self) -> M {
@@ -273,6 +266,20 @@ impl ProjectionHelper {
             .inverse_transform()
             .expect("projection and view matrix was not invertible");
     }
+}
+
+/// Calculate an “eye position” (camera position) to view the entire given `grid`.
+///
+/// `direction` points in the direction the camera should be relative to the space.
+///
+/// TODO: This function does not yet consider the effects of field-of-view,
+/// and it will need additional parameters to do so.
+pub fn eye_for_look_at(grid: &Grid, direction: Vector3<FreeCoordinate>) -> Point3<FreeCoordinate> {
+    let mut space_radius: FreeCoordinate = 0.0;
+    for axis in 0..3 {
+        space_radius = space_radius.max(grid.size()[axis].into());
+    }
+    grid.center() + direction.normalize() * space_radius // TODO: allow for camera FoV
 }
 
 /// Find the first selectable block the ray strikes and express the result in a `Cursor`
