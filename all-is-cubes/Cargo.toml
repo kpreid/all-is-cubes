@@ -23,6 +23,10 @@ harness = false
 name = "raycast_bench"
 harness = false
 
+[[bench]]
+name = "triangulator_bench"
+harness = false
+
 [features]
 default = ["lum"]
 # Unfortunately, we need a different name to avoid the feature name conflicting with
