@@ -92,7 +92,7 @@ mod tests {
             Tool::None.use_tool(&space_ref, &cursor),
             Err(ToolError::NotUsable)
         );
-        print_space(&space_ref, (-1., 1., 1.));
+        print_space(&*space_ref.borrow(), (-1., 1., 1.));
     }
 
     #[test]
@@ -102,7 +102,7 @@ mod tests {
             space.set((1, 0, 0), &blocks[0]).unwrap();
         });
         assert_eq!(Tool::DeleteBlock.use_tool(&space_ref, &cursor), Ok(()));
-        print_space(&space_ref, (-1., 1., 1.));
+        print_space(&*space_ref.borrow(), (-1., 1., 1.));
         assert_eq!(&space_ref.borrow()[(1, 0, 0)], &AIR);
     }
 
@@ -116,7 +116,7 @@ mod tests {
             Tool::PlaceBlock(blocks[1].clone()).use_tool(&space_ref, &cursor),
             Ok(())
         );
-        print_space(&space_ref, (-1., 1., 1.));
+        print_space(&*space_ref.borrow(), (-1., 1., 1.));
         assert_eq!(&space_ref.borrow()[(1, 0, 0)], &blocks[0]);
         assert_eq!(&space_ref.borrow()[(0, 0, 0)], &blocks[1]);
     }

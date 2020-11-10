@@ -13,18 +13,17 @@
 //! In the future (or currently, if I forgot to update this comment), it will be used
 //! as a means to display the state of `Space`s used for testing inline in test output.
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
+use cgmath::{EuclideanSpace as _, Matrix4, Point3, Vector3, Zero as _};
 use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
-use crate::camera::{Camera, ProjectionHelper};
+use crate::camera::{eye_for_look_at, ProjectionHelper};
 use crate::math::{Face, FreeCoordinate, GridPoint, RGB, RGBA};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
-use crate::universe::URef;
 
 /// Precomputed data for raytracing a single frame of a single Space, and bearer of the
 /// methods for actually performing raytracing.
@@ -237,29 +236,27 @@ impl std::iter::Sum for RaytraceInfo {
 ///
 /// `direction` specifies the direction from which the camera will be looking towards
 /// the center of the space. The text output will be 80 columns wide.
-pub fn print_space(space_ref: &URef<Space>, direction: impl Into<Vector3<FreeCoordinate>>) {
-    print_space_impl(space_ref, direction, |s| {
+pub fn print_space(space: &Space, direction: impl Into<Vector3<FreeCoordinate>>) {
+    print_space_impl(space, direction, |s| {
         print!("{}", s);
     });
 }
 
 /// Version of `print_space` that takes a destination, for testing.
 fn print_space_impl<F: FnMut(&str)>(
-    space_ref: &URef<Space>,
+    space: &Space,
     direction: impl Into<Vector3<FreeCoordinate>>,
     mut write: F,
 ) -> RaytraceInfo {
-    // TODO: The only reason we need a `URef` is to construct a `Camera`.
-    // This is a possible sign of design issues. Possibly Camera should be more
-    // flexible, or possibly the look-at algorithms should be extracted from
-    // where they live now.
-
-    let camera = Camera::looking_at_space(space_ref.clone(), direction.into());
-    // TODO: optimize height for the shape of the space
+    // TODO: optimize height (and thus aspect ratio) for the shape of the space
     let mut projection = ProjectionHelper::new(0.5, (80, 40));
-    projection.set_view_matrix(camera.view());
+    projection.set_view_matrix(Matrix4::look_at(
+        eye_for_look_at(space.grid(), direction.into()),
+        space.grid().center(),
+        Vector3::new(0., 1., 0.),
+    ));
 
-    SpaceRaytracer::<CharacterBuf>::new(&*space_ref.borrow())
+    SpaceRaytracer::<CharacterBuf>::new(space)
         .trace_scene_to_text(&projection, &"\n", move |s| {
             write(s);
             let r: Result<(), ()> = Ok(());
@@ -602,7 +599,6 @@ mod rayon_helper {
 mod tests {
     use super::*;
     use crate::blockgen::make_some_blocks;
-    use crate::universe::Universe;
     // use ordered_float::NotNan;
 
     #[test]
@@ -648,11 +644,8 @@ mod tests {
         space.set((1, 0, 0), &blocks[1]).unwrap();
         space.set((2, 0, 0), &blocks[2]).unwrap();
 
-        let mut u = Universe::new();
-        let space_ref = u.insert_anonymous(space);
-
         let mut output = String::new();
-        print_space_impl(&space_ref, (1., 1., 1.), |s| output += s);
+        print_space_impl(&space, (1., 1., 1.), |s| output += s);
         print!("{}", output);
         assert_eq!(
             output,
