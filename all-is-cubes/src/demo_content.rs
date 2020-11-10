@@ -17,7 +17,7 @@ use crate::block::{Block, BlockAttributes};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
 use crate::drawing::{draw_text, draw_to_blocks, VoxelBrush};
-use crate::math::{GridPoint, GridVector};
+use crate::math::{GridPoint, GridVector, RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::{Universe, UniverseIndex};
 use crate::worldgen::{axes, wavy_landscape};
@@ -83,6 +83,57 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
             Some(&text_blocks[cube - text_offset])
         })
         .unwrap();
+
+    space
+}
+
+#[rustfmt::skip]
+#[allow(unused)]  // TODO: Make a scene selector menu somehow so this can be used without recompiling.
+fn cornell_box(universe: &mut Universe) -> Space {
+    // Coordinates are set up based on this dimension because, being blocks, we're not
+    // going to *exactly* replicate the original data, but we might want to adjust the
+    // scale to something else entirely.
+    let box_size = 55;
+    // Add one block to all sides for wall thickness.
+    let grid = Grid::new(
+        (-1, -1, -1),
+        GridVector::new(1, 1, 1) * box_size + GridVector::new(2, 2, 2),
+    );
+    let mut space = Space::empty(grid);
+    // There shall be no light but that which we make for ourselves!
+    space.set_sky_color(RGB::new(0., 0., 0.));
+
+    let white: Block = RGBA::new(1.0, 1.0, 1.0, 1.0).into();
+    let red: Block = RGBA::new(0.57, 0.025, 0.025, 1.0).into();
+    let green: Block = RGBA::new(0.025, 0.236, 0.025, 1.0).into();
+    let light: Block = Block::Atom(
+        BlockAttributes {
+            display_name: "Light".into(),
+            light_emission: RGB::new(4., 4., 4.),
+            ..BlockAttributes::default()
+        },
+        RGBA::new(1.0, 1.0, 1.0, 1.0),
+    );
+
+    // Floor.
+    space.fill(&Grid::new((0, -1, 0), (box_size, 1, box_size)), |_| Some(&white)).unwrap();
+    // Ceiling.
+    space.fill(&Grid::new((0, box_size, 0), (box_size, 1, box_size)), |_| Some(&white)).unwrap();
+    // Light in ceiling.
+    space.fill(&Grid::from_lower_upper((21, box_size, 23), (34, box_size + 1, 33)), |_| Some(&light)).unwrap();
+    // Back wall.
+    space.fill(&Grid::new((0, 0, -1), (box_size, box_size, 1)), |_| Some(&white)).unwrap();
+    // Right wall (green).
+    space.fill(&Grid::new((box_size, 0, 0), (1, box_size, box_size)), |_| Some(&green)).unwrap();
+    // Left wall (red).
+    space.fill(&Grid::new((-1, 0, 0), (1, box_size, box_size)), |_| Some(&red)).unwrap();
+
+    // Block #1
+    space.fill(&Grid::new((29, 0, 36), (16, 16, 15)), |_| Some(&white)).unwrap();
+    // Block #2
+    space.fill(&Grid::new((10, 0, 13), (18, 33, 15)), |_| Some(&white)).unwrap();
+
+    // TODO: Explicitly define camera.
 
     space
 }
