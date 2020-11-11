@@ -141,6 +141,7 @@ const QUAD_VERTICES: &[Point3<FreeCoordinate>; 6] = &[
     Point3::new(1.0, 1.0, 0.0),
 ];
 
+#[inline]
 fn push_quad_solid<V: From<BlockVertex>>(vertices: &mut Vec<V>, face: Face, color: RGBA) {
     let transform = face.matrix();
     for &p in QUAD_VERTICES {
@@ -152,6 +153,7 @@ fn push_quad_solid<V: From<BlockVertex>>(vertices: &mut Vec<V>, face: Face, colo
     }
 }
 
+#[inline]
 fn push_quad_textured<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
     face: Face,

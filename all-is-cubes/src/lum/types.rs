@@ -60,6 +60,7 @@ impl Vertex {
     };
 
     /// Constructor taking our natural types instead of luminance specialized types.
+    #[inline]
     pub fn new_colored(
         position: Point3<FreeCoordinate>,
         normal: Vector3<FreeCoordinate>,
@@ -113,6 +114,7 @@ pub struct GLBlockVertex {
 }
 
 impl From<BlockVertex> for GLBlockVertex {
+    #[inline]
     fn from(vertex: BlockVertex) -> Self {
         Self {
             position: vertex.position.cast::<f32>().unwrap().to_vec(),
@@ -134,6 +136,7 @@ impl From<BlockVertex> for GLBlockVertex {
 impl ToGfxVertex<Vertex> for GLBlockVertex {
     type Coordinate = f32;
 
+    #[inline]
     fn instantiate(&self, offset: Vector3<Self::Coordinate>, lighting: PackedLight) -> Vertex {
         Vertex {
             position: VertexPosition::new((self.position + offset).into()),

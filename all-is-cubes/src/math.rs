@@ -76,6 +76,7 @@ impl Face {
     }
 
     /// Returns the opposite face (maps `PX` to `NX` and so on).
+    #[inline]
     pub const fn opposite(&self) -> Face {
         match self {
             Face::WITHIN => Face::WITHIN,
@@ -89,6 +90,7 @@ impl Face {
     }
 
     /// Returns the vector normal to this face. `WITHIN` is assigned the zero vector.
+    #[inline]
     pub fn normal_vector<S>(&self) -> Vector3<S>
     where
         S: BaseNum + std::ops::Neg<Output = S>,
