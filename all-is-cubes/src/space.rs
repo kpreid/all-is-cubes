@@ -37,21 +37,29 @@ impl Grid {
     /// rather than discrete coordinates) spans 5 to 15.
     ///
     /// TODO: Rename this to be parallel with from_lower_upper
+    #[track_caller]
     pub fn new(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridVector>) -> Grid {
         let lower_bounds = lower_bounds.into();
         let sizes = sizes.into();
 
         // TODO: Replace assert! with nice error reporting and then test it
         for i in 0..3 {
-            assert!(sizes[i] > 0);
+            assert!(
+                sizes[i] > 0,
+                "Grid sizes[{}] must be > 0, not {}",
+                i,
+                sizes[i]
+            );
             assert!(
                 lower_bounds[i].checked_add(sizes[i]).is_some(),
-                "lower_bounds too large for sizes"
+                "Grid lower_bounds[{}] too large for sizes",
+                i
             );
         }
         assert!(
             Self::checked_volume_helper(sizes).is_ok(),
-            "Volume too large"
+            "Grid volume too large; {:?} overflows",
+            sizes
         );
 
         Grid {
@@ -60,6 +68,7 @@ impl Grid {
         }
     }
 
+    #[track_caller]
     pub fn from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
         upper_bounds: impl Into<GridPoint>,
