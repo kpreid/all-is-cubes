@@ -4,21 +4,7 @@
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast; // dyn_into()
-use web_sys::{console, AddEventListenerOptions, Document, Event, EventTarget};
-
-/// Runs on module load. Does only key Rust environment initialization things;
-/// application logic is separately called from JS.
-#[wasm_bindgen(start)]
-pub fn wasm_module_start_js() -> Result<(), JsValue> {
-    #[cfg(debug_assertions)]
-    console_error_panic_hook::set_once();
-
-    console::log_1(&JsValue::from_str(
-        "WebAssembly module load hook completed.",
-    ));
-
-    Ok(())
-}
+use web_sys::{AddEventListenerOptions, Document, Event, EventTarget};
 
 pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -> Result<E, Error> {
     document

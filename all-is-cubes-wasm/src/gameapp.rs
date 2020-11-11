@@ -27,6 +27,11 @@ use crate::web_glue::{add_event_listener, get_mandatory_element};
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
 pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
+    // Note: This used to be in a `#[wasm_bindgen(start)]` function, but that stopped working.
+    // Rather than stop to figure out what went wrong even though I Didn't Change Anything,
+    // I moved it here since this is our sole entry point in practice.
+    console_error_panic_hook::set_once();
+
     let document = web_sys::window()
         .expect("missing `window`")
         .document()
