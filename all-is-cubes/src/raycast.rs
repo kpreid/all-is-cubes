@@ -337,13 +337,18 @@ impl RaycastStep {
 /// Find the smallest positive t such that s + t * ds is an integer.
 // TODO: Tests!
 fn scale_to_integer_step(s: FreeCoordinate, ds: FreeCoordinate) -> FreeCoordinate {
-    if ds < 0.0 {
-        scale_to_integer_step(-s, -ds)
-    } else {
-        let s = s.rem_euclid(1.0);
-        // problem is now s + t * ds = 1
-        (1.0 - s) / ds
-    }
+    let result = {
+        if ds < 0.0 {
+            scale_to_integer_step(-s, -ds)
+        } else {
+            let s = s.rem_euclid(1.0);
+            // problem is now s + t * ds = 1
+            (1.0 - s) / ds
+        }
+    };
+    // Debugging a rare failure...
+    assert!(result > 0., "scale_to_integer_step failed ({}, {}) => {}", s, ds, result);
+    result
 }
 
 fn scale_to_integer_step_componentwise(
