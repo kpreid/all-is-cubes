@@ -22,6 +22,9 @@ use crate::math::{AAB, RGBA};
 use crate::universe::URef;
 use crate::util::WarningsResult;
 
+// TODO: Make this a runtime toggle
+const DRAW_LIGHTING_DEBUG: bool = false;
+
 /// Viewport dimensions for `GLRenderer`.
 /// Field types at the whim of what's useful for the code that uses it.
 pub struct Viewport {
@@ -118,11 +121,14 @@ where
 
         let debug_lines_tess = {
             let mut v: Vec<Vertex> = Vec::new();
+
+            // Collision box
             wireframe_vertices(
                 &mut v,
                 RGBA::new(0.0, 0.0, 1.0, 1.0),
                 camera.body.collision_box_abs(),
             );
+            // What it collided with
             for cube in &camera.colliding_cubes {
                 wireframe_vertices(
                     &mut v,
@@ -130,6 +136,18 @@ where
                     AAB::from_cube(*cube).enlarge(0.005),
                 );
             }
+
+            // Lighting trace at cursor
+            if DRAW_LIGHTING_DEBUG {
+                if let Some(cursor) = &self.cursor_result {
+                    let space = camera.space.borrow();
+                    let (_, _, lighting_info) =
+                        space.compute_lighting(cursor.place.previous_cube());
+                    wireframe_vertices(&mut v, RGBA::new(0.8, 0.8, 1.0, 1.0), lighting_info);
+                }
+            }
+
+            // If we have vertices, draw them
             if v.is_empty() {
                 None
             } else {

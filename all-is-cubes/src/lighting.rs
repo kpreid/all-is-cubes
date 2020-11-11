@@ -201,7 +201,7 @@ impl Space {
     /// The returned vector of points lists those cubes which the computed value depends on
     /// (imprecisely; empty cubes passed through are not listed).
     #[inline]
-    fn compute_lighting(
+    pub(crate) fn compute_lighting(
         &self,
         cube: GridPoint,
     ) -> (PackedLight, Vec<GridPoint>, LightingUpdateInfo) {
@@ -220,10 +220,9 @@ impl Space {
         } else {
             for face_ray_data in &*LIGHT_RAYS {
                 'each_ray: for ray in &face_ray_data.rays[..] {
-                    let raycaster = ray
-                        .translate(cube.cast::<FreeCoordinate>().unwrap().to_vec())
-                        .cast()
-                        .within_grid(*self.grid());
+                    let translated_ray =
+                        ray.translate(cube.cast::<FreeCoordinate>().unwrap().to_vec());
+                    let raycaster = translated_ray.cast().within_grid(*self.grid());
 
                     // Fraction of the light value that is to be determined by future, rather than past,
                     // tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
@@ -260,8 +259,8 @@ impl Space {
                             // Diagnostics. TODO: Track transparency to some extent.
                             *info = Some(LightingUpdateRayInfo {
                                 ray: Ray {
-                                    origin: ray.origin,
-                                    direction: ray.direction * 10.0, // TODO: translate hit position into ray
+                                    origin: translated_ray.origin,
+                                    direction: translated_ray.direction * 10.0, // TODO: translate hit position into ray
                                 },
                                 trigger_cube: hit.cube,
                                 value_cube: light_cube,
@@ -324,12 +323,55 @@ pub struct LightingUpdateInfo {
     rays: [Option<LightingUpdateRayInfo>; ALL_RAYS_COUNT],
 }
 
+impl Geometry for LightingUpdateInfo {
+    type Coord = FreeCoordinate;
+
+    fn translate(self, _offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
+        unimplemented!();
+    }
+
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<Point3<FreeCoordinate>>,
+    {
+        // Draw output cube
+        AAB::from_cube(self.cube)
+            .enlarge(0.1)
+            .wireframe_points(output);
+        // Draw rays
+        for ray_info in &self.rays {
+            if let Some(ray_info) = ray_info {
+                ray_info.wireframe_points(output);
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct LightingUpdateRayInfo {
     ray: Ray,
     trigger_cube: GridPoint,
     value_cube: GridPoint,
     value: PackedLight,
+}
+
+impl Geometry for LightingUpdateRayInfo {
+    type Coord = FreeCoordinate;
+
+    fn translate(self, _offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
+        unimplemented!();
+    }
+
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<Point3<FreeCoordinate>>,
+    {
+        // TODO: represent self.value somehoe
+        AAB::from_cube(self.value_cube)
+            .enlarge(0.01)
+            .wireframe_points(output);
+        self.ray.wireframe_points(output);
+    }
 }
 
 #[cfg(test)]
