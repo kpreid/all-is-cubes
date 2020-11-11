@@ -52,11 +52,11 @@ impl<'a> BlockGen<'a> {
     ) -> Block {
         let (block, mut space) = self.new_recursive_block(attributes);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
-        for point in space.grid().interior_iter() {
-            space
-                .set(point, &f(self, point, rng.gen_range(0.0, 1.0)))
-                .unwrap();
-        }
+        // TODO: Make this use closer to the same function interface as Space::fill?
+        let grid = *space.grid();
+        space
+            .fill(&grid, |point| Some(f(self, point, rng.gen_range(0.0, 1.0))))
+            .unwrap();
         block
     }
 }

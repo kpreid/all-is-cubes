@@ -77,9 +77,12 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
     .unwrap();
 
     // Small test text
-    for cube in text_blocks.grid().interior_iter() {
-        let _ = space.set(cube + GridVector::new(-16, 3, -14), &text_blocks[cube]);
-    }
+    let text_offset = GridVector::new(-16, 3, -14);
+    space
+        .fill(&text_blocks.grid().translate(text_offset), |cube| {
+            Some(&text_blocks[cube - text_offset])
+        })
+        .unwrap();
 
     space
 }

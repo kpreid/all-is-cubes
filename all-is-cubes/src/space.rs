@@ -606,6 +606,49 @@ impl Space {
         self.notifier.notify(SpaceChange::Block(position));
     }
 
+    /// Replace blocks in `region` with a block computed by the function.
+    ///
+    /// The function may return a reference to a block or a block. If it returns `None`,
+    /// the existing block is left unchanged.
+    ///
+    /// The operation will stop on the first error, potentially leaving some blocks
+    /// replaced. (Exception: If the `grid` extends outside of `self.space()`, that
+    /// will always be rejected before any changes are made.)
+    ///
+    /// ```
+    /// use all_is_cubes::block::{AIR, Block};
+    /// use all_is_cubes::math::RGBA;
+    /// use all_is_cubes::space::{Grid, Space};
+    ///
+    /// let mut space = Space::empty_positive(10, 10, 10);
+    /// let a_block: Block = RGBA::new(1.0, 0.0, 0.0, 1.0).into();
+    ///
+    /// space.fill(&Grid::new((0, 0, 0), (2, 1, 1)), |_point| Some(&a_block)).unwrap();
+    ///
+    /// assert_eq!(space[(0, 0, 0)], a_block);
+    /// assert_eq!(space[(1, 0, 0)], a_block);
+    /// assert_eq!(space[(0, 1, 0)], AIR);
+    /// ```
+    ///
+    /// TODO: Support providing the previous block as a parameter (take cues from `extract`).
+    pub fn fill<F, B>(&mut self, region: &Grid, mut function: F) -> Result<(), SetCubeError>
+    where
+        F: FnMut(GridPoint) -> Option<B>,
+        B: std::borrow::Borrow<Block>,
+    {
+        if !self.grid().contains_grid(region) {
+            return Err(SetCubeError::OutOfBounds);
+        }
+        for cube in region.interior_iter() {
+            if let Some(block) = function(cube) {
+                // TODO: Optimize side effect processing by batching lighting updates for
+                // when we know what's now opaque or not.
+                self.set(cube, block.borrow())?;
+            }
+        }
+        Ok(())
+    }
+
     /// Returns all distinct block types found in the space.
     ///
     /// TODO: This was invented for testing the indexing of blocks and should
@@ -985,4 +1028,6 @@ mod tests {
         assert_eq!(Ok(false), space.set((0, 0, 0), &blocks[0]));
         assert_eq!(None, sink.next());
     }
+
+    // TODO: test fill() equivalence and error handling
 }

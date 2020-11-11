@@ -55,10 +55,11 @@ fn checkerboard_setup() -> (Space, BlocksRenderData<BlockVertex, NullTextureAllo
     blocks[0] = AIR.clone();
 
     // Generate checkerboard
-    for p in grid.interior_iter() {
-        let which = ((p.x + p.y + p.z) as usize).rem_euclid(blocks.len());
-        space.set(p, &blocks[which]).unwrap();
-    }
+    space
+        .replace(grid, |p| {
+            blocks[((p.x + p.y + p.z) as usize).rem_euclid(blocks.len())]
+        })
+        .unwrap();
 
     let blocks_render_data = triangulate_blocks(&space, &mut NullTextureAllocator);
 

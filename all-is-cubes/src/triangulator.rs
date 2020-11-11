@@ -441,9 +441,8 @@ mod tests {
     fn excludes_interior_faces() {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 2, 2);
-        for cube in space.grid().interior_iter() {
-            space.set(cube, &block).unwrap();
-        }
+        let grid = *space.grid();
+        space.fill(&grid, |_| Some(&block)).unwrap();
 
         let mut rendering = new_space_buffer();
         triangulate_space::<BlockVertex, BlockVertex, NullTextureAllocator>(
