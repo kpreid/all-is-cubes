@@ -21,6 +21,8 @@ lint:
 	# TODO: add JS linting
 
 test:
+	# Confirm benchmarks etc. compile, even if we don't run them
+	cargo build --all-targets
 	cargo test  # ignores wasm-only code
 	(cd all-is-cubes-wasm && npm test)
 

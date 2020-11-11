@@ -56,8 +56,8 @@ fn checkerboard_setup() -> (Space, BlocksRenderData<BlockVertex, NullTextureAllo
 
     // Generate checkerboard
     space
-        .replace(grid, |p| {
-            blocks[((p.x + p.y + p.z) as usize).rem_euclid(blocks.len())]
+        .fill(&grid, |p| {
+            Some(&blocks[((p.x + p.y + p.z) as usize).rem_euclid(blocks.len())])
         })
         .unwrap();
 
