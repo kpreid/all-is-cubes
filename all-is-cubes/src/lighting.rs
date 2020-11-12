@@ -411,9 +411,7 @@ mod tests {
         let mut space = Space::empty_positive(3, 1, 1);
         let former_sky_light = PackedLight::from(space.sky_color());
         space.set_sky_color(RGB::new(1.0, 0.0, 0.0));
-        // subtraction compensates for an apparent rounding error; I haven't looked into whether
-        // it's bug-like
-        let new_sky_light = PackedLight::from(space.sky_color() - RGB::new(1.0 / 64.0, 0.0, 0.0));
+        let new_sky_light = PackedLight::from(space.sky_color());
 
         space.set((0, 0, 0), &RGB::ONE.into()).unwrap();
         // Not changed yet... except for the now-opaque block
