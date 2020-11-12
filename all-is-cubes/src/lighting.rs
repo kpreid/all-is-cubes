@@ -13,6 +13,7 @@ use crate::math::*;
 use crate::raycast::Ray;
 use crate::space::*;
 
+/// One component of a `PackedLight`.
 pub(crate) type PackedLightScalar = u8;
 
 /// Lighting within a `Space`; an `all_is_cubes::math::RGB` value stored with reduced
@@ -23,12 +24,10 @@ pub struct PackedLight(Vector3<PackedLightScalar>);
 // decide whether having colored lighting is worth the compute and storage cost.
 // If memory vs. bit depth is an issue, consider switching to something like YCbCr
 // representation, or possibly something that GPUs specifically do well with.
-//
-// Also consider whether we should have gamma -- or even a logarithmic representation.
 
 impl PackedLight {
-    /// Unit value of these fixed-point color components, as a f32 for conversion calculations.
-    const UNIT_F32: f32 = 64.0;
+    const LOG_SCALE: f32 = 16.0;
+    const LOG_OFFSET: f32 = 128.0;
 
     pub(crate) const ZERO: PackedLight = PackedLight(Vector3 { x: 0, y: 0, z: 0 });
 
@@ -41,15 +40,29 @@ impl PackedLight {
             .max(dm(self.0[1], other.0[1]))
             .max(dm(self.0[2], other.0[2]))
     }
+
+    fn scalar_in(value: impl Into<f32>) -> PackedLightScalar {
+        // Note that `as` is a saturating cast.
+        (value.into().log2() * Self::LOG_SCALE + Self::LOG_OFFSET) as PackedLightScalar
+    }
+
+    fn scalar_out(value: PackedLightScalar) -> f32 {
+        // Special representation to ensure we don't "round" zero up to a small nonzero value.
+        if value == 0 {
+            0.0
+        } else {
+            ((f32::from(value) - Self::LOG_OFFSET) / Self::LOG_SCALE).exp2()
+        }
+    }
 }
 
 impl From<RGB> for PackedLight {
     #[inline]
     fn from(value: RGB) -> Self {
         PackedLight(Vector3::new(
-            (value.red().into_inner() * PackedLight::UNIT_F32) as PackedLightScalar,
-            (value.green().into_inner() * PackedLight::UNIT_F32) as PackedLightScalar,
-            (value.blue().into_inner() * PackedLight::UNIT_F32) as PackedLightScalar,
+            Self::scalar_in(value.red()),
+            Self::scalar_in(value.green()),
+            Self::scalar_in(value.blue()),
         ))
     }
 }
@@ -57,9 +70,9 @@ impl From<PackedLight> for [f32; 3] {
     #[inline]
     fn from(value: PackedLight) -> Self {
         [
-            f32::from(value.0[0]) / PackedLight::UNIT_F32,
-            f32::from(value.0[1]) / PackedLight::UNIT_F32,
-            f32::from(value.0[2]) / PackedLight::UNIT_F32,
+            PackedLight::scalar_out(value.0[0]),
+            PackedLight::scalar_out(value.0[1]),
+            PackedLight::scalar_out(value.0[2]),
         ]
     }
 }
@@ -67,9 +80,9 @@ impl From<PackedLight> for RGB {
     #[inline]
     fn from(value: PackedLight) -> Self {
         RGB::new(
-            f32::from(value.0[0]) / PackedLight::UNIT_F32,
-            f32::from(value.0[1]) / PackedLight::UNIT_F32,
-            f32::from(value.0[2]) / PackedLight::UNIT_F32,
+            PackedLight::scalar_out(value.0[0]),
+            PackedLight::scalar_out(value.0[1]),
+            PackedLight::scalar_out(value.0[2]),
         )
     }
 }
@@ -398,6 +411,43 @@ mod tests {
     use super::*;
     use crate::space::Space;
     use std::time::Duration;
+
+    /// Test that unpacking and packing doesn't shift the value, which could lead
+    /// to runaway light values.
+    #[test]
+    fn packed_light_roundtrip() {
+        for i in PackedLightScalar::MIN..PackedLightScalar::MAX {
+            assert_eq!(i, PackedLight::scalar_in(PackedLight::scalar_out(i)));
+        }
+    }
+
+    /// Test out-of-range floats.
+    #[test]
+    fn packed_light_clipping_in() {
+        assert_eq!(
+            [
+                PackedLight::scalar_in(NotNan::new(-1.).unwrap()),
+                PackedLight::scalar_in(NotNan::new(1e-30).unwrap()),
+                PackedLight::scalar_in(NotNan::new(1e+30).unwrap()),
+            ],
+            [0, 0, 255],
+        );
+    }
+
+    /// Demonstrate what range and step sizes we get out of the encoding.
+    #[test]
+    fn packed_light_extreme_values_out() {
+        assert_eq!(
+            [
+                PackedLight::scalar_out(0),
+                PackedLight::scalar_out(1),
+                PackedLight::scalar_out(2),
+                PackedLight::scalar_out(254),
+                PackedLight::scalar_out(255),
+            ],
+            [0.0, 0.0040791943, 0.004259796, 234.75304, 245.14644],
+        );
+    }
 
     #[test]
     fn initial_lighting_value() {

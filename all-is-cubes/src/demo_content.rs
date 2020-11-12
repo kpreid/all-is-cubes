@@ -109,7 +109,7 @@ fn cornell_box(universe: &mut Universe) -> Space {
     let light: Block = Block::Atom(
         BlockAttributes {
             display_name: "Light".into(),
-            light_emission: RGB::new(4., 4., 4.),
+            light_emission: RGB::new(30., 30., 30.),
             ..BlockAttributes::default()
         },
         RGBA::new(1.0, 1.0, 1.0, 1.0),
