@@ -223,8 +223,9 @@ impl Space {
                 if !self
                     .get_evaluated(cube + face_ray_data.reflect_face)
                     .visible
+                    && !ev_origin.visible
                 {
-                    // Skip rays where there is no opposing surface to "catch" the light.
+                    // Skip rays where there is no opposing or interior surface to "catch" the light.
                     continue;
                 }
                 'each_ray: for ray in &face_ray_data.rays[..] {
