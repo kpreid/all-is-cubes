@@ -347,7 +347,13 @@ fn scale_to_integer_step(s: FreeCoordinate, ds: FreeCoordinate) -> FreeCoordinat
         }
     };
     // Debugging a rare failure...
-    assert!(result > 0., "scale_to_integer_step failed ({}, {}) => {}", s, ds, result);
+    assert!(
+        result > 0. || ds.is_nan(),
+        "scale_to_integer_step failed ({}, {}) => {}",
+        s,
+        ds,
+        result
+    );
     result
 }
 
