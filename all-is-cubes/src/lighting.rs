@@ -94,8 +94,6 @@ const ALL_RAYS_COUNT: usize = RAYS_PER_FACE * 6;
 /// Fixed configuration of light rays to use for light tracing.
 #[derive(Clone, Copy)]
 struct FaceRayData {
-    // TODO: reflect_face was used in the original lighting algorithm but we haven't implemented that part yet (and one try produced bad results).
-    #[allow(dead_code)]
     face: Face,
     rays: [Ray; RAYS_PER_FACE],
 }
