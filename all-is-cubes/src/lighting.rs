@@ -83,7 +83,7 @@ const ALL_RAYS_COUNT: usize = RAYS_PER_FACE * 6;
 struct FaceRayData {
     // TODO: reflect_face was used in the original lighting algorithm but we haven't implemented that part yet (and one try produced bad results).
     #[allow(dead_code)]
-    reflect_face: Vector3<GridCoordinate>,
+    face: Face,
     rays: [Ray; RAYS_PER_FACE],
 }
 
@@ -91,9 +91,8 @@ static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
     let mut ray_data = Vec::new();
     for &face in Face::ALL_SIX {
         let origin = Point3::new(0.5, 0.5, 0.5) + face.normal_vector() * 0.25;
-        let reflect_face = face.normal_vector() * -1;
         let mut face_ray_data = FaceRayData {
-            reflect_face,
+            face,
             rays: [Ray {
                 origin: Point3::origin(),
                 direction: Vector3::zero(),
@@ -220,14 +219,25 @@ impl Space {
             // Opaque blocks are always dark inside.
         } else {
             for face_ray_data in &*LIGHT_RAYS {
+                let face = face_ray_data.face;
+                // We can and should skip these rays if:
+                // * There is no surface facing into this cube that would reflect arriving light into it.
+                // * There is no surface *within* this cube, ditto.
+                // * The ray isn't going to directly hit a light source.
+                // (Without this last special case, opaque light sources won't look bright.)
                 if !self
-                    .get_evaluated(cube + face_ray_data.reflect_face)
+                    .get_evaluated(cube + face.opposite().normal_vector())
                     .visible
                     && !ev_origin.visible
+                    && self
+                        .get_evaluated(cube + face.normal_vector())
+                        .attributes
+                        .light_emission
+                        == RGB::ZERO
                 {
-                    // Skip rays where there is no opposing or interior surface to "catch" the light.
                     continue;
                 }
+
                 'each_ray: for ray in &face_ray_data.rays[..] {
                     let translated_ray =
                         ray.translate(cube.cast::<FreeCoordinate>().unwrap().to_vec());
