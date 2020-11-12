@@ -67,7 +67,7 @@ impl Block {
                     visible: voxels
                         .grid()
                         .interior_iter()
-                        .all(|p| !voxels[p].fully_transparent()),
+                        .any(|p| !voxels[p].fully_transparent()),
 
                     voxels: Some(voxels),
                 })
@@ -172,7 +172,6 @@ impl ConciseDebug for EvaluatedBlock {
     }
 }
 
-
 /// Type of notification when an `EvaluatedBlock` result changes.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct BlockChange;
@@ -275,6 +274,31 @@ mod tests {
                         0.5
                     } else {
                         1.0
+                    },
+                ),
+            )
+        });
+
+        let e = block.evaluate().unwrap();
+        assert_eq!(e.opaque, false);
+        assert_eq!(e.visible, true);
+    }
+
+    #[test]
+    fn evaluate_voxels_not_filling_block() {
+        let mut universe = Universe::new();
+        let mut bg: BlockGen = BlockGen::new(&mut universe, 4);
+        let block = bg.block_from_function(BlockAttributes::default(), |_ctx, point, _random| {
+            Block::Atom(
+                BlockAttributes::default(),
+                RGBA::new(
+                    0.0,
+                    0.0,
+                    0.0,
+                    if point == GridPoint::new(1, 1, 1) {
+                        1.0
+                    } else {
+                        0.0
                     },
                 ),
             )
