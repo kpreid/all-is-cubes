@@ -334,21 +334,26 @@ impl RaycastStep {
     }
 }
 
-/// Find the smallest positive t such that s + t * ds is an integer.
-// TODO: Tests!
-fn scale_to_integer_step(s: FreeCoordinate, ds: FreeCoordinate) -> FreeCoordinate {
-    let result = {
-        if ds < 0.0 {
-            scale_to_integer_step(-s, -ds)
-        } else {
-            let s = s.rem_euclid(1.0);
-            // problem is now s + t * ds = 1
-            (1.0 - s) / ds
-        }
-    };
-    // Debugging a rare failure...
+/// Find the smallest positive `t` such that `s + t * ds` is an integer.
+///
+/// If `ds` is zero, returns positive infinity; this is a useful answer because
+/// it means that the less-than comparisons in the raycast algorithm will never pick
+/// the corresponding axis. If any input is NaN, returns NaN.
+fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeCoordinate {
+    // Simplify to positive case only.
+    // `.signum()` ensures a negative zero can't cause us to return negative infinity.
+    if ds.signum() < 0.0 {
+        s = -s;
+        ds = -ds;
+    }
+
+    let s = s.rem_euclid(1.0);
+    // problem is now s + t * ds = 1
+    let result = (1.0 - s) / ds;
+
+    // Debugging a rare failure... This may be fixed now.
     assert!(
-        result > 0. || ds.is_nan(),
+        result.signum() > 0.0 || ds.is_nan() || s.is_nan(),
         "scale_to_integer_step failed ({}, {}) => {}",
         s,
         ds,
@@ -586,5 +591,29 @@ mod tests {
             .within_grid(grid),
             vec![None],
         );
+    }
+    
+    #[test]
+    fn scale_to_integer_step_basics() {
+        assert_eq!(scale_to_integer_step(1.25, 0.25), 3.0);
+        assert_eq!(scale_to_integer_step(1.25, -0.25), 1.0);
+        assert_eq!(scale_to_integer_step(-1.25, 0.25), 1.0);
+        assert_eq!(scale_to_integer_step(-1.25, -0.25), 3.0);
+    }
+
+    #[test]
+    fn scale_to_integer_step_positive_and_negative_zero() {
+        assert_eq!(scale_to_integer_step(1.5, 0.0), FreeCoordinate::INFINITY);
+        assert_eq!(scale_to_integer_step(1.5, -0.0), FreeCoordinate::INFINITY);
+        assert_eq!(scale_to_integer_step(0.0, 0.0), FreeCoordinate::INFINITY);
+        assert_eq!(scale_to_integer_step(0.0, -0.0), FreeCoordinate::INFINITY);
+        assert_eq!(scale_to_integer_step(-0.0, 0.0), FreeCoordinate::INFINITY);
+    }
+    
+    #[test]
+    fn scale_to_integer_step_nan_propagation() {
+        assert!(scale_to_integer_step(1.5, FreeCoordinate::NAN).is_nan());
+        assert!(scale_to_integer_step(FreeCoordinate::NAN, 1.0).is_nan());
+        assert!(scale_to_integer_step(FreeCoordinate::NAN, 0.0).is_nan());
     }
 }
