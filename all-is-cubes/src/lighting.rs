@@ -90,8 +90,8 @@ struct FaceRayData {
 static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
     let mut ray_data = Vec::new();
     for &face in Face::ALL_SIX {
-        let origin = Point3::new(0.5, 0.5, 0.5) + face.normal_vector() * -0.25;
-        let reflect_face = Vector3::new(0, 0, 0) + face.normal_vector() * -1;
+        let origin = Point3::new(0.5, 0.5, 0.5) + face.normal_vector() * 0.25;
+        let reflect_face = face.normal_vector() * -1;
         let mut face_ray_data = FaceRayData {
             reflect_face,
             rays: [Ray {
@@ -104,12 +104,13 @@ static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
         let mut i = 0;
         for rayx in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
             for rayy in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
+                // TODO: we can simplify this if we add "transform ray by matrix".
                 face_ray_data.rays[i] = Ray {
                     origin,
                     direction: face.matrix().transform_vector(Vector3::new(
                         rayx as FreeCoordinate,
                         rayy as FreeCoordinate,
-                        1.0,
+                        -1.0,
                     )),
                 };
                 i += 1;
