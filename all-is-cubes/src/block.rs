@@ -10,6 +10,7 @@ use std::borrow::Cow;
 use crate::math::{RGB, RGBA};
 use crate::space::{GridArray, Space};
 use crate::universe::{RefError, URef};
+use crate::util::ConciseDebug;
 
 /// A `Block` is something that can exist in the grid of a `Space`; it occupies one unit
 /// cube of space and has a specified appearance and behavior.
@@ -158,6 +159,19 @@ pub struct EvaluatedBlock {
     /// is false if the block is completely transparent.
     pub visible: bool,
 }
+
+impl ConciseDebug for EvaluatedBlock {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fmt.debug_struct("EvaluatedBlock")
+            .field("attributes", &self.attributes)
+            .field("color", &self.color)
+            .field("opaque", &self.opaque)
+            .field("visible", &self.visible)
+            .field("voxels", &"...")
+            .finish()
+    }
+}
+
 
 /// Type of notification when an `EvaluatedBlock` result changes.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

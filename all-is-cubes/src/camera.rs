@@ -312,13 +312,14 @@ pub struct Cursor {
     pub evaluated: EvaluatedBlock,
 }
 
+// TODO: this probably shouldn't be Display any more, but Debug or ConciseDebug
 impl std::fmt::Display for Cursor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Block: {}\n   at: {:?}",
-            self.evaluated.attributes.display_name,
-            self.place.cube.as_concise_debug()
+            "Block at {:?}\n{:#?}",
+            self.place.cube.as_concise_debug(),
+            self.evaluated.as_concise_debug(),
         )
     }
 }
