@@ -220,6 +220,13 @@ impl Space {
             // Opaque blocks are always dark inside.
         } else {
             for face_ray_data in &*LIGHT_RAYS {
+                if !self
+                    .get_evaluated(cube + face_ray_data.reflect_face)
+                    .visible
+                {
+                    // Skip rays where there is no opposing surface to "catch" the light.
+                    continue;
+                }
                 'each_ray: for ray in &face_ray_data.rays[..] {
                     let translated_ray =
                         ray.translate(cube.cast::<FreeCoordinate>().unwrap().to_vec());
