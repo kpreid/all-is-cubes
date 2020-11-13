@@ -126,7 +126,13 @@ static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
                     direction: face.matrix().transform_vector(Vector3::new(
                         rayx as FreeCoordinate,
                         rayy as FreeCoordinate,
-                        -1.0,
+                        // Constrain the light ray angle to be at most 45° off axis — in fact,
+                        // less (so that we don't send two redundant rays, and it's more like
+                        // a uniform fan).
+                        // This is not actually physically realistic (a real diffuse
+                        // reflecting surface will reflect some light right up till the dot
+                        // product is zero) but it seems like a good place to stop.
+                        -(RAY_DIRECTION_STEP as FreeCoordinate + 0.5),
                     )),
                 };
                 i += 1;
