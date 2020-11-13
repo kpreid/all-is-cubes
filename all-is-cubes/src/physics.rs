@@ -151,8 +151,11 @@ impl Body {
                 collision_callback(ray_step.cube);
 
                 // Advance however much straight-line distance is available.
-                let unobstructed_delta_position = delta_position * ray_step.t_distance
-                    + ray_step.face.normal_vector() * POSITION_EPSILON;
+                // But a little bit back from that, to avoid floating point error pushing us
+                // into being already colliding next frame.
+                let unobstructed_distance_along_ray =
+                    (ray_step.t_distance - POSITION_EPSILON / delta_position.magnitude()).max(0.0);
+                let unobstructed_delta_position = delta_position * unobstructed_distance_along_ray;
                 self.position += unobstructed_delta_position;
                 // Figure the distance we have have left.
                 delta_position -= unobstructed_delta_position;
