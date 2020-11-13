@@ -60,7 +60,6 @@ name = "all-is-cubes-server"
 version = "0.1.2"
 dependencies = [
  "all-is-cubes",
- "cgmath",
  "itertools",
  "num-traits",
  "once_cell",
@@ -76,7 +75,6 @@ name = "all-is-cubes-wasm"
 version = "0.1.2"
 dependencies = [
  "all-is-cubes",
- "cgmath",
  "console_error_panic_hook",
  "js-sys",
  "luminance",

@@ -4,11 +4,10 @@
 //! Procedural block generation. See the `worldgen` module for code that uses the results
 //! of this.
 
-use ordered_float::NotNan;
 use rand::{Rng, SeedableRng as _};
 
 use crate::block::{Block, BlockAttributes, AIR};
-use crate::math::{GridCoordinate, GridPoint, RGBA};
+use crate::math::{GridCoordinate, GridPoint, NotNan, RGBA};
 use crate::space::Space;
 use crate::universe::{UBorrowMut, Universe};
 

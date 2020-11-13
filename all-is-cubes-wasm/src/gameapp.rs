@@ -1,7 +1,6 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-use cgmath::Point2;
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
 use std::borrow::Cow;
@@ -15,6 +14,7 @@ use web_sys::{
 };
 
 use all_is_cubes::camera::{Camera, InputProcessor, Key};
+use all_is_cubes::cgmath::Point2;
 use all_is_cubes::demo_content::new_universe_with_stuff;
 use all_is_cubes::lum::glrender::GLRenderer;
 use all_is_cubes::space::SpaceStepInfo;

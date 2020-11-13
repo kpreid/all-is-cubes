@@ -2,10 +2,10 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 /// Bindings for our own JS code.
-use cgmath::Vector2;
 use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
+use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::lum::glrender::Viewport;
 use all_is_cubes::math::FreeCoordinate;
 

@@ -3,16 +3,15 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::Vector2;
 use once_cell::sync::Lazy;
-use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::io;
 use termion::color;
 use termion::event::{Event, Key};
 
 use all_is_cubes::camera::{Camera, ProjectionHelper};
-use all_is_cubes::math::RGBA;
+use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::math::{NotNan, RGBA};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 

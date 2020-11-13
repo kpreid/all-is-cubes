@@ -7,7 +7,7 @@ use cgmath::{
     BaseFloat, BaseNum, ElementWise as _, EuclideanSpace as _, Matrix4, Point3, Vector3, Vector4,
 };
 use num_traits::identities::Zero;
-use ordered_float::{FloatIsNan, NotNan};
+pub use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
 use std::ops::{Add, AddAssign, Index, IndexMut, Mul, Sub};
 

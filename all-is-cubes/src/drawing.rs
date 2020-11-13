@@ -14,6 +14,9 @@ use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
 use std::convert::TryInto;
 
+/// Re-export the version of the `embedded_graphics` crate we're using.
+pub use embedded_graphics;
+
 use crate::block::{Block, BlockAttributes};
 use crate::blockgen::BlockGen;
 use crate::math::{GridCoordinate, GridPoint, GridVector, RGB, RGBA};

@@ -6,7 +6,6 @@
 
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3, Zero as _};
 use once_cell::sync::Lazy;
-use ordered_float::NotNan;
 use std::convert::TryInto as _;
 
 use crate::math::*;
