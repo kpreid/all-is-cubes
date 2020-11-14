@@ -19,8 +19,10 @@ use crate::triangulator::{BlockVertex, Coloring, ToGfxVertex};
 #[rustfmt::skip]
 pub enum VertexSemantics {
     // TODO: revisit compact representations
+    /// Vertex position.
     #[sem(name = "a_position", repr = "[f32; 3]", wrapper = "VertexPosition")]
     Position,
+    /// Vertex normal (should be length 1).
     #[sem(name = "a_normal", repr = "[f32; 3]", wrapper = "VertexNormal")]
     Normal,
     /// Packed format:
@@ -28,7 +30,8 @@ pub enum VertexSemantics {
     /// * If [3] is -1.0, then the first three components are array texture coordinates.
     #[sem(name = "a_color_or_texture", repr = "[f32; 4]", wrapper = "VertexColorOrTexture")]
     ColorOrTexture,
-    // TODO: look into packed repr for lighting
+    /// Diffuse lighting intensity; typically the color or texture should be multiplied by this.
+    // TODO: look into packed repr for lighting, or switching to a 3D texture
     #[sem(name = "a_lighting", repr = "[f32; 3]", wrapper = "VertexLighting")]
     Lighting,
 }

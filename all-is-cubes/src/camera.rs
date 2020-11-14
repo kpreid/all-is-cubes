@@ -25,17 +25,32 @@ use crate::util::ConciseDebug as _;
 const FLYING_SPEED: FreeCoordinate = 10.0;
 //const JUMP_SPEED: FreeCoordinate = 10.0;
 
+/// A slightly unfortunate grab-bag of “player character” stuff. A `Camera`:
+///
+/// * knows what `Space` it is looking at, by reference,
+/// * knows where it is located and how it collides via a `Body` which it owns and
+///   steps, and
+/// * handles the parts of input management that are associated with universe state
+///   (controlling velocity, holding `Tool`s).
+///
+/// TODO: This probably ought to be renamed. And probably ought to be refactored.
+/// Are we *sure* we don't want an entity-component system?
 pub struct Camera {
-    // TODO: This is now less about rendering and more about hanging an input controller on a Body.
-    // Rename!
+    /// Holds the camera position and look direction.
     pub body: Body,
     // TODO: the space ref is here instead of on Body on a notion that it might be useful to have
     // Body be a pure data structure with no refs. Dubious; revisit.
+    /// Refers to the `Space` to be viewed and collided with.
     pub space: URef<Space>,
 
+    /// Whether the camera should rotate without user input for demo purposes.
     pub auto_rotate: bool,
+
+    /// Velocity specified by user input, which the actual velocity is smoothly adjusted
+    /// towards.
     velocity_input: Vector3<FreeCoordinate>,
-    // TODO: actually render (for debug) colliding_cubes. Also, y'know, it should be in the Space perhaps.
+
+    // TODO: Does this belong here? Or in the Space?
     pub(crate) colliding_cubes: HashSet<GridPoint>,
 
     tools: [Tool; 2],
@@ -91,12 +106,17 @@ impl Camera {
         camera
     }
 
+    /// Computes the view matrix for this camera; the translation and rotation from
+    /// the `Space`'s coordinate system to one where the look direction is the -Z axis.
     pub fn view(&self) -> M {
         Matrix4::from_angle_x(Deg(self.body.pitch))
             * Matrix4::from_angle_y(Deg(self.body.yaw))
             * Matrix4::from_translation(-(self.body.position.to_vec()))
     }
 
+    /// Advances time.
+    ///
+    /// Normally, this is called from `Universe::step`.
     pub fn step(&mut self, duration: Duration) {
         let dt = duration.as_secs_f64();
         let control_orientation: Matrix3<FreeCoordinate> =
@@ -190,10 +210,16 @@ impl ProjectionHelper {
         new_self
     }
 
+    /// Returns the viewport value last provided.
     pub fn viewport(&self) -> Vector2<usize> {
         self.viewport
     }
 
+    /// Sets the viewport, and recalculates matrices to be suitable for the new viewport's
+    /// aspect ratio.
+    ///
+    /// The viewport dimensions are assumed to be in “pixels” — this determines the
+    /// scale of the integer values passed to `normalize_pixel_x` and `normalize_pixel_y`.
     pub fn set_viewport(&mut self, viewport: Vector2<usize>) {
         if viewport != self.viewport {
             self.viewport = viewport;
@@ -209,6 +235,10 @@ impl ProjectionHelper {
         );
     }
 
+    /// Sets the view matrix.
+    ///
+    /// This matrix is used by `project_ndc_into_world` and `project_cursor_into_world`
+    /// to determine what world coordinates are.
     pub fn set_view_matrix(&mut self, view: M) {
         if view != self.view {
             self.view = view;
@@ -231,7 +261,7 @@ impl ProjectionHelper {
         self.projection
     }
 
-    /// Convert a screen position in normalized device coordinates (as produced by
+    /// Converts a screen position in normalized device coordinates (as produced by
     /// `normalize_pixel_x` & `normalize_pixel_y`) into a ray in world space.
     /// Uses the view transformation given by `set_view_matrix`.
     pub fn project_ndc_into_world(&self, ndc_x: FreeCoordinate, ndc_y: FreeCoordinate) -> Ray {
@@ -247,7 +277,7 @@ impl ProjectionHelper {
         }
     }
 
-    /// Convert the cursor position into a ray in world space.
+    /// Converts the cursor position into a ray in world space.
     /// Uses the view transformation given by `set_view_matrix`.
     pub fn project_cursor_into_world(&self) -> Ray {
         self.project_ndc_into_world(self.cursor_ndc_position.x, self.cursor_ndc_position.y)
@@ -301,6 +331,10 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
     None
 }
 
+/// Data collected by `cursor_raycast` about the blocks struck by the ray; intended to be
+/// sufficient for various player interactions with blocks.
+///
+/// TODO: Should carry information about lighting, and both the struck and preceding cubes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
     /// The cube the cursor is at, as defined by a raycast result (thus including the
@@ -313,6 +347,7 @@ pub struct Cursor {
 }
 
 // TODO: this probably shouldn't be Display any more, but Debug or ConciseDebug
+// — or just a regular method.
 impl std::fmt::Display for Cursor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -330,14 +365,17 @@ pub struct InputProcessor {
 }
 
 impl InputProcessor {
+    /// Handles incoming key-down events.
     pub fn key_down(&mut self, key: Key) {
         self.keys_held.insert(key);
     }
 
+    /// Handles incoming key-up events.
     pub fn key_up(&mut self, key: Key) {
         self.keys_held.remove(&key);
     }
 
+    /// Returns the character movement velocity that input is currently requesting.
     pub fn movement(&self) -> Vector3<FreeCoordinate> {
         Vector3::new(
             self.net_movement(Key::Character('a'), Key::Character('d')),
@@ -346,6 +384,7 @@ impl InputProcessor {
         )
     }
 
+    /// Applies the current input to the given `Camera`.
     pub fn apply_input(&self, camera: &mut Camera, timestep: Duration) {
         camera.set_velocity_input(self.movement());
 
@@ -359,6 +398,7 @@ impl InputProcessor {
         .max(-90.0);
     }
 
+    /// Computes the net effect of a pair of opposed inputs (e.g. "forward" and "back").
     fn net_movement(&self, negative: Key, positive: Key) -> FreeCoordinate {
         match (
             self.keys_held.contains(&negative),
@@ -379,13 +419,18 @@ impl Default for InputProcessor {
     }
 }
 
+/// A platform-neutral representation of keyboard keys for `InputProcessor`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Key {
     /// Letters should be lowercase.
     Character(char),
+    /// Left arrow key.
     Left,
+    /// Right arrow key.
     Right,
+    /// Up arrow key.
     Up,
+    /// Down arrow key.
     Down,
 }
 

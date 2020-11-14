@@ -41,19 +41,34 @@ pub trait Geometry {
 }
 
 /// Identifies a face of a cube or an orthogonal unit vector, except for `WITHIN` meaning
-/// "zero distance and undefined direction".
+/// “zero distance and undefined direction”.
 ///
 /// So far, nearly every usage of Face has a use for `WITHIN`, but we should keep an eye
-/// out for uses of the 'true' 6-face version.
+/// out for uses of the ‘true’ 6-face version.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 #[rustfmt::skip]
 pub enum Face {
-    WITHIN, NX, NY, NZ, PX, PY, PZ,
+    /// The interior volume of a cube, or an undefined direction. Corresponds to the vector `(0, 0, 0)`.
+    WITHIN,
+    /// Negative X; the face whose normal vector is `(-1, 0, 0)`.
+    NX,
+    /// Negative Y; the face whose normal vector is `(0, -1, 0)`; downward.
+    NY,
+    /// Negative Z; the face whose normal vector is `(0, 0, -1)`.
+    NZ,
+    /// Positive X; the face whose normal vector is `(1, 0, 0)`.
+    PX,
+    /// Positive Y; the face whose normal vector is `(0, 1, 0)`; upward.
+    PY,
+    /// Positive Z; the face whose normal vector is `(0, 0, 1)`.
+    PZ,
 }
 
 impl Face {
+    /// All the values of `Face` except for `Face::WITHIN`.
     pub const ALL_SIX: &'static [Face; 6] =
         &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
+    /// All the values of `Face`, with `Face::WITHIN` listed first.
     pub const ALL_SEVEN: &'static [Face; 7] = &[
         Face::WITHIN,
         Face::NX,
@@ -167,13 +182,20 @@ impl Face {
 /// Container for values keyed by `Face`s.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FaceMap<V> {
-    pub nx: V,
-    pub ny: V,
-    pub nz: V,
-    pub px: V,
-    pub py: V,
-    pub pz: V,
+    /// The value whose key is `Face::WITHIN`.
     pub within: V,
+    /// The value whose key is `Face::NX`.
+    pub nx: V,
+    /// The value whose key is `Face::NY`.
+    pub ny: V,
+    /// The value whose key is `Face::NZ`.
+    pub nz: V,
+    /// The value whose key is `Face::PX`.
+    pub px: V,
+    /// The value whose key is `Face::PY`.
+    pub py: V,
+    /// The value whose key is `Face::PZ`.
+    pub pz: V,
 }
 
 impl<V> FaceMap<V> {
@@ -247,7 +269,10 @@ impl<V> IndexMut<Face> for FaceMap<V> {
 
 /// A floating-point RGB color value.
 ///
-/// * Nominal range 0 to 1, but permitting out of range values.
+/// * Each component may be considered to have a nominal range of 0 to 1, but larger
+///   values are permitted — corresponding to bright light sources and other such
+///   things which it is reasonable to “overexpose”. (No meaning is given to negative
+///   values, but they are permitted.)
 /// * NaN is banned so that `Eq` may be implemented. (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -255,10 +280,15 @@ pub struct RGB(Vector3<NotNan<f32>>);
 
 /// A floating-point RGBA color value.
 ///
-/// * Nominal range 0 to 1, but permitting out of range values.
+/// * Each color component may be considered to have a nominal range of 0 to 1, but
+///   larger values are permitted — corresponding to bright light sources and other such
+///   things which it is reasonable to “overexpose”. (No meaning is given to negative
+///   values, but they are permitted.)
 /// * NaN is banned so that `Eq` may be implemented. (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
 /// * The alpha is not premultiplied.
+/// * Alpha values less than zero and greater than one will be treated equivalently to
+///   zero and one, respectively, but are preserved rather than clipped.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct RGBA(Vector4<NotNan<f32>>);
 
@@ -282,24 +312,33 @@ impl RGB {
     pub const fn with_alpha(self, alpha: NotNan<f32>) -> RGBA {
         RGBA(Vector4::new(self.0.x, self.0.y, self.0.z, alpha))
     }
+    /// Adds an alpha component of `1.0` (fully opaque) to produce an RGBA color.
     pub const fn with_alpha_one(self) -> RGBA {
         self.with_alpha(NN1)
     }
 
+    /// Returns the red color component. Values are linear (gamma = 1).
     pub const fn red(self) -> NotNan<f32> {
         self.0.x
     }
+    /// Returns the green color component. Values are linear (gamma = 1).
     pub const fn green(self) -> NotNan<f32> {
         self.0.y
     }
+    /// Returns the blue color component. Values are linear (gamma = 1).
     pub const fn blue(self) -> NotNan<f32> {
         self.0.z
     }
 }
 impl RGBA {
-    /// Transparent black (all components zero).
+    /// Transparent black (all components zero); identical to
+    /// `RGBA::new(0.0, 0.0, 0.0, 0.0)` except for being a constant.
     pub const TRANSPARENT: RGBA = RGBA(Vector4::new(NN0, NN0, NN0, NN0));
+    /// Black; identical to `RGBA::new(0.0, 0.0, 0.0, 1.0)` except for being a constant.
     pub const BLACK: RGBA = RGBA(Vector4::new(NN0, NN0, NN0, NN1));
+    /// White; identical to `RGBA::new(1.0, 1.0, 1.0, 1.0)` except for being a constant.
+    ///
+    /// Note that brighter values may exist; this is only a "nominal" white.
     pub const WHITE: RGBA = RGBA(Vector4::new(NN1, NN1, NN1, NN1));
 
     /// Constructs a color from components. Panics if any component is NaN.
@@ -308,22 +347,34 @@ impl RGBA {
         Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
     }
 
+    /// Returns the red color component. Values are linear (gamma = 1).
     pub const fn red(self) -> NotNan<f32> {
         self.0.x
     }
+    /// Returns the green color component. Values are linear (gamma = 1).
     pub const fn green(self) -> NotNan<f32> {
         self.0.y
     }
+    /// Returns the blue color component. Values are linear (gamma = 1).
     pub const fn blue(self) -> NotNan<f32> {
         self.0.z
     }
+    /// Returns the alpha component.
+    ///
+    /// Alpha is not premultiplied. Alpha values less than zero and greater than one are
+    /// allowed and may be returned by this method, but alpha test methods will treat
+    // them equivalently to zero and one.
     pub const fn alpha(self) -> NotNan<f32> {
         self.0.w
     }
 
+    /// Returns whether this color is fully transparent, or has an alpha component of
+    /// zero or less.
     pub fn fully_transparent(self) -> bool {
         self.alpha() <= NN0
     }
+    /// Returns whether this color is fully opaque, or has an alpha component of
+    /// one or greater.
     pub fn fully_opaque(self) -> bool {
         self.alpha() >= NN1
     }
@@ -336,7 +387,8 @@ impl RGBA {
         RGB(self.0.truncate())
     }
 
-    pub fn to_saturating_8bpp(self) -> (u8, u8, u8, u8) {
+    /// Converts this color lossily to linear 8-bits-per-component color.
+    pub fn to_saturating_32bit(self) -> (u8, u8, u8, u8) {
         fn convert_component(x: NotNan<f32>) -> u8 {
             // As of Rust 1.45, `as` on float to int is saturating
             (x.into_inner() * 255.0) as u8
@@ -503,7 +555,7 @@ pub struct AAB {
 }
 
 impl AAB {
-    /// The AAB of zero size at the origin.
+    /// The `AAB` of zero size at the origin.
     pub const ZERO: AAB = AAB {
         lower_bounds: Point3 {
             x: 0.0,
@@ -522,6 +574,7 @@ impl AAB {
         },
     };
 
+    /// Constructs an `AAB` from individual coordinates.
     #[track_caller]
     pub fn new(
         lx: FreeCoordinate,
@@ -534,6 +587,7 @@ impl AAB {
         Self::from_lower_upper(Point3::new(lx, ly, lz), Point3::new(hx, hy, hz))
     }
 
+    /// Constructs an `AAB` from most-negative and most-positive corner points.
     #[track_caller]
     #[rustfmt::skip]
     pub fn from_lower_upper(
@@ -707,15 +761,15 @@ mod tests {
     // TODO: Add tests of the color not-NaN mechanisms.
 
     #[test]
-    fn rgba_to_saturating_8bpp() {
+    fn rgba_to_saturating_32bit() {
         assert_eq!(
-            RGBA::new(0.125, 0.25, 0.5, 0.75).to_saturating_8bpp(),
+            RGBA::new(0.125, 0.25, 0.5, 0.75).to_saturating_32bit(),
             (31, 63, 127, 191)
         );
 
         // Test saturation
         assert_eq!(
-            RGBA::new(0.5, -1.0, 10.0, 1.0).to_saturating_8bpp(),
+            RGBA::new(0.5, -1.0, 10.0, 1.0).to_saturating_32bit(),
             (127, 0, 255, 255)
         );
     }

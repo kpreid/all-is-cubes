@@ -29,7 +29,7 @@ pub struct Grid {
 }
 
 impl Grid {
-    /// Construct a `Grid` from coordinate lower bounds and sizes.
+    /// Constructs a `Grid` from coordinate lower bounds and sizes.
     ///
     /// For example, if on one axis the lower bound is 5 and the size is 10,
     /// then the positions where blocks can exist are numbered 5 through 14
@@ -68,6 +68,12 @@ impl Grid {
         }
     }
 
+    /// Constructs a `Grid` from inclusive lower bounds and exclusive upper bounds.
+    ///
+    /// For example, if on one axis the lower bound is 5 and the upper bound is 10,
+    /// then the positions where blocks can exist are numbered 5 through 9
+    /// (inclusive) and the occupied volume (from a perspective of continuous
+    /// rather than discrete coordinates) spans 5 to 10.
     #[track_caller]
     pub fn from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
@@ -414,6 +420,7 @@ impl Space {
         Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)))
     }
 
+    /// Registers a listener for mutations of this space.
     pub fn listen(&mut self, listener: impl Listener<SpaceChange> + 'static) {
         self.notifier.listen(listener)
     }
@@ -690,15 +697,20 @@ impl Space {
         self.update_lighting_from_queue()
     }
 
+    /// Returns the sky color; for lighting purposes, this is the illumination assumed
+    /// to arrive from all directions outside the bounds of this space.
     pub fn sky_color(&self) -> RGB {
         self.sky_color
     }
 
+    /// Sets the sky color, as per `sky_color`.
+    ///
+    /// This function does not currently cause any recomputation of cube lighting,
+    /// but [TODO:] it may later be improved to do so.
     pub fn set_sky_color(&mut self, color: RGB) {
         self.sky_color = color;
         self.packed_sky_color = self.sky_color.into();
-        // TODO: set up rerunning lighting for everything, preferably not
-        // by queueing every single block for a lighting update.
+        // TODO: Also send out a SpaceChange.
     }
 
     /// Finds or assigns an index to denote the block.
@@ -778,10 +790,14 @@ impl SpaceBlockData {
     // Public accessors follow. We do this instead of making public fields so that
     // the data structure can be changed should a need arise.
 
+    /// Returns the `Block` this data is about.
     pub fn block(&self) -> &Block {
         &self.block
     }
 
+    /// Returns the `EvaluatedBlock` representation of the block.
+    ///
+    /// TODO: Describe when this may be stale.
     pub fn evaluated(&self) -> &EvaluatedBlock {
         &self.evaluated
     }
@@ -822,6 +838,7 @@ pub struct SpaceStepInfo {
     pub light_update_count: usize,
     /// Number of entries in the light update queue.
     pub light_queue_count: usize,
+    /// The largest change in light value that occurred this step.
     pub max_light_update_difference: u8,
 }
 impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
@@ -865,10 +882,13 @@ impl<V> GridArray<V> {
         }
     }
 
+    /// Returns the `Grid` specifying the bounds of this array.
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
 
+    /// Returns the element at `position` of this array, or `None` if `position` is out of
+    /// bounds.
     pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
         self.grid.index(position).map(|index| &self.contents[index])
     }
@@ -877,6 +897,10 @@ impl<V> GridArray<V> {
 impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
     type Output = V;
 
+    /// Returns the element at `position` of this array, or panics if `position` is out of
+    /// bounds.
+    ///
+    /// Use `GridArray::get` for a non-panicing alternative.
     fn index(&self, position: P) -> &Self::Output {
         let position: GridPoint = position.into();
         if let Some(index) = self.grid.index(position) {
@@ -889,6 +913,7 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
         }
     }
 }
+// TODO: Implement IndexMut
 
 #[cfg(test)]
 mod tests {

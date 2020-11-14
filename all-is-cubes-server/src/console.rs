@@ -38,12 +38,16 @@ pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
     None  // match branches default to consuming event
 }
 
+/// Obtain the terminal size and adjust it such that it is suitable for a
+/// `ProjectionHelper::set_viewport` followed by `draw_space`.
 pub fn viewport_from_terminal_size() -> io::Result<Vector2<usize>> {
     let (w, h) = termion::terminal_size()?;
+    // max(1) is to keep the projection math from blowing up.
+    // Subtracting some height allows for info text.
     Ok(Vector2::new(w.max(1) as usize, (h - 5).max(1) as usize))
 }
 
-// Draw the camera's space to an ANSI terminal using raytracing.
+/// Draw the camera's space to an ANSI terminal using raytracing.
 pub fn draw_space<O: io::Write>(
     projection: &mut ProjectionHelper,
     camera: &Camera,

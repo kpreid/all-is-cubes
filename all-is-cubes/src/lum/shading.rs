@@ -1,7 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-// Shaders, uniforms, etc.
+//! Shaders, uniforms, etc.
 
 use cgmath::Matrix4;
 use luminance::UniformInterface;
@@ -17,9 +17,11 @@ use crate::lum::types::VertexSemantics;
 use crate::math::FreeCoordinate;
 use crate::util::WarningsResult;
 
+/// Type of the block shader program (output of `prepare_block_program`).
 pub type BlockProgram = Program<VertexSemantics, (), BlockUniformInterface>;
 
 // TODO: Make higher-level abstractions such that this doesn't need to be public
+/// Compile the block shader program for the given graphics context.
 pub fn prepare_block_program<C>(context: &mut C) -> WarningsResult<BlockProgram, String, String>
 where
     C: GraphicsContext<Backend = Backend>,
@@ -53,6 +55,7 @@ const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
 const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
 const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 
+/// Uniform interface for the block shader program.
 #[derive(Debug, UniformInterface)]
 pub struct BlockUniformInterface {
     #[uniform(unbound)]
@@ -66,6 +69,7 @@ pub struct BlockUniformInterface {
 }
 
 impl BlockUniformInterface {
+    /// Type converting wrapper for the `projection_matrix` uniform.
     pub fn set_projection_matrix(
         &self,
         program_iface: &mut ProgramInterface,
@@ -77,6 +81,7 @@ impl BlockUniformInterface {
         );
     }
 
+    /// Type converting wrapper for the `view_matrix` uniform.
     pub fn set_view_matrix(
         &self,
         program_iface: &mut ProgramInterface,
@@ -85,6 +90,7 @@ impl BlockUniformInterface {
         program_iface.set(&self.view_matrix, view_matrix.cast::<f32>().unwrap().into());
     }
 
+    /// Type converting wrapper for the `block_texture` uniform.
     pub fn set_block_texture(
         &self,
         program_iface: &mut ProgramInterface,

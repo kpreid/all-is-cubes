@@ -26,15 +26,25 @@ use crate::triangulator::{
 
 /// Alias for the concrete type of the block texture.
 pub type BlockTexture = Texture<Dim2Array, NormRGBA8UI>;
+/// Alias for the concrete type of the block texture when bound in a luminance pipeline.
 pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim2Array, NormRGBA8UI>;
 
-#[allow(dead_code)] // used in conditionally compiled wasm32 code
+/// Precalculated models (vertices and texture atlas) for a set of blocks to be drawn
+/// in a `luminance` graphics context. A concrete type of output from
+/// `all_is_cubes::triangulator::triangulate_blocks`.
 pub struct BlockGLRenderData {
+    /// Data for use with `all_is_cubes::triangulator::triangulate_space`.
     pub block_render_data: BlocksRenderData<GLBlockVertex, BlockGLTexture>,
     pub(crate) texture_allocator: BlockGLTexture,
 }
 
 impl BlockGLRenderData {
+    /// Constructs `BlockGLRenderData` for the blocks of the given `Space`.
+    ///
+    /// Returns an error if the required texture could not be allocated.
+    ///
+    /// The second return value is diagnostics from texture allocation which may be
+    /// logged.
     pub fn prepare<C>(context: &mut C, space: &Space) -> Result<(Self, String), TextureError>
     where
         C: GraphicsContext<Backend = Backend>,
@@ -67,6 +77,9 @@ pub struct BlockGLTexture {
     next_free: u32,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
 }
+/// Texture tile handle used by our implementation of `TextureAllocator`.
+///
+/// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
 pub struct GLTile {
     /// Actual storage and metadata about the tile; may be updated as needed by the

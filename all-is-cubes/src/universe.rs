@@ -19,7 +19,9 @@ use crate::space::{Space, SpaceStepInfo};
 /// Name/key of an object in a `Universe`.
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Name {
+    /// An explicitly set name.
     Specific(String),
+    /// An automatically assigned name.
     Anonym(usize),
 }
 impl From<&str> for Name {
@@ -30,6 +32,8 @@ impl From<&str> for Name {
 
 /// A collection of named objects which can refer to each other via `URef`. In the future,
 /// it will enable garbage collection and inter-object invariants.
+///
+/// See also the `UniverseIndex` trait for methods for adding and removing objects.
 pub struct Universe {
     spaces: HashMap<Name, URootRef<Space>>,
     cameras: HashMap<Name, URootRef<Camera>>,
@@ -37,6 +41,7 @@ pub struct Universe {
 }
 
 impl Universe {
+    /// Construct an empty `Universe`.
     pub fn new() -> Self {
         Universe {
             spaces: HashMap::new(),
@@ -54,7 +59,7 @@ impl Universe {
         self.get(&"camera".into()).unwrap()
     }
 
-    /// Advance time.
+    /// Advance time for all members.
     pub fn step(&mut self, timestep: Duration) -> (SpaceStepInfo, ()) {
         let mut space_info = SpaceStepInfo::default();
         for space in self.spaces.values() {
@@ -72,6 +77,8 @@ impl Universe {
         (space_info, ())
     }
 
+    /// Inserts a new object without giving it a specific name, and returns
+    /// a reference to it.
     pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T>
     where
         Self: UniverseIndex<T>,
@@ -81,6 +88,8 @@ impl Universe {
         self.insert(name, value)
     }
 }
+
+impl sealed_gimmick::Sealed for Universe {}
 
 /// Trait implemented once for each type of object that can be stored in a `Universe`
 /// that internally provides the table for that type. This trait differs from
@@ -108,8 +117,16 @@ impl UniverseTable<Camera> for Universe {
 
 /// Trait implemented once for each type of object that can be stored in a `Universe`
 /// that permits lookups of that type.
-pub trait UniverseIndex<T> {
+pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
+    /// Translates a name for an object of type `T` into a `URef` for it, which
+    /// allows borrowing the actual object.
+    ///
+    /// Returns `None` if no object exists for the name.
     fn get(&self, name: &Name) -> Option<URef<T>>;
+
+    /// Insert a new object with a specific name.
+    ///
+    /// TODO: Implement failure on already-existing names.
     fn insert(&mut self, name: Name, value: T) -> URef<T>;
 }
 impl UniverseIndex<Space> for Universe {
@@ -354,12 +371,14 @@ impl<M> Notifier<M>
 where
     M: Clone,
 {
+    /// Constructs a new empty `Notifier`.
     pub fn new() -> Self {
         Self {
             listeners: Vec::new(),
         }
     }
 
+    /// Add a `Listener` to this set of listeners.
     pub fn listen<L: Listener<M> + 'static>(&mut self, listener: L) {
         if !listener.alive() {
             return;
@@ -368,6 +387,7 @@ where
         self.listeners.push(Box::new(listener));
     }
 
+    /// Deliver a message to all ```Listener```s.
     pub fn notify(&self, message: M) {
         for listener in self.listeners.iter() {
             listener.receive(message.clone());
@@ -398,11 +418,20 @@ where
 /// A receiver of messages which can indicate when it is no longer interested in
 /// them (typically because the associated recipient has been dropped). Note that
 /// a Listener must use interior mutability to store the message. As a Listener
-/// may be called from various places, that mutability should in general be limited
+/// may be called from various contexts, that mutability should in general be limited
 /// to setting dirty flags or inserting into message queues — not triggering any
 /// state changes of more general interest.
 pub trait Listener<M> {
+    /// Process and store a message.
+    ///
+    /// As a Listener may be called from various contexts, this method should avoid
+    /// triggering further side effects, by setting dirty flags or inserting into
+    /// message queues — definitely not taking a lock or borrowing a `RefCell` that
+    /// is not for the sole use of the `Listener` and its destination.
     fn receive(&self, message: M);
+
+    /// Returns `false` if the `Listener` should not receive any further messages
+    /// because its 2
     fn alive(&self) -> bool;
 }
 
@@ -435,7 +464,7 @@ impl<M> Listener<M> for NullListener {
     }
 }
 
-/// A `Listener` which stores all the messages it receives, deduplicated.
+/// A `Listener` destination which stores all the messages it receives, deduplicated.
 pub struct Sink<M> {
     messages: Rc<RefCell<IndexSet<M>>>,
 }
@@ -446,12 +475,14 @@ impl<M> Sink<M>
 where
     M: Eq + Hash + Clone,
 {
+    /// Constructs a new empty `Sink`.
     pub fn new() -> Self {
         Self {
             messages: Rc::new(RefCell::new(IndexSet::new())),
         }
     }
 
+    /// Returns a `Listener` which records the messages it receives in this Sink.
     pub fn listener(&self) -> impl Listener<M> {
         SinkListener {
             weak_messages: Rc::downgrade(&self.messages),
@@ -504,25 +535,30 @@ where
     }
 }
 
-/// A `Listener` which only stores a single flag indicating if any messages were
-/// received.
+/// A `Listener` destination which only stores a single flag indicating if any messages
+/// were received.
 pub struct DirtyFlag {
     flag: Rc<Cell<bool>>,
 }
-pub struct DirtyFlagListener {
+struct DirtyFlagListener {
     weak_flag: Weak<Cell<bool>>,
 }
 impl DirtyFlag {
+    /// Constructs a new `DirtyFlag` with the flag value set to `false`.
     pub fn new() -> Self {
         Self {
             flag: Rc::new(Cell::new(false)),
         }
     }
+
+    /// Return a `Listener` which sets this flag to `true` when it receives any message.
     pub fn listener<M>(&self) -> impl Listener<M> {
         DirtyFlagListener {
             weak_flag: Rc::downgrade(&self.flag),
         }
     }
+
+    /// Return the flag value, setting it to `false` at the same time.
     pub fn get_and_clear(&self) -> bool {
         self.flag.replace(false)
     }
@@ -537,7 +573,9 @@ impl<M> Listener<M> for DirtyFlagListener {
         self.weak_flag.upgrade().is_some()
     }
 }
+/// Equivalent to `DirtyFlag::new`.
 impl Default for DirtyFlag {
+    /// Equivalent to `DirtyFlag::new`.
     fn default() -> Self {
         Self::new()
     }
@@ -549,7 +587,9 @@ impl Default for DirtyFlag {
 ///
 /// TODO: add doc test
 pub struct Filter<F, T> {
+    /// The function to transform and possibly discard each message.
     pub function: F,
+    /// The recipient of the messages.
     pub target: T,
 }
 impl<MI, MO, F, T> Listener<MI> for Filter<F, T>
@@ -582,6 +622,9 @@ impl FrameClock {
     const STEP_LENGTH: Duration = Duration::from_micros(1_000_000 / 60);
     const ACCUMULATOR_CAP: Duration = Duration::from_millis(500);
 
+    /// Constructs a new `FrameClock`.
+    ///
+    /// This operation is independent of the system clock.
     pub fn new() -> Self {
         Self {
             last_absolute_time: None,
@@ -621,23 +664,37 @@ impl FrameClock {
         result
     }
 
+    /// Indicates whether a new frame should be drawn, given the amount of time that this
+    /// `FrameClock` has been informed has passed.
+    ///
+    /// When a frame *is* drawn, `did_draw` must be called; otherwise, this will always
+    /// return true.
     pub fn should_draw(&self) -> bool {
         self.render_dirty
     }
 
+    /// Informs the `FrameClock` that a frame was just drawn.
     pub fn did_draw(&mut self) {
         self.render_dirty = false;
     }
 
+    /// Indicates whether `Universe:step` should be performed, given the amount of time
+    /// that this `FrameClock` has been informed has passed.
+    ///
+    /// When a step *is* performd, `did_step` must be called; otherwise, this will always
+    /// return true.
     pub fn should_step(&self) -> bool {
         self.accumulated_step_time >= Self::STEP_LENGTH
     }
 
+    /// Informs the `FrameClock` that a step was just performed.
     pub fn did_step(&mut self) {
         self.accumulated_step_time -= Self::STEP_LENGTH;
         self.render_dirty = true;
     }
 
+    /// The timestep value that should be passed to `Universe::step` when stepping in
+    /// response to `should_step` returning true.
     pub fn step_length(&self) -> Duration {
         Self::STEP_LENGTH
     }
@@ -653,6 +710,11 @@ impl Default for FrameClock {
     fn default() -> Self {
         Self::new()
     }
+}
+
+mod sealed_gimmick {
+    /// As a supertrait, this prevents a trait from being implemented outside the crate.
+    pub trait Sealed {}
 }
 
 #[cfg(test)]

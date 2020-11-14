@@ -140,14 +140,24 @@ pub const AIR: Block = Block::Atom(
     RGBA::TRANSPARENT,
 );
 
+/// The result of `AIR.evaluate()`. This may be used when a sound `EvaluatedBlock` value
+/// is needed but there is no block.
 pub static AIR_EVALUATED: Lazy<EvaluatedBlock> = Lazy::new(|| AIR.evaluate().unwrap());
 
 /// A “flattened” and snapshotted form of `Block` which contains all information needed
 /// for rendering and physics, and does not require `URef` access to other objects.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvaluatedBlock {
+    /// The block's attributes.
     pub attributes: BlockAttributes,
+    /// The block's color; if made of multiple voxels, then an average or representative
+    /// color.
     pub color: RGBA,
+    /// The voxels making up the block, if any; if `None`, then `color` should be used as
+    /// a uniform color value.
+    ///
+    /// TODO: Specify how it should be handled if the grid has unsuitable dimensions
+    /// (not cubical, not having an origin of 0, etc.).
     pub voxels: Option<GridArray<RGBA>>,
     /// Whether the block is known to be completely opaque to light on all six faces.
     ///

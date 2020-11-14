@@ -35,6 +35,11 @@ pub struct SpaceRenderer {
 }
 
 impl SpaceRenderer {
+    /// Constructs a `SpaceRenderer` for the given `Space`.
+    ///
+    /// Note that the actual geometry for the `Space` will be computed over several
+    /// frames after construction. There is not currently a specific way to wait for
+    /// completion.
     pub fn new(space: URef<Space>) -> Self {
         let mut space_borrowed = space.borrow_mut();
 
@@ -54,10 +59,14 @@ impl SpaceRenderer {
         }
     }
 
+    /// Get the reference to the `Space` this was constructed with.
     pub fn space(&self) -> &URef<Space> {
         &self.space
     }
 
+    /// Prepare to draw a frame, performing the steps that must be done while holding a
+    /// `&mut C`; the returned `SpaceRendererOutput` is then for use within the luminance
+    /// pipeline.
     pub fn prepare_frame<'a, C>(
         &'a mut self,
         context: &mut C,
@@ -117,22 +126,27 @@ impl SpaceRenderer {
 /// Ingredients to actually draw the Space inside a luminance pipeline, produced by
 /// `prepare_frame`.
 pub struct SpaceRendererOutput<'a> {
+    /// Space's sky color, to be used as clear color when drawing a frame (if applicable).
+    pub sky_color: RGB,
+
     block_texture: &'a mut BlockTexture,
     /// Chunks are handy wrappers around some Tesses
     chunks: Vec<&'a Chunk>,
-    pub sky_color: RGB,
     view_matrix: Matrix4<FreeCoordinate>,
     info: SpaceRenderInfo,
 }
 /// As `SpaceRendererBound`, but past the texture-binding stage of the pipeline.
 pub struct SpaceRendererBound<'a> {
+    /// Block texture to pass to the shader.
     pub bound_block_texture: BoundBlockTexture<'a>,
-    pub chunks: Vec<&'a Chunk>,
+    /// View matrix to pass to the shader.
     pub view_matrix: Matrix4<FreeCoordinate>,
+    chunks: Vec<&'a Chunk>,
     info: SpaceRenderInfo,
 }
 
 impl<'a> SpaceRendererOutput<'a> {
+    /// Bind texture, in preparation for using the `ShadingGate`.
     pub fn bind(self, pipeline: &'a Pipeline<'a>) -> Result<SpaceRendererBound<'a>, PipelineError> {
         Ok(SpaceRendererBound {
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
@@ -143,6 +157,7 @@ impl<'a> SpaceRendererOutput<'a> {
     }
 }
 impl<'a> SpaceRendererBound<'a> {
+    /// Use a `TessGate` to actually draw the space.
     pub fn render<E>(&self, tess_gate: &mut TessGate) -> Result<SpaceRenderInfo, E> {
         let mut square_count = 0;
         for chunk in &self.chunks {
@@ -155,11 +170,15 @@ impl<'a> SpaceRendererBound<'a> {
     }
 }
 
-/// Performance info from a `SpaceRenderer`.
+/// Performance info from a `SpaceRenderer` drawing one frame.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SpaceRenderInfo {
+    /// How many chunks need to be recomputed (redrawn) but are still waiting in queue.
     pub chunk_queue_count: usize,
+    /// How many chunks were recomputed this time.
     pub chunk_update_count: usize,
+    /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
+    /// to draw this frame.
     pub square_count: usize,
 }
 
@@ -231,7 +250,7 @@ impl Chunk {
         }
     }
 
-    pub fn render<E>(&self, tess_gate: &mut TessGate) -> Result<usize, E> {
+    fn render<E>(&self, tess_gate: &mut TessGate) -> Result<usize, E> {
         let mut count = 0;
         for &face in Face::ALL_SEVEN {
             if let Some(tess) = self.tesses[face].as_ref() {

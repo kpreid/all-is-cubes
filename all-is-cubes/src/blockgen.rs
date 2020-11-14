@@ -20,6 +20,10 @@ pub struct BlockGen<'a> {
 }
 
 impl<'a> BlockGen<'a> {
+    /// Constructs a `BlockGen` to generate blocks for the given universe.
+    ///
+    /// `size` is the side length of block spaces; the cube root of the number of voxels
+    /// making up a block.
     pub fn new(universe: &'a mut Universe, size: GridCoordinate) -> Self {
         assert!(size > 0);
         Self { universe, size }
@@ -98,6 +102,10 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 }
 
 /// A collection of block types assigned specific roles in generating outdoor landscapes.
+///
+/// TODO: This is probably too specific to be useful in the long term; call it a
+/// placeholder.
+#[allow(missing_docs)]
 pub struct LandscapeBlocks {
     pub air: Block,
     pub grass: Block,

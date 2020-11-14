@@ -84,9 +84,15 @@ pub type WarningsResult<T, E, W> = Result<(T, Vec<W>), (E, Vec<W>)>;
 /// Helper trait to provide methods for the `WarningsResult` type.
 #[allow(clippy::type_complexity)]
 pub trait Warnings: Sized {
+    /// A successful result.
     type T;
+    /// An error.
     type E;
+    /// A single warning (more than one may be stored).
     type W;
+
+    /// Separate the warnings from the success or failure, returning them as separate
+    /// values.
     fn split_warnings(self) -> (Vec<Self::W>, Result<Self::T, Self::E>);
 
     /// Call the `handler` with all warnings and return a `Result` stripped of the warnings.

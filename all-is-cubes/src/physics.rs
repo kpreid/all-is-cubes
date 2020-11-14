@@ -1,6 +1,8 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
+//! Continuously moving objects and collision.
+
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use std::collections::HashSet;
 use std::time::Duration;
@@ -20,14 +22,30 @@ const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 #[non_exhaustive]
 pub struct Body {
     // TODO: pub space: Option<URef<Space>>   --- or maybe backwards?
+    /// Position.
     pub position: Point3<FreeCoordinate>,
+    /// Velocity, in position units per second.
     pub velocity: Vector3<FreeCoordinate>,
 
+    /// Collision volume, defined with `position` as the origin.
     // Thought for the future: switching to a "cylinder" representation (height + radius)
     // would allow for simultaneous collision with multiple spaces with different axes.
     pub collision_box: AAB,
 
+    /// Yaw of the camera look direction, in degrees clockwise from looking towards -Z.
+    ///
+    /// The preferred range is 0 inclusive to 360 exclusive.
+    ///
+    /// This does not affect the behavior of the `Body` itself; it has nothing to do with
+    /// the direction of the velocity.
     pub yaw: FreeCoordinate,
+
+    /// Pitch of the camera look direction, in degrees downward from looking horixontally.
+    ///
+    /// The preferred range is -90 to 90, inclusive.
+    ///
+    /// This does not affect the behavior of the `Body` itself; it has nothing to do with
+    /// the direction of the velocity.
     pub pitch: FreeCoordinate,
 }
 
@@ -203,6 +221,8 @@ impl Body {
         self.collision_box.translate(self.position.to_vec())
     }
 
+    /// Changes `yaw` and `pitch` to look directly towards the given point within the same
+    /// coordinate system as `self.position`.
     pub fn look_at(&mut self, point: impl Into<Point3<FreeCoordinate>>) {
         let direction = point.into() - self.position;
         let horizontal_distance = direction.x.hypot(direction.z);
@@ -218,7 +238,10 @@ impl Body {
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct BodyStepInfo {
+    /// Whether movement computation was skipped due to approximately zero velocity.
     pub quiescent: bool,
+    /// Details on movement and collision. A single frame's movement may have up to three
+    /// segments as differently oriented faces are collided with.
     pub move_segments: [MoveSegment; 3],
 }
 
@@ -226,7 +249,12 @@ pub struct BodyStepInfo {
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct MoveSegment {
+    /// The change in position.
     pub delta_position: Vector3<FreeCoordinate>,
+    /// What movement stopped this segment from continuing further.
+    /// Note that `self.stopped_by.cube` is not necessarily the cube that
+    /// contained an obstruction, as that cube may be off to the side relative to
+    /// the ray.
     pub stopped_by: Option<RaycastStep>,
 }
 

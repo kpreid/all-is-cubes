@@ -34,6 +34,7 @@ pub struct Viewport {
     pub viewport_dev: [u32; 2],
 }
 
+/// Game world/UI renderer targeting `luminance`.
 // TODO: give this and its module a better name
 pub struct GLRenderer<C>
 where
@@ -57,6 +58,9 @@ impl<C> GLRenderer<C>
 where
     C: GraphicsContext<Backend = Backend>,
 {
+    /// Constructs `GLRenderer` for the given graphics context and initial viewport dimensions.
+    ///
+    /// Returns any shader compilation errors or warnings.
     pub fn new(mut surface: C, viewport: Viewport) -> WarningsResult<Self, String, String> {
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
         let (block_program, warnings) = prepare_block_program(&mut surface)?;
@@ -79,6 +83,7 @@ where
         ))
     }
 
+    /// Sets the expected viewport dimensions. Use in case of window resizing.
     pub fn set_viewport(&mut self, viewport: Viewport) {
         self.proj.set_viewport(viewport.viewport_px);
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
@@ -88,10 +93,12 @@ where
         .unwrap(); // TODO error handling
     }
 
+    /// Sets the `Camera` whose view we render.
     pub fn set_camera(&mut self, camera: Option<URef<Camera>>) {
         self.camera = camera;
     }
 
+    /// Draw a frame.
     pub fn render_frame(&mut self) -> RenderInfo {
         let mut info = RenderInfo::default();
         let camera: &Camera = &*(if let Some(camera_ref) = &self.camera {
@@ -216,13 +223,14 @@ where
         info
     }
 
+    /// Set the current cursor position, in pixel coordinates. Affects mouseover/click results.
     // TODO: This is a workaround for self.proj being private; arguably doesn't even belong there or here. Find a better structure.
     pub fn set_cursor_position(&mut self, position: Point2<usize>) {
         self.proj.set_cursor_position(position);
     }
 }
 
-/// Information about render performance
+/// Information about render performance.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RenderInfo {
     space: SpaceRenderInfo,
