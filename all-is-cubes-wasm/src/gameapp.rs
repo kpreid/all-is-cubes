@@ -14,7 +14,7 @@ use web_sys::{
 };
 
 use all_is_cubes::apps::AllIsCubesAppState;
-use all_is_cubes::camera::{InputProcessor, Key};
+use all_is_cubes::camera::Key;
 use all_is_cubes::cgmath::Point2;
 use all_is_cubes::lum::glrender::GLRenderer;
 use all_is_cubes::space::SpaceStepInfo;
@@ -81,7 +81,6 @@ struct WebGameRoot {
 
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
-    input_processor: InputProcessor,
     app: AllIsCubesAppState,
     renderer: GLRenderer<WebSysWebGL2Surface>,
     raf_callback: Closure<dyn FnMut(f64)>,
@@ -104,7 +103,6 @@ impl WebGameRoot {
 
             gui_helpers,
             static_dom,
-            input_processor: InputProcessor::default(),
             app,
             renderer,
             raf_callback: Closure::wrap(Box::new(|_| { /* dummy no-op for initialization */ })),
@@ -152,7 +150,7 @@ impl WebGameRoot {
             if let Some(refcell_ref) = self_ref.upgrade() {
                 let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
                 if let Some(key) = map_keyboard_event(&event) {
-                    self2.input_processor.key_down(key);
+                    self2.app.input_processor.key_down(key);
 
                     // TODO: return for keys we don't bind
                     let event: &Event = event.as_ref();
@@ -167,7 +165,7 @@ impl WebGameRoot {
             if let Some(refcell_ref) = self_ref.upgrade() {
                 let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
                 if let Some(key) = map_keyboard_event(&event) {
-                    self2.input_processor.key_up(key);
+                    self2.app.input_processor.key_up(key);
 
                     // TODO: return for keys we don't bind
                     let event: &Event = event.as_ref();
@@ -203,6 +201,7 @@ impl WebGameRoot {
                     x => x as usize,
                 };
                 if let Some(cursor) = &self2.renderer.cursor_result {
+                    // TODO: This should maybe go through InputProcessor? For consistency?
                     let result = self2.app.camera().borrow_mut().click(cursor, mapped_button);
                     console::log_1(&JsValue::from_str(&format!("click {}: {:?}", mapped_button, result)));
                 } else {
@@ -272,17 +271,7 @@ impl WebGameRoot {
         self.step_callback_scheduled = false;
         // Allow 2 steps of catch-up. TODO: This policy should probably live in FrameClock instead.
         for _ in 0..2 {
-            // TODO: All of this should be app.maybe_step_universe() but that interface doesn't leave room for the input processing work...
-            if self.app.frame_clock.should_step() {
-                let timestep = self.app.frame_clock.step_length();
-                self.app.frame_clock.did_step();
-
-                {
-                    let camera = &mut *self.app.camera().borrow_mut();
-                    self.input_processor.apply_input(camera, timestep);
-                }
-
-                let (space_step_info, _) = self.app.universe_mut().step(timestep);
+            if let Some((space_step_info, ())) = self.app.maybe_step_universe() {
                 self.last_step_info = space_step_info;
             }
         }

@@ -7,35 +7,29 @@ use once_cell::sync::Lazy;
 use std::borrow::Cow;
 use std::io;
 use termion::color;
-use termion::event::{Event, Key};
+use termion::event::{Event, Key as TermionKey};
 
-use all_is_cubes::camera::{Camera, ProjectionHelper};
+use all_is_cubes::camera::{Camera, Key, ProjectionHelper};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::math::{NotNan, RGBA};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
-/// Processes events for moving a camera. Returns all those events it does not process.
-#[rustfmt::skip]
-pub fn controller(camera: &mut Camera, event: Event) -> Option<Event> {
-    camera.auto_rotate = false;  // stop on any keypress
+/// Converts `termion::Event` to `all_is_cubes::camera::Key`.
+///
+/// Returns `None` if there is no corresponding value.
+pub fn map_termion_event(event: &Event) -> Option<Key> {
     match event {
         Event::Key(key) => match key {
-            Key::Char('w') | Key::Char('W') => { camera.set_velocity_input(( 0.0,  0.0, -1.0)); },
-            Key::Char('a') | Key::Char('A') => { camera.set_velocity_input((-1.0,  0.0,  0.0)); },
-            Key::Char('s') | Key::Char('S') => { camera.set_velocity_input(( 0.0,  0.0,  1.0)); },
-            Key::Char('d') | Key::Char('D') => { camera.set_velocity_input(( 1.0,  0.0,  0.0)); },
-            Key::Char('e') | Key::Char('E') => { camera.set_velocity_input(( 0.0,  1.0,  0.0)); },
-            Key::Char('c') | Key::Char('C') => { camera.set_velocity_input(( 0.0, -1.0,  0.0)); },
-            Key::Up => { camera.body.pitch += 5.0; },
-            Key::Down => { camera.body.pitch -= 5.0; },
-            Key::Left => { camera.body.yaw -= 5.0; },
-            Key::Right => { camera.body.yaw += 5.0; },
-            _ => { return Some(event); },
+            TermionKey::Char(c) => Some(Key::Character(c.to_ascii_lowercase())),
+            TermionKey::Up => Some(Key::Up),
+            TermionKey::Down => Some(Key::Down),
+            TermionKey::Left => Some(Key::Left),
+            TermionKey::Right => Some(Key::Right),
+            _ => None,
         },
-        _ => { return Some(event); },
+        _ => None,
     }
-    None  // match branches default to consuming event
 }
 
 /// Obtain the terminal size and adjust it such that it is suitable for a

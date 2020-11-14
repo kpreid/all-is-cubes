@@ -8,7 +8,7 @@ use cgmath::{
     Vector2, Vector3, Vector4,
 };
 use num_traits::identities::Zero;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
@@ -137,10 +137,6 @@ impl Camera {
         } else {
             // TODO: set a warning flag
         }
-
-        // TODO: temporary placeholder while we change over to continuous movement controls
-        // This will have no effect if velocity input is set every frame
-        self.velocity_input *= (0.1 as FreeCoordinate).powf(dt);
 
         if self.auto_rotate {
             self.body.yaw += 45.0 * dt;
@@ -360,19 +356,56 @@ impl std::fmt::Display for Cursor {
 }
 
 /// Parse input events, particularly key-down/up pairs, into camera control and such.
+#[derive(Clone, Debug, Default)]
 pub struct InputProcessor {
     keys_held: HashSet<Key>,
+    momentary_timeout: HashMap<Key, Duration>,
 }
 
 impl InputProcessor {
-    /// Handles incoming key-down events.
-    pub fn key_down(&mut self, key: Key) {
-        self.keys_held.insert(key);
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn is_bound(key: Key) -> bool {
+        match key {
+            // Used in `InputProcessor::movement()`.
+            Key::Character('w') => true,
+            Key::Character('a') => true,
+            Key::Character('s') => true,
+            Key::Character('d') => true,
+            Key::Character('e') => true,
+            Key::Character('c') => true,
+            // Used in `InputProcessor::apply_input()`.
+            Key::Left => true,
+            Key::Right => true,
+            Key::Up => true,
+            Key::Down => true,
+            _ => false,
+        }
+    }
+
+    /// Handles incoming key-down events. Returns whether the key was unbound.
+    pub fn key_down(&mut self, key: Key) -> bool {
+        let bound = Self::is_bound(key);
+        if bound {
+            self.keys_held.insert(key);
+        }
+        bound
     }
 
     /// Handles incoming key-up events.
     pub fn key_up(&mut self, key: Key) {
         self.keys_held.remove(&key);
+    }
+
+    /// Handles incoming key events in the case where key-up events are not available,
+    /// such that an assumption about equivalent press duration must be made.
+    pub fn key_momentary(&mut self, key: Key) -> bool {
+        self.momentary_timeout
+            .insert(key, Duration::from_millis(200));
+        self.key_up(key);
+        self.key_down(key)
     }
 
     /// Returns the character movement velocity that input is currently requesting.
@@ -384,9 +417,31 @@ impl InputProcessor {
         )
     }
 
+    /// Advance time insofar as input interpretation is affected by time.
+    ///
+    /// This method should be called *after* `apply_input`, when applicable.
+    pub fn step(&mut self, timestep: Duration) {
+        let mut to_drop = Vec::new();
+        for (key, duration) in self.momentary_timeout.iter_mut() {
+            if let Some(reduced) = duration.checked_sub(timestep) {
+                *duration = reduced;
+            } else {
+                to_drop.push(*key);
+            }
+        }
+        for key in to_drop.drain(..) {
+            self.momentary_timeout.remove(&key);
+            self.key_up(key);
+        }
+    }
+
     /// Applies the current input to the given `Camera`.
     pub fn apply_input(&self, camera: &mut Camera, timestep: Duration) {
-        camera.set_velocity_input(self.movement());
+        let movement = self.movement();
+        if movement != Vector3::zero() {
+            camera.auto_rotate = false;
+        }
+        camera.set_velocity_input(movement);
 
         let turning_step = 80.0 * timestep.as_secs_f64();
         camera.body.yaw = (camera.body.yaw
@@ -407,14 +462,6 @@ impl InputProcessor {
             (true, false) => -1.0,
             (false, true) => 1.0,
             _ => 0.0,
-        }
-    }
-}
-
-impl Default for InputProcessor {
-    fn default() -> Self {
-        InputProcessor {
-            keys_held: HashSet::new(),
         }
     }
 }
@@ -440,7 +487,7 @@ mod tests {
 
     #[test]
     fn input_movement() {
-        let mut input = InputProcessor::default();
+        let mut input = InputProcessor::new();
         assert_eq!(input.movement(), Vector3::new(0.0, 0.0, 0.0));
         input.key_down(Key::Character('d'));
         assert_eq!(input.movement(), Vector3::new(1.0, 0.0, 0.0));

@@ -1,7 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-use crate::camera::Camera;
+use crate::camera::{Camera, InputProcessor};
 use crate::demo_content::new_universe_with_stuff;
 use crate::space::SpaceStepInfo;
 use crate::universe::{FrameClock, URef, Universe};
@@ -12,9 +12,16 @@ use crate::universe::{FrameClock, URef, Universe};
 /// structure.
 #[derive(Debug)]
 pub struct AllIsCubesAppState {
+    /// Determines the timing of simulation and drawing. The caller must arrange
+    /// to advance time in the clock.
+    pub frame_clock: FrameClock,
+
+    /// Handles (some) user input. The caller must provide input events/state;
+    /// `AllIsCubesAppState` will handle calling `InputProcessor::apply_input`.
+    pub input_processor: InputProcessor,
+
     universe: Universe,
     camera: URef<Camera>,
-    pub frame_clock: FrameClock,
 }
 
 impl AllIsCubesAppState {
@@ -23,8 +30,9 @@ impl AllIsCubesAppState {
     pub fn new() -> Self {
         let universe = new_universe_with_stuff();
         Self {
-            camera: universe.get_default_camera(),
             frame_clock: FrameClock::new(),
+            input_processor: InputProcessor::new(),
+            camera: universe.get_default_camera(),
             universe,
         }
     }
@@ -43,9 +51,12 @@ impl AllIsCubesAppState {
     /// Steps the universe if the `FrameClock` says it's time to do so.
     pub fn maybe_step_universe(&mut self) -> Option<(SpaceStepInfo, ())> {
         if self.frame_clock.should_step() {
-            let result = self.universe.step(self.frame_clock.step_length());
+            let step_length = self.frame_clock.step_length();
             self.frame_clock.did_step();
-            Some(result)
+            self.input_processor
+                .apply_input(&mut *self.camera().borrow_mut(), step_length);
+            self.input_processor.step(step_length);
+            Some(self.universe.step(step_length))
         } else {
             None
         }

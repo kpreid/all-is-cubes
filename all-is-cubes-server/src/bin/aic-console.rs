@@ -14,7 +14,7 @@ use termion::raw::IntoRawMode;
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::ProjectionHelper;
 
-use all_is_cubes_server::console::{controller, draw_space, viewport_from_terminal_size};
+use all_is_cubes_server::console::{draw_space, map_termion_event, viewport_from_terminal_size};
 
 /// TODO: break this up into testable library code insofar as feasible.
 
@@ -46,9 +46,13 @@ fn main() -> io::Result<()> {
         'input: loop {
             match event_rx.try_recv() {
                 Ok(event) => {
-                    if let Some(Event::Key(key)) =
-                        controller(&mut *app.camera().borrow_mut(), event)
-                    {
+                    if let Some(aic_event) = map_termion_event(&event) {
+                        if app.input_processor.key_momentary(aic_event) {
+                            // Handled by input_processor
+                            continue 'input;
+                        }
+                    }
+                    if let Event::Key(key) = event {
                         match key {
                             Key::Esc | Key::Ctrl('c') | Key::Ctrl('d') => {
                                 return Ok(());
