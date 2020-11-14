@@ -1,6 +1,8 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
+//! Components for "apps", or game clients: user interface and top-level state.
+
 use crate::camera::{Camera, InputProcessor};
 use crate::demo_content::new_universe_with_stuff;
 use crate::space::SpaceStepInfo;
