@@ -18,6 +18,7 @@ pub mod apps;
 pub mod block;
 pub mod blockgen;
 pub mod camera;
+mod chunking;
 pub mod demo_content;
 pub mod drawing;
 mod lighting;

@@ -14,16 +14,15 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
+use crate::chunking::{cube_to_chunk, ChunkPos, CHUNK_SIZE};
 use crate::lum::block_texture::{
     BlockGLRenderData, BlockGLTexture, BlockTexture, BoundBlockTexture,
 };
 use crate::lum::types::{GLBlockVertex, Vertex};
-use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, RGB};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
 use crate::space::{Grid, Space, SpaceChange};
 use crate::triangulator::{triangulate_space, BlocksRenderData};
 use crate::universe::{Listener, URef};
-
-const CHUNK_SIZE: GridCoordinate = 16;
 
 /// Manages cached data and GPU resources for drawing a single `Space`.
 pub struct SpaceRenderer {
@@ -31,7 +30,7 @@ pub struct SpaceRenderer {
     todo: Rc<RefCell<SpaceRendererTodo>>,
     block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
     /// Indexed by coordinate divided by CHUNK_SIZE
-    chunks: HashMap<GridPoint, Chunk>,
+    chunks: HashMap<ChunkPos, Chunk>,
 }
 
 impl SpaceRenderer {
@@ -46,7 +45,7 @@ impl SpaceRenderer {
         let mut todo = SpaceRendererTodo::default();
         // TODO: Eventually we will want to draw only in-view-range chunks
         for chunk_pos in space_borrowed.grid().divide(CHUNK_SIZE).interior_iter() {
-            todo.chunks.insert(chunk_pos);
+            todo.chunks.insert(ChunkPos(chunk_pos));
         }
         let todo_rc = Rc::new(RefCell::new(todo));
         space_borrowed.listen(TodoListener(Rc::downgrade(&todo_rc)));
@@ -182,15 +181,6 @@ pub struct SpaceRenderInfo {
     pub square_count: usize,
 }
 
-/// Divide a cube position to obtain a chunk position.
-fn chunkify(cube: GridPoint) -> GridPoint {
-    GridPoint::new(
-        cube.x.div_euclid(CHUNK_SIZE),
-        cube.y.div_euclid(CHUNK_SIZE),
-        cube.z.div_euclid(CHUNK_SIZE),
-    )
-}
-
 /// Storage for rendering of part of a `Space`.
 pub struct Chunk {
     bounds: Grid,
@@ -200,9 +190,9 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    fn new(chunk_pos: GridPoint) -> Self {
+    fn new(chunk_pos: ChunkPos) -> Self {
         Chunk {
-            bounds: Grid::new(chunk_pos * CHUNK_SIZE, (CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE)),
+            bounds: chunk_pos.grid(),
             vertices: FaceMap::default(),
             tesses: FaceMap::default(),
         }
@@ -267,7 +257,7 @@ impl Chunk {
 struct SpaceRendererTodo {
     blocks: bool,
     // TODO: Organize chunks as a priority queue ordered by distance from camera.
-    chunks: IndexSet<GridPoint>,
+    chunks: IndexSet<ChunkPos>,
 }
 
 impl SpaceRendererTodo {
@@ -280,7 +270,7 @@ impl SpaceRendererTodo {
             for offset in &[-1, 1] {
                 let mut adjacent = cube;
                 adjacent[axis] += offset;
-                self.chunks.insert(chunkify(adjacent));
+                self.chunks.insert(cube_to_chunk(adjacent));
             }
         }
     }
@@ -329,7 +319,7 @@ mod tests {
         )));
         assert_eq!(
             todo.borrow().chunks,
-            vec![GridPoint::new(0, 0, 0), GridPoint::new(1, 0, 0)]
+            vec![ChunkPos::new(0, 0, 0), ChunkPos::new(1, 0, 0)]
                 .into_iter()
                 .collect::<IndexSet<_>>(),
         );
@@ -346,7 +336,7 @@ mod tests {
         )));
         assert_eq!(
             todo.borrow().chunks,
-            vec![GridPoint::new(0, 0, 0), GridPoint::new(-1, 0, 0)]
+            vec![ChunkPos::new(0, 0, 0), ChunkPos::new(-1, 0, 0)]
                 .into_iter()
                 .collect::<IndexSet<_>>(),
         );
