@@ -62,8 +62,7 @@ impl ChunkChart {
         // Convert to NotNan and sanity check.
         // TODO: What should we do about overly large inputs?
         let view_distance =
-            NotNan::try_from(view_distance.max(0.))
-                .unwrap_or_else(|_| NotNan::zero());
+            NotNan::try_from(view_distance.max(0.)).unwrap_or_else(|_| NotNan::zero());
 
         // Add 1/2 chunk distance because so that the layout works for any position
         // within 1/2 chunk of the origin of the grid.

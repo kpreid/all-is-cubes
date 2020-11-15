@@ -3,18 +3,19 @@
 
 //! Get from `Space` to `luminance::tess::Tess`.
 
-use cgmath::Matrix4;
-use indexmap::IndexSet;
+use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as _, Vector3};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::{Pipeline, PipelineError};
 use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::Backend;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry::Vacant, HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
-use crate::chunking::{cube_to_chunk, ChunkPos, CHUNK_SIZE};
+use crate::chunking::{
+    cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE, CHUNK_SIZE_FREE,
+};
 use crate::lum::block_texture::{
     BlockGLRenderData, BlockGLTexture, BlockTexture, BoundBlockTexture,
 };
@@ -29,8 +30,8 @@ pub struct SpaceRenderer {
     space: URef<Space>,
     todo: Rc<RefCell<SpaceRendererTodo>>,
     block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
-    /// Indexed by coordinate divided by CHUNK_SIZE
     chunks: HashMap<ChunkPos, Chunk>,
+    chunk_chart: ChunkChart,
 }
 
 impl SpaceRenderer {
@@ -42,11 +43,7 @@ impl SpaceRenderer {
     pub fn new(space: URef<Space>) -> Self {
         let mut space_borrowed = space.borrow_mut();
 
-        let mut todo = SpaceRendererTodo::default();
-        // TODO: Eventually we will want to draw only in-view-range chunks
-        for chunk_pos in space_borrowed.grid().divide(CHUNK_SIZE).interior_iter() {
-            todo.chunks.insert(ChunkPos(chunk_pos));
-        }
+        let todo = SpaceRendererTodo::default();
         let todo_rc = Rc::new(RefCell::new(todo));
         space_borrowed.listen(TodoListener(Rc::downgrade(&todo_rc)));
 
@@ -55,6 +52,8 @@ impl SpaceRenderer {
             todo: todo_rc,
             block_data_cache: None,
             chunks: HashMap::new(),
+            // TODO: Use the actual draw distance!
+            chunk_chart: ChunkChart::new(200.),
         }
     }
 
@@ -92,31 +91,53 @@ impl SpaceRenderer {
             block_data
         });
 
+        // TODO: tested function for this matrix op mess
+        // TODO: replace unwrap()s with falling back to drawing nothing or drawing the origin
+        let view_point =
+            Point3::from_vec(view_matrix.invert().unwrap().transpose().row(3).truncate());
+        // TODO: This coordinate tweak should be in ChunkChart since odd/even sizes are its business
+        let view_chunk = point_to_chunk(view_point + Vector3::new(0.5, 0.5, 0.5) * CHUNK_SIZE_FREE);
+
         // Update some chunk geometry.
-        // TODO: tune max update count
+        let chunk_grid = space.grid().divide(CHUNK_SIZE);
         let mut chunk_update_count = 0;
-        while chunk_update_count < 10 {
-            // TODO: We want to add chunks if they are _in the view range_, not unconditionally
-            if let Some(p) = todo.chunks.pop() {
-                self.chunks
-                    .entry(p)
-                    .or_insert_with(|| Chunk::new(p))
-                    .update(context, &space, &block_data.block_render_data);
-                chunk_update_count += 1;
-            } else {
+        for p in self.chunk_chart.chunks(view_chunk) {
+            if !chunk_grid.contains_cube(p.0) {
+                // Chunk not in the Space
+                continue;
+            }
+
+            // TODO: tune max update count dynamically?
+            if chunk_update_count >= 10 {
                 break;
+            }
+
+            let chunk_entry = self.chunks.entry(p);
+            // If the chunk needs updating or never existed, update it.
+            if todo.chunks.remove(&p) || matches!(chunk_entry, Vacant(_)) {
+                chunk_entry.or_insert_with(|| Chunk::new(p)).update(
+                    context,
+                    &space,
+                    &block_data.block_render_data,
+                );
+                chunk_update_count += 1;
             }
         }
 
+        // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
+
         SpaceRendererOutput {
-            block_texture: block_data.texture(),
-            chunks: self.chunks.values().collect(), // TODO visibility culling, and don't allocate every frame
             sky_color: space.sky_color(),
+            block_texture: block_data.texture(),
             view_matrix,
+            chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
+            chunk_chart: &self.chunk_chart,
+            view_chunk,
             info: SpaceRenderInfo {
                 chunk_queue_count: todo.chunks.len(),
                 chunk_update_count,
-                square_count: 0, // filled later
+                chunks_drawn: 0,
+                squares_drawn: 0, // filled later
             },
         }
     }
@@ -129,9 +150,11 @@ pub struct SpaceRendererOutput<'a> {
     pub sky_color: RGB,
 
     block_texture: &'a mut BlockTexture,
-    /// Chunks are handy wrappers around some Tesses
-    chunks: Vec<&'a Chunk>,
     view_matrix: Matrix4<FreeCoordinate>,
+    /// Chunks are handy wrappers around some Tesses
+    chunks: &'a HashMap<ChunkPos, Chunk>,
+    chunk_chart: &'a ChunkChart,
+    view_chunk: ChunkPos,
     info: SpaceRenderInfo,
 }
 /// As `SpaceRendererBound`, but past the texture-binding stage of the pipeline.
@@ -140,7 +163,9 @@ pub struct SpaceRendererBound<'a> {
     pub bound_block_texture: BoundBlockTexture<'a>,
     /// View matrix to pass to the shader.
     pub view_matrix: Matrix4<FreeCoordinate>,
-    chunks: Vec<&'a Chunk>,
+    chunks: &'a HashMap<ChunkPos, Chunk>,
+    chunk_chart: &'a ChunkChart,
+    view_chunk: ChunkPos,
     info: SpaceRenderInfo,
 }
 
@@ -149,8 +174,10 @@ impl<'a> SpaceRendererOutput<'a> {
     pub fn bind(self, pipeline: &'a Pipeline<'a>) -> Result<SpaceRendererBound<'a>, PipelineError> {
         Ok(SpaceRendererBound {
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
-            chunks: self.chunks,
             view_matrix: self.view_matrix,
+            chunks: self.chunks,
+            chunk_chart: self.chunk_chart,
+            view_chunk: self.view_chunk,
             info: self.info,
         })
     }
@@ -158,12 +185,18 @@ impl<'a> SpaceRendererOutput<'a> {
 impl<'a> SpaceRendererBound<'a> {
     /// Use a `TessGate` to actually draw the space.
     pub fn render<E>(&self, tess_gate: &mut TessGate) -> Result<SpaceRenderInfo, E> {
-        let mut square_count = 0;
-        for chunk in &self.chunks {
-            square_count += chunk.render(tess_gate)?;
+        let mut chunks_drawn = 0;
+        let mut squares_drawn = 0;
+        for p in self.chunk_chart.chunks(self.view_chunk) {
+            if let Some(chunk) = self.chunks.get(&p) {
+                chunks_drawn += 1;
+                squares_drawn += chunk.render(tess_gate)?;
+            }
+            // TODO: If the chunk is missing, draw a blocking shape, possibly?
         }
         Ok(SpaceRenderInfo {
-            square_count,
+            chunks_drawn,
+            squares_drawn,
             ..self.info
         })
     }
@@ -176,9 +209,10 @@ pub struct SpaceRenderInfo {
     pub chunk_queue_count: usize,
     /// How many chunks were recomputed this time.
     pub chunk_update_count: usize,
+    pub chunks_drawn: usize,
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
     /// to draw this frame.
-    pub square_count: usize,
+    pub squares_drawn: usize,
 }
 
 /// Storage for rendering of part of a `Space`.
@@ -256,8 +290,7 @@ impl Chunk {
 #[derive(Default)]
 struct SpaceRendererTodo {
     blocks: bool,
-    // TODO: Organize chunks as a priority queue ordered by distance from camera.
-    chunks: IndexSet<ChunkPos>,
+    chunks: HashSet<ChunkPos>,
 }
 
 impl SpaceRendererTodo {
@@ -321,7 +354,7 @@ mod tests {
             todo.borrow().chunks,
             vec![ChunkPos::new(0, 0, 0), ChunkPos::new(1, 0, 0)]
                 .into_iter()
-                .collect::<IndexSet<_>>(),
+                .collect::<HashSet<_>>(),
         );
     }
 
@@ -338,7 +371,7 @@ mod tests {
             todo.borrow().chunks,
             vec![ChunkPos::new(0, 0, 0), ChunkPos::new(-1, 0, 0)]
                 .into_iter()
-                .collect::<IndexSet<_>>(),
+                .collect::<HashSet<_>>(),
         );
     }
 }
