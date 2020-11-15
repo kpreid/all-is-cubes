@@ -103,14 +103,26 @@ impl<'a> From<&'a Block> for Cow<'a, Block> {
 }
 /// Convert a color to a block with default attributes.
 impl From<RGB> for Block {
-    fn from(color: RGB) -> Block {
+    fn from(color: RGB) -> Self {
         Block::from(color.with_alpha_one())
     }
 }
 /// Convert a color to a block with default attributes.
 impl From<RGBA> for Block {
-    fn from(color: RGBA) -> Block {
+    fn from(color: RGBA) -> Self {
         Block::Atom(BlockAttributes::default(), color)
+    }
+}
+/// Convert a color to a block with default attributes.
+impl From<RGB> for Cow<'_, Block> {
+    fn from(color: RGB) -> Self {
+        Cow::Owned(Block::from(color))
+    }
+}
+/// Convert a color to a block with default attributes.
+impl From<RGBA> for Cow<'_, Block> {
+    fn from(color: RGBA) -> Self {
+        Cow::Owned(Block::from(color))
     }
 }
 

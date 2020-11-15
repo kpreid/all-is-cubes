@@ -5,6 +5,7 @@
 
 use cgmath::Point3;
 use itertools::Itertools as _;
+use std::borrow::Cow;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -528,12 +529,13 @@ impl Space {
     /// space.set((0, 0, 0), &a_block);
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// ```
-    pub fn set(
+    pub fn set<'a>(
         &mut self,
         position: impl Into<GridPoint>,
-        block: &Block,
+        block: impl Into<Cow<'a, Block>>,
     ) -> Result<bool, SetCubeError> {
         let position: GridPoint = position.into();
+        let block: Cow<'a, Block> = block.into();
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
             let old_block = &self.block_data[old_block_index as usize].block;
@@ -554,7 +556,7 @@ impl Space {
 
                 // Swap out the block_data entry.
                 let old_block = {
-                    let mut data = SpaceBlockData::new(block)?;
+                    let mut data = SpaceBlockData::new(block.clone().into_owned())?;
                     data.count = 1;
                     std::mem::swap(&mut data, &mut self.block_data[old_block_index as usize]);
                     data.block
@@ -562,7 +564,8 @@ impl Space {
 
                 // Update block_to_index.
                 self.block_to_index.remove(&old_block);
-                self.block_to_index.insert(block.clone(), old_block_index);
+                self.block_to_index
+                    .insert(block.into_owned(), old_block_index);
 
                 // Side effects.
                 self.notifier
@@ -725,8 +728,8 @@ impl Space {
     ///
     /// The caller is responsible for incrementing `self.block_data[index].count`.
     #[inline]
-    fn ensure_block_index(&mut self, block: &Block) -> Result<BlockIndex, SetCubeError> {
-        if let Some(&old_index) = self.block_to_index.get(&block) {
+    fn ensure_block_index(&mut self, block: Cow<'_, Block>) -> Result<BlockIndex, SetCubeError> {
+        if let Some(&old_index) = self.block_to_index.get(&*block) {
             Ok(old_index)
         } else {
             // Look for if there is a previously used index to take.
@@ -734,9 +737,9 @@ impl Space {
             let high_mark = self.block_data.len();
             for new_index in 0..high_mark {
                 if self.block_data[new_index].count == 0 {
-                    self.block_data[new_index] = SpaceBlockData::new(block)?;
+                    self.block_data[new_index] = SpaceBlockData::new(block.clone().into_owned())?;
                     self.block_to_index
-                        .insert(block.clone(), new_index as BlockIndex);
+                        .insert(block.into_owned(), new_index as BlockIndex);
                     self.notifier
                         .notify(SpaceChange::Number(new_index as BlockIndex));
                     return Ok(new_index as BlockIndex);
@@ -749,11 +752,11 @@ impl Space {
                 );
             }
             // Evaluate the new block type. Can fail, but we haven't done any mutation yet.
-            let new_data = SpaceBlockData::new(block)?;
+            let new_data = SpaceBlockData::new(block.clone().into_owned())?;
             // Grow the vector.
             self.block_data.push(new_data);
             self.block_to_index
-                .insert(block.clone(), high_mark as BlockIndex);
+                .insert(block.into_owned(), high_mark as BlockIndex);
             self.notifier
                 .notify(SpaceChange::Number(high_mark as BlockIndex));
             Ok(high_mark as BlockIndex)
@@ -790,11 +793,12 @@ impl SpaceBlockData {
         }
     }
 
-    fn new(block: &Block) -> Result<Self, SetCubeError> {
+    fn new(block: Block) -> Result<Self, SetCubeError> {
+        let evaluated = block.evaluate().map_err(SetCubeError::BlockDataAccess)?;
         Ok(Self {
-            block: block.clone(),
+            block,
             count: 0,
-            evaluated: block.evaluate().map_err(SetCubeError::BlockDataAccess)?,
+            evaluated,
         })
     }
 

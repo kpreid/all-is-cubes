@@ -56,7 +56,7 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
     let mut space = Space::empty(grid);
     wavy_landscape(&mut space, &blocks, 1.0);
     axes(&mut space);
-    let _ = space.set((-1, 3, -1), &axis_block);
+    let _ = space.set((-1, 3, -1), axis_block);
 
     // Large banner text
     let foreground_text_block: Block = Rgb888::new(200, 50, 120).into();

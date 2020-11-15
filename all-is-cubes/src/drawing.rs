@@ -12,7 +12,7 @@ use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::style::TextStyleBuilder;
 use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use std::convert::TryInto;
 
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
@@ -78,7 +78,7 @@ where
             // For debugging block bounds chosen for the graphic. TODO: Keep this around
             // as an option but draw a full bounding box instead.
             block_space
-                .set((0, 0, 0), &RGBA::new(1.0, 0.0, 0.0, 1.0).into())
+                .set((0, 0, 0), Block::from(RGBA::new(1.0, 0.0, 0.0, 1.0)))
                 .expect("can't happen: draw_to_blocks failed to write to its own block space");
         }
 
@@ -172,7 +172,7 @@ impl DrawTarget<&'_ VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
         let Pixel(point, brush) = pixel;
         let point = self.convert_point(point);
         for (offset, block) in &brush.0 {
-            Self::handle_set_result(self.space.set(point + offset.to_vec(), block))?;
+            Self::handle_set_result(self.space.set(point + offset.to_vec(), Cow::borrow(block)))?;
         }
         Ok(())
     }

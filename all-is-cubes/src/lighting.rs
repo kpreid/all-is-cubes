@@ -487,7 +487,7 @@ mod tests {
         space.set_sky_color(RGB::new(1.0, 0.0, 0.0));
         let new_sky_light = PackedLight::from(space.sky_color());
 
-        space.set((0, 0, 0), &RGB::ONE.into()).unwrap();
+        space.set((0, 0, 0), RGB::ONE).unwrap();
         // Not changed yet... except for the now-opaque block
         assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::ZERO);
         assert_eq!(space.get_lighting((1, 0, 0)), former_sky_light);
