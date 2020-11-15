@@ -97,10 +97,13 @@ impl Camera {
     ///
     /// `direction` gives the direction in which the camera will lie relative to the
     /// center of the space.
-    pub fn looking_at_space(space: URef<Space>, direction: Vector3<FreeCoordinate>) -> Self {
+    pub fn looking_at_space(
+        space: URef<Space>,
+        direction: impl Into<Vector3<FreeCoordinate>>,
+    ) -> Self {
         let grid: Grid = *space.borrow().grid();
 
-        let mut camera = Self::new(space, eye_for_look_at(&grid, direction));
+        let mut camera = Self::new(space, eye_for_look_at(&grid, direction.into()));
         camera.body.look_at(grid.center());
 
         camera
