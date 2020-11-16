@@ -35,11 +35,14 @@ impl Tool {
 
 // Generic handler for a tool that replaces one cube.
 fn tool_set_cube(space: &URef<Space>, cube: GridPoint, block: &Block) -> Result<(), ToolError> {
-    space
-        .try_borrow_mut()
-        .map_err(ToolError::SpaceRef)?
-        .set(cube, block)
-        .map_err(ToolError::SetCube)?;
+    let mut space = space.try_borrow_mut().map_err(ToolError::SpaceRef)?;
+    space.set(cube, block).map_err(ToolError::SetCube)?;
+
+    // Gimmick: update lighting ASAP in order to make it less likely that non-updated
+    // light is rendered. This is particularly needful for tools because their effects
+    // (currently) happen outside of Space::step.
+    space.update_lighting_from_queue();
+
     Ok(())
 }
 
