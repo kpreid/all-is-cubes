@@ -14,7 +14,8 @@ use num_traits::identities::Zero as _;
 use crate::math::{FreeCoordinate, Geometry, GridCoordinate};
 use crate::space::Grid;
 
-pub use crate::math::Face; // necessary for any use of raycast, so let it be used
+/// Closely related types.
+pub use crate::math::{CubeFace, Face};
 
 /// A ray; a half-infinite line segment.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -142,10 +143,10 @@ impl Raycaster {
     /// let mut next = || r.next().unwrap();
     ///
     /// // The cube containing the origin point is always the first cube reported.
-    /// assert_eq!(next().cube, GridPoint::new(0, 0, 0));
-    /// assert_eq!(next().cube, GridPoint::new(1, 0, 0));
-    /// assert_eq!(next().cube, GridPoint::new(1, 1, 0));
-    /// assert_eq!(next().cube, GridPoint::new(2, 1, 0));
+    /// assert_eq!(next().cube_ahead(), GridPoint::new(0, 0, 0));
+    /// assert_eq!(next().cube_ahead(), GridPoint::new(1, 0, 0));
+    /// assert_eq!(next().cube_ahead(), GridPoint::new(1, 1, 0));
+    /// assert_eq!(next().cube_ahead(), GridPoint::new(2, 1, 0));
     /// ```
     pub fn new(
         origin: impl Into<Point3<FreeCoordinate>>,
@@ -309,8 +310,10 @@ impl Iterator for Raycaster {
             }
 
             return Some(RaycastStep {
-                cube: self.cube,
-                face: self.last_face,
+                cube_face: CubeFace {
+                    cube: self.cube,
+                    face: self.last_face,
+                },
                 t_distance: self.last_t_distance,
             });
         }
@@ -323,25 +326,61 @@ impl Iterator for Raycaster {
 
 impl std::iter::FusedIterator for Raycaster {}
 
-/// Describes a ray striking a cube as defined by [`Raycaster`].
+/// Describes a ray crossing into a cube as defined by [`Raycaster`].
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[non_exhaustive]
 pub struct RaycastStep {
-    /// The cube which was entered.
-    pub cube: Point3<GridCoordinate>,
-    /// Which face of the cube the ray struck to enter it.
-    /// If the ray's origin was within the cube, is [`Face::WITHIN`].
-    pub face: Face,
+    // The fields of this structure are private to allow for future revision of which
+    // values are calculated versus stored.
+    /// The specific face that was crossed. If the ray's origin was within a cube,
+    /// the face will be Face::WITHIN.
+    cube_face: CubeFace,
     /// The distance traversed, as measured in multiples of the supplied direction vector.
-    pub t_distance: FreeCoordinate,
+    t_distance: FreeCoordinate,
 }
 
 impl RaycastStep {
-    /// Returns the cube adjacent to [`self.cube`](Self::cube) which the ray arrived from
-    /// within.
+    /// Returns the cube which the raycaster has just found the ray to intersect.
     ///
-    /// If this cube contained the origin of the ray, then instead of an adjacent cube
-    /// the same cube will be returned.
+    /// Note that the cube containing the origin of the ray, if any, will be included. In
+    /// that case and only that case, `self.cube_ahead() == self.cube_behind()`.
+    #[inline]
+    pub fn cube_ahead(&self) -> Point3<GridCoordinate> {
+        self.cube_face.cube
+    }
+
+    /// Returns the cube which the raycaster has just found the ray to intersect
+    /// and the face of that cube crossed.
+    #[inline]
+    pub fn cube_face(&self) -> CubeFace {
+        self.cube_face
+    }
+
+    /// Returns the face of `self.cube_ahead()` which is being crossed. The face's normal
+    /// vector points away from that cube and towards `self.cube_behind()`.
+    ///
+    /// If the ray starts within a cube, then the initial step will have a face of
+    /// `Face::WITHIN`.
+    ///
+    /// ```
+    /// use all_is_cubes::math::Face;
+    /// use all_is_cubes::raycast::Raycaster;
+    ///
+    /// let mut r = Raycaster::new((0.5, 0.5, 0.5), (1.0, 0.0, 0.0));
+    /// let mut next = || r.next().unwrap();
+    ///
+    /// assert_eq!(next().face(), Face::WITHIN);  // started at (0, 0, 0)
+    /// assert_eq!(next().face(), Face::NX);      // moved to (1, 0, 0)
+    /// assert_eq!(next().face(), Face::NX);      // moved to (2, 0, 0)
+    /// ```
+    #[inline]
+    pub fn face(&self) -> Face {
+        self.cube_face.face
+    }
+
+    /// Returns the cube adjacent to `self.cube_ahead()` which the ray arrived from within.
+    ///
+    /// If the ray starts within a cube, then for that case and that case only,
+    /// `self.cube_ahead() == self.cube_behind()`.
     ///
     /// ```
     /// use all_is_cubes::math::GridPoint;
@@ -350,14 +389,20 @@ impl RaycastStep {
     /// let mut r = Raycaster::new((0.5, 0.5, 0.5), (1.0, 0.0, 0.0));
     /// let mut next = || r.next().unwrap();
     ///
-    /// assert_eq!(next().previous_cube(), GridPoint::new(0, 0, 0));  // started here
-    /// assert_eq!(next().previous_cube(), GridPoint::new(0, 0, 0));  // moved to (1, 0, 0)
-    /// assert_eq!(next().previous_cube(), GridPoint::new(1, 0, 0));  // which is now previous...
-    /// assert_eq!(next().previous_cube(), GridPoint::new(2, 0, 0));
+    /// assert_eq!(next().cube_behind(), GridPoint::new(0, 0, 0));  // started here
+    /// assert_eq!(next().cube_behind(), GridPoint::new(0, 0, 0));  // moved to (1, 0, 0)
+    /// assert_eq!(next().cube_behind(), GridPoint::new(1, 0, 0));  // which is now behind...
+    /// assert_eq!(next().cube_behind(), GridPoint::new(2, 0, 0));
     /// ```
-    pub fn previous_cube(&self) -> Point3<GridCoordinate> {
-        // TODO: Write unit tests
-        self.cube + self.face.normal_vector()
+    #[inline]
+    pub fn cube_behind(&self) -> Point3<GridCoordinate> {
+        self.cube_face.adjacent()
+    }
+
+    /// The distance traversed so far, as measured in multiples of the ray's direction vector.
+    #[inline]
+    pub fn t_distance(&self) -> FreeCoordinate {
+        self.t_distance
     }
 
     /// Returns the specific point at which the ray intersected the face.
@@ -387,11 +432,11 @@ impl RaycastStep {
         let mut intersection = ray.origin + ray.direction * self.t_distance;
         // TODO: Make sure this always falls within the square?
 
-        let face = self.face;
+        let CubeFace { cube, face } = self.cube_face;
         if face != Face::WITHIN {
             // Make the value on the axis perpendicular to the plane exact, since we can.
             let axis = face.axis_number();
-            intersection[axis] = FreeCoordinate::from(self.cube[axis])
+            intersection[axis] = FreeCoordinate::from(cube[axis])
                 + face.normal_vector::<FreeCoordinate>()[axis].max(0.0);
         }
 
@@ -478,8 +523,10 @@ mod tests {
     /// Helper to construct steps
     fn step(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate, face: Face, t_distance: FreeCoordinate) -> RaycastStep {
         RaycastStep {
-            cube: Point3::new(x, y, z),
-            face,
+            cube_face: CubeFace {
+                cube: Point3::new(x, y, z),
+                face,
+            },
             t_distance,
         }
     }
@@ -702,7 +749,7 @@ mod tests {
                             interiors += 1;
                         }
                     }
-                    assert!(surfaces + interiors == 3 && (surfaces > 0 || step.face == Face::WITHIN),
+                    assert!(surfaces + interiors == 3 && (surfaces > 0 || step.face() == Face::WITHIN),
                         "ray {:?} produced invalid point {:?}", ray, point);
                 }
                 steps => {

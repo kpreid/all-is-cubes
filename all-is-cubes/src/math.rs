@@ -277,11 +277,19 @@ pub struct CubeFace {
 }
 
 impl CubeFace {
+    #[inline]
     pub fn new(cube: impl Into<GridPoint>, face: Face) -> Self {
         Self {
             cube: cube.into(),
             face,
         }
+    }
+
+    /// Computes the cube that is adjacent in the direction of `self.face`.
+    /// Equal to `self.cube` if the face is [`Face::WITHIN`].
+    #[inline]
+    pub fn adjacent(self) -> GridPoint {
+        self.cube + self.face.normal_vector()
     }
 }
 

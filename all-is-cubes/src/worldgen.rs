@@ -37,7 +37,7 @@ pub fn axes(space: &mut Space) {
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within_grid(*space.grid());
         for step in raycaster {
-            let i = step.cube[axis] * direction; // always positive
+            let i = step.cube_ahead()[axis] * direction; // always positive
             let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
             let mut light = Vector3::new(0.0, 0.0, 0.0);
             let mut display_name: Cow<'static, str> = (i % 10).to_string().into();
@@ -54,7 +54,7 @@ pub fn axes(space: &mut Space) {
             light[axis] = 3.0;
             space
                 .set(
-                    step.cube,
+                    step.cube_ahead(),
                     &Block::Atom(
                         BlockAttributes {
                             display_name,

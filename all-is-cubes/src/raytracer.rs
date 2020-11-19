@@ -64,7 +64,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                     break;
                 }
 
-                match &cubes[hit.cube].block {
+                match &cubes[hit.cube_ahead()].block {
                     TracingBlock::Atom(pixel_block_data, color) => {
                         if color.fully_transparent() {
                             continue;
@@ -72,8 +72,8 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         s.trace_through_surface(
                             pixel_block_data,
                             *color,
-                            self.get_lighting(hit.previous_cube()),
-                            hit.face,
+                            self.get_lighting(hit.cube_behind()),
+                            hit.face(),
                         );
                     }
                     TracingBlock::Recur(pixel_block_data, array) => {
@@ -82,22 +82,23 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         // grid. Fix that to get way more performance.
                         let adjusted_ray = Ray {
                             origin: Point3::from_vec(
-                                (ray.origin - hit.cube.cast::<FreeCoordinate>().unwrap())
+                                (ray.origin - hit.cube_ahead().cast::<FreeCoordinate>().unwrap())
                                     * FreeCoordinate::from(array.grid().size().x),
                             ),
                             ..ray
                         };
-                        let lighting = self.get_lighting(hit.previous_cube());
+                        // TODO: not the right lighting for non-opaque blocks
+                        let lighting = self.get_lighting(hit.cube_behind());
                         for subcube_hit in adjusted_ray.cast().within_grid(*array.grid()) {
                             if s.count_step_should_stop() {
                                 break;
                             }
-                            let color = array[subcube_hit.cube];
+                            let color = array[subcube_hit.cube_ahead()];
                             s.trace_through_surface(
                                 pixel_block_data,
                                 color,
                                 lighting,
-                                subcube_hit.face,
+                                subcube_hit.face(),
                             );
                         }
                     }
@@ -638,6 +639,7 @@ mod tests {
     }
 
     // TODO: test actual raytracer
+    // Particularly, test subcube/voxel rendering
 
     #[test]
     fn print_space_test() {

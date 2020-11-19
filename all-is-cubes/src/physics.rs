@@ -184,18 +184,18 @@ impl Body {
         let leading_corner_abs = self.position + leading_corner;
         let ray = Ray::new(leading_corner_abs, delta_position);
         for ray_step in ray.cast().within_grid(*space.grid()) {
-            if ray_step.t_distance >= 1.0 {
+            if ray_step.t_distance() >= 1.0 {
                 // Movement is unobstructed in this timestep.
                 break;
             }
-            if ray_step.face == Face::WITHIN {
+            if ray_step.face() == Face::WITHIN {
                 // If we are intersecting a block, we are allowed to leave it; pretend
                 // it doesn't exist.
                 // TODO: Implement pushing out of shallow collisions.
                 for box_cube in collision_iter(ray_step.intersection_point(ray)) {
                     already_colliding.insert(Contact {
                         cube: box_cube,
-                        face: ray_step.face,
+                        face: ray_step.face(),
                     });
                 }
                 continue;
@@ -212,7 +212,7 @@ impl Body {
             {
                 let contact = Contact {
                     cube: box_cube,
-                    face: ray_step.face,
+                    face: ray_step.face(),
                 };
                 if space.get_evaluated(box_cube).attributes.solid
                     && !already_colliding.contains(&contact)
@@ -227,17 +227,18 @@ impl Body {
                 // Advance however much straight-line distance is available.
                 // But a little bit back from that, to avoid floating point error pushing us
                 // into being already colliding next frame.
-                let unobstructed_distance_along_ray =
-                    (ray_step.t_distance - POSITION_EPSILON / delta_position.magnitude()).max(0.0);
+                let unobstructed_distance_along_ray = (ray_step.t_distance()
+                    - POSITION_EPSILON / delta_position.magnitude())
+                .max(0.0);
                 let unobstructed_delta_position = delta_position * unobstructed_distance_along_ray;
                 self.position += unobstructed_delta_position;
                 // Figure the distance we have have left.
                 delta_position -= unobstructed_delta_position;
                 // Convert it to sliding movement for the axes we didn't collide in.
-                delta_position[ray_step.face.axis_number()] = 0.0;
+                delta_position[ray_step.face().axis_number()] = 0.0;
 
                 // Absorb velocity in that direction.
-                self.velocity[ray_step.face.axis_number()] = 0.0;
+                self.velocity[ray_step.face().axis_number()] = 0.0;
 
                 return (
                     delta_position,

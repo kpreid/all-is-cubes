@@ -273,7 +273,7 @@ impl Space {
                     let info = &mut info_rays[total_rays];
 
                     'raycast: for hit in raycaster {
-                        let ev_hit = self.get_evaluated(hit.cube);
+                        let ev_hit = self.get_evaluated(hit.cube_ahead());
                         if !ev_hit.visible {
                             // Completely transparent block is passed through.
                             continue 'raycast;
@@ -283,8 +283,8 @@ impl Space {
                         if ev_hit.opaque {
                             // On striking a fully opaque block, we use the light value from its
                             // adjacent cube as the light falling on that face.
-                            let light_cube = hit.previous_cube();
-                            if light_cube == cube {
+                            let light_cube = hit.cube_behind();
+                            if light_cube == hit.cube_ahead() {
                                 // Don't read the value we're trying to recalculate.
                                 // We hit an opaque block, so this ray is stopping.
                                 continue 'each_ray;
@@ -307,7 +307,7 @@ impl Space {
                                     origin: translated_ray.origin,
                                     direction: translated_ray.direction * 10.0, // TODO: translate hit position into ray
                                 },
-                                trigger_cube: hit.cube,
+                                trigger_cube: hit.cube_ahead(),
                                 value_cube: light_cube,
                                 value: stored_light,
                             });
@@ -315,7 +315,7 @@ impl Space {
                             break;
                         } else {
                             // Block is partly transparent and light should pass through.
-                            let light_cube = hit.cube;
+                            let light_cube = hit.cube_ahead();
                             if light_cube == cube {
                                 // Don't read the value we're trying to recalculate.
                                 continue 'raycast;
@@ -328,7 +328,7 @@ impl Space {
                                 + self.get_lighting(light_cube).into())
                                 * coverage;
                             ray_alpha *= 1.0 - coverage;
-                            dependencies.push(hit.cube);
+                            dependencies.push(hit.cube_ahead());
                         }
                     }
                     // TODO: set *info even if we hit the sky

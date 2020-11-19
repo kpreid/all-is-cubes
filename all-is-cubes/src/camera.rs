@@ -351,13 +351,15 @@ pub fn eye_for_look_at(grid: &Grid, direction: Vector3<FreeCoordinate>) -> Point
 pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
     let ray = ray.within_grid(*space.grid());
     // TODO: implement 'reach' radius limit
-    // Note: it may become the cse in the future that we want to pass something more specialized than a RaycastStep, but for now RaycastStep is exactly the right structure.
+    // Note: it may become the case in the future that we want to pass something more specialized than a RaycastStep, but for now RaycastStep is exactly the right structure.
     for step in ray {
-        let evaluated = space.get_evaluated(step.cube);
+        let cube = step.cube_ahead();
+        let evaluated = space.get_evaluated(cube);
         if evaluated.attributes.selectable {
             return Some(Cursor {
+                // TODO: Cursor info text would like to have lighting information too.
                 place: step,
-                block: space[step.cube].clone(),
+                block: space[cube].clone(),
                 evaluated: evaluated.clone(),
             });
         }
@@ -387,7 +389,7 @@ impl std::fmt::Display for Cursor {
         write!(
             f,
             "Block at {:?}\n{:#?}",
-            self.place.cube.as_concise_debug(),
+            self.place.cube_ahead().as_concise_debug(),
             self.evaluated.as_concise_debug(),
         )
     }

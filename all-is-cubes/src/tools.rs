@@ -27,8 +27,9 @@ impl Tool {
     pub fn use_tool(&mut self, space: &URef<Space>, cursor: &Cursor) -> Result<(), ToolError> {
         match self {
             Self::None => Err(ToolError::NotUsable),
-            Self::DeleteBlock => tool_set_cube(space, cursor.place.cube, &AIR),
-            Self::PlaceBlock(block) => tool_set_cube(space, cursor.place.previous_cube(), block),
+            Self::DeleteBlock => tool_set_cube(space, cursor.place.cube_ahead(), &AIR),
+            // TODO: test cube behind is unoccupied
+            Self::PlaceBlock(block) => tool_set_cube(space, cursor.place.cube_behind(), block),
         }
     }
 }

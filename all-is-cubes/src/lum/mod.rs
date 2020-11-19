@@ -34,7 +34,7 @@ where
         wireframe_vertices(
             &mut vertices,
             RGBA::BLACK,
-            AAB::from_cube(cursor.place.cube).enlarge(0.01),
+            AAB::from_cube(cursor.place.cube_ahead()).enlarge(0.01),
         );
         context
             .new_tess()
