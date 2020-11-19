@@ -9,7 +9,7 @@
 //! `all_is_cubes::raytracer`.
 
 use cgmath::{Point3, Vector3};
-use num_traits::identities::Zero;
+use num_traits::identities::Zero as _;
 
 use crate::math::{FreeCoordinate, Geometry, GridCoordinate};
 use crate::space::Grid;
@@ -94,7 +94,7 @@ pub struct Raycaster {
     // <https://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.42.3443>
     // Extensions to the described algorithm:
     //   • The face passed through to reach the current cube is reported.
-
+    //
     // The foundation of this algorithm is a parameterized representation of
     // the provided ray,
     //                    origin + t * direction,
@@ -359,6 +359,44 @@ impl RaycastStep {
         // TODO: Write unit tests
         self.cube + self.face.normal_vector()
     }
+
+    /// Returns the specific point at which the ray intersected the face.
+    ///
+    /// The caller must provide the ray; this is because remembering the ray
+    /// so as to perform a ray-plane intersection is unnecessary overhead
+    /// for all raycasts that don't need this information.
+    ///
+    /// TODO: Write up any guarantees we make that might fail by default
+    /// (for example, will the point always be within the unit square of the
+    /// face?)
+    ///
+    /// ```
+    /// use all_is_cubes::cgmath::Point3;
+    /// use all_is_cubes::raycast::Ray;
+    ///
+    /// let ray = Ray::new((0.5, 0.5, 0.5), (1.0, 0.0, 0.0));
+    /// let mut raycaster = ray.cast();
+    /// let mut next = || raycaster.next().unwrap().intersection_point(ray);
+    ///
+    /// // First intersection is the interior of the origin cube.
+    /// assert_eq!(next(), Point3::new(0.5, 0.5, 0.5));
+    /// assert_eq!(next(), Point3::new(1.0, 0.5, 0.5));
+    /// assert_eq!(next(), Point3::new(2.0, 0.5, 0.5));
+    /// ```
+    pub fn intersection_point(&self, ray: Ray) -> Point3<FreeCoordinate> {
+        let mut intersection = ray.origin + ray.direction * self.t_distance;
+        // TODO: Make sure this always falls within the square?
+
+        let face = self.face;
+        if face != Face::WITHIN {
+            // Make the value on the axis perpendicular to the plane exact, since we can.
+            let axis = face.axis_number();
+            intersection[axis] = FreeCoordinate::from(self.cube[axis])
+                + face.normal_vector::<FreeCoordinate>()[axis].max(0.0);
+        }
+
+        intersection
+    }
 }
 
 /// Find the smallest positive `t` such that `s + t * ds` is an integer.
@@ -406,9 +444,7 @@ fn scale_to_integer_step_componentwise(
 mod tests {
     use super::*;
     use cgmath::Vector3;
-    use num_traits::identities::Zero;
-
-    // TODO: Have at least one doc test
+    use rand::{Rng as _, SeedableRng as _};
 
     #[track_caller]
     fn assert_steps_option<T: IntoIterator<Item = Option<RaycastStep>>>(
@@ -619,7 +655,63 @@ mod tests {
             vec![None],
         );
     }
-    
+
+    #[test]
+    fn intersection_point_positive_face() {
+        let ray = Ray::new((0.5, 0.5, 0.5), (-1.0, 0.0, 0.0));
+        let mut raycaster = ray.cast();
+        let mut next = || raycaster.next().unwrap().intersection_point(ray);
+       
+        assert_eq!(next(), Point3::new(0.5, 0.5, 0.5));
+        assert_eq!(next(), Point3::new(0.0, 0.5, 0.5));
+        assert_eq!(next(), Point3::new(-1.0, 0.5, 0.5));
+    }
+
+    #[test]
+    fn intersection_point_random_test() {
+        // A one-cube grid, so that all possible rays should either intersect
+        // exactly this cube, or none at all.
+        let grid = Grid::new((0, 0, 0), (1, 1, 1));
+
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+        for _ in 0..1000 {
+            // TODO: When/if cgmath gets updated, use cgmath's random vectors
+            let ray = Ray::new(
+                Point3::new(
+                    rng.gen_range(-1., 2.),
+                    rng.gen_range(-1., 2.),
+                    rng.gen_range(-1., 2.),
+                ),
+                Vector3::new(
+                    rng.gen_range(-1., 1.),
+                    rng.gen_range(-1., 1.),
+                    rng.gen_range(-1., 1.),
+                ),
+            );
+            let steps: Vec<RaycastStep> = ray.cast().within_grid(grid).collect();
+            match &steps[..] {
+                [] => {},
+                [step] => {
+                    let point = step.intersection_point(ray);
+                    let mut surfaces = 0;
+                    let mut interiors = 0;
+                    for axis in 0..3 {
+                        if point[axis] == 0.0 || point[axis] == 1.0 {
+                            surfaces += 1;
+                        } else if point[axis] > 0.0 && point[axis] < 1.0 {
+                            interiors += 1;
+                        }
+                    }
+                    assert!(surfaces + interiors == 3 && (surfaces > 0 || step.face == Face::WITHIN),
+                        "ray {:?} produced invalid point {:?}", ray, point);
+                }
+                steps => {
+                    panic!("Raycaster should not have produced multiple steps {:?}", steps);
+                }
+            }
+        }
+    }
+
     #[test]
     fn scale_to_integer_step_basics() {
         assert_eq!(scale_to_integer_step(1.25, 0.25), 3.0);
