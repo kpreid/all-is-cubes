@@ -24,11 +24,37 @@ pub struct Ray {
 
     /// The direction in which the ray extends infinitely.
     ///
-    /// The meaning, if any, of the magnitude of this vector depends on context.
+    /// The meaning, if any, of the magnitude of this vector depends on context;
+    /// considered as a geometric object it is a parameter.
     pub direction: Vector3<FreeCoordinate>,
 }
 
 impl Ray {
+    /// Constructs a `Ray` from convertible types (e.g. tuples or 3-element arrays).
+    /// Other than the use of `Into`, this is equivalent to a struct literal.
+    ///
+    /// ```
+    /// use all_is_cubes::cgmath::{Point3, Vector3};
+    /// use all_is_cubes::raycast::Ray;
+    ///
+    /// assert_eq!(
+    ///     Ray::new((1., 2., 3.,), (4., 5., 6.,)),
+    ///     Ray {
+    ///         origin: Point3::new(1., 2., 3.),
+    ///         direction: Vector3::new(4., 5., 6.),
+    ///     }
+    /// );
+    /// ```
+    pub fn new(
+        origin: impl Into<Point3<FreeCoordinate>>,
+        direction: impl Into<Vector3<FreeCoordinate>>,
+    ) -> Self {
+        Self {
+            origin: origin.into(),
+            direction: direction.into(),
+        }
+    }
+
     /// Construct a `Raycaster` initialized with this ray.
     pub fn cast(&self) -> Raycaster {
         Raycaster::new(self.origin, self.direction)
