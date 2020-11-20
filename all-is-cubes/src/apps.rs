@@ -19,7 +19,7 @@ pub struct AllIsCubesAppState {
     pub frame_clock: FrameClock,
 
     /// Handles (some) user input. The caller must provide input events/state;
-    /// `AllIsCubesAppState` will handle calling `InputProcessor::apply_input`.
+    /// `AllIsCubesAppState` will handle calling [`InputProcessor::apply_input`].
     pub input_processor: InputProcessor,
 
     universe: Universe,
@@ -28,7 +28,7 @@ pub struct AllIsCubesAppState {
 
 impl AllIsCubesAppState {
     /// Construct a new `AllIsCubesAppState` using the result of
-    /// `new_universe_with_stuff()` as initial content.
+    /// [`new_universe_with_stuff()`] as initial content.
     pub fn new() -> Self {
         let universe = new_universe_with_stuff();
         Self {
@@ -39,12 +39,12 @@ impl AllIsCubesAppState {
         }
     }
 
-    /// Returns a reference to the camera that should be shown to the user.
+    /// Returns a reference to the [`Camera`] that should be shown to the user.
     pub fn camera(&self) -> &URef<Camera> {
         &self.camera
     }
 
-    /// Returns a mutable reference to the universe.
+    /// Returns a mutable reference to the [`Universe`].
     pub fn universe_mut(&mut self) -> &mut Universe {
         &mut self.universe
     }

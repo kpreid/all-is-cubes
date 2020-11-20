@@ -122,9 +122,9 @@ impl ChunkChart {
     }
 }
 
-/// Compute the squared magnitude of a `GridVector`.
+/// Compute the squared magnitude of a [`GridVector`].
 ///
-/// `cgmath::InnerSpace::magnitude2` would do the same but only for floats.
+/// [`cgmath::InnerSpace::magnitude2`] would do the same but only for floats.
 #[inline]
 fn int_magnitude_squared(v: GridVector) -> GridCoordinate {
     v.x * v.x + v.y * v.y + v.z * v.z

@@ -93,7 +93,7 @@ where
         .unwrap(); // TODO error handling
     }
 
-    /// Sets the `Camera` whose view we render.
+    /// Sets the [`Camera`] whose view we render.
     pub fn set_camera(&mut self, camera: Option<URef<Camera>>) {
         self.camera = camera;
     }

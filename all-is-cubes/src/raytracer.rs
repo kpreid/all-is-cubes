@@ -29,7 +29,7 @@ use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
 /// methods for actually performing raytracing.
 pub struct SpaceRaytracer<P: PixelBuf>(SpaceRaytracerImpl<P>);
 
-/// Helper struct for `SpaceRaytracer` so the details of `ouroboros::self_referencing`
+/// Helper struct for [`SpaceRaytracer`] so the details of [`ouroboros::self_referencing`]
 /// aren't exposed.
 #[self_referencing]
 struct SpaceRaytracerImpl<P: PixelBuf> {
@@ -40,7 +40,7 @@ struct SpaceRaytracerImpl<P: PixelBuf> {
 }
 
 impl<P: PixelBuf> SpaceRaytracer<P> {
-    /// Snapshots the given `Space` to prepare for raytracing it.
+    /// Snapshots the given [`Space`] to prepare for raytracing it.
     pub fn new(space: &Space) -> Self {
         SpaceRaytracer(
             SpaceRaytracerImplBuilder {
@@ -120,11 +120,11 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
 }
 
 impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
-    /// Raytrace to text, using any `PixelBuf` whose output is `String`.
+    /// Raytrace to text, using any [`PixelBuf`] whose output is [`String`].
     ///
     /// `F` is the function accepting the output, and `E` is the type of error it may
     /// produce. This function-based interface is intended to abstract over the
-    /// inconvenient difference between `std::io::Write` and `std::fmt::Write`.
+    /// inconvenient difference between [`std::io::Write`] and [`std::fmt::Write`].
     ///
     /// After each line (row) of the image, `write(line_ending)` will be called.
     pub fn trace_scene_to_text<F, E>(
@@ -201,10 +201,10 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
     }
 }
 
-/// Performance info from a `SpaceRaytracer` operation.
+/// Performance info from a [`SpaceRaytracer`] operation.
 ///
-/// The contents of this structure are subject to change; use `Debug` to view it.
-/// The `Default` value is the zero value.
+/// The contents of this structure are subject to change; use [`Debug`] to view it.
+/// The [`Default`] value is the zero value.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct RaytraceInfo {
@@ -231,8 +231,8 @@ impl std::iter::Sum for RaytraceInfo {
 /// Print an image of the given space as “ASCII art”.
 ///
 /// Intended for use in tests, to visualize the results in case of failure.
-/// Accordingly, it always writes to the same destination as `print!` (which is redirected
-/// when tests are run).
+/// Accordingly, it always writes to the same destination as [`print!`] (which is
+/// redirected when tests are run).
 ///
 /// `direction` specifies the direction from which the camera will be looking towards
 /// the center of the space. The text output will be 80 columns wide.
@@ -265,7 +265,8 @@ fn print_space_impl<F: FnMut(&str)>(
         .unwrap()
 }
 
-/// Get block data out of `Space` (which is not `Sync`, and not specialized for our efficient use).
+/// Get block data out of [`Space`] (which is not [`Sync`], and not specialized for our
+/// efficient use).
 #[inline]
 fn prepare_blocks<P: PixelBuf>(space: &Space) -> Box<[TracingBlock<P::BlockData>]> {
     space
@@ -282,7 +283,8 @@ fn prepare_blocks<P: PixelBuf>(space: &Space) -> Box<[TracingBlock<P::BlockData>
         .collect()
 }
 
-/// Get cube data out of `Space` (which is not `Sync`, and not specialized for our efficient use).
+/// Get cube data out of [`Space`] (which is not [`Sync`], and not specialized for our
+/// efficient use).
 #[inline]
 #[allow(clippy::ptr_arg)] // no benefit
 fn prepare_cubes<'a, P: PixelBuf>(
@@ -310,7 +312,7 @@ enum TracingBlock<B: 'static> {
 #[derive(Clone, Debug, Default)]
 struct TracingState<P: PixelBuf> {
     /// Number of cubes traced through -- controlled by the caller, so not necessarily
-    /// equal to the number of calls to trace_through_surface().
+    /// equal to the number of calls to [`Self::trace_through_surface()`].
     cubes_traced: usize,
     pixel_buf: P,
 }
@@ -380,7 +382,7 @@ fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
     rgb + modifier
 }
 
-/// Implementations of `PixelBuf` define output formats of the raytracer, by being
+/// Implementations of [`PixelBuf`] define output formats of the raytracer, by being
 /// responsible for accumulating the color (and/or other information) for each image
 /// pixel.
 ///
@@ -388,36 +390,37 @@ fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
 /// and it must represent the transparency so as to be able to signal when to stop
 /// tracing.
 ///
-/// The implementation of the `Default` trait must provide a suitable initial state,
+/// The implementation of the [`Default`] trait must provide a suitable initial state,
 /// i.e. fully transparent/no light accumulated.
 pub trait PixelBuf: Default {
-    /// Type of the pixel value this `PixelBuf` produces; the value that will be
+    /// Type of the pixel value this [`PixelBuf`] produces; the value that will be
     /// returned by tracing a single ray.
     ///
     /// This trait does not define how multiple pixels are combined into an image.
     type Pixel: Send + Sync + 'static;
 
-    /// Type of the data precomputed for each distinct block by `compute_block_data()`.
+    /// Type of the data precomputed for each distinct block by
+    /// [`Self::compute_block_data()`].
     ///
     /// If no data beyond color is needed, this may be `()`.
     // Note: I tried letting BlockData contain references but I couldn't satisfy
     // the borrow checker.
     type BlockData: Send + Sync + 'static;
 
-    /// Computes whatever data the `PixelBuf` wishes to have available in `add(p)`,
-    /// for a given block.
+    /// Computes whatever data this [`PixelBuf`] wishes to have available in
+    /// [`Self::add`], for a given block.
     fn compute_block_data(block: &SpaceBlockData) -> Self::BlockData;
 
-    /// Computes whatever value should be passed to `add` when the raytracer encounters
-    /// an error.
+    /// Computes whatever value should be passed to [`Self::add`] when the raytracer
+    /// encounters an error.
     fn error_block_data() -> Self::BlockData;
 
-    /// Computes whatever value should be passed to `add` when the raytracer encounters
-    /// the sky (background behind all blocks).
+    /// Computes whatever value should be passed to [`Self::add`] when the raytracer
+    /// encounters the sky (background behind all blocks).
     fn sky_block_data() -> Self::BlockData;
 
     /// Returns whether `self` has recorded an opaque surface and therefore will not
-    /// be affected by future calls to `add`.
+    /// be affected by future calls to [`Self::add`].
     fn opaque(&self) -> bool;
 
     /// Computes the value the raytracer should return for this pixel when tracing is
@@ -435,11 +438,11 @@ pub trait PixelBuf: Default {
 
     /// Indicates that the trace did not intersect any space that could have contained
     /// anything to draw. May be used for special diagnostic drawing. If used, should
-    /// disable future `add()` calls.
+    /// disable the effects of future [`Self::add`] calls.
     fn hit_nothing(&mut self) {}
 }
 
-/// Implements `PixelBuf` for RGB(A) color with `f32` components.
+/// Implements [`PixelBuf`] for RGB(A) color with [`f32`] components.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ColorBuf {
     /// Color buffer.
@@ -506,7 +509,7 @@ impl Default for ColorBuf {
     }
 }
 
-/// Implements `PixelBuf` for text output: captures the first characters of block names
+/// Implements [`PixelBuf`] for text output: captures the first characters of block names
 /// rather than colors.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CharacterBuf {
@@ -565,8 +568,8 @@ mod rayon_helper {
     use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator as _};
     use std::iter::{empty, once, Sum};
 
-    /// Implements `ParallelExtend` to just sum things, so that `ParallelIterator::unzip`
-    /// can produce a sum.
+    /// Implements [`ParallelExtend`] to just sum things, so that
+    /// [`ParallelIterator::unzip`] can produce a sum.
     #[cfg(feature = "rayon")]
     #[derive(Clone, Copy, Debug, Default)]
     pub struct ParExtSum<T>(Option<T>);

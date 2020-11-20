@@ -22,7 +22,7 @@ use crate::space::{Grid, Space};
 use crate::universe::{Universe, UniverseIndex};
 use crate::worldgen::{axes, wavy_landscape};
 
-/// Creates a Universe with some content for a "new game", as much as that can exist.
+/// Creates a [`Universe`] with some content for a "new game", as much as that can exist.
 pub fn new_universe_with_stuff() -> Universe {
     new_universe_with_space_setup(new_landscape_space)
 }

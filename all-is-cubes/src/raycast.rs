@@ -30,8 +30,8 @@ pub struct Ray {
 }
 
 impl Ray {
-    /// Constructs a `Ray` from convertible types (e.g. tuples or 3-element arrays).
-    /// Other than the use of `Into`, this is equivalent to a struct literal.
+    /// Constructs a [`Ray`] from convertible types (e.g. tuples or 3-element arrays).
+    /// Other than the use of [`Into`], this is equivalent to a struct literal.
     ///
     /// ```
     /// use all_is_cubes::cgmath::{Point3, Vector3};
@@ -55,7 +55,7 @@ impl Ray {
         }
     }
 
-    /// Construct a `Raycaster` initialized with this ray.
+    /// Prepares a [`Raycaster`] that will iterate over cubes intersected by this ray.
     pub fn cast(&self) -> Raycaster {
         Raycaster::new(self.origin, self.direction)
     }
@@ -125,11 +125,11 @@ pub struct Raycaster {
 }
 
 impl Raycaster {
-    /// Construct a `Raycaster` for a ray with the given `origin` and `direction` vector.
+    /// Construct a [`Raycaster`] for a ray with the given `origin` and `direction` vector.
     ///
     /// The magnitude of `direction` has no effect on the sequence of cubes traversed
     /// but may affect calculation precision, so should not be especially large or small.
-    /// It also appears as the scale of the output field `RaycastStep::t_distance`.
+    /// It also appears as the scale of the output field [`RaycastStep::t_distance`].
     ///
     /// Note that this is an infinite iterator by default. Use `.within_grid()` to
     /// restrict it.
@@ -174,10 +174,10 @@ impl Raycaster {
         }
     }
 
-    /// Restrict the cubes iterated over to those which lie within the given `Grid`.
+    /// Restrict the cubes iterated over to those which lie within the given [`Grid`].
     ///
-    /// This makes the iterator finite: `next()` will return `None` forevermore once
-    /// there are no more cubes intersecting the grid to report.
+    /// This makes the iterator finite: [`next()`](Self::next) will return [`None`]
+    /// forevermore once there are no more cubes intersecting the grid to report.
     pub fn within_grid(mut self, grid: Grid) -> Self {
         if self.grid == None {
             self.grid = Some(grid);
@@ -280,7 +280,7 @@ impl Raycaster {
 impl Iterator for Raycaster {
     type Item = RaycastStep;
 
-    /// Returns a `RaycastStep` describing the next cube intersected by the ray.
+    /// Returns a [`RaycastStep`] describing the next cube face intersected by the ray.
     #[inline]
     fn next(&mut self) -> Option<RaycastStep> {
         loop {
@@ -323,21 +323,22 @@ impl Iterator for Raycaster {
 
 impl std::iter::FusedIterator for Raycaster {}
 
-/// Describes a ray striking a cube as defined by `Raycaster`
+/// Describes a ray striking a cube as defined by [`Raycaster`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct RaycastStep {
     /// The cube which was entered.
     pub cube: Point3<GridCoordinate>,
     /// Which face of the cube the ray struck to enter it.
-    /// If the ray's origin was within the cube, is `Face::WITHIN`.
+    /// If the ray's origin was within the cube, is [`Face::WITHIN`].
     pub face: Face,
     /// The distance traversed, as measured in multiples of the supplied direction vector.
     pub t_distance: FreeCoordinate,
 }
 
 impl RaycastStep {
-    /// Returns the cube adjacent to `self.cube` which the ray arrived from within.
+    /// Returns the cube adjacent to [`self.cube`](Self::cube) which the ray arrived from
+    /// within.
     ///
     /// If this cube contained the origin of the ray, then instead of an adjacent cube
     /// the same cube will be returned.

@@ -40,11 +40,11 @@ pub trait Geometry {
         E: Extend<Point3<FreeCoordinate>>;
 }
 
-/// Identifies a face of a cube or an orthogonal unit vector, except for `WITHIN` meaning
-/// “zero distance and undefined direction”.
+/// Identifies a face of a cube or an orthogonal unit vector, except for
+/// [`WITHIN`](Face::WITHIN) meaning “zero distance and undefined direction”.
 ///
-/// So far, nearly every usage of Face has a use for `WITHIN`, but we should keep an eye
-/// out for uses of the ‘true’ 6-face version.
+/// So far, nearly every usage of Face has a use for [`WITHIN`](Face::WITHIN), but we
+/// should keep an eye out for uses of the ‘true’ 6-face version.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 #[rustfmt::skip]
 pub enum Face {
@@ -65,10 +65,10 @@ pub enum Face {
 }
 
 impl Face {
-    /// All the values of `Face` except for `Face::WITHIN`.
+    /// All the values of [`Face`] except for [`Face::WITHIN`].
     pub const ALL_SIX: &'static [Face; 6] =
         &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
-    /// All the values of `Face`, with `Face::WITHIN` listed first.
+    /// All the values of [`Face`], with [`Face::WITHIN`] listed first.
     pub const ALL_SEVEN: &'static [Face; 7] = &[
         Face::WITHIN,
         Face::NX,
@@ -80,7 +80,7 @@ impl Face {
     ];
 
     /// Returns which axis this face's normal vector is parallel to, with the numbering
-    /// X = 0, Y = 1, Z = 2. Panics if given `Face::WITHIN`.
+    /// X = 0, Y = 1, Z = 2. Panics if given [`Face::WITHIN`].
     pub fn axis_number(&self) -> usize {
         match self {
             Face::WITHIN => panic!("WITHIN has no axis number"),
@@ -90,7 +90,7 @@ impl Face {
         }
     }
 
-    /// Returns the opposite face (maps `PX` to `NX` and so on).
+    /// Returns the opposite face (maps [`PX`](Self::PX) to [`NX`](Self::NX) and so on).
     #[inline]
     pub const fn opposite(&self) -> Face {
         match self {
@@ -104,7 +104,8 @@ impl Face {
         }
     }
 
-    /// Returns the vector normal to this face. `WITHIN` is assigned the zero vector.
+    /// Returns the vector normal to this face. [`WITHIN`](Self::WITHIN) is assigned the
+    /// zero vector.
     #[inline]
     pub fn normal_vector<S>(&self) -> Vector3<S>
     where
@@ -179,7 +180,7 @@ impl Face {
     }
 }
 
-/// Container for values keyed by `Face`s.
+/// Container for values keyed by [`Face`]s.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FaceMap<V> {
     /// The value whose key is `Face::WITHIN`.
@@ -199,7 +200,7 @@ pub struct FaceMap<V> {
 }
 
 impl<V> FaceMap<V> {
-    /// Compute and store a value for each `Face` enum variant.
+    /// Compute and store a value for each [`Face`] enum variant.
     pub fn generate(mut f: impl FnMut(Face) -> V) -> Self {
         Self {
             within: f(Face::WITHIN),
@@ -273,7 +274,7 @@ impl<V> IndexMut<Face> for FaceMap<V> {
 ///   values are permitted — corresponding to bright light sources and other such
 ///   things which it is reasonable to “overexpose”. (No meaning is given to negative
 ///   values, but they are permitted.)
-/// * NaN is banned so that `Eq` may be implemented. (Infinities are permitted.)
+/// * NaN is banned so that [`Eq`] may be implemented. (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct RGB(Vector3<NotNan<f32>>);
@@ -284,7 +285,7 @@ pub struct RGB(Vector3<NotNan<f32>>);
 ///   larger values are permitted — corresponding to bright light sources and other such
 ///   things which it is reasonable to “overexpose”. (No meaning is given to negative
 ///   values, but they are permitted.)
-/// * NaN is banned so that `Eq` may be implemented. (Infinities are permitted.)
+/// * NaN is banned so that [`Eq`] may be implemented. (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
 /// * The alpha is not premultiplied.
 /// * Alpha values less than zero and greater than one will be treated equivalently to
@@ -299,7 +300,7 @@ const NN1: NotNan<f32> = unsafe { NotNan::unchecked_new(1.0) };
 impl RGB {
     /// Black.
     pub const ZERO: RGB = RGB(Vector3::new(NN0, NN0, NN0));
-    /// White (unity brightness.)
+    /// White (unity brightness).
     pub const ONE: RGB = RGB(Vector3::new(NN1, NN1, NN1));
 
     /// Constructs a color from components. Panics if any component is NaN.
@@ -308,11 +309,11 @@ impl RGB {
         Self::try_from(Vector3::new(r, g, b)).expect("Color components may not be NaN")
     }
 
-    /// Adds an alpha component to produce an RGBA color.
+    /// Adds an alpha component to produce an [RGBA] color.
     pub const fn with_alpha(self, alpha: NotNan<f32>) -> RGBA {
         RGBA(Vector4::new(self.0.x, self.0.y, self.0.z, alpha))
     }
-    /// Adds an alpha component of `1.0` (fully opaque) to produce an RGBA color.
+    /// Adds an alpha component of `1.0` (fully opaque) to produce an [RGBA] color.
     pub const fn with_alpha_one(self) -> RGBA {
         self.with_alpha(NN1)
     }
@@ -543,7 +544,7 @@ impl std::fmt::Debug for RGBA {
 /// Axis-Aligned Box data type.
 ///
 /// Note that this has continuous coordinates, and a discrete analogue exists as
-/// `all_is_cubes::space::Grid`.
+/// [`Grid`](crate::space::Grid).
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct AAB {
     // TODO: Should we be using NotNan coordinates?
@@ -555,7 +556,7 @@ pub struct AAB {
 }
 
 impl AAB {
-    /// The `AAB` of zero size at the origin.
+    /// The [`AAB`] of zero size at the origin.
     pub const ZERO: AAB = AAB {
         lower_bounds: Point3 {
             x: 0.0,
@@ -574,7 +575,7 @@ impl AAB {
         },
     };
 
-    /// Constructs an `AAB` from individual coordinates.
+    /// Constructs an [`AAB`] from individual coordinates.
     #[track_caller]
     pub fn new(
         lx: FreeCoordinate,
@@ -587,7 +588,7 @@ impl AAB {
         Self::from_lower_upper(Point3::new(lx, ly, lz), Point3::new(hx, hy, hz))
     }
 
-    /// Constructs an `AAB` from most-negative and most-positive corner points.
+    /// Constructs an [`AAB`] from most-negative and most-positive corner points.
     #[track_caller]
     #[rustfmt::skip]
     pub fn from_lower_upper(
@@ -603,8 +604,9 @@ impl AAB {
         Self { lower_bounds, upper_bounds, sizes }
     }
 
-    /// Returns the AAB of a given cube in the interpretation used by `Grid` and `Space`;
-    /// that is, a unit cube extending in the positive directions from the given point.
+    /// Returns the AAB of a given cube in the interpretation used by [`Grid`] and
+    /// [`Space`](crate::space::Space); that is, a unit cube extending in the positive
+    /// directions from the given point.
     ///
     /// ```
     /// use all_is_cubes::math::{AAB, GridPoint};
@@ -619,22 +621,22 @@ impl AAB {
         Self::from_lower_upper(lower, lower + Vector3::new(1.0, 1.0, 1.0))
     }
 
-    /// The most negative corner of the box, as a `Point3`.
+    /// The most negative corner of the box, as a [`Point3`].
     pub const fn lower_bounds_p(&self) -> Point3<FreeCoordinate> {
         self.lower_bounds
     }
 
-    /// The most positive corner of the box, as a `Point3`.
+    /// The most positive corner of the box, as a [`Point3`].
     pub const fn upper_bounds_p(&self) -> Point3<FreeCoordinate> {
         self.upper_bounds
     }
 
-    /// The most negative corner of the box, as a `Vector3`.
+    /// The most negative corner of the box, as a [`Vector3`].
     pub fn lower_bounds_v(&self) -> Vector3<FreeCoordinate> {
         self.lower_bounds.to_vec()
     }
 
-    /// The most positive corner of the box, as a `Vector3`.
+    /// The most positive corner of the box, as a [`Vector3`].
     pub fn upper_bounds_v(&self) -> Vector3<FreeCoordinate> {
         self.upper_bounds.to_vec()
     }

@@ -17,11 +17,11 @@ use crate::lum::types::VertexSemantics;
 use crate::math::FreeCoordinate;
 use crate::util::WarningsResult;
 
-/// Type of the block shader program (output of `prepare_block_program`).
+/// Type of the block shader program (output of [`prepare_block_program`]).
 pub type BlockProgram = Program<VertexSemantics, (), BlockUniformInterface>;
 
 // TODO: Make higher-level abstractions such that this doesn't need to be public
-/// Compile the block shader program for the given graphics context.
+/// Compile the block shader program for the given [`GraphicsContext`].
 pub fn prepare_block_program<C>(context: &mut C) -> WarningsResult<BlockProgram, String, String>
 where
     C: GraphicsContext<Backend = Backend>,
@@ -69,7 +69,7 @@ pub struct BlockUniformInterface {
 }
 
 impl BlockUniformInterface {
-    /// Type converting wrapper for the `projection_matrix` uniform.
+    /// Type converting wrapper for [`Self::projection_matrix`].
     pub fn set_projection_matrix(
         &self,
         program_iface: &mut ProgramInterface,
@@ -81,7 +81,7 @@ impl BlockUniformInterface {
         );
     }
 
-    /// Type converting wrapper for the `view_matrix` uniform.
+    /// Type converting wrapper for [`Self::view_matrix`].
     pub fn set_view_matrix(
         &self,
         program_iface: &mut ProgramInterface,
@@ -90,7 +90,7 @@ impl BlockUniformInterface {
         program_iface.set(&self.view_matrix, view_matrix.cast::<f32>().unwrap().into());
     }
 
-    /// Type converting wrapper for the `block_texture` uniform.
+    /// Type converting wrapper for [`Self::block_texture`].
     pub fn set_block_texture(
         &self,
         program_iface: &mut ProgramInterface,

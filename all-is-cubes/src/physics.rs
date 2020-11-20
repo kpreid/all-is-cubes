@@ -17,7 +17,7 @@ const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 
-/// An object with a position, velocity, and (TODO) collision volume.
+/// An object with a position, velocity, and collision volume.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Body {
@@ -36,7 +36,7 @@ pub struct Body {
     ///
     /// The preferred range is 0 inclusive to 360 exclusive.
     ///
-    /// This does not affect the behavior of the `Body` itself; it has nothing to do with
+    /// This does not affect the behavior of the [`Body`] itself; it has nothing to do with
     /// the direction of the velocity.
     pub yaw: FreeCoordinate,
 
@@ -44,7 +44,7 @@ pub struct Body {
     ///
     /// The preferred range is -90 to 90, inclusive.
     ///
-    /// This does not affect the behavior of the `Body` itself; it has nothing to do with
+    /// This does not affect the behavior of the [`Body`] itself; it has nothing to do with
     /// the direction of the velocity.
     pub pitch: FreeCoordinate,
 }
@@ -61,7 +61,7 @@ impl std::fmt::Debug for Body {
 }
 
 impl Body {
-    /// Constructs a `Body` requiring only information that can't be reasonably defaulted.
+    /// Constructs a [`Body`] requiring only information that can't be reasonably defaulted.
     pub fn new_minimal(
         position: impl Into<Point3<FreeCoordinate>>,
         collision_box: impl Into<AAB>,
@@ -221,8 +221,9 @@ impl Body {
         self.collision_box.translate(self.position.to_vec())
     }
 
-    /// Changes `yaw` and `pitch` to look directly towards the given point within the same
-    /// coordinate system as `self.position`.
+    /// Changes [`self.yaw`](Self::yaw) and [`self.pitch`](Self::pitch) to look directly
+    /// towards the given point within the same coordinate system as
+    /// [`self.position`](Self::position).
     pub fn look_at(&mut self, point: impl Into<Point3<FreeCoordinate>>) {
         let direction = point.into() - self.position;
         let horizontal_distance = direction.x.hypot(direction.z);
@@ -232,8 +233,8 @@ impl Body {
     }
 }
 
-/// Diagnostic data returned by `Body::step`. The exact contents of this structure
-/// are unstable; use only `Debug` formatting to examine its contents unless you have
+/// Diagnostic data returned by [`Body::step`]. The exact contents of this structure
+/// are unstable; use only [`Debug`] formatting to examine its contents unless you have
 /// a specific need for one of the values.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
@@ -245,7 +246,7 @@ pub struct BodyStepInfo {
     pub move_segments: [MoveSegment; 3],
 }
 
-/// One of the individual straight-line movement segments of a `BodyStepInfo`.
+/// One of the individual straight-line movement segments of a [`BodyStepInfo`].
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct MoveSegment {

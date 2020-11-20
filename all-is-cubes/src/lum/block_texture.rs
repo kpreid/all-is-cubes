@@ -30,20 +30,20 @@ pub type BlockTexture = Texture<Dim2Array, NormRGBA8UI>;
 pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim2Array, NormRGBA8UI>;
 
 /// Precalculated models (vertices and texture atlas) for a set of blocks to be drawn
-/// in a `luminance` graphics context. A concrete type of output from
-/// `all_is_cubes::triangulator::triangulate_blocks`.
+/// in a [`luminance`] graphics context. A concrete type of output from
+/// [`triangulate_blocks`](crate::triangulator::triangulate_blocks).
 pub struct BlockGLRenderData {
-    /// Data for use with `all_is_cubes::triangulator::triangulate_space`.
+    /// Data for use with [`triangulate_space`](crate::triangulator::triangulate_space).
     pub block_render_data: BlocksRenderData<GLBlockVertex, BlockGLTexture>,
     pub(crate) texture_allocator: BlockGLTexture,
 }
 
 impl BlockGLRenderData {
-    /// Constructs `BlockGLRenderData` for the blocks of the given `Space`.
+    /// Constructs [`BlockGLRenderData`] for the blocks of the given [`Space`].
     ///
     /// Returns an error if the required texture could not be allocated.
     ///
-    /// The second return value is diagnostics from texture allocation which may be
+    /// The [`String`] return value is diagnostics from texture allocation which may be
     /// logged.
     pub fn prepare<C>(context: &mut C, space: &Space) -> Result<(Self, String), TextureError>
     where
@@ -60,7 +60,7 @@ impl BlockGLRenderData {
 
     /// Returns the texture to bind for rendering blocks.
     ///
-    /// Mutable because `luminance` considers binding a mutation.
+    /// Mutable because [`luminance`] considers binding a mutation.
     pub fn texture(&mut self) -> &mut Texture<Dim2Array, NormRGBA8UI> {
         &mut self.texture_allocator.texture
     }
@@ -69,15 +69,15 @@ impl BlockGLRenderData {
 /// Manages a block face texture, which is an atlased array texture (to minimize
 /// the chance of hitting any size limits).
 ///
-/// TODO: Rename this for acciracy (luminance is theoretically abstract) and to
-/// distinguish it from `BlockTexture`.
+/// TODO: Rename this for accuracy (luminance is theoretically abstract) and to
+/// distinguish it from [`BlockTexture`].
 pub struct BlockGLTexture {
     texture: BlockTexture,
     layout: AtlasLayout,
     next_free: u32,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
 }
-/// Texture tile handle used by our implementation of `TextureAllocator`.
+/// Texture tile handle used by our implementation of [`TextureAllocator`].
 ///
 /// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
@@ -241,17 +241,17 @@ struct AtlasLayout {
 
 /// Type of texel indices (coordinates) and single-row (-column/-layer) tile positions.
 ///
-/// Values are stored as u16 because this is all that is necessary for typical GPU limits,
-/// and doing so gives lets us use guaranteed lossless numeric conversions in the
-/// arithmetic (whereas e.g. u32 to f32 is not).
+/// Values are stored as [`u16`] because this is all that is necessary for typical GPU
+/// limits, and doing so gives lets us use guaranteed lossless numeric conversions in the
+/// arithmetic (whereas e.g. [`u32`] to [`f32`] is not).
 type AtlasCoord = u16;
-/// Type of linear tile indices. (Maybe it should be `usize`?)
+/// Type of linear tile indices. (Maybe it should be [`usize`]?)
 type AtlasIndex = u32; // TODO: Review whether this will be more convenient as usize
 
 impl AtlasLayout {
     // TODO: Add a constructor which sanity checks the size parameters.
 
-    /// Texture size in the format used by `luminance`.
+    /// Texture size in the format used by [`luminance`].
     fn dimensions(&self) -> <Dim2Array as Dimensionable>::Size {
         let texel_edge_length = self.texel_edge_length();
         (
@@ -299,7 +299,7 @@ impl AtlasLayout {
         (column as AtlasCoord, row as AtlasCoord, layer as AtlasCoord)
     }
 
-    /// Compute location in the atlas of a tile, as [0, 1] texture coordinates.
+    /// Compute location in the atlas of a tile, as \[0, 1\] texture coordinates.
     ///
     /// Panics if `index >= self.tile_count()`.
     /// TODO: Return Option instead, which the caller can handle as choosing aa missing-texture

@@ -1,7 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! Get from `Space` to `luminance::tess::Tess`.
+//! Get from [`Space`] to [`Tess`].
 
 use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as _, Vector3};
 use luminance_front::context::GraphicsContext;
@@ -25,7 +25,7 @@ use crate::space::{Grid, Space, SpaceChange};
 use crate::triangulator::{triangulate_space, BlocksRenderData};
 use crate::universe::{Listener, URef};
 
-/// Manages cached data and GPU resources for drawing a single `Space`.
+/// Manages cached data and GPU resources for drawing a single [`Space`].
 pub struct SpaceRenderer {
     space: URef<Space>,
     todo: Rc<RefCell<SpaceRendererTodo>>,
@@ -35,9 +35,9 @@ pub struct SpaceRenderer {
 }
 
 impl SpaceRenderer {
-    /// Constructs a `SpaceRenderer` for the given `Space`.
+    /// Constructs a [`SpaceRenderer`] for the given [`Space`].
     ///
-    /// Note that the actual geometry for the `Space` will be computed over several
+    /// Note that the actual geometry for the [`Space`] will be computed over several
     /// frames after construction. There is not currently a specific way to wait for
     /// completion.
     pub fn new(space: URef<Space>) -> Self {
@@ -57,14 +57,14 @@ impl SpaceRenderer {
         }
     }
 
-    /// Get the reference to the `Space` this was constructed with.
+    /// Get the reference to the [`Space`] this draws.
     pub fn space(&self) -> &URef<Space> {
         &self.space
     }
 
     /// Prepare to draw a frame, performing the steps that must be done while holding a
-    /// `&mut C`; the returned `SpaceRendererOutput` is then for use within the luminance
-    /// pipeline.
+    /// `&mut C`; the returned [`SpaceRendererOutput`] is then for use within the
+    /// luminance pipeline.
     pub fn prepare_frame<'a, C>(
         &'a mut self,
         context: &mut C,
@@ -143,8 +143,8 @@ impl SpaceRenderer {
     }
 }
 
-/// Ingredients to actually draw the Space inside a luminance pipeline, produced by
-/// `prepare_frame`.
+/// Ingredients to actually draw the [`Space`] inside a luminance pipeline, produced by
+/// [`SpaceRenderer::prepare_frame`].
 pub struct SpaceRendererOutput<'a> {
     /// Space's sky color, to be used as clear color when drawing a frame (if applicable).
     pub sky_color: RGB,
@@ -157,7 +157,7 @@ pub struct SpaceRendererOutput<'a> {
     view_chunk: ChunkPos,
     info: SpaceRenderInfo,
 }
-/// As `SpaceRendererBound`, but past the texture-binding stage of the pipeline.
+/// As [`SpaceRendererOutput`], but past the texture-binding stage of the pipeline.
 pub struct SpaceRendererBound<'a> {
     /// Block texture to pass to the shader.
     pub bound_block_texture: BoundBlockTexture<'a>,
@@ -170,7 +170,8 @@ pub struct SpaceRendererBound<'a> {
 }
 
 impl<'a> SpaceRendererOutput<'a> {
-    /// Bind texture, in preparation for using the `ShadingGate`.
+    /// Bind texture, in preparation for using the
+    /// [`ShadingGate`](luminance_front::shading_gate::ShadingGate).
     pub fn bind(self, pipeline: &'a Pipeline<'a>) -> Result<SpaceRendererBound<'a>, PipelineError> {
         Ok(SpaceRendererBound {
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
@@ -183,7 +184,7 @@ impl<'a> SpaceRendererOutput<'a> {
     }
 }
 impl<'a> SpaceRendererBound<'a> {
-    /// Use a `TessGate` to actually draw the space.
+    /// Use a [`TessGate`] to actually draw the space.
     pub fn render<E>(&self, tess_gate: &mut TessGate) -> Result<SpaceRenderInfo, E> {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
@@ -202,7 +203,7 @@ impl<'a> SpaceRendererBound<'a> {
     }
 }
 
-/// Performance info from a `SpaceRenderer` drawing one frame.
+/// Performance info from a [`SpaceRenderer`] drawing one frame.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SpaceRenderInfo {
     /// How many chunks need to be recomputed (redrawn) but are still waiting in queue.
@@ -215,7 +216,7 @@ pub struct SpaceRenderInfo {
     pub squares_drawn: usize,
 }
 
-/// Storage for rendering of part of a `Space`.
+/// Storage for rendering of part of a [`Space`].
 pub struct Chunk {
     bounds: Grid,
     /// Vertices grouped by the direction they face
@@ -286,7 +287,7 @@ impl Chunk {
     }
 }
 
-/// `SpaceRenderer`'s set of things that need recomputing.
+/// [`SpaceRenderer`]'s set of things that need recomputing.
 #[derive(Default)]
 struct SpaceRendererTodo {
     blocks: bool,
@@ -309,7 +310,7 @@ impl SpaceRendererTodo {
     }
 }
 
-/// `Listener` adapter for `SpaceRendererTodo`.
+/// [`Listener`] adapter for [`SpaceRendererTodo`].
 struct TodoListener(Weak<RefCell<SpaceRendererTodo>>);
 
 impl Listener<SpaceChange> for TodoListener {

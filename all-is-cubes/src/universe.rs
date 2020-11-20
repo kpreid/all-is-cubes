@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 use crate::camera::Camera;
 use crate::space::{Space, SpaceStepInfo};
 
-/// Name/key of an object in a `Universe`.
+/// Name/key of an object in a [`Universe`].
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Name {
     /// An explicitly set name.
@@ -30,10 +30,10 @@ impl From<&str> for Name {
     }
 }
 
-/// A collection of named objects which can refer to each other via `URef`. In the future,
-/// it will enable garbage collection and inter-object invariants.
+/// A collection of named objects which can refer to each other via [`URef`]. In the
+/// future, it will enable garbage collection and inter-object invariants.
 ///
-/// See also the `UniverseIndex` trait for methods for adding and removing objects.
+/// See also the [`UniverseIndex`] trait for methods for adding and removing objects.
 #[derive(Debug)] // TODO: impl Debug with a less verbose result
 pub struct Universe {
     spaces: HashMap<Name, URootRef<Space>>,
@@ -42,7 +42,7 @@ pub struct Universe {
 }
 
 impl Universe {
-    /// Construct an empty `Universe`.
+    /// Construct an empty [`Universe`].
     pub fn new() -> Self {
         Universe {
             spaces: HashMap::new(),
@@ -92,9 +92,9 @@ impl Universe {
 
 impl sealed_gimmick::Sealed for Universe {}
 
-/// Trait implemented once for each type of object that can be stored in a `Universe`
+/// Trait implemented once for each type of object that can be stored in a [`Universe`]
 /// that internally provides the table for that type. This trait differs from
-/// `UniverseIndex` in that it is not public.
+/// [`UniverseIndex`] in that it is not public.
 trait UniverseTable<T> {
     fn table(&self) -> &HashMap<Name, URootRef<T>>;
     fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<T>>;
@@ -116,13 +116,13 @@ impl UniverseTable<Camera> for Universe {
     }
 }
 
-/// Trait implemented once for each type of object that can be stored in a `Universe`
+/// Trait implemented once for each type of object that can be stored in a [`Universe`]
 /// that permits lookups of that type.
 pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
-    /// Translates a name for an object of type `T` into a `URef` for it, which
+    /// Translates a name for an object of type `T` into a [`URef`] for it, which
     /// allows borrowing the actual object.
     ///
-    /// Returns `None` if no object exists for the name.
+    /// Returns [`None`] if no object exists for the name.
     fn get(&self, name: &Name) -> Option<URef<T>>;
 
     /// Insert a new object with a specific name.
@@ -172,15 +172,16 @@ impl Default for Universe {
     }
 }
 
-/// Type of a strong reference to an entry in a `Universe`. Defined to make types
+/// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
 /// parameterized with this somewhat less hairy.
 type StrongEntryRef<T> = Rc<RefCell<UEntry<T>>>;
 
-/// A reference from an object in a `Universe` to another.
+/// A reference from an object in a [`Universe`] to another.
 ///
-/// If they are held by objects outside of the `Universe`, it is not guaranteed
-/// that they will remain valid (in which case using the `URef` will panic).
-/// To ensure an object does not vanish while operating on it, `.borrow()` it.
+/// If they are held by objects outside of the [`Universe`], it is not guaranteed
+/// that they will remain valid (in which case using the `URef` will return an error
+/// or panic depending on the method).
+/// To ensure an object does not vanish while operating on it, [`URef::borrow`] it.
 /// (TODO: Should there be an operation in the style of `Weak::upgrade`?)
 #[derive(Debug)]
 pub struct URef<T> {
@@ -188,26 +189,27 @@ pub struct URef<T> {
     // collector for the graph of URefs. Reference counts would be an easy way to ensure
     // nothing is deleted while it is in use from a UI perspective.
     /// Reference to the object. Weak because we don't want to create reference cycles;
-    /// the assumption is that the overall game system will keep the `Universe` alive
-    /// and that `Universe` will ensure no entry goes away while referenced.
+    /// the assumption is that the overall game system will keep the [`Universe`] alive
+    /// and that [`Universe`] will ensure no entry goes away while referenced.
     weak_ref: Weak<RefCell<UEntry<T>>>,
     hash: u64,
 }
 
 impl<T: 'static> URef<T> {
-    /// Borrow the value, in the sense of std::RefCell::borrow, and panic on failure.
+    /// Borrow the value, in the sense of [`RefCell::borrow`], and panic on failure.
     #[track_caller]
     pub fn borrow(&self) -> UBorrow<T> {
         self.try_borrow().unwrap()
     }
 
-    /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut, and panic on failure.
+    /// Borrow the value mutably, in the sense of [`RefCell::borrow_mut`], and panic
+    /// on failure.
     #[track_caller]
     pub fn borrow_mut(&self) -> UBorrowMut<T> {
         self.try_borrow_mut().unwrap()
     }
 
-    /// Borrow the value, in the sense of std::RefCell::borrow.
+    /// Borrow the value, in the sense of [`RefCell::try_borrow`].
     pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
         let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
 
@@ -219,7 +221,7 @@ impl<T: 'static> URef<T> {
         ))
     }
 
-    /// Borrow the value mutably, in the sense of std::RefCell::borrow_mut.
+    /// Borrow the value mutably, in the sense of [`RefCell::try_borrow_mut`].
     pub fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, RefError> {
         let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
 
@@ -261,21 +263,21 @@ impl<T> Clone for URef<T> {
     }
 }
 
-/// Errors resulting from attempting to borrow/dereference a `URef`.
+/// Errors resulting from attempting to borrow/dereference a [`URef`].
 // TODO: implement Error
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum RefError {
-    /// Target was deleted.
+    /// Target was deleted, or its entire universe was dropped.
     Gone,
     /// Target is currently incompatibly borrowed.
     InUse,
 }
 
-/// A wrapper type for an immutably borrowed value from an `URef<T>`.
+/// A wrapper type for an immutably borrowed value from an [`URef`].
 pub struct UBorrow<T: 'static>(
     OwningRef<OwningHandle<StrongEntryRef<T>, Ref<'static, UEntry<T>>>, T>,
 );
-/// A wrapper type for a mutably borrowed value from an `URef<T>`.
+/// A wrapper type for a mutably borrowed value from an [`URef`].
 pub struct UBorrowMut<T: 'static>(
     OwningRefMut<OwningHandle<StrongEntryRef<T>, RefMut<'static, UEntry<T>>>, T>,
 );
@@ -352,13 +354,13 @@ impl<T> URootRef<T> {
         }
     }
 
-    /// Borrow the value mutably, in the sense of std::RefCell::try_borrow_mut.
+    /// Borrow the value mutably, in the sense of [`RefCell::try_borrow_mut`].
     fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, RefError> {
         self.downgrade().try_borrow_mut()
     }
 }
 
-/// Mechanism for observing changes to objects. A `Notifier` delivers messages
+/// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// to a set of listeners which implement some form of weak-reference semantics
 /// to allow cleanup.
 pub struct Notifier<M>
@@ -372,14 +374,14 @@ impl<M> Notifier<M>
 where
     M: Clone,
 {
-    /// Constructs a new empty `Notifier`.
+    /// Constructs a new empty [`Notifier`].
     pub fn new() -> Self {
         Self {
             listeners: Vec::new(),
         }
     }
 
-    /// Add a `Listener` to this set of listeners.
+    /// Add a [`Listener`] to this set of listeners.
     pub fn listen<L: Listener<M> + 'static>(&mut self, listener: L) {
         if !listener.alive() {
             return;
@@ -388,7 +390,7 @@ where
         self.listeners.push(Box::new(listener));
     }
 
-    /// Deliver a message to all ```Listener```s.
+    /// Deliver a message to all [`Listener`]s.
     pub fn notify(&self, message: M) {
         for listener in self.listeners.iter() {
             listener.receive(message.clone());
@@ -427,16 +429,18 @@ pub trait Listener<M> {
     ///
     /// As a Listener may be called from various contexts, this method should avoid
     /// triggering further side effects, by setting dirty flags or inserting into
-    /// message queues — definitely not taking a lock or borrowing a `RefCell` that
-    /// is not for the sole use of the `Listener` and its destination.
+    /// message queues — definitely not taking a lock or borrowing a [`RefCell`] that
+    /// is not for the sole use of the [`Listener`] and its destination.
     fn receive(&self, message: M);
 
-    /// Returns `false` if the `Listener` should not receive any further messages
-    /// because its 2
+    /// Returns [`false`] if the [`Listener`] should not receive any further messages
+    /// because its destination is no longer interested in them or they would not
+    /// have any effects on the rest of the system.
     fn alive(&self) -> bool;
 }
 
-/// Methods for adapting listeners that are not object-safe.
+/// Methods for adapting listeners that would make `Listener` not [object-safe]
+/// (https://doc.rust-lang.org/book/ch17-02-trait-objects.html).
 pub trait ListenerHelper<M>
 where
     Self: Sized,
@@ -454,7 +458,7 @@ where
 }
 impl<M, L: Listener<M> + Sized> ListenerHelper<M> for L {}
 
-/// A `Listener` which discards all messages and is suitable for filling
+/// A [`Listener`] which discards all messages and is suitable for filling
 /// listener parameters when no listener is needed.
 pub struct NullListener;
 
@@ -465,7 +469,7 @@ impl<M> Listener<M> for NullListener {
     }
 }
 
-/// A `Listener` destination which stores all the messages it receives, deduplicated.
+/// A [`Listener`] destination which stores all the messages it receives, deduplicated.
 pub struct Sink<M> {
     messages: Rc<RefCell<IndexSet<M>>>,
 }
@@ -476,14 +480,14 @@ impl<M> Sink<M>
 where
     M: Eq + Hash + Clone,
 {
-    /// Constructs a new empty `Sink`.
+    /// Constructs a new empty [`Sink`].
     pub fn new() -> Self {
         Self {
             messages: Rc::new(RefCell::new(IndexSet::new())),
         }
     }
 
-    /// Returns a `Listener` which records the messages it receives in this Sink.
+    /// Returns a [`Listener`] which records the messages it receives in this Sink.
     pub fn listener(&self) -> impl Listener<M> {
         SinkListener {
             weak_messages: Rc::downgrade(&self.messages),
@@ -505,7 +509,7 @@ where
         self.messages.borrow_mut().swap_remove(&message)
     }
 }
-/// As an Iterator, yields all messages currently waiting in arbitrary order.
+/// As an [`Iterator`], yields all messages currently waiting in arbitrary order.
 /// TODO: A singular Iterator is not the best way to express polling.
 /// Generate independent Iterators (that can be consumed) or use something else.
 impl<M> Iterator for Sink<M>
@@ -536,7 +540,7 @@ where
     }
 }
 
-/// A `Listener` destination which only stores a single flag indicating if any messages
+/// A [`Listener`] destination which only stores a single flag indicating if any messages
 /// were received.
 pub struct DirtyFlag {
     flag: Rc<Cell<bool>>,
@@ -545,21 +549,22 @@ struct DirtyFlagListener {
     weak_flag: Weak<Cell<bool>>,
 }
 impl DirtyFlag {
-    /// Constructs a new `DirtyFlag` with the flag value set to `false`.
+    /// Constructs a new [`DirtyFlag`] with the flag value set to [`false`].
     pub fn new() -> Self {
         Self {
             flag: Rc::new(Cell::new(false)),
         }
     }
 
-    /// Return a `Listener` which sets this flag to `true` when it receives any message.
+    /// Returns a [`Listener`] which will set this flag to [`true`] when it receives any
+    /// message.
     pub fn listener<M>(&self) -> impl Listener<M> {
         DirtyFlagListener {
             weak_flag: Rc::downgrade(&self.flag),
         }
     }
 
-    /// Return the flag value, setting it to `false` at the same time.
+    /// Returns the flag value, setting it to [`false`] at the same time.
     pub fn get_and_clear(&self) -> bool {
         self.flag.replace(false)
     }
@@ -574,15 +579,15 @@ impl<M> Listener<M> for DirtyFlagListener {
         self.weak_flag.upgrade().is_some()
     }
 }
-/// Equivalent to `DirtyFlag::new`.
+/// Equivalent to [`DirtyFlag::new`].
 impl Default for DirtyFlag {
-    /// Equivalent to `DirtyFlag::new`.
+    /// Equivalent to [`DirtyFlag::new`].
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// A `Listener` which transforms messages before passing them on.
+/// A [`Listener`] which transforms messages before passing them on.
 ///
 /// This may be used to drop uninteresting messages or reduce their granularity.
 ///
@@ -624,7 +629,7 @@ impl FrameClock {
     const STEP_LENGTH: Duration = Duration::from_micros(1_000_000 / 60);
     const ACCUMULATOR_CAP: Duration = Duration::from_millis(500);
 
-    /// Constructs a new `FrameClock`.
+    /// Constructs a new [`FrameClock`].
     ///
     /// This operation is independent of the system clock.
     pub fn new() -> Self {
@@ -637,7 +642,8 @@ impl FrameClock {
 
     /// Advance the clock using a source of absolute time.
     ///
-    /// This cannot be meaningfully used in combination with `request_frame()`.
+    /// This cannot be meaningfully used in combination with
+    /// [`FrameClock::request_frame()`].
     pub fn advance_to(&mut self, instant: Instant) {
         if let Some(last_absolute_time) = self.last_absolute_time {
             let delta = instant - last_absolute_time;
@@ -652,9 +658,9 @@ impl FrameClock {
     /// clock based on this input (it will not advance if no requests are made).
     ///
     /// Returns whether a frame should actually be rendered now. The caller should also
-    /// consult `should_step()` afterward to schedule game state steps.
+    /// consult [`FrameClock::should_step()`] afterward to schedule game state steps.
     ///
-    /// This cannot be meaningfully used in combination with `advance_to()`.
+    /// This cannot be meaningfully used in combination with [`FrameClock::advance_to()`].
     #[must_use]
     pub fn request_frame(&mut self, time_since_last_frame: Duration) -> bool {
         let result = self.should_draw();
@@ -667,36 +673,36 @@ impl FrameClock {
     }
 
     /// Indicates whether a new frame should be drawn, given the amount of time that this
-    /// `FrameClock` has been informed has passed.
+    /// [`FrameClock`] has been informed has passed.
     ///
-    /// When a frame *is* drawn, `did_draw` must be called; otherwise, this will always
-    /// return true.
+    /// When a frame *is* drawn, [`FrameClock::did_draw`]] must be called; otherwise, this
+    /// will always return true.
     pub fn should_draw(&self) -> bool {
         self.render_dirty
     }
 
-    /// Informs the `FrameClock` that a frame was just drawn.
+    /// Informs the [`FrameClock`] that a frame was just drawn.
     pub fn did_draw(&mut self) {
         self.render_dirty = false;
     }
 
-    /// Indicates whether `Universe:step` should be performed, given the amount of time
-    /// that this `FrameClock` has been informed has passed.
+    /// Indicates whether [`Universe::step`] should be performed, given the amount of time
+    /// that this [`FrameClock`] has been informed has passed.
     ///
-    /// When a step *is* performd, `did_step` must be called; otherwise, this will always
-    /// return true.
+    /// When a step *is* performd, [`FrameClock::did_step`] must be called; otherwise, this
+    /// will always return true.
     pub fn should_step(&self) -> bool {
         self.accumulated_step_time >= Self::STEP_LENGTH
     }
 
-    /// Informs the `FrameClock` that a step was just performed.
+    /// Informs the [`FrameClock`] that a step was just performed.
     pub fn did_step(&mut self) {
         self.accumulated_step_time -= Self::STEP_LENGTH;
         self.render_dirty = true;
     }
 
-    /// The timestep value that should be passed to `Universe::step` when stepping in
-    /// response to `should_step` returning true.
+    /// The timestep value that should be passed to [`Universe::step`] when stepping in
+    /// response to [`FrameClock::should_step`] returning true.
     pub fn step_length(&self) -> Duration {
         Self::STEP_LENGTH
     }

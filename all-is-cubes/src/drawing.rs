@@ -14,7 +14,7 @@ use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
 use std::convert::TryInto;
 
-/// Re-export the version of the `embedded_graphics` crate we're using.
+/// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
 use crate::block::{Block, BlockAttributes};
@@ -22,7 +22,7 @@ use crate::blockgen::BlockGen;
 use crate::math::{GridCoordinate, GridPoint, GridVector, RGB, RGBA};
 use crate::space::{Grid, SetCubeError, Space};
 
-/// Draw text into a `Space`, extending in the +X and -Y directions from `origin`.
+/// Draw text into a [`Space`], extending in the +X and -Y directions from `origin`.
 pub fn draw_text<F, C>(
     space: &mut Space,
     color: C,
@@ -43,7 +43,7 @@ where
     // to fail, but if we generalize that later then we might need more error handling.
 }
 
-/// Generate a set of blocks which together display the given `Drawable` which may be
+/// Generate a set of blocks which together display the given [`Drawable`] which may be
 /// larger than one block. The Z position is always the middle of the block.
 pub fn draw_to_blocks<D, C>(ctx: &mut BlockGen, object: D) -> Result<Space, SetCubeError>
 where
@@ -99,7 +99,7 @@ where
     Ok(output_space)
 }
 
-/// Adapter to use a `Space` as a `embedded_graphics::DrawTarget`.
+/// Adapter to use a [`Space`] as a [`DrawTarget`].
 ///
 /// The coordinate system is currently fixed to map X to X, Y to -Y, and a constant to Z.
 /// The vertical flip is because embedded_graphics assumes Y-down coordinates for text.
@@ -121,8 +121,8 @@ impl VoxelDisplayAdapter<'_> {
         self.origin + GridVector::new(point.x, -point.y, 0)
     }
 
-    /// Converts the return value of `Space::set` to the return value of
-    /// `DrawTarget::draw_pixel`, by making out-of-bounds not an error.
+    /// Converts the return value of [`Space::set`] to the return value of
+    /// [`DrawTarget::draw_pixel`], by making out-of-bounds not an error.
     fn handle_set_result(result: Result<bool, SetCubeError>) -> Result<(), SetCubeError> {
         match result {
             Ok(_) => Ok(()),
@@ -132,7 +132,7 @@ impl VoxelDisplayAdapter<'_> {
         }
     }
 
-    /// Common implementation for the DrawTarget size methods
+    /// Common implementation for the [`DrawTarget`] size methods
     fn size_for_eg(&self) -> Size {
         let size = self.space.grid().size();
         Size {
@@ -143,8 +143,8 @@ impl VoxelDisplayAdapter<'_> {
     }
 }
 
-/// A `VoxelDisplayAdapter` accepts any color type provided that there is a conversion
-/// from colors to `Block`s.
+/// A [`VoxelDisplayAdapter`] accepts any color type provided that there is a conversion
+/// from those colors to [`Block`]s.
 impl<C> DrawTarget<C> for VoxelDisplayAdapter<'_>
 where
     C: Into<Block> + PixelColor,
@@ -162,7 +162,7 @@ where
     }
 }
 
-/// A `VoxelBrush` may be used to draw multiple layers of blocks from a single 2D
+/// A [`VoxelBrush`] may be used to draw multiple layers of blocks from a single 2D
 /// graphic, producing shadow or outline effects, or simply changing the depth/layer.
 impl DrawTarget<VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
     type Error = SetCubeError;
@@ -196,7 +196,7 @@ impl From<Rgb888> for RGB {
     }
 }
 
-/// Perform the conversion to Block used by our `DrawTarget`, alone so that
+/// Perform the conversion to [`Block`] used by our [`DrawTarget`], alone so that
 /// it can be matched if desired.
 impl From<Rgb888> for Block {
     fn from(color: Rgb888) -> Block {
@@ -213,7 +213,7 @@ impl<'a> VoxelBrush<'a> {
     /// depth.
     const MAX_COUNT: usize = 7;
 
-    /// Makes a `VoxelBrush` which paints the specified blocks at the specified offsets
+    /// Makes a [`VoxelBrush`] which paints the specified blocks at the specified offsets
     /// from each pixel position.
     // TODO: is there a good way to generalize the argument type more than Vec, given that we want
     // owned input?
@@ -226,15 +226,15 @@ impl<'a> VoxelBrush<'a> {
         result
     }
 
-    /// Makes a `VoxelBrush` which paints the specified block with no offset.
+    /// Makes a [`VoxelBrush`] which paints the specified block with no offset.
     pub fn single(block: &'a Block) -> Self {
         Self::new(vec![((0, 0, 0), block)])
     }
 
     /// Add the given offset to the offset of each blocks, offsetting everything drawn.
     ///
-    /// Caution: Since the coordinates are `i8`, this cannot be used for the full
-    /// `GridPoint` range.
+    /// Caution: Since the coordinates are [`i8`], this cannot be used for the full
+    /// [`GridPoint`] coordinate range.
     pub fn translate<V: Into<Vector3<i8>>>(mut self, offset: V) -> Self {
         let offset = offset.into();
         for (block_offset, _) in self.0.iter_mut().flatten() {

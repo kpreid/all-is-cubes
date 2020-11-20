@@ -27,11 +27,11 @@ const FLYING_SPEED: FreeCoordinate = 10.0;
 
 /// A slightly unfortunate grab-bag of “player character” stuff. A `Camera`:
 ///
-/// * knows what `Space` it is looking at, by reference,
+/// * knows what [`Space`] it is looking at, by reference,
 /// * knows where it is located and how it collides via a `Body` which it owns and
 ///   steps, and
 /// * handles the parts of input management that are associated with universe state
-///   (controlling velocity, holding `Tool`s).
+///   (controlling velocity, holding tools).
 ///
 /// TODO: This probably ought to be renamed. And probably ought to be refactored.
 /// Are we *sure* we don't want an entity-component system?
@@ -40,7 +40,7 @@ pub struct Camera {
     pub body: Body,
     // TODO: the space ref is here instead of on Body on a notion that it might be useful to have
     // Body be a pure data structure with no refs. Dubious; revisit.
-    /// Refers to the `Space` to be viewed and collided with.
+    /// Refers to the [`Space`] to be viewed and collided with.
     pub space: URef<Space>,
 
     /// Whether the camera should rotate without user input for demo purposes.
@@ -75,7 +75,7 @@ impl std::fmt::Debug for Camera {
 }
 
 impl Camera {
-    /// Constructs a `Camera` with specified position.
+    /// Constructs a [`Camera`] with specified position.
     pub fn new(space: URef<Space>, position: impl Into<Point3<FreeCoordinate>>) -> Self {
         Self {
             body: Body::new_minimal(
@@ -93,7 +93,8 @@ impl Camera {
         }
     }
 
-    /// Constructs a `Camera` located outside the `Space` and with its bounds in frame.
+    /// Constructs a [`Camera`] located outside the [`Space`] and with its bounds in
+    /// frame.
     ///
     /// `direction` gives the direction in which the camera will lie relative to the
     /// center of the space.
@@ -110,7 +111,7 @@ impl Camera {
     }
 
     /// Computes the view matrix for this camera; the translation and rotation from
-    /// the `Space`'s coordinate system to one where the look direction is the -Z axis.
+    /// the [`Space`]'s coordinate system to one where the look direction is the -Z axis.
     pub fn view(&self) -> M {
         Matrix4::from_angle_x(Deg(self.body.pitch))
             * Matrix4::from_angle_y(Deg(self.body.yaw))
@@ -119,7 +120,7 @@ impl Camera {
 
     /// Advances time.
     ///
-    /// Normally, this is called from `Universe::step`.
+    /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).
     pub fn step(&mut self, duration: Duration) {
         let dt = duration.as_secs_f64();
         let control_orientation: Matrix3<FreeCoordinate> =
@@ -188,7 +189,7 @@ pub struct ProjectionHelper {
 
 #[allow(clippy::cast_lossless)]
 impl ProjectionHelper {
-    /// pixel_aspect_ratio is the width divided by the height
+    /// `pixel_aspect_ratio` is the width divided by the height
     pub fn new(pixel_aspect_ratio: FreeCoordinate, viewport: impl Into<Vector2<usize>>) -> Self {
         let viewport = viewport.into();
         assert!(
@@ -218,7 +219,8 @@ impl ProjectionHelper {
     /// aspect ratio.
     ///
     /// The viewport dimensions are assumed to be in “pixels” — this determines the
-    /// scale of the integer values passed to `normalize_pixel_x` and `normalize_pixel_y`.
+    /// scale of the integer values passed to [`normalize_pixel_x`](Self::normalize_pixel_x)
+    /// and [`normalize_pixel_y`](Self::normalize_pixel_y).
     pub fn set_viewport(&mut self, viewport: Vector2<usize>) {
         if viewport != self.viewport {
             self.viewport = viewport;
@@ -236,7 +238,8 @@ impl ProjectionHelper {
 
     /// Sets the view matrix.
     ///
-    /// This matrix is used by `project_ndc_into_world` and `project_cursor_into_world`
+    /// This matrix is used by [`project_ndc_into_world`](Self::project_ndc_into_world)
+    /// and [`project_cursor_into_world`](Self::project_cursor_into_world)
     /// to determine what world coordinates are.
     pub fn set_view_matrix(&mut self, view: M) {
         if view != self.view {
@@ -261,8 +264,9 @@ impl ProjectionHelper {
     }
 
     /// Converts a screen position in normalized device coordinates (as produced by
-    /// `normalize_pixel_x` & `normalize_pixel_y`) into a ray in world space.
-    /// Uses the view transformation given by `set_view_matrix`.
+    /// [`normalize_pixel_x`](Self::normalize_pixel_x) and
+    /// [`normalize_pixel_y`](Self::normalize_pixel_y)) into a ray in world space.
+    /// Uses the view transformation given by [`set_view_matrix`](Self::set_view_matrix).
     pub fn project_ndc_into_world(&self, ndc_x: FreeCoordinate, ndc_y: FreeCoordinate) -> Ray {
         let ndc_near = Vector4::new(ndc_x, ndc_y, -1.0, 1.0);
         let ndc_far = Vector4::new(ndc_x, ndc_y, 1.0, 1.0);
@@ -277,7 +281,7 @@ impl ProjectionHelper {
     }
 
     /// Converts the cursor position into a ray in world space.
-    /// Uses the view transformation given by `set_view_matrix`.
+    /// Uses the view transformation given by [`set_view_matrix`](Self::set_view_matrix).
     pub fn project_cursor_into_world(&self) -> Ray {
         self.project_ndc_into_world(self.cursor_ndc_position.x, self.cursor_ndc_position.y)
     }
@@ -311,8 +315,8 @@ pub fn eye_for_look_at(grid: &Grid, direction: Vector3<FreeCoordinate>) -> Point
     grid.center() + direction.normalize() * space_radius // TODO: allow for camera FoV
 }
 
-/// Find the first selectable block the ray strikes and express the result in a `Cursor`
-/// value, or `None` if nothing was struck.
+/// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
+/// value, or [`None`] if nothing was struck.
 pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
     let ray = ray.within_grid(*space.grid());
     // TODO: implement 'reach' radius limit
@@ -330,7 +334,7 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
     None
 }
 
-/// Data collected by `cursor_raycast` about the blocks struck by the ray; intended to be
+/// Data collected by [`cursor_raycast`] about the blocks struck by the ray; intended to be
 /// sufficient for various player interactions with blocks.
 ///
 /// TODO: Should carry information about lighting, and both the struck and preceding cubes.
@@ -422,7 +426,8 @@ impl InputProcessor {
 
     /// Advance time insofar as input interpretation is affected by time.
     ///
-    /// This method should be called *after* `apply_input`, when applicable.
+    /// This method should be called *after* [`apply_input`](Self::apply_input), when
+    /// applicable.
     pub fn step(&mut self, timestep: Duration) {
         let mut to_drop = Vec::new();
         for (key, duration) in self.momentary_timeout.iter_mut() {
@@ -469,7 +474,7 @@ impl InputProcessor {
     }
 }
 
-/// A platform-neutral representation of keyboard keys for `InputProcessor`.
+/// A platform-neutral representation of keyboard keys for [`InputProcessor`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Key {
     /// Letters should be lowercase.

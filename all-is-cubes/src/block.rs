@@ -2,7 +2,7 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 //! Definition of blocks, which are game objects which live in the grid of a
-//! `Space`. See `block::Block` for details.
+//! [`Space`]. See [`Block`] for details.
 
 use once_cell::sync::Lazy;
 use std::borrow::Cow;
@@ -12,7 +12,7 @@ use crate::space::{GridArray, Space};
 use crate::universe::{RefError, URef};
 use crate::util::ConciseDebug;
 
-/// A `Block` is something that can exist in the grid of a `Space`; it occupies one unit
+/// A `Block` is something that can exist in the grid of a [`Space`]; it occupies one unit
 /// cube of space and has a specified appearance and behavior.
 ///
 /// In general, when a block appears multiple times from an in-game perspective, that may
@@ -35,7 +35,7 @@ pub enum Block {
 
 impl Block {
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
-    /// information needed for rendering and physics, and does not require `URef` access
+    /// information needed for rendering and physics, and does not require [`URef`] access
     /// to other objects.
     pub fn evaluate(&self) -> Result<EvaluatedBlock, RefError> {
         match self {
@@ -76,7 +76,7 @@ impl Block {
         // TODO: need to track which things we need change notifications on
     }
 
-    /// Returns the single RGBA color of this block, or panics if it does not have a
+    /// Returns the single [RGBA] color of this block, or panics if it does not have a
     /// single color. For use in tests only.
     #[cfg(test)]
     pub fn color(&self) -> RGBA {
@@ -140,8 +140,8 @@ pub const AIR: Block = Block::Atom(
     RGBA::TRANSPARENT,
 );
 
-/// The result of `AIR.evaluate()`. This may be used when a sound `EvaluatedBlock` value
-/// is needed but there is no block.
+/// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>. This may be used when
+/// a consistent [`EvaluatedBlock`] value is needed but there is no block value.
 pub static AIR_EVALUATED: Lazy<EvaluatedBlock> = Lazy::new(|| AIR.evaluate().unwrap());
 
 /// A “flattened” and snapshotted form of `Block` which contains all information needed
@@ -153,8 +153,8 @@ pub struct EvaluatedBlock {
     /// The block's color; if made of multiple voxels, then an average or representative
     /// color.
     pub color: RGBA,
-    /// The voxels making up the block, if any; if `None`, then `color` should be used as
-    /// a uniform color value.
+    /// The voxels making up the block, if any; if [`None`], then `self.color` should be
+    /// used as a uniform color value.
     ///
     /// TODO: Specify how it should be handled if the grid has unsuitable dimensions
     /// (not cubical, not having an origin of 0, etc.).
@@ -182,7 +182,7 @@ impl ConciseDebug for EvaluatedBlock {
     }
 }
 
-/// Type of notification when an `EvaluatedBlock` result changes.
+/// Type of notification when an [`EvaluatedBlock`] result changes.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct BlockChange;
 

@@ -1,13 +1,10 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! Algorithms for rendering content using the `luminance` graphics library.
+//! Algorithms for rendering content using the [`luminance`] graphics library.
 //!
-//! These are platform-independent but use the `luminance-front` interface so they
+//! These are platform-independent but use the [`luminance_front`] interface so they
 //! are always compiled against the automatically-selected luminance backend.
-//!
-//! TODO: This module does not currently form a well-specified API; it is merely
-//! the subset of graphics code I've abstracted out of the wasm-specific client.
 
 #![cfg(feature = "lum")]
 
@@ -27,7 +24,7 @@ pub mod shading;
 pub mod space;
 pub mod types;
 
-/// Creates a `Tess` to draw a `Cursor` as a wireframe cube.
+/// Creates a [`Tess`] to draw a [`Cursor`] as a wireframe cube.
 pub fn make_cursor_tess<C>(context: &mut C, cursor_result: &Option<Cursor>) -> Tess<Vertex>
 where
     C: GraphicsContext<Backend = Backend>,
@@ -50,8 +47,8 @@ where
     }
 }
 
-/// Add the wireframe of `geometry` to `vertices` (to be drawn in `Line` mode) with the
-/// given `color`.
+/// Add the wireframe of `geometry` to `vertices` (to be drawn in [`Line`](Mode::Line)
+/// mode) with the given `color`.
 pub fn wireframe_vertices<E, G>(vertices: &mut E, color: RGBA, geometry: G)
 where
     E: Extend<Vertex>,

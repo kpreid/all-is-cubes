@@ -9,7 +9,7 @@ use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::fmt;
 use std::marker::PhantomData;
 
-/// Objects for which alternate `Debug` representations can be generated.
+/// Objects for which alternate [`Debug`] representations can be generated.
 pub trait ConciseDebug: Sized {
     // TODO: Can we not require Sized?
 
@@ -24,7 +24,8 @@ pub trait ConciseDebug: Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result;
 }
 
-/// You can use `ConciseDebug::as_concise_debug` to construct this. See its documentation.
+/// You can use [`ConciseDebug::as_concise_debug`] to construct this.
+/// See its documentation.
 pub struct ConciseDebugWrapper<'a, T: ConciseDebug>(&'a T);
 
 impl<'a, T: ConciseDebug> fmt::Debug for ConciseDebugWrapper<'a, T> {
@@ -76,12 +77,12 @@ impl<S: fmt::Debug> ConciseDebug for Vector4<S> {
 /// A type for "return a result or errors, with possible warnings".
 ///
 /// In order to preserve compatibility with the `?` operator and other idioms,
-/// it is an alias for `Result` instead of a new type.
+/// it is an alias for [`Result`] instead of a new type.
 ///
-/// Use the trait `Warnings` for helpful methods.
+/// Use the trait [`Warnings`] for helpful methods.
 pub type WarningsResult<T, E, W> = Result<(T, Vec<W>), (E, Vec<W>)>;
 
-/// Helper trait to provide methods for the `WarningsResult` type.
+/// Helper trait to provide methods for the [`WarningsResult`] type alias.
 #[allow(clippy::type_complexity)]
 pub trait Warnings: Sized {
     /// A successful result.
@@ -95,7 +96,8 @@ pub trait Warnings: Sized {
     /// values.
     fn split_warnings(self) -> (Vec<Self::W>, Result<Self::T, Self::E>);
 
-    /// Call the `handler` with all warnings and return a `Result` stripped of the warnings.
+    /// Call the `handler` with all warnings and return a [`Result`] stripped of the
+    /// warnings.
     fn handle_warnings<H>(self, handler: H) -> Result<Self::T, Self::E>
     where
         H: Fn(Self::W),
@@ -120,7 +122,7 @@ impl<T, E, W> Warnings for WarningsResult<T, E, W> {
     }
 }
 
-/// Equivalent of `Iterator::map` but applied to an `Extend` instead, transforming
+/// Equivalent of [`Iterator::map`] but applied to an [`Extend`] instead, transforming
 /// the incoming elements.
 pub(crate) struct MapExtend<'a, A, B, T, F>
 where

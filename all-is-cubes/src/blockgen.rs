@@ -11,7 +11,7 @@ use crate::math::{GridCoordinate, GridPoint, NotNan, RGBA};
 use crate::space::Space;
 use crate::universe::{UBorrowMut, Universe};
 
-/// Utilities for generating blocks that are compatible with each other.
+/// Utilities for generating [`Block`]s that are compatible with each other.
 pub struct BlockGen<'a> {
     /// The `Universe` in which block spaces live.
     pub universe: &'a mut Universe,
@@ -20,7 +20,7 @@ pub struct BlockGen<'a> {
 }
 
 impl<'a> BlockGen<'a> {
-    /// Constructs a `BlockGen` to generate blocks for the given universe.
+    /// Constructs a [`BlockGen`] to generate blocks for the given universe.
     ///
     /// `size` is the side length of block spaces; the cube root of the number of voxels
     /// making up a block.
@@ -29,12 +29,12 @@ impl<'a> BlockGen<'a> {
         Self { universe, size }
     }
 
-    /// Create a `Space` of a suitable size for a block.
+    /// Create a [`Space`] of a suitable size for a block.
     pub fn new_block_space(&self) -> Space {
         Space::empty_positive(self.size, self.size, self.size)
     }
 
-    /// Create a `Block` referring to a `Space` and return the `Space` for modification.
+    /// Create a [`Block`] referring to a [`Space`] and return the [`Space`] for modification.
     pub fn new_recursive_block(
         &mut self,
         attributes: BlockAttributes,
@@ -46,8 +46,8 @@ impl<'a> BlockGen<'a> {
         )
     }
 
-    /// Create a `Block` referring to a `Space` filled with sub-blocks chosen by the
-    /// given function. The third argument to the function is a random value in [0.0, 1.0).
+    /// Create a [`Block`] referring to a [`Space`] filled with sub-blocks chosen by the
+    /// given function. The third argument to the function is a random value in \[0.0, 1.0).
     pub fn block_from_function(
         &mut self,
         attributes: BlockAttributes,
@@ -64,7 +64,7 @@ impl<'a> BlockGen<'a> {
     }
 }
 
-/// Generate a copy of a `Block::Atom` with its color scaled by the given scalar.
+/// Generate a copy of a [`Block::Atom`] with its color scaled by the given scalar.
 pub fn scale_color(block: Block, scalar: NotNan<f32>) -> Block {
     match block {
         Block::Atom(attributes, color) => Block::Atom(
@@ -152,7 +152,7 @@ impl LandscapeBlocks {
 }
 
 impl Default for LandscapeBlocks {
-    /// Generate a bland instance of `LandscapeBlocks` with single color blocks.
+    /// Generate a bland instance of [`LandscapeBlocks`] with single color blocks.
     fn default() -> LandscapeBlocks {
         fn color_and_name(r: f32, g: f32, b: f32, name: &str) -> Block {
             Block::Atom(

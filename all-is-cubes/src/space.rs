@@ -18,10 +18,14 @@ use crate::universe::{Listener, Notifier, RefError};
 
 pub use crate::lighting::PackedLight;
 
-/// Specifies the coordinate extent of a `Space`.
+/// Specifies the coordinate extent of a [`Space`], as an axis-aligned box with integer
+/// coordinates whose volume is between 1 and [`usize::MAX`].
 ///
-/// TODO: Wait, we're going to have other uses for an axis-aligned-box and this is that
-/// with some additional restrictions.
+/// When we refer to “a cube” in a `Grid`, that is a unit cube which is identified by the
+/// integer coordinates of its most negative corner. Hence, coordinate bounds are always
+/// half-open intervals: lower inclusive and upper exclusive.
+///
+/// TODO: Do we really need the minimum of 1?
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Grid {
     lower_bounds: GridPoint,
@@ -29,7 +33,7 @@ pub struct Grid {
 }
 
 impl Grid {
-    /// Constructs a `Grid` from coordinate lower bounds and sizes.
+    /// Constructs a [`Grid`] from coordinate lower bounds and sizes.
     ///
     /// For example, if on one axis the lower bound is 5 and the size is 10,
     /// then the positions where blocks can exist are numbered 5 through 14
@@ -68,7 +72,7 @@ impl Grid {
         }
     }
 
-    /// Constructs a `Grid` from inclusive lower bounds and exclusive upper bounds.
+    /// Constructs a [`Grid`] from inclusive lower bounds and exclusive upper bounds.
     ///
     /// For example, if on one axis the lower bound is 5 and the upper bound is 10,
     /// then the positions where blocks can exist are numbered 5 through 9
@@ -168,7 +172,7 @@ impl Grid {
         self.axis_range(2)
     }
 
-    /// The center of the enclosed volume. Returns `FreeCoordinate` since the center
+    /// The center of the enclosed volume. Returns [`FreeCoordinate`] since the center
     /// may be at a half-block position.
     ///
     /// ```
@@ -321,7 +325,7 @@ impl Grid {
     }
 }
 
-/// Container for `Block`s arranged in three-dimensional space. The main “game world”
+/// Container for [`Block`]s arranged in three-dimensional space. The main “game world”
 /// data structure.
 pub struct Space {
     grid: Grid,
@@ -361,8 +365,9 @@ pub struct Space {
 
 /// Information about the interpretation of a block index.
 ///
-/// Design note: This is primarily an internal data structure, but it happens to be
-/// convenient to expose it as a read-only view of exactly this information.
+/// Design note: This doubles as an internal data structure for [`Space`]. While we'll
+/// try to keep it available, this interface has a higher risk of needing to change
+/// incompatibility.
 #[derive(Debug)]
 pub struct SpaceBlockData {
     /// The block itself.
@@ -386,7 +391,7 @@ impl std::fmt::Debug for Space {
 pub(crate) type BlockIndex = u8;
 
 impl Space {
-    /// Constructs a `Space` that is entirely filled with `all_is_cubes::block::AIR`.
+    /// Constructs a [`Space`] that is entirely filled with [`AIR`].
     pub fn empty(grid: Grid) -> Space {
         // TODO: Might actually be worth checking for memory allocation failure here...?
         let volume = grid.volume();
@@ -425,15 +430,17 @@ impl Space {
         self.notifier.listen(listener)
     }
 
-    /// Returns the `Grid` describing the bounds of this `Space`; no blocks may exist
+    /// Returns the [`Grid`] describing the bounds of this space; no blocks may exist
     /// outside it.
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
 
     /// Returns the internal unstable numeric ID for the block at the given position,
-    /// which may be mapped to a `Block` by `.distinct_blocks_unfiltered()`. If you are
-    /// looking for *simple* access, use `space[position]` (the `Index` trait) instead.
+    /// which may be mapped to a [`Block`] by
+    /// [`Space::.distinct_blocks_unfiltered_iter()`].
+    /// If you are looking for *simple* access, use `space[position]` (the [`Index`]
+    /// trait) instead.
     ///
     /// These IDs may be used to perform efficient processing of many blocks, but they
     /// may be renumbered after any mutation.
@@ -478,7 +485,7 @@ impl Space {
         }
     }
 
-    /// Get the `EvaluatedBlock` of the block in this space at the given position.
+    /// Gets the [`EvaluatedBlock`] of the block in this space at the given position.
     #[inline(always)]
     pub fn get_evaluated(&self, position: impl Into<GridPoint>) -> &EvaluatedBlock {
         if let Some(index) = self.grid.index(position) {
@@ -624,12 +631,13 @@ impl Space {
 
     /// Replace blocks in `region` with a block computed by the function.
     ///
-    /// The function may return a reference to a block or a block. If it returns `None`,
+    /// The function may return a reference to a block or a block. If it returns [`None`],
     /// the existing block is left unchanged.
     ///
     /// The operation will stop on the first error, potentially leaving some blocks
-    /// replaced. (Exception: If the `grid` extends outside of `self.space()`, that
-    /// will always be rejected before any changes are made.)
+    /// replaced. (Exception: If the `grid` extends outside of
+    /// [`self.grid()`](Self::grid), that will always be rejected before any changes are
+    /// made.)
     ///
     /// ```
     /// use all_is_cubes::block::{AIR, Block};
@@ -703,10 +711,10 @@ impl Space {
         self.sky_color
     }
 
-    /// Sets the sky color, as per `sky_color`.
+    /// Sets the sky color, as per [`sky_color`](Self::sky_color).
     ///
     /// This function does not currently cause any recomputation of cube lighting,
-    /// but [TODO:] it may later be improved to do so.
+    /// but \[TODO:\] it may later be improved to do so.
     pub fn set_sky_color(&mut self, color: RGB) {
         self.sky_color = color;
         self.packed_sky_color = self.sky_color.into();
@@ -756,9 +764,12 @@ impl Space {
 impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     type Output = Block;
 
-    /// Get the block in this space at the given position.
+    /// Gets a reference to the block in this space at the given position.
     ///
-    /// If the position is out of bounds, there is no effect.
+    /// If the position is out of bounds, returns [`AIR`].
+    ///
+    /// Note that [`Space`] does not implement [`IndexMut`](std::ops::IndexMut);
+    /// use [`Space::set`] or [`Space::fill`] to modify blocks.
     #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
         if let Some(index) = self.grid.index(position) {
@@ -790,12 +801,12 @@ impl SpaceBlockData {
     // Public accessors follow. We do this instead of making public fields so that
     // the data structure can be changed should a need arise.
 
-    /// Returns the `Block` this data is about.
+    /// Returns the [`Block`] this data is about.
     pub fn block(&self) -> &Block {
         &self.block
     }
 
-    /// Returns the `EvaluatedBlock` representation of the block.
+    /// Returns the [`EvaluatedBlock`] representation of the block.
     ///
     /// TODO: Describe when this may be stale.
     pub fn evaluated(&self) -> &EvaluatedBlock {
@@ -806,7 +817,7 @@ impl SpaceBlockData {
     // but might be interesting 'statistics'.
 }
 
-/// Ways that Space::set can fail to make a change.
+/// Ways that [`Space::set`] can fail to make a change.
 ///
 /// Note that "already contained the given block" is considered a success.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -817,7 +828,7 @@ pub enum SetCubeError {
     BlockDataAccess(RefError),
 }
 
-/// Description of a change to a `Space` for use in listeners.
+/// Description of a change to a [`Space`] for use in listeners.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SpaceChange {
     /// The block at the given location was replaced.
@@ -828,7 +839,7 @@ pub enum SpaceChange {
     Number(BlockIndex),
 }
 
-/// Performance data returned by `Space::step`. The exact contents of this structure
+/// Performance data returned by [`Space::step`]. The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -851,7 +862,7 @@ impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     }
 }
 
-/// A 3-dimensional array with arbitrary element type instead of `Space`'s fixed types.
+/// A 3-dimensional array with arbitrary element type instead of [`Space`]'s fixed types.
 ///
 /// TODO: Should we rebuild Space on top of this?
 #[derive(Clone, Debug, Eq, Hash, PartialEq)] // TODO: nondefault Debug
@@ -861,7 +872,7 @@ pub struct GridArray<V> {
 }
 
 impl<V> GridArray<V> {
-    /// Constructs a `GridArray` from a function choosing the value at each point.
+    /// Constructs a [`GridArray`] from a function choosing the value at each point.
     pub fn generate<F>(grid: Grid, f: F) -> Self
     where
         F: Fn(GridPoint) -> V,
@@ -882,13 +893,13 @@ impl<V> GridArray<V> {
         }
     }
 
-    /// Returns the `Grid` specifying the bounds of this array.
+    /// Returns the [`Grid`] specifying the bounds of this array.
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
 
-    /// Returns the element at `position` of this array, or `None` if `position` is out of
-    /// bounds.
+    /// Returns the element at `position` of this array, or [`None`] if `position` is out
+    /// of bounds.
     pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
         self.grid.index(position).map(|index| &self.contents[index])
     }
@@ -900,7 +911,7 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
     /// Returns the element at `position` of this array, or panics if `position` is out of
     /// bounds.
     ///
-    /// Use `GridArray::get` for a non-panicing alternative.
+    /// Use [`GridArray::get`] for a non-panicing alternative.
     fn index(&self, position: P) -> &Self::Output {
         let position: GridPoint = position.into();
         if let Some(index) = self.grid.index(position) {
@@ -913,7 +924,7 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
         }
     }
 }
-// TODO: Implement IndexMut
+// TODO: impl IndexMut for GridArray
 
 #[cfg(test)]
 mod tests {
