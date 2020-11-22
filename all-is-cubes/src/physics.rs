@@ -17,6 +17,10 @@ const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 
+/// Gravity vector, in cubes/s².
+/// TODO: Should probably be a property of the Space or something.
+const GRAVITY: Vector3<FreeCoordinate> = Vector3::new(0., -20., 0.);
+
 /// An object with a position, velocity, and collision volume.
 /// What it collides with is determined externally.
 #[derive(Clone)]
@@ -32,6 +36,11 @@ pub struct Body {
     // Thought for the future: switching to a "cylinder" representation (height + radius)
     // would allow for simultaneous collision with multiple spaces with different axes.
     pub collision_box: AAB,
+
+    /// Is this body not subject to gravity?
+    pub flying: bool,
+    /// Is this body not subject to collision?
+    pub noclip: bool,
 
     /// Yaw of the camera look direction, in degrees clockwise from looking towards -Z.
     ///
@@ -55,6 +64,9 @@ impl std::fmt::Debug for Body {
         fmt.debug_struct("Body")
             .field("position", &self.position.as_concise_debug())
             .field("velocity", &self.velocity.as_concise_debug())
+            .field("collision_box", &self.collision_box)
+            .field("flying", &self.flying)
+            .field("noclip", &self.noclip)
             .field("yaw", &self.yaw)
             .field("pitch", &self.pitch)
             .finish()
@@ -71,6 +83,8 @@ impl Body {
             position: position.into(),
             velocity: Vector3::zero(),
             collision_box: collision_box.into(),
+            flying: false,
+            noclip: false,
             yaw: 0.0,
             pitch: 0.0,
         }
@@ -96,7 +110,9 @@ impl Body {
 
         // TODO: Reset any non-finite values found to allow recovery from glitches.
 
-        // TODO: this.velocity += GRAVITY * dt;
+        if !self.flying {
+            self.velocity += GRAVITY * dt;
+        }
         if self.velocity.magnitude2() <= VELOCITY_EPSILON_SQUARED {
             return BodyStepInfo {
                 quiescent: true,
@@ -104,6 +120,7 @@ impl Body {
             };
         }
 
+        // TODO: correct integration of acceleration due to gravity
         let unobstructed_delta_position = self.velocity * dt;
 
         // Do collision detection and resolution.
@@ -301,17 +318,40 @@ impl Default for MoveSegment {
 mod tests {
     use super::*;
 
+    fn collision_noop(_: GridPoint) {}
+
+    fn test_body() -> Body {
+        Body {
+            flying: false,
+            noclip: false,
+            ..Body::new_minimal((0., 2., 0.), AAB::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
+        }
+    }
+
     #[test]
-    fn basic_physics() {
+    fn freefall_no_gravity() {
         let mut body = Body {
-            position: Point3::new(0.0, 1.0, 0.0),
             velocity: Vector3::new(2.0, 0.0, 0.0),
-            collision_box: AAB::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5),
-            yaw: 0.0,
-            pitch: 0.0,
+            flying: true,
+            ..test_body()
         };
-        body.step(Duration::from_secs(2), None, |_| ());
-        assert_eq!(body.position, Point3::new(4.0, 1.0, 0.0));
+        body.step(Duration::from_millis(1500), None, collision_noop);
+        assert_eq!(body.position, Point3::new(3.0, 2.0, 0.0));
+        body.step(Duration::from_millis(1500), None, collision_noop);
+        assert_eq!(body.position, Point3::new(6.0, 2.0, 0.0));
+    }
+
+    #[test]
+    fn freefall_with_gravity() {
+        let mut body = Body {
+            velocity: Vector3::new(2.0, 0.0, 0.0),
+            flying: false,
+            ..test_body()
+        };
+        body.step(Duration::from_millis(1500), None, collision_noop);
+        assert_eq!(body.position, Point3::new(3.0, -43.0, 0.0));
+        body.step(Duration::from_millis(1500), None, collision_noop);
+        assert_eq!(body.position, Point3::new(6.0, -133.0, 0.0));
     }
 
     // TODO: test having all 3 move segments

@@ -78,10 +78,13 @@ impl Camera {
     /// Constructs a [`Camera`] with specified position.
     pub fn new(space: URef<Space>, position: impl Into<Point3<FreeCoordinate>>) -> Self {
         Self {
-            body: Body::new_minimal(
-                position.into(),
-                AAB::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
-            ),
+            body: Body {
+                flying: true,
+                ..Body::new_minimal(
+                    position.into(),
+                    AAB::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
+                )
+            },
             space,
             auto_rotate: false,
             velocity_input: Vector3::zero(),
