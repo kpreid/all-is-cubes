@@ -11,8 +11,6 @@ pub use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
 use std::ops::{Add, AddAssign, Index, IndexMut, Mul, Sub};
 
-use crate::space::Grid;
-
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = i32;
 /// Positions that are locked to the cube grid.
@@ -681,25 +679,24 @@ impl AAB {
     pub(crate) fn leading_corner_trailing_box(
         &self,
         direction: Vector3<FreeCoordinate>,
-    ) -> (Vector3<FreeCoordinate>, Grid) {
+    ) -> (Vector3<FreeCoordinate>, AAB) {
         let mut leading_corner = Vector3::zero();
         let mut trailing_box_lower = Point3::origin();
         let mut trailing_box_upper = Point3::origin();
         for axis in 0..3 {
-            let rounded_size = self.sizes[axis].ceil() as GridCoordinate;
             if direction[axis] >= 0.0 {
                 leading_corner[axis] = self.upper_bounds[axis];
-                trailing_box_lower[axis] = -rounded_size;
-                trailing_box_upper[axis] = 0;
+                trailing_box_lower[axis] = -self.sizes[axis];
+                trailing_box_upper[axis] = -0.;
             } else {
                 leading_corner[axis] = self.lower_bounds[axis];
-                trailing_box_lower[axis] = 0;
-                trailing_box_upper[axis] = rounded_size;
+                trailing_box_lower[axis] = 0.;
+                trailing_box_upper[axis] = self.sizes[axis];
             }
         }
         (
             leading_corner,
-            Grid::from_lower_upper(trailing_box_lower, trailing_box_upper),
+            AAB::from_lower_upper(trailing_box_lower, trailing_box_upper),
         )
     }
 }
