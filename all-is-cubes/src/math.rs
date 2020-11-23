@@ -581,7 +581,7 @@ impl std::fmt::Debug for RGBA {
 ///
 /// Note that this has continuous coordinates, and a discrete analogue exists as
 /// [`Grid`](crate::space::Grid).
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct AAB {
     // TODO: Should we be using NotNan coordinates?
     // The upper > lower checks will reject NaNs anyway.
@@ -746,6 +746,17 @@ impl AAB {
     }
 }
 
+impl std::fmt::Debug for AAB {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            fmt,
+            "AAB({:?} to {:?})",
+            self.lower_bounds.as_concise_debug(),
+            self.upper_bounds.as_concise_debug(),
+        )
+    }
+}
+
 impl Geometry for AAB {
     type Coord = FreeCoordinate;
 
@@ -836,6 +847,14 @@ mod tests {
         assert_eq!(
             format!("{:#?}", RGBA::new(0.1, 0.2, 0.3, 0.4)),
             "RGBA(0.1, 0.2, 0.3, 0.4)"
+        );
+    }
+
+    #[test]
+    fn aab_debug() {
+        assert_eq!(
+            format!("{:#?}", AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)),
+            "AAB((+1.000, +3.000, +5.000) to (+2.000, +4.000, +6.000))"
         );
     }
 
