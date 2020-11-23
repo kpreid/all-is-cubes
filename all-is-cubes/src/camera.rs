@@ -4,15 +4,15 @@
 //! Miscellaneous display and player-character stuff.
 
 use cgmath::{
-    Deg, EuclideanSpace, InnerSpace, Matrix3, Matrix4, Point2, Point3, SquareMatrix, Transform,
-    Vector2, Vector3, Vector4,
+    Deg, ElementWise, EuclideanSpace, InnerSpace, Matrix3, Matrix4, Point2, Point3, SquareMatrix,
+    Transform, Vector2, Vector3, Vector4,
 };
 use num_traits::identities::Zero;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
-use crate::math::{FreeCoordinate, AAB};
+use crate::math::{Face, FreeCoordinate, AAB};
 use crate::physics::{Body, Contact};
 use crate::raycast::{Ray, RaycastStep, Raycaster};
 use crate::space::{Grid, Space};
@@ -21,9 +21,9 @@ use crate::universe::URef;
 use crate::util::ConciseDebug as _;
 
 // Control characteristics.
-//const WALKING_SPEED: FreeCoordinate = 10.0;
+const WALKING_SPEED: FreeCoordinate = 4.0;
 const FLYING_SPEED: FreeCoordinate = 10.0;
-//const JUMP_SPEED: FreeCoordinate = 10.0;
+const JUMP_SPEED: FreeCoordinate = 8.0;
 
 /// A slightly unfortunate grab-bag of “player character” stuff. A `Camera`:
 ///
@@ -72,7 +72,7 @@ impl Camera {
     pub fn new(space: URef<Space>, position: impl Into<Point3<FreeCoordinate>>) -> Self {
         Self {
             body: Body {
-                flying: true,
+                // flying: true,
                 ..Body::new_minimal(
                     position.into(),
                     AAB::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
@@ -123,10 +123,21 @@ impl Camera {
             Matrix3::from_angle_y(-Deg(self.body.yaw));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
 
-        let velocity_target = control_orientation * self.velocity_input * FLYING_SPEED;
-        let stiffness = 10.8; // TODO walking vs. flying
+        let speed = if self.body.flying {
+            FLYING_SPEED
+        } else {
+            WALKING_SPEED
+        };
+        let velocity_target = control_orientation * self.velocity_input * speed;
+        // TODO should have an on-ground condition...
+        let stiffness = if self.body.flying {
+            Vector3::new(10.8, 10.8, 10.8)
+        } else {
+            Vector3::new(10.8, 0., 10.8)
+        }; // TODO constants/tables...
 
-        self.body.velocity += (velocity_target - self.body.velocity) * stiffness * dt;
+        self.body.velocity +=
+            (velocity_target - self.body.velocity).mul_element_wise(stiffness) * dt;
 
         if let Ok(space) = self.space.try_borrow() {
             let colliding_cubes = &mut self.colliding_cubes;
@@ -136,6 +147,12 @@ impl Camera {
             });
         } else {
             // TODO: set a warning flag
+        }
+
+        if velocity_target.y > 0. {
+            self.body.flying = true;
+        } else if self.is_on_ground() {
+            self.body.flying = false;
         }
 
         if self.auto_rotate {
@@ -155,6 +172,24 @@ impl Camera {
         } else {
             Err(ToolError::NotUsable)
         }
+    }
+
+    // TODO: this code's location is driven by colliding_cubes being here, which is probably wrong
+    // If nothing else, the jump height probably belongs elsewhere.
+    fn jump_if_able(&mut self) {
+        if self.is_on_ground() {
+            self.body.velocity += Vector3 {
+                x: 0.,
+                y: JUMP_SPEED,
+                z: 0.,
+            };
+        }
+    }
+
+    fn is_on_ground(&self) -> bool {
+        self.colliding_cubes
+            .iter()
+            .any(|contact| contact.face == Face::PY)
     }
 }
 
@@ -371,6 +406,7 @@ impl InputProcessor {
     }
 
     fn is_bound(key: Key) -> bool {
+        // Eventually we'll have actual configurable keybindings...
         match key {
             // Used in `InputProcessor::movement()`.
             Key::Character('w') => true,
@@ -384,6 +420,7 @@ impl InputProcessor {
             Key::Right => true,
             Key::Up => true,
             Key::Down => true,
+            Key::Character(' ') => true,
             _ => false,
         }
     }
@@ -455,6 +492,10 @@ impl InputProcessor {
             + turning_step * self.net_movement(Key::Up, Key::Down))
         .min(90.0)
         .max(-90.0);
+
+        if self.keys_held.contains(&Key::Character(' ')) {
+            camera.jump_if_able();
+        }
     }
 
     /// Computes the net effect of a pair of opposed inputs (e.g. "forward" and "back").
@@ -500,4 +541,6 @@ mod tests {
         input.key_up(Key::Character('d'));
         assert_eq!(input.movement(), Vector3::new(-1.0, 0.0, 0.0));
     }
+
+    // TODO: test jump and flying logic
 }
