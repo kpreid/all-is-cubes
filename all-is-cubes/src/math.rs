@@ -12,6 +12,7 @@ use std::convert::{TryFrom, TryInto};
 use std::ops::{Add, AddAssign, Index, IndexMut, Mul, Sub};
 
 use crate::space::Grid;
+use crate::util::ConciseDebug;
 
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = i32;
@@ -46,7 +47,6 @@ pub trait Geometry {
 /// So far, nearly every usage of Face has a use for [`WITHIN`](Face::WITHIN), but we
 /// should keep an eye out for uses of the ‘true’ 6-face version.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
-#[rustfmt::skip]
 pub enum Face {
     /// The interior volume of a cube, or an undefined direction. Corresponds to the vector `(0, 0, 0)`.
     WITHIN,
@@ -265,6 +265,34 @@ impl<V> IndexMut<Face> for FaceMap<V> {
             Face::PY => &mut self.py,
             Face::PZ => &mut self.pz,
         }
+    }
+}
+
+#[derive(Clone, Copy, Hash, Eq, PartialEq)]
+/// The combination of a `GridPoint` identifying a unit cube and a `Face` identifying
+/// one face of it. This pattern recurs in selection and collision detection.
+pub struct CubeFace {
+    pub cube: GridPoint,
+    pub face: Face,
+}
+
+impl CubeFace {
+    pub fn new(cube: impl Into<GridPoint>, face: Face) -> Self {
+        Self {
+            cube: cube.into(),
+            face,
+        }
+    }
+}
+
+impl std::fmt::Debug for CubeFace {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            fmt,
+            "CubeFace({:?}, {:?})",
+            self.cube.as_concise_debug(),
+            self.face,
+        )
     }
 }
 
@@ -765,6 +793,15 @@ mod tests {
     // TODO: More tests of face.matrix()
 
     // TODO: Tests of FaceMap
+
+    #[test]
+    fn cubeface_format() {
+        let cube_face = CubeFace {
+            cube: GridPoint::new(1, 2, 3),
+            face: Face::NY,
+        };
+        assert_eq!(&format!("{:#?}", cube_face), "CubeFace((+1, +2, +3), NY)");
+    }
 
     // TODO: Add tests of the color not-NaN mechanisms.
 
