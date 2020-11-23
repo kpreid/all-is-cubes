@@ -14,7 +14,7 @@ use std::time::Duration;
 use crate::block::{Block, EvaluatedBlock};
 use crate::math::{Face, FreeCoordinate, AAB};
 use crate::physics::{Body, Contact};
-use crate::raycast::{Ray, RaycastStep, Raycaster};
+use crate::raycast::{CubeFace, Ray, Raycaster};
 use crate::space::{Grid, Space};
 use crate::tools::{Tool, ToolError};
 use crate::universe::URef;
@@ -358,7 +358,7 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
         if evaluated.attributes.selectable {
             return Some(Cursor {
                 // TODO: Cursor info text would like to have lighting information too.
-                place: step,
+                place: step.cube_face(),
                 block: space[cube].clone(),
                 evaluated: evaluated.clone(),
             });
@@ -373,9 +373,8 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
 /// TODO: Should carry information about lighting, and both the struck and preceding cubes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
-    /// The cube the cursor is at, as defined by a raycast result (thus including the
-    /// face touched).
-    pub place: RaycastStep,
+    /// The cube the cursor is at and which face was hit.
+    pub place: CubeFace,
     /// The block that was found in the given cube.
     pub block: Block,
     /// The EvaluatedBlock data for the block.
@@ -389,7 +388,7 @@ impl std::fmt::Display for Cursor {
         write!(
             f,
             "Block at {:?}\n{:#?}",
-            self.place.cube_ahead().as_concise_debug(),
+            self.place,
             self.evaluated.as_concise_debug(),
         )
     }

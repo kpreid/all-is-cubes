@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::math::{CubeFace, Face, FreeCoordinate, Geometry as _, AAB};
-use crate::raycast::{Ray, RaycastStep};
+use crate::raycast::Ray;
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
 
@@ -244,7 +244,7 @@ impl Body {
                     delta_position,
                     MoveSegment {
                         delta_position: unobstructed_delta_position,
-                        stopped_by: Some(ray_step),
+                        stopped_by: Some(ray_step.cube_face()),
                     },
                 );
             }
@@ -313,7 +313,7 @@ pub struct MoveSegment {
     /// Note that `self.stopped_by.cube` is not necessarily the cube that
     /// contained an obstruction, as that cube may be off to the side relative to
     /// the ray.
-    pub stopped_by: Option<RaycastStep>,
+    pub stopped_by: Option<CubeFace>,
 }
 
 impl Default for MoveSegment {
