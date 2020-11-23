@@ -136,11 +136,11 @@ where
                 camera.body.collision_box_abs(),
             );
             // What it collided with
-            for cube in &camera.colliding_cubes {
+            for contact in &camera.colliding_cubes {
                 wireframe_vertices(
                     &mut v,
                     RGBA::new(1.0, 0.0, 0.0, 1.0),
-                    AAB::from_cube(*cube).enlarge(0.005),
+                    AAB::from_cube(contact.cube).enlarge(0.005),
                 );
             }
 

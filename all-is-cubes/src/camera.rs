@@ -12,8 +12,8 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
-use crate::math::{FreeCoordinate, GridPoint, AAB};
-use crate::physics::Body;
+use crate::math::{FreeCoordinate, AAB};
+use crate::physics::{Body, Contact};
 use crate::raycast::{Ray, RaycastStep, Raycaster};
 use crate::space::{Grid, Space};
 use crate::tools::{Tool, ToolError};
@@ -51,7 +51,7 @@ pub struct Camera {
     velocity_input: Vector3<FreeCoordinate>,
 
     // TODO: Does this belong here? Or in the Space?
-    pub(crate) colliding_cubes: HashSet<GridPoint>,
+    pub(crate) colliding_cubes: HashSet<Contact>,
 
     tools: [Tool; 2],
 }
@@ -62,14 +62,7 @@ impl std::fmt::Debug for Camera {
             .field("body", &self.body)
             .field("auto_rotate", &self.auto_rotate)
             .field("velocity_input", &self.velocity_input.as_concise_debug())
-            .field(
-                "colliding_cubes",
-                &self
-                    .colliding_cubes
-                    .iter()
-                    .map(|p| p.as_concise_debug())
-                    .collect::<Vec<_>>(),
-            )
+            .field("colliding_cubes", &self.colliding_cubes)
             .finish()
     }
 }

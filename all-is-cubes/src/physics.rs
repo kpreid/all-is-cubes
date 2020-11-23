@@ -7,7 +7,7 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::math::{Face, FreeCoordinate, Geometry as _, GridPoint, AAB};
+use crate::math::{CubeFace, Face, FreeCoordinate, Geometry as _, AAB};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
@@ -20,6 +20,9 @@ const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 /// Gravity vector, in cubes/s².
 /// TODO: Should probably be a property of the Space or something.
 const GRAVITY: Vector3<FreeCoordinate> = Vector3::new(0., -20., 0.);
+
+/// An individual collision contact.
+pub type Contact = CubeFace;
 
 /// An object with a position, velocity, and collision volume.
 /// What it collides with is determined externally.
@@ -103,7 +106,7 @@ impl Body {
         mut collision_callback: CC,
     ) -> BodyStepInfo
     where
-        CC: FnMut(GridPoint),
+        CC: FnMut(Contact),
     {
         let dt = duration.as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
@@ -164,9 +167,9 @@ impl Body {
         mut delta_position: Vector3<FreeCoordinate>,
     ) -> (Vector3<FreeCoordinate>, MoveSegment)
     where
-        CC: FnMut(GridPoint),
+        CC: FnMut(Contact),
     {
-        let mut already_colliding: HashSet<GridPoint> = HashSet::new();
+        let mut already_colliding: HashSet<Contact> = HashSet::new();
         let (leading_corner, trailing_box) = self
             .collision_box
             .leading_corner_trailing_box(delta_position);
@@ -190,7 +193,10 @@ impl Body {
                 // it doesn't exist.
                 // TODO: Implement pushing out of shallow collisions.
                 for box_cube in collision_iter(ray_step.intersection_point(ray)) {
-                    already_colliding.insert(box_cube);
+                    already_colliding.insert(Contact {
+                        cube: box_cube,
+                        face: ray_step.face,
+                    });
                 }
                 continue;
             }
@@ -204,11 +210,15 @@ impl Body {
             for box_cube in
                 collision_iter(ray_step.intersection_point(ray) + delta_position * POSITION_EPSILON)
             {
+                let contact = Contact {
+                    cube: box_cube,
+                    face: ray_step.face,
+                };
                 if space.get_evaluated(box_cube).attributes.solid
-                    && !already_colliding.contains(&box_cube)
+                    && !already_colliding.contains(&contact)
                 {
                     hit_something = true;
-                    collision_callback(box_cube);
+                    collision_callback(contact);
                 }
             }
 
@@ -320,7 +330,7 @@ mod tests {
     use crate::blockgen::make_some_blocks;
     use crate::space::Space;
 
-    fn collision_noop(_: GridPoint) {}
+    fn collision_noop(_: Contact) {}
 
     fn test_body() -> Body {
         Body {
@@ -372,7 +382,7 @@ mod tests {
         assert_eq!(body.position.x, 2.0);
         assert_eq!(body.position.z, 0.0);
         assert!((body.position.y - 1.5).abs() < 1e-6, "{:?}", body.position);
-        assert_eq!(contacts, vec![GridPoint::new(0, 0, 0)]);
+        assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);
     }
 
     // TODO: test collision more
