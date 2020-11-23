@@ -317,6 +317,8 @@ impl Default for MoveSegment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockgen::make_some_blocks;
+    use crate::space::Space;
 
     fn collision_noop(_: GridPoint) {}
 
@@ -354,9 +356,27 @@ mod tests {
         assert_eq!(body.position, Point3::new(6.0, -133.0, 0.0));
     }
 
-    // TODO: test having all 3 move segments
+    #[test]
+    fn falling_collision() {
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set((0, 0, 0), &make_some_blocks(1)[0]).unwrap();
+        let mut body = Body {
+            velocity: Vector3::new(2.0, 0.0, 0.0),
+            flying: false,
+            ..test_body()
+        };
 
-    // TODO: test collision
+        let mut contacts = Vec::new();
+        body.step(Duration::from_secs(1), Some(&space), |c| contacts.push(c));
+
+        assert_eq!(body.position.x, 2.0);
+        assert_eq!(body.position.z, 0.0);
+        assert!((body.position.y - 1.5).abs() < 1e-6, "{:?}", body.position);
+        assert_eq!(contacts, vec![GridPoint::new(0, 0, 0)]);
+    }
+
+    // TODO: test collision more
+    // TODO: test having all 3 move segments
 
     #[test]
     fn look_at() {
