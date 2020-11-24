@@ -934,6 +934,7 @@ mod tests {
     use crate::math::GridPoint;
     use crate::universe::{Sink, Universe};
     use cgmath::EuclideanSpace as _;
+    use std::convert::TryInto;
 
     #[test]
     fn it_works() {
@@ -949,23 +950,23 @@ mod tests {
     /// set() returns Ok when the cube was changed or already equal.
     #[test]
     fn set_success() {
-        let blocks = make_some_blocks(2);
+        let [first, second]: [_; 2] = make_some_blocks(2).try_into().unwrap();
         let mut space = Space::empty_positive(1, 1, 1);
         let pt = GridPoint::origin();
-        assert_eq!(Ok(true), space.set(pt, &blocks[0]));
-        assert_eq!(&space[pt], &blocks[0]);
-        assert_eq!(Ok(false), space.set(pt, &blocks[0]));
-        assert_eq!(&space[pt], &blocks[0]);
-        assert_eq!(Ok(true), space.set(pt, &blocks[1]));
-        assert_eq!(&space[pt], &blocks[1]);
+        assert_eq!(Ok(true), space.set(pt, &first));
+        assert_eq!(&space[pt], &first);
+        assert_eq!(Ok(false), space.set(pt, &first));
+        assert_eq!(&space[pt], &first);
+        assert_eq!(Ok(true), space.set(pt, &second));
+        assert_eq!(&space[pt], &second);
     }
 
     #[test]
     fn set_failure_out_of_bounds() {
-        let blocks = make_some_blocks(1);
+        let block = make_some_blocks(1).swap_remove(0);
         let pt = GridPoint::new(1, 0, 0);
         let mut space = Space::empty_positive(1, 1, 1);
-        assert_eq!(Err(SetCubeError::OutOfBounds), space.set(pt, &blocks[0]));
+        assert_eq!(Err(SetCubeError::OutOfBounds), space.set(pt, &block));
         assert_eq!(Err(SetCubeError::OutOfBounds), space.set(pt, &AIR));
     }
 
@@ -988,32 +989,26 @@ mod tests {
     /// EvaluatedBlock data is updated when a new block index is allocated.
     #[test]
     fn set_updates_evaluated_on_added_block() {
-        let blocks = make_some_blocks(1);
+        let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 1, 1);
-        space.set((0, 0, 0), &blocks[0]).unwrap();
+        space.set((0, 0, 0), &block).unwrap();
         // Confirm the expected indices
         assert_eq!(Some(1), space.get_block_index((0, 0, 0)));
         assert_eq!(Some(0), space.get_block_index((1, 0, 0)));
         // Confirm the data is correct
-        assert_eq!(
-            space.get_evaluated((0, 0, 0)),
-            &blocks[0].evaluate().unwrap()
-        );
+        assert_eq!(space.get_evaluated((0, 0, 0)), &block.evaluate().unwrap());
     }
 
     /// EvaluatedBlock data is updated when a block index is reused.
     #[test]
     fn set_updates_evaluated_on_replaced_block() {
-        let blocks = make_some_blocks(1);
+        let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &blocks[0]).unwrap();
+        space.set((0, 0, 0), &block).unwrap();
         // Confirm the expected indices
         assert_eq!(Some(0), space.get_block_index((0, 0, 0)));
         // Confirm the data is correct
-        assert_eq!(
-            space.get_evaluated((0, 0, 0)),
-            &blocks[0].evaluate().unwrap()
-        );
+        assert_eq!(space.get_evaluated((0, 0, 0)), &block.evaluate().unwrap());
     }
 
     #[test]

@@ -97,22 +97,23 @@ mod tests {
 
     #[test]
     fn use_none() {
-        let blocks = make_some_blocks(1);
+        let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
         let (_universe, space_ref, cursor) = setup(|space| {
-            space.set((1, 0, 0), &blocks[0]).unwrap();
+            space.set((1, 0, 0), &existing).unwrap();
         });
         assert_eq!(
             Tool::None.use_tool(&space_ref, &cursor),
             Err(ToolError::NotUsable)
         );
         print_space(&*space_ref.borrow(), (-1., 1., 1.));
+        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &existing);
     }
 
     #[test]
     fn use_delete_block() {
-        let blocks = make_some_blocks(1);
+        let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
         let (_universe, space_ref, cursor) = setup(|space| {
-            space.set((1, 0, 0), &blocks[0]).unwrap();
+            space.set((1, 0, 0), &existing).unwrap();
         });
         assert_eq!(Tool::DeleteBlock.use_tool(&space_ref, &cursor), Ok(()));
         print_space(&*space_ref.borrow(), (-1., 1., 1.));
@@ -121,17 +122,17 @@ mod tests {
 
     #[test]
     fn use_place_block() {
-        let blocks = make_some_blocks(2);
+        let [existing, tool_block]: [Block; 2] = make_some_blocks(2).try_into().unwrap();
         let (_universe, space_ref, cursor) = setup(|space| {
-            space.set((1, 0, 0), &blocks[0]).unwrap();
+            space.set((1, 0, 0), &existing).unwrap();
         });
         assert_eq!(
-            Tool::PlaceBlock(blocks[1].clone()).use_tool(&space_ref, &cursor),
+            Tool::PlaceBlock(tool_block.clone()).use_tool(&space_ref, &cursor),
             Ok(())
         );
         print_space(&*space_ref.borrow(), (-1., 1., 1.));
-        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &blocks[0]);
-        assert_eq!(&space_ref.borrow()[(0, 0, 0)], &blocks[1]);
+        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &existing);
+        assert_eq!(&space_ref.borrow()[(0, 0, 0)], &tool_block);
     }
 
     #[test]

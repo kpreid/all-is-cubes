@@ -78,8 +78,11 @@ pub fn scale_color(block: Block, scalar: NotNan<f32>) -> Block {
 /// Generate some atom blocks with unspecified contents for testing.
 ///
 /// ```
-/// use all_is_cubes::blockgen::make_some_blocks;
-/// assert_eq!(make_some_blocks(3).len(), 3);
+/// # use all_is_cubes::blockgen::make_some_blocks;
+/// # use all_is_cubes::block::Block;
+///
+/// let blocks: Vec<Block> = make_some_blocks(3);
+/// assert_eq!(blocks.len(), 3);
 /// ```
 pub fn make_some_blocks(count: usize) -> Vec<Block> {
     // TODO: should this return an iterator? would anyone care?
