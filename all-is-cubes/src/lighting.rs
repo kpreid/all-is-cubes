@@ -189,7 +189,7 @@ impl Space {
             // optimized away.
             let (difference, _) = self.update_lighting_now_on(cube);
             max_difference = max_difference.max(difference);
-            if light_update_count >= 120 {
+            if light_update_count >= 200 {
                 break;
             }
         }
