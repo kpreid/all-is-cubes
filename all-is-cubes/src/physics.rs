@@ -183,7 +183,9 @@ impl Body {
 
         let leading_corner_abs = self.position + leading_corner;
         let ray = Ray::new(leading_corner_abs, delta_position);
-        for ray_step in ray.cast().within_grid(*space.grid()) {
+        // Note: no `.within_grid()` because that would not work when the leading
+        // corner is not within the grid.
+        for ray_step in ray.cast() {
             if ray_step.t_distance() >= 1.0 {
                 // Movement is unobstructed in this timestep.
                 break;
