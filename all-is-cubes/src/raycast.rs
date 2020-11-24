@@ -8,8 +8,7 @@
 //! looking for *raytracing*, forming an image from many rays, that's
 //! `all_is_cubes::raytracer`.
 
-use cgmath::{EuclideanSpace, Point3, Vector3};
-use num_traits::identities::Zero as _;
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use crate::math::{FreeCoordinate, Geometry, GridCoordinate};
 use crate::space::Grid;
@@ -60,6 +59,13 @@ impl Ray {
     pub fn cast(&self) -> Raycaster {
         Raycaster::new(self.origin, self.direction)
     }
+
+    fn advance(self, t: FreeCoordinate) -> Self {
+        Self {
+            origin: self.origin + t * self.direction,
+            direction: self.direction,
+        }
+    }
 }
 
 impl Geometry for Ray {
@@ -104,6 +110,7 @@ pub struct Raycaster {
     // if we took a step sufficient to cross a cube boundary along that axis
     // (i.e. change the integer part of the coordinate) in the components of
     // t_max.
+    ray: Ray,
     /// Have we not yet produced the origin cube itself?
     emit_current: bool,
     /// Cube we're in; always the next cube to return from the iterator.
@@ -164,6 +171,7 @@ impl Raycaster {
         }
 
         Self {
+            ray: Ray::new(origin, direction),
             emit_current: true,
             cube: origin.map(|x| x.floor() as GridCoordinate),
             step: direction.map(improved_signum),
@@ -184,6 +192,10 @@ impl Raycaster {
             self.grid = Some(grid);
         } else {
             unimplemented!("multiple uses of .within_grid()");
+        }
+        if false {
+            // Not actually faster, so disabled for now. See function doc.
+            self.fast_forward();
         }
         self
     }
@@ -275,6 +287,60 @@ impl Raycaster {
             }
         }
         false
+    }
+
+    /// In the case where the current position is outside the grid but might intersect
+    /// the grid later, attempt to move the position to intersect sooner, in a fashion
+    /// we'd hope is more efficient than single stepping.
+    ///
+    /// However, benchmarks have not shown it to be of substantial benefit, so it's
+    /// not enabled currently. Future use cases might differ, so I'm keeping the code
+    /// around and compiling at least "until 1.0"...
+    #[inline(always)]
+    fn fast_forward(&mut self) {
+        let grid: Grid = self.grid.unwrap();
+
+        // Find the point which is the origin of all three planes that we want to
+        // intersect with. (Strictly speaking, this could be combined with the next
+        // loop, but it seems more elegant to have a well-defined point.)
+        let mut plane_origin = grid.lower_bounds();
+        for axis in 0..3 {
+            if self.step[axis] < 0 {
+                // Iff the ray is going negatively, then we must use the upper bound
+                // for the plane origin in this axis. Otherwise, either it doesn't
+                // matter (parallel) or should be lower bound.
+                plane_origin[axis] = grid.upper_bounds()[axis];
+            }
+        }
+
+        // Perform intersections.
+        let mut max_t: FreeCoordinate = 0.0;
+        for axis in 0..3 {
+            let mut plane_normal = Vector3::zero();
+            let direction = self.step[axis];
+            if direction == 0 {
+                // Parallel ray; no intersection.
+                continue;
+            }
+            plane_normal[axis] = direction;
+            let intersection_t = ray_plane_intersection(self.ray, plane_origin, plane_normal);
+            max_t = max_t.max(intersection_t);
+        }
+
+        // TODO: Right test?
+        if max_t > self.last_t_distance {
+            let t_start = max_t - 0.01;
+            // TODO: bad epsilon
+            let mut new_state = self.ray.advance(t_start).cast();
+
+            new_state.grid = Some(grid); // .within_grid() would recurse
+
+            // Adapt t values
+            new_state.t_max = new_state.t_max.map(|t| t + t_start);
+            new_state.last_t_distance = t_start;
+
+            *self = new_state;
+        }
     }
 }
 
@@ -470,6 +536,19 @@ fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeC
         result
     );
     result
+}
+
+fn ray_plane_intersection(
+    ray: Ray,
+    plane_origin: Point3<GridCoordinate>,
+    plane_normal: Vector3<GridCoordinate>,
+) -> FreeCoordinate {
+    let plane_origin = plane_origin.map(FreeCoordinate::from);
+    let plane_normal = plane_normal.map(FreeCoordinate::from);
+    let relative_position = plane_origin - ray.origin;
+
+    // Compute the intersection 't' value.
+    relative_position.dot(plane_normal) / ray.direction.dot(plane_normal)
 }
 
 #[cfg(test)]
