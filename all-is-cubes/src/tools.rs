@@ -27,17 +27,25 @@ impl Tool {
     pub fn use_tool(&mut self, space: &URef<Space>, cursor: &Cursor) -> Result<(), ToolError> {
         match self {
             Self::None => Err(ToolError::NotUsable),
-            Self::DeleteBlock => tool_set_cube(space, cursor.place.cube, &AIR),
+            Self::DeleteBlock => tool_set_cube(space, cursor.place.cube, &cursor.block, &AIR),
             // TODO: test cube behind is unoccupied
-            Self::PlaceBlock(block) => tool_set_cube(space, cursor.place.adjacent(), block),
+            Self::PlaceBlock(block) => tool_set_cube(space, cursor.place.adjacent(), &AIR, block),
         }
     }
 }
 
 // Generic handler for a tool that replaces one cube.
-fn tool_set_cube(space: &URef<Space>, cube: GridPoint, block: &Block) -> Result<(), ToolError> {
+fn tool_set_cube(
+    space: &URef<Space>,
+    cube: GridPoint,
+    old_block: &Block,
+    new_block: &Block,
+) -> Result<(), ToolError> {
     let mut space = space.try_borrow_mut().map_err(ToolError::SpaceRef)?;
-    space.set(cube, block).map_err(ToolError::SetCube)?;
+    if &space[cube] != old_block {
+        return Err(ToolError::NotUsable);
+    }
+    space.set(cube, new_block).map_err(ToolError::SetCube)?;
 
     // Gimmick: update lighting ASAP in order to make it less likely that non-updated
     // light is rendered. This is particularly needful for tools because their effects
@@ -68,6 +76,7 @@ mod tests {
     use crate::raycast::Raycaster;
     use crate::raytracer::print_space;
     use crate::universe::Universe;
+    use std::convert::TryInto;
 
     fn setup<F: FnOnce(&mut Space)>(f: F) -> (Universe, URef<Space>, Cursor) {
         let mut universe = Universe::new();
@@ -123,5 +132,22 @@ mod tests {
         print_space(&*space_ref.borrow(), (-1., 1., 1.));
         assert_eq!(&space_ref.borrow()[(1, 0, 0)], &blocks[0]);
         assert_eq!(&space_ref.borrow()[(0, 0, 0)], &blocks[1]);
+    }
+
+    #[test]
+    fn use_place_block_with_obstacle() {
+        let [existing, tool_block, obstacle]: [Block; 3] = make_some_blocks(3).try_into().unwrap();
+        let (_universe, space_ref, cursor) = setup(|space| {
+            space.set((1, 0, 0), &existing).unwrap();
+        });
+        // Place the obstacle after the raycast
+        space_ref.borrow_mut().set((0, 0, 0), &obstacle).unwrap();
+        assert_eq!(
+            Tool::PlaceBlock(tool_block).use_tool(&space_ref, &cursor),
+            Err(ToolError::NotUsable)
+        );
+        print_space(&*space_ref.borrow(), (-1., 1., 1.));
+        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &existing);
+        assert_eq!(&space_ref.borrow()[(0, 0, 0)], &obstacle);
     }
 }
