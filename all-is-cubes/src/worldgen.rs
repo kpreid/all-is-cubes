@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 
 use crate::block::Block;
-use crate::math::{FreeCoordinate, GridCoordinate, Rgb, Rgba};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, Space};
 
@@ -115,18 +115,21 @@ pub(crate) fn physics_lab(shell_radius: u16, planet_radius: u16) -> Space {
     }
 
     // Inner surface.
-    for x in -planet_radius..=planet_radius {
-        for y in -planet_radius..=planet_radius {
-            for z in -planet_radius..=planet_radius {
-                let block = if (x + y + z).rem_euclid(2) == 0 {
+    space
+        .fill(
+            Grid::from_lower_upper(
+                Point3::new(-1, -1, -1) * planet_radius,
+                Point3::new(1, 1, 1) * planet_radius,
+            ),
+            |GridPoint { x, y, z }| {
+                Some(if (x + y + z).rem_euclid(2) == 0 {
                     &floor_1
                 } else {
                     &floor_2
-                };
-                space.set((x, y, z), block).unwrap();
-            }
-        }
-    }
+                })
+            },
+        )
+        .unwrap();
 
     space
 }
