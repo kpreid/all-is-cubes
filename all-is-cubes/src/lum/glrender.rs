@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Point2, Vector2};
+use cgmath::{Angle as _, Matrix4, Point2, Vector2, Vector3};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
@@ -18,7 +18,8 @@ use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::Vertex;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
-use crate::math::{AAB, RGBA};
+use crate::math::{FreeCoordinate, AAB, RGBA};
+use crate::space::Space;
 use crate::universe::URef;
 use crate::util::WarningsResult;
 
@@ -47,10 +48,12 @@ where
 
     // Rendering state
     camera: Option<URef<Camera>>,
-    space_renderer: Option<SpaceRenderer>,
+    world_renderer: Option<SpaceRenderer>,
+    ui_renderer: Option<SpaceRenderer>,
+    world_proj: ProjectionHelper,
+    ui_proj: ProjectionHelper,
 
     // Miscellaneous
-    proj: ProjectionHelper,
     pub cursor_result: Option<Cursor>, // TODO: give this an accessor
 }
 
@@ -65,7 +68,6 @@ where
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
         let (block_program, warnings) = prepare_block_program(&mut surface)?;
 
-        let proj = ProjectionHelper::new(1.0, viewport.viewport_px);
         let back_buffer =
             luminance::framebuffer::Framebuffer::back_buffer(&mut surface, viewport.viewport_dev)
                 .unwrap(); // TODO error handling
@@ -75,8 +77,10 @@ where
                 back_buffer,
                 block_program,
                 camera: None,
-                space_renderer: None,
-                proj,
+                world_renderer: None,
+                ui_renderer: None,
+                world_proj: ProjectionHelper::new(1.0, viewport.viewport_px),
+                ui_proj: ProjectionHelper::new(1.0, viewport.viewport_px),
                 cursor_result: None,
             },
             warnings,
@@ -85,7 +89,27 @@ where
 
     /// Sets the expected viewport dimensions. Use in case of window resizing.
     pub fn set_viewport(&mut self, viewport: Viewport) {
-        self.proj.set_viewport(viewport.viewport_px);
+        self.world_proj.set_viewport(viewport.viewport_px);
+
+        if let Some(ui_renderer) = &self.ui_renderer {
+            self.ui_proj.set_viewport(viewport.viewport_px);
+
+            // TODO: this belongs in apps code
+            let grid = *ui_renderer.space().borrow().grid();
+            let mut ui_center = grid.center();
+            ui_center.z = grid.upper_bounds().z.into(); // align with "front" face.
+
+            // View distance which will put the front of the UI space exactly aligned with the viewport edges...at least vertically.
+            let view_distance =
+                FreeCoordinate::from(grid.size().y) * (self.ui_proj.fov_y() / 2.).cot() / 2.;
+
+            self.ui_proj.set_view_matrix(Matrix4::look_at(
+                ui_center + Vector3::new(0., 0., view_distance),
+                ui_center,
+                Vector3::new(0., 1., 0.),
+            ));
+        }
+
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut self.surface,
             viewport.viewport_dev,
@@ -98,6 +122,10 @@ where
         self.camera = camera;
     }
 
+    pub fn set_ui_space(&mut self, space: Option<URef<Space>>) {
+        self.ui_renderer = space.map(SpaceRenderer::new);
+    }
+
     /// Draw a frame.
     pub fn render_frame(&mut self) -> RenderInfo {
         let mut info = RenderInfo::default();
@@ -108,23 +136,31 @@ where
         });
         let surface = &mut self.surface;
         let block_program = &mut self.block_program;
-        let projection_matrix = self.proj.projection();
+        let world_projection_matrix = self.world_proj.projection();
+        let ui_projection_matrix = self.ui_proj.projection();
 
         // Update cursor state. This is, strictly speaking, not rendering, but it is closely
         // related in that the cursor should match the pixels being drawn.
         // TODO: Figure out how to lay this out with more separation of concerns, though.
-        self.proj.set_view_matrix(camera.view());
+        self.world_proj.set_view_matrix(camera.view());
         self.cursor_result = cursor_raycast(
-            self.proj.project_cursor_into_world().cast(),
+            self.world_proj.project_cursor_into_world().cast(),
             &*camera.space.borrow(),
         );
 
         // Prepare Tess and Texture for space.
-        if self.space_renderer.as_ref().map(|sr| sr.space()) != Some(&camera.space) {
-            self.space_renderer = Some(SpaceRenderer::new(camera.space.clone()));
+        if self.world_renderer.as_ref().map(|sr| sr.space()) != Some(&camera.space) {
+            self.world_renderer = Some(SpaceRenderer::new(camera.space.clone()));
         }
-        let space_renderer = self.space_renderer.as_mut().unwrap();
-        let space_output = space_renderer.prepare_frame(surface, camera.view());
+        let world_renderer = self.world_renderer.as_mut().unwrap();
+        let world_output = world_renderer.prepare_frame(surface, camera.view());
+
+        // TODO: wrong view matrix
+        let ui_output = if let Some(ui_renderer) = &mut self.ui_renderer {
+            Some(ui_renderer.prepare_frame(surface, self.ui_proj.view()))
+        } else {
+            None
+        };
 
         let debug_lines_tess = {
             let mut v: Vec<Vertex> = Vec::new();
@@ -176,28 +212,26 @@ where
         // TODO: cache
         let cursor_tess = make_cursor_tess(surface, &self.cursor_result);
 
-        let render = surface
+        surface
             .new_pipeline_gate()
             .pipeline(
                 &self.back_buffer,
                 // TODO: port skybox cube map code
                 &PipelineState::default()
-                    .set_clear_color(space_output.sky_color.with_alpha_one().into()),
+                    .set_clear_color(world_output.sky_color.with_alpha_one().into()),
                 |pipeline, mut shading_gate| {
-                    let space_output_bound = space_output.bind(&pipeline)?;
-
+                    let world_output_bound = world_output.bind(&pipeline)?;
                     shading_gate.shade(block_program, |mut program_iface, u, mut render_gate| {
-                        u.set_projection_matrix(&mut program_iface, projection_matrix);
-
                         // Render space (and cursor).
-                        u.set_view_matrix(&mut program_iface, space_output_bound.view_matrix);
+                        u.set_projection_matrix(&mut program_iface, world_projection_matrix);
+                        u.set_view_matrix(&mut program_iface, world_output_bound.view_matrix);
                         u.set_block_texture(
                             &mut program_iface,
-                            &space_output_bound.bound_block_texture,
+                            &world_output_bound.bound_block_texture,
                         );
                         render_gate.render(&render_state, |mut tess_gate| {
                             // TODO: should be `info.space += ...`
-                            info.space = space_output_bound.render(&mut tess_gate)?;
+                            info.space = world_output_bound.render(&mut tess_gate)?;
 
                             tess_gate.render(&cursor_tess)?;
 
@@ -206,26 +240,59 @@ where
                             }
 
                             Ok(())
-                        })?;
-
-                        Ok(())
+                        })
                     })
                 },
             )
-            .assume(); // TODO error handling
+            .assume()
+            .into_result()
+            .unwrap();
 
-        if !render.is_ok() {
-            panic!("not ok"); // TODO what good error handling goes here?
-        }
+        surface
+            .new_pipeline_gate()
+            .pipeline(
+                &self.back_buffer,
+                // TODO: port skybox cube map code
+                &PipelineState::default().enable_clear_color(false),
+                |pipeline, mut shading_gate| {
+                    if let Some(ui_output) = ui_output {
+                        let ui_bound = ui_output.bind(&pipeline)?;
+
+                        shading_gate.shade(
+                            block_program,
+                            |mut program_iface, u, mut render_gate| {
+                                // TODO: duplicated code for uniform setup.
+                                u.set_projection_matrix(&mut program_iface, ui_projection_matrix);
+                                u.set_view_matrix(&mut program_iface, ui_bound.view_matrix);
+                                u.set_block_texture(
+                                    &mut program_iface,
+                                    &ui_bound.bound_block_texture,
+                                );
+                                render_gate.render(&render_state, |mut tess_gate| {
+                                    let _ = ui_bound.render(&mut tess_gate)?;
+                                    Ok(())
+                                })?;
+
+                                Ok(())
+                            },
+                        )?;
+                    }
+
+                    Ok(())
+                },
+            )
+            .assume()
+            .into_result()
+            .unwrap();
 
         // There is no swap_buffers operation because WebGL implicitly does so.
         info
     }
 
     /// Set the current cursor position, in pixel coordinates. Affects mouseover/click results.
-    // TODO: This is a workaround for self.proj being private; arguably doesn't even belong there or here. Find a better structure.
+    // TODO: This is a workaround for self.world_proj being private; arguably doesn't even belong there or here. Find a better structure.
     pub fn set_cursor_position(&mut self, position: Point2<usize>) {
-        self.proj.set_cursor_position(position);
+        self.world_proj.set_cursor_position(position);
     }
 }
 

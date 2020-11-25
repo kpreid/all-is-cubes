@@ -57,6 +57,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
             JsValue::from_str(&*error)
         })?;
     renderer.set_camera(Some(app.camera().clone()));
+    renderer.set_ui_space(Some(app.ui_space().clone()));
 
     static_dom.scene_info_text_node.append_data("\nGL ready.")?;
 

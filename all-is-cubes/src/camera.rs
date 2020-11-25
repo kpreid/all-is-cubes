@@ -4,8 +4,8 @@
 //! Miscellaneous display and player-character stuff.
 
 use cgmath::{
-    Deg, ElementWise, EuclideanSpace, InnerSpace, Matrix3, Matrix4, Point2, Point3, SquareMatrix,
-    Transform, Vector2, Vector3, Vector4,
+    Deg, ElementWise as _, EuclideanSpace as _, InnerSpace as _, Matrix3, Matrix4, Point2, Point3,
+    SquareMatrix, Transform, Vector2, Vector3, Vector4,
 };
 use num_traits::identities::Zero;
 use std::collections::{HashMap, HashSet};
@@ -259,6 +259,10 @@ impl ProjectionHelper {
         }
     }
 
+    pub fn fov_y(&self) -> Deg<FreeCoordinate> {
+        Deg(90.0)
+    }
+
     /// Set the current cursor position. In the same pixel units as `set_viewport`.
     pub fn set_cursor_position(&mut self, position: Point2<usize>) {
         self.cursor_ndc_position = Vector2::new(
@@ -294,6 +298,11 @@ impl ProjectionHelper {
         self.projection
     }
 
+    /// Returns a view matrix suitable for OpenGL use.
+    pub fn view(&self) -> M {
+        self.view
+    }
+
     /// Converts a screen position in normalized device coordinates (as produced by
     /// [`normalize_pixel_x`](Self::normalize_pixel_x) and
     /// [`normalize_pixel_y`](Self::normalize_pixel_y)) into a ray in world space.
@@ -321,7 +330,7 @@ impl ProjectionHelper {
         let aspect_ratio = self.pixel_aspect_ratio
             * ((self.viewport.x as FreeCoordinate) / (self.viewport.y as FreeCoordinate));
         self.projection = cgmath::perspective(
-            /* fovy: */ Deg(90.0),
+            self.fov_y(),
             aspect_ratio,
             /* near: */ 0.1,
             /* far: */ 2000.0,
