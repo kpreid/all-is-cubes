@@ -5,7 +5,9 @@
 
 use crate::camera::{Camera, InputProcessor};
 use crate::demo_content::new_universe_with_stuff;
+use crate::space::Space;
 use crate::universe::{FrameClock, URef, Universe, UniverseStepInfo};
+use crate::vui::Vui;
 
 /// Everything that a game application needs regardless of platform.
 ///
@@ -21,34 +23,40 @@ pub struct AllIsCubesAppState {
     /// `AllIsCubesAppState` will handle calling [`InputProcessor::apply_input`].
     pub input_processor: InputProcessor,
 
-    universe: Universe,
-    camera: URef<Camera>,
+    game_universe: Universe,
+    game_camera: URef<Camera>,
+
+    ui: Vui,
 }
 
 impl AllIsCubesAppState {
     /// Construct a new `AllIsCubesAppState` using the result of
     /// [`new_universe_with_stuff()`] as initial content.
     pub fn new() -> Self {
-        let universe = new_universe_with_stuff();
+        let game_universe = new_universe_with_stuff();
         Self {
             frame_clock: FrameClock::new(),
             input_processor: InputProcessor::new(),
-            camera: universe.get_default_camera(),
-            universe,
+            game_camera: game_universe.get_default_camera(),
+            game_universe,
+            ui: Vui::new(),
         }
     }
 
     /// Returns a reference to the [`Camera`] that should be shown to the user.
     pub fn camera(&self) -> &URef<Camera> {
-        &self.camera
+        &self.game_camera
     }
 
     /// Returns a mutable reference to the [`Universe`].
     pub fn universe_mut(&mut self) -> &mut Universe {
-        &mut self.universe
+        &mut self.game_universe
     }
 
-    // TODO: Universe should have a proper info struct return
+    pub fn ui_space(&self) -> &URef<Space> {
+        &self.ui.current_space()
+    }
+
     /// Steps the universe if the `FrameClock` says it's time to do so.
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
         if self.frame_clock.should_step() {
@@ -57,7 +65,9 @@ impl AllIsCubesAppState {
             self.input_processor
                 .apply_input(&mut *self.camera().borrow_mut(), step_length);
             self.input_processor.step(step_length);
-            Some(self.universe.step(step_length))
+            let mut info = self.game_universe.step(step_length);
+            info += self.ui.step(step_length);
+            Some(info)
         } else {
             None
         }
