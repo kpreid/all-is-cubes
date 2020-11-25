@@ -61,10 +61,10 @@ impl Universe {
     }
 
     /// Advance time for all members.
-    pub fn step(&mut self, timestep: Duration) -> (SpaceStepInfo, ()) {
-        let mut space_info = SpaceStepInfo::default();
+    pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
+        let mut info = UniverseStepInfo::default();
         for space in self.spaces.values() {
-            space_info += space
+            info.space_step += space
                 .try_borrow_mut()
                 .expect("space borrowed during universe.step()")
                 .step(timestep);
@@ -75,7 +75,7 @@ impl Universe {
                 .expect("camera borrowed during universe.step()")
                 .step(timestep);
         }
-        (space_info, ())
+        info
     }
 
     /// Inserts a new object without giving it a specific name, and returns
@@ -357,6 +357,20 @@ impl<T> URootRef<T> {
     /// Borrow the value mutably, in the sense of [`RefCell::try_borrow_mut`].
     fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, RefError> {
         self.downgrade().try_borrow_mut()
+    }
+}
+
+/// Performance data returned by [`Universe::step`]. The exact contents of this structure
+/// are unstable; use only `Debug` formatting to examine its contents unless you have
+/// a specific need for one of the values.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct UniverseStepInfo {
+    space_step: SpaceStepInfo,
+}
+impl std::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
+    fn add_assign(&mut self, other: Self) {
+        self.space_step += other.space_step;
     }
 }
 

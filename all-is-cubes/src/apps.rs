@@ -5,8 +5,7 @@
 
 use crate::camera::{Camera, InputProcessor};
 use crate::demo_content::new_universe_with_stuff;
-use crate::space::SpaceStepInfo;
-use crate::universe::{FrameClock, URef, Universe};
+use crate::universe::{FrameClock, URef, Universe, UniverseStepInfo};
 
 /// Everything that a game application needs regardless of platform.
 ///
@@ -51,7 +50,7 @@ impl AllIsCubesAppState {
 
     // TODO: Universe should have a proper info struct return
     /// Steps the universe if the `FrameClock` says it's time to do so.
-    pub fn maybe_step_universe(&mut self) -> Option<(SpaceStepInfo, ())> {
+    pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
         if self.frame_clock.should_step() {
             let step_length = self.frame_clock.step_length();
             self.frame_clock.did_step();

@@ -17,7 +17,7 @@ use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::Key;
 use all_is_cubes::cgmath::Point2;
 use all_is_cubes::lum::glrender::GLRenderer;
-use all_is_cubes::space::SpaceStepInfo;
+use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::Warnings;
 
 use crate::js_bindings::GuiHelpers;
@@ -87,7 +87,7 @@ struct WebGameRoot {
     step_callback: Closure<dyn FnMut()>,
     step_callback_scheduled: bool,
     last_raf_timestamp: f64,
-    last_step_info: SpaceStepInfo,
+    last_step_info: UniverseStepInfo,
 }
 
 impl WebGameRoot {
@@ -109,7 +109,7 @@ impl WebGameRoot {
             step_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
             step_callback_scheduled: false,
             last_raf_timestamp: 0.0, // TODO better initial value or special case
-            last_step_info: SpaceStepInfo::default(),
+            last_step_info: UniverseStepInfo::default(),
         }));
 
         // Add the self-references.
@@ -271,8 +271,8 @@ impl WebGameRoot {
         self.step_callback_scheduled = false;
         // Allow 2 steps of catch-up. TODO: This policy should probably live in FrameClock instead.
         for _ in 0..2 {
-            if let Some((space_step_info, ())) = self.app.maybe_step_universe() {
-                self.last_step_info = space_step_info;
+            if let Some(universe_step_info) = self.app.maybe_step_universe() {
+                self.last_step_info = universe_step_info;
             }
         }
     }
