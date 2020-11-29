@@ -6,6 +6,7 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
+use cgmath::Vector2;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::Rectangle;
@@ -14,7 +15,7 @@ use std::time::Duration;
 
 use crate::block::{Block, BlockAttributes, AIR};
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
-use crate::math::{FreeCoordinate, GridPoint, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
@@ -31,7 +32,7 @@ pub(crate) struct Vui {
 impl Vui {
     pub fn new() -> Self {
         let mut universe = Universe::new();
-        let hud_space = draw_hud_space(&mut universe);
+        let hud_space = HudLayout::default().new_space(&mut universe);
 
         Self {
             universe,
@@ -51,32 +52,70 @@ impl Vui {
     }
 }
 
-fn draw_hud_space(universe: &mut Universe) -> URef<Space> {
-    // TODO: need to dynamically adjust aspect ratio
-    // TODO: ...and when we do, make sure bad sizes don't cause us to crash
-    let w = 40;
-    let h = 30;
-    let grid = Grid::new((-1, -1, 0), (w + 2, h + 2, 10));
-    let mut space = Space::empty(grid);
+#[derive(Clone, Debug, PartialEq)]
+struct HudLayout {
+    size: Vector2<GridCoordinate>,
+    toolbar_positions: usize,
+}
 
-    if true {
-        // Visualization of the bounds of the space we're drawing.
-        let frame_block = Block::from(RGBA::new(0.0, 1.0, 1.0, 1.0));
-        let mut add_frame = |z| {
-            space
-                .fill(&Grid::new((-1, -1, z), (w + 2, h + 2, 1)), |_| {
-                    Some(&frame_block)
-                })
-                .unwrap();
-            space
-                .fill(&Grid::new((0, 0, z), (w, h, 1)), |_| Some(&AIR))
-                .unwrap();
-        };
-        add_frame(0);
-        add_frame(grid.upper_bounds().z - 1);
+// TODO: This will probably not make sense once we have aspect ratio adaptations
+impl Default for HudLayout {
+    fn default() -> Self {
+        Self {
+            size: Vector2::new(24, 18),
+            toolbar_positions: 10,
+        }
+    }
+}
+
+impl HudLayout {
+    fn grid(&self) -> Grid {
+        Grid::new((-1, -1, 0), (self.size.x + 2, self.size.y + 2, 10))
     }
 
-    universe.insert_anonymous(space)
+    // TODO: taking the entire Universe doesn't seem like the best interface
+    // but we want room to set up new blocks. Figure out a route for that.
+    // TODO: validate this doesn't crash on wonky sizes.
+    fn new_space(&self, universe: &mut Universe) -> URef<Space> {
+        let Vector2 { x: w, y: h } = self.size;
+        let grid = self.grid();
+        let mut space = Space::empty(grid);
+
+        if true {
+            // Visualization of the bounds of the space we're drawing.
+            let frame_block = Block::from(RGBA::new(0.0, 1.0, 1.0, 1.0));
+            let mut add_frame = |z| {
+                space
+                    .fill(&Grid::new((-1, -1, z), (w + 2, h + 2, 1)), |_| {
+                        Some(&frame_block)
+                    })
+                    .unwrap();
+                space
+                    .fill(&Grid::new((0, 0, z), (w, h, 1)), |_| Some(&AIR))
+                    .unwrap();
+            };
+            add_frame(0);
+            add_frame(grid.upper_bounds().z - 1);
+        }
+
+        for (index, block) in crate::blockgen::make_some_blocks(self.toolbar_positions)
+            .into_iter()
+            .enumerate()
+        {
+            // TODO: don't let the out of bounds error we might be ignoring arise
+            let _ = space.set(self.tool_icon_position(index), &block);
+        }
+
+        universe.insert_anonymous(space)
+    }
+
+    fn tool_icon_position(&self, index: usize) -> GridPoint {
+        let stepping = 2;
+        let x_start =
+            (self.size.x - (self.toolbar_positions as GridCoordinate - 1) * stepping + 1) / 2;
+        // TODO: set depth sensibly
+        GridPoint::new(x_start + (index as GridCoordinate) * stepping, 0, 9)
+    }
 }
 
 #[allow(unused)] // TODO: not yet used for real
