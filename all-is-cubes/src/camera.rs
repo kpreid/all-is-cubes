@@ -207,6 +207,7 @@ pub struct ProjectionHelper {
     /// Width divided by height of a single pixel.
     pixel_aspect_ratio: FreeCoordinate,
     view: M,
+    fov_y: Deg<FreeCoordinate>,
 
     // Derived data
     projection: M,
@@ -232,6 +233,7 @@ impl ProjectionHelper {
         let mut new_self = Self {
             viewport,
             pixel_aspect_ratio,
+            fov_y: Deg(90.0),
             projection: M::identity(), // overwritten immediately
             view: M::identity(),
             inverse_projection_view: M::identity(), // overwritten immediately
@@ -259,8 +261,20 @@ impl ProjectionHelper {
         }
     }
 
+    /// Returns the field of view, expressed in degrees on the vertical axis (that is, the
+    /// horizontal field of view depends on the viewport's aspect ratio).
     pub fn fov_y(&self) -> Deg<FreeCoordinate> {
-        Deg(90.0)
+        self.fov_y
+    }
+
+    /// Sets the field of view, in degrees on the vertical axis, and recalculates matrices
+    /// to be suitable for the new projection.
+    pub fn set_fov_y(&mut self, fov_y: Deg<FreeCoordinate>) {
+        if fov_y.0.is_nan() {
+            return; // TODO: panic? reset to default?
+        }
+        self.fov_y = Deg(fov_y.0.min(179.).max(1.));
+        self.compute_matrices();
     }
 
     /// Set the current cursor position. In the same pixel units as `set_viewport`.
