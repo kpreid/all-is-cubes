@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Angle as _, Matrix4, Point2, Vector2, Vector3};
+use cgmath::{Angle as _, Deg, Matrix4, Point2, Vector2, Vector3};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
@@ -67,10 +67,14 @@ where
     pub fn new(mut surface: C, viewport: Viewport) -> WarningsResult<Self, String, String> {
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
         let (block_program, warnings) = prepare_block_program(&mut surface)?;
-
         let back_buffer =
             luminance::framebuffer::Framebuffer::back_buffer(&mut surface, viewport.viewport_dev)
                 .unwrap(); // TODO error handling
+
+        // TODO: this belongs in UI setup code
+        let mut ui_proj = ProjectionHelper::new(1.0, viewport.viewport_px);
+        ui_proj.set_fov_y(Deg(30.));
+
         Ok((
             Self {
                 surface,
@@ -80,7 +84,7 @@ where
                 world_renderer: None,
                 ui_renderer: None,
                 world_proj: ProjectionHelper::new(1.0, viewport.viewport_px),
-                ui_proj: ProjectionHelper::new(1.0, viewport.viewport_px),
+                ui_proj,
                 cursor_result: None,
             },
             warnings,
