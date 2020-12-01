@@ -3,9 +3,11 @@
 
 //! Means by which the player may alter or interact with the world.
 
+use std::borrow::Cow;
+
 use crate::block::{Block, AIR};
 use crate::camera::Cursor;
-use crate::math::GridPoint;
+use crate::math::{GridPoint, RGBA};
 use crate::space::{SetCubeError, Space};
 use crate::universe::{RefError, URef};
 
@@ -30,6 +32,26 @@ impl Tool {
             Self::DeleteBlock => tool_set_cube(space, cursor.place.cube, &cursor.block, &AIR),
             // TODO: test cube behind is unoccupied
             Self::PlaceBlock(block) => tool_set_cube(space, cursor.place.adjacent(), &AIR, block),
+        }
+    }
+
+    /// Return a block to use as an icon for this tool. For [`Tool::PlaceBlock`], has the
+    /// same appearance as the block to be placed.
+    ///
+    /// TODO (API instability): When we have fully implemented generalized block sizes we
+    /// will need a parameter
+    /// here to be able to rescale the icon to match.
+    ///
+    /// TODO (API instability): Eventually we will want additional decorations like "use
+    /// count" that probably should not need to be painted into the block itself.
+
+    pub fn icon(&self) -> Cow<Block> {
+        match self {
+            Self::None => Cow::Borrowed(&AIR),
+            // TODO: draw an "x" icon or something.
+            Self::DeleteBlock => Cow::Owned(RGBA::new(1., 0., 0., 1.).into()),
+            // TODO: Once blocks have behaviors, we need to defuse them for this use.
+            Self::PlaceBlock(block) => Cow::Borrowed(&block),
         }
     }
 }
@@ -96,6 +118,11 @@ mod tests {
     // TODO: Work on making these tests less verbose.
 
     #[test]
+    fn icon_none() {
+        assert_eq!(*Tool::None.icon(), AIR);
+    }
+
+    #[test]
     fn use_none() {
         let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
         let (_universe, space_ref, cursor) = setup(|space| {
@@ -110,6 +137,12 @@ mod tests {
     }
 
     #[test]
+    fn icon_delete_block() {
+        // TODO: Check "is the right resolution" once there's an actual icon.
+        let _ = Tool::DeleteBlock.icon();
+    }
+
+    #[test]
     fn use_delete_block() {
         let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
         let (_universe, space_ref, cursor) = setup(|space| {
@@ -118,6 +151,12 @@ mod tests {
         assert_eq!(Tool::DeleteBlock.use_tool(&space_ref, &cursor), Ok(()));
         print_space(&*space_ref.borrow(), (-1., 1., 1.));
         assert_eq!(&space_ref.borrow()[(1, 0, 0)], &AIR);
+    }
+
+    #[test]
+    fn icon_place_block() {
+        let [block]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
+        assert_eq!(*Tool::PlaceBlock(block.clone()).icon(), block);
     }
 
     #[test]
