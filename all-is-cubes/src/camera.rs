@@ -53,7 +53,8 @@ pub struct Camera {
     // TODO: Does this belong here? Or in the Space?
     pub(crate) colliding_cubes: HashSet<Contact>,
 
-    tools: [Tool; 2],
+    // TODO: Figure out what access is needed and add accessors
+    pub(crate) tools: [Tool; 2],
 }
 
 impl std::fmt::Debug for Camera {

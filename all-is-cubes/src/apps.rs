@@ -34,12 +34,18 @@ impl AllIsCubesAppState {
     /// [`new_universe_with_stuff()`] as initial content.
     pub fn new() -> Self {
         let game_universe = new_universe_with_stuff();
+        let game_camera = game_universe.get_default_camera();
+        let mut ui = Vui::new();
+
+        // TODO: this will need to be done on a notification/invalidation basis
+        ui.set_tools(&game_camera.borrow().tools);
+
         Self {
             frame_clock: FrameClock::new(),
             input_processor: InputProcessor::new(),
-            game_camera: game_universe.get_default_camera(),
+            game_camera,
             game_universe,
-            ui: Vui::new(),
+            ui,
         }
     }
 

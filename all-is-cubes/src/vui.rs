@@ -17,6 +17,7 @@ use crate::block::{Block, BlockAttributes, AIR};
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
 use crate::space::{Grid, Space};
+use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
 /// `Vui` builds user interfaces out of voxels. It owns a `Universe` dedicated to the
@@ -49,6 +50,10 @@ impl Vui {
 
     pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
         self.universe.step(timestep)
+    }
+
+    pub fn set_tools(&mut self, tools: &[Tool]) {
+        HudLayout::default().set_tools(&mut *self.hud_space.borrow_mut(), tools);
     }
 }
 
@@ -115,6 +120,17 @@ impl HudLayout {
             (self.size.x - (self.toolbar_positions as GridCoordinate - 1) * stepping + 1) / 2;
         // TODO: set depth sensibly
         GridPoint::new(x_start + (index as GridCoordinate) * stepping, 0, 9)
+    }
+
+    pub fn set_tools(&self, space: &mut Space, tools: &[Tool]) {
+        for (index, tool) in tools.iter().enumerate() {
+            if index >= self.toolbar_positions {
+                break;
+            }
+            space
+                .set(self.tool_icon_position(index), &*tool.icon())
+                .unwrap();
+        }
     }
 }
 
