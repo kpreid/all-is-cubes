@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use crate::block::{Block, BlockAttributes, AIR};
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, RGBA};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -103,12 +103,24 @@ impl HudLayout {
             add_frame(grid.upper_bounds().z - 1);
         }
 
-        for (index, block) in crate::blockgen::make_some_blocks(self.toolbar_positions)
-            .into_iter()
-            .enumerate()
-        {
-            // TODO: don't let the out of bounds error we might be ignoring arise
-            let _ = space.set(self.tool_icon_position(index), &block);
+        // Draw background for toolbar.
+        // TODO: give this more shape and decoration (custom outline blocks).
+        // And a selected-highlight.
+        let toolbar_background = Block::from(RGBA::new(0.5, 0.5, 0.5, 1.0));
+        for index in 0..self.toolbar_positions {
+            let position = self.tool_icon_position(index);
+            space
+                .set(position + GridVector::new(0, 0, -1), &toolbar_background)
+                .unwrap();
+            space
+                .set(position + GridVector::new(0, -1, 0), &toolbar_background)
+                .unwrap();
+            space
+                .set(position + GridVector::new(1, 0, -1), &toolbar_background)
+                .unwrap();
+            space
+                .set(position + GridVector::new(1, -1, 0), &toolbar_background)
+                .unwrap();
         }
 
         universe.insert_anonymous(space)
