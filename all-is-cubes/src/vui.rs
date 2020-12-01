@@ -86,7 +86,7 @@ impl HudLayout {
         let grid = self.grid();
         let mut space = Space::empty(grid);
 
-        if true {
+        if false {
             // Visualization of the bounds of the space we're drawing.
             let frame_block = Block::from(RGBA::new(0.0, 1.0, 1.0, 1.0));
             let mut add_frame = |z| {
