@@ -8,14 +8,14 @@
 
 use cgmath::Vector2;
 use embedded_graphics::geometry::Point;
-use embedded_graphics::prelude::{Drawable, Primitive};
+use embedded_graphics::prelude::{Drawable, Pixel, Primitive};
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
 use crate::block::{Block, BlockAttributes, AIR};
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -26,6 +26,7 @@ use crate::universe::{URef, Universe, UniverseStepInfo};
 pub(crate) struct Vui {
     universe: Universe,
     current_space: URef<Space>,
+    hud_blocks: HudBlocks,
     hud_space: URef<Space>,
     aspect_ratio: FreeCoordinate,
 }
@@ -33,11 +34,13 @@ pub(crate) struct Vui {
 impl Vui {
     pub fn new() -> Self {
         let mut universe = Universe::new();
-        let hud_space = HudLayout::default().new_space(&mut universe);
+        let hud_blocks = HudBlocks::new(&mut universe);
+        let hud_space = HudLayout::default().new_space(&mut universe, &hud_blocks);
 
         Self {
             universe,
             current_space: hud_space.clone(),
+            hud_blocks,
             hud_space,
             aspect_ratio: 4. / 3., // arbitrary placeholder assumption
         }
@@ -73,6 +76,7 @@ impl Default for HudLayout {
     }
 }
 
+const TOOLBAR_STEP: GridCoordinate = 2;
 impl HudLayout {
     fn grid(&self) -> Grid {
         Grid::new((-1, -1, 0), (self.size.x + 2, self.size.y + 2, 10))
@@ -81,7 +85,7 @@ impl HudLayout {
     // TODO: taking the entire Universe doesn't seem like the best interface
     // but we want room to set up new blocks. Figure out a route for that.
     // TODO: validate this doesn't crash on wonky sizes.
-    fn new_space(&self, universe: &mut Universe) -> URef<Space> {
+    fn new_space(&self, universe: &mut Universe, hud_blocks: &HudBlocks) -> URef<Space> {
         let Vector2 { x: w, y: h } = self.size;
         let grid = self.grid();
         let mut space = Space::empty(grid);
@@ -106,32 +110,36 @@ impl HudLayout {
         // Draw background for toolbar.
         // TODO: give this more shape and decoration (custom outline blocks).
         // And a selected-highlight.
-        let toolbar_background = Block::from(RGBA::new(0.5, 0.5, 0.5, 1.0));
+        let toolbar_disp = &mut VoxelDisplayAdapter::new(&mut space, self.tool_icon_position(0));
+        Pixel(Point::new(-1, 0), &hud_blocks.toolbar_left_cap)
+            .draw(toolbar_disp)
+            .unwrap();
+        Pixel(
+            Point::new((self.toolbar_positions as i32 - 1) * TOOLBAR_STEP + 1, 0),
+            &hud_blocks.toolbar_right_cap,
+        )
+        .draw(toolbar_disp)
+        .unwrap();
         for index in 0..self.toolbar_positions {
-            let position = self.tool_icon_position(index);
-            space
-                .set(position + GridVector::new(0, 0, -1), &toolbar_background)
+            let x = index as i32 * TOOLBAR_STEP;
+            Pixel(Point::new(x, 0), &hud_blocks.toolbar_middle)
+                .draw(toolbar_disp)
                 .unwrap();
-            space
-                .set(position + GridVector::new(0, -1, 0), &toolbar_background)
-                .unwrap();
-            space
-                .set(position + GridVector::new(1, 0, -1), &toolbar_background)
-                .unwrap();
-            space
-                .set(position + GridVector::new(1, -1, 0), &toolbar_background)
-                .unwrap();
+            if index > 0 {
+                Pixel(Point::new(x - 1, 0), &hud_blocks.toolbar_divider)
+                    .draw(toolbar_disp)
+                    .unwrap();
+            }
         }
 
         universe.insert_anonymous(space)
     }
 
     fn tool_icon_position(&self, index: usize) -> GridPoint {
-        let stepping = 2;
         let x_start =
-            (self.size.x - (self.toolbar_positions as GridCoordinate - 1) * stepping + 1) / 2;
+            (self.size.x - (self.toolbar_positions as GridCoordinate - 1) * TOOLBAR_STEP + 1) / 2;
         // TODO: set depth sensibly
-        GridPoint::new(x_start + (index as GridCoordinate) * stepping, 0, 9)
+        GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 0, 9)
     }
 
     pub fn set_tools(&self, space: &mut Space, tools: &[Tool]) {
@@ -142,6 +150,47 @@ impl HudLayout {
             space
                 .set(self.tool_icon_position(index), &*tool.icon())
                 .unwrap();
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct HudBlocks {
+    toolbar_left_cap: VoxelBrush<'static>,
+    toolbar_right_cap: VoxelBrush<'static>,
+    toolbar_divider: VoxelBrush<'static>,
+    toolbar_middle: VoxelBrush<'static>,
+}
+
+impl HudBlocks {
+    fn new(_universe: &mut Universe) -> Self {
+        // TODO: if we introduce a `Block` that contains voxels directly,
+        // we won't need a `Universe` parameter here.
+        let toolbar_background_1 = Block::from(RGBA::new(0.5, 0.5, 0.5, 1.0));
+        let toolbar_background_2 = Block::from(RGBA::new(0.75, 0.75, 0.75, 1.0));
+        Self {
+            toolbar_middle: VoxelBrush::new(vec![
+                ((0, 0, -1), &toolbar_background_1),
+                ((0, -1, 0), &toolbar_background_2),
+            ])
+            .into_owned(),
+            toolbar_divider: VoxelBrush::new(vec![
+                ((0, 0, -1), &toolbar_background_1),
+                ((0, -1, 0), &toolbar_background_1),
+            ])
+            .into_owned(),
+            toolbar_left_cap: VoxelBrush::new(vec![
+                ((0, 0, 0), &toolbar_background_1),
+                ((0, 0, -1), &toolbar_background_1),
+                ((0, -1, 0), &toolbar_background_1),
+            ])
+            .into_owned(),
+            toolbar_right_cap: VoxelBrush::new(vec![
+                ((0, 0, 0), &toolbar_background_1),
+                ((0, 0, -1), &toolbar_background_1),
+                ((0, -1, 0), &toolbar_background_1),
+            ])
+            .into_owned(),
         }
     }
 }
