@@ -236,6 +236,16 @@ impl<'a> VoxelBrush<'a> {
         Self::new(vec![((0, 0, 0), block)])
     }
 
+    /// Converts a `VoxelBrush` with borrowed blocks to one with owned blocks.
+    pub fn into_owned(self) -> VoxelBrush<'static> {
+        VoxelBrush(
+            self.0
+                .into_iter()
+                .map(|(v, b)| (v, Cow::Owned(b.into_owned())))
+                .collect(),
+        )
+    }
+
     /// Add the given offset to the offset of each blocks, offsetting everything drawn.
     pub fn translate<V: Into<GridVector>>(mut self, offset: V) -> Self {
         let offset = offset.into();
