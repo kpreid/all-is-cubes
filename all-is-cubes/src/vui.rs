@@ -8,13 +8,15 @@
 
 use cgmath::Vector2;
 use embedded_graphics::geometry::Point;
+use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::{Drawable, Pixel, Primitive};
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
 use crate::block::{Block, BlockAttributes, AIR};
-use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
+use crate::blockgen::BlockGen;
+use crate::drawing::{draw_to_blocks, VoxelBrush, VoxelDisplayAdapter};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
@@ -163,34 +165,51 @@ struct HudBlocks {
 }
 
 impl HudBlocks {
-    fn new(_universe: &mut Universe) -> Self {
+    fn new(universe: &mut Universe) -> Self {
         // TODO: if we introduce a `Block` that contains voxels directly,
         // we won't need a `Universe` parameter here.
-        let toolbar_background_1 = Block::from(RGBA::new(0.5, 0.5, 0.5, 1.0));
-        let toolbar_background_2 = Block::from(RGBA::new(0.75, 0.75, 0.75, 1.0));
+
+        // TODO: This toolbar graphic is a "get the bugs in the drawing tools worked out"
+        // placeholder for better art...
+
+        let resolution = 16;
+        let padding = 4;
+        let stroke_width = 1;
+        let drawable = Rectangle::new(
+            // TODO: confirm these offsets are exactly right
+            Point::new(-padding - stroke_width, -padding - resolution),
+            Point::new(resolution + padding, padding + stroke_width),
+        )
+        .into_styled(
+            PrimitiveStyleBuilder::new()
+                .fill_color(Rgb888::new(127, 127, 127))
+                .stroke_color(Rgb888::new(255, 255, 255))
+                .stroke_width(stroke_width as u32)
+                .build(),
+        );
+        let blocks_temp_space =
+            draw_to_blocks(&mut BlockGen::new(universe, resolution), drawable).unwrap();
+
+        // TODO: Make this a feature of VoxelBrush?
+        let slice_drawing = |points: Grid| {
+            VoxelBrush::new(
+                points
+                    .interior_iter()
+                    .map(|p| (p, blocks_temp_space[p].clone()))
+                    .collect(),
+            )
+        };
+
         Self {
-            toolbar_middle: VoxelBrush::new(vec![
-                ((0, 0, -1), &toolbar_background_1),
-                ((0, -1, 0), &toolbar_background_2),
-            ])
-            .into_owned(),
-            toolbar_divider: VoxelBrush::new(vec![
-                ((0, 0, -1), &toolbar_background_1),
-                ((0, -1, 0), &toolbar_background_1),
-            ])
-            .into_owned(),
-            toolbar_left_cap: VoxelBrush::new(vec![
-                ((0, 0, 0), &toolbar_background_1),
-                ((0, 0, -1), &toolbar_background_1),
-                ((0, -1, 0), &toolbar_background_1),
-            ])
-            .into_owned(),
-            toolbar_right_cap: VoxelBrush::new(vec![
-                ((0, 0, 0), &toolbar_background_1),
-                ((0, 0, -1), &toolbar_background_1),
-                ((0, -1, 0), &toolbar_background_1),
-            ])
-            .into_owned(),
+            toolbar_middle: slice_drawing(Grid::from_lower_upper((0, -1, -1), (1, 2, 2))),
+            // TODO: divider should have an appropriate shape; waiting on being able to draw
+            // more than one shape in draw_to_blocks
+            toolbar_divider: slice_drawing(Grid::from_lower_upper((1, -1, -1), (2, 2, 2)))
+                .translate((-1, 0, 0)),
+            toolbar_left_cap: slice_drawing(Grid::from_lower_upper((-1, -1, -1), (0, 2, 2)))
+                .translate((1, 0, 0)),
+            toolbar_right_cap: slice_drawing(Grid::from_lower_upper((1, -1, -1), (2, 2, 2)))
+                .translate((-1, 0, 0)),
         }
     }
 }
