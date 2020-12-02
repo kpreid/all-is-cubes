@@ -156,17 +156,22 @@ pub(crate) fn draw_background(space: &mut Space) {
 
     let display = &mut VoxelDisplayAdapter::new(space, GridPoint::new(0, 0, grid.lower_bounds().z));
 
-    let background_block = Block::Atom(BlockAttributes::default(), RGBA::new(0.5, 0.5, 0.5, 1.0));
-    let background = VoxelBrush::single(&background_block);
-    let frame_block = Block::Atom(BlockAttributes::default(), RGBA::new(0.95, 0.95, 0.95, 1.0));
-    let frame = VoxelBrush::single(&frame_block).translate((0, 0, 1));
+    let background = VoxelBrush::single(Block::Atom(
+        BlockAttributes::default(),
+        RGBA::new(0.5, 0.5, 0.5, 1.0),
+    ));
+    let frame = VoxelBrush::single(Block::Atom(
+        BlockAttributes::default(),
+        RGBA::new(0.95, 0.95, 0.95, 1.0),
+    ))
+    .translate((0, 0, 1));
 
     background_rect
         .into_styled(
             PrimitiveStyleBuilder::new()
                 .stroke_width(1)
-                .stroke_color(frame)
-                .fill_color(background)
+                .stroke_color(&frame)
+                .fill_color(&background)
                 .build(),
         )
         .draw(display)

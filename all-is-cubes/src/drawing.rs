@@ -4,7 +4,7 @@
 //! Draw 2D graphics into spaces and blocks, including text, using an adapter for the
 //! `embedded_graphics` crate.
 
-use cgmath::Vector3;
+use cgmath::EuclideanSpace as _;
 use embedded_graphics::drawable::{Drawable, Pixel};
 use embedded_graphics::fonts::{Font, Text};
 use embedded_graphics::geometry::{Dimensions, Point, Size};
@@ -12,6 +12,7 @@ use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::style::TextStyleBuilder;
 use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
+use std::borrow::Cow;
 use std::convert::TryInto;
 
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
@@ -19,7 +20,7 @@ pub use embedded_graphics;
 
 use crate::block::{Block, BlockAttributes};
 use crate::blockgen::BlockGen;
-use crate::math::{GridCoordinate, GridPoint, GridVector, RGB, RGBA};
+use crate::math::{GridPoint, GridVector, RGB, RGBA};
 use crate::space::{Grid, SetCubeError, Space};
 
 /// Draw text into a [`Space`], extending in the +X and -Y directions from `origin`.
@@ -164,17 +165,14 @@ where
 
 /// A [`VoxelBrush`] may be used to draw multiple layers of blocks from a single 2D
 /// graphic, producing shadow or outline effects, or simply changing the depth/layer.
-impl DrawTarget<VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
+impl DrawTarget<&'_ VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
     type Error = SetCubeError;
 
-    fn draw_pixel(&mut self, pixel: Pixel<VoxelBrush>) -> Result<(), Self::Error> {
+    fn draw_pixel(&mut self, pixel: Pixel<&VoxelBrush>) -> Result<(), Self::Error> {
         let Pixel(point, brush) = pixel;
         let point = self.convert_point(point);
-        for bristle in &brush.0 {
-            if let Some((offset, block)) = bristle {
-                let offset = offset.cast::<GridCoordinate>().unwrap();
-                Self::handle_set_result(self.space.set(point + offset, block))?;
-            }
+        for (offset, block) in &brush.0 {
+            Self::handle_set_result(self.space.set(point + offset.to_vec(), block))?;
         }
         Ok(())
     }
@@ -205,39 +203,41 @@ impl From<Rgb888> for Block {
 }
 
 /// A "color" that is a set of independently colored and offset layers.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct VoxelBrush<'a>([Option<(Vector3<i8>, &'a Block)>; VoxelBrush::MAX_COUNT]);
+///
+/// Note that only `&VoxelBrush` implements [`PixelColor`]; this is because `PixelColor`
+/// requires a value implementing [`Copy`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VoxelBrush<'a>(Vec<(GridPoint, Cow<'a, Block>)>);
 
 impl<'a> VoxelBrush<'a> {
-    /// 7 is chosen as being enough cubes to draw a "+" shape, creating a border and
-    /// depth.
-    const MAX_COUNT: usize = 7;
-
     /// Makes a [`VoxelBrush`] which paints the specified blocks at the specified offsets
     /// from each pixel position.
-    // TODO: is there a good way to generalize the argument type more than Vec, given that we want
-    // owned input?
-    pub fn new<V: Into<Vector3<i8>>>(blocks: Vec<(V, &'a Block)>) -> Self {
-        assert!(blocks.len() <= Self::MAX_COUNT);
-        let mut result = VoxelBrush([None; Self::MAX_COUNT]);
-        for (i, (offset, block)) in blocks.into_iter().enumerate() {
-            result.0[i] = Some((offset.into(), block));
-        }
-        result
+    // TODO: revisit what generics the parameter types have.
+    pub fn new<V, B>(blocks: Vec<(V, B)>) -> Self
+    where
+        V: Into<GridPoint>,
+        B: Into<Cow<'a, Block>>,
+    {
+        Self(
+            blocks
+                .into_iter()
+                .map(|(offset, block)| (offset.into(), block.into()))
+                .collect(),
+        )
     }
 
     /// Makes a [`VoxelBrush`] which paints the specified block with no offset.
-    pub fn single(block: &'a Block) -> Self {
+    pub fn single<B>(block: B) -> Self
+    where
+        B: Into<Cow<'a, Block>>,
+    {
         Self::new(vec![((0, 0, 0), block)])
     }
 
     /// Add the given offset to the offset of each blocks, offsetting everything drawn.
-    ///
-    /// Caution: Since the coordinates are [`i8`], this cannot be used for the full
-    /// [`GridPoint`] coordinate range.
-    pub fn translate<V: Into<Vector3<i8>>>(mut self, offset: V) -> Self {
+    pub fn translate<V: Into<GridVector>>(mut self, offset: V) -> Self {
         let offset = offset.into();
-        for (block_offset, _) in self.0.iter_mut().flatten() {
+        for (block_offset, _) in self.0.iter_mut() {
             // TODO: use explicitly checked add for a good error?
             *block_offset += offset;
         }
@@ -245,7 +245,7 @@ impl<'a> VoxelBrush<'a> {
     }
 }
 
-impl<'a> PixelColor for VoxelBrush<'a> {
+impl<'a, 'b> PixelColor for &'a VoxelBrush<'b> {
     type Raw = ();
 }
 
@@ -297,7 +297,7 @@ mod tests {
         let mut space = Space::empty_positive(100, 100, 100);
 
         let brush = VoxelBrush::new(vec![((0, 0, 0), &blocks[0]), ((0, 1, 1), &blocks[1])]);
-        Pixel(Point::new(2, -3), brush).draw(&mut VoxelDisplayAdapter::new(
+        Pixel(Point::new(2, -3), &brush).draw(&mut VoxelDisplayAdapter::new(
             &mut space,
             GridPoint::new(0, 0, 4),
         ))?;
@@ -324,11 +324,6 @@ mod tests {
     fn draw_set_failure() {
         todo!("test a case where a SetCubeError is propagated");
     }
-
-    //#[test]
-    //fn voxel_brush_size_sanity_check() {
-    //    assert_eq!(64, std::mem::size_of::<VoxelBrush>());
-    //}
 
     fn a_primitive_style() -> PrimitiveStyle<Rgb888> {
         PrimitiveStyleBuilder::new()

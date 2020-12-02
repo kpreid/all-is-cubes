@@ -87,6 +87,20 @@ impl Block {
     }
 }
 
+// Implementing conversions to `Cow` allow various functions to accept either an owned
+// or borrowed `Block`. The motivation for this is to avoid unnecessary cloning
+// (in case an individual block has large data).
+
+impl From<Block> for Cow<'_, Block> {
+    fn from(block: Block) -> Self {
+        Cow::Owned(block)
+    }
+}
+impl<'a> From<&'a Block> for Cow<'a, Block> {
+    fn from(block: &'a Block) -> Self {
+        Cow::Borrowed(block)
+    }
+}
 /// Convert a color to a block with default attributes.
 impl From<RGB> for Block {
     fn from(color: RGB) -> Block {

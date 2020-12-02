@@ -63,7 +63,7 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
     let background_text_block: Block = Rgb888::new(50, 50, 50).into();
     draw_text(
         &mut space,
-        VoxelBrush::new(vec![
+        &VoxelBrush::new(vec![
             ((0, 0, 1), &foreground_text_block),
             ((1, 0, 0), &background_text_block),
             ((-1, 0, 0), &background_text_block),
