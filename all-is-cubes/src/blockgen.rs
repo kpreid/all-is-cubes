@@ -4,6 +4,7 @@
 //! Procedural block generation. See the `worldgen` module for code that uses the results
 //! of this.
 
+use cgmath::EuclideanSpace as _;
 use rand::{Rng, SeedableRng as _};
 
 use crate::block::{Block, BlockAttributes, Resolution, AIR};
@@ -43,7 +44,12 @@ impl<'a> BlockGen<'a> {
     ) -> (Block, UBorrowMut<Space>) {
         let space_ref = self.universe.insert_anonymous(self.new_block_space());
         (
-            Block::Recur(attributes, space_ref.clone()),
+            Block::Recur {
+                attributes,
+                offset: GridPoint::origin(),
+                resolution: self.resolution,
+                space: space_ref.clone(),
+            },
             space_ref.borrow_mut(),
         )
     }

@@ -90,10 +90,12 @@ where
             .set(
                 cube,
                 // TODO: Allow attribute alteration.
-                &Block::Recur(
-                    BlockAttributes::default(),
-                    ctx.universe.insert_anonymous(block_space),
-                ),
+                &Block::Recur {
+                    attributes: BlockAttributes::default(),
+                    offset: GridPoint::origin(),
+                    resolution: ctx.resolution,
+                    space: ctx.universe.insert_anonymous(block_space),
+                },
             )
             .expect("can't happen: draw_to_blocks failed to write to its own output space");
     }
@@ -344,7 +346,11 @@ mod tests {
         let space = draw_to_blocks(&mut ctx, drawable).unwrap();
         // Output is at negative Y because coordinate system is flipped.
         assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
-        if let Block::Recur(_, block_space_ref) = &space[(0, -1, 0)] {
+        if let Block::Recur {
+            space: block_space_ref,
+            ..
+        } = &space[(0, -1, 0)]
+        {
             assert_eq!(
                 block_space_ref.borrow()[(0, 15, 8)].color(),
                 a_primitive_color()
@@ -362,7 +368,11 @@ mod tests {
             Rectangle::new(Point::new(-3, -2), Point::new(0, 0)).into_styled(a_primitive_style());
         let space = draw_to_blocks(&mut ctx, drawable).unwrap();
         assert_eq!(space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
-        if let Block::Recur(_, block_space_ref) = &space[(-1, 0, 0)] {
+        if let Block::Recur {
+            space: block_space_ref,
+            ..
+        } = &space[(-1, 0, 0)]
+        {
             assert_eq!(
                 block_space_ref.borrow()[(15, 0, 8)].color(),
                 a_primitive_color()

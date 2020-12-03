@@ -283,7 +283,7 @@ impl Grid {
         )
     }
 
-    /// Moves the grid to anoter location with unchanged size and orientation.
+    /// Moves the grid to another location with unchanged size and orientation.
     ///
     /// ```
     /// use all_is_cubes::space::Grid;
@@ -924,6 +924,14 @@ impl<V> GridArray<V> {
     pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
         self.grid.index(position).map(|index| &self.contents[index])
     }
+
+    /// Adds to the origin of the array without affecting the contents.
+    ///
+    /// TODO: example
+    pub fn translate(mut self, offset: impl Into<GridVector>) -> Self {
+        self.grid = self.grid.translate(offset);
+        self
+    }
 }
 
 impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
@@ -996,7 +1004,12 @@ mod tests {
     fn set_failure_borrow() {
         let mut u = Universe::new();
         let inner_space_ref = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let block = Block::Recur(BlockAttributes::default(), inner_space_ref.clone());
+        let block = Block::Recur {
+            attributes: BlockAttributes::default(),
+            offset: GridPoint::origin(),
+            resolution: 1,
+            space: inner_space_ref.clone(),
+        };
         let mut outer_space = Space::empty_positive(1, 1, 1);
 
         let borrow = inner_space_ref.borrow_mut();

@@ -451,6 +451,7 @@ mod tests {
     use super::*;
     use crate::block::{Block, BlockAttributes};
     use crate::blockgen::make_some_blocks;
+    use crate::math::GridPoint;
     use crate::universe::Universe;
     use cgmath::MetricSpace as _;
 
@@ -514,10 +515,12 @@ mod tests {
         inner_block_space
             .set((0, 0, 0), &make_some_blocks(1)[0])
             .unwrap();
-        let inner_block = Block::Recur(
-            BlockAttributes::default(),
-            u.insert_anonymous(inner_block_space),
-        );
+        let inner_block = Block::Recur {
+            attributes: BlockAttributes::default(),
+            offset: GridPoint::origin(),
+            resolution: 1,
+            space: u.insert_anonymous(inner_block_space),
+        };
         let mut outer_space = Space::empty_positive(1, 1, 1);
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 

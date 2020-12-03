@@ -4,11 +4,12 @@
 //! Definition of blocks, which are game objects which live in the grid of a
 //! [`Space`]. See [`Block`] for details.
 
+use cgmath::EuclideanSpace as _;
 use once_cell::sync::Lazy;
 use std::borrow::Cow;
 
-use crate::math::{RGB, RGBA};
-use crate::space::{GridArray, Space};
+use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
+use crate::space::{Grid, GridArray, Space};
 use crate::universe::{RefError, URef};
 use crate::util::ConciseDebug;
 
@@ -27,6 +28,9 @@ pub type Resolution = u8;
 /// or may not be the the same copy; `Block`s are "by value". However, some blocks are
 /// defined by reference to shared mutable data, in which case changes to that data should
 /// take effect everywhere a `Block` having that same reference occurs.
+///
+/// To obtain the concrete appearance and behavior of a block, use [`Block::evaluate`] to
+/// obtain an [`EvaluatedBlock`] value, preferably with caching.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Block {
@@ -35,10 +39,16 @@ pub enum Block {
     Atom(BlockAttributes, RGBA),
 
     /// A block that is composed of smaller blocks, defined by the referenced `Space`.
-    ///
-    /// Renderers are expected to traverse only one recursion level to determine the
-    /// appearance of a block,
-    Recur(BlockAttributes, URef<Space>),
+    Recur {
+        attributes: BlockAttributes,
+        /// Which portion of the space will be used, specified by the most negative
+        /// corner.
+        offset: GridPoint,
+        /// The side length of the cubical volume of sub-blocks (voxels) used for this
+        /// block.
+        resolution: u8,
+        space: URef<Space>,
+    },
 }
 
 impl Block {
@@ -55,13 +65,26 @@ impl Block {
                 visible: !color.fully_transparent(),
             }),
 
-            Block::Recur(attributes, space_ref) => {
+            Block::Recur {
+                attributes,
+                offset,
+                resolution,
+                space: space_ref,
+            } => {
+                // Ensure resolution is at least 1 to not panic on bad data.
+                // (We could eliminate this if Grid allowed a size of zero, but that
+                // might lead to division-by-zero trouble elsewhere...)
+                let resolution: GridCoordinate = (*resolution).max(1).into();
+                let offset = *offset;
+
                 let block_space = space_ref.try_borrow()?;
-                let voxels =
-                    block_space.extract(block_space.grid(), |_index, sub_block_data, _lighting| {
+                let grid = Grid::new(offset, (resolution, resolution, resolution));
+                let voxels = block_space
+                    .extract(grid, |_index, sub_block_data, _lighting| {
                         // TODO: need to also extract solidity info once we start doing collision
                         sub_block_data.evaluated().color
-                    });
+                    })
+                    .translate(-offset.to_vec());
                 Ok(EvaluatedBlock {
                     attributes: attributes.clone(),
                     color: RGBA::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels
@@ -222,7 +245,7 @@ struct BlockChange;
 mod tests {
     use super::*;
     use crate::blockgen::BlockGen;
-    use crate::math::GridPoint;
+    use crate::math::{GridPoint, GridVector};
     use crate::space::Grid;
     use crate::universe::Universe;
     use std::borrow::Cow;
@@ -346,6 +369,43 @@ mod tests {
         let e = block.evaluate().unwrap();
         assert_eq!(e.opaque, false);
         assert_eq!(e.visible, true);
+    }
+
+    /// Tests that the `offset` field of `Block::Recur` is respected.
+    #[test]
+    fn recur_with_offset() {
+        let resolution = 4;
+        let offset = GridVector::new(resolution, 0, 0);
+        let mut universe = Universe::new();
+        let mut space = Space::empty_positive(resolution * 2, resolution, resolution);
+        space
+            .fill(space.grid(), |point| {
+                let point = point.cast::<f32>().unwrap();
+                Some(Block::Atom(
+                    BlockAttributes::default(),
+                    RGBA::new(point.x, point.y, point.z, 1.0),
+                ))
+            })
+            .unwrap();
+        let space_ref = universe.insert_anonymous(space);
+        let block_at_offset = Block::Recur {
+            attributes: BlockAttributes::default(),
+            offset: GridPoint::from_vec(offset),
+            resolution: resolution as Resolution,
+            space: space_ref.clone(),
+        };
+
+        let e = block_at_offset.evaluate().unwrap();
+        assert_eq!(
+            e.voxels,
+            Some(GridArray::generate(
+                Grid::for_block(resolution as Resolution),
+                |point| {
+                    let point = (point + offset).cast::<f32>().unwrap();
+                    RGBA::new(point.x, point.y, point.z, 1.0)
+                }
+            ))
+        );
     }
 
     // TODO: test of evaluate where the block's space is the wrong size
