@@ -453,29 +453,36 @@ impl Space {
     }
 
     /// Copy data out of a portion of the space in a caller-chosen format.
+    ///
+    /// If the provided [`grid`] contains portions outside of this space's grid,
+    /// those positions in the output will be treated as if they are filled with [`AIR`]
+    /// and light of the [`Space::sky_color`].
     pub fn extract<V>(
         &self,
         subgrid: Grid,
-        extractor: impl Fn(BlockIndex, &SpaceBlockData, PackedLight) -> V,
+        extractor: impl Fn(Option<BlockIndex>, &SpaceBlockData, PackedLight) -> V,
     ) -> GridArray<V> {
-        assert!(
-            self.grid.contains_grid(&subgrid),
-            "space.extract({:?}) out of range {:?}",
-            subgrid,
-            &self.grid,
-        );
         let mut output: Vec<V> = Vec::with_capacity(subgrid.volume());
-        // TODO: Implement optimized index calculation, maybe as an iterator
+        let out_of_bounds_data = SpaceBlockData {
+            block: AIR.clone(),
+            count: 0,
+            evaluated: AIR_EVALUATED.clone(),
+        };
         for x in subgrid.x_range() {
             for y in subgrid.y_range() {
                 for z in subgrid.z_range() {
-                    let cube_index = self.grid.index((x, y, z)).unwrap(); // already checked, should not fail
-                    let block_index = self.contents[cube_index];
-                    output.push(extractor(
-                        block_index,
-                        &self.block_data[block_index as usize],
-                        self.lighting[cube_index],
-                    ));
+                    // TODO: Implement optimized index calculation, maybe as an iterator
+                    output.push(match self.grid.index((x, y, z)) {
+                        Some(cube_index) => {
+                            let block_index = self.contents[cube_index];
+                            extractor(
+                                Some(block_index),
+                                &self.block_data[block_index as usize],
+                                self.lighting[cube_index],
+                            )
+                        }
+                        None => extractor(None, &out_of_bounds_data, self.packed_sky_color),
+                    });
                 }
             }
         }
@@ -1071,6 +1078,26 @@ mod tests {
         // No change, no notification
         assert_eq!(Ok(false), space.set((0, 0, 0), &blocks[0]));
         assert_eq!(None, sink.next());
+    }
+
+    #[test]
+    fn extract_out_of_bounds() {
+        let blocks = make_some_blocks(2);
+        let mut space = Space::empty_positive(2, 1, 1);
+        space.set((0, 0, 0), &blocks[0]).unwrap();
+        space.set((1, 0, 0), &blocks[1]).unwrap();
+
+        let extract_grid = Grid::new((1, 0, 0), (1, 2, 1));
+        let extracted = space.extract(extract_grid, |_index, block_data, _lighting| {
+            // TODO: arrange to sanity check index and lighting
+            let block = block_data.block().clone();
+            assert_eq!(block.evaluate().unwrap(), block_data.evaluated);
+            block
+        });
+
+        assert_eq!(*extracted.grid(), extract_grid);
+        assert_eq!(&extracted[(1, 0, 0)], &blocks[1]);
+        assert_eq!(&extracted[(1, 1, 0)], &AIR);
     }
 
     // TODO: test fill() equivalence and error handling

@@ -293,7 +293,7 @@ fn prepare_cubes<'a, P: PixelBuf>(
     space: &Space,
 ) -> GridArray<TracingCubeData<'a, P::BlockData>> {
     space.extract(*space.grid(), |index, _block, lighting| TracingCubeData {
-        block: &indexed_block_data[index as usize],
+        block: &indexed_block_data[index.unwrap() as usize],
         lighting,
     })
 }
