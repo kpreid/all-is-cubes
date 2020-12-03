@@ -17,7 +17,7 @@ use std::time::Duration;
 use crate::block::{Block, BlockAttributes, AIR};
 use crate::blockgen::BlockGen;
 use crate::drawing::{draw_to_blocks, VoxelBrush, VoxelDisplayAdapter};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -91,6 +91,8 @@ impl HudLayout {
         let Vector2 { x: w, y: h } = self.size;
         let grid = self.grid();
         let mut space = Space::empty(grid);
+
+        space.set_sky_color(RGB::ONE);
 
         if false {
             // Visualization of the bounds of the space we're drawing.
@@ -182,8 +184,8 @@ impl HudBlocks {
         )
         .into_styled(
             PrimitiveStyleBuilder::new()
-                .fill_color(Rgb888::new(127, 127, 127))
-                .stroke_color(Rgb888::new(255, 255, 255))
+                .fill_color(Rgb888::new(0x7F, 0x7F, 0x7F))
+                .stroke_color(Rgb888::new(0xDD, 0xDD, 0xDD))
                 .stroke_width(stroke_width as u32)
                 .build(),
         );
