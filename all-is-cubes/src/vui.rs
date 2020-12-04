@@ -14,7 +14,7 @@ use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
-use crate::block::{Block, BlockAttributes, AIR};
+use crate::block::{Block, BlockAttributes, Resolution, AIR};
 use crate::blockgen::BlockGen;
 use crate::drawing::{draw_to_blocks, VoxelBrush, VoxelDisplayAdapter};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGB, RGBA};
@@ -189,8 +189,11 @@ impl HudBlocks {
                 .stroke_width(stroke_width as u32)
                 .build(),
         );
-        let blocks_temp_space =
-            draw_to_blocks(&mut BlockGen::new(universe, resolution), drawable).unwrap();
+        let blocks_temp_space = draw_to_blocks(
+            &mut BlockGen::new(universe, resolution as Resolution),
+            drawable,
+        )
+        .unwrap();
 
         // TODO: Make this a feature of VoxelBrush?
         let slice_drawing = |points: Grid| {

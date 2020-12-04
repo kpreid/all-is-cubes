@@ -53,7 +53,7 @@ where
     C: PixelColor,
     for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
 {
-    let resolution: i32 = ctx.resolution;
+    let resolution: i32 = ctx.resolution.into();
     let top_left_2d = object.top_left();
     let bottom_right_2d = object.bottom_right();
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because

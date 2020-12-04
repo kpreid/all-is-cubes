@@ -6,9 +6,9 @@
 
 use rand::{Rng, SeedableRng as _};
 
-use crate::block::{Block, BlockAttributes, AIR};
+use crate::block::{Block, BlockAttributes, Resolution, AIR};
 use crate::math::{GridCoordinate, GridPoint, NotNan, RGBA};
-use crate::space::Space;
+use crate::space::{Grid, Space};
 use crate::universe::{UBorrowMut, Universe};
 
 /// Utilities for generating [`Block`]s that are compatible with each other.
@@ -16,7 +16,7 @@ pub struct BlockGen<'a> {
     /// The `Universe` in which block spaces live.
     pub universe: &'a mut Universe,
     /// The side length of block spaces.
-    pub resolution: GridCoordinate,
+    pub resolution: Resolution,
 }
 
 impl<'a> BlockGen<'a> {
@@ -24,14 +24,16 @@ impl<'a> BlockGen<'a> {
     ///
     /// `resolution` is the side length of block spaces; the cube root of the number of
     /// voxels making up a block.
-    pub fn new(universe: &'a mut Universe, resolution: GridCoordinate) -> Self {
-        assert!(resolution > 0);
-        Self { universe, resolution }
+    pub fn new(universe: &'a mut Universe, resolution: Resolution) -> Self {
+        Self {
+            universe,
+            resolution,
+        }
     }
 
     /// Create a [`Space`] of a suitable size for a block.
     pub fn new_block_space(&self) -> Space {
-        Space::empty_positive(self.resolution, self.resolution, self.resolution)
+        Space::empty(Grid::for_block(self.resolution))
     }
 
     /// Create a [`Block`] referring to a [`Space`] and return the [`Space`] for modification.
@@ -142,7 +144,9 @@ impl LandscapeBlocks {
                 // block types. TODO: Better strategy, perhaps palette-based.
                 let color_randomization =
                     NotNan::new(1.0 + ((random * 5.0).floor() - 2.0) * 0.05).unwrap();
-                if point.y >= ctx.resolution - (random * 3.0 + 1.0) as GridCoordinate {
+                if point.y
+                    >= GridCoordinate::from(ctx.resolution) - (random * 3.0 + 1.0) as GridCoordinate
+                {
                     scale_color(grass_color.clone(), color_randomization)
                 } else {
                     scale_color(dirt_color.clone(), color_randomization)

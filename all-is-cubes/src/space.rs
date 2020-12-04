@@ -88,6 +88,16 @@ impl Grid {
         Grid::new(lower_bounds, upper_bounds.into() - lower_bounds)
     }
 
+    /// Constructs a [`Grid`] with a cubical volume in the positive octant, as is used
+    /// for recursive blocks.
+    ///
+    /// If you need such a grid at a position other than the origin, use
+    /// [`Grid::translate`].
+    pub fn for_block(resolution: Resolution) -> Grid {
+        let size = GridCoordinate::from(resolution);
+        Grid::new((0, 0, 0), (size, size, size))
+    }
+
     /// Compute volume with checked arithmetic. In a function solely for the convenience
     /// of the `?` operator without which this is even worse.
     fn checked_volume_helper(sizes: GridVector) -> Result<usize, ()> {

@@ -12,6 +12,14 @@ use crate::space::{GridArray, Space};
 use crate::universe::{RefError, URef};
 use crate::util::ConciseDebug;
 
+/// Type for the edge length of recursive blocks in terms of their component voxels.
+/// This resolution cubed is the number of voxels making up a block.
+///
+/// This type was chosen as `u8` so as to make it nonnegative and easy to losslessly
+/// convert into larger, possibly signed, sizes. It's plenty of range since a resolution
+/// of 255 would mean 16 million voxels — more than we want to work with.
+pub type Resolution = u8;
+
 /// A `Block` is something that can exist in the grid of a [`Space`]; it occupies one unit
 /// cube of space and has a specified appearance and behavior.
 ///
@@ -283,13 +291,10 @@ mod tests {
         assert_eq!(e.attributes, attributes);
         assert_eq!(
             e.voxels,
-            Some(GridArray::generate(
-                Grid::new((0, 0, 0), (resolution, resolution, resolution)),
-                |point| {
-                    let point = point.cast::<f32>().unwrap();
-                    RGBA::new(point.x, point.y, point.z, 1.0)
-                }
-            ))
+            Some(GridArray::generate(Grid::for_block(resolution), |point| {
+                let point = point.cast::<f32>().unwrap();
+                RGBA::new(point.x, point.y, point.z, 1.0)
+            }))
         );
         assert_eq!(e.opaque, true);
         assert_eq!(e.visible, true);
