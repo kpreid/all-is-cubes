@@ -241,6 +241,34 @@ impl ConciseDebug for EvaluatedBlock {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct BlockChange;
 
+/// Construct a set of [`Block::Recur`] that form a miniature of the given `space`.
+/// The returned [`Space`] contains each of the blocks; its coordinates will correspond to
+/// those of the input, scaled down by `resolution`.
+///
+/// TODO: add doc test for this
+pub fn space_to_blocks(
+    resolution: Resolution,
+    attributes: BlockAttributes,
+    space_ref: URef<Space>,
+) -> Result<Space, RefError> {
+    let resolution_g: GridCoordinate = resolution.into();
+    let source_grid = space_ref.try_borrow()?.grid();
+    let destination_grid = source_grid.divide(resolution_g);
+
+    let mut destination_space = Space::empty(destination_grid);
+    destination_space
+        .fill(destination_grid, move |cube| {
+            Some(Block::Recur {
+                attributes: attributes.clone(),
+                offset: GridPoint::from_vec(cube.to_vec() * resolution_g),
+                resolution,
+                space: space_ref.clone(),
+            })
+        })
+        .expect("can't happen: space_to_blocks failed to write to its own output space");
+    Ok(destination_space)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
