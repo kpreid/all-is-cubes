@@ -28,7 +28,7 @@ pub fn new_universe_with_stuff() -> Universe {
 }
 
 fn new_landscape_space(universe: &mut Universe) -> Space {
-    let mut bg = BlockGen { universe, size: 16 };
+    let mut bg = BlockGen { universe, resolution: 16 };
     let blocks = LandscapeBlocks::new(&mut bg);
 
     let text_blocks: Space = draw_to_blocks(

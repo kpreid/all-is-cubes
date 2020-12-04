@@ -105,7 +105,7 @@ impl BlockGLTexture {
         C: GraphicsContext<Backend = Backend>,
     {
         let layout = AtlasLayout {
-            tile_size: 16,
+            resolution: 16,
             row_length: 8,
             layer_count: 32,
             border: 3,
@@ -189,11 +189,11 @@ impl BlockGLTexture {
 impl TextureAllocator for BlockGLTexture {
     type Tile = GLTile;
 
-    fn size(&self) -> GridCoordinate {
+    fn resolution(&self) -> GridCoordinate {
         self.layout
-            .tile_size
+            .resolution
             .try_into()
-            .expect("probably bogus tile size")
+            .expect("probably bogus resolution")
     }
 
     fn allocate(&mut self) -> GLTile {
@@ -228,7 +228,7 @@ impl TextureTile for GLTile {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct AtlasLayout {
     /// Edge length of a tile.
-    tile_size: AtlasCoord,
+    resolution: AtlasCoord,
     /// Number of tiles in texture atlas along one edge (square root of total tiles in one
     /// layer).
     row_length: AtlasCoord,
@@ -269,7 +269,7 @@ impl AtlasLayout {
 
     #[inline]
     fn texel_edge_length(&self) -> u32 {
-        u32::from(self.row_length) * u32::from(self.tile_size + self.border * 2)
+        u32::from(self.row_length) * u32::from(self.resolution + self.border * 2)
             - u32::from(self.border * 2)
     }
 
@@ -306,7 +306,7 @@ impl AtlasLayout {
     /// tile, so data mismatches are only graphical glitches.
     #[inline]
     fn index_to_origin(&self, index: AtlasIndex) -> Vector3<TextureCoordinate> {
-        let step = TextureCoordinate::from(self.tile_size + self.border * 2)
+        let step = TextureCoordinate::from(self.resolution + self.border * 2)
             / (self.texel_edge_length() as TextureCoordinate);
         let (column, row, layer) = self.index_to_location(index);
         Vector3::new(
@@ -319,7 +319,7 @@ impl AtlasLayout {
 
     #[inline]
     fn texcoord_scale(&self) -> TextureCoordinate {
-        TextureCoordinate::from(self.tile_size) / (self.texel_edge_length() as TextureCoordinate)
+        TextureCoordinate::from(self.resolution) / (self.texel_edge_length() as TextureCoordinate)
     }
 
     /// Copy texels for one tile into an array arranged according to this layout
@@ -328,7 +328,7 @@ impl AtlasLayout {
     fn copy_to_atlas<T: Copy>(&self, index: AtlasIndex, target: &mut [T], source: &[T]) {
         // .try_into().unwrap() because we require that usize is at least as big as u32,
         // but infallible into() conversions don't assume that's true.
-        let tile_size_i32 = i32::from(self.tile_size);
+        let tile_size_i32 = i32::from(self.resolution);
         let bordered_tile_size = tile_size_i32 + i32::from(self.border) * 2;
         let edge_length: usize = self.texel_edge_length().try_into().unwrap();
         let layer_texels: usize = edge_length * edge_length;
@@ -492,7 +492,7 @@ mod tests {
     #[test]
     fn atlas_layout_no_overflow() {
         let layout = AtlasLayout {
-            tile_size: 0xFFFF,
+            resolution: 0xFFFF,
             row_length: 0xFFFF,
             layer_count: 0xFFFF,
             border: 0xFFFF,
@@ -517,7 +517,7 @@ mod tests {
     #[test]
     fn atlas_layout_copy() {
         let layout = AtlasLayout {
-            tile_size: 2,
+            resolution: 2,
             row_length: 3,
             layer_count: 2,
             border: 1,

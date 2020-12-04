@@ -237,7 +237,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // Use the size from the textures, regardless of what the actual tile size is,
             // because this won't panic and the other strategy will. TODO: Implement
             // dynamic choice of texture size.
-            let tile_size: GridCoordinate = texture_allocator.size();
+            let resolution: GridCoordinate = texture_allocator.resolution();
 
             let out_of_bounds_color = RGBA::new(1.0, 1.0, 0.0, 1.0);
 
@@ -246,14 +246,14 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
                 // Layer 0 is the outside surface of the cube and successive layers are
                 // deeper inside.
-                for layer in 0..tile_size {
+                for layer in 0..resolution {
                     // TODO: JS version would detect fully-opaque blocks (a derived property of Block)
                     // and only scan the first and last faces
                     let mut tile_texels: Vec<(u8, u8, u8, u8)> =
-                        Vec::with_capacity((tile_size * tile_size) as usize);
+                        Vec::with_capacity((resolution as usize).pow(2));
                     let mut layer_is_visible_somewhere = false;
-                    for t in 0..tile_size {
-                        for s in 0..tile_size {
+                    for t in 0..resolution {
+                        for s in 0..resolution {
                             // TODO: Matrix4 isn't allowed to be integer. Make Face provide a better strategy.
                             // While we're at it, also implement the optimization that positive and negative
                             // faces can share a texture sometimes (which requires dropping the property
@@ -264,9 +264,9 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                     FreeCoordinate::from(t),
                                     FreeCoordinate::from(layer),
                                 ) + Vector3::new(0.5, 0.5, 0.5))
-                                    / FreeCoordinate::from(tile_size),
+                                    / FreeCoordinate::from(resolution),
                             ) * FreeCoordinate::from(
-                                tile_size,
+                                resolution,
                             ) - Vector3::new(0.5, 0.5, 0.5))
                             .cast::<GridCoordinate>()
                             .unwrap();
@@ -301,7 +301,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }]
                                 .vertices,
                             face,
-                            FreeCoordinate::from(layer) / FreeCoordinate::from(tile_size),
+                            FreeCoordinate::from(layer) / FreeCoordinate::from(resolution),
                             &texture_tile,
                         );
                         textures_used.push(texture_tile);
@@ -401,7 +401,7 @@ pub trait TextureAllocator {
     type Tile: TextureTile;
 
     /// Edge length of the texture tiles
-    fn size(&self) -> GridCoordinate;
+    fn resolution(&self) -> GridCoordinate;
 
     /// Allocate a tile, whose texture coordinates will be available as long as the Tile
     /// value is not dropped.
@@ -417,7 +417,7 @@ pub trait TextureTile {
 
     /// Write texture data as RGBA color.
     ///
-    /// `data` must be of length `allocator.size() * allocator.size()`.
+    /// `data` must be of length `allocator.resolution().pow(2)`.
     fn write(&mut self, data: &[Texel]);
 }
 
@@ -426,7 +426,7 @@ pub trait TextureTile {
 pub struct NullTextureAllocator;
 impl TextureAllocator for NullTextureAllocator {
     type Tile = ();
-    fn size(&self) -> GridCoordinate {
+    fn resolution(&self) -> GridCoordinate {
         14 // an arbitrary size
     }
     fn allocate(&mut self) {}
@@ -440,8 +440,8 @@ impl TextureTile for () {
         // Validate data size.
         assert_eq!(
             GridCoordinate::try_from(data.len()).expect("tile data way too big"),
-            NullTextureAllocator.size() * NullTextureAllocator.size(),
-            "tile data did not match tile size"
+            NullTextureAllocator.resolution().pow(2),
+            "tile data did not match resolution"
         );
     }
 }

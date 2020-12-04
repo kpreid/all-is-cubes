@@ -53,19 +53,19 @@ where
     C: PixelColor,
     for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
 {
-    let block_size: i32 = ctx.size;
+    let resolution: i32 = ctx.resolution;
     let top_left_2d = object.top_left();
     let bottom_right_2d = object.bottom_right();
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
     // for text drawing, embedded_graphics assumes a Y-down coordinate system.
     let low_block = GridPoint::new(
-        floor_divide(top_left_2d.x, block_size),
-        floor_divide(-bottom_right_2d.y, block_size),
+        floor_divide(top_left_2d.x, resolution),
+        floor_divide(-bottom_right_2d.y, resolution),
         0,
     );
     let high_block = GridPoint::new(
-        ceil_divide(bottom_right_2d.x, block_size),
-        ceil_divide(-top_left_2d.y, block_size),
+        ceil_divide(bottom_right_2d.x, resolution),
+        ceil_divide(-top_left_2d.y, resolution),
         1,
     );
     let block_grid = Grid::new(low_block, high_block - low_block);
@@ -84,7 +84,7 @@ where
 
         object.draw(&mut VoxelDisplayAdapter::new(
             &mut block_space,
-            GridPoint::new(-cube.x * block_size, -cube.y * block_size, ctx.size / 2),
+            GridPoint::new(-cube.x * resolution, -cube.y * resolution, resolution / 2),
         ))?;
         output_space
             .set(

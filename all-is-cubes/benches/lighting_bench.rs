@@ -37,7 +37,7 @@ fn universe_for_lighting_test() -> Universe {
 
     let mut bg = BlockGen {
         universe: &mut universe,
-        size: 16,
+        resolution: 16,
     };
     let blocks = LandscapeBlocks::new(&mut bg);
 

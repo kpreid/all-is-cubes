@@ -263,9 +263,9 @@ mod tests {
 
     #[test]
     fn evaluate_voxels_checked_individually() {
-        let voxel_scale = 4;
+        let resolution = 4;
         let mut universe = Universe::new();
-        let mut bg: BlockGen = BlockGen::new(&mut universe, voxel_scale);
+        let mut bg: BlockGen = BlockGen::new(&mut universe, resolution);
 
         let attributes = BlockAttributes {
             display_name: Cow::Borrowed(&"hello world"),
@@ -284,7 +284,7 @@ mod tests {
         assert_eq!(
             e.voxels,
             Some(GridArray::generate(
-                Grid::new((0, 0, 0), (voxel_scale, voxel_scale, voxel_scale)),
+                Grid::new((0, 0, 0), (resolution, resolution, resolution)),
                 |point| {
                     let point = point.cast::<f32>().unwrap();
                     RGBA::new(point.x, point.y, point.z, 1.0)
