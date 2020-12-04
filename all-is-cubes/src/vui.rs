@@ -99,12 +99,12 @@ impl HudLayout {
             let frame_block = Block::from(RGBA::new(0.0, 1.0, 1.0, 1.0));
             let mut add_frame = |z| {
                 space
-                    .fill(&Grid::new((-1, -1, z), (w + 2, h + 2, 1)), |_| {
+                    .fill(Grid::new((-1, -1, z), (w + 2, h + 2, 1)), |_| {
                         Some(&frame_block)
                     })
                     .unwrap();
                 space
-                    .fill(&Grid::new((0, 0, z), (w, h, 1)), |_| Some(&AIR))
+                    .fill(Grid::new((0, 0, z), (w, h, 1)), |_| Some(&AIR))
                     .unwrap();
             };
             add_frame(0);
@@ -221,7 +221,7 @@ impl HudBlocks {
 
 #[allow(unused)] // TODO: not yet used for real
 pub(crate) fn draw_background(space: &mut Space) {
-    let grid = *space.grid();
+    let grid = space.grid();
     let background_rect = Rectangle::new(
         Point::new(grid.lower_bounds().x, -grid.upper_bounds().y + 1),
         Point::new(grid.upper_bounds().x - 1, -grid.lower_bounds().y),

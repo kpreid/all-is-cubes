@@ -35,7 +35,7 @@ pub fn axes(space: &mut Space) {
         let axis = face.axis_number();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
-            .within_grid(*space.grid());
+            .within_grid(space.grid());
         for step in raycaster {
             let i = step.cube_ahead()[axis] * direction; // always positive
             let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);

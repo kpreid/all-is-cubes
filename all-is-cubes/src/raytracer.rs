@@ -59,7 +59,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         self.0.with(|impl_fields| {
             let cubes = impl_fields.cubes;
             let mut s: TracingState<P> = TracingState::default();
-            for hit in ray.cast().within_grid(*cubes.grid()) {
+            for hit in ray.cast().within_grid(cubes.grid()) {
                 if s.count_step_should_stop() {
                     break;
                 }
@@ -89,7 +89,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         };
                         // TODO: not the right lighting for non-opaque blocks
                         let lighting = self.get_lighting(hit.cube_behind());
-                        for subcube_hit in adjusted_ray.cast().within_grid(*array.grid()) {
+                        for subcube_hit in adjusted_ray.cast().within_grid(array.grid()) {
                             if s.count_step_should_stop() {
                                 break;
                             }
@@ -292,7 +292,7 @@ fn prepare_cubes<'a, P: PixelBuf>(
     indexed_block_data: &'a [TracingBlock<P::BlockData>],
     space: &Space,
 ) -> GridArray<TracingCubeData<'a, P::BlockData>> {
-    space.extract(*space.grid(), |index, _block, lighting| TracingCubeData {
+    space.extract(space.grid(), |index, _block, lighting| TracingCubeData {
         block: &indexed_block_data[index.unwrap() as usize],
         lighting,
     })

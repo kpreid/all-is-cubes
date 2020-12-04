@@ -99,7 +99,7 @@ where
             self.ui_proj.set_viewport(viewport.viewport_px);
 
             // TODO: this belongs in apps code
-            let grid = *ui_renderer.space().borrow().grid();
+            let grid = ui_renderer.space().borrow().grid();
             let mut ui_center = grid.center();
             ui_center.z = grid.upper_bounds().z.into(); // align with "front" face.
 

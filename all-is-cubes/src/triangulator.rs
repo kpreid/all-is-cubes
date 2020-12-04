@@ -349,7 +349,7 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 /// vectors.
 pub fn triangulate_space<BV, GV, A>(
     space: &Space,
-    bounds: &Grid,
+    bounds: Grid,
     blocks_render_data: &BlocksRenderData<BV, A>,
     output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
@@ -458,13 +458,12 @@ mod tests {
     fn excludes_interior_faces() {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 2, 2);
-        let grid = *space.grid();
-        space.fill(&grid, |_| Some(&block)).unwrap();
+        space.fill(space.grid(), |_| Some(&block)).unwrap();
 
         let mut rendering = new_space_buffer();
         triangulate_space::<BlockVertex, BlockVertex, NullTextureAllocator>(
             &space,
-            &space.grid(),
+            space.grid(),
             &triangulate_blocks(&space, &mut NullTextureAllocator),
             &mut rendering,
         );
@@ -502,7 +501,7 @@ mod tests {
         space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
         triangulate_space(
             &space,
-            &space.grid(),
+            space.grid(),
             &blocks_render_data,
             &mut new_space_buffer(),
         );
@@ -530,7 +529,7 @@ mod tests {
         let mut space_rendered = new_space_buffer();
         triangulate_space(
             &outer_space,
-            &outer_space.grid(),
+            outer_space.grid(),
             &blocks_render_data,
             &mut space_rendered,
         );

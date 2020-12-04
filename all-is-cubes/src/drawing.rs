@@ -343,7 +343,7 @@ mod tests {
             Rectangle::new(Point::new(0, 0), Point::new(2, 3)).into_styled(a_primitive_style());
         let space = draw_to_blocks(&mut ctx, drawable).unwrap();
         // Output is at negative Y because coordinate system is flipped.
-        assert_eq!(*space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
+        assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
         if let Block::Recur(_, block_space_ref) = &space[(0, -1, 0)] {
             assert_eq!(
                 block_space_ref.borrow()[(0, 15, 8)].color(),
@@ -361,7 +361,7 @@ mod tests {
         let drawable =
             Rectangle::new(Point::new(-3, -2), Point::new(0, 0)).into_styled(a_primitive_style());
         let space = draw_to_blocks(&mut ctx, drawable).unwrap();
-        assert_eq!(*space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
+        assert_eq!(space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
         if let Block::Recur(_, block_space_ref) = &space[(-1, 0, 0)] {
             assert_eq!(
                 block_space_ref.borrow()[(15, 0, 8)].color(),

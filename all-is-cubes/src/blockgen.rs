@@ -58,9 +58,9 @@ impl<'a> BlockGen<'a> {
         let (block, mut space) = self.new_recursive_block(attributes);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         // TODO: Make this use closer to the same function interface as Space::fill?
-        let grid = *space.grid();
+        let grid = space.grid();
         space
-            .fill(&grid, |point| Some(f(self, point, rng.gen_range(0.0, 1.0))))
+            .fill(grid, |point| Some(f(self, point, rng.gen_range(0.0, 1.0))))
             .unwrap();
         block
     }
@@ -193,7 +193,7 @@ mod tests {
         let ctx = BlockGen::new(&mut universe, 10);
         assert_eq!(
             ctx.new_block_space().grid(),
-            &Grid::new((0, 0, 0), (10, 10, 10))
+            Grid::new((0, 0, 0), (10, 10, 10))
         );
     }
 

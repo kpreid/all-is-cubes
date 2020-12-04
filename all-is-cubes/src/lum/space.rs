@@ -239,7 +239,7 @@ impl Chunk {
         space: &Space,
         blocks_render_data: &BlocksRenderData<GLBlockVertex, BlockGLTexture>,
     ) {
-        triangulate_space(space, &self.bounds, blocks_render_data, &mut self.vertices);
+        triangulate_space(space, self.bounds, blocks_render_data, &mut self.vertices);
 
         for &face in Face::ALL_SEVEN {
             let tess_option = &mut self.tesses[face];

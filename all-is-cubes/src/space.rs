@@ -245,13 +245,13 @@ impl Grid {
     /// ```
     /// use all_is_cubes::space::Grid;
     /// assert!(Grid::new((4, 4, 4), (6, 6, 6)).contains_grid(
-    ///     &Grid::new((4, 4, 4), (6, 6, 6))));
+    ///     Grid::new((4, 4, 4), (6, 6, 6))));
     /// assert!(!Grid::new((4, 4, 4), (6, 6, 6)).contains_grid(
-    ///     &Grid::new((4, 4, 4), (7, 6, 6))));
+    ///     Grid::new((4, 4, 4), (7, 6, 6))));
     /// assert!(!Grid::new((0, 0, 0), (6, 6, 6)).contains_grid(
-    ///     &Grid::new((4, 4, 4), (6, 6, 6))));
+    ///     Grid::new((4, 4, 4), (6, 6, 6))));
     /// ```
-    pub fn contains_grid(&self, other: &Grid) -> bool {
+    pub fn contains_grid(&self, other: Grid) -> bool {
         let self_upper = self.upper_bounds();
         let other_upper = other.upper_bounds();
         for axis in 0..3 {
@@ -443,8 +443,8 @@ impl Space {
 
     /// Returns the [`Grid`] describing the bounds of this space; no blocks may exist
     /// outside it.
-    pub fn grid(&self) -> &Grid {
-        &self.grid
+    pub fn grid(&self) -> Grid {
+        self.grid
     }
 
     /// Returns the internal unstable numeric ID for the block at the given position,
@@ -667,7 +667,7 @@ impl Space {
     /// let mut space = Space::empty_positive(10, 10, 10);
     /// let a_block: Block = RGBA::new(1.0, 0.0, 0.0, 1.0).into();
     ///
-    /// space.fill(&Grid::new((0, 0, 0), (2, 1, 1)), |_point| Some(&a_block)).unwrap();
+    /// space.fill(Grid::new((0, 0, 0), (2, 1, 1)), |_point| Some(&a_block)).unwrap();
     ///
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// assert_eq!(space[(1, 0, 0)], a_block);
@@ -675,7 +675,7 @@ impl Space {
     /// ```
     ///
     /// TODO: Support providing the previous block as a parameter (take cues from `extract`).
-    pub fn fill<F, B>(&mut self, region: &Grid, mut function: F) -> Result<(), SetCubeError>
+    pub fn fill<F, B>(&mut self, region: Grid, mut function: F) -> Result<(), SetCubeError>
     where
         F: FnMut(GridPoint) -> Option<B>,
         B: std::borrow::Borrow<Block>,
@@ -915,8 +915,8 @@ impl<V> GridArray<V> {
     }
 
     /// Returns the [`Grid`] specifying the bounds of this array.
-    pub fn grid(&self) -> &Grid {
-        &self.grid
+    pub fn grid(&self) -> Grid {
+        self.grid
     }
 
     /// Returns the element at `position` of this array, or [`None`] if `position` is out
@@ -1105,7 +1105,7 @@ mod tests {
             block
         });
 
-        assert_eq!(*extracted.grid(), extract_grid);
+        assert_eq!(extracted.grid(), extract_grid);
         assert_eq!(&extracted[(1, 0, 0)], &blocks[1]);
         assert_eq!(&extracted[(1, 1, 0)], &AIR);
     }

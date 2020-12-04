@@ -99,9 +99,9 @@ impl Camera {
         space: URef<Space>,
         direction: impl Into<Vector3<FreeCoordinate>>,
     ) -> Self {
-        let grid: Grid = *space.borrow().grid();
+        let grid: Grid = space.borrow().grid();
 
-        let mut camera = Self::new(space, eye_for_look_at(&grid, direction.into()));
+        let mut camera = Self::new(space, eye_for_look_at(grid, direction.into()));
         camera.body.look_at(grid.center());
 
         camera
@@ -362,7 +362,7 @@ impl ProjectionHelper {
 ///
 /// TODO: This function does not yet consider the effects of field-of-view,
 /// and it will need additional parameters to do so.
-pub fn eye_for_look_at(grid: &Grid, direction: Vector3<FreeCoordinate>) -> Point3<FreeCoordinate> {
+pub fn eye_for_look_at(grid: Grid, direction: Vector3<FreeCoordinate>) -> Point3<FreeCoordinate> {
     let mut space_radius: FreeCoordinate = 0.0;
     for axis in 0..3 {
         space_radius = space_radius.max(grid.size()[axis].into());
@@ -373,7 +373,7 @@ pub fn eye_for_look_at(grid: &Grid, direction: Vector3<FreeCoordinate>) -> Point
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck.
 pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
-    let ray = ray.within_grid(*space.grid());
+    let ray = ray.within_grid(space.grid());
     // TODO: implement 'reach' radius limit
     // Note: it may become the case in the future that we want to pass something more specialized than a RaycastStep, but for now RaycastStep is exactly the right structure.
     for step in ray {

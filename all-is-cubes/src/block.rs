@@ -57,13 +57,11 @@ impl Block {
 
             Block::Recur(attributes, space_ref) => {
                 let block_space = space_ref.try_borrow()?;
-                let voxels = block_space.extract(
-                    *block_space.grid(),
-                    |_index, sub_block_data, _lighting| {
+                let voxels =
+                    block_space.extract(block_space.grid(), |_index, sub_block_data, _lighting| {
                         // TODO: need to also extract solidity info once we start doing collision
                         sub_block_data.evaluated().color
-                    },
-                );
+                    });
                 Ok(EvaluatedBlock {
                     attributes: attributes.clone(),
                     color: RGBA::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels

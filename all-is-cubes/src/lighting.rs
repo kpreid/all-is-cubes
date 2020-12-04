@@ -264,7 +264,7 @@ impl Space {
                 'each_ray: for ray in &face_ray_data.rays[..] {
                     let translated_ray =
                         ray.translate(cube.cast::<FreeCoordinate>().unwrap().to_vec());
-                    let raycaster = translated_ray.cast().within_grid(*self.grid());
+                    let raycaster = translated_ray.cast().within_grid(self.grid());
 
                     // Fraction of the light value that is to be determined by future, rather than past,
                     // tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
