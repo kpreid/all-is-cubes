@@ -234,6 +234,7 @@ mod tests {
     use super::*;
     use crate::blockgen::make_some_blocks;
     use crate::math::RGBA;
+    use crate::raytracer::print_space;
     use crate::universe::Universe;
     use embedded_graphics::primitives::{Primitive, Rectangle};
     use embedded_graphics::style::{PrimitiveStyle, PrimitiveStyleBuilder};
@@ -311,6 +312,8 @@ mod tests {
             ..
         } = &space[(0, -1, 0)]
         {
+            // TODO: This printing does not produce a useful result; fix it.
+            print_space(&*block_space_ref.borrow(), (0., 0., -1.));
             assert_eq!(
                 block_space_ref.borrow()[(0, 15, 8)].color(),
                 a_primitive_color()
@@ -333,6 +336,7 @@ mod tests {
             ..
         } = &space[(-1, 0, 0)]
         {
+            print_space(&*block_space_ref.borrow(), (0., 0., -1.));
             assert_eq!(
                 block_space_ref.borrow()[(15, 0, 8)].color(),
                 a_primitive_color()
