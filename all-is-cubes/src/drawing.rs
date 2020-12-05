@@ -10,7 +10,6 @@ use embedded_graphics::fonts::{Font, Text};
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::style::TextStyleBuilder;
-use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
 use std::borrow::{Borrow, Cow};
 use std::convert::TryInto;
@@ -18,9 +17,9 @@ use std::convert::TryInto;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{Block, BlockAttributes};
+use crate::block::{space_to_blocks, Block, BlockAttributes};
 use crate::blockgen::BlockGen;
-use crate::math::{GridPoint, GridVector, RGB, RGBA};
+use crate::math::{GridPoint, GridVector, RGB};
 use crate::space::{Grid, SetCubeError, Space};
 
 /// Draw text into a [`Space`], extending in the +X and -Y directions from `origin`.
@@ -46,10 +45,12 @@ where
 
 /// Generate a set of blocks which together display the given [`Drawable`] which may be
 /// larger than one block. The Z position is always the middle of the block.
+///
+/// Returns an error if reading the `Drawable`'s blocks fails.
 pub fn draw_to_blocks<D, C>(ctx: &mut BlockGen, object: D) -> Result<Space, SetCubeError>
 where
     for<'a> &'a D: Drawable<C>,
-    D: Dimensions + Transform,
+    D: Dimensions,
     C: PixelColor,
     for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
 {
@@ -58,48 +59,25 @@ where
     let bottom_right_2d = object.bottom_right();
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
     // for text drawing, embedded_graphics assumes a Y-down coordinate system.
-    let low_block = GridPoint::new(
-        floor_divide(top_left_2d.x, resolution),
-        floor_divide(-bottom_right_2d.y, resolution),
-        0,
+    let drawing_grid = Grid::from_lower_upper(
+        (top_left_2d.x, -bottom_right_2d.y, 0),
+        (bottom_right_2d.x, -top_left_2d.y, resolution),
     );
-    let high_block = GridPoint::new(
-        ceil_divide(bottom_right_2d.x, resolution),
-        ceil_divide(-top_left_2d.y, resolution),
-        1,
-    );
-    let block_grid = Grid::new(low_block, high_block - low_block);
-    let mut output_space = Space::empty(block_grid);
 
-    for cube in block_grid.interior_iter() {
-        let mut block_space = ctx.new_block_space();
+    let mut drawing_space = Space::empty(drawing_grid);
+    object.draw(&mut VoxelDisplayAdapter::new(
+        &mut drawing_space,
+        GridPoint::new(0, 0, resolution / 2),
+    ))?;
 
-        if false {
-            // For debugging block bounds chosen for the graphic. TODO: Keep this around
-            // as an option but draw a full bounding box instead.
-            block_space
-                .set((0, 0, 0), Block::from(RGBA::new(1.0, 0.0, 0.0, 1.0)))
-                .expect("can't happen: draw_to_blocks failed to write to its own block space");
-        }
-
-        object.draw(&mut VoxelDisplayAdapter::new(
-            &mut block_space,
-            GridPoint::new(-cube.x * resolution, -cube.y * resolution, resolution / 2),
-        ))?;
-        output_space
-            .set(
-                cube,
-                // TODO: Allow attribute alteration.
-                &Block::Recur {
-                    attributes: BlockAttributes::default(),
-                    offset: GridPoint::origin(),
-                    resolution: ctx.resolution,
-                    space: ctx.universe.insert_anonymous(block_space),
-                },
-            )
-            .expect("can't happen: draw_to_blocks failed to write to its own output space");
-    }
-    Ok(output_space)
+    Ok(space_to_blocks(
+        ctx.resolution,
+        // TODO: give caller control over attributes
+        BlockAttributes::default(),
+        // TODO: give caller control over name used
+        ctx.universe.insert_anonymous(drawing_space),
+    )
+    .unwrap())
 }
 
 /// Adapter to use a [`Space`] as a [`DrawTarget`].
@@ -249,24 +227,6 @@ impl<'a> VoxelBrush<'a> {
 
 impl<'a, 'b> PixelColor for &'a VoxelBrush<'b> {
     type Raw = ();
-}
-
-// TODO: dig up a crate that does this?
-fn ceil_divide(a: i32, b: i32) -> i32 {
-    assert!(b > 0);
-    if a < 0 {
-        a / b
-    } else {
-        (a + b - 1) / b
-    }
-}
-fn floor_divide(a: i32, b: i32) -> i32 {
-    assert!(b > 0);
-    if a > 0 {
-        a / b
-    } else {
-        (a - (b - 1)) / b
-    }
 }
 
 #[cfg(test)]
