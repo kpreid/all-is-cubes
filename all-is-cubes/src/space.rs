@@ -319,7 +319,13 @@ impl Grid {
     /// );
     /// ```
     #[inline]
+    #[track_caller]
     pub fn divide(self, divisor: GridCoordinate) -> Self {
+        assert!(
+            divisor > 0,
+            "Grid::divide: divisor must be > 0, not {}",
+            divisor
+        );
         let upper_bounds = self.upper_bounds();
         Self::from_lower_upper(
             (
@@ -966,12 +972,23 @@ mod tests {
     use std::convert::TryInto;
 
     #[test]
-    fn it_works() {
-        let grid = Grid::new(GridPoint::new(0, 0, 0), [100, 100, 100]);
-        let _space = Space::empty(grid);
+    fn grid_one_cube() {
+        assert_eq!(
+            Grid::new((11, 22, 33), (1, 1, 1)).divide(10),
+            Grid::new((1, 2, 3), (1, 1, 1)),
+        );
+    }
 
-        // TODO: Replace this with something meaningful
-        assert!(grid.volume() == 1000_000);
+    #[test]
+    #[should_panic(expected = "Grid::divide: divisor must be > 0, not 0")]
+    fn grid_divide_zero() {
+        let _ = Grid::new((-10, -10, -10), (20, 20, 20)).divide(0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Grid::divide: divisor must be > 0, not -10")]
+    fn grid_divide_negative() {
+        let _ = Grid::new((-10, -10, -10), (20, 20, 20)).divide(-10);
     }
 
     // TODO: test consistency between the index and get_* methods
