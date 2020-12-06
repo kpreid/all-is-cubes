@@ -15,7 +15,7 @@
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
 use std::convert::TryFrom;
 
-use crate::block::EvaluatedBlock;
+use crate::block::{EvaluatedBlock, Resolution};
 use crate::lighting::PackedLight;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
 use crate::space::{Grid, Space};
@@ -442,17 +442,21 @@ pub trait TextureTile: Clone {
 /// [`TextureAllocator`] which discards all input except for counting calls; for testing.
 ///
 /// This type is public so that it may be used in benchmarks and such.
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct TestTextureAllocator {
-    /// Number of tiles allocated. Does not decrement for deallocations.
+    resolution: GridCoordinate,
     count_allocated: usize,
 }
 
 impl TestTextureAllocator {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(resolution: Resolution) -> Self {
+        Self {
+            resolution: resolution.into(),
+            count_allocated: 0,
+        }
     }
 
+    /// Number of tiles allocated. Does not decrement for deallocations.
     pub fn count_allocated(&self) -> usize {
         self.count_allocated
     }
@@ -462,7 +466,7 @@ impl TextureAllocator for TestTextureAllocator {
     type Tile = TestTextureTile;
 
     fn resolution(&self) -> GridCoordinate {
-        14 // an arbitrary size
+        self.resolution
     }
 
     fn allocate(&mut self) -> Self::Tile {
@@ -515,7 +519,7 @@ mod tests {
         triangulate_space::<BlockVertex, BlockVertex, TestTextureAllocator>(
             &space,
             space.grid(),
-            &triangulate_blocks(&space, &mut TestTextureAllocator::new()),
+            &triangulate_blocks(&space, &mut TestTextureAllocator::new(43)),
             &mut rendering,
         );
         let rendering_flattened: Vec<BlockVertex> = rendering
@@ -545,7 +549,7 @@ mod tests {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 1, 1);
         let blocks_render_data: BlocksRenderData<BlockVertex, _> =
-            triangulate_blocks(&space, &mut TestTextureAllocator::new());
+            triangulate_blocks(&space, &mut TestTextureAllocator::new(43));
         assert_eq!(blocks_render_data.len(), 1); // check our assumption
 
         // This should not panic; visual glitches are preferable to failure.
@@ -558,6 +562,8 @@ mod tests {
         );
     }
 
+    /// Construct a 1x1 recursive block and test that this is equivalent in geometry
+    /// to an atom block.
     #[test]
     fn trivial_subcube_rendering() {
         let mut u = Universe::new();
@@ -575,7 +581,7 @@ mod tests {
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 
         let blocks_render_data: BlocksRenderData<BlockVertex, _> =
-            triangulate_blocks(&outer_space, &mut TestTextureAllocator::new());
+            triangulate_blocks(&outer_space, &mut TestTextureAllocator::new(1));
         let block_render_data: BlockRenderData<_, _> = blocks_render_data[0].clone();
 
         eprintln!("{:#?}", blocks_render_data);
@@ -596,7 +602,8 @@ mod tests {
 
     #[test]
     fn test_texture_allocator() {
-        let mut allocator = TestTextureAllocator::new();
+        let mut allocator = TestTextureAllocator::new(123);
+        assert_eq!(allocator.resolution(), 123);
         assert_eq!(allocator.count_allocated(), 0);
         let _ = allocator.allocate();
         let _ = allocator.allocate();

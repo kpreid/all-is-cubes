@@ -61,7 +61,7 @@ fn checkerboard_setup() -> (Space, BlocksRenderData<BlockVertex, TestTextureAllo
         })
         .unwrap();
 
-    let blocks_render_data = triangulate_blocks(&space, &mut TestTextureAllocator::new());
+    let blocks_render_data = triangulate_blocks(&space, &mut TestTextureAllocator::new(16));
 
     (space, blocks_render_data)
 }
