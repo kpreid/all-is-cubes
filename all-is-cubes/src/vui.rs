@@ -6,17 +6,17 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
-use cgmath::Vector2;
+use cgmath::{EuclideanSpace as _, Vector2};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::prelude::{Drawable, Pixel, Primitive};
+use embedded_graphics::prelude::{Drawable, Pixel, Primitive, Transform as _};
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
-use crate::block::{Block, BlockAttributes, Resolution, AIR};
+use crate::block::{space_to_blocks, Block, BlockAttributes, AIR};
 use crate::blockgen::BlockGen;
-use crate::drawing::{draw_to_blocks, VoxelBrush, VoxelDisplayAdapter};
+use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
@@ -36,7 +36,7 @@ pub(crate) struct Vui {
 impl Vui {
     pub fn new() -> Self {
         let mut universe = Universe::new();
-        let hud_blocks = HudBlocks::new(&mut universe);
+        let hud_blocks = HudBlocks::new(&mut BlockGen::new(&mut universe, 16));
         let hud_space = HudLayout::default().new_space(&mut universe, &hud_blocks);
 
         Self {
@@ -167,17 +167,21 @@ struct HudBlocks {
 }
 
 impl HudBlocks {
-    fn new(universe: &mut Universe) -> Self {
-        // TODO: if we introduce a `Block` that contains voxels directly,
-        // we won't need a `Universe` parameter here.
-
+    fn new(blockgen: &mut BlockGen) -> Self {
+        let resolution = GridCoordinate::from(blockgen.resolution);
         // TODO: This toolbar graphic is a "get the bugs in the drawing tools worked out"
         // placeholder for better art...
 
-        let resolution = 16;
+        // Draw toolbar icon frame, twice so we can have start-middle-end shapes.
+        let toolbar_frame_block_grid = Grid::new((-1, -1, -1), (5, 3, 3));
+        let toolbar_frame_voxel_grid = toolbar_frame_block_grid.multiply(resolution);
+        let mut toolbar_drawing_space = Space::empty(toolbar_frame_voxel_grid);
+        let display =
+            &mut VoxelDisplayAdapter::new(&mut toolbar_drawing_space, GridPoint::origin());
+
         let padding = 4;
         let stroke_width = 1;
-        let drawable = Rectangle::new(
+        let icon_background_rectangle = Rectangle::new(
             // TODO: confirm these offsets are exactly right
             Point::new(-padding - stroke_width, -padding - resolution),
             Point::new(resolution + padding, padding + stroke_width),
@@ -189,9 +193,17 @@ impl HudBlocks {
                 .stroke_width(stroke_width as u32)
                 .build(),
         );
-        let blocks_temp_space = draw_to_blocks(
-            &mut BlockGen::new(universe, resolution as Resolution),
-            drawable,
+        icon_background_rectangle.draw(display).unwrap();
+        icon_background_rectangle
+            .translate(Point::new(resolution * 2, 0))
+            .draw(display)
+            .unwrap();
+
+        // TODO: use a name for the space
+        let toolbar_blocks_space = space_to_blocks(
+            blockgen.resolution,
+            BlockAttributes::default(),
+            blockgen.universe.insert_anonymous(toolbar_drawing_space),
         )
         .unwrap();
 
@@ -200,7 +212,7 @@ impl HudBlocks {
             VoxelBrush::new(
                 points
                     .interior_iter()
-                    .map(|p| (p, blocks_temp_space[p].clone()))
+                    .map(|p| (p, toolbar_blocks_space[p].clone()))
                     .collect(),
             )
         };
@@ -213,8 +225,8 @@ impl HudBlocks {
                 .translate((-1, 0, 0)),
             toolbar_left_cap: slice_drawing(Grid::from_lower_upper((-1, -1, -1), (0, 2, 2)))
                 .translate((1, 0, 0)),
-            toolbar_right_cap: slice_drawing(Grid::from_lower_upper((1, -1, -1), (2, 2, 2)))
-                .translate((-1, 0, 0)),
+            toolbar_right_cap: slice_drawing(Grid::from_lower_upper((3, -1, -1), (4, 2, 2)))
+                .translate((-3, 0, 0)),
         }
     }
 }
