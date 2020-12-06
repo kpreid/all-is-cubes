@@ -135,7 +135,7 @@ impl<V, A> Clone for BlockRenderData<V, A>
 where
     V: From<BlockVertex> + Clone,
     A: TextureAllocator,
- {
+{
     fn clone(&self) -> Self {
         Self {
             faces: self.faces.clone(),
@@ -289,18 +289,20 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             .cast::<GridCoordinate>()
                             .unwrap();
 
-                            let obscuring_cube = cube + face.normal_vector();
-                            let obscured = voxels
-                                .get(obscuring_cube)
-                                .map(|c| c.fully_opaque())
-                                .unwrap_or(false);
-                            if !obscured {
-                                layer_is_visible_somewhere = true;
-                            }
-
                             // Diagnose out-of-space accesses. TODO: Tidy this up and document it, or remove it:
                             // it will happen whenever the space is the wrong size for the textures.
                             let color = voxels.get(cube).unwrap_or(&out_of_bounds_color);
+
+                            if !color.fully_transparent() && {
+                                // Compute whether this voxel is not hidden behind another
+                                let obscuring_cube = cube + face.normal_vector();
+                                !voxels
+                                    .get(obscuring_cube)
+                                    .map(|c| c.fully_opaque())
+                                    .unwrap_or(false)
+                            } {
+                                layer_is_visible_somewhere = true;
+                            }
 
                             if layer == 0 && !color.fully_opaque() {
                                 // If the first layer is transparent somewhere...
@@ -580,8 +582,9 @@ mod tests {
         let mut outer_space = Space::empty_positive(1, 1, 1);
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 
+        let mut tex = TestTextureAllocator::new(1);
         let blocks_render_data: BlocksRenderData<BlockVertex, _> =
-            triangulate_blocks(&outer_space, &mut TestTextureAllocator::new(1));
+            triangulate_blocks(&outer_space, &mut tex);
         let block_render_data: BlockRenderData<_, _> = blocks_render_data[0].clone();
 
         eprintln!("{:#?}", blocks_render_data);
@@ -597,6 +600,51 @@ mod tests {
         assert_eq!(
             space_rendered,
             block_render_data.faces.map(|_, frd| frd.vertices.to_vec())
+        );
+        assert_eq!(
+            tex.count_allocated(),
+            6,
+            "Should be only 6 cube face textures"
+        );
+    }
+
+    /// Check for hidden surfaces being given textures.
+    #[test]
+    fn no_extraneous_layers() {
+        let resolution = 8;
+        let mut u = Universe::new();
+        let mut inner_block_space = Space::empty(Grid::for_block(resolution));
+        let filler_block = make_some_blocks(1).swap_remove(0);
+        inner_block_space
+            .fill(Grid::new((2, 2, 2), (4, 4, 4)), |_| Some(&filler_block))
+            .unwrap();
+        let inner_block = Block::Recur {
+            attributes: BlockAttributes::default(),
+            offset: GridPoint::origin(),
+            resolution: 16,
+            space: u.insert_anonymous(inner_block_space),
+        };
+        let mut outer_space = Space::empty_positive(1, 1, 1);
+        outer_space.set((0, 0, 0), &inner_block).unwrap();
+
+        let mut tex = TestTextureAllocator::new(resolution);
+        let blocks_render_data: BlocksRenderData<BlockVertex, _> =
+            triangulate_blocks(&outer_space, &mut tex);
+
+        eprintln!("{:#?}", blocks_render_data);
+        let mut space_rendered = new_space_buffer();
+        triangulate_space(
+            &outer_space,
+            outer_space.grid(),
+            &blocks_render_data,
+            &mut space_rendered,
+        );
+        eprintln!("{:#?}", space_rendered);
+
+        assert_eq!(
+            tex.count_allocated(),
+            6,
+            "Should be only 6 cube face textures"
         );
     }
 
