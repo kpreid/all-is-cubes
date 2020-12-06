@@ -107,7 +107,7 @@ impl BlockGLTexture {
         let layout = AtlasLayout {
             resolution: 16,
             row_length: 8,
-            layer_count: 32,
+            layer_count: 64,
             border: 3,
         };
 
