@@ -302,9 +302,13 @@ impl Grid {
 
     /// Scales the grid down by the given factor, rounding outward.
     ///
-    /// ```
-    /// use all_is_cubes::space::Grid;
+    /// For example, this may be used to convert from voxels (subcubes) to blocks or
+    /// blocks to [chunks](crate::chunking).
     ///
+    /// Panics if the divisor is not positive.
+    ///
+    /// ```
+    /// # use all_is_cubes::space::Grid;
     /// assert_eq!(
     ///     Grid::new((-10, -10, -10), (20, 20, 20)).divide(10),
     ///     Grid::new((-1, -1, -1), (2, 2, 2)),
@@ -339,6 +343,26 @@ impl Grid {
                 (upper_bounds.z + divisor - 1).div_euclid(divisor),
             ),
         )
+    }
+
+    /// Scales the grid up by the given factor.
+    ///
+    /// Panics if the scale is zero.
+    ///
+    /// ```
+    /// # use all_is_cubes::space::Grid;
+    /// assert_eq!(
+    ///     Grid::new((-1, 2, 3), (4, 5, 6)).multiply(10),
+    ///     Grid::new((-10, 20, 30), (40, 50, 60)),
+    /// );
+    /// ```
+    #[inline]
+    #[track_caller]
+    pub fn multiply(self, scale: GridCoordinate) -> Self {
+        // Note: This restriction exists only because zero volume Grids are not
+        // permitted, and if we change that, this should match.
+        assert!(scale != 0, "Grid::multiply: scale must be != 0");
+        Self::new(self.lower_bounds * scale, self.sizes * scale)
     }
 }
 
