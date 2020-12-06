@@ -112,8 +112,12 @@ impl<V: From<BlockVertex>> Default for FaceRenderData<V> {
 }
 
 /// Describes how to draw a block. Pass it to [`triangulate_space`] to use it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BlockRenderData<V: From<BlockVertex>, A: TextureAllocator> {
+#[derive(Debug, PartialEq, Eq)]
+pub struct BlockRenderData<V, A>
+where
+    V: From<BlockVertex>,
+    A: TextureAllocator,
+{
     /// Vertices grouped by the face they belong to.
     ///
     /// All triangles which are on the surface of the cube (such that they may be omitted
@@ -124,6 +128,20 @@ pub struct BlockRenderData<V: From<BlockVertex>, A: TextureAllocator> {
     /// Texture tiles used by the vertices; holding these objects ensures the texture
     /// coordinates stay valid.
     textures_used: Vec<A::Tile>,
+}
+
+/// Manual implementation of `Clone` to avoid the constraint `A: Clone`.
+impl<V, A> Clone for BlockRenderData<V, A>
+where
+    V: From<BlockVertex> + Clone,
+    A: TextureAllocator,
+ {
+    fn clone(&self) -> Self {
+        Self {
+            faces: self.faces.clone(),
+            textures_used: self.textures_used.clone(),
+        }
+    }
 }
 
 impl<V: From<BlockVertex>, A: TextureAllocator> Default for BlockRenderData<V, A> {
@@ -403,14 +421,14 @@ pub trait TextureAllocator {
     /// Edge length of the texture tiles
     fn resolution(&self) -> GridCoordinate;
 
-    /// Allocate a tile, whose texture coordinates will be available as long as the Tile
-    /// value is not dropped.
+    /// Allocate a tile, whose texture coordinates will be available as long as the `Tile`
+    /// value, and its clones, are not dropped.
     fn allocate(&mut self) -> Self::Tile;
 }
 
 /// 2D texture to paint block faces into. It is assumed that when this value is dropped,
 /// the texture allocation will be released.
-pub trait TextureTile {
+pub trait TextureTile: Clone {
     /// Transform a unit-square texture coordinate for the tile ([0..1] in each
     /// component) into a general texture coordinate.
     fn texcoord(&self, in_tile: Vector2<TextureCoordinate>) -> Vector3<TextureCoordinate>;
@@ -421,17 +439,49 @@ pub trait TextureTile {
     fn write(&mut self, data: &[Texel]);
 }
 
-/// [`TextureAllocator`] which discards all input; for testing.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct NullTextureAllocator;
-impl TextureAllocator for NullTextureAllocator {
-    type Tile = ();
+/// [`TextureAllocator`] which discards all input except for counting calls; for testing.
+///
+/// This type is public so that it may be used in benchmarks and such.
+#[derive(Default, Debug, Eq, PartialEq)]
+pub struct TestTextureAllocator {
+    /// Number of tiles allocated. Does not decrement for deallocations.
+    count_allocated: usize,
+}
+
+impl TestTextureAllocator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn count_allocated(&self) -> usize {
+        self.count_allocated
+    }
+}
+
+impl TextureAllocator for TestTextureAllocator {
+    type Tile = TestTextureTile;
+
     fn resolution(&self) -> GridCoordinate {
         14 // an arbitrary size
     }
-    fn allocate(&mut self) {}
+
+    fn allocate(&mut self) -> Self::Tile {
+        self.count_allocated += 1;
+        TestTextureTile {
+            data_length: usize::try_from(self.resolution()).unwrap().pow(2),
+        }
+    }
 }
-impl TextureTile for () {
+
+/// Tile type for [`TestTextureAllocator`].
+///
+/// This type is public so that it may be used in benchmarks and such.
+#[derive(Clone, Debug)]
+pub struct TestTextureTile {
+    data_length: usize,
+}
+
+impl TextureTile for TestTextureTile {
     fn texcoord(&self, in_tile: Vector2<TextureCoordinate>) -> Vector3<TextureCoordinate> {
         in_tile.extend(0.0)
     }
@@ -439,8 +489,8 @@ impl TextureTile for () {
     fn write(&mut self, data: &[(u8, u8, u8, u8)]) {
         // Validate data size.
         assert_eq!(
-            GridCoordinate::try_from(data.len()).expect("tile data way too big"),
-            NullTextureAllocator.resolution().pow(2),
+            data.len(),
+            self.data_length,
             "tile data did not match resolution"
         );
     }
@@ -462,10 +512,10 @@ mod tests {
         space.fill(space.grid(), |_| Some(&block)).unwrap();
 
         let mut rendering = new_space_buffer();
-        triangulate_space::<BlockVertex, BlockVertex, NullTextureAllocator>(
+        triangulate_space::<BlockVertex, BlockVertex, TestTextureAllocator>(
             &space,
             space.grid(),
-            &triangulate_blocks(&space, &mut NullTextureAllocator),
+            &triangulate_blocks(&space, &mut TestTextureAllocator::new()),
             &mut rendering,
         );
         let rendering_flattened: Vec<BlockVertex> = rendering
@@ -495,7 +545,7 @@ mod tests {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 1, 1);
         let blocks_render_data: BlocksRenderData<BlockVertex, _> =
-            triangulate_blocks(&space, &mut NullTextureAllocator);
+            triangulate_blocks(&space, &mut TestTextureAllocator::new());
         assert_eq!(blocks_render_data.len(), 1); // check our assumption
 
         // This should not panic; visual glitches are preferable to failure.
@@ -525,7 +575,7 @@ mod tests {
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 
         let blocks_render_data: BlocksRenderData<BlockVertex, _> =
-            triangulate_blocks(&outer_space, &mut NullTextureAllocator);
+            triangulate_blocks(&outer_space, &mut TestTextureAllocator::new());
         let block_render_data: BlockRenderData<_, _> = blocks_render_data[0].clone();
 
         eprintln!("{:#?}", blocks_render_data);
@@ -542,6 +592,15 @@ mod tests {
             space_rendered,
             block_render_data.faces.map(|_, frd| frd.vertices.to_vec())
         );
+    }
+
+    #[test]
+    fn test_texture_allocator() {
+        let mut allocator = TestTextureAllocator::new();
+        assert_eq!(allocator.count_allocated(), 0);
+        let _ = allocator.allocate();
+        let _ = allocator.allocate();
+        assert_eq!(allocator.count_allocated(), 2);
     }
 
     // TODO: more tests

@@ -6,7 +6,7 @@ use all_is_cubes::math::Face;
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::triangulator::{
     new_space_buffer, triangulate_blocks, triangulate_space, BlockVertex, BlocksRenderData,
-    NullTextureAllocator,
+    TestTextureAllocator,
 };
 
 pub fn triangulator_bench(c: &mut Criterion) {
@@ -48,7 +48,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
     });
 }
 
-fn checkerboard_setup() -> (Space, BlocksRenderData<BlockVertex, NullTextureAllocator>) {
+fn checkerboard_setup() -> (Space, BlocksRenderData<BlockVertex, TestTextureAllocator>) {
     let grid = Grid::new((0, 0, 0), (16, 16, 16));
     let mut space = Space::empty(grid);
     let mut blocks = make_some_blocks(2);
@@ -61,7 +61,7 @@ fn checkerboard_setup() -> (Space, BlocksRenderData<BlockVertex, NullTextureAllo
         })
         .unwrap();
 
-    let blocks_render_data = triangulate_blocks(&space, &mut NullTextureAllocator);
+    let blocks_render_data = triangulate_blocks(&space, &mut TestTextureAllocator::new());
 
     (space, blocks_render_data)
 }
