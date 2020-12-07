@@ -303,7 +303,7 @@ impl Grid {
     /// Scales the grid down by the given factor, rounding outward.
     ///
     /// For example, this may be used to convert from voxels (subcubes) to blocks or
-    /// blocks to [chunks](crate::chunking).
+    /// blocks to chunks.
     ///
     /// Panics if the divisor is not positive.
     ///
@@ -494,7 +494,7 @@ impl Space {
 
     /// Copy data out of a portion of the space in a caller-chosen format.
     ///
-    /// If the provided [`grid`] contains portions outside of this space's grid,
+    /// If the provided [`Grid`] contains portions outside of this space's grid,
     /// those positions in the output will be treated as if they are filled with [`AIR`]
     /// and light of the [`Space::sky_color`].
     pub fn extract<V>(

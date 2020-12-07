@@ -1,9 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! Dumping ground for stuff that hasn't gotten big enough to put in a well-named module yet.
-//!
-//! also somewhat themed around “things that we could imagine being in the standard library”.
+//! Tools that we could imagine being in the Rust standard library, but aren't.
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::fmt;

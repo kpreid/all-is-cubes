@@ -1,7 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! VUI stands for Voxel User Interface.
+//! Voxel User Interface.
 //!
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
