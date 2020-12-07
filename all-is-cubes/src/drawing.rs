@@ -2,7 +2,9 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 //! Draw 2D graphics into spaces and blocks, including text, using an adapter for the
-//! `embedded_graphics` crate.
+//! [`embedded_graphics`] crate.
+//!
+//! The [`VoxelBrush`] type can also be useful in direct 3D drawing.
 
 use cgmath::EuclideanSpace as _;
 use embedded_graphics::drawable::{Drawable, Pixel};
@@ -124,17 +126,6 @@ impl VoxelDisplayAdapter<'_> {
         self.origin + GridVector::new(point.x, -point.y, 0)
     }
 
-    /// Converts the return value of [`Space::set`] to the return value of
-    /// [`DrawTarget::draw_pixel`], by making out-of-bounds not an error.
-    fn handle_set_result(result: Result<bool, SetCubeError>) -> Result<(), SetCubeError> {
-        match result {
-            Ok(_) => Ok(()),
-            // Drawing out of bounds is not an error.
-            Err(SetCubeError::OutOfBounds) => Ok(()),
-            Err(e) => Err(e),
-        }
-    }
-
     /// Common implementation for the [`DrawTarget`] size methods
     fn size_for_eg(&self) -> Size {
         let size = self.space.grid().size();
@@ -157,7 +148,7 @@ where
     fn draw_pixel(&mut self, pixel: Pixel<C>) -> Result<(), Self::Error> {
         let Pixel(point, color) = pixel;
         // TODO: Allow customizing block attributes.
-        Self::handle_set_result(self.space.set(self.convert_point(point), &color.into()))
+        ignore_out_of_bounds(self.space.set(self.convert_point(point), &color.into()))
     }
 
     fn size(&self) -> Size {
@@ -172,11 +163,7 @@ impl DrawTarget<&'_ VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
 
     fn draw_pixel(&mut self, pixel: Pixel<&VoxelBrush>) -> Result<(), Self::Error> {
         let Pixel(point, brush) = pixel;
-        let point = self.convert_point(point);
-        for (offset, block) in &brush.0 {
-            Self::handle_set_result(self.space.set(point + offset.to_vec(), Cow::borrow(block)))?;
-        }
-        Ok(())
+        brush.paint(self.space, self.convert_point(point))
     }
 
     fn size(&self) -> Size {
@@ -204,7 +191,8 @@ impl From<Rgb888> for Block {
     }
 }
 
-/// A "color" that is a set of independently colored and offset layers.
+/// A shape of multiple blocks to “paint” with. This may be used to make copies of a
+/// simple shape, or to make multi-layered "2.5D" drawings using [`VoxelDisplayAdapter`].
 ///
 /// Note that only `&VoxelBrush` implements [`PixelColor`]; this is because `PixelColor`
 /// requires a value implementing [`Copy`].
@@ -236,6 +224,18 @@ impl<'a> VoxelBrush<'a> {
         Self::new(vec![((0, 0, 0), block)])
     }
 
+    /// Copies each of the brush's blocks into the `Space` relative to the given origin
+    /// point.
+    ///
+    /// Unlike [`Space::set`], it is not considered an error if any of the affected cubes
+    /// fall outside of the `Space`'s bounds.
+    pub fn paint(&self, space: &mut Space, origin: GridPoint) -> Result<(), SetCubeError> {
+        for (offset, block) in &self.0 {
+            ignore_out_of_bounds(space.set(origin + offset.to_vec(), Cow::borrow(block)))?;
+        }
+        Ok(())
+    }
+
     /// Converts a `VoxelBrush` with borrowed blocks to one with owned blocks.
     pub fn into_owned(self) -> VoxelBrush<'static> {
         VoxelBrush(
@@ -259,6 +259,17 @@ impl<'a> VoxelBrush<'a> {
 
 impl<'a, 'b> PixelColor for &'a VoxelBrush<'b> {
     type Raw = ();
+}
+
+/// Converts the return value of [`Space::set`] to the return value of
+/// [`DrawTarget::draw_pixel`], by making out-of-bounds not an error.
+fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCubeError> {
+    match result {
+        Ok(_) => Ok(()),
+        // Drawing out of bounds is not an error.
+        Err(SetCubeError::OutOfBounds) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 // TODO: dig up a crate that does this?
