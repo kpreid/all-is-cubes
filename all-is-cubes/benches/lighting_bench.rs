@@ -2,7 +2,7 @@ use all_is_cubes::linking::BlockProvider;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::time::Duration;
 
-use all_is_cubes::content::demo::install_landscape_blocks;
+use all_is_cubes::content::blocks::install_landscape_blocks;
 use all_is_cubes::space::{Grid, Space, SpaceStepInfo};
 use all_is_cubes::universe::{Universe, UniverseIndex as _};
 use all_is_cubes::worldgen::{axes, wavy_landscape};

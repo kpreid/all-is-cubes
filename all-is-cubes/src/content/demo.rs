@@ -3,81 +3,250 @@
 
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
 
-use cgmath::Vector3;
+use std::error::Error;
+
+use cgmath::{Basis2, InnerSpace, Rad, Rotation, Rotation2, Vector2, Vector3};
 use embedded_graphics::fonts::Font8x16;
 use embedded_graphics::fonts::Text;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
-use noise::Seedable as _;
 
-use crate::block::{Block, Resolution};
+use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
+use crate::content::blocks::{install_demo_blocks, DemoBlocks};
 use crate::content::logo_text;
-use crate::drawing::draw_to_blocks;
+use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::BlockProvider;
-use crate::math::{GridPoint, GridVector, NoiseFnExt as _, NotNan, RGB, RGBA};
+use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, RGB, RGBA};
+use crate::raycast::Raycaster;
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
-use crate::universe::{InsertError, Name, Universe, UniverseIndex};
+use crate::universe::{Name, Universe, UniverseIndex};
 use crate::worldgen::{axes, wavy_landscape};
 
 /// Creates a [`Universe`] with some content for a "new game", as much as that can exist.
 pub fn new_universe_with_stuff() -> Universe {
-    new_universe_with_space_setup(new_landscape_space)
+    new_universe_with_space_setup(demo_city)
 }
 
-fn new_landscape_space(universe: &mut Universe) -> Space {
-    let mut bg = BlockGen {
+fn demo_city(universe: &mut Universe) -> Space {
+    let bg = BlockGen {
         universe,
         resolution: 16,
     };
-    let blocks = BlockProvider::<LandscapeBlocks>::using(bg.universe).unwrap();
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(bg.universe).unwrap();
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(bg.universe).unwrap();
+    use DemoBlocks::*;
 
-    let text_blocks: Space = draw_to_blocks(
-        &mut bg,
-        Text::new("Hello block world", Point::new(0, 0)).into_styled(
-            TextStyleBuilder::new(Font8x16)
-                .text_color(Rgb888::new(120, 100, 200))
-                .build(),
-        ),
-    )
-    .unwrap();
+    // Layout parameters
+    let road_radius = 2;
+    let lamp_position_radius = road_radius + 2;
+    let exhibit_front_radius = lamp_position_radius + 2;
+    let lamp_spacing = 20;
+    let sky_height = 30;
+    let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
+    let radius_xz = 60;
 
-    let axis_block = {
-        let mut space = bg.new_block_space();
-        axes(&mut space);
-        Block::builder()
-            .display_name("Block Axes Test")
-            .voxels_ref(bg.resolution, bg.universe.insert_anonymous(space))
-            .build()
-    };
+    // Prepare brushes.
+    let lamp_brush = VoxelBrush::new(vec![
+        ((0, 0, 0), &*demo_blocks[Lamppost]),
+        ((0, 1, 0), &*demo_blocks[Lamppost]),
+        ((0, 2, 0), &*demo_blocks[Lamppost]),
+        ((0, 3, 0), &*demo_blocks[Lamp]),
+    ]);
 
-    let radius_xz = 50;
-    let diameter_xz = radius_xz * 2 + 1;
-    let grid = Grid::new(
-        (-radius_xz, -16, -radius_xz),
-        (diameter_xz, 33, diameter_xz),
-    );
-    let mut space = Space::empty(grid);
-    wavy_landscape(grid, &mut space, &blocks, 1.0);
-    axes(&mut space);
-    let _ = space.set((-1, 3, -1), axis_block);
+    // Construct space.
+    let mut space = Space::empty(Grid::from_lower_upper(
+        (-radius_xz, -ground_depth, -radius_xz),
+        (radius_xz, sky_height, radius_xz),
+    ));
+    space.set_sky_color(RGB::new(0.9, 0.9, 1.4));
 
-    // Large banner text
-    logo_text(GridPoint::new(0, 8, -radius_xz), &mut space);
-
-    // Small test text
-    let text_offset = GridVector::new(-16, 3, -14);
+    // Fill in flat ground
     space
-        .fill(text_blocks.grid().translate(text_offset), |cube| {
-            Some(&text_blocks[cube - text_offset])
-        })
+        .fill(
+            Grid::from_lower_upper(
+                (-radius_xz, -ground_depth, -radius_xz),
+                (radius_xz, 0, radius_xz),
+            ),
+            |_| Some(landscape_blocks[LandscapeBlocks::Stone].clone()), // TODO: fix design so no clone needed
+        )
         .unwrap();
+    space
+        .fill(
+            Grid::from_lower_upper((-radius_xz, 0, -radius_xz), (radius_xz, 1, radius_xz)),
+            |_| Some(landscape_blocks[LandscapeBlocks::Grass].clone()), // TODO: fix design so no clone needed
+        )
+        .unwrap();
+
+    // Roads and lamps
+    for face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
+        let forward: GridVector = face.normal_vector();
+        let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
+            .within_grid(space.grid());
+        for (i, step) in raycaster.enumerate() {
+            let i = i as GridCoordinate;
+            let perpendicular: GridVector = forward.cross(Face::PY.normal_vector());
+            for p in -road_radius..=road_radius {
+                space
+                    .set(step.cube_ahead() + perpendicular * p, &*demo_blocks[Road])
+                    .unwrap();
+            }
+
+            if (i - lamp_position_radius) % lamp_spacing == 0 {
+                for p in &[-lamp_position_radius, lamp_position_radius] {
+                    lamp_brush
+                        .paint(
+                            &mut space,
+                            step.cube_ahead() + GridVector::new(0, 1, 0) + perpendicular * *p,
+                        )
+                        .unwrap();
+                }
+            }
+        }
+    }
+
+    axes(&mut space);
+
+    // Landscape filling one quadrant
+    let landscape_region = Grid::from_lower_upper(
+        [-radius_xz, -ground_depth * 8 / 10, -radius_xz],
+        [-exhibit_front_radius, sky_height, -exhibit_front_radius],
+    );
+    space.fill(landscape_region, |_| Some(&AIR)).unwrap();
+    wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0);
+
+    // Exhibits
+    // TODO: Generalize this so it can use all directions and sides of roads
+    let mut exhibit_x = exhibit_front_radius + 1;
+    for exhibit in DEMO_CITY_EXHIBITS {
+        // Align lower bound of footprint with starting point
+        exhibit_x -= exhibit.footprint.lower_bounds().x;
+        let translation = GridVector::new(
+            exhibit_x,
+            1,
+            -exhibit_front_radius - exhibit.footprint.upper_bounds().z,
+        );
+        let translated_footprint = exhibit.footprint.translate(translation);
+
+        // Mark the exhibit bounds
+        // TODO: Design a unique block for this
+        let enclosure = Grid::from_lower_upper(
+            translated_footprint.lower_bounds().map(|x| x - 1),
+            [
+                translated_footprint.upper_bounds().x + 1,
+                1,
+                translated_footprint.upper_bounds().z + 1,
+            ],
+        );
+        space
+            .fill(enclosure, |_| {
+                Some(&*landscape_blocks[LandscapeBlocks::Stone])
+            })
+            .unwrap();
+
+        // Write exhibit content
+        let exhibit_space = (exhibit.factory)(exhibit, universe)
+            .expect("TODO: place an error marker and continue instead");
+        space
+            .fill(translated_footprint, |p| {
+                Some(&exhibit_space[p - translation])
+            })
+            .expect("TODO: place an error marker and continue instead");
+
+        // Line up for the next exhibit
+        exhibit_x += exhibit.footprint.upper_bounds().x + 3;
+    }
+
+    logo_text(GridPoint::new(0, 12, -radius_xz), &mut space);
 
     space
 }
+
+struct Exhibit {
+    name: &'static str,
+    footprint: Grid,
+    factory: fn(&Exhibit, &mut Universe) -> Result<Space, Box<dyn Error>>,
+}
+
+static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
+    Exhibit {
+        name: "Placeholder",
+        footprint: Grid::new_c([0, 0, 0], [1, 1, 1]),
+        factory: |_, universe| {
+            let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+            let mut space = Space::empty_positive(1, 1, 1);
+            space.set([0, 0, 0], demo_blocks[DemoBlocks::Lamp].clone())?;
+            Ok(space)
+        },
+    },
+    Exhibit {
+        name: "Knot",
+        footprint: Grid::new_c([-2, -2, -1], [5, 5, 3]),
+        factory: |this, universe| {
+            let resolution = 16;
+            let toroidal_radius = 24.;
+            let knot_split_radius = 9.;
+            let strand_radius = 6.;
+            let twists = 2.5;
+
+            let mut drawing_space = Space::empty(this.footprint.multiply(resolution));
+            let paint = Block::from(RGBA::new(0.9, 0.9, 0.9, 1.0));
+            drawing_space.fill(drawing_space.grid(), |p| {
+                // Measure from midpoint of odd dimension space
+                let p = p - Vector3::new(1, 1, 1) * (resolution / 2);
+                // Work in floating point
+                let p = p.map(FreeCoordinate::from);
+
+                let cylindrical = Vector2::new((p.x.powi(2) + p.y.powi(2)).sqrt(), p.z);
+                let torus_cross_section = cylindrical - Vector2::new(toroidal_radius, 0.);
+                let angle = Rad(p.x.atan2(p.y));
+                let rotated_cross_section =
+                    Basis2::from_angle(angle * twists).rotate_vector(torus_cross_section);
+                let knot_center_1 = rotated_cross_section - Vector2::new(knot_split_radius, 0.);
+                let knot_center_2 = rotated_cross_section + Vector2::new(knot_split_radius, 0.);
+
+                if knot_center_1.magnitude() < strand_radius
+                    || knot_center_2.magnitude() < strand_radius
+                {
+                    Some(&paint)
+                } else {
+                    None
+                }
+            })?;
+            let space = space_to_blocks(
+                16,
+                BlockAttributes {
+                    display_name: this.name.into(),
+                    collision: BlockCollision::None,
+                    ..BlockAttributes::default()
+                },
+                universe.insert_anonymous(drawing_space),
+            )?;
+            Ok(space)
+        },
+    },
+    Exhibit {
+        name: "Text",
+        footprint: Grid::new_c([0, 0, 0], [9, 1, 1]),
+        factory: |_, universe| {
+            let space = draw_to_blocks(
+                &mut BlockGen {
+                    universe,
+                    resolution: 16,
+                },
+                Text::new("Hello block world", Point::new(0, -16)).into_styled(
+                    TextStyleBuilder::new(Font8x16)
+                        .text_color(Rgb888::new(120, 100, 200))
+                        .build(),
+                ),
+            )?;
+            Ok(space)
+        },
+    },
+];
 
 #[rustfmt::skip]
 #[allow(unused)]  // TODO: Make a scene selector menu somehow so this can be used without recompiling.
@@ -135,7 +304,8 @@ where
     install_demo_blocks(&mut universe).unwrap();
 
     let space: Space = space_fn(&mut universe);
-    let position = space.grid().center() + Vector3::new(-3.0, 3.0, -3.0);
+    // TODO: this position should be configurable; it makes some sense to have a "spawn point" per Space
+    let position = space.grid().center() + Vector3::new(0.5, 2.91, 8.5);
     let space_ref = universe.insert("space".into(), space).unwrap();
 
     //let camera = Camera::looking_at_space(space_ref, Vector3::new(0.5, 0.5, 1.0));
@@ -158,91 +328,6 @@ where
     universe
 }
 
-/// Add to `universe` demo-content blocks, that might be used by demo worldgen or offered to the player.
-fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
-    let resolution = 16;
-    install_landscape_blocks(universe, resolution)?;
-    Ok(())
-}
-
-/// Construct blocks for [`LandscapeBlocks`] with some detail and add block definitions to the universe.
-// TODO: migrate away from returning the structure
-// TODO: not sure if we want this to be a public interface; is currently in use by lighting_bench
-#[doc(hidden)]
-pub fn install_landscape_blocks(
-    universe: &mut Universe,
-    resolution: Resolution,
-) -> Result<(), InsertError> {
-    use LandscapeBlocks::*;
-    let colors = BlockProvider::<LandscapeBlocks>::default();
-
-    let stone_noise_v = noise::Value::new().set_seed(0x21b5cc6b);
-    let stone_noise = noise::ScaleBias::new(&stone_noise_v)
-        .set_bias(1.0)
-        .set_scale(0.04);
-    let dirt_noise_v = noise::Value::new().set_seed(0x2e240365);
-    let dirt_noise = noise::ScaleBias::new(&dirt_noise_v)
-        .set_bias(1.0)
-        .set_scale(0.12);
-    let overhang_noise_v = noise::Value::new();
-    let overhang_noise = noise::ScaleBias::new(&overhang_noise_v)
-        .set_bias(f64::from(resolution) * 0.75)
-        .set_scale(2.5);
-
-    BlockProvider::<LandscapeBlocks>::new(|key| match key {
-        Stone => Block::builder()
-            .attributes(colors[Stone].evaluate().unwrap().attributes)
-            .voxels_fn(universe, resolution, |cube| {
-                scale_color((*colors[Stone]).clone(), stone_noise.at_grid(cube), 0.02)
-            })
-            .unwrap()
-            .build(),
-
-        Grass => Block::builder()
-            .attributes(colors[Grass].evaluate().unwrap().attributes)
-            .voxels_fn(universe, resolution, |cube| {
-                if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
-                    scale_color((*colors[Grass]).clone(), dirt_noise.at_grid(cube), 0.02)
-                } else {
-                    scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
-                }
-            })
-            .unwrap()
-            .build(),
-
-        Dirt => Block::builder()
-            .attributes(colors[Dirt].evaluate().unwrap().attributes)
-            .voxels_fn(universe, resolution, |cube| {
-                scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
-            })
-            .unwrap()
-            .build(),
-
-        Trunk => (*colors[Trunk]).clone(),
-
-        Leaves => (*colors[Leaves]).clone(),
-    })
-    .install(universe)?;
-    Ok(())
-}
-
-/// Generate a copy of a [`Block::Atom`] with its color scaled by the given scalar.
-///
-/// The scalar is rounded to steps of `quantization`, to reduce the number of distinct
-/// block types generated.
-///
-/// If the computation is NaN or the block is not an atom, it is returned unchanged.
-fn scale_color(block: Block, scalar: f64, quantization: f64) -> Block {
-    let scalar = (scalar / quantization).round() * quantization;
-    match (block, NotNan::new(scalar as f32)) {
-        (Block::Atom(attributes, color), Ok(scalar)) => Block::Atom(
-            attributes,
-            (color.to_rgb() * scalar).with_alpha(color.alpha()),
-        ),
-        (block, _) => block,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,12 +340,5 @@ mod tests {
         let _ = u.get_default_camera().borrow();
         let _ = u.get_default_space().borrow();
         u.step(Duration::from_millis(10));
-    }
-
-    #[test]
-    pub fn install_demo_blocks_test() {
-        let mut universe = Universe::new();
-        install_demo_blocks(&mut universe).unwrap();
-        // TODO: assert what entries were created, once Universe has iteration
     }
 }

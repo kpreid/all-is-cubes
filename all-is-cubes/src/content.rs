@@ -12,6 +12,7 @@ use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
 use crate::math::GridPoint;
 use crate::space::Space;
 
+pub mod blocks;
 pub mod demo;
 pub mod palette;
 
