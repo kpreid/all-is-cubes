@@ -181,15 +181,17 @@ impl Space {
         // Do a finite number of updates.
         let mut light_update_count: usize = 0;
         let mut max_difference: PackedLightScalar = 0;
+        let mut cost = 0;
         while let Some(LightUpdateRequest { cube, .. }) = self.lighting_update_queue.pop() {
             self.lighting_update_set.remove(&cube);
             light_update_count += 1;
             // Note: For performance, it is key that this call site ignores the info value
             // and the functions are inlined. Thus, the info calculation can be
             // optimized away.
-            let (difference, _) = self.update_lighting_now_on(cube);
+            let (difference, cube_cost, _) = self.update_lighting_now_on(cube);
             max_difference = max_difference.max(difference);
-            if light_update_count >= 200 {
+            cost += cube_cost;
+            if cost >= 10000 {
                 break;
             }
         }
@@ -204,11 +206,12 @@ impl Space {
     fn update_lighting_now_on(
         &mut self,
         cube: GridPoint,
-    ) -> (PackedLightScalar, LightingUpdateInfo) {
-        let (new_light_value, dependencies, info) = self.compute_lighting(cube);
+    ) -> (PackedLightScalar, usize, LightingUpdateInfo) {
+        let (new_light_value, dependencies, mut cost, info) = self.compute_lighting(cube);
         let old_light_value: PackedLight = self.get_lighting(cube);
         let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
         if difference_magnitude > 0 {
+            cost += 200;
             // TODO: compute index only once
             self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
             self.notifier.notify(SpaceChange::Lighting(cube));
@@ -216,7 +219,7 @@ impl Space {
                 self.light_needs_update(cube, difference_magnitude);
             }
         }
-        (difference_magnitude, info)
+        (difference_magnitude, cost, info)
     }
 
     /// Compute the new lighting value for a cube.
@@ -227,14 +230,17 @@ impl Space {
     pub(crate) fn compute_lighting(
         &self,
         cube: GridPoint,
-    ) -> (PackedLight, Vec<GridPoint>, LightingUpdateInfo) {
+    ) -> (PackedLight, Vec<GridPoint>, usize, LightingUpdateInfo) {
         // Accumulator of incoming light encountered.
         let mut incoming_light: RGB = RGB::ZERO;
         // Number of rays contributing to incoming_light.
         let mut total_rays = 0;
         // Cubes whose lighting value contributed to the incoming_light value.
         let mut dependencies: Vec<GridPoint> = Vec::new();
-        // Diagnostics. TODO not written yet
+        // Approximation of CPU cost of doing the calculation, with one unit defined as
+        // one raycast step.
+        let mut cost = 0;
+        // Diagnostics.
         let mut info_rays: [Option<LightingUpdateRayInfo>; ALL_RAYS_COUNT] = [None; ALL_RAYS_COUNT];
 
         let ev_origin = self.get_evaluated(cube);
@@ -273,6 +279,7 @@ impl Space {
                     let info = &mut info_rays[total_rays];
 
                     'raycast: for hit in raycaster {
+                        cost += 1;
                         let ev_hit = self.get_evaluated(hit.cube_ahead());
                         if !ev_hit.visible {
                             // Completely transparent block is passed through.
@@ -297,6 +304,7 @@ impl Space {
                                 + RGB::from(stored_light) * surface_color;
                             incoming_light += light_from_struck_face * ray_alpha;
                             dependencies.push(light_cube);
+                            cost += 10;
                             // This terminates the raycast; we don't bounce rays
                             // (diffuse reflections, not specular/mirror).
                             ray_alpha = 0.0;
@@ -329,6 +337,7 @@ impl Space {
                                 * coverage;
                             ray_alpha *= 1.0 - coverage;
                             dependencies.push(hit.cube_ahead());
+                            cost += 10;
                         }
                     }
                     // TODO: set *info even if we hit the sky
@@ -350,6 +359,7 @@ impl Space {
         (
             new_light_value,
             dependencies,
+            cost,
             LightingUpdateInfo {
                 cube,
                 result: new_light_value,

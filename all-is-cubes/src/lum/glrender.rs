@@ -188,7 +188,7 @@ where
             if DRAW_LIGHTING_DEBUG {
                 if let Some(cursor) = &self.cursor_result {
                     let space = camera.space.borrow();
-                    let (_, _, lighting_info) = space.compute_lighting(cursor.place.adjacent());
+                    let (_, _, _, lighting_info) = space.compute_lighting(cursor.place.adjacent());
                     wireframe_vertices(&mut v, RGBA::new(0.8, 0.8, 1.0, 1.0), lighting_info);
                 }
             }
