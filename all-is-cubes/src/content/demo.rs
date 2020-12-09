@@ -2,9 +2,6 @@
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
-//!
-//! This is split out into its own module so that test data tinkering doesn't
-//! touch the same files as the engine code.
 
 use cgmath::Vector3;
 use embedded_graphics::fonts::Font8x16;

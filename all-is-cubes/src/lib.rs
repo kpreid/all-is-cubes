@@ -22,7 +22,7 @@ pub mod block;
 pub mod blockgen;
 pub mod camera;
 mod chunking;
-pub mod demo_content;
+pub mod content;
 pub mod drawing;
 mod lighting;
 pub mod lum;
