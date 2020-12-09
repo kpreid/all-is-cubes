@@ -14,6 +14,7 @@ use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
 use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
+use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::Vertex;
@@ -172,14 +173,14 @@ where
             // Collision box
             wireframe_vertices(
                 &mut v,
-                RGBA::new(0.0, 0.0, 1.0, 1.0),
+                palette::DEBUG_COLLISION_BOX,
                 camera.body.collision_box_abs(),
             );
             // What it collided with
             for contact in &camera.colliding_cubes {
                 wireframe_vertices(
                     &mut v,
-                    RGBA::new(1.0, 0.0, 0.0, 1.0),
+                    palette::DEBUG_COLLISION_CUBES,
                     AAB::from_cube(contact.cube).enlarge(0.005),
                 );
             }

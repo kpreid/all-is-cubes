@@ -14,6 +14,7 @@ use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
 
 use crate::camera::Cursor;
+use crate::content::palette;
 use crate::lum::types::{empty_tess, Vertex};
 use crate::math::{Geometry, AAB, RGBA};
 use crate::util::MapExtend;
@@ -33,7 +34,7 @@ where
         let mut vertices = Vec::new();
         wireframe_vertices(
             &mut vertices,
-            RGBA::BLACK,
+            palette::CURSOR_OUTLINE,
             AAB::from_cube(cursor.place.cube).enlarge(0.01),
         );
         // TODO: draw the selected face

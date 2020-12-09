@@ -8,7 +8,8 @@ use cgmath::EuclideanSpace as _;
 use rand::{Rng, SeedableRng as _};
 
 use crate::block::{Block, BlockAttributes, Resolution, AIR};
-use crate::math::{GridCoordinate, GridPoint, NotNan, RGBA};
+use crate::content::palette;
+use crate::math::{GridCoordinate, GridPoint, NotNan, RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::{UBorrowMut, Universe};
 
@@ -167,23 +168,23 @@ impl LandscapeBlocks {
 impl Default for LandscapeBlocks {
     /// Generate a bland instance of [`LandscapeBlocks`] with single color blocks.
     fn default() -> LandscapeBlocks {
-        fn color_and_name(r: f32, g: f32, b: f32, name: &str) -> Block {
+        fn color_and_name(color: RGB, name: &'static str) -> Block {
             Block::Atom(
                 BlockAttributes {
-                    display_name: name.to_owned().into(),
+                    display_name: name.into(),
                     ..BlockAttributes::default()
                 },
-                RGBA::new(r, g, b, 1.0),
+                color.with_alpha_one(),
             )
         }
 
         LandscapeBlocks {
             air: AIR.clone(),
-            grass: color_and_name(0.3, 0.8, 0.3, "Grass"),
-            dirt: color_and_name(0.4, 0.2, 0.2, "Dirt"),
-            stone: color_and_name(0.5, 0.5, 0.5, "Stone"),
-            trunk: color_and_name(0.6, 0.3, 0.6, "Wood"),
-            leaves: color_and_name(0.0, 0.7, 0.2, "Leaves"),
+            grass: color_and_name(palette::GRASS, "Grass"),
+            dirt: color_and_name(palette::DIRT, "Dirt"),
+            stone: color_and_name(palette::STONE, "Stone"),
+            trunk: color_and_name(palette::TREE_BARK, "Wood"),
+            leaves: color_and_name(palette::TREE_LEAVES, "Leaves"),
         }
     }
 }

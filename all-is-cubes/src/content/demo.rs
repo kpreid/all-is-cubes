@@ -13,6 +13,7 @@ use embedded_graphics::style::TextStyleBuilder;
 use crate::block::{Block, BlockAttributes};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
+use crate::content::palette;
 use crate::drawing::{draw_text, draw_to_blocks, VoxelBrush};
 use crate::math::{GridPoint, GridVector, RGB, RGBA};
 use crate::space::{Grid, Space};
@@ -59,8 +60,8 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
     let _ = space.set((-1, 3, -1), axis_block);
 
     // Large banner text
-    let foreground_text_block: Block = Rgb888::new(200, 50, 120).into();
-    let background_text_block: Block = Rgb888::new(50, 50, 50).into();
+    let foreground_text_block: Block = palette::LOGO_FILL.into();
+    let background_text_block: Block = palette::LOGO_STROKE.into();
     draw_text(
         &mut space,
         &VoxelBrush::new(vec![

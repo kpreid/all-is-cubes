@@ -13,6 +13,7 @@ use std::ops::Range;
 use std::time::Duration;
 
 use crate::block::*;
+use crate::content::palette;
 use crate::lighting::*;
 use crate::math::*;
 use crate::universe::{Listener, Notifier, RefError};
@@ -436,7 +437,7 @@ impl Space {
     pub fn empty(grid: Grid) -> Space {
         // TODO: Might actually be worth checking for memory allocation failure here...?
         let volume = grid.volume();
-        let sky_color = RGB::new(0.9, 0.9, 1.4); // TODO: customizability
+        let sky_color = palette::DAY_SKY_COLOR;
 
         Space {
             grid,

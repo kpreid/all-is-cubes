@@ -8,7 +8,6 @@
 
 use cgmath::{EuclideanSpace as _, Vector2};
 use embedded_graphics::geometry::Point;
-use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::{Drawable, Pixel, Primitive, Transform as _};
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::style::PrimitiveStyleBuilder;
@@ -16,8 +15,9 @@ use std::time::Duration;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, AIR};
 use crate::blockgen::BlockGen;
+use crate::content::palette;
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGB, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -92,7 +92,7 @@ impl HudLayout {
         let grid = self.grid();
         let mut space = Space::empty(grid);
 
-        space.set_sky_color(RGB::ONE);
+        space.set_sky_color(palette::HUD_SKY);
 
         if false {
             // Visualization of the bounds of the space we're drawing.
@@ -188,8 +188,8 @@ impl HudBlocks {
         )
         .into_styled(
             PrimitiveStyleBuilder::new()
-                .fill_color(Rgb888::new(0x7F, 0x7F, 0x7F))
-                .stroke_color(Rgb888::new(0xDD, 0xDD, 0xDD))
+                .fill_color(palette::HUD_TOOLBAR_BACK)
+                .stroke_color(palette::HUD_TOOLBAR_FRAME)
                 .stroke_width(stroke_width as u32)
                 .build(),
         );
@@ -241,15 +241,10 @@ pub(crate) fn draw_background(space: &mut Space) {
 
     let display = &mut VoxelDisplayAdapter::new(space, GridPoint::new(0, 0, grid.lower_bounds().z));
 
-    let background = VoxelBrush::single(Block::Atom(
-        BlockAttributes::default(),
-        RGBA::new(0.5, 0.5, 0.5, 1.0),
-    ));
-    let frame = VoxelBrush::single(Block::Atom(
-        BlockAttributes::default(),
-        RGBA::new(0.95, 0.95, 0.95, 1.0),
-    ))
-    .translate((0, 0, 1));
+    let background =
+        VoxelBrush::single(Block::Atom(BlockAttributes::default(), palette::MENU_BACK));
+    let frame = VoxelBrush::single(Block::Atom(BlockAttributes::default(), palette::MENU_FRAME))
+        .translate((0, 0, 1));
 
     background_rect
         .into_styled(

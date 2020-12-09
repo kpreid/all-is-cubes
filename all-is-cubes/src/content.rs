@@ -4,4 +4,4 @@
 //! Built-in content: either demos or basic shapes and colors used in the UI.
 
 pub mod demo;
-
+pub mod palette;
