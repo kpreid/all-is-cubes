@@ -14,6 +14,9 @@
 // the modules are mostly per-data-type rather than being convenient usage bundles.
 // Or have modules reexport by API consumer (world-builder versus renderer etc.)
 
+#[macro_use]
+pub mod math;
+
 pub mod apps;
 pub mod block;
 pub mod blockgen;
@@ -23,7 +26,6 @@ pub mod demo_content;
 pub mod drawing;
 mod lighting;
 pub mod lum;
-pub mod math;
 pub mod physics;
 pub mod raycast;
 pub mod raytracer;

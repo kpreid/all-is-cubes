@@ -304,6 +304,39 @@ impl std::fmt::Debug for CubeFace {
     }
 }
 
+/// Allows writing a constant [`RGB`] color value, provided that its components are float
+/// literals.
+///
+/// TODO: examples
+macro_rules! rgb_const {
+    ($r:literal, $g:literal, $b:literal) => {
+        unsafe {
+            // Safety: Only literal values are allowed, which will either be a non-NaN
+            // float or a type mismatch.
+            $crate::math::RGB::new_nn(
+                $crate::math::NotNan::unchecked_new($r),
+                $crate::math::NotNan::unchecked_new($g),
+                $crate::math::NotNan::unchecked_new($b),
+            )
+        }
+    };
+}
+
+/// Allows writing a constant [`RGB`] color value, provided that its components are float
+/// literals.
+macro_rules! rgba_const {
+    ($r:literal, $g:literal, $b:literal, $a:literal) => {
+        unsafe {
+            $crate::math::RGBA::new_nn(
+                $crate::math::NotNan::unchecked_new($r),
+                $crate::math::NotNan::unchecked_new($g),
+                $crate::math::NotNan::unchecked_new($b),
+                $crate::math::NotNan::unchecked_new($a),
+            )
+        }
+    };
+}
+
 /// A floating-point RGB color value.
 ///
 /// * Each component may be considered to have a nominal range of 0 to 1, but larger
@@ -345,6 +378,15 @@ impl RGB {
         Self::try_from(Vector3::new(r, g, b)).expect("Color components may not be NaN")
     }
 
+    /// Constructs a color from components that have already been checked for not being
+    /// NaN.
+    ///
+    /// Note: This exists primarily to assist the [`rgb_const!`] macro and may be renamed
+    /// or replaced in future versions.
+    pub const fn new_nn(r: NotNan<f32>, g: NotNan<f32>, b: NotNan<f32>) -> Self {
+        Self(Vector3::new(r, g, b))
+    }
+
     /// Adds an alpha component to produce an [RGBA] color.
     pub const fn with_alpha(self, alpha: NotNan<f32>) -> RGBA {
         RGBA(Vector4::new(self.0.x, self.0.y, self.0.z, alpha))
@@ -382,6 +424,15 @@ impl RGBA {
     /// No other range checks are performed.
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
+    }
+
+    /// Constructs a color from components that have already been checked for not being
+    /// NaN.
+    ///
+    /// Note: This exists primarily to assist the [`rgb_const!`] macro and may be renamed
+    /// or replaced in future versions.
+    pub const fn new_nn(r: NotNan<f32>, g: NotNan<f32>, b: NotNan<f32>, a: NotNan<f32>) -> Self {
+        Self(Vector4::new(r, g, b, a))
     }
 
     /// Returns the red color component. Values are linear (gamma = 1).
