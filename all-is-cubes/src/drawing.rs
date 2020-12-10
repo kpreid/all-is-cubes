@@ -126,7 +126,7 @@ impl VoxelDisplayAdapter<'_> {
         self.origin + GridVector::new(point.x, -point.y, 0)
     }
 
-    /// Common implementation for the [`DrawTarget`] size methods
+    /// Common implementation for the [`DrawTarget`] size methods.
     fn size_for_eg(&self) -> Size {
         let size = self.space.grid().size();
         Size {
@@ -134,6 +134,19 @@ impl VoxelDisplayAdapter<'_> {
             width: size.x.try_into().unwrap_or(u32::MAX),
             height: size.y.try_into().unwrap_or(u32::MAX),
         }
+    }
+}
+
+impl DrawTarget<&Block> for VoxelDisplayAdapter<'_> {
+    type Error = SetCubeError;
+
+    fn draw_pixel(&mut self, pixel: Pixel<&Block>) -> Result<(), Self::Error> {
+        let Pixel(point, color) = pixel;
+        ignore_out_of_bounds(self.space.set(self.convert_point(point), color))
+    }
+
+    fn size(&self) -> Size {
+        self.size_for_eg()
     }
 }
 
@@ -147,7 +160,6 @@ where
 
     fn draw_pixel(&mut self, pixel: Pixel<C>) -> Result<(), Self::Error> {
         let Pixel(point, color) = pixel;
-        // TODO: Allow customizing block attributes.
         ignore_out_of_bounds(self.space.set(self.convert_point(point), &color.into()))
     }
 
@@ -189,6 +201,11 @@ impl From<Rgb888> for Block {
     fn from(color: Rgb888) -> Block {
         Block::from(RGB::from(color))
     }
+}
+
+/// Allows `&Block` to be used directly as a color with no conversion.
+impl<'a> PixelColor for &'a Block {
+    type Raw = ();
 }
 
 /// A shape of multiple blocks to “paint” with. This may be used to make copies of a
@@ -301,7 +318,20 @@ mod tests {
     use embedded_graphics::style::{PrimitiveStyle, PrimitiveStyleBuilder};
 
     #[test]
-    fn drawing_adapter_works() -> Result<(), SetCubeError> {
+    fn draw_with_block_ref() -> Result<(), SetCubeError> {
+        let block = make_some_blocks(1).swap_remove(0);
+        let mut space = Space::empty_positive(100, 100, 100);
+
+        Pixel(Point::new(2, -3), &block).draw(&mut VoxelDisplayAdapter::new(
+            &mut space,
+            GridPoint::new(1, 2, 4),
+        ))?;
+        assert_eq!(space[(3, 5, 4)], block);
+        Ok(())
+    }
+
+    #[test]
+    fn draw_with_rgb888() -> Result<(), SetCubeError> {
         let mut space = Space::empty_positive(100, 100, 100);
 
         Pixel(Point::new(2, -3), Rgb888::new(0, 127, 255)).draw(&mut VoxelDisplayAdapter::new(
