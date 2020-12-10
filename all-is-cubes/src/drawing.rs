@@ -208,6 +208,14 @@ impl<'a> PixelColor for &'a Block {
     type Raw = ();
 }
 
+impl PixelColor for RGB {
+    type Raw = ();
+}
+
+impl PixelColor for RGBA {
+    type Raw = ();
+}
+
 /// A shape of multiple blocks to “paint” with. This may be used to make copies of a
 /// simple shape, or to make multi-layered "2.5D" drawings using [`VoxelDisplayAdapter`].
 ///
@@ -317,32 +325,45 @@ mod tests {
     use embedded_graphics::primitives::{Primitive, Rectangle};
     use embedded_graphics::style::{PrimitiveStyle, PrimitiveStyleBuilder};
 
-    #[test]
-    fn draw_with_block_ref() -> Result<(), SetCubeError> {
-        let block = make_some_blocks(1).swap_remove(0);
+    /// Test using a particular color type with [`VoxelDisplayAdapter`].
+    fn test_color_drawing<C, E>(color_value: C, expected_block: &Block)
+    where
+        C: PixelColor,
+        for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = E>,
+        E: std::fmt::Debug,
+    {
         let mut space = Space::empty_positive(100, 100, 100);
-
-        Pixel(Point::new(2, -3), &block).draw(&mut VoxelDisplayAdapter::new(
-            &mut space,
-            GridPoint::new(1, 2, 4),
-        ))?;
-        assert_eq!(space[(3, 5, 4)], block);
-        Ok(())
+        let mut display = VoxelDisplayAdapter::new(&mut space, GridPoint::new(1, 2, 4));
+        Pixel(Point::new(2, -3), color_value)
+            .draw(&mut display)
+            .unwrap();
+        assert_eq!(space[(3, 5, 4)], *expected_block);
     }
 
     #[test]
-    fn draw_with_rgb888() -> Result<(), SetCubeError> {
-        let mut space = Space::empty_positive(100, 100, 100);
+    fn draw_with_block_ref() {
+        let block = make_some_blocks(1).swap_remove(0);
+        test_color_drawing(&block, &block);
+    }
 
-        Pixel(Point::new(2, -3), Rgb888::new(0, 127, 255)).draw(&mut VoxelDisplayAdapter::new(
-            &mut space,
-            GridPoint::new(1, 2, 4),
-        ))?;
-        assert_eq!(
-            space[(3, 5, 4)].color(),
-            RGBA::new(0.0, 127.0 / 255.0, 1.0, 1.0)
+    #[test]
+    fn draw_with_eg_rgb888() {
+        test_color_drawing(
+            Rgb888::new(0, 127, 255),
+            &RGBA::new(0.0, 127.0 / 255.0, 1.0, 1.0).into(),
         );
-        Ok(())
+    }
+
+    #[test]
+    fn draw_with_our_rgb() {
+        let color = RGB::new(0.73, 0.27, 0.11);
+        test_color_drawing(color, &color.into());
+    }
+
+    #[test]
+    fn draw_with_our_rgba() {
+        let color = RGBA::new(0.73, 0.27, 0.11, 0.9);
+        test_color_drawing(color, &color.into());
     }
 
     #[test]
