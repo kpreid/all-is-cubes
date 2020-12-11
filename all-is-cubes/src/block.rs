@@ -34,6 +34,9 @@ pub type Resolution = u8;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Block {
+    /// A block whose definition is stored in a [`Universe`].
+    Indirect(URef<BlockDef>),
+
     /// A block that is a single-colored unit cube. (It may still be be transparent or
     /// non-solid to physics.)
     Atom(BlockAttributes, RGBA),
@@ -57,6 +60,8 @@ impl Block {
     /// to other objects.
     pub fn evaluate(&self) -> Result<EvaluatedBlock, RefError> {
         match self {
+            Block::Indirect(uref) => uref.try_borrow()?.block.evaluate(),
+
             Block::Atom(attributes, color) => Ok(EvaluatedBlock {
                 attributes: attributes.clone(),
                 color: *color,
@@ -240,6 +245,17 @@ impl ConciseDebug for EvaluatedBlock {
 /// Type of notification when an [`EvaluatedBlock`] result changes.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct BlockChange;
+
+/// Contains a [`Block`] and can be stored in a [`Universe`], allowing indirection
+/// through a [`URef`].
+///
+/// TODO: This type exists because I predict it will be needed for correct change
+/// notifications (possibly in the form of removing `Block::Recur`). If I'm wrong,
+/// it should be removed.
+#[derive(Debug)]
+pub struct BlockDef {
+    block: Block,
+}
 
 /// Construct a set of [`Block::Recur`] that form a miniature of the given `space`.
 /// The returned [`Space`] contains each of the blocks; its coordinates will correspond to
@@ -434,6 +450,35 @@ mod tests {
                 }
             ))
         );
+    }
+
+    #[test]
+    fn indirect_equivalence() {
+        let resolution = 4;
+        let mut universe = Universe::new();
+        let mut space = Space::empty_positive(resolution, resolution, resolution);
+        // TODO: BlockGen should support constructing indirects (by default, even)
+        // and we can use the more concise version
+        space
+            .fill(space.grid(), |point| {
+                let point = point.cast::<f32>().unwrap();
+                Some(Block::Atom(
+                    BlockAttributes::default(),
+                    RGBA::new(point.x, point.y, point.z, 1.0),
+                ))
+            })
+            .unwrap();
+        let space_ref = universe.insert_anonymous(space);
+        let block = Block::Recur {
+            attributes: BlockAttributes::default(),
+            offset: GridPoint::origin(),
+            resolution: resolution as Resolution,
+            space: space_ref.clone(),
+        };
+        let eval_bare = block.evaluate();
+        let block_def_ref = universe.insert_anonymous(BlockDef { block });
+        let eval_def = block_def_ref.borrow().block.evaluate();
+        assert_eq!(eval_bare, eval_def);
     }
 
     // TODO: test of evaluate where the block's space is the wrong size

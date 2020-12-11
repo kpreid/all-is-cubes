@@ -13,6 +13,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
+use crate::block::BlockDef;
 use crate::camera::Camera;
 use crate::space::{Space, SpaceStepInfo};
 
@@ -44,8 +45,9 @@ impl Display for Name {
 /// See also the [`UniverseIndex`] trait for methods for adding and removing objects.
 #[derive(Debug)] // TODO: impl Debug with a less verbose result
 pub struct Universe {
-    spaces: HashMap<Name, URootRef<Space>>,
+    blocks: HashMap<Name, URootRef<BlockDef>>,
     cameras: HashMap<Name, URootRef<Camera>>,
+    spaces: HashMap<Name, URootRef<Space>>,
     next_anonym: usize,
 }
 
@@ -53,6 +55,7 @@ impl Universe {
     /// Construct an empty [`Universe`].
     pub fn new() -> Self {
         Universe {
+            blocks: HashMap::new(),
             spaces: HashMap::new(),
             // TODO: bodies so body-in-world stepping
             cameras: HashMap::new(),
@@ -107,12 +110,12 @@ trait UniverseTable<T> {
     fn table(&self) -> &HashMap<Name, URootRef<T>>;
     fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<T>>;
 }
-impl UniverseTable<Space> for Universe {
-    fn table(&self) -> &HashMap<Name, URootRef<Space>> {
-        &self.spaces
+impl UniverseTable<BlockDef> for Universe {
+    fn table(&self) -> &HashMap<Name, URootRef<BlockDef>> {
+        &self.blocks
     }
-    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Space>> {
-        &mut self.spaces
+    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<BlockDef>> {
+        &mut self.blocks
     }
 }
 impl UniverseTable<Camera> for Universe {
@@ -121,6 +124,14 @@ impl UniverseTable<Camera> for Universe {
     }
     fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Camera>> {
         &mut self.cameras
+    }
+}
+impl UniverseTable<Space> for Universe {
+    fn table(&self) -> &HashMap<Name, URootRef<Space>> {
+        &self.spaces
+    }
+    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Space>> {
+        &mut self.spaces
     }
 }
 
@@ -138,11 +149,11 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
     /// TODO: Implement failure on already-existing names.
     fn insert(&mut self, name: Name, value: T) -> URef<T>;
 }
-impl UniverseIndex<Space> for Universe {
-    fn get(&self, name: &Name) -> Option<URef<Space>> {
+impl UniverseIndex<BlockDef> for Universe {
+    fn get(&self, name: &Name) -> Option<URef<BlockDef>> {
         index_get(self, name)
     }
-    fn insert(&mut self, name: Name, value: Space) -> URef<Space> {
+    fn insert(&mut self, name: Name, value: BlockDef) -> URef<BlockDef> {
         index_insert(self, name, value)
     }
 }
@@ -151,6 +162,14 @@ impl UniverseIndex<Camera> for Universe {
         index_get(self, name)
     }
     fn insert(&mut self, name: Name, value: Camera) -> URef<Camera> {
+        index_insert(self, name, value)
+    }
+}
+impl UniverseIndex<Space> for Universe {
+    fn get(&self, name: &Name) -> Option<URef<Space>> {
+        index_get(self, name)
+    }
+    fn insert(&mut self, name: Name, value: Space) -> URef<Space> {
         index_insert(self, name, value)
     }
 }
