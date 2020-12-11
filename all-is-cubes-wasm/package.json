@@ -5,7 +5,7 @@
   "version": "0.1.2",
   "scripts": {
     "build": "rimraf dist pkg && webpack",
-    "start": "rimraf dist pkg && webpack-dev-server --debug --devtool eval-cheap-module-source-map --output-pathinfo",
+    "start": "rimraf dist pkg && webpack-dev-server -d",
     "test": "wasm-pack test --chrome --headless"
   },
   "devDependencies": {
