@@ -90,6 +90,44 @@ pub enum ToolError {
     SpaceRef(RefError),
 }
 
+/// A collection of [`Tool`]s. (Might contain other sorts of items in the future.)
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct Inventory {
+    /// TODO: This probably shouldn't be public forever.
+    pub slots: Vec<Tool>,
+}
+
+impl Inventory {
+    #[allow(dead_code)] // TODO: revisit design
+    pub fn new(size: usize) -> Self {
+        Inventory {
+            slots: vec![Tool::None; size],
+        }
+    }
+
+    /// TODO: temporary interface, reevaluate design
+    pub(crate) fn from_items(mut items: Vec<Tool>) -> Self {
+        items.shrink_to_fit();
+        Inventory { slots: items }
+    }
+
+    /// Apply a tool to the space.
+    /// TODO: Space and Cursor should perhaps be bundled into one object?
+    pub fn use_tool(
+        &mut self,
+        space: &URef<Space>,
+        cursor: &Cursor,
+        index: usize,
+    ) -> Result<(), ToolError> {
+        if let Some(tool) = self.slots.get_mut(index) {
+            tool.use_tool(space, cursor)
+        } else {
+            Err(ToolError::NotUsable)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

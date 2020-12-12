@@ -16,7 +16,7 @@ use crate::math::{Face, FreeCoordinate, AAB};
 use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray, Raycaster};
 use crate::space::{Grid, Space};
-use crate::tools::{Tool, ToolError};
+use crate::tools::{Inventory, Tool, ToolError};
 use crate::universe::URef;
 use crate::util::ConciseDebug as _;
 
@@ -54,7 +54,7 @@ pub struct Camera {
     pub(crate) colliding_cubes: HashSet<Contact>,
 
     // TODO: Figure out what access is needed and add accessors
-    pub(crate) tools: [Tool; 2],
+    pub(crate) inventory: Inventory,
 }
 
 impl std::fmt::Debug for Camera {
@@ -83,10 +83,10 @@ impl Camera {
             auto_rotate: false,
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
-            tools: [
+            inventory: Inventory::from_items(vec![
                 Tool::DeleteBlock,
                 Tool::PlaceBlock(crate::math::RGBA::new(1.0, 0.0, 0.5, 1.0).into()), // TODO placeholder
-            ],
+            ]),
         }
     }
 
@@ -168,11 +168,8 @@ impl Camera {
 
     /// Handle a click/tool-use on the view.
     pub fn click(&mut self, cursor: &Cursor, button: usize) -> Result<(), ToolError> {
-        if let Some(tool) = self.tools.get_mut(button) {
-            tool.use_tool(&self.space, cursor)
-        } else {
-            Err(ToolError::NotUsable)
-        }
+        // TODO: migrate from "button = tool number" to selections
+        self.inventory.use_tool(&self.space, cursor, button)
     }
 
     // TODO: this code's location is driven by colliding_cubes being here, which is probably wrong

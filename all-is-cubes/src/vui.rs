@@ -57,8 +57,8 @@ impl Vui {
         self.universe.step(timestep)
     }
 
-    pub fn set_tools(&mut self, tools: &[Tool]) {
-        HudLayout::default().set_tools(&mut *self.hud_space.borrow_mut(), tools);
+    pub fn set_toolbar(&mut self, tools: &[Tool]) {
+        HudLayout::default().set_toolbar(&mut *self.hud_space.borrow_mut(), tools);
     }
 }
 
@@ -146,7 +146,7 @@ impl HudLayout {
         GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 0, 9)
     }
 
-    pub fn set_tools(&self, space: &mut Space, tools: &[Tool]) {
+    pub fn set_toolbar(&self, space: &mut Space, tools: &[Tool]) {
         for (index, tool) in tools.iter().enumerate() {
             if index >= self.toolbar_positions {
                 break;
