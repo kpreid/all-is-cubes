@@ -78,16 +78,22 @@ fn tool_set_cube(
 }
 
 /// Ways that a tool can fail.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 pub enum ToolError {
+    // TODO: Add tests for these error messages and make them make good sense in contexts
+    // they might appear ... or possibly we have a separate trait for them.
     /// The tool cannot currently be used or does not apply to the target.
+    #[error("does not apply")]
     NotUsable,
     /// The tool requires a target cube and none was present.
+    #[error("nothing is selected")]
     NothingSelected,
     /// The cube to be modified could not be modified; see the inner error for why.
-    SetCube(SetCubeError),
+    #[error("error placing block: {0}")]
+    SetCube(#[from] SetCubeError),
     /// The space to be modified could not be accessed.
-    SpaceRef(RefError),
+    #[error("error modifying space: {0}")]
+    SpaceRef(#[from] RefError),
 }
 
 /// A collection of [`Tool`]s. (Might contain other sorts of items in the future.)

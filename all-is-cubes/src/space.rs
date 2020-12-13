@@ -17,6 +17,7 @@ use crate::content::palette;
 use crate::lighting::*;
 use crate::math::*;
 use crate::universe::{Listener, Notifier, RefError};
+use crate::util::ConciseDebug as _;
 
 pub use crate::lighting::PackedLight;
 
@@ -643,7 +644,7 @@ impl Space {
             self.side_effects_of_set(new_block_index, position, contents_index);
             Ok(true)
         } else {
-            Err(SetCubeError::OutOfBounds)
+            Err(SetCubeError::OutOfBounds(position))
         }
     }
 
@@ -712,7 +713,10 @@ impl Space {
         B: std::borrow::Borrow<Block>,
     {
         if !self.grid().contains_grid(region) {
-            return Err(SetCubeError::OutOfBounds);
+            // TODO: Compute a cube that's *actually* out of bounds. Or change the definition of OutOfBounds.
+            return Err(SetCubeError::OutOfBounds(
+                region.interior_iter().next().unwrap(),
+            ));
         }
         for cube in region.interior_iter() {
             if let Some(block) = function(cube) {
@@ -872,12 +876,14 @@ impl SpaceBlockData {
 /// Ways that [`Space::set`] can fail to make a change.
 ///
 /// Note that "already contained the given block" is considered a success.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 pub enum SetCubeError {
     /// The given cube is out of the bounds of this Space.
-    OutOfBounds,
+    #[error("{:?} is out of bounds", .0.as_concise_debug())]
+    OutOfBounds(GridPoint),
     /// The block data could not be read.
-    BlockDataAccess(RefError),
+    #[error("block data could not be read: {0}")]
+    BlockDataAccess(#[from] RefError),
 }
 
 /// Description of a change to a [`Space`] for use in listeners.
@@ -992,9 +998,10 @@ mod tests {
     use crate::block::AIR;
     use crate::blockgen::make_some_blocks;
     use crate::math::GridPoint;
-    use crate::universe::{Sink, Universe};
+    use crate::universe::{Sink, Universe, UniverseIndex as _};
     use cgmath::EuclideanSpace as _;
     use std::convert::TryInto;
+    use std::rc::Rc;
 
     #[test]
     fn grid_one_cube() {
@@ -1037,15 +1044,15 @@ mod tests {
         let block = make_some_blocks(1).swap_remove(0);
         let pt = GridPoint::new(1, 0, 0);
         let mut space = Space::empty_positive(1, 1, 1);
-        assert_eq!(Err(SetCubeError::OutOfBounds), space.set(pt, &block));
-        assert_eq!(Err(SetCubeError::OutOfBounds), space.set(pt, &AIR));
+        assert_eq!(Err(SetCubeError::OutOfBounds(pt)), space.set(pt, &block));
+        assert_eq!(Err(SetCubeError::OutOfBounds(pt)), space.set(pt, &AIR));
     }
 
     /// This test case should also cover `RefError::Gone`.
     #[test]
     fn set_failure_borrow() {
         let mut u = Universe::new();
-        let inner_space_ref = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let inner_space_ref = u.insert("bs".into(), Space::empty_positive(1, 1, 1));
         let block = Block::Recur {
             attributes: BlockAttributes::default(),
             offset: GridPoint::origin(),
@@ -1056,10 +1063,24 @@ mod tests {
 
         let borrow = inner_space_ref.borrow_mut();
         assert_eq!(
-            Err(SetCubeError::BlockDataAccess(RefError::InUse)),
+            Err(SetCubeError::BlockDataAccess(RefError::InUse(Rc::new(
+                "bs".into()
+            )))),
             outer_space.set((0, 0, 0), &block)
         );
         drop(borrow);
+    }
+
+    #[test]
+    fn set_error_format() {
+        assert_eq!(
+            SetCubeError::OutOfBounds(GridPoint::new(1, 2, 3)).to_string(),
+            "(+1, +2, +3) is out of bounds"
+        );
+        assert_eq!(
+            SetCubeError::BlockDataAccess(RefError::Gone(Rc::new("foo".into()))).to_string(),
+            "block data could not be read: object was deleted: 'foo'"
+        );
     }
 
     /// EvaluatedBlock data is updated when a new block index is allocated.

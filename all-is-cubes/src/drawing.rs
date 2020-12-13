@@ -292,7 +292,7 @@ fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCub
     match result {
         Ok(_) => Ok(()),
         // Drawing out of bounds is not an error.
-        Err(SetCubeError::OutOfBounds) => Ok(()),
+        Err(SetCubeError::OutOfBounds(..)) => Ok(()),
         Err(e) => Err(e),
     }
 }
