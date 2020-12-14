@@ -9,6 +9,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::HashMap;
 use std::fmt::{self, Debug, Display};
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
@@ -16,7 +17,7 @@ use std::time::Duration;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
-use crate::util::{CustomFormat, StatusText};
+use crate::util::{CustomFormat, StatusText, TypeName};
 
 /// Name/key of an object in a [`Universe`].
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
@@ -44,7 +45,6 @@ impl Display for Name {
 /// future, it will enable garbage collection and inter-object invariants.
 ///
 /// See also the [`UniverseIndex`] trait for methods for adding and removing objects.
-#[derive(Debug)] // TODO: impl Debug with a less verbose result
 pub struct Universe {
     blocks: HashMap<Name, URootRef<BlockDef>>,
     characters: HashMap<Name, URootRef<Character>>,
@@ -104,6 +104,28 @@ impl Universe {
         self.next_anonym += 1;
         self.insert(name, value)
             .expect("shouldn't happen: newly created anonym already in use")
+    }
+}
+
+impl std::fmt::Debug for Universe {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = fmt.debug_struct("Universe");
+        format_members::<BlockDef>(&self, &mut ds);
+        format_members::<Character>(&self, &mut ds);
+        format_members::<Space>(&self, &mut ds);
+        ds.finish()
+    }
+}
+fn format_members<T>(universe: &Universe, ds: &mut std::fmt::DebugStruct<'_, '_>)
+where
+    Universe: UniverseTable<T>,
+{
+    for name in universe.table().keys() {
+        // match root.strong_ref.try_borrow() {
+        //     Ok(entry) => ds.field(&name.to_string(), &entry.data),
+        //     Err(_) => ds.field(&name.to_string(), &"<in use>"),
+        // };
+        ds.field(&name.to_string(), &PhantomData::<T>.custom_format(TypeName));
     }
 }
 
@@ -600,6 +622,34 @@ mod tests {
     use super::*;
     use crate::block::AIR;
     use crate::content::make_some_blocks;
+
+    #[test]
+    fn universe_debug_empty() {
+        assert_eq!(format!("{:?}", Universe::new()), "Universe");
+        assert_eq!(format!("{:#?}", Universe::new()), "Universe");
+    }
+
+    /// Universe does not print contents of members, on the assumption this would be too verbose.
+    #[test]
+    fn universe_debug_elements() {
+        let mut u = Universe::new();
+        u.insert("foo".into(), Space::empty_positive(1, 2, 3))
+            .unwrap();
+        u.insert_anonymous(BlockDef::new(make_some_blocks(1).swap_remove(0)));
+        assert_eq!(
+            format!("{:?}", u),
+            "Universe { [anonymous #0]: all_is_cubes::block::BlockDef, 'foo': all_is_cubes::space::Space }"
+        );
+        assert_eq!(
+            format!("{:#?}", u),
+            "\
+Universe {
+    [anonymous #0]: all_is_cubes::block::BlockDef,
+    'foo': all_is_cubes::space::Space,
+}\
+            "
+        );
+    }
 
     #[test]
     fn uref_try_borrow_in_use() {

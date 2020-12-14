@@ -35,6 +35,16 @@ impl<'a, F: Copy, T: CustomFormat<F>> Display for CustomFormatWrapper<'a, F, T> 
     }
 }
 
+/// Format type for [`CustomFormat`] which prints the name of a type.
+/// The value is a `PhantomData` to avoid requiring an actual instance of the type.
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub(crate) struct TypeName;
+impl<T> CustomFormat<TypeName> for PhantomData<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: TypeName) -> fmt::Result {
+        write!(fmt, "{}", std::any::type_name::<T>())
+    }
+}
+
 /// Format type for [`CustomFormat`] which is similar to [`Debug`], but uses an
 /// alternate concise format.
 ///
