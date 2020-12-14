@@ -9,7 +9,7 @@
 use cgmath::{EuclideanSpace as _, Vector2};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Pixel, Primitive, Transform as _};
-use embedded_graphics::primitives::Rectangle;
+use embedded_graphics::primitives::{Rectangle, Triangle};
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
@@ -18,7 +18,7 @@ use crate::blockgen::BlockGen;
 use crate::content::palette;
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
-use crate::space::{Grid, Space};
+use crate::space::{Grid, SetCubeError, Space};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
@@ -57,8 +57,19 @@ impl Vui {
         self.universe.step(timestep)
     }
 
-    pub fn set_toolbar(&mut self, tools: &[Tool]) {
-        HudLayout::default().set_toolbar(&mut *self.hud_space.borrow_mut(), tools);
+    // TODO: return type leaks implementation details, ish
+    // (but we do want to return/log an error rather than eithe panicking or doing nothing)
+    pub fn set_toolbar(
+        &mut self,
+        tools: &[Tool],
+        selections: [usize; 2],
+    ) -> Result<(), SetCubeError> {
+        HudLayout::default().set_toolbar(
+            &mut *self.hud_space.borrow_mut(),
+            &self.hud_blocks,
+            tools,
+            selections,
+        )
     }
 }
 
@@ -146,15 +157,37 @@ impl HudLayout {
         GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 0, 9)
     }
 
-    pub fn set_toolbar(&self, space: &mut Space, tools: &[Tool]) {
+    /// Repaint the toolbar with a new set of tools and selected tools.
+    ///
+    /// Returns an error if using the tools' icons produced an error — or possibly if
+    /// there was a drawing layout problem.
+    // TODO: Error return should probably be something other than SetCubeError
+    pub fn set_toolbar(
+        &self,
+        space: &mut Space,
+        hud_blocks: &HudBlocks,
+        tools: &[Tool],
+        selections: [usize; 2],
+    ) -> Result<(), SetCubeError> {
         for (index, tool) in tools.iter().enumerate() {
             if index >= self.toolbar_positions {
                 break;
             }
-            space
-                .set(self.tool_icon_position(index), &*tool.icon())
-                .unwrap();
+
+            let position = self.tool_icon_position(index);
+            // Draw icon
+            space.set(position, &*tool.icon())?;
+            // Draw pointers. TODO: avoid erase-then-draw strategy
+            let toolbar_disp = &mut VoxelDisplayAdapter::new(space, position);
+            Pixel(Point::new(0, 0), &hud_blocks.toolbar_pointer_erase).draw(toolbar_disp)?;
+            if selections[0] == index {
+                Pixel(Point::new(0, 0), &hud_blocks.toolbar_pointer_0).draw(toolbar_disp)?;
+            }
+            if selections[1] == index {
+                Pixel(Point::new(0, 0), &hud_blocks.toolbar_pointer_1).draw(toolbar_disp)?;
+            }
         }
+        Ok(())
     }
 }
 
@@ -164,6 +197,9 @@ struct HudBlocks {
     toolbar_right_cap: VoxelBrush<'static>,
     toolbar_divider: VoxelBrush<'static>,
     toolbar_middle: VoxelBrush<'static>,
+    toolbar_pointer_erase: VoxelBrush<'static>,
+    toolbar_pointer_0: VoxelBrush<'static>,
+    toolbar_pointer_1: VoxelBrush<'static>,
 }
 
 impl HudBlocks {
@@ -199,6 +235,31 @@ impl HudBlocks {
             .draw(display)
             .unwrap();
 
+        // Draw pointers. The pointers are placed above and below the second
+        // icon frame.
+        let pointer_offset = Point::new(resolution * 5 / 2, 0);
+        // TODO: use different related colors
+        let pointer_fill =
+            VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, resolution - 1));
+        let pointer_stroke =
+            VoxelBrush::single(palette::HUD_TOOLBAR_FRAME).translate((0, 0, resolution - 1));
+        let pointer_style = PrimitiveStyleBuilder::new()
+            .fill_color(&pointer_fill)
+            .stroke_color(&pointer_stroke)
+            .stroke_width(stroke_width as u32)
+            .build();
+        Triangle::new(Point::new(-5, 10), Point::new(5, 10), Point::new(0, 0))
+            .into_styled(pointer_style)
+            .translate(pointer_offset)
+            .draw(display)
+            .unwrap();
+        Triangle::new(Point::new(-5, -10), Point::new(0, 0), Point::new(5, -10))
+            .into_styled(pointer_style)
+            .translate(Point::new(0, -resolution)) // position point at top of block
+            .translate(pointer_offset)
+            .draw(display)
+            .unwrap();
+
         // TODO: use a name for the space
         let toolbar_blocks_space = space_to_blocks(
             blockgen.resolution,
@@ -217,16 +278,20 @@ impl HudBlocks {
             )
         };
 
+        // TODO: reconcile: the hud space has the icons "flush with the front" but these slice coordinates assume a 1-block fringe around the icons in all directions.
         Self {
             toolbar_middle: slice_drawing(Grid::from_lower_upper((0, -1, -1), (1, 2, 2))),
-            // TODO: divider should have an appropriate shape; waiting on being able to draw
-            // more than one shape in draw_to_blocks
             toolbar_divider: slice_drawing(Grid::from_lower_upper((1, -1, -1), (2, 2, 2)))
                 .translate((-1, 0, 0)),
             toolbar_left_cap: slice_drawing(Grid::from_lower_upper((-1, -1, -1), (0, 2, 2)))
                 .translate((1, 0, 0)),
             toolbar_right_cap: slice_drawing(Grid::from_lower_upper((3, -1, -1), (4, 2, 2)))
                 .translate((-3, 0, 0)),
+            toolbar_pointer_erase: slice_drawing(Grid::from_lower_upper((0, 1, -1), (1, 2, 2))),
+            toolbar_pointer_0: slice_drawing(Grid::from_lower_upper((2, 1, -1), (3, 2, 2)))
+                .translate((-2, 0, 0)),
+            toolbar_pointer_1: slice_drawing(Grid::from_lower_upper((2, -1, -1), (3, 0, 2)))
+                .translate((-2, 0, 0)),
         }
     }
 }

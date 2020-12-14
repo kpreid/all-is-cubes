@@ -38,7 +38,10 @@ impl AllIsCubesAppState {
         let mut ui = Vui::new();
 
         // TODO: this will need to be done on a notification/invalidation basis
-        ui.set_toolbar(&game_camera.borrow().inventory.slots);
+        // and also probably shouldn't be the responsibility of AllIsCubesAppState
+        let camera = game_camera.borrow();
+        ui.set_toolbar(&camera.inventory.slots, camera.selected_slots)
+            .unwrap();
 
         Self {
             frame_clock: FrameClock::new(),

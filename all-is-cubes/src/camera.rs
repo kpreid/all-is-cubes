@@ -55,6 +55,9 @@ pub struct Camera {
 
     // TODO: Figure out what access is needed and add accessors
     pub(crate) inventory: Inventory,
+
+    //. Indices into `self.inventory` slots.
+    pub(crate) selected_slots: [usize; 2],
 }
 
 impl std::fmt::Debug for Camera {
@@ -87,6 +90,7 @@ impl Camera {
                 Tool::DeleteBlock,
                 Tool::PlaceBlock(crate::math::RGBA::new(1.0, 0.0, 0.5, 1.0).into()), // TODO placeholder
             ]),
+            selected_slots: [0, 1],
         }
     }
 
@@ -168,8 +172,12 @@ impl Camera {
 
     /// Handle a click/tool-use on the view.
     pub fn click(&mut self, cursor: &Cursor, button: usize) -> Result<(), ToolError> {
-        // TODO: migrate from "button = tool number" to selections
-        self.inventory.use_tool(&self.space, cursor, button)
+        let slot_index = self
+            .selected_slots
+            .get(button)
+            .copied()
+            .unwrap_or(self.selected_slots[0]);
+        self.inventory.use_tool(&self.space, cursor, slot_index)
     }
 
     // TODO: this code's location is driven by colliding_cubes being here, which is probably wrong
