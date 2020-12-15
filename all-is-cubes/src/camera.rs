@@ -135,6 +135,15 @@ impl Camera {
         self.selected_slots
     }
 
+    pub fn set_selected_slot(&mut self, which_selection: usize, slot: usize) {
+        if which_selection < self.selected_slots.len()
+            && slot != self.selected_slots[which_selection]
+        {
+            self.selected_slots[which_selection] = slot;
+            self.notifier.notify(CameraChange::Selections);
+        }
+    }
+
     /// Advances time.
     ///
     /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).
@@ -479,6 +488,7 @@ impl InputProcessor {
             Key::Up => true,
             Key::Down => true,
             Key::Character(' ') => true,
+            Key::Character(d) if d.is_ascii_digit() => true,
             _ => false,
         }
     }
@@ -553,6 +563,20 @@ impl InputProcessor {
 
         if self.keys_held.contains(&Key::Character(' ')) {
             camera.jump_if_able();
+        }
+
+        // TODO: would be nice to express this in a more straightforward fashion
+        // (though it's probably fast enough that the O(n) doesn't matter)
+        for slot in 0..=9 {
+            let digit = if slot == 9 {
+                '0'
+            } else {
+                std::char::from_digit(slot as u32 + 1, 10).unwrap()
+            };
+            if self.keys_held.contains(&Key::Character(digit)) {
+                camera.set_selected_slot(0, slot);
+                // TODO: need to signal to update the toolbar (or have it be guaranteed)
+            }
         }
     }
 
