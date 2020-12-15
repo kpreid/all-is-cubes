@@ -267,7 +267,7 @@ impl<T: 'static> URef<T> {
     fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {
         self.weak_ref
             .upgrade()
-            .ok_or(RefError::Gone(Rc::clone(&self.name)))
+            .ok_or_else(|| RefError::Gone(Rc::clone(&self.name)))
     }
 }
 
