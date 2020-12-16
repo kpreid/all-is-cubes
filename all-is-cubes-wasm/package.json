@@ -13,7 +13,7 @@
     "copy-webpack-plugin": "^6.4.0",
     "rimraf": "^3.0.0",
     "webpack": "^4.44.2",
-    "webpack-cli": "^3.3.3",
+    "webpack-cli": "^4.2.0",
     "webpack-dev-server": "^3.7.1"
   }
 }
