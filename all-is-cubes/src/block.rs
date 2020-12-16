@@ -7,10 +7,12 @@
 use cgmath::EuclideanSpace as _;
 use once_cell::sync::Lazy;
 use std::borrow::Cow;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 
 use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
-use crate::space::{Grid, GridArray, Space};
-use crate::universe::{RefError, URef};
+use crate::space::{Grid, GridArray, Space, SpaceChange};
+use crate::universe::{Gate, Listener, ListenerHelper, Notifier, RefError, URef};
 use crate::util::ConciseDebug;
 
 /// Type for the edge length of recursive blocks in terms of their component voxels.
@@ -60,7 +62,7 @@ impl Block {
     /// to other objects.
     pub fn evaluate(&self) -> Result<EvaluatedBlock, RefError> {
         match self {
-            Block::Indirect(uref) => uref.try_borrow()?.block.evaluate(),
+            Block::Indirect(def_ref) => def_ref.try_borrow()?.block.evaluate(),
 
             Block::Atom(attributes, color) => Ok(EvaluatedBlock {
                 attributes: attributes.clone(),
@@ -108,6 +110,39 @@ impl Block {
             }
         }
         // TODO: need to track which things we need change notifications on
+    }
+
+    /// Registers a listener for mutations of any data sources which may affect this
+    /// block's [`Block::evaluate`] result.
+    ///
+    /// Note that this does not listen for mutations of the `Block` value itself —
+    /// which would be impossible since it is an enum and all its fields
+    /// are public. In contrast, [`BlockDef`] does perform such tracking.
+    ///
+    /// This may fail under the same conditions as `evaluate`.
+    pub fn listen(&self, listener: impl Listener<BlockChange> + 'static) -> Result<(), RefError> {
+        match self {
+            Block::Indirect(def_ref) => {
+                def_ref.try_borrow_mut()?.listen(listener)?;
+            }
+            Block::Atom(_, _) => {
+                // Atoms don't refer to anything external and thus cannot change other
+                // than being directly overwritten, which is out of the scope of this
+                // operation.
+            }
+            Block::Recur {
+                space: space_ref, ..
+            } => {
+                space_ref
+                    .try_borrow_mut()?
+                    .listen(listener.filter(|msg| match msg {
+                        SpaceChange::Block(_) => Some(BlockChange::new()),
+                        SpaceChange::Lighting(_) => None,
+                        SpaceChange::Number(_) => None,
+                    }));
+            }
+        }
+        Ok(())
     }
 
     /// Returns the single [RGBA] color of this block, or panics if it does not have a
@@ -243,8 +278,20 @@ impl ConciseDebug for EvaluatedBlock {
 }
 
 /// Type of notification when an [`EvaluatedBlock`] result changes.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct BlockChange;
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct BlockChange {
+    /// I expect there _might_ be future uses for a set of flags of what changed;
+    /// this helps preserve the option of adding them.
+    _not_public: (),
+}
+
+impl BlockChange {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> BlockChange {
+        BlockChange { _not_public: () }
+    }
+}
 
 /// Contains a [`Block`] and can be stored in a [`Universe`], allowing indirection
 /// through a [`URef`].
@@ -255,6 +302,74 @@ struct BlockChange;
 #[derive(Debug)]
 pub struct BlockDef {
     block: Block,
+    // TODO: It might be a good idea to cache EvaluatedBlock here, since we're doing
+    // mutation tracking anyway.
+    notifier: Rc<Notifier<BlockChange>>,
+    block_listen_gate: Gate,
+}
+
+impl BlockDef {
+    pub fn new(block: Block) -> Self {
+        let notifier = Rc::new(Notifier::new());
+        let (gate, block_listener) = Notifier::forwarder(Rc::downgrade(&notifier)).gate();
+        // TODO: Log if listening fails. We can't meaningfully fail this because we want to do the
+        // parallel operation in `BlockDefMut::drop` but it does indicate trouble if it happens.
+        let _ = block.listen(block_listener);
+        BlockDef {
+            block,
+            notifier,
+            block_listen_gate: gate,
+        }
+    }
+
+    /// Registers a listener for mutations of any data sources which may affect the
+    /// [`Block::evaluate`] result from blocks defined using this block definition.
+    pub fn listen(
+        &mut self,
+        listener: impl Listener<BlockChange> + 'static,
+    ) -> Result<(), RefError> {
+        // TODO: Need to arrange listening to the contained block, and either translate
+        // that here or have our own notifier generate forwardings.
+        self.notifier.listen(listener);
+        Ok(())
+    }
+
+    /// Creates a handle by which the contained block may be mutated.
+    ///
+    /// When the handle is dropped, a change notification will be sent.
+    pub fn modify(&mut self) -> BlockDefMut<'_> {
+        BlockDefMut(self)
+    }
+}
+
+/// Mutable borrow of the [`Block`] inside a [`BlockDefMut`].
+///
+/// Provides the functionality of delivering change notifications when mutations are
+/// complete.
+pub struct BlockDefMut<'a>(&'a mut BlockDef);
+
+impl Deref for BlockDefMut<'_> {
+    type Target = Block;
+    fn deref(&self) -> &Self::Target {
+        &self.0.block
+    }
+}
+impl DerefMut for BlockDefMut<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0.block
+    }
+}
+impl Drop for BlockDefMut<'_> {
+    fn drop(&mut self) {
+        let block_def = &mut self.0;
+
+        // Swap out what we're listening to
+        let (gate, block_listener) = Notifier::forwarder(Rc::downgrade(&block_def.notifier)).gate();
+        let _ = block_def.block.listen(block_listener);
+        block_def.block_listen_gate = gate; // old gate is now dropped
+
+        block_def.notifier.notify(BlockChange::new());
+    }
 }
 
 /// Construct a set of [`Block::Recur`] that form a miniature of the given `space`.
@@ -291,7 +406,7 @@ mod tests {
     use crate::blockgen::BlockGen;
     use crate::math::{GridPoint, GridVector};
     use crate::space::Grid;
-    use crate::universe::Universe;
+    use crate::universe::{Sink, Universe};
     use std::borrow::Cow;
 
     #[test]
@@ -476,9 +591,96 @@ mod tests {
             space: space_ref.clone(),
         };
         let eval_bare = block.evaluate();
-        let block_def_ref = universe.insert_anonymous(BlockDef { block });
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
         let eval_def = block_def_ref.borrow().block.evaluate();
         assert_eq!(eval_bare, eval_def);
+    }
+
+    #[test]
+    fn listen_atom() {
+        let block = Block::Atom(BlockAttributes::default(), RGBA::WHITE);
+        let mut sink = Sink::new();
+        block.listen(sink.listener()).unwrap();
+        assert_eq!(None, sink.next());
+        // No notifications are possible, so nothing more to test.
+    }
+
+    #[test]
+    fn listen_indirect_atom() {
+        let mut universe = Universe::new();
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::Atom(
+            BlockAttributes::default(),
+            RGBA::WHITE,
+        )));
+        let indirect = Block::Indirect(block_def_ref.clone());
+        let mut sink = Sink::new();
+        indirect.listen(sink.listener()).unwrap();
+        assert_eq!(None, sink.next());
+
+        // Now mutate it and we should see a notification.
+        *(block_def_ref.borrow_mut().modify()) =
+            Block::Atom(BlockAttributes::default(), RGBA::BLACK);
+        assert!(sink.next().is_some());
+    }
+
+    /// Testing double indirection not because it's a case we expect to use routinely,
+    /// but because it exercises the generality of the notification mechanism.
+    #[test]
+    fn listen_indirect_double() {
+        let mut universe = Universe::new();
+        let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::Atom(
+            BlockAttributes::default(),
+            RGBA::WHITE,
+        )));
+        let block_def_ref2 =
+            universe.insert_anonymous(BlockDef::new(Block::Indirect(block_def_ref1.clone())));
+        let indirect2 = Block::Indirect(block_def_ref2.clone());
+        let mut sink = Sink::new();
+        indirect2.listen(sink.listener()).unwrap();
+        assert_eq!(None, sink.next());
+
+        // Now mutate the original block and we should see a notification.
+        *(block_def_ref1.borrow_mut().modify()) =
+            Block::Atom(BlockAttributes::default(), RGBA::BLACK);
+        assert!(sink.next().is_some());
+
+        // Remove block_def_ref1 from the contents of block_def_ref2...
+        *(block_def_ref2.borrow_mut().modify()) =
+            Block::Atom(BlockAttributes::default(), RGBA::BLACK);
+        assert!(sink.next().is_some());
+        assert!(sink.next().is_none());
+        // ...and then block_def_ref1's changes should NOT be forwarded.
+        *(block_def_ref1.borrow_mut().modify()) =
+            Block::Atom(BlockAttributes::default(), RGBA::WHITE);
+        assert!(sink.next().is_none());
+    }
+
+    /// Test that changes to a `Space` propagate to block listeners.
+    #[test]
+    fn listen_recur() {
+        let mut universe = Universe::new();
+        let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let block = Block::Recur {
+            attributes: BlockAttributes::default(),
+            offset: GridPoint::origin(),
+            resolution: 1,
+            space: space_ref.clone(),
+        };
+        let mut sink = Sink::new();
+        block.listen(sink.listener()).unwrap();
+        assert_eq!(None, sink.next());
+
+        // Now mutate the space and we should see a notification.
+        space_ref
+            .borrow_mut()
+            .set(
+                (0, 0, 0),
+                Block::Atom(BlockAttributes::default(), RGBA::new(0.1, 0.2, 0.3, 0.4)),
+            )
+            .unwrap();
+        assert!(sink.next().is_some());
+
+        // TODO: Also test that we don't propagate lighting changes
     }
 
     // TODO: test of evaluate where the block's space is the wrong size
