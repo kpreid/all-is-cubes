@@ -408,17 +408,11 @@ impl std::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// to a set of listeners which implement some form of weak-reference semantics
 /// to allow cleanup.
-pub struct Notifier<M>
-where
-    M: Clone,
-{
+pub struct Notifier<M: Clone> {
     listeners: Vec<Box<dyn Listener<M>>>,
 }
 
-impl<M> Notifier<M>
-where
-    M: Clone,
-{
+impl<M: Clone> Notifier<M> {
     /// Constructs a new empty [`Notifier`].
     pub fn new() -> Self {
         Self {
@@ -454,12 +448,18 @@ where
         }
     }
 }
-impl<M> Default for Notifier<M>
-where
-    M: Clone,
-{
+
+impl<M: Clone> Default for Notifier<M> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<M: Clone> Debug for Notifier<M> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt.debug_tuple("Notifier")
+            .field(&self.listeners.len())
+            .finish()
     }
 }
 
@@ -843,16 +843,20 @@ mod tests {
     }
 
     #[test]
-    fn notifier() {
+    fn notifier_basics_and_debug() {
         let mut cn: Notifier<u8> = Notifier::new();
+        assert_eq!(format!("{:?}", cn), "Notifier(0)");
         cn.notify(0);
+        assert_eq!(format!("{:?}", cn), "Notifier(0)");
         let mut sink = Sink::new();
         cn.listen(sink.listener());
+        assert_eq!(format!("{:?}", cn), "Notifier(1)");
         assert_eq!(None, sink.next());
         cn.notify(1);
         cn.notify(2);
         assert_eq!(Some(2), sink.next());
         assert_eq!(Some(1), sink.next());
         assert_eq!(None, sink.next());
+        assert_eq!(format!("{:?}", cn), "Notifier(1)");
     }
 }
