@@ -491,6 +491,8 @@ where
     Self: Sized,
 {
     /// Apply a map/filter function to incoming messages.
+    ///
+    /// TODO: Doc test
     fn filter<MI, F>(self, function: F) -> Filter<F, Self>
     where
         F: Fn(MI) -> Option<M>,
@@ -499,6 +501,28 @@ where
             function,
             target: self,
         }
+    }
+
+    /// Wraps `self` to pass messages only until the returned [`Gate`], and any clones
+    /// of it, are dropped.
+    ///    
+    /// This may be used to stop forwarding messages when a dependency no longer exists.
+    ///
+    /// ```
+    /// use all_is_cubes::universe::{Listener, ListenerHelper, Gate, Sink};
+    ///
+    /// let sink = Sink::new();
+    /// let (gate, gated) = sink.listener().gate();
+    /// gated.receive("kept");
+    /// assert!(sink.take_equal("kept"));
+    /// drop(gate);
+    /// gated.receive("discarded");
+    /// assert!(!sink.take_equal("discarded"));
+    /// ```
+    fn gate(self) -> (Gate, GateListener<Self>) {
+        let signaller = Rc::new(());
+        let weak = Rc::downgrade(&signaller);
+        (Gate(signaller), GateListener { weak, target: self })
     }
 }
 impl<M, L: Listener<M> + Sized> ListenerHelper<M> for L {}
@@ -621,7 +645,7 @@ impl<M> Listener<M> for DirtyFlagListener {
         }
     }
     fn alive(&self) -> bool {
-        self.weak_flag.upgrade().is_some()
+        self.weak_flag.strong_count() > 0
     }
 }
 /// Equivalent to [`DirtyFlag::new`].
@@ -639,9 +663,9 @@ impl Default for DirtyFlag {
 /// TODO: add doc test
 pub struct Filter<F, T> {
     /// The function to transform and possibly discard each message.
-    pub function: F,
+    function: F,
     /// The recipient of the messages.
-    pub target: T,
+    target: T,
 }
 impl<MI, MO, F, T> Listener<MI> for Filter<F, T>
 where
@@ -655,6 +679,32 @@ where
     }
     fn alive(&self) -> bool {
         self.target.alive()
+    }
+}
+
+/// Controls a [`Listener`] chain by discarding messages when this gate is dropped.
+///
+/// Construct this using [`ListenerHelper::gate`].
+#[derive(Clone, Debug)]
+pub struct Gate(Rc<()>);
+
+/// [`Listener`] implementation which discards messages when the corresponding [`Gate`]
+/// is dropped. Construct this using [`ListenerHelper::gate`].
+pub struct GateListener<T> {
+    weak: Weak<()>,
+    target: T,
+}
+impl<M, T> Listener<M> for GateListener<T>
+where
+    T: Listener<M>,
+{
+    fn receive(&self, message: M) {
+        if self.alive() {
+            self.target.receive(message);
+        }
+    }
+    fn alive(&self) -> bool {
+        self.weak.strong_count() > 0 && self.target.alive()
     }
 }
 
