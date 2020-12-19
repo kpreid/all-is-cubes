@@ -425,9 +425,39 @@ impl<M: Clone> Notifier<M> {
         if !listener.alive() {
             return;
         }
-        let mut listeners = self.listeners.try_borrow_mut().expect("Adding listeners while a notification is being sent is not implemented");
+        let mut listeners = self
+            .listeners
+            .try_borrow_mut()
+            .expect("Adding listeners while a notification is being sent is not implemented");
         Self::cleanup(&mut listeners);
         listeners.push(Box::new(listener));
+    }
+
+    /// Returns a [`Listener`] which forwards messages to the listeners registered with
+    /// this `Notifier`, provided that it is owned by an `Rc`.
+    ///
+    /// This may be used together with [`ListenerHelper::filter`] to forward notifications
+    /// of changes in dependencies. Using this operation means that the dependent does not
+    /// need to fan out listener registrations to all of its current dependencies.
+    ///
+    /// ```
+    /// use std::rc::Rc;
+    /// use all_is_cubes::universe::{Notifier, Sink};
+    ///
+    /// let notifier_1 = Notifier::new();
+    /// let notifier_2 = Rc::new(Notifier::new());
+    /// let mut sink = Sink::new();
+    /// notifier_1.listen(Notifier::forwarder(Rc::downgrade(&notifier_2)));
+    /// notifier_2.listen(sink.listener());
+    ///
+    /// notifier_1.notify("a");
+    /// assert!(sink.take_equal("a"));
+    /// drop(notifier_2);
+    /// notifier_1.notify("a");
+    /// assert_eq!(None, sink.next());
+    /// ```
+    pub fn forwarder(this: Weak<Self>) -> impl Listener<M> {
+        NotifierForwarder(this)
     }
 
     /// Deliver a message to all [`Listener`]s.
@@ -459,13 +489,9 @@ impl<M: Clone> Default for Notifier<M> {
 impl<M: Clone> Debug for Notifier<M> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Ok(listeners) = self.listeners.try_borrow() {
-            fmt.debug_tuple("Notifier")
-                .field(&listeners.len())
-                .finish()
+            fmt.debug_tuple("Notifier").field(&listeners.len()).finish()
         } else {
-            fmt.debug_tuple("Notifier")
-                .field(&"?")
-                .finish()
+            fmt.debug_tuple("Notifier").field(&"?").finish()
         }
     }
 }
@@ -712,6 +738,21 @@ where
     }
     fn alive(&self) -> bool {
         self.weak.strong_count() > 0 && self.target.alive()
+    }
+}
+
+/// A [`Listener`] which forwards messages through a [`Notifier`].
+/// Constructed by [`Notifier::forwarder`].
+#[derive(Debug)]
+struct NotifierForwarder<M: Clone>(Weak<Notifier<M>>);
+impl<M: Clone> Listener<M> for NotifierForwarder<M> {
+    fn receive(&self, message: M) {
+        if let Some(notifier) = self.0.upgrade() {
+            notifier.notify(message);
+        }
+    }
+    fn alive(&self) -> bool {
+        self.0.strong_count() > 0
     }
 }
 
