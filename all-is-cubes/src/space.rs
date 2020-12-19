@@ -469,7 +469,7 @@ impl Space {
     }
 
     /// Registers a listener for mutations of this space.
-    pub fn listen(&mut self, listener: impl Listener<SpaceChange> + 'static) {
+    pub fn listen(&self, listener: impl Listener<SpaceChange> + 'static) {
         self.notifier.listen(listener)
     }
 

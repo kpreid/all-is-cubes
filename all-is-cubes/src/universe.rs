@@ -409,41 +409,42 @@ impl std::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
 /// to a set of listeners which implement some form of weak-reference semantics
 /// to allow cleanup.
 pub struct Notifier<M: Clone> {
-    listeners: Vec<Box<dyn Listener<M>>>,
+    listeners: RefCell<Vec<Box<dyn Listener<M>>>>,
 }
 
 impl<M: Clone> Notifier<M> {
     /// Constructs a new empty [`Notifier`].
     pub fn new() -> Self {
         Self {
-            listeners: Vec::new(),
+            listeners: Default::default(),
         }
     }
 
     /// Add a [`Listener`] to this set of listeners.
-    pub fn listen<L: Listener<M> + 'static>(&mut self, listener: L) {
+    pub fn listen<L: Listener<M> + 'static>(&self, listener: L) {
         if !listener.alive() {
             return;
         }
-        self.cleanup();
-        self.listeners.push(Box::new(listener));
+        let mut listeners = self.listeners.try_borrow_mut().expect("Adding listeners while a notification is being sent is not implemented");
+        Self::cleanup(&mut listeners);
+        listeners.push(Box::new(listener));
     }
 
     /// Deliver a message to all [`Listener`]s.
     pub fn notify(&self, message: M) {
-        for listener in self.listeners.iter() {
+        for listener in self.listeners.borrow().iter() {
             listener.receive(message.clone());
         }
     }
 
-    /// Discard all dead weak pointers in `self.listeners`.
-    fn cleanup(&mut self) {
+    /// Discard all dead weak pointers in `listeners`.
+    fn cleanup(listeners: &mut Vec<Box<dyn Listener<M>>>) {
         let mut i = 0;
-        while i < self.listeners.len() {
-            if self.listeners[i].alive() {
+        while i < listeners.len() {
+            if listeners[i].alive() {
                 i += 1;
             } else {
-                self.listeners.swap_remove(i);
+                listeners.swap_remove(i);
             }
         }
     }
@@ -457,9 +458,15 @@ impl<M: Clone> Default for Notifier<M> {
 
 impl<M: Clone> Debug for Notifier<M> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt.debug_tuple("Notifier")
-            .field(&self.listeners.len())
-            .finish()
+        if let Ok(listeners) = self.listeners.try_borrow() {
+            fmt.debug_tuple("Notifier")
+                .field(&listeners.len())
+                .finish()
+        } else {
+            fmt.debug_tuple("Notifier")
+                .field(&"?")
+                .finish()
+        }
     }
 }
 
@@ -894,7 +901,7 @@ mod tests {
 
     #[test]
     fn notifier_basics_and_debug() {
-        let mut cn: Notifier<u8> = Notifier::new();
+        let cn: Notifier<u8> = Notifier::new();
         assert_eq!(format!("{:?}", cn), "Notifier(0)");
         cn.notify(0);
         assert_eq!(format!("{:?}", cn), "Notifier(0)");

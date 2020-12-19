@@ -41,7 +41,7 @@ impl SpaceRenderer {
     /// frames after construction. There is not currently a specific way to wait for
     /// completion.
     pub fn new(space: URef<Space>) -> Self {
-        let mut space_borrowed = space.borrow_mut();
+        let space_borrowed = space.borrow_mut();
 
         let todo = SpaceRendererTodo::default();
         let todo_rc = Rc::new(RefCell::new(todo));
