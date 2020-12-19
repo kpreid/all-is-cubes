@@ -647,6 +647,14 @@ where
 pub struct DirtyFlag {
     flag: Rc<Cell<bool>>,
 }
+impl Debug for DirtyFlag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("DirtyFlag")
+            .field(&self.flag.get())
+            .finish()
+    }
+}
+
 struct DirtyFlagListener {
     weak_flag: Weak<Cell<bool>>,
 }
@@ -956,5 +964,13 @@ mod tests {
         assert_eq!(Some(1), sink.next());
         assert_eq!(None, sink.next());
         assert_eq!(format!("{:?}", cn), "Notifier(1)");
+    }
+
+    #[test]
+    fn dirty_flag_debug() {
+        assert_eq!(format!("{:?}", DirtyFlag::new()), "DirtyFlag(false)");
+        let dirtied = DirtyFlag::new();
+        dirtied.listener().receive(());
+        assert_eq!(format!("{:?}", dirtied), "DirtyFlag(true)");
     }
 }
