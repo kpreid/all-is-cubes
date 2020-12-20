@@ -308,6 +308,7 @@ impl std::fmt::Debug for CubeFace {
 /// literals.
 ///
 /// TODO: examples
+#[macro_export]
 macro_rules! rgb_const {
     ($r:literal, $g:literal, $b:literal) => {
         unsafe {
@@ -324,6 +325,7 @@ macro_rules! rgb_const {
 
 /// Allows writing a constant [`RGB`] color value, provided that its components are float
 /// literals.
+#[macro_export]
 macro_rules! rgba_const {
     ($r:literal, $g:literal, $b:literal, $a:literal) => {
         unsafe {
