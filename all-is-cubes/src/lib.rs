@@ -24,7 +24,6 @@ pub mod camera;
 mod chunking;
 pub mod content;
 pub mod drawing;
-mod lighting;
 pub mod lum;
 pub mod physics;
 pub mod raycast;

@@ -16,9 +16,8 @@ use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
 use std::convert::TryFrom;
 
 use crate::block::{EvaluatedBlock, Resolution};
-use crate::lighting::PackedLight;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
-use crate::space::{Grid, Space};
+use crate::space::{Grid, PackedLight, Space};
 use crate::util::ConciseDebug as _;
 
 /// Numeric type used to store texture coordinates.
