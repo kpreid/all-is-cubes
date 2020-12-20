@@ -36,7 +36,7 @@ pub type Resolution = u8;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Block {
-    /// A block whose definition is stored in a [`Universe`].
+    /// A block whose definition is stored in a [`Universe`](crate::universe::Universe).
     Indirect(URef<BlockDef>),
 
     /// A block that is a single-colored unit cube. (It may still be be transparent or
@@ -293,8 +293,8 @@ impl BlockChange {
     }
 }
 
-/// Contains a [`Block`] and can be stored in a [`Universe`], allowing indirection
-/// through a [`URef`].
+/// Contains a [`Block`] and can be stored in a [`Universe`](crate::universe::Universe),
+/// allowing indirection through a [`URef`].
 ///
 /// TODO: This type exists because I predict it will be needed for correct change
 /// notifications (possibly in the form of removing `Block::Recur`). If I'm wrong,

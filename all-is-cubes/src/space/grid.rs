@@ -12,8 +12,8 @@ use std::ops::Range;
 use crate::block::Resolution;
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector};
 
-/// Specifies the coordinate extent of a [`Space`], as an axis-aligned box with integer
-/// coordinates whose volume is between 1 and [`usize::MAX`].
+/// Specifies the coordinate extent of a [`Space`](super::Space), as an axis-aligned box
+/// with integer coordinates whose volume is between 1 and [`usize::MAX`].
 ///
 /// When we refer to “a cube” in a `Grid`, that is a unit cube which is identified by the
 /// integer coordinates of its most negative corner. Hence, coordinate bounds are always
@@ -359,7 +359,8 @@ impl Grid {
     }
 }
 
-/// A 3-dimensional array with arbitrary element type instead of [`Space`]'s fixed types.
+/// A 3-dimensional array with arbitrary element type instead of [`Space`](super::Space)'s
+/// fixed types.
 ///
 /// TODO: Should we rebuild Space on top of this?
 #[derive(Clone, Debug, Eq, Hash, PartialEq)] // TODO: nondefault Debug
