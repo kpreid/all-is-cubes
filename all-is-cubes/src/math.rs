@@ -856,7 +856,9 @@ mod tests {
     #[test]
     fn face_matrix_does_not_scale_or_reflect() {
         for &face in Face::ALL_SIX {
-            assert_eq!(1.0, face.matrix().determinant());
+            // The ::<f32> is not strictly necessary, but prevents an extraneous
+            // error whenever the program fails to typecheck *elsewhere*.
+            assert_eq!(1.0, face.matrix::<f32>().determinant());
         }
     }
 
