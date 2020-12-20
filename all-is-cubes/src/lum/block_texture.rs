@@ -21,7 +21,8 @@ use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::GridCoordinate;
 use crate::space::Space;
 use crate::triangulator::{
-    triangulate_blocks, BlocksRenderData, Texel, TextureAllocator, TextureCoordinate, TextureTile,
+    triangulate_blocks, BlockTriangulations, Texel, TextureAllocator, TextureCoordinate,
+    TextureTile,
 };
 
 /// Alias for the concrete type of the block texture.
@@ -34,7 +35,7 @@ pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim2Array, NormRGBA8UI>;
 /// [`triangulate_blocks`](crate::triangulator::triangulate_blocks).
 pub struct BlockGLRenderData {
     /// Data for use with [`triangulate_space`](crate::triangulator::triangulate_space).
-    pub block_render_data: BlocksRenderData<GLBlockVertex, BlockGLTexture>,
+    pub block_triangulations: BlockTriangulations<GLBlockVertex, BlockGLTexture>,
     pub(crate) texture_allocator: BlockGLTexture,
 }
 
@@ -51,7 +52,7 @@ impl BlockGLRenderData {
     {
         let mut texture_allocator = BlockGLTexture::new(context)?;
         let mut result = BlockGLRenderData {
-            block_render_data: triangulate_blocks(space, &mut texture_allocator),
+            block_triangulations: triangulate_blocks(space, &mut texture_allocator),
             texture_allocator,
         };
         let flush_info = result.texture_allocator.flush()?;

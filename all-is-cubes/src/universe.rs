@@ -649,9 +649,7 @@ pub struct DirtyFlag {
 }
 impl Debug for DirtyFlag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("DirtyFlag")
-            .field(&self.flag.get())
-            .finish()
+        f.debug_tuple("DirtyFlag").field(&self.flag.get()).finish()
     }
 }
 

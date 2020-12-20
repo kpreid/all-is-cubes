@@ -93,8 +93,12 @@ impl ToGfxVertex<BlockVertex> for BlockVertex {
 }
 
 /// Describes how to draw one [`Face`] of a [`Block`].
+///
+/// See [`BlockTriangulation`] for a description of how triangles are grouped into faces.
+/// The texture associated with the contained vertices' texture coordinates is also
+/// kept there.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct FaceRenderData<V: From<BlockVertex>> {
+struct FaceTriangulation<V: From<BlockVertex>> {
     /// Vertices of triangles (i.e. length is a multiple of 3) in counterclockwise order.
     vertices: Vec<V>,
     /// Whether the block entirely fills its cube, such that nothing can be seen through
@@ -102,9 +106,9 @@ struct FaceRenderData<V: From<BlockVertex>> {
     fully_opaque: bool,
 }
 
-impl<V: From<BlockVertex>> Default for FaceRenderData<V> {
+impl<V: From<BlockVertex>> Default for FaceTriangulation<V> {
     fn default() -> Self {
-        FaceRenderData {
+        FaceTriangulation {
             vertices: Vec::new(),
             fully_opaque: false,
         }
@@ -113,7 +117,7 @@ impl<V: From<BlockVertex>> Default for FaceRenderData<V> {
 
 /// Describes how to draw a block. Pass it to [`triangulate_space`] to use it.
 #[derive(Debug, PartialEq, Eq)]
-pub struct BlockRenderData<V, A>
+pub struct BlockTriangulation<V, A>
 where
     V: From<BlockVertex>,
     A: TextureAllocator,
@@ -123,15 +127,15 @@ where
     /// All triangles which are on the surface of the cube (such that they may be omitted
     /// when a `fully_opaque` block is adjacent) are grouped under the corresponding
     /// face, and all other triangles are grouped under `Face::WITHIN`.
-    faces: FaceMap<FaceRenderData<V>>,
+    faces: FaceMap<FaceTriangulation<V>>,
 
-    /// Texture tiles used by the vertices; holding these objects ensures the texture
-    /// coordinates stay valid.
+    /// Texture tiles used by the vertices; holding these objects is intended to ensure
+    /// the texture coordinates stay valid.
     textures_used: Vec<A::Tile>,
 }
 
 /// Manual implementation of `Clone` to avoid the constraint `A: Clone`.
-impl<V, A> Clone for BlockRenderData<V, A>
+impl<V, A> Clone for BlockTriangulation<V, A>
 where
     V: From<BlockVertex> + Clone,
     A: TextureAllocator,
@@ -144,18 +148,18 @@ where
     }
 }
 
-impl<V: From<BlockVertex>, A: TextureAllocator> Default for BlockRenderData<V, A> {
+impl<V: From<BlockVertex>, A: TextureAllocator> Default for BlockTriangulation<V, A> {
     fn default() -> Self {
         Self {
-            faces: FaceMap::generate(|_| FaceRenderData::default()),
+            faces: FaceMap::generate(|_| FaceTriangulation::default()),
             textures_used: Vec::new(),
         }
     }
 }
 
-/// Collection of [`BlockRenderData`] indexed by a [`Space`]'s block indices.
+/// Collection of [`BlockTriangulation`] indexed by a [`Space`]'s block indices.
 /// Pass it to [`triangulate_space`] to use it.
-pub type BlocksRenderData<V, A> = Box<[BlockRenderData<V, A>]>;
+pub type BlockTriangulations<V, A> = Box<[BlockTriangulation<V, A>]>;
 
 const QUAD_VERTICES: &[Point3<FreeCoordinate>; 6] = &[
     // Two-triangle quad.
@@ -203,23 +207,23 @@ fn push_quad_textured<V: From<BlockVertex>>(
     }
 }
 
-/// Generate [`BlockRenderData`] for a block.
+/// Generate [`BlockTriangulation`] for a block.
 fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // TODO: Arrange to pass in a buffer of old data such that we can reuse existing textures.
     // This will allow for efficient implementation of animated blocks.
     block: &EvaluatedBlock,
     texture_allocator: &mut A,
-) -> BlockRenderData<V, A> {
+) -> BlockTriangulation<V, A> {
     match &block.voxels {
         None => {
             let faces = FaceMap::generate(|face| {
                 if face == Face::WITHIN {
                     // No interior detail for atom blocks.
-                    return FaceRenderData::default();
+                    return FaceTriangulation::default();
                 }
 
                 let fully_opaque = block.color.fully_opaque();
-                FaceRenderData {
+                FaceTriangulation {
                     // TODO: Port over pseudo-transparency mechanism, then change this to a
                     // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
                     vertices: if fully_opaque {
@@ -233,7 +237,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 }
             });
 
-            BlockRenderData {
+            BlockTriangulation {
                 faces,
                 textures_used: vec![],
             }
@@ -241,7 +245,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
         Some(voxels) => {
             // Construct empty output to mutate, because inside the loops we'll be
             // updating WITHIN independently of other faces.
-            let mut output_by_face = FaceMap::generate(|face| FaceRenderData {
+            let mut output_by_face = FaceMap::generate(|face| FaceTriangulation {
                 vertices: Vec::new(),
                 // Start assuming opacity; if we find any transparent pixels we'll set
                 // this to false. WITHIN is always "transparent" because the algorithm
@@ -329,7 +333,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 }
             }
 
-            BlockRenderData {
+            BlockTriangulation {
                 faces: output_by_face,
                 textures_used,
             }
@@ -343,7 +347,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
-) -> BlocksRenderData<V, A> {
+) -> BlockTriangulations<V, A> {
     space
         .distinct_blocks_unfiltered_iter()
         .map(|block_data| triangulate_block(block_data.evaluated(), texture_allocator))
@@ -370,13 +374,13 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 pub fn triangulate_space<BV, GV, A>(
     space: &Space,
     bounds: Grid,
-    blocks_render_data: &BlocksRenderData<BV, A>,
+    blocks_render_data: &BlockTriangulations<BV, A>,
     output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
     BV: ToGfxVertex<GV>,
     A: TextureAllocator,
 {
-    let empty_render = BlockRenderData::<BV, A>::default();
+    let empty_render = BlockTriangulation::<BV, A>::default();
     let lookup = |cube| {
         match space.get_block_index(cube) {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one.
@@ -550,7 +554,7 @@ mod tests {
     fn no_panic_on_missing_blocks() {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 1, 1);
-        let blocks_render_data: BlocksRenderData<BlockVertex, _> =
+        let blocks_render_data: BlockTriangulations<BlockVertex, _> =
             triangulate_blocks(&space, &mut TestTextureAllocator::new(43));
         assert_eq!(blocks_render_data.len(), 1); // check our assumption
 
@@ -583,9 +587,9 @@ mod tests {
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 
         let mut tex = TestTextureAllocator::new(1);
-        let blocks_render_data: BlocksRenderData<BlockVertex, _> =
+        let blocks_render_data: BlockTriangulations<BlockVertex, _> =
             triangulate_blocks(&outer_space, &mut tex);
-        let block_render_data: BlockRenderData<_, _> = blocks_render_data[0].clone();
+        let block_render_data: BlockTriangulation<_, _> = blocks_render_data[0].clone();
 
         eprintln!("{:#?}", blocks_render_data);
         let mut space_rendered = new_space_buffer();
@@ -628,7 +632,7 @@ mod tests {
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 
         let mut tex = TestTextureAllocator::new(resolution);
-        let blocks_render_data: BlocksRenderData<BlockVertex, _> =
+        let blocks_render_data: BlockTriangulations<BlockVertex, _> =
             triangulate_blocks(&outer_space, &mut tex);
 
         eprintln!("{:#?}", blocks_render_data);

@@ -22,7 +22,7 @@ use crate::lum::block_texture::{
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
 use crate::space::{Grid, Space, SpaceChange};
-use crate::triangulator::{triangulate_space, BlocksRenderData};
+use crate::triangulator::{triangulate_space, BlockTriangulations};
 use crate::universe::{Listener, URef};
 
 /// Manages cached data and GPU resources for drawing a single [`Space`].
@@ -118,7 +118,7 @@ impl SpaceRenderer {
                 chunk_entry.or_insert_with(|| Chunk::new(p)).update(
                     context,
                     &space,
-                    &block_data.block_render_data,
+                    &block_data.block_triangulations,
                 );
                 chunk_update_count += 1;
             }
@@ -237,7 +237,7 @@ impl Chunk {
         &mut self,
         context: &mut C,
         space: &Space,
-        blocks_render_data: &BlocksRenderData<GLBlockVertex, BlockGLTexture>,
+        blocks_render_data: &BlockTriangulations<GLBlockVertex, BlockGLTexture>,
     ) {
         triangulate_space(space, self.bounds, blocks_render_data, &mut self.vertices);
 
