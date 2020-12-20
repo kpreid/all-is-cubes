@@ -35,7 +35,7 @@ pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim2Array, NormRGBA8UI>;
 /// [`triangulate_blocks`](crate::triangulator::triangulate_blocks).
 pub struct BlockGLRenderData {
     /// Data for use with [`triangulate_space`](crate::triangulator::triangulate_space).
-    pub block_triangulations: BlockTriangulations<GLBlockVertex, BlockGLTexture>,
+    pub block_triangulations: BlockTriangulations<GLBlockVertex, GLTile>,
     pub(crate) texture_allocator: BlockGLTexture,
 }
 

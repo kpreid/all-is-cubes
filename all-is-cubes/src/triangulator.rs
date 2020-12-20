@@ -98,7 +98,7 @@ impl ToGfxVertex<BlockVertex> for BlockVertex {
 /// The texture associated with the contained vertices' texture coordinates is also
 /// kept there.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct FaceTriangulation<V: From<BlockVertex>> {
+struct FaceTriangulation<V> {
     /// Vertices of triangles (i.e. length is a multiple of 3) in counterclockwise order.
     vertices: Vec<V>,
     /// Whether the block entirely fills its cube, such that nothing can be seen through
@@ -106,7 +106,7 @@ struct FaceTriangulation<V: From<BlockVertex>> {
     fully_opaque: bool,
 }
 
-impl<V: From<BlockVertex>> Default for FaceTriangulation<V> {
+impl<V> Default for FaceTriangulation<V> {
     fn default() -> Self {
         FaceTriangulation {
             vertices: Vec::new(),
@@ -116,12 +116,8 @@ impl<V: From<BlockVertex>> Default for FaceTriangulation<V> {
 }
 
 /// Describes how to draw a block. Pass it to [`triangulate_space`] to use it.
-#[derive(Debug, PartialEq, Eq)]
-pub struct BlockTriangulation<V, A>
-where
-    V: From<BlockVertex>,
-    A: TextureAllocator,
-{
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BlockTriangulation<V, T> {
     /// Vertices grouped by the face they belong to.
     ///
     /// All triangles which are on the surface of the cube (such that they may be omitted
@@ -131,24 +127,10 @@ where
 
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates stay valid.
-    textures_used: Vec<A::Tile>,
+    textures_used: Vec<T>,
 }
 
-/// Manual implementation of `Clone` to avoid the constraint `A: Clone`.
-impl<V, A> Clone for BlockTriangulation<V, A>
-where
-    V: From<BlockVertex> + Clone,
-    A: TextureAllocator,
-{
-    fn clone(&self) -> Self {
-        Self {
-            faces: self.faces.clone(),
-            textures_used: self.textures_used.clone(),
-        }
-    }
-}
-
-impl<V: From<BlockVertex>, A: TextureAllocator> Default for BlockTriangulation<V, A> {
+impl<V, T> Default for BlockTriangulation<V, T> {
     fn default() -> Self {
         Self {
             faces: FaceMap::generate(|_| FaceTriangulation::default()),
@@ -213,7 +195,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // This will allow for efficient implementation of animated blocks.
     block: &EvaluatedBlock,
     texture_allocator: &mut A,
-) -> BlockTriangulation<V, A> {
+) -> BlockTriangulation<V, A::Tile> {
     match &block.voxels {
         None => {
             let faces = FaceMap::generate(|face| {
@@ -347,7 +329,7 @@ fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
-) -> BlockTriangulations<V, A> {
+) -> BlockTriangulations<V, A::Tile> {
     space
         .distinct_blocks_unfiltered_iter()
         .map(|block_data| triangulate_block(block_data.evaluated(), texture_allocator))
@@ -371,16 +353,15 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 ///
 /// `output_vertices` is a [`FaceMap`] dividing the faces according to their normal
 /// vectors.
-pub fn triangulate_space<BV, GV, A>(
+pub fn triangulate_space<BV, GV, T>(
     space: &Space,
     bounds: Grid,
-    blocks_render_data: &BlockTriangulations<BV, A>,
+    blocks_render_data: &BlockTriangulations<BV, T>,
     output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
     BV: ToGfxVertex<GV>,
-    A: TextureAllocator,
 {
-    let empty_render = BlockTriangulation::<BV, A>::default();
+    let empty_render = BlockTriangulation::<BV, T>::default();
     let lookup = |cube| {
         match space.get_block_index(cube) {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one.
@@ -522,7 +503,7 @@ mod tests {
         space.fill(space.grid(), |_| Some(&block)).unwrap();
 
         let mut rendering = new_space_buffer();
-        triangulate_space::<BlockVertex, BlockVertex, TestTextureAllocator>(
+        triangulate_space::<BlockVertex, BlockVertex, TestTextureTile>(
             &space,
             space.grid(),
             &triangulate_blocks(&space, &mut TestTextureAllocator::new(43)),

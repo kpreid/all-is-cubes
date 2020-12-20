@@ -16,9 +16,7 @@ use std::rc::{Rc, Weak};
 use crate::chunking::{
     cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE, CHUNK_SIZE_FREE,
 };
-use crate::lum::block_texture::{
-    BlockGLRenderData, BlockGLTexture, BlockTexture, BoundBlockTexture,
-};
+use crate::lum::block_texture::{BlockGLRenderData, BlockTexture, BoundBlockTexture, GLTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
 use crate::space::{Grid, Space, SpaceChange};
@@ -237,7 +235,7 @@ impl Chunk {
         &mut self,
         context: &mut C,
         space: &Space,
-        blocks_render_data: &BlockTriangulations<GLBlockVertex, BlockGLTexture>,
+        blocks_render_data: &BlockTriangulations<GLBlockVertex, GLTile>,
     ) {
         triangulate_space(space, self.bounds, blocks_render_data, &mut self.vertices);
 
