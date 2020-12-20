@@ -101,9 +101,9 @@ impl Space {
                 map
             },
             block_data: vec![SpaceBlockData {
-                block: AIR.clone(),
+                block: AIR,
                 count: volume,
-                evaluated: AIR_EVALUATED.clone(),
+                evaluated: AIR_EVALUATED,
             }],
             contents: vec![0; volume].into_boxed_slice(),
             lighting: initialize_lighting(grid, sky_color.into()),
@@ -158,11 +158,6 @@ impl Space {
         extractor: impl Fn(Option<BlockIndex>, &SpaceBlockData, PackedLight) -> V,
     ) -> GridArray<V> {
         let mut output: Vec<V> = Vec::with_capacity(subgrid.volume());
-        let out_of_bounds_data = SpaceBlockData {
-            block: AIR.clone(),
-            count: 0,
-            evaluated: AIR_EVALUATED.clone(),
-        };
         for x in subgrid.x_range() {
             for y in subgrid.y_range() {
                 for z in subgrid.z_range() {
@@ -176,7 +171,7 @@ impl Space {
                                 self.lighting[cube_index],
                             )
                         }
-                        None => extractor(None, &out_of_bounds_data, self.packed_sky_color),
+                        None => extractor(None, &SpaceBlockData::NOTHING, self.packed_sky_color),
                     });
                 }
             }
@@ -194,7 +189,7 @@ impl Space {
         if let Some(index) = self.grid.index(position) {
             &self.block_data[self.contents[index] as usize].evaluated
         } else {
-            &*AIR_EVALUATED
+            &AIR_EVALUATED
         }
     }
 
@@ -489,7 +484,18 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
 }
 
 impl SpaceBlockData {
+    /// A `SpaceBlockData` value used to represent out-of-bounds or placeholder
+    /// situations. The block is [`AIR`] and the count is always zero.
+    pub const NOTHING: Self = Self {
+        block: AIR,
+        count: 0,
+        evaluated: AIR_EVALUATED,
+    };
+
     /// Value used to fill empty entries in the block data vector.
+    /// This is the same value as [`SpaceBlockData::NOTHING`] but is not merely done
+    /// by `.clone()` because I haven't decided whether providing [`Clone`] for
+    /// `SpaceBlockData` is a good long-term API design decision.
     fn tombstone() -> Self {
         Self {
             block: AIR.clone(),

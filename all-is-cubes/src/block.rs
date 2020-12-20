@@ -5,7 +5,6 @@
 //! [`Space`]. See [`Block`] for details.
 
 use cgmath::EuclideanSpace as _;
-use once_cell::sync::Lazy;
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -225,19 +224,32 @@ impl Default for BlockAttributes {
 }
 
 /// Generic 'empty'/'null' block. It is used by `Space` to respond to out-of-bounds requests.
-pub const AIR: Block = Block::Atom(
-    BlockAttributes {
-        display_name: Cow::Borrowed("<air>"),
-        selectable: false,
-        solid: false,
-        light_emission: RGB::ZERO,
-    },
-    RGBA::TRANSPARENT,
-);
+///
+/// See also [`AIR_EVALUATED`].
+pub const AIR: Block = Block::Atom(AIR_ATTRIBUTES, RGBA::TRANSPARENT);
 
 /// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>. This may be used when
 /// a consistent [`EvaluatedBlock`] value is needed but there is no block value.
-pub static AIR_EVALUATED: Lazy<EvaluatedBlock> = Lazy::new(|| AIR.evaluate().unwrap());
+///
+/// ```
+/// use all_is_cubes::block::{AIR, AIR_EVALUATED};
+///
+/// assert_eq!(Ok(AIR_EVALUATED), AIR.evaluate());
+/// ```
+pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
+    attributes: AIR_ATTRIBUTES,
+    color: RGBA::TRANSPARENT,
+    voxels: None,
+    opaque: false,
+    visible: false,
+};
+
+const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
+    display_name: Cow::Borrowed("<air>"),
+    selectable: false,
+    solid: false,
+    light_emission: RGB::ZERO,
+};
 
 /// A “flattened” and snapshotted form of `Block` which contains all information needed
 /// for rendering and physics, and does not require `URef` access to other objects.
