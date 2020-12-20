@@ -4,14 +4,16 @@
 //! That which contains many blocks.
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
+use std::rc::{Rc, Weak};
 use std::time::Duration;
 
 use crate::block::*;
 use crate::content::palette;
 use crate::math::*;
-use crate::universe::{Listener, Notifier, RefError};
+use crate::universe::{Gate, Listener, ListenerHelper as _, Notifier, RefError};
 use crate::util::ConciseDebug as _;
 
 mod grid;
@@ -57,6 +59,9 @@ pub struct Space {
     packed_sky_color: PackedLight,
 
     pub(crate) notifier: Notifier<SpaceChange>,
+
+    /// Storage for incoming change notifications from blocks.
+    todo: Rc<RefCell<SpaceTodo>>,
 }
 
 /// Information about the interpretation of a block index.
@@ -71,6 +76,7 @@ pub struct SpaceBlockData {
     /// Number of uses of this block in the space.
     count: usize,
     evaluated: EvaluatedBlock,
+    block_listen_gate: Option<Gate>,
 }
 
 impl std::fmt::Debug for Space {
@@ -101,9 +107,8 @@ impl Space {
                 map
             },
             block_data: vec![SpaceBlockData {
-                block: AIR,
                 count: volume,
-                evaluated: AIR_EVALUATED,
+                ..SpaceBlockData::NOTHING
             }],
             contents: vec![0; volume].into_boxed_slice(),
             lighting: initialize_lighting(grid, sky_color.into()),
@@ -112,6 +117,7 @@ impl Space {
             sky_color,
             packed_sky_color: sky_color.into(),
             notifier: Notifier::new(),
+            todo: Default::default(),
         }
     }
 
@@ -253,7 +259,10 @@ impl Space {
 
                 // Swap out the block_data entry.
                 let old_block = {
-                    let mut data = SpaceBlockData::new(block.clone().into_owned())?;
+                    let mut data = SpaceBlockData::new(
+                        block.clone().into_owned(),
+                        self.listener_for_block(old_block_index),
+                    )?;
                     data.count = 1;
                     std::mem::swap(&mut data, &mut self.block_data[old_block_index as usize]);
                     data.block
@@ -403,6 +412,19 @@ impl Space {
 
     /// Advance time in the space.
     pub fn step(&mut self, _timestep: Duration) -> SpaceStepInfo {
+        // Process changed block definitions.
+        for block_index in self.todo.borrow_mut().blocks.drain() {
+            self.notifier.notify(SpaceChange::BlockValue(block_index));
+            let data: &mut SpaceBlockData = &mut self.block_data[usize::from(block_index)];
+            // TODO: handle error by switching to a "broken block" state.
+            // We may want to have a higher-level error handling by pausing the world
+            // and giving the user choices like reverting to save, editing to fix, or
+            // continuing with a partly broken world.
+            data.evaluated = data.block.evaluate().expect("block reevaluation failed");
+            // TODO: Process side effects on individual cubes such as reevaluating the
+            // lighting influenced by the block.
+        }
+
         // TODO: other world behaviors...
 
         self.update_lighting_from_queue()
@@ -437,7 +459,10 @@ impl Space {
             let high_mark = self.block_data.len();
             for new_index in 0..high_mark {
                 if self.block_data[new_index].count == 0 {
-                    self.block_data[new_index] = SpaceBlockData::new(block.clone().into_owned())?;
+                    self.block_data[new_index] = SpaceBlockData::new(
+                        block.clone().into_owned(),
+                        self.listener_for_block(new_index as BlockIndex),
+                    )?;
                     self.block_to_index
                         .insert(block.into_owned(), new_index as BlockIndex);
                     self.notifier
@@ -451,15 +476,24 @@ impl Space {
                     BlockIndex::MAX as usize + 1
                 );
             }
+            let new_index = high_mark as BlockIndex;
             // Evaluate the new block type. Can fail, but we haven't done any mutation yet.
-            let new_data = SpaceBlockData::new(block.clone().into_owned())?;
+            let new_data = SpaceBlockData::new(
+                block.clone().into_owned(),
+                self.listener_for_block(new_index),
+            )?;
             // Grow the vector.
             self.block_data.push(new_data);
-            self.block_to_index
-                .insert(block.into_owned(), high_mark as BlockIndex);
-            self.notifier
-                .notify(SpaceChange::Number(high_mark as BlockIndex));
-            Ok(high_mark as BlockIndex)
+            self.block_to_index.insert(block.into_owned(), new_index);
+            self.notifier.notify(SpaceChange::Number(new_index));
+            Ok(new_index)
+        }
+    }
+
+    fn listener_for_block(&self, index: BlockIndex) -> SpaceBlockChangeListener {
+        SpaceBlockChangeListener {
+            todo: Rc::downgrade(&self.todo),
+            index,
         }
     }
 }
@@ -490,6 +524,7 @@ impl SpaceBlockData {
         block: AIR,
         count: 0,
         evaluated: AIR_EVALUATED,
+        block_listen_gate: None,
     };
 
     /// Value used to fill empty entries in the block data vector.
@@ -498,18 +533,28 @@ impl SpaceBlockData {
     /// `SpaceBlockData` is a good long-term API design decision.
     fn tombstone() -> Self {
         Self {
-            block: AIR.clone(),
+            block: AIR,
             count: 0,
-            evaluated: AIR_EVALUATED.clone(),
+            evaluated: AIR_EVALUATED,
+            block_listen_gate: None,
         }
     }
 
-    fn new(block: Block) -> Result<Self, SetCubeError> {
+    fn new(
+        block: Block,
+        listener: impl Listener<BlockChange> + 'static,
+    ) -> Result<Self, SetCubeError> {
+        // TODO: double ref error check suggests that maybe evaluate() and listen() should be one combined operation.
         let evaluated = block.evaluate().map_err(SetCubeError::BlockDataAccess)?;
+        let (gate, block_listener) = listener.gate();
+        let _ = block
+            .listen(block_listener)
+            .map_err(SetCubeError::BlockDataAccess)?;
         Ok(Self {
             block,
             count: 0,
             evaluated,
+            block_listen_gate: Some(gate),
         })
     }
 
@@ -548,12 +593,17 @@ pub enum SetCubeError {
 /// Description of a change to a [`Space`] for use in listeners.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SpaceChange {
+    // TODO: This set of names is not very clear and self-consistent.
     /// The block at the given location was replaced.
     Block(GridPoint),
     /// The light level value at the given location changed.
     Lighting(GridPoint),
-    /// The given numerical block ID was reassigned.
+    /// The given block index number was reassigned and now refers to a different
+    /// [`Block`] value.
     Number(BlockIndex),
+    /// The definition of the block referred to by the given block index number was
+    /// changed; the result of [`Space::get_evaluated`] may differ.
+    BlockValue(BlockIndex),
 }
 
 /// Performance data returned by [`Space::step`]. The exact contents of this structure
@@ -576,6 +626,34 @@ impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
         self.max_light_update_difference = self
             .max_light_update_difference
             .max(other.max_light_update_difference);
+    }
+}
+
+/// [`Space`]'s set of things that need recomputing based on notifications.
+///
+/// Currently this is responsible for counting block changes.
+/// In the future it might be used for side effects in the world, or we might
+/// want to handle that differently.
+#[derive(Default)]
+struct SpaceTodo {
+    blocks: HashSet<BlockIndex>,
+}
+
+struct SpaceBlockChangeListener {
+    todo: Weak<RefCell<SpaceTodo>>,
+    index: BlockIndex,
+}
+
+impl Listener<BlockChange> for SpaceBlockChangeListener {
+    fn receive(&self, _: BlockChange) {
+        if let Some(cell) = self.todo.upgrade() {
+            let mut todo = cell.borrow_mut();
+            todo.blocks.insert(self.index);
+        }
+    }
+
+    fn alive(&self) -> bool {
+        self.todo.strong_count() > 0
     }
 }
 
@@ -751,6 +829,37 @@ mod tests {
         assert_eq!(extracted.grid(), extract_grid);
         assert_eq!(&extracted[(1, 0, 0)], &blocks[1]);
         assert_eq!(&extracted[(1, 1, 0)], &AIR);
+    }
+
+    #[test]
+    fn listens_to_block_changes() {
+        // Set up indirect block
+        let mut universe = Universe::new();
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::Atom(
+            BlockAttributes::default(),
+            RGBA::WHITE,
+        )));
+        let indirect = Block::Indirect(block_def_ref.clone());
+
+        // Set up space and listener
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set((0, 0, 0), indirect).unwrap();
+        let mut sink = Sink::new();
+        space.listen(sink.listener());
+        assert_eq!(None, sink.next());
+
+        // Now mutate the block def .
+        let new_block = Block::Atom(BlockAttributes::default(), RGBA::BLACK);
+        let new_evaluated = new_block.evaluate().unwrap();
+        *(block_def_ref.borrow_mut().modify()) = new_block;
+        // This does not result in an outgoing notification, because we don't want
+        // computations like reevaluation to happen during the notification process.
+        assert_eq!(sink.next(), None);
+        // Instead, it only happens the next time the space is stepped.
+        space.step(Duration::from_secs(0));
+        // Now we should see a notification and the evaluated block data having changed.
+        assert_eq!(sink.next(), Some(SpaceChange::BlockValue(0)));
+        assert_eq!(space.get_evaluated((0, 0, 0)), &new_evaluated);
     }
 
     // TODO: test fill() equivalence and error handling

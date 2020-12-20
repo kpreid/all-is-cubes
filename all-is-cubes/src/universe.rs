@@ -723,8 +723,9 @@ where
 
 /// Controls a [`Listener`] chain by discarding messages when this gate is dropped.
 ///
-/// Construct this using [`ListenerHelper::gate`].
-#[derive(Clone, Debug)]
+/// Construct this using [`ListenerHelper::gate`], or if a placeholder instance with no
+/// effect is required, [`Gate::default`].
+#[derive(Clone, Debug, Default)]
 pub struct Gate(Rc<()>);
 
 /// [`Listener`] implementation which discards messages when the corresponding [`Gate`]

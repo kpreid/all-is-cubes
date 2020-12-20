@@ -136,6 +136,7 @@ impl Block {
                     .try_borrow_mut()?
                     .listen(listener.filter(|msg| match msg {
                         SpaceChange::Block(_) => Some(BlockChange::new()),
+                        SpaceChange::BlockValue(_) => Some(BlockChange::new()),
                         SpaceChange::Lighting(_) => None,
                         SpaceChange::Number(_) => None,
                     }));

@@ -325,6 +325,12 @@ impl Listener<SpaceChange> for TodoListener {
                 SpaceChange::Number(_) => {
                     todo.blocks = true;
                 }
+                SpaceChange::BlockValue(_) => {
+                    // TODO:
+                    // 1. This is overly broad because we don't need to invalidate all blocks.
+                    // 2. This does not trigger invalidating the chunks containing that block.
+                    todo.blocks = true;
+                }
             }
         }
     }
