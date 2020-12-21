@@ -81,6 +81,14 @@ impl SpaceRenderer {
         if todo.blocks {
             todo.blocks = false;
             self.block_data_cache = None;
+
+            // Mark all chunks as needing redrawing.
+            // TODO: This is a crude approximation of the precise approach of
+            // "recompute the chunks that contain the affected blocks".
+            // We would also like to support merely modifying the chunk geometry
+            // in-place when the geometry is compatible, but that's a whole
+            // new algorithmic challenge.
+            todo.chunks.extend(self.chunks.keys());
         }
         let block_data = self.block_data_cache.get_or_insert_with(|| {
             let (block_data, _info) =
