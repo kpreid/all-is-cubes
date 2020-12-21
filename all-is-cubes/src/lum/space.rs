@@ -16,18 +16,19 @@ use std::rc::{Rc, Weak};
 use crate::chunking::{
     cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE, CHUNK_SIZE_FREE,
 };
-use crate::lum::block_texture::{BlockGLRenderData, BlockTexture, BoundBlockTexture, GLTile};
+use crate::lum::block_texture::{BlockGLTexture, BlockTexture, BoundBlockTexture, GLTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
 use crate::space::{Grid, Space, SpaceChange};
-use crate::triangulator::{triangulate_space, BlockTriangulations};
+use crate::triangulator::{triangulate_blocks, triangulate_space, BlockTriangulations};
 use crate::universe::{Listener, URef};
 
 /// Manages cached data and GPU resources for drawing a single [`Space`].
 pub struct SpaceRenderer {
     space: URef<Space>,
     todo: Rc<RefCell<SpaceRendererTodo>>,
-    block_data_cache: Option<BlockGLRenderData>, // TODO: quick hack, needs an invalidation strategy
+    block_triangulations: Option<BlockTriangulations<GLBlockVertex, GLTile>>,
+    block_texture: Option<BlockGLTexture>,
     chunks: HashMap<ChunkPos, Chunk>,
     chunk_chart: ChunkChart,
 }
@@ -48,7 +49,8 @@ impl SpaceRenderer {
         Self {
             space,
             todo: todo_rc,
-            block_data_cache: None,
+            block_triangulations: None,
+            block_texture: None,
             chunks: HashMap::new(),
             // TODO: Use the actual draw distance!
             chunk_chart: ChunkChart::new(200.),
@@ -80,7 +82,7 @@ impl SpaceRenderer {
 
         if todo.blocks {
             todo.blocks = false;
-            self.block_data_cache = None;
+            self.block_triangulations = None;
 
             // Mark all chunks as needing redrawing.
             // TODO: This is a crude approximation of the precise approach of
@@ -90,11 +92,19 @@ impl SpaceRenderer {
             // new algorithmic challenge.
             todo.chunks.extend(self.chunks.keys());
         }
-        let block_data = self.block_data_cache.get_or_insert_with(|| {
-            let (block_data, _info) =
-                BlockGLRenderData::prepare(context, space).expect("texture failure");
-            // TODO get a logging strategy and use it for _info
-            block_data
+
+        let block_texture_allocator = self.block_texture.get_or_insert_with(|| {
+            // TODO: friendlier error
+            BlockGLTexture::new(context).expect("texture setup failure")
+        });
+        let block_triangulations = self.block_triangulations.get_or_insert_with(|| {
+            let t = triangulate_blocks(space, block_texture_allocator);
+            // TODO: recoverable error
+            let _flush_info = block_texture_allocator
+                .flush()
+                .expect("texture write failure");
+            // TODO propagate flush_info
+            t
         });
 
         // TODO: tested function for this matrix op mess
@@ -124,7 +134,7 @@ impl SpaceRenderer {
                 chunk_entry.or_insert_with(|| Chunk::new(p)).update(
                     context,
                     &space,
-                    &block_data.block_triangulations,
+                    &block_triangulations,
                 );
                 chunk_update_count += 1;
             }
@@ -134,7 +144,7 @@ impl SpaceRenderer {
 
         SpaceRendererOutput {
             sky_color: space.sky_color(),
-            block_texture: block_data.texture(),
+            block_texture: &mut block_texture_allocator.texture,
             view_matrix,
             chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
             chunk_chart: &self.chunk_chart,

@@ -1,7 +1,8 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! Block texture atlas management.
+//! Block texture atlas management: provides [`BlockGLTexture`], the
+//! [`TextureAllocator`] implementation for use with [`luminance_front`].
 
 use cgmath::{Vector2, Vector3, Zero as _};
 use luminance_front::context::GraphicsContext;
@@ -18,63 +19,25 @@ use std::convert::{TryFrom, TryInto};
 use std::rc::{Rc, Weak};
 
 use crate::intalloc::IntAllocator;
-use crate::lum::types::{GLBlockVertex, Vertex};
+use crate::lum::types::Vertex;
 use crate::math::GridCoordinate;
-use crate::space::Space;
-use crate::triangulator::{
-    triangulate_blocks, BlockTriangulations, Texel, TextureAllocator, TextureCoordinate,
-    TextureTile,
-};
+use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
 /// Alias for the concrete type of the block texture.
 pub type BlockTexture = Texture<Dim2Array, NormRGBA8UI>;
 /// Alias for the concrete type of the block texture when bound in a luminance pipeline.
 pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim2Array, NormRGBA8UI>;
 
-/// Precalculated models (vertices and texture atlas) for a set of blocks to be drawn
-/// in a [`luminance`] graphics context. A concrete type of output from
-/// [`triangulate_blocks`](crate::triangulator::triangulate_blocks).
-pub struct BlockGLRenderData {
-    /// Data for use with [`triangulate_space`](crate::triangulator::triangulate_space).
-    pub block_triangulations: BlockTriangulations<GLBlockVertex, GLTile>,
-    pub(crate) texture_allocator: BlockGLTexture,
-}
-
-impl BlockGLRenderData {
-    /// Constructs [`BlockGLRenderData`] for the blocks of the given [`Space`].
-    ///
-    /// Returns an error if the required texture could not be allocated.
-    ///
-    /// The [`String`] return value is diagnostics from texture allocation which may be
-    /// logged.
-    pub fn prepare<C>(context: &mut C, space: &Space) -> Result<(Self, String), TextureError>
-    where
-        C: GraphicsContext<Backend = Backend>,
-    {
-        let mut texture_allocator = BlockGLTexture::new(context)?;
-        let mut result = BlockGLRenderData {
-            block_triangulations: triangulate_blocks(space, &mut texture_allocator),
-            texture_allocator,
-        };
-        let flush_info = result.texture_allocator.flush()?;
-        Ok((result, flush_info))
-    }
-
-    /// Returns the texture to bind for rendering blocks.
-    ///
-    /// Mutable because [`luminance`] considers binding a mutation.
-    pub fn texture(&mut self) -> &mut Texture<Dim2Array, NormRGBA8UI> {
-        &mut self.texture_allocator.texture
-    }
-}
-
 /// Manages a block face texture, which is an atlased array texture (to minimize
-/// the chance of hitting any size limits).
+/// the chance of hitting any size limits) and implements [`TextureAllocator`].
+///
+/// After any allocations, you must call [`BlockGLTexture::flush`] to write the
+/// updates to the actual GPU texture for drawing.
 ///
 /// TODO: Rename this for accuracy (luminance is theoretically abstract) and to
 /// distinguish it from [`BlockTexture`].
 pub struct BlockGLTexture {
-    texture: BlockTexture,
+    pub texture: BlockTexture,
     layout: AtlasLayout,
     index_allocator: Rc<RefCell<IntAllocator<u32>>>,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
@@ -105,7 +68,7 @@ struct TileBacking {
 }
 
 impl BlockGLTexture {
-    fn new<C>(context: &mut C) -> Result<Self, TextureError>
+    pub fn new<C>(context: &mut C) -> Result<Self, TextureError>
     where
         C: GraphicsContext<Backend = Backend>,
     {
@@ -135,7 +98,8 @@ impl BlockGLTexture {
         })
     }
 
-    fn flush(&mut self) -> Result<String, TextureError> {
+    // TODO: Should this be part of the TextureAllocator trait?
+    pub fn flush(&mut self) -> Result<String, TextureError> {
         let layout = self.layout;
         // Allocate contiguous storage for uploading.
         // TODO: Should we keep this allocated? Probably
