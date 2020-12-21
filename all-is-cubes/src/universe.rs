@@ -630,7 +630,7 @@ impl<M: Eq + Hash + Clone> Listener<M> for SinkListener<M> {
         }
     }
     fn alive(&self) -> bool {
-        self.weak_messages.upgrade().is_some()
+        self.weak_messages.strong_count() > 0
     }
 }
 impl<M> Default for Sink<M>

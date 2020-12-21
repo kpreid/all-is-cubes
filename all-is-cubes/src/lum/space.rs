@@ -330,7 +330,7 @@ impl Listener<SpaceChange> for TodoListener {
     }
 
     fn alive(&self) -> bool {
-        self.0.upgrade().is_some()
+        self.0.strong_count() > 0
     }
 }
 
