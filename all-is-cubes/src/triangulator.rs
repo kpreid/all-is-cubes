@@ -200,7 +200,7 @@ fn push_quad_textured<V: From<BlockVertex>>(
 }
 
 /// Generate [`BlockTriangulation`] for a block.
-fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
+pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // TODO: Arrange to pass in a buffer of old data such that we can reuse existing textures.
     // This will allow for efficient implementation of animated blocks.
     block: &EvaluatedBlock,

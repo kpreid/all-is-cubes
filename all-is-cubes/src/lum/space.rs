@@ -19,9 +19,9 @@ use crate::chunking::{
 use crate::lum::block_texture::{BlockGLTexture, BlockTexture, BoundBlockTexture, GLTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
-use crate::space::{Grid, Space, SpaceChange};
+use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
-    triangulate_blocks, triangulate_space, BlockTriangulation, BlockTriangulations,
+    triangulate_block, triangulate_blocks, triangulate_space, BlockTriangulation,
 };
 use crate::universe::{Listener, URef};
 
@@ -29,7 +29,7 @@ use crate::universe::{Listener, URef};
 pub struct SpaceRenderer {
     space: URef<Space>,
     todo: Rc<RefCell<SpaceRendererTodo>>,
-    block_triangulations: Option<BlockTriangulations<GLBlockVertex, GLTile>>,
+    block_triangulations: Vec<BlockTriangulation<GLBlockVertex, GLTile>>,
     block_texture: Option<BlockGLTexture>,
     chunks: HashMap<ChunkPos, Chunk>,
     chunk_chart: ChunkChart,
@@ -51,7 +51,7 @@ impl SpaceRenderer {
         Self {
             space,
             todo: todo_rc,
-            block_triangulations: None,
+            block_triangulations: Vec::new(),
             block_texture: None,
             chunks: HashMap::new(),
             // TODO: Use the actual draw distance!
@@ -80,11 +80,51 @@ impl SpaceRenderer {
             .try_borrow()
             .expect("TODO: return a trivial result instead of panic.");
 
-        let mut todo = self.todo.borrow_mut();
+        let block_texture_allocator = self.block_texture.get_or_insert_with(|| {
+            // TODO: friendlier error
+            BlockGLTexture::new(context).expect("texture setup failure")
+        });
 
-        if todo.blocks {
-            todo.blocks = false;
-            self.block_triangulations = None;
+        let mut todo = self.todo.borrow_mut();
+        
+        let mut block_update_count = 0;
+        if self.block_triangulations.is_empty() {
+            // Must be first run and we haven't prepared the blocks at all.
+            // (Or somehow the space has zero blocks in which case this is trivial anyway.)
+            self.block_triangulations =
+                Vec::from(triangulate_blocks(space, block_texture_allocator));
+            block_update_count = self.block_triangulations.len();
+        } else if !todo.blocks.is_empty() {
+            // Partial update.
+            let block_data = space.block_data();
+
+            // Update the vector length to match the space.
+            let new_length = block_data.len();
+            // (Correctness: cannot overflow because the largest array size in Rust is isize::MAX.
+            // And our block indices don't get that big anyway.)
+            let delta_length = (new_length as isize) - (self.block_triangulations.len() as isize);
+            if delta_length < 0 {
+                self.block_triangulations.truncate(new_length);
+            } else if delta_length > 0 {
+                self.block_triangulations.extend((0..delta_length).map(|_| BlockTriangulation::default()));
+            }
+
+            for index in todo.blocks.drain() {
+                let index: usize = index.into();
+                self.block_triangulations[index] =
+                    triangulate_block(block_data[index].evaluated(), block_texture_allocator);
+                block_update_count += 1;
+            }
+        }
+
+        if block_update_count > 0 {
+            // TODO: recoverable error
+            // TODO: We wouldn't need to flush conditionally if the allocator was smart enough
+            // to not copy unmodified tiles.
+            let _flush_info = block_texture_allocator
+                .flush()
+                .expect("texture write failure");
+            // TODO propagate flush_info
 
             // Mark all chunks as needing redrawing.
             // TODO: This is a crude approximation of the precise approach of
@@ -94,20 +134,6 @@ impl SpaceRenderer {
             // new algorithmic challenge.
             todo.chunks.extend(self.chunks.keys());
         }
-
-        let block_texture_allocator = self.block_texture.get_or_insert_with(|| {
-            // TODO: friendlier error
-            BlockGLTexture::new(context).expect("texture setup failure")
-        });
-        let block_triangulations = self.block_triangulations.get_or_insert_with(|| {
-            let t = triangulate_blocks(space, block_texture_allocator);
-            // TODO: recoverable error
-            let _flush_info = block_texture_allocator
-                .flush()
-                .expect("texture write failure");
-            // TODO propagate flush_info
-            t
-        });
 
         // TODO: tested function for this matrix op mess
         // TODO: replace unwrap()s with falling back to drawing nothing or drawing the origin
@@ -136,7 +162,7 @@ impl SpaceRenderer {
                 chunk_entry.or_insert_with(|| Chunk::new(p)).update(
                     context,
                     &space,
-                    &block_triangulations,
+                    &self.block_triangulations,
                 );
                 chunk_update_count += 1;
             }
@@ -154,6 +180,7 @@ impl SpaceRenderer {
             info: SpaceRenderInfo {
                 chunk_queue_count: todo.chunks.len(),
                 chunk_update_count,
+                block_update_count,
                 chunks_drawn: 0,
                 squares_drawn: 0, // filled later
             },
@@ -228,6 +255,8 @@ pub struct SpaceRenderInfo {
     pub chunk_queue_count: usize,
     /// How many chunks were recomputed this time.
     pub chunk_update_count: usize,
+    /// How many block triangulations were recomputed this time.
+    pub block_update_count: usize,
     pub chunks_drawn: usize,
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
     /// to draw this frame.
@@ -318,7 +347,7 @@ impl Chunk {
 /// [`SpaceRenderer`]'s set of things that need recomputing.
 #[derive(Default)]
 struct SpaceRendererTodo {
-    blocks: bool,
+    blocks: HashSet<BlockIndex>,
     chunks: HashSet<ChunkPos>,
 }
 
@@ -352,14 +381,11 @@ impl Listener<SpaceChange> for TodoListener {
                 SpaceChange::Lighting(p) => {
                     todo.insert_block_and_adjacent(p);
                 }
-                SpaceChange::Number(_) => {
-                    todo.blocks = true;
+                SpaceChange::Number(index) => {
+                    todo.blocks.insert(index);
                 }
-                SpaceChange::BlockValue(_) => {
-                    // TODO:
-                    // 1. This is overly broad because we don't need to invalidate all blocks.
-                    // 2. This does not trigger invalidating the chunks containing that block.
-                    todo.blocks = true;
+                SpaceChange::BlockValue(index) => {
+                    todo.blocks.insert(index);
                 }
             }
         }
