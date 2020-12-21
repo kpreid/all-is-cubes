@@ -376,6 +376,7 @@ impl RGB {
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.
+    #[inline]
     pub fn new(r: f32, g: f32, b: f32) -> Self {
         Self::try_from(Vector3::new(r, g, b)).expect("Color components may not be NaN")
     }
@@ -385,28 +386,34 @@ impl RGB {
     ///
     /// Note: This exists primarily to assist the [`rgb_const!`] macro and may be renamed
     /// or replaced in future versions.
+    #[inline]
     pub const fn new_nn(r: NotNan<f32>, g: NotNan<f32>, b: NotNan<f32>) -> Self {
         Self(Vector3::new(r, g, b))
     }
 
     /// Adds an alpha component to produce an [RGBA] color.
+    #[inline]
     pub const fn with_alpha(self, alpha: NotNan<f32>) -> RGBA {
         RGBA(Vector4::new(self.0.x, self.0.y, self.0.z, alpha))
     }
     /// Adds an alpha component of `1.0` (fully opaque) to produce an [RGBA] color.
+    #[inline]
     pub const fn with_alpha_one(self) -> RGBA {
         self.with_alpha(NN1)
     }
 
     /// Returns the red color component. Values are linear (gamma = 1).
+    #[inline]
     pub const fn red(self) -> NotNan<f32> {
         self.0.x
     }
     /// Returns the green color component. Values are linear (gamma = 1).
+    #[inline]
     pub const fn green(self) -> NotNan<f32> {
         self.0.y
     }
     /// Returns the blue color component. Values are linear (gamma = 1).
+    #[inline]
     pub const fn blue(self) -> NotNan<f32> {
         self.0.z
     }
@@ -424,6 +431,7 @@ impl RGBA {
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.
+    #[inline]
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self::try_from(Vector4::new(r, g, b, a)).expect("Color components may not be NaN")
     }
@@ -433,19 +441,23 @@ impl RGBA {
     ///
     /// Note: This exists primarily to assist the [`rgb_const!`] macro and may be renamed
     /// or replaced in future versions.
+    #[inline]
     pub const fn new_nn(r: NotNan<f32>, g: NotNan<f32>, b: NotNan<f32>, a: NotNan<f32>) -> Self {
         Self(Vector4::new(r, g, b, a))
     }
 
     /// Returns the red color component. Values are linear (gamma = 1).
+    #[inline]
     pub const fn red(self) -> NotNan<f32> {
         self.0.x
     }
     /// Returns the green color component. Values are linear (gamma = 1).
+    #[inline]
     pub const fn green(self) -> NotNan<f32> {
         self.0.y
     }
     /// Returns the blue color component. Values are linear (gamma = 1).
+    #[inline]
     pub const fn blue(self) -> NotNan<f32> {
         self.0.z
     }
@@ -454,17 +466,20 @@ impl RGBA {
     /// Alpha is not premultiplied. Alpha values less than zero and greater than one are
     /// allowed and may be returned by this method, but alpha test methods will treat
     // them equivalently to zero and one.
+    #[inline]
     pub const fn alpha(self) -> NotNan<f32> {
         self.0.w
     }
 
     /// Returns whether this color is fully transparent, or has an alpha component of
     /// zero or less.
+    #[inline]
     pub fn fully_transparent(self) -> bool {
         self.alpha() <= NN0
     }
     /// Returns whether this color is fully opaque, or has an alpha component of
     /// one or greater.
+    #[inline]
     pub fn fully_opaque(self) -> bool {
         self.alpha() >= NN1
     }
@@ -473,12 +488,15 @@ impl RGBA {
     ///
     /// Note that if alpha is 0 then the components could be any value and yet be “hidden”
     /// by the transparency.
+    #[inline]
     pub fn to_rgb(self) -> RGB {
         RGB(self.0.truncate())
     }
 
     /// Converts this color lossily to linear 8-bits-per-component color.
+    #[inline]
     pub fn to_saturating_32bit(self) -> (u8, u8, u8, u8) {
+        #[inline]
         fn convert_component(x: NotNan<f32>) -> u8 {
             // As of Rust 1.45, `as` on float to int is saturating
             (x.into_inner() * 255.0) as u8
