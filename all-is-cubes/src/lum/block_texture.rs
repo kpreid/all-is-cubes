@@ -17,6 +17,7 @@ use std::cell::RefCell;
 use std::convert::{TryFrom, TryInto};
 use std::rc::{Rc, Weak};
 
+use crate::intalloc::IntAllocator;
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::GridCoordinate;
 use crate::space::Space;
@@ -75,10 +76,10 @@ impl BlockGLRenderData {
 pub struct BlockGLTexture {
     texture: BlockTexture,
     layout: AtlasLayout,
-    next_free: u32,
+    index_allocator: Rc<RefCell<IntAllocator<u32>>>,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
 }
-/// Texture tile handle used by our implementation of [`TextureAllocator`].
+/// Texture tile handle used by [`BlockGLTexture`].
 ///
 /// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
@@ -98,6 +99,9 @@ struct TileBacking {
     /// Scale factor for tile coordinates (0..1) to texture coordinates (some fraction of that).
     scale: f32,
     data: Option<Box<[Texel]>>,
+    /// Reference to the allocator so we can free our index.
+    /// Weak because if the allocator is dropped, nobody cares.
+    index_allocator: Weak<RefCell<IntAllocator<u32>>>,
 }
 
 impl BlockGLTexture {
@@ -126,7 +130,7 @@ impl BlockGLTexture {
                 },
             )?,
             layout,
-            next_free: 0,
+            index_allocator: Rc::new(RefCell::new(IntAllocator::new())),
             in_use: Vec::new(),
         })
     }
@@ -198,17 +202,19 @@ impl TextureAllocator for BlockGLTexture {
     }
 
     fn allocate(&mut self) -> GLTile {
-        if self.next_free == self.layout.tile_count() {
+        let mut index_allocator = self.index_allocator.borrow_mut();
+        let index = index_allocator.allocate().unwrap();
+        if index >= self.layout.tile_count() {
+            index_allocator.free(index);
             todo!("ran out of tile space, but reallocation is not implemented");
         }
-        let index = self.next_free;
-        self.next_free += 1;
         let result = GLTile {
             backing: Rc::new(RefCell::new(TileBacking {
                 index,
                 origin: self.layout.index_to_origin(index),
                 scale: self.layout.texcoord_scale(),
                 data: None,
+                index_allocator: Rc::downgrade(&self.index_allocator),
             })),
         };
         self.in_use.push(Rc::downgrade(&result.backing));
@@ -222,6 +228,13 @@ impl TextureTile for GLTile {
     }
     fn write(&mut self, data: &[Texel]) {
         self.backing.borrow_mut().data = Some(data.into());
+    }
+}
+impl Drop for TileBacking {
+    fn drop(&mut self) {
+        if let Some(index_allocator) = self.index_allocator.upgrade() {
+            index_allocator.borrow_mut().free(self.index);
+        }
     }
 }
 
