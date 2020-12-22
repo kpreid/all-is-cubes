@@ -86,7 +86,7 @@ impl SpaceRenderer {
         });
 
         let mut todo = self.todo.borrow_mut();
-        
+
         let mut block_update_count = 0;
         if self.block_triangulations.is_empty() {
             // Must be first run and we haven't prepared the blocks at all.
@@ -106,7 +106,8 @@ impl SpaceRenderer {
             if delta_length < 0 {
                 self.block_triangulations.truncate(new_length);
             } else if delta_length > 0 {
-                self.block_triangulations.extend((0..delta_length).map(|_| BlockTriangulation::default()));
+                self.block_triangulations
+                    .extend((0..delta_length).map(|_| BlockTriangulation::default()));
             }
 
             for index in todo.blocks.drain() {
