@@ -148,7 +148,8 @@ impl<V, T> Default for BlockTriangulation<V, T> {
     }
 }
 
-/// Collection of [`BlockTriangulation`] indexed by a [`Space`]'s block indices.
+/// Array of [`BlockTriangulation`] indexed by a [`Space`]'s block indices; a convenience
+/// alias for the return type of [`triangulate_blocks`].
 /// Pass it to [`triangulate_space`] to use it.
 pub type BlockTriangulations<V, A> = Box<[BlockTriangulation<V, A>]>;
 
@@ -354,8 +355,9 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 
 /// Computes a triangle-based representation of a [`Space`] for rasterization.
 ///
-/// `blocks_render_data` should be provided by [`triangulate_blocks`] and must be up to
-/// date (TODO: provide a means to ensure it is up to date).
+/// `block_triangulations` should be the result of [`triangulate_blocks`] or equivalent,
+/// and must be up-to-date with the [`Space`]'s blocks or the result will be inaccurate
+/// and may contain severe lighting errors.
 ///
 /// The triangles will be written into `output_vertices`, replacing the existing
 /// contents. This is intended to avoid memory reallocation in the common case of
@@ -363,10 +365,15 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 ///
 /// `output_vertices` is a [`FaceMap`] dividing the faces according to their normal
 /// vectors.
+///
+/// Note about edge case behavior: This algorithm does not use the [`Space`]'s block data
+/// at all. Thus, it always has a consistent interpretation based on
+/// `block_triangulations` (as opposed to, for example, using face opacity data not the
+/// same as the meshes and thus producing a rendering with gaps in it)..
 pub fn triangulate_space<BV, GV, T>(
     space: &Space,
     bounds: Grid,
-    blocks_render_data: &BlockTriangulations<BV, T>,
+    block_triangulations: &[BlockTriangulation<BV, T>],
     output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
     BV: ToGfxVertex<GV>,
@@ -375,7 +382,7 @@ pub fn triangulate_space<BV, GV, T>(
     let lookup = |cube| {
         match space.get_block_index(cube) {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one.
-            Some(index) => &blocks_render_data
+            Some(index) => &block_triangulations
                 .get(index as usize)
                 .unwrap_or(&empty_render),
             None => &empty_render,
@@ -545,16 +552,16 @@ mod tests {
     fn no_panic_on_missing_blocks() {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 1, 1);
-        let blocks_render_data: BlockTriangulations<BlockVertex, _> =
+        let block_triangulations: BlockTriangulations<BlockVertex, _> =
             triangulate_blocks(&space, &mut TestTextureAllocator::new(43));
-        assert_eq!(blocks_render_data.len(), 1); // check our assumption
+        assert_eq!(block_triangulations.len(), 1); // check our assumption
 
         // This should not panic; visual glitches are preferable to failure.
         space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
         triangulate_space(
             &space,
             space.grid(),
-            &blocks_render_data,
+            &block_triangulations,
             &mut new_space_buffer(),
         );
     }
@@ -578,16 +585,16 @@ mod tests {
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 
         let mut tex = TestTextureAllocator::new(1);
-        let blocks_render_data: BlockTriangulations<BlockVertex, _> =
+        let block_triangulations: BlockTriangulations<BlockVertex, _> =
             triangulate_blocks(&outer_space, &mut tex);
-        let block_render_data: BlockTriangulation<_, _> = blocks_render_data[0].clone();
+        let block_render_data: BlockTriangulation<_, _> = block_triangulations[0].clone();
 
-        eprintln!("{:#?}", blocks_render_data);
+        eprintln!("{:#?}", block_triangulations);
         let mut space_rendered = new_space_buffer();
         triangulate_space(
             &outer_space,
             outer_space.grid(),
-            &blocks_render_data,
+            &block_triangulations,
             &mut space_rendered,
         );
         eprintln!("{:#?}", space_rendered);
@@ -623,15 +630,15 @@ mod tests {
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 
         let mut tex = TestTextureAllocator::new(resolution);
-        let blocks_render_data: BlockTriangulations<BlockVertex, _> =
+        let block_triangulations: BlockTriangulations<BlockVertex, _> =
             triangulate_blocks(&outer_space, &mut tex);
 
-        eprintln!("{:#?}", blocks_render_data);
+        eprintln!("{:#?}", block_triangulations);
         let mut space_rendered = new_space_buffer();
         triangulate_space(
             &outer_space,
             outer_space.grid(),
-            &blocks_render_data,
+            &block_triangulations,
             &mut space_rendered,
         );
         eprintln!("{:#?}", space_rendered);

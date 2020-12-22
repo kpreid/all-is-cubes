@@ -13,11 +13,11 @@ pub fn triangulator_bench(c: &mut Criterion) {
     c.bench_function("triangulate_space: checkerboard, new buffer", |b| {
         b.iter_batched(
             checkerboard_setup,
-            |(space, blocks_render_data)| {
+            |(space, block_triangulations)| {
                 triangulate_space(
                     &space,
                     space.grid(),
-                    &blocks_render_data,
+                    &block_triangulations,
                     &mut new_space_buffer(),
                 )
             },
@@ -28,20 +28,20 @@ pub fn triangulator_bench(c: &mut Criterion) {
     c.bench_function("triangulate_space: checkerboard, reused buffer", |b| {
         b.iter_batched(
             || {
-                let (space, blocks_render_data) = checkerboard_setup();
+                let (space, block_triangulations) = checkerboard_setup();
                 let mut buffer = new_space_buffer();
-                triangulate_space(&space, space.grid(), &blocks_render_data, &mut buffer);
+                triangulate_space(&space, space.grid(), &block_triangulations, &mut buffer);
                 // Sanity check that we're actually rendering as much as we expect.
                 assert_eq!(buffer[Face::PX].len(), 6 * (16 * 16 * 16) / 2);
-                (space, blocks_render_data, buffer)
+                (space, block_triangulations, buffer)
             },
-            |(space, blocks_render_data, mut buffer)| {
+            |(space, block_triangulations, mut buffer)| {
                 // As of this writing, this benchmark is really just "what if we don't allocate
                 // a new Vec". Later, the buffers will hopefully become cleverer and we'll be
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
                 // and so this will become a meaningful benchmark of how much CPU time we're
                 // spending or saving on that.
-                triangulate_space(&space, space.grid(), &blocks_render_data, &mut buffer)
+                triangulate_space(&space, space.grid(), &block_triangulations, &mut buffer)
             },
             BatchSize::SmallInput,
         );
@@ -61,9 +61,9 @@ fn checkerboard_setup() -> (Space, BlockTriangulations<BlockVertex, TestTextureT
         })
         .unwrap();
 
-    let blocks_render_data = triangulate_blocks(&space, &mut TestTextureAllocator::new(16));
+    let block_triangulations = triangulate_blocks(&space, &mut TestTextureAllocator::new(16));
 
-    (space, blocks_render_data)
+    (space, block_triangulations)
 }
 
 criterion_group!(benches, triangulator_bench);

@@ -20,7 +20,9 @@ use crate::lum::block_texture::{BlockGLTexture, BlockTexture, BoundBlockTexture,
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
 use crate::space::{Grid, Space, SpaceChange};
-use crate::triangulator::{triangulate_blocks, triangulate_space, BlockTriangulations};
+use crate::triangulator::{
+    triangulate_blocks, triangulate_space, BlockTriangulation, BlockTriangulations,
+};
 use crate::universe::{Listener, URef};
 
 /// Manages cached data and GPU resources for drawing a single [`Space`].
@@ -255,13 +257,17 @@ impl Chunk {
         &mut self,
         context: &mut C,
         space: &Space,
-        blocks_render_data: &BlockTriangulations<GLBlockVertex, GLTile>,
+        block_triangulations: &[BlockTriangulation<GLBlockVertex, GLTile>],
     ) {
-        triangulate_space(space, self.bounds, blocks_render_data, &mut self.vertices);
+        triangulate_space(space, self.bounds, block_triangulations, &mut self.vertices);
 
         // Stash all the texture tiles so they aren't deallocated out from under us.
         // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
-        self.tiles = blocks_render_data.iter().flat_map(|bt| bt.textures().into_iter()).cloned().collect();
+        self.tiles = block_triangulations
+            .iter()
+            .flat_map(|bt| bt.textures().into_iter())
+            .cloned()
+            .collect();
 
         for &face in Face::ALL_SEVEN {
             let tess_option = &mut self.tesses[face];
