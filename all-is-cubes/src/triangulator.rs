@@ -340,7 +340,8 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     texture_allocator: &mut A,
 ) -> BlockTriangulations<V, A::Tile> {
     space
-        .distinct_blocks_unfiltered_iter()
+        .block_data()
+        .iter()
         .map(|block_data| triangulate_block(block_data.evaluated(), texture_allocator))
         .collect()
 }

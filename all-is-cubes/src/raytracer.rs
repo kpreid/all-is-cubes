@@ -271,7 +271,8 @@ fn print_space_impl<F: FnMut(&str)>(
 #[inline]
 fn prepare_blocks<P: PixelBuf>(space: &Space) -> Box<[TracingBlock<P::BlockData>]> {
     space
-        .distinct_blocks_unfiltered_iter()
+        .block_data()
+        .iter()
         .map(|block_data| {
             let evaluated = block_data.evaluated();
             let pixel_block_data = P::compute_block_data(block_data);

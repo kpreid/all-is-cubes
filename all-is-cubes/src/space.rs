@@ -399,15 +399,12 @@ impl Space {
         blocks
     }
 
-    /// Returns all the blocks assigned internal IDs in the space, which may be a
-    /// superset of all blocks which actually exist in the space.
+    /// Returns data about all the blocks assigned internal IDs (indices) in the space,
+    /// as well as placeholder data for any deallocated indices.
     ///
-    /// The ordering of the iterated items corresponds to the internal IDs, and match
-    /// the results of `.get_block_index()`.
-    pub fn distinct_blocks_unfiltered_iter(
-        &self,
-    ) -> impl Iterator<Item = &SpaceBlockData> + ExactSizeIterator {
-        self.block_data.iter()
+    /// The indices of this slice correspond to the results of [`Space::get_block_index`].
+    pub fn block_data(&self) -> &[SpaceBlockData] {
+        &self.block_data
     }
 
     /// Advance time in the space.
