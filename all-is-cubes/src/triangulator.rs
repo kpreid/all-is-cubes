@@ -129,6 +129,16 @@ pub struct BlockTriangulation<V, T> {
     textures_used: Vec<T>,
 }
 
+impl<V, T> BlockTriangulation<V, T> {
+    /// Return the textures used for this block. This may be used to retain the textures
+    /// for as long as the associated vertices are being used, rather than only as long as
+    /// the life of this triangulation.
+    // TODO: revisit this interface design. Maybe callers should just have an Rc<BlockTriangulation>?
+    pub(crate) fn textures(&self) -> &[T] {
+        &self.textures_used
+    }
+}
+
 impl<V, T> Default for BlockTriangulation<V, T> {
     fn default() -> Self {
         Self {

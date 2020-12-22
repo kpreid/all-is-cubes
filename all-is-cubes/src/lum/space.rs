@@ -228,6 +228,7 @@ pub struct Chunk {
     /// Vertices grouped by the direction they face
     vertices: FaceMap<Vec<Vertex>>,
     tesses: FaceMap<Option<Tess<Vertex>>>,
+    tiles: Vec<GLTile>,
 }
 
 impl Chunk {
@@ -236,6 +237,7 @@ impl Chunk {
             bounds: chunk_pos.grid(),
             vertices: FaceMap::default(),
             tesses: FaceMap::default(),
+            tiles: Vec::new(),
         }
     }
 
@@ -246,6 +248,10 @@ impl Chunk {
         blocks_render_data: &BlockTriangulations<GLBlockVertex, GLTile>,
     ) {
         triangulate_space(space, self.bounds, blocks_render_data, &mut self.vertices);
+
+        // Stash all the texture tiles so they aren't deallocated out from under us.
+        // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
+        self.tiles = blocks_render_data.iter().flat_map(|bt| bt.textures().into_iter()).cloned().collect();
 
         for &face in Face::ALL_SEVEN {
             let tess_option = &mut self.tesses[face];
