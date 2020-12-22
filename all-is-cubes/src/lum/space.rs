@@ -10,7 +10,7 @@ use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::Backend;
 use std::cell::RefCell;
-use std::collections::{hash_map::Entry::Vacant, HashMap, HashSet};
+use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
 use crate::chunking::{
@@ -22,6 +22,7 @@ use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
     triangulate_block, triangulate_blocks, triangulate_space, BlockTriangulation,
+    BlockTriangulationProvider,
 };
 use crate::universe::{Listener, URef};
 
@@ -30,6 +31,10 @@ pub struct SpaceRenderer {
     space: URef<Space>,
     todo: Rc<RefCell<SpaceRendererTodo>>,
     block_triangulations: Vec<BlockTriangulation<GLBlockVertex, GLTile>>,
+    /// Version IDs used to track whether chunks have stale block triangulations.
+    /// Indices are block indices and values are version numbers.
+    block_versioning: Vec<u32>,
+    block_version_counter: u32,
     block_texture: Option<BlockGLTexture>,
     chunks: HashMap<ChunkPos, Chunk>,
     chunk_chart: ChunkChart,
@@ -52,6 +57,8 @@ impl SpaceRenderer {
             space,
             todo: todo_rc,
             block_triangulations: Vec::new(),
+            block_versioning: Vec::new(),
+            block_version_counter: 0,
             block_texture: None,
             chunks: HashMap::new(),
             // TODO: Use the actual draw distance!
@@ -93,9 +100,12 @@ impl SpaceRenderer {
             // (Or somehow the space has zero blocks in which case this is trivial anyway.)
             self.block_triangulations =
                 Vec::from(triangulate_blocks(space, block_texture_allocator));
+            self.block_versioning =
+                vec![self.block_version_counter; self.block_triangulations.len()];
             block_update_count = self.block_triangulations.len();
         } else if !todo.blocks.is_empty() {
             // Partial update.
+            self.block_version_counter = self.block_version_counter.wrapping_add(1);
             let block_data = space.block_data();
 
             // Update the vector length to match the space.
@@ -105,15 +115,18 @@ impl SpaceRenderer {
             let delta_length = (new_length as isize) - (self.block_triangulations.len() as isize);
             if delta_length < 0 {
                 self.block_triangulations.truncate(new_length);
+                self.block_versioning.truncate(new_length);
             } else if delta_length > 0 {
                 self.block_triangulations
                     .extend((0..delta_length).map(|_| BlockTriangulation::default()));
+                self.block_versioning.extend((0..delta_length).map(|_| 0));
             }
 
             for index in todo.blocks.drain() {
                 let index: usize = index.into();
                 self.block_triangulations[index] =
                     triangulate_block(block_data[index].evaluated(), block_texture_allocator);
+                self.block_versioning[index] = self.block_version_counter;
                 block_update_count += 1;
             }
         }
@@ -126,14 +139,6 @@ impl SpaceRenderer {
                 .flush()
                 .expect("texture write failure");
             // TODO propagate flush_info
-
-            // Mark all chunks as needing redrawing.
-            // TODO: This is a crude approximation of the precise approach of
-            // "recompute the chunks that contain the affected blocks".
-            // We would also like to support merely modifying the chunk geometry
-            // in-place when the geometry is compatible, but that's a whole
-            // new algorithmic challenge.
-            todo.chunks.extend(self.chunks.keys());
         }
 
         // TODO: tested function for this matrix op mess
@@ -159,11 +164,15 @@ impl SpaceRenderer {
 
             let chunk_entry = self.chunks.entry(p);
             // If the chunk needs updating or never existed, update it.
-            if todo.chunks.remove(&p) || matches!(chunk_entry, Vacant(_)) {
+            if todo.chunks.remove(&p)
+                || matches!(chunk_entry, Vacant(_))
+                || matches!(chunk_entry, Occupied(ref oe) if oe.get().stale_blocks(&self.block_versioning))
+            {
                 chunk_entry.or_insert_with(|| Chunk::new(p)).update(
                     context,
                     &space,
                     &self.block_triangulations,
+                    &self.block_versioning,
                 );
                 chunk_update_count += 1;
             }
@@ -272,6 +281,7 @@ pub struct Chunk {
     tesses: FaceMap<Option<Tess<Vertex>>>,
     /// Texture tiles that our vertices' texture coordinates refer to.
     tile_dependencies: Vec<GLTile>,
+    block_dependencies: Vec<(BlockIndex, u32)>,
 }
 
 impl Chunk {
@@ -281,7 +291,15 @@ impl Chunk {
             vertices: FaceMap::default(),
             tesses: FaceMap::default(),
             tile_dependencies: Vec::new(),
+            block_dependencies: Vec::new(),
         }
+    }
+
+    fn stale_blocks(&self, versions: &[u32]) -> bool {
+        self.block_dependencies
+            .iter()
+            .copied()
+            .any(|(index, version)| versions[usize::from(index)] != version)
     }
 
     fn update<C: GraphicsContext<Backend = Backend>>(
@@ -289,16 +307,29 @@ impl Chunk {
         context: &mut C,
         space: &Space,
         block_triangulations: &[BlockTriangulation<GLBlockVertex, GLTile>],
+        block_versioning: &[u32],
     ) {
-        triangulate_space(space, self.bounds, block_triangulations, &mut self.vertices);
+        let mut block_provider = TrackingBlockProvider::new(block_triangulations);
+        triangulate_space(space, self.bounds, &mut block_provider, &mut self.vertices);
 
         // Stash all the texture tiles so they aren't deallocated out from under us.
         // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
-        self.tile_dependencies = block_triangulations
-            .iter()
-            .flat_map(|bt| bt.textures().iter())
-            .cloned()
-            .collect();
+        self.tile_dependencies.clear();
+        self.tile_dependencies.extend(
+            block_provider
+                .seen
+                .iter()
+                .flat_map(|index| block_triangulations[usize::from(*index)].textures().iter())
+                .cloned(),
+        );
+        // Record the block triangulations we used.
+        self.block_dependencies.clear();
+        self.block_dependencies.extend(
+            block_provider
+                .seen
+                .into_iter()
+                .map(|index| (index, block_versioning[usize::from(index)])),
+        );
 
         for &face in Face::ALL_SEVEN {
             let tess_option = &mut self.tesses[face];
@@ -343,6 +374,27 @@ impl Chunk {
             }
         }
         Ok(count)
+    }
+}
+
+/// Helper for [`Chunk`]'s dependency tracking.
+struct TrackingBlockProvider<'a> {
+    block_triangulations: &'a [BlockTriangulation<GLBlockVertex, GLTile>],
+    // TODO: make this a bitset? copy the structures direct to the Chunk? In any case, benchmark.
+    seen: HashSet<BlockIndex>,
+}
+impl<'a> TrackingBlockProvider<'a> {
+    fn new(block_triangulations: &'a [BlockTriangulation<GLBlockVertex, GLTile>]) -> Self {
+        Self {
+            block_triangulations,
+            seen: HashSet::new(),
+        }
+    }
+}
+impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, GLTile> for &mut TrackingBlockProvider<'a> {
+    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<GLBlockVertex, GLTile>> {
+        self.seen.insert(index);
+        self.block_triangulations.get(usize::from(index))
     }
 }
 
