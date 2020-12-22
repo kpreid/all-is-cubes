@@ -265,7 +265,7 @@ impl Chunk {
         // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
         self.tiles = block_triangulations
             .iter()
-            .flat_map(|bt| bt.textures().into_iter())
+            .flat_map(|bt| bt.textures().iter())
             .cloned()
             .collect();
 
