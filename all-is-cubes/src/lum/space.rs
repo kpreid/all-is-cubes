@@ -270,7 +270,8 @@ pub struct Chunk {
     /// Vertices grouped by the direction they face
     vertices: FaceMap<Vec<Vertex>>,
     tesses: FaceMap<Option<Tess<Vertex>>>,
-    tiles: Vec<GLTile>,
+    /// Texture tiles that our vertices' texture coordinates refer to.
+    tile_dependencies: Vec<GLTile>,
 }
 
 impl Chunk {
@@ -279,7 +280,7 @@ impl Chunk {
             bounds: chunk_pos.grid(),
             vertices: FaceMap::default(),
             tesses: FaceMap::default(),
-            tiles: Vec::new(),
+            tile_dependencies: Vec::new(),
         }
     }
 
@@ -293,7 +294,7 @@ impl Chunk {
 
         // Stash all the texture tiles so they aren't deallocated out from under us.
         // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
-        self.tiles = block_triangulations
+        self.tile_dependencies = block_triangulations
             .iter()
             .flat_map(|bt| bt.textures().iter())
             .cloned()
