@@ -17,7 +17,7 @@ use std::convert::TryFrom;
 
 use crate::block::{EvaluatedBlock, Resolution};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
-use crate::space::{Grid, PackedLight, Space};
+use crate::space::{BlockIndex, Grid, PackedLight, Space};
 use crate::util::ConciseDebug as _;
 
 /// Numeric type used to store texture coordinates.
@@ -370,21 +370,20 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 /// at all. Thus, it always has a consistent interpretation based on
 /// `block_triangulations` (as opposed to, for example, using face opacity data not the
 /// same as the meshes and thus producing a rendering with gaps in it)..
-pub fn triangulate_space<BV, GV, T>(
+pub fn triangulate_space<BV, GV, T, P>(
     space: &Space,
     bounds: Grid,
-    block_triangulations: &[BlockTriangulation<BV, T>],
+    block_triangulations: P,
     output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
     BV: ToGfxVertex<GV>,
+    P: BlockTriangulationProvider<BV, T>,
 {
     let empty_render = BlockTriangulation::<BV, T>::default();
     let lookup = |cube| {
         match space.get_block_index(cube) {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one.
-            Some(index) => &block_triangulations
-                .get(index as usize)
-                .unwrap_or(&empty_render),
+            Some(index) => &block_triangulations.get(index).unwrap_or(&empty_render),
             None => &empty_render,
         }
     };
@@ -410,6 +409,18 @@ pub fn triangulate_space<BV, GV, T>(
                 output_vertices[face].push(vertex.instantiate(low_corner.to_vec(), lighting));
             }
         }
+    }
+}
+/// Source of [`BlockTriangulation`] values for [`triangulate_space`].
+///
+/// This trait allows the caller of [`triangulate_space`] to provide an implementation
+/// which records which blocks were actually used, for precise invalidation.
+pub trait BlockTriangulationProvider<V, T> {
+    fn get(&self, index: BlockIndex) -> Option<&BlockTriangulation<V, T>>;
+}
+impl<V, T> BlockTriangulationProvider<V, T> for &[BlockTriangulation<V, T>] {
+    fn get(&self, index: BlockIndex) -> Option<&BlockTriangulation<V, T>> {
+        <[_]>::get(self, usize::from(index))
     }
 }
 
@@ -520,10 +531,10 @@ mod tests {
         space.fill(space.grid(), |_| Some(&block)).unwrap();
 
         let mut rendering = new_space_buffer();
-        triangulate_space::<BlockVertex, BlockVertex, TestTextureTile>(
+        triangulate_space::<BlockVertex, BlockVertex, TestTextureTile, _>(
             &space,
             space.grid(),
-            &triangulate_blocks(&space, &mut TestTextureAllocator::new(43)),
+            &*triangulate_blocks(&space, &mut TestTextureAllocator::new(43)),
             &mut rendering,
         );
         let rendering_flattened: Vec<BlockVertex> = rendering
@@ -561,7 +572,7 @@ mod tests {
         triangulate_space(
             &space,
             space.grid(),
-            &block_triangulations,
+            &*block_triangulations,
             &mut new_space_buffer(),
         );
     }
@@ -594,7 +605,7 @@ mod tests {
         triangulate_space(
             &outer_space,
             outer_space.grid(),
-            &block_triangulations,
+            &*block_triangulations,
             &mut space_rendered,
         );
         eprintln!("{:#?}", space_rendered);
@@ -638,7 +649,7 @@ mod tests {
         triangulate_space(
             &outer_space,
             outer_space.grid(),
-            &block_triangulations,
+            &*block_triangulations,
             &mut space_rendered,
         );
         eprintln!("{:#?}", space_rendered);

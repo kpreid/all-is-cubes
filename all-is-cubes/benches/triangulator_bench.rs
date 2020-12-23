@@ -17,7 +17,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
                 triangulate_space(
                     &space,
                     space.grid(),
-                    &block_triangulations,
+                    &*block_triangulations,
                     &mut new_space_buffer(),
                 )
             },
@@ -30,7 +30,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
             || {
                 let (space, block_triangulations) = checkerboard_setup();
                 let mut buffer = new_space_buffer();
-                triangulate_space(&space, space.grid(), &block_triangulations, &mut buffer);
+                triangulate_space(&space, space.grid(), &*block_triangulations, &mut buffer);
                 // Sanity check that we're actually rendering as much as we expect.
                 assert_eq!(buffer[Face::PX].len(), 6 * (16 * 16 * 16) / 2);
                 (space, block_triangulations, buffer)
@@ -41,7 +41,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
                 // and so this will become a meaningful benchmark of how much CPU time we're
                 // spending or saving on that.
-                triangulate_space(&space, space.grid(), &block_triangulations, &mut buffer)
+                triangulate_space(&space, space.grid(), &*block_triangulations, &mut buffer)
             },
             BatchSize::SmallInput,
         );
