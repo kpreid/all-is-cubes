@@ -369,35 +369,39 @@ pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
 /// Note about edge case behavior: This algorithm does not use the [`Space`]'s block data
 /// at all. Thus, it always has a consistent interpretation based on
 /// `block_triangulations` (as opposed to, for example, using face opacity data not the
-/// same as the meshes and thus producing a rendering with gaps in it)..
-pub fn triangulate_space<BV, GV, T, P>(
+/// same as the meshes and thus producing a rendering with gaps in it).
+pub fn triangulate_space<'p, BV, GV, T, P>(
     space: &Space,
     bounds: Grid,
-    block_triangulations: P,
+    mut block_triangulations: P,
     output_vertices: &mut FaceMap<Vec<GV>>,
 ) where
-    BV: ToGfxVertex<GV>,
-    P: BlockTriangulationProvider<BV, T>,
+    BV: ToGfxVertex<GV> + 'p,
+    P: BlockTriangulationProvider<'p, BV, T>,
+    T: 'p,
 {
+    // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
+    // If we do this, we'd make it the provider's responsibility
     let empty_render = BlockTriangulation::<BV, T>::default();
-    let lookup = |cube| {
-        match space.get_block_index(cube) {
-            // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one.
-            Some(index) => &block_triangulations.get(index).unwrap_or(&empty_render),
-            None => &empty_render,
-        }
-    };
 
     for &face in Face::ALL_SEVEN.iter() {
         // use the buffer but not the existing data
         output_vertices[face].clear();
     }
     for cube in bounds.interior_iter() {
-        let precomputed = lookup(cube);
+        let precomputed = space
+            .get_block_index(cube)
+            .and_then(|index| block_triangulations.get(index))
+            .unwrap_or(&empty_render);
         let low_corner = cube.cast::<BV::Coordinate>().unwrap();
         for &face in Face::ALL_SEVEN {
             let adjacent_cube = cube + face.normal_vector();
-            if lookup(adjacent_cube).faces[face.opposite()].fully_opaque {
+            if space
+                .get_block_index(adjacent_cube)
+                .and_then(|index| block_triangulations.get(index))
+                .map(|bt| bt.faces[face.opposite()].fully_opaque)
+                .unwrap_or(false)
+            {
                 // Don't draw obscured faces
                 continue;
             }
@@ -415,11 +419,11 @@ pub fn triangulate_space<BV, GV, T, P>(
 ///
 /// This trait allows the caller of [`triangulate_space`] to provide an implementation
 /// which records which blocks were actually used, for precise invalidation.
-pub trait BlockTriangulationProvider<V, T> {
-    fn get(&self, index: BlockIndex) -> Option<&BlockTriangulation<V, T>>;
+pub trait BlockTriangulationProvider<'a, V, T> {
+    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<V, T>>;
 }
-impl<V, T> BlockTriangulationProvider<V, T> for &[BlockTriangulation<V, T>] {
-    fn get(&self, index: BlockIndex) -> Option<&BlockTriangulation<V, T>> {
+impl<'a, V, T> BlockTriangulationProvider<'a, V, T> for &'a [BlockTriangulation<V, T>] {
+    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<V, T>> {
         <[_]>::get(self, usize::from(index))
     }
 }
