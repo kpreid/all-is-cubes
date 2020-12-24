@@ -10,6 +10,7 @@ use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::Backend;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
@@ -110,17 +111,21 @@ impl SpaceRenderer {
 
             // Update the vector length to match the space.
             let new_length = block_data.len();
-            // (Correctness: cannot overflow because the largest array size in Rust is isize::MAX.
-            // And our block indices don't get that big anyway.)
-            let delta_length = (new_length as isize) - (self.block_triangulations.len() as isize);
-            if delta_length < 0 {
-                self.block_triangulations.truncate(new_length);
-                self.block_versioning.truncate(new_length);
-            } else if delta_length > 0 {
-                self.block_triangulations
-                    .extend((0..delta_length).map(|_| BlockTriangulation::default()));
-                self.block_versioning.extend((0..delta_length).map(|_| 0));
+            let old_length = self.block_triangulations.len();
+            match new_length.cmp(&old_length) {
+                Ordering::Less => {
+                    self.block_triangulations.truncate(new_length);
+                    self.block_versioning.truncate(new_length);
+                }
+                Ordering::Greater => {
+                    let added = old_length..new_length;
+                    self.block_triangulations
+                        .extend(added.clone().map(|_| BlockTriangulation::default()));
+                    self.block_versioning.extend(added.map(|_| 0));
+                }
+                Ordering::Equal => {}
             }
+            assert!(self.block_triangulations.len() == new_length);
 
             for index in todo.blocks.drain() {
                 let index: usize = index.into();
