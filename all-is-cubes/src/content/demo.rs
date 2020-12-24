@@ -13,8 +13,8 @@ use embedded_graphics::style::TextStyleBuilder;
 use crate::block::{Block, BlockAttributes};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
-use crate::content::palette;
-use crate::drawing::{draw_text, draw_to_blocks, VoxelBrush};
+use crate::content::logo_text;
+use crate::drawing::draw_to_blocks;
 use crate::math::{GridPoint, GridVector, RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::{Universe, UniverseIndex};
@@ -60,22 +60,7 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
     let _ = space.set((-1, 3, -1), axis_block);
 
     // Large banner text
-    let foreground_text_block: Block = palette::LOGO_FILL.into();
-    let background_text_block: Block = palette::LOGO_STROKE.into();
-    draw_text(
-        &mut space,
-        &VoxelBrush::new(vec![
-            ((0, 0, 1), &foreground_text_block),
-            ((1, 0, 0), &background_text_block),
-            ((-1, 0, 0), &background_text_block),
-            ((0, 1, 0), &background_text_block),
-            ((0, -1, 0), &background_text_block),
-        ]),
-        GridPoint::new(-radius_xz + 3, 16, -radius_xz),
-        Font8x16,
-        "All is Cubes",
-    )
-    .unwrap();
+    logo_text(GridPoint::new(0, 8, -radius_xz), &mut space);
 
     // Small test text
     let text_offset = GridVector::new(-16, 3, -14);
