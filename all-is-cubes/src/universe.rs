@@ -658,9 +658,9 @@ struct DirtyFlagListener {
 }
 impl DirtyFlag {
     /// Constructs a new [`DirtyFlag`] with the flag value set to [`false`].
-    pub fn new() -> Self {
+    pub fn new(value: bool) -> Self {
         Self {
-            flag: Rc::new(Cell::new(false)),
+            flag: Rc::new(Cell::new(value)),
         }
     }
 
@@ -685,13 +685,6 @@ impl<M> Listener<M> for DirtyFlagListener {
     }
     fn alive(&self) -> bool {
         self.weak_flag.strong_count() > 0
-    }
-}
-/// Equivalent to [`DirtyFlag::new`].
-impl Default for DirtyFlag {
-    /// Equivalent to [`DirtyFlag::new`].
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -967,8 +960,9 @@ mod tests {
 
     #[test]
     fn dirty_flag_debug() {
-        assert_eq!(format!("{:?}", DirtyFlag::new()), "DirtyFlag(false)");
-        let dirtied = DirtyFlag::new();
+        assert_eq!(format!("{:?}", DirtyFlag::new(false)), "DirtyFlag(false)");
+        assert_eq!(format!("{:?}", DirtyFlag::new(true)), "DirtyFlag(true)");
+        let dirtied = DirtyFlag::new(false);
         dirtied.listener().receive(());
         assert_eq!(format!("{:?}", dirtied), "DirtyFlag(true)");
     }
