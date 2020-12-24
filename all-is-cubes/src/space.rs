@@ -69,13 +69,13 @@ pub struct Space {
 /// Design note: This doubles as an internal data structure for [`Space`]. While we'll
 /// try to keep it available, this interface has a higher risk of needing to change
 /// incompatibility.
-#[derive(Debug)]
 pub struct SpaceBlockData {
     /// The block itself.
     block: Block,
     /// Number of uses of this block in the space.
     count: usize,
     evaluated: EvaluatedBlock,
+    #[allow(dead_code)] // Used only for its `Drop`
     block_listen_gate: Option<Gate>,
 }
 
@@ -85,6 +85,18 @@ impl std::fmt::Debug for Space {
         fmt.debug_struct("Space")
             .field("grid", &self.grid)
             .field("block_data", &self.block_data)
+            .field("sky_color", &self.sky_color)
+            .finish() // TODO: use .finish_non_exhaustive() if that stabilizes
+    }
+}
+
+impl std::fmt::Debug for SpaceBlockData {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // Omit the evaluated data because it is usually redundant.
+        // We may regret this later...
+        fmt.debug_struct("SpaceBlockData")
+            .field("count", &self.count)
+            .field("block", &self.block)
             .finish() // TODO: use .finish_non_exhaustive() if that stabilizes
     }
 }
@@ -666,6 +678,7 @@ mod tests {
     use std::rc::Rc;
 
     // TODO: test consistency between the index and get_* methods
+    // TODO: test fill() equivalence and error handling
 
     /// set() returns Ok when the cube was changed or already equal.
     #[test]
@@ -859,5 +872,34 @@ mod tests {
         assert_eq!(space.get_evaluated((0, 0, 0)), &new_evaluated);
     }
 
-    // TODO: test fill() equivalence and error handling
+    #[test]
+    fn space_debug() {
+        let space = Space::empty_positive(1, 1, 1);
+        println!("{:#?}", space);
+        assert_eq!(
+            format!("{:#?}", space),
+            "Space {\n\
+            \x20   grid: Grid(\n\
+            \x20       0..1,\n\
+            \x20       0..1,\n\
+            \x20       0..1,\n\
+            \x20   ),\n\
+            \x20   block_data: [\n\
+            \x20       SpaceBlockData {\n\
+            \x20           count: 1,\n\
+            \x20           block: Atom(\n\
+            \x20               BlockAttributes {\n\
+            \x20                   display_name: \"<air>\",\n\
+            \x20                   selectable: false,\n\
+            \x20                   solid: false,\n\
+            \x20                   light_emission: RGB(0.0, 0.0, 0.0),\n\
+            \x20               },\n\
+            \x20               RGBA(0.0, 0.0, 0.0, 0.0),\n\
+            \x20           ),\n\
+            \x20       },\n\
+            \x20   ],\n\
+            \x20   sky_color: RGB(0.9, 0.9, 1.4),\n\
+            }"
+        );
+    }
 }
