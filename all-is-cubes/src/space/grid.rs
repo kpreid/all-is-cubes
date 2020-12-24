@@ -81,6 +81,24 @@ impl Grid {
         Grid::new(lower_bounds, upper_bounds.into() - lower_bounds)
     }
 
+    /// Constructor constrained to be able to be `const fn`: limited numeric ranges
+    /// cannot overflow and there are no implicit `Into` conversions.
+    #[allow(dead_code)]  // TODO: expecting to use this in demo content or make public
+    pub(crate) const fn new_c(lower_bounds: [i16; 3], sizes: [u16; 3]) -> Self {
+        Self {
+            lower_bounds: GridPoint {
+                x: lower_bounds[0] as GridCoordinate,
+                y: lower_bounds[1] as GridCoordinate,
+                z: lower_bounds[2] as GridCoordinate,
+            },
+            sizes: GridVector {
+                x: sizes[0] as GridCoordinate,
+                y: sizes[1] as GridCoordinate,
+                z: sizes[2] as GridCoordinate,
+            },
+        }
+    }
+
     /// Constructs a [`Grid`] with a cubical volume in the positive octant, as is used
     /// for recursive blocks.
     ///
