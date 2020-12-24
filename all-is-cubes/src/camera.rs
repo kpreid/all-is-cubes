@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
-use crate::math::{Face, FreeCoordinate, AAB};
+use crate::math::{Face, FreeCoordinate, AAB, RGBA};
 use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray, Raycaster};
 use crate::space::{Grid, Space};
@@ -90,10 +90,20 @@ impl Camera {
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
             inventory: Inventory::from_items(vec![
+                // TODO: placeholder inventory should be set up some other way.
                 Tool::DeleteBlock,
-                Tool::PlaceBlock(crate::math::RGBA::new(1.0, 0.0, 0.5, 1.0).into()), // TODO placeholder
+                Tool::PlaceBlock(RGBA::new(1.0, 0.0, 0.5, 1.0).into()),
+                Tool::PlaceBlock(RGBA::new(0.0, 1.0, 0.5, 1.0).into()),
+                Tool::None,
+                Tool::None,
+                Tool::None,
+                Tool::None,
+                Tool::None,
+                Tool::None,
+                Tool::None,
+                Tool::DeleteBlock,
             ]),
-            selected_slots: [0, 1],
+            selected_slots: [10, 1],
             notifier: Notifier::new(),
         }
     }
@@ -574,8 +584,7 @@ impl InputProcessor {
                 std::char::from_digit(slot as u32 + 1, 10).unwrap()
             };
             if self.keys_held.contains(&Key::Character(digit)) {
-                camera.set_selected_slot(0, slot);
-                // TODO: need to signal to update the toolbar (or have it be guaranteed)
+                camera.set_selected_slot(1, slot);
             }
         }
     }
