@@ -20,7 +20,7 @@ use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector};
 /// half-open intervals: lower inclusive and upper exclusive.
 ///
 /// TODO: Do we really need the minimum of 1?
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Grid {
     lower_bounds: GridPoint,
     sizes: GridVector, // checked to be always positive
@@ -377,6 +377,16 @@ impl Grid {
     }
 }
 
+impl std::fmt::Debug for Grid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Grid")
+            .field(&self.x_range())
+            .field(&self.y_range())
+            .field(&self.z_range())
+            .finish()
+    }
+}
+
 /// A 3-dimensional array with arbitrary element type instead of [`Space`](super::Space)'s
 /// fixed types.
 ///
@@ -456,7 +466,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn grid_one_cube() {
+    fn divide_to_one_cube() {
         assert_eq!(
             Grid::new((11, 22, 33), (1, 1, 1)).divide(10),
             Grid::new((1, 2, 3), (1, 1, 1)),
@@ -465,13 +475,29 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Grid::divide: divisor must be > 0, not 0")]
-    fn grid_divide_zero() {
+    fn divide_by_zero() {
         let _ = Grid::new((-10, -10, -10), (20, 20, 20)).divide(0);
     }
 
     #[test]
     #[should_panic(expected = "Grid::divide: divisor must be > 0, not -10")]
-    fn grid_divide_negative() {
+    fn divide_by_negative() {
         let _ = Grid::new((-10, -10, -10), (20, 20, 20)).divide(-10);
+    }
+
+    #[test]
+    fn debug() {
+        let grid = Grid::new((1, 2, 3), (10, 20, 30));
+        println!("{:#?}", grid);
+        assert_eq!(format!("{:?}", grid), "Grid(1..11, 2..22, 3..33)");
+        assert_eq!(
+            format!("{:#?}", grid),
+            "\
+            Grid(\n\
+            \x20   1..11,\n\
+            \x20   2..22,\n\
+            \x20   3..33,\n\
+            )"
+        );
     }
 }
