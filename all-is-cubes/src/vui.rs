@@ -212,8 +212,10 @@ impl HudBlocks {
         let display =
             &mut VoxelDisplayAdapter::new(&mut toolbar_drawing_space, GridPoint::origin());
 
-        let padding = 4;
+        let padding = 3;
         let stroke_width = 1;
+        let background_fill = VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, -1));
+        let background_stroke = VoxelBrush::single(palette::HUD_TOOLBAR_FRAME);
         let icon_background_rectangle = Rectangle::new(
             // TODO: confirm these offsets are exactly right
             Point::new(-padding - stroke_width, -padding - resolution),
@@ -221,8 +223,8 @@ impl HudBlocks {
         )
         .into_styled(
             PrimitiveStyleBuilder::new()
-                .fill_color(palette::HUD_TOOLBAR_BACK)
-                .stroke_color(palette::HUD_TOOLBAR_FRAME)
+                .fill_color(&background_fill)
+                .stroke_color(&background_stroke)
                 .stroke_width(stroke_width as u32)
                 .build(),
         );
