@@ -83,7 +83,7 @@ impl Grid {
 
     /// Constructor constrained to be able to be `const fn`: limited numeric ranges
     /// cannot overflow and there are no implicit `Into` conversions.
-    #[allow(dead_code)]  // TODO: expecting to use this in demo content or make public
+    #[allow(dead_code)] // TODO: expecting to use this in demo content or make public
     pub(crate) const fn new_c(lower_bounds: [i16; 3], sizes: [u16; 3]) -> Self {
         Self {
             lower_bounds: GridPoint {

@@ -3,6 +3,7 @@
 
 //! Get from [`Space`] to [`Tess`].
 
+use bitvec::prelude::BitVec;
 use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as _, Vector3};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::{Pipeline, PipelineError};
@@ -322,18 +323,16 @@ impl Chunk {
         self.tile_dependencies.clear();
         self.tile_dependencies.extend(
             block_provider
-                .seen
-                .iter()
-                .flat_map(|index| block_triangulations[usize::from(*index)].textures().iter())
+                .seen()
+                .flat_map(|index| block_triangulations[index].textures().iter())
                 .cloned(),
         );
         // Record the block triangulations we used.
         self.block_dependencies.clear();
         self.block_dependencies.extend(
             block_provider
-                .seen
-                .into_iter()
-                .map(|index| (index, block_versioning[usize::from(index)])),
+                .seen()
+                .map(|index| (index as BlockIndex, block_versioning[index])),
         );
 
         for &face in Face::ALL_SEVEN {
@@ -385,21 +384,32 @@ impl Chunk {
 /// Helper for [`Chunk`]'s dependency tracking.
 struct TrackingBlockProvider<'a> {
     block_triangulations: &'a [BlockTriangulation<GLBlockVertex, GLTile>],
-    // TODO: make this a bitset? copy the structures direct to the Chunk? In any case, benchmark.
-    seen: HashSet<BlockIndex>,
+    seen: BitVec,
 }
 impl<'a> TrackingBlockProvider<'a> {
     fn new(block_triangulations: &'a [BlockTriangulation<GLBlockVertex, GLTile>]) -> Self {
         Self {
             block_triangulations,
-            seen: HashSet::new(),
+            seen: BitVec::with_capacity(256), // TODO: cleverer choice
         }
+    }
+
+    /// Return the indices of all the block triangulations that were used.
+    ///
+    /// Note: In principle, the value type should be [`BlockIndex`], but in practice it
+    /// is used as an array index so this avoids writing a double conversion.
+    fn seen<'s: 'a>(&'s self) -> impl Iterator<Item = usize> + 's {
+        self.seen.iter_ones()
     }
 }
 impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, GLTile> for &mut TrackingBlockProvider<'a> {
     fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<GLBlockVertex, GLTile>> {
-        self.seen.insert(index);
-        self.block_triangulations.get(usize::from(index))
+        let index = usize::from(index);
+        if index >= self.seen.len() {
+            self.seen.resize(index + 1, false);
+        }
+        self.seen.set(index, true);
+        self.block_triangulations.get(index)
     }
 }
 
