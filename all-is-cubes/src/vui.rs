@@ -177,14 +177,12 @@ impl HudLayout {
             let position = self.tool_icon_position(index);
             // Draw icon
             space.set(position, &*tool.icon())?;
-            // Draw pointers. TODO: avoid erase-then-draw strategy
+            // Draw pointers.
             let toolbar_disp = &mut VoxelDisplayAdapter::new(space, position);
-            Pixel(Point::new(0, 0), &hud_blocks.toolbar_pointer_erase).draw(toolbar_disp)?;
-            if selections[0] == index {
-                Pixel(Point::new(0, 0), &hud_blocks.toolbar_pointer_0).draw(toolbar_disp)?;
-            }
-            if selections[1] == index {
-                Pixel(Point::new(0, 0), &hud_blocks.toolbar_pointer_1).draw(toolbar_disp)?;
+            for (sel, &slot) in selections.iter().enumerate() {
+                let brush: &VoxelBrush =
+                    &hud_blocks.toolbar_pointer[sel][usize::from(slot == index)];
+                Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
             }
         }
         Ok(())
@@ -197,9 +195,8 @@ struct HudBlocks {
     toolbar_right_cap: VoxelBrush<'static>,
     toolbar_divider: VoxelBrush<'static>,
     toolbar_middle: VoxelBrush<'static>,
-    toolbar_pointer_erase: VoxelBrush<'static>,
-    toolbar_pointer_0: VoxelBrush<'static>,
-    toolbar_pointer_1: VoxelBrush<'static>,
+    /// Outer index is "which pointer", inner index is "shown or hidden".
+    toolbar_pointer: [[VoxelBrush<'static>; 2]; 2],
 }
 
 impl HudBlocks {
@@ -287,11 +284,18 @@ impl HudBlocks {
                 .translate((1, 0, 0)),
             toolbar_right_cap: slice_drawing(Grid::from_lower_upper((3, -1, -1), (4, 2, 2)))
                 .translate((-3, 0, 0)),
-            toolbar_pointer_erase: slice_drawing(Grid::from_lower_upper((0, 1, -1), (1, 2, 2))),
-            toolbar_pointer_0: slice_drawing(Grid::from_lower_upper((2, 1, -1), (3, 2, 2)))
-                .translate((-2, 0, 0)),
-            toolbar_pointer_1: slice_drawing(Grid::from_lower_upper((2, -1, -1), (3, 0, 2)))
-                .translate((-2, 0, 0)),
+            toolbar_pointer: [
+                [
+                    slice_drawing(Grid::from_lower_upper((0, 1, -1), (1, 2, 2))),
+                    slice_drawing(Grid::from_lower_upper((2, 1, -1), (3, 2, 2)))
+                        .translate((-2, 0, 0)),
+                ],
+                [
+                    slice_drawing(Grid::from_lower_upper((0, -1, -1), (1, 0, 2))),
+                    slice_drawing(Grid::from_lower_upper((2, -1, -1), (3, 0, 2)))
+                        .translate((-2, 0, 0)),
+                ],
+            ],
         }
     }
 }
