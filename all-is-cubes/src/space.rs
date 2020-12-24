@@ -58,7 +58,7 @@ pub struct Space {
     sky_color: RGB,
     packed_sky_color: PackedLight,
 
-    pub(crate) notifier: Notifier<SpaceChange>,
+    notifier: Notifier<SpaceChange>,
 
     /// Storage for incoming change notifications from blocks.
     todo: Rc<RefCell<SpaceTodo>>,
@@ -588,7 +588,7 @@ pub enum SetCubeError {
 }
 
 /// Description of a change to a [`Space`] for use in listeners.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum SpaceChange {
     // TODO: This set of names is not very clear and self-consistent.
     /// The block at the given location was replaced.

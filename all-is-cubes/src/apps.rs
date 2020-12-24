@@ -3,10 +3,12 @@
 
 //! Components for "apps", or game clients: user interface and top-level state.
 
-use crate::camera::{Camera, InputProcessor};
+use crate::camera::{Camera, CameraChange, InputProcessor};
 use crate::content::demo::new_universe_with_stuff;
 use crate::space::Space;
-use crate::universe::{FrameClock, URef, Universe, UniverseStepInfo};
+use crate::universe::{
+    DirtyFlag, FrameClock, ListenerHelper as _, URef, Universe, UniverseStepInfo,
+};
 use crate::vui::Vui;
 
 /// Everything that a game application needs regardless of platform.
@@ -27,6 +29,7 @@ pub struct AllIsCubesAppState {
     game_camera: URef<Camera>,
 
     ui: Vui,
+    ui_dirty: DirtyFlag,
 }
 
 impl AllIsCubesAppState {
@@ -34,22 +37,26 @@ impl AllIsCubesAppState {
     /// [`new_universe_with_stuff()`] as initial content.
     pub fn new() -> Self {
         let game_universe = new_universe_with_stuff();
-        let game_camera = game_universe.get_default_camera();
-        let mut ui = Vui::new();
 
-        // TODO: this will need to be done on a notification/invalidation basis
-        // and also probably shouldn't be the responsibility of AllIsCubesAppState
-        let camera = game_camera.borrow();
-        ui.set_toolbar(&camera.inventory.slots, camera.selected_slots)
-            .unwrap();
-
-        Self {
+        let mut new_self = Self {
             frame_clock: FrameClock::new(),
             input_processor: InputProcessor::new(),
-            game_camera,
+            game_camera: game_universe.get_default_camera(),
             game_universe,
-            ui,
-        }
+            ui: Vui::new(),
+            ui_dirty: DirtyFlag::new(true),
+        };
+
+        // TODO: once it's possible to switch cameras we will need to clear and reinstall this
+        new_self
+            .game_camera
+            .borrow()
+            .listen(new_self.ui_dirty.listener().filter(|msg| match msg {
+                CameraChange::Inventory | CameraChange::Selections => Some(()),
+            }));
+        new_self.maybe_sync_ui();
+
+        new_self
     }
 
     /// Returns a reference to the [`Camera`] that should be shown to the user.
@@ -71,14 +78,28 @@ impl AllIsCubesAppState {
         if self.frame_clock.should_step() {
             let step_length = self.frame_clock.step_length();
             self.frame_clock.did_step();
+
             self.input_processor
                 .apply_input(&mut *self.camera().borrow_mut(), step_length);
             self.input_processor.step(step_length);
+
             let mut info = self.game_universe.step(step_length);
+
+            self.maybe_sync_ui();
             info += self.ui.step(step_length);
             Some(info)
         } else {
             None
+        }
+    }
+
+    fn maybe_sync_ui(&mut self) {
+        if self.ui_dirty.get_and_clear() {
+            // TODO: Exact interaction between Camera and Vui probably shouldn't be AllIsCubesAppState's responsibility.
+            let camera = self.game_camera.borrow();
+            self.ui
+                .set_toolbar(&camera.inventory().slots, camera.selected_slots())
+                .unwrap();
         }
     }
 }

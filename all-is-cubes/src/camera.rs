@@ -17,7 +17,7 @@ use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray, Raycaster};
 use crate::space::{Grid, Space};
 use crate::tools::{Inventory, Tool, ToolError};
-use crate::universe::URef;
+use crate::universe::{Listener, Notifier, URef};
 use crate::util::ConciseDebug as _;
 
 // Control characteristics.
@@ -54,10 +54,13 @@ pub struct Camera {
     pub(crate) colliding_cubes: HashSet<Contact>,
 
     // TODO: Figure out what access is needed and add accessors
-    pub(crate) inventory: Inventory,
+    inventory: Inventory,
 
     //. Indices into `self.inventory` slots.
-    pub(crate) selected_slots: [usize; 2],
+    selected_slots: [usize; 2],
+
+    /// Notifier for camera modifications.
+    notifier: Notifier<CameraChange>,
 }
 
 impl std::fmt::Debug for Camera {
@@ -91,6 +94,7 @@ impl Camera {
                 Tool::PlaceBlock(crate::math::RGBA::new(1.0, 0.0, 0.5, 1.0).into()), // TODO placeholder
             ]),
             selected_slots: [0, 1],
+            notifier: Notifier::new(),
         }
     }
 
@@ -111,12 +115,24 @@ impl Camera {
         camera
     }
 
+    /// Registers a listener for mutations of this camera.
+    pub fn listen(&self, listener: impl Listener<CameraChange> + 'static) {
+        self.notifier.listen(listener)
+    }
     /// Computes the view matrix for this camera; the translation and rotation from
     /// the [`Space`]'s coordinate system to one where the look direction is the -Z axis.
     pub fn view(&self) -> M {
         Matrix4::from_angle_x(Deg(self.body.pitch))
             * Matrix4::from_angle_y(Deg(self.body.yaw))
             * Matrix4::from_translation(-(self.body.position.to_vec()))
+    }
+
+    pub fn inventory(&self) -> &Inventory {
+        &self.inventory
+    }
+
+    pub fn selected_slots(&self) -> [usize; 2] {
+        self.selected_slots
     }
 
     /// Advances time.
@@ -177,7 +193,9 @@ impl Camera {
             .get(button)
             .copied()
             .unwrap_or(self.selected_slots[0]);
-        self.inventory.use_tool(&self.space, cursor, slot_index)
+        self.inventory.use_tool(&self.space, cursor, slot_index)?;
+        self.notifier.notify(CameraChange::Inventory);
+        Ok(())
     }
 
     // TODO: this code's location is driven by colliding_cubes being here, which is probably wrong
@@ -197,6 +215,16 @@ impl Camera {
             .iter()
             .any(|contact| contact.face == Face::PY)
     }
+}
+/// Description of a change to a [`Camera`] for use in listeners.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum CameraChange {
+    // We'll probably want more but these are the ones needed for now.
+    // (Also note that anything that's a public field can't be reliably notified about.)
+    /// Inventory slot contents. (TODO: This should specify which slot changed.)
+    Inventory,
+    /// Which inventory slots are selected.
+    Selections,
 }
 
 type M = Matrix4<FreeCoordinate>;
