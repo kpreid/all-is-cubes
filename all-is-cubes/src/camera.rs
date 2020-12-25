@@ -57,7 +57,7 @@ pub struct Camera {
     inventory: Inventory,
 
     //. Indices into `self.inventory` slots.
-    selected_slots: [usize; 2],
+    selected_slots: [usize; 3],
 
     /// Notifier for camera modifications.
     notifier: Notifier<CameraChange>,
@@ -102,8 +102,9 @@ impl Camera {
                 Tool::None,
                 Tool::None,
                 Tool::DeleteBlock,
+                Tool::CopyFromSpace,
             ]),
-            selected_slots: [10, 1],
+            selected_slots: [10, 1, 11],
             notifier: Notifier::new(),
         }
     }
@@ -141,7 +142,7 @@ impl Camera {
         &self.inventory
     }
 
-    pub fn selected_slots(&self) -> [usize; 2] {
+    pub fn selected_slots(&self) -> [usize; 3] {
         self.selected_slots
     }
 

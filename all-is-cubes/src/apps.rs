@@ -98,7 +98,7 @@ impl AllIsCubesAppState {
             // TODO: Exact interaction between Camera and Vui probably shouldn't be AllIsCubesAppState's responsibility.
             let camera = self.game_camera.borrow();
             self.ui
-                .set_toolbar(&camera.inventory().slots, camera.selected_slots())
+                .set_toolbar(&camera.inventory().slots, &camera.selected_slots())
                 .unwrap();
         }
     }

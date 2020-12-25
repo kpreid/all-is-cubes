@@ -62,7 +62,7 @@ impl Vui {
     pub fn set_toolbar(
         &mut self,
         tools: &[Tool],
-        selections: [usize; 2],
+        selections: &[usize],
     ) -> Result<(), SetCubeError> {
         HudLayout::default().set_toolbar(
             &mut *self.hud_space.borrow_mut(),
@@ -167,7 +167,7 @@ impl HudLayout {
         space: &mut Space,
         hud_blocks: &HudBlocks,
         tools: &[Tool],
-        selections: [usize; 2],
+        selections: &[usize],
     ) -> Result<(), SetCubeError> {
         for (index, tool) in tools.iter().enumerate() {
             if index >= self.toolbar_positions {
@@ -179,7 +179,8 @@ impl HudLayout {
             space.set(position, &*tool.icon())?;
             // Draw pointers.
             let toolbar_disp = &mut VoxelDisplayAdapter::new(space, position);
-            for (sel, &slot) in selections.iter().enumerate() {
+            for sel in 0..2 {
+                let slot = selections.get(sel).copied().unwrap_or(usize::MAX);
                 let brush: &VoxelBrush =
                     &hud_blocks.toolbar_pointer[sel][usize::from(slot == index)];
                 Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
