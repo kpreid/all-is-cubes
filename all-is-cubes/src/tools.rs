@@ -25,6 +25,8 @@ pub enum Tool {
     DeleteBlock,
     /// Place a copy of the given block in empty space.
     PlaceBlock(Block),
+    /// Copy block from space to inventory.
+    CopyFromSpace,
 }
 
 impl Tool {
@@ -35,6 +37,10 @@ impl Tool {
                 input.set_cube(input.cursor().place.cube, &input.cursor().block, &AIR)
             }
             Self::PlaceBlock(block) => input.set_cube(input.cursor().place.adjacent(), &AIR, block),
+            Self::CopyFromSpace => {
+                input.produce_item(Tool::PlaceBlock(input.cursor().block.clone()));
+                Ok(())
+            }
         }
     }
 
@@ -55,6 +61,8 @@ impl Tool {
             Self::DeleteBlock => Cow::Owned(RGBA::new(1., 0., 0., 1.).into()),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             Self::PlaceBlock(block) => Cow::Borrowed(&block),
+            // TODO: icon
+            Self::CopyFromSpace => Cow::Owned(RGBA::new(0., 1., 0., 1.).into()),
         }
     }
 }
@@ -318,6 +326,19 @@ mod tests {
         print_space(&*tester.space(), (-1., 1., 1.));
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
         assert_eq!(&tester.space()[(0, 0, 0)], &obstacle);
+    }
+
+    #[test]
+    fn use_copy_from_space() {
+        let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
+        let tester = ToolTester::new(|space| {
+            space.set((1, 0, 0), &existing).unwrap();
+        });
+        let mut input = tester.input();
+        assert_eq!(Tool::CopyFromSpace.use_tool(&mut input), Ok(()));
+        assert_eq!(input.output_items, vec![Tool::PlaceBlock(existing.clone())]);
+        // Space is unmodified
+        assert_eq!(&tester.space()[(1, 0, 0)], &existing);
     }
 
     // TODO: test for Inventory::use_tool
