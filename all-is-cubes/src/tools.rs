@@ -15,23 +15,26 @@ use crate::universe::{RefError, URef};
 /// such as placing or removing a block. In particular, a tool use usually corresponds
 /// to a click.
 ///
-/// TODO: Do we actually want to have this be "Item", not "Tool"?
+/// Currently, `Tool`s also play the role of “inventory items”. This may change in the
+/// future.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Tool {
+    /// Empty slot; does nothing.
     None,
+    /// Destroy any targeted block.
     DeleteBlock,
+    /// Place a copy of the given block in empty space.
     PlaceBlock(Block),
 }
 
 impl Tool {
-    // TODO: This should probably get a `ToolContext` struct or something so as to provide extensibility
-    // TODO: It shouldn't be mandatory to have a valid cursor input.
-    pub fn use_tool(&mut self, space: &URef<Space>, cursor: &Cursor) -> Result<(), ToolError> {
+    pub fn use_tool(&mut self, input: &mut ToolInput) -> Result<(), ToolError> {
         match self {
             Self::None => Err(ToolError::NotUsable),
-            Self::DeleteBlock => tool_set_cube(space, cursor.place.cube, &cursor.block, &AIR),
-            // TODO: test cube behind is unoccupied
-            Self::PlaceBlock(block) => tool_set_cube(space, cursor.place.adjacent(), &AIR, block),
+            Self::DeleteBlock => {
+                input.set_cube(input.cursor().place.cube, &input.cursor().block, &AIR)
+            }
+            Self::PlaceBlock(block) => input.set_cube(input.cursor().place.adjacent(), &AIR, block),
         }
     }
 
@@ -48,7 +51,7 @@ impl Tool {
     pub fn icon(&self) -> Cow<Block> {
         match self {
             Self::None => Cow::Borrowed(&AIR),
-            // TODO: draw an "x" icon or something.
+            // TODO: icon
             Self::DeleteBlock => Cow::Owned(RGBA::new(1., 0., 0., 1.).into()),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             Self::PlaceBlock(block) => Cow::Borrowed(&block),
@@ -56,25 +59,43 @@ impl Tool {
     }
 }
 
-// Generic handler for a tool that replaces one cube.
-fn tool_set_cube(
-    space: &URef<Space>,
-    cube: GridPoint,
-    old_block: &Block,
-    new_block: &Block,
-) -> Result<(), ToolError> {
-    let mut space = space.try_borrow_mut().map_err(ToolError::SpaceRef)?;
-    if &space[cube] != old_block {
-        return Err(ToolError::NotUsable);
+/// Resources available to a `Tool` to perform its function.
+///
+/// This is intended to provide future extensibility compared to having a complex
+/// parameter list for `Tool::use_tool`.
+#[derive(Debug)]
+pub struct ToolInput {
+    space: URef<Space>,
+    // TODO: It shouldn't be mandatory to have a valid cursor input; some tools
+    // might not need targeting.
+    cursor: Cursor,
+}
+
+impl ToolInput {
+    // Generic handler for a tool that replaces one cube.
+    fn set_cube(
+        &self,
+        cube: GridPoint,
+        old_block: &Block,
+        new_block: &Block,
+    ) -> Result<(), ToolError> {
+        let mut space = self.space.try_borrow_mut().map_err(ToolError::SpaceRef)?;
+        if &space[cube] != old_block {
+            return Err(ToolError::NotUsable);
+        }
+        space.set(cube, new_block).map_err(ToolError::SetCube)?;
+
+        // Gimmick: update lighting ASAP in order to make it less likely that non-updated
+        // light is rendered. This is particularly needful for tools because their effects
+        // (currently) happen outside of Space::step.
+        space.update_lighting_from_queue();
+
+        Ok(())
     }
-    space.set(cube, new_block).map_err(ToolError::SetCube)?;
 
-    // Gimmick: update lighting ASAP in order to make it less likely that non-updated
-    // light is rendered. This is particularly needful for tools because their effects
-    // (currently) happen outside of Space::step.
-    space.update_lighting_from_queue();
-
-    Ok(())
+    pub fn cursor(&self) -> &Cursor {
+        &self.cursor
+    }
 }
 
 /// Ways that a tool can fail.
@@ -119,15 +140,18 @@ impl Inventory {
     }
 
     /// Apply a tool to the space.
-    /// TODO: Space and Cursor should perhaps be bundled into one object?
     pub fn use_tool(
         &mut self,
         space: &URef<Space>,
         cursor: &Cursor,
-        index: usize,
+        slot_index: usize,
     ) -> Result<(), ToolError> {
-        if let Some(tool) = self.slots.get_mut(index) {
-            tool.use_tool(space, cursor)
+        if let Some(tool) = self.slots.get_mut(slot_index) {
+            let mut input = ToolInput {
+                space: space.clone(),
+                cursor: cursor.clone(),
+            };
+            tool.use_tool(&mut input)
         } else {
             Err(ToolError::NotUsable)
         }
@@ -141,25 +165,48 @@ mod tests {
     use crate::camera::cursor_raycast;
     use crate::raycast::Raycaster;
     use crate::raytracer::print_space;
-    use crate::universe::Universe;
+    use crate::universe::{UBorrow, UBorrowMut, Universe};
     use std::convert::TryInto;
 
-    fn setup<F: FnOnce(&mut Space)>(f: F) -> (Universe, URef<Space>, Cursor) {
-        let mut universe = Universe::new();
-        let mut space = Space::empty_positive(6, 4, 4);
-        f(&mut space);
-        let space_ref = universe.insert_anonymous(space);
-
-        let cursor = cursor_raycast(
-            Raycaster::new((0., 0.5, 0.5), (1., 0., 0.)),
-            &*space_ref.borrow(),
-        )
-        .unwrap();
-
-        (universe, space_ref, cursor)
+    #[derive(Debug)]
+    struct ToolTester {
+        universe: Universe,
+        space_ref: URef<Space>,
     }
+    impl ToolTester {
+        /// The provided function should modify the space to contain the blocks to operate on,
+        /// given a cursor ray along the line of cubes from the origin in the +X direction.
+        fn new<F: FnOnce(&mut Space)>(f: F) -> Self {
+            let mut universe = Universe::new();
+            let mut space = Space::empty_positive(6, 4, 4);
+            f(&mut space);
+            let space_ref = universe.insert_anonymous(space);
 
-    // TODO: Work on making these tests less verbose.
+            Self {
+                universe,
+                space_ref,
+            }
+        }
+
+        fn input(&self) -> ToolInput {
+            let cursor = cursor_raycast(
+                Raycaster::new((0., 0.5, 0.5), (1., 0., 0.)),
+                &*self.space_ref.borrow(),
+            )
+            .unwrap();
+            ToolInput {
+                space: self.space_ref.clone(),
+                cursor,
+            }
+        }
+
+        fn space(&self) -> UBorrow<Space> {
+            self.space_ref.borrow()
+        }
+        fn space_mut(&self) -> UBorrowMut<Space> {
+            self.space_ref.borrow_mut()
+        }
+    }
 
     #[test]
     fn icon_none() {
@@ -169,15 +216,15 @@ mod tests {
     #[test]
     fn use_none() {
         let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
-        let (_universe, space_ref, cursor) = setup(|space| {
+        let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
         assert_eq!(
-            Tool::None.use_tool(&space_ref, &cursor),
+            Tool::None.use_tool(&mut tester.input()),
             Err(ToolError::NotUsable)
         );
-        print_space(&*space_ref.borrow(), (-1., 1., 1.));
-        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &existing);
+        print_space(&tester.space(), (-1., 1., 1.));
+        assert_eq!(&tester.space()[(1, 0, 0)], &existing);
     }
 
     #[test]
@@ -189,12 +236,12 @@ mod tests {
     #[test]
     fn use_delete_block() {
         let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
-        let (_universe, space_ref, cursor) = setup(|space| {
+        let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
-        assert_eq!(Tool::DeleteBlock.use_tool(&space_ref, &cursor), Ok(()));
-        print_space(&*space_ref.borrow(), (-1., 1., 1.));
-        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &AIR);
+        assert_eq!(Tool::DeleteBlock.use_tool(&mut tester.input()), Ok(()));
+        print_space(&*tester.space(), (-1., 1., 1.));
+        assert_eq!(&tester.space()[(1, 0, 0)], &AIR);
     }
 
     #[test]
@@ -206,32 +253,32 @@ mod tests {
     #[test]
     fn use_place_block() {
         let [existing, tool_block]: [Block; 2] = make_some_blocks(2).try_into().unwrap();
-        let (_universe, space_ref, cursor) = setup(|space| {
+        let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
         assert_eq!(
-            Tool::PlaceBlock(tool_block.clone()).use_tool(&space_ref, &cursor),
+            Tool::PlaceBlock(tool_block.clone()).use_tool(&mut tester.input()),
             Ok(())
         );
-        print_space(&*space_ref.borrow(), (-1., 1., 1.));
-        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &existing);
-        assert_eq!(&space_ref.borrow()[(0, 0, 0)], &tool_block);
+        print_space(&tester.space(), (-1., 1., 1.));
+        assert_eq!(&tester.space()[(1, 0, 0)], &existing);
+        assert_eq!(&tester.space()[(0, 0, 0)], &tool_block);
     }
 
     #[test]
     fn use_place_block_with_obstacle() {
         let [existing, tool_block, obstacle]: [Block; 3] = make_some_blocks(3).try_into().unwrap();
-        let (_universe, space_ref, cursor) = setup(|space| {
+        let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
         // Place the obstacle after the raycast
-        space_ref.borrow_mut().set((0, 0, 0), &obstacle).unwrap();
+        tester.space_mut().set((0, 0, 0), &obstacle).unwrap();
         assert_eq!(
-            Tool::PlaceBlock(tool_block).use_tool(&space_ref, &cursor),
+            Tool::PlaceBlock(tool_block).use_tool(&mut tester.input()),
             Err(ToolError::NotUsable)
         );
-        print_space(&*space_ref.borrow(), (-1., 1., 1.));
-        assert_eq!(&space_ref.borrow()[(1, 0, 0)], &existing);
-        assert_eq!(&space_ref.borrow()[(0, 0, 0)], &obstacle);
+        print_space(&*tester.space(), (-1., 1., 1.));
+        assert_eq!(&tester.space()[(1, 0, 0)], &existing);
+        assert_eq!(&tester.space()[(0, 0, 0)], &obstacle);
     }
 }
