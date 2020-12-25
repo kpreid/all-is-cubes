@@ -156,6 +156,20 @@ impl Inventory {
             Err(ToolError::NotUsable)
         }
     }
+
+    /// Add an item to an empty slot in this inventory. Returns the item if there is
+    /// no empty slot.
+    pub fn try_add_item(&mut self, item: Tool) -> Result<(), Tool> {
+        for slot in self.slots.iter_mut() {
+            if *slot == Tool::None {
+                *slot = item;
+                // TODO: should we help out sending notifications somehow?
+                return Ok(());
+            }
+        }
+        // Out of inventory space. Return the item.
+        Err(item)
+    }
 }
 
 #[cfg(test)]
@@ -280,5 +294,34 @@ mod tests {
         print_space(&*tester.space(), (-1., 1., 1.));
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
         assert_eq!(&tester.space()[(0, 0, 0)], &obstacle);
+    }
+
+    // TODO: test for Inventory::use_tool
+
+    #[test]
+    fn inventory_add_item_success() {
+        let mut inventory = Inventory::from_items(vec![
+            Tool::DeleteBlock,
+            Tool::DeleteBlock,
+            Tool::None,
+            Tool::DeleteBlock,
+            Tool::None,
+        ]);
+        let new_item = Tool::PlaceBlock(RGBA::WHITE.into());
+
+        assert_eq!(inventory.slots[2], Tool::None);
+        assert_eq!(Ok(()), inventory.try_add_item(new_item.clone()));
+        assert_eq!(inventory.slots[2], new_item);
+    }
+
+    #[test]
+    fn inventory_add_item_no_space() {
+        let contents = vec![Tool::DeleteBlock, Tool::DeleteBlock];
+        let mut inventory = Inventory::from_items(contents.clone());
+        let new_item = Tool::PlaceBlock(RGBA::WHITE.into());
+
+        assert_eq!(inventory.slots, contents);
+        assert_eq!(Err(new_item.clone()), inventory.try_add_item(new_item));
+        assert_eq!(inventory.slots, contents);
     }
 }
