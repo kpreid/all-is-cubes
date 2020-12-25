@@ -69,6 +69,7 @@ pub struct ToolInput {
     // TODO: It shouldn't be mandatory to have a valid cursor input; some tools
     // might not need targeting.
     cursor: Cursor,
+    output_items: Vec<Tool>,
 }
 
 impl ToolInput {
@@ -95,6 +96,13 @@ impl ToolInput {
 
     pub fn cursor(&self) -> &Cursor {
         &self.cursor
+    }
+
+    /// Add the provided item to the inventory from which the tool was used.
+    // TODO: Provide a way to check if inventory space is full? In general, should there
+    // be transaction support?
+    pub fn produce_item(&mut self, item: Tool) {
+        self.output_items.push(item);
     }
 }
 
@@ -150,8 +158,22 @@ impl Inventory {
             let mut input = ToolInput {
                 space: space.clone(),
                 cursor: cursor.clone(),
+                output_items: Vec::new(),
             };
-            tool.use_tool(&mut input)
+            tool.use_tool(&mut input)?;
+
+            // Stuff any outputs into our inventory
+            // TODO: Write tests for this
+            for output in input.output_items {
+                match self.try_add_item(output) {
+                    Ok(()) => {}
+                    Err(_output) => {
+                        // TODO: drop these items on the ground or something once that option exists.
+                        // Or in some cases we might want transactional tools (no effect if can't succeed).
+                    }
+                }
+            }
+            Ok(())
         } else {
             Err(ToolError::NotUsable)
         }
@@ -209,8 +231,10 @@ mod tests {
             )
             .unwrap();
             ToolInput {
+                // TODO: define ToolInput::new
                 space: self.space_ref.clone(),
                 cursor,
+                output_items: Vec::new(),
             }
         }
 
