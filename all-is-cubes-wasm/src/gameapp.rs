@@ -195,6 +195,8 @@ impl WebGameRoot {
                 self2.renderer.set_cursor_position(Point2::new(
                     event.client_x() as usize,
                     event.client_y() as usize));
+                // MouseEvent button numbering is sequential for a three button mouse, instead of
+                // counting the middle/wheel button as the third button.
                 let mapped_button: usize = match event.button() {
                     0 => 0,
                     2 => 1,
