@@ -5,10 +5,9 @@
 
 use crate::camera::{Camera, CameraChange, InputProcessor};
 use crate::content::demo::new_universe_with_stuff;
+use crate::listen::{DirtyFlag, ListenerHelper as _};
 use crate::space::Space;
-use crate::universe::{
-    DirtyFlag, FrameClock, ListenerHelper as _, URef, Universe, UniverseStepInfo,
-};
+use crate::universe::{FrameClock, URef, Universe, UniverseStepInfo};
 use crate::vui::Vui;
 
 /// Everything that a game application needs regardless of platform.

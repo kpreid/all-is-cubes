@@ -12,12 +12,13 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
+use crate::listen::{Listener, Notifier};
 use crate::math::{Face, FreeCoordinate, AAB, RGBA};
 use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray, Raycaster};
 use crate::space::{Grid, Space};
 use crate::tools::{Inventory, Tool, ToolError};
-use crate::universe::{Listener, Notifier, URef};
+use crate::universe::URef;
 use crate::util::ConciseDebug as _;
 
 // Control characteristics.

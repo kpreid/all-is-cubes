@@ -9,9 +9,10 @@ use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
+use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
 use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
 use crate::space::{Grid, GridArray, Space, SpaceChange};
-use crate::universe::{Gate, Listener, ListenerHelper, Notifier, RefError, URef};
+use crate::universe::{RefError, URef};
 use crate::util::ConciseDebug;
 
 /// Type for the edge length of recursive blocks in terms of their component voxels.
@@ -417,9 +418,10 @@ pub fn space_to_blocks(
 mod tests {
     use super::*;
     use crate::blockgen::BlockGen;
+    use crate::listen::Sink;
     use crate::math::{GridPoint, GridVector};
     use crate::space::Grid;
-    use crate::universe::{Sink, Universe};
+    use crate::universe::Universe;
     use std::borrow::Cow;
 
     #[test]

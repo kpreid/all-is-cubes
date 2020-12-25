@@ -12,8 +12,9 @@ use std::time::Duration;
 
 use crate::block::*;
 use crate::content::palette;
+use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
 use crate::math::*;
-use crate::universe::{Gate, Listener, ListenerHelper as _, Notifier, RefError};
+use crate::universe::RefError;
 use crate::util::ConciseDebug as _;
 
 mod grid;
@@ -671,8 +672,9 @@ mod tests {
     use super::*;
     use crate::block::AIR;
     use crate::blockgen::make_some_blocks;
+    use crate::listen::Sink;
     use crate::math::GridPoint;
-    use crate::universe::{Sink, Universe, UniverseIndex as _};
+    use crate::universe::{Universe, UniverseIndex as _};
     use cgmath::EuclideanSpace as _;
     use std::convert::TryInto;
     use std::rc::Rc;

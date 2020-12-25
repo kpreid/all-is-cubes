@@ -18,6 +18,7 @@ use std::rc::{Rc, Weak};
 use crate::chunking::{
     cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE, CHUNK_SIZE_FREE,
 };
+use crate::listen::Listener;
 use crate::lum::block_texture::{BlockGLTexture, BlockTexture, BoundBlockTexture, GLTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
@@ -26,7 +27,7 @@ use crate::triangulator::{
     triangulate_block, triangulate_blocks, triangulate_space, BlockTriangulation,
     BlockTriangulationProvider,
 };
-use crate::universe::{Listener, URef};
+use crate::universe::URef;
 
 /// Manages cached data and GPU resources for drawing a single [`Space`].
 pub struct SpaceRenderer {
