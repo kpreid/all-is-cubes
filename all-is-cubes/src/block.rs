@@ -307,12 +307,12 @@ impl BlockChange {
     }
 }
 
-/// Contains a [`Block`] and can be stored in a [`Universe`](crate::universe::Universe),
-/// allowing indirection through a [`URef`].
+/// Contains a [`Block`] and can be stored in a [`Universe`](crate::universe::Universe).
+/// Together with [`Block::Indirect`], this allows mutation of a block definition such
+/// that all its usages follow.
 ///
-/// TODO: This type exists because I predict it will be needed for correct change
-/// notifications (possibly in the form of removing `Block::Recur`). If I'm wrong,
-/// it should be removed.
+/// It is a distinct type from [`Block`] in order to ensure that change notifications
+/// will be delivered on any mutation.
 #[derive(Debug)]
 pub struct BlockDef {
     block: Block,
