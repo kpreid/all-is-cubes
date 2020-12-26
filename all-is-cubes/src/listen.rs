@@ -56,7 +56,7 @@ impl<M: Clone> Notifier<M> {
     ///
     /// ```
     /// use std::rc::Rc;
-    /// use all_is_cubes::universe::{Notifier, Sink};
+    /// use all_is_cubes::listen::{Notifier, Sink};
     ///
     /// let notifier_1 = Notifier::new();
     /// let notifier_2 = Rc::new(Notifier::new());
@@ -156,7 +156,7 @@ where
     /// This may be used to stop forwarding messages when a dependency no longer exists.
     ///
     /// ```
-    /// use all_is_cubes::universe::{Listener, ListenerHelper, Gate, Sink};
+    /// use all_is_cubes::listen::{Listener, ListenerHelper, Gate, Sink};
     ///
     /// let sink = Sink::new();
     /// let (gate, gated) = sink.listener().gate();
@@ -217,7 +217,7 @@ where
     /// If the given message was received, remove it and return true.
     ///
     /// ```
-    /// use all_is_cubes::universe::{Listener, Sink};
+    /// use all_is_cubes::listen::{Listener, Sink};
     ///
     /// let sink = Sink::new();
     /// sink.listener().receive(2);
