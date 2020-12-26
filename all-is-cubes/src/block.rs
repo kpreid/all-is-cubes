@@ -12,7 +12,7 @@ use std::rc::Rc;
 use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
 use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
 use crate::space::{Grid, GridArray, Space, SpaceChange};
-use crate::universe::{RefError, URef};
+use crate::universe::{Name, RefError, URef, Universe, UniverseIndex as _};
 use crate::util::ConciseDebug;
 
 /// Type for the edge length of recursive blocks in terms of their component voxels.
@@ -57,6 +57,12 @@ pub enum Block {
 }
 
 impl Block {
+    /// Returns a new [`BlockBuilder`] which may be used to construct a [`Block`] value
+    /// from various inputs with convenient syntax.
+    pub const fn builder() -> BlockBuilder<builder::NeedsColorOrVoxels> {
+        builder::DEFAULT
+    }
+
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require [`URef`] access
     /// to other objects.
@@ -197,21 +203,36 @@ impl From<RGBA> for Cow<'_, Block> {
 }
 
 /// Collection of miscellaneous attribute data for blocks that doesn't come in variants.
+///
+/// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
+/// blocks.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct BlockAttributes {
     /// The name that should be displayed to players.
+    ///
+    /// The default value is the empty string. The empty string should be considered a
+    /// reasonable choice for solid-color blocks with no special features.
     pub display_name: Cow<'static, str>,
+
     /// Whether players' cursors target it or pass through it.
+    ///
+    /// The default value is `true`.
     pub selectable: bool,
+
     /// Whether the block is a physical obstacle.
+    ///
+    /// The default value is `true`.
     pub solid: bool,
+
     /// Light emitted by the block.
+    ///
+    /// The default value is [`RGB::ZERO`].
     pub light_emission: RGB,
     // TODO: add 'behavior' functionality, if we don't come up with something else
 }
 
-static DEFAULT_ATTRIBUTES: BlockAttributes = BlockAttributes {
+const DEFAULT_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: Cow::Borrowed(""),
     selectable: true,
     solid: true,
@@ -221,17 +242,18 @@ static DEFAULT_ATTRIBUTES: BlockAttributes = BlockAttributes {
 impl Default for BlockAttributes {
     /// Block attributes suitable as default values for in-game use.
     fn default() -> BlockAttributes {
-        DEFAULT_ATTRIBUTES.clone()
+        DEFAULT_ATTRIBUTES
     }
 }
 
-/// Generic 'empty'/'null' block. It is used by `Space` to respond to out-of-bounds requests.
+/// Generic 'empty'/'null' block. It is used by [`Space`] to respond to out-of-bounds requests.
 ///
 /// See also [`AIR_EVALUATED`].
 pub const AIR: Block = Block::Atom(AIR_ATTRIBUTES, RGBA::TRANSPARENT);
 
-/// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>. This may be used when
-/// a consistent [`EvaluatedBlock`] value is needed but there is no block value.
+/// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
+/// This may be used when an [`EvaluatedBlock`] value is needed but there is no block
+/// value.
 ///
 /// ```
 /// use all_is_cubes::block::{AIR, AIR_EVALUATED};
@@ -253,8 +275,8 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     light_emission: RGB::ZERO,
 };
 
-/// A “flattened” and snapshotted form of `Block` which contains all information needed
-/// for rendering and physics, and does not require `URef` access to other objects.
+/// A “flattened” and snapshotted form of [`Block`] which contains all information needed
+/// for rendering and physics, and does not require dereferencing [`URef`]s.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvaluatedBlock {
     /// The block's attributes.
@@ -291,7 +313,7 @@ impl ConciseDebug for EvaluatedBlock {
     }
 }
 
-/// Type of notification when an [`EvaluatedBlock`] result changes.
+/// Notification when an [`EvaluatedBlock`] result changes.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct BlockChange {
@@ -412,6 +434,242 @@ pub fn space_to_blocks(
         })
         .expect("can't happen: space_to_blocks failed to write to its own output space");
     Ok(destination_space)
+}
+
+#[doc(inline)]
+pub use builder::BlockBuilder;
+
+/// Lesser-used helpers for [`BlockBuilder`].
+pub mod builder {
+    use crate::space::SetCubeError;
+
+    use super::*;
+
+    pub(crate) const DEFAULT: BlockBuilder<NeedsColorOrVoxels> = BlockBuilder {
+        attributes: DEFAULT_ATTRIBUTES,
+        content: NeedsColorOrVoxels,
+    };
+
+    /// Tool for constructing [`Block`] values conveniently.
+    ///
+    /// To create one, call [`Block::builder()`].
+    /// ([`BlockBuilder::default()`] is also available.)
+    ///
+    /// ```
+    /// use all_is_cubes::block::Block;
+    ///
+    /// let block = Block::builder()
+    ///    .display_name("BROWN")
+    ///    .color(RGBA::new(0.5, 0.5, 0., 1.))
+    ///    .build();
+    ///
+    /// assert_eq!(block.evaluate().unwrap().color, RGBA::new(0.5, 0.5, 0., 1.));
+    /// assert_eq!(
+    ///     block.evaluate().unwrap().attributes.display_name,
+    ///     Cow::Borrowed("BROWN"),
+    /// );
+    /// ```
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct BlockBuilder<C> {
+        attributes: BlockAttributes,
+        content: C,
+    }
+
+    impl Default for BlockBuilder<NeedsColorOrVoxels> {
+        fn default() -> Self {
+            DEFAULT
+        }
+    }
+
+    impl<C> BlockBuilder<C> {
+        // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make
+        // this builder usable in const contexts.
+        // https://github.com/rust-lang/rust/issues/73255
+        // Doing that will also require creating non-trait-using alternate methods,
+        // until const traits https://github.com/rust-lang/rust/issues/67792 is also available.
+
+        // TODO: Document all of these methods
+
+        /// Sets the value for [`BlockAttributes::display_name`].
+        pub fn attributes(mut self, value: BlockAttributes) -> Self {
+            self.attributes = value;
+            self
+        }
+
+        /// Sets the value for [`BlockAttributes::display_name`].
+        pub fn display_name(mut self, value: impl Into<Cow<'static, str>>) -> Self {
+            self.attributes.display_name = value.into();
+            self
+        }
+
+        /// Sets the value for [`BlockAttributes::selectable`].
+        pub const fn selectable(mut self, value: bool) -> Self {
+            self.attributes.selectable = value;
+            self
+        }
+
+        /// Sets the value for [`BlockAttributes::solid`].
+        pub const fn solid(mut self, value: bool) -> Self {
+            self.attributes.solid = value;
+            self
+        }
+
+        /// Sets the value for [`BlockAttributes::light_emission`].
+        pub fn light_emission(mut self, value: impl Into<RGB>) -> Self {
+            self.attributes.light_emission = value.into();
+            self
+        }
+
+        /// Sets the color value for building a [`Block::Atom`].
+        ///
+        /// This will replace any previous color **or voxels.**
+        pub fn color(self, color: impl Into<RGBA>) -> BlockBuilder<RGBA> {
+            BlockBuilder {
+                attributes: self.attributes,
+                content: color.into(),
+            }
+        }
+
+        /// Sets the space for building a [`Block::Recur`].
+        ///
+        /// This will replace any previous voxels **or color.**
+        pub fn voxels_ref(
+            self,
+            resolution: Resolution,
+            space: URef<Space>,
+        ) -> BlockBuilder<BlockBuilderVoxels> {
+            BlockBuilder {
+                attributes: self.attributes,
+                content: BlockBuilderVoxels {
+                    space,
+                    resolution,
+                    offset: GridPoint::origin(),
+                },
+            }
+        }
+
+        /// Constructs a `Space` for building a [`Block::Recur`], and calls
+        /// the given function to fill it with blocks, in the manner of [`Space::fill`].
+        ///
+        /// Note that the resulting builder is cloned, all clones will share the same
+        /// space.
+        // TODO: (doc) test for this
+        pub fn voxels_fn<F, B>(
+            self,
+            // TODO: awkward requirement for universe; defer computation instead, or
+            // add a `.universe()` method to provide it once.
+            universe: &mut Universe,
+            // TODO: Maybe resolution should be a separate method? Check usage patterns later.
+            resolution: Resolution,
+            mut function: F,
+        ) -> Result<BlockBuilder<BlockBuilderVoxels>, SetCubeError>
+        where
+            F: FnMut(GridPoint) -> B,
+            B: std::borrow::Borrow<Block>,
+        {
+            let grid = Grid::for_block(resolution);
+            let mut space = Space::empty(grid);
+            space.fill(grid, |point| Some(function(point)))?;
+            Ok(self.voxels_ref(resolution, universe.insert_anonymous(space)))
+        }
+
+        /// Converts this builder into a block value.
+        pub fn build(self) -> Block
+        where
+            C: BuilderContentIndependent,
+        {
+            self.content.build_i(self.attributes)
+        }
+
+        /// Converts this builder into a block value and stores it as a [`BlockDef`] in the
+        /// given [`Universe`] with the given name.
+        ///
+        /// TODO: this has no tests and no usage...because we don't use BlockDef enough yet.
+        /// And it should probably return a `Block::Indirect` for convenience.
+        pub fn into_named_definition(
+            self,
+            universe: &mut Universe,
+            name: impl Into<Name>,
+        ) -> URef<BlockDef>
+        where
+            C: BuilderContentInUniverse,
+        {
+            let block = self.content.build_u(self.attributes, universe);
+            universe.insert(name.into(), BlockDef::new(block))
+        }
+    }
+
+    /// Voxel-specific builder methods.
+    impl BlockBuilder<BlockBuilderVoxels> {
+        pub fn offset(mut self, offset: GridPoint) -> Self {
+            self.content.offset = offset;
+            self
+        }
+
+        // TODO: It might be useful to have "offset equal to resolution"
+        // and "add offset", but don't add those until use cases are seen.
+    }
+
+    /// Allows implicitly converting `BlockBuilder` to the block it would build.
+    impl<C: BuilderContentIndependent> From<BlockBuilder<C>> for Block {
+        fn from(builder: BlockBuilder<C>) -> Self {
+            builder.build()
+        }
+    }
+    /// Equivalent to `Block::builder().color(color)`.
+    impl From<RGBA> for BlockBuilder<RGBA> {
+        fn from(color: RGBA) -> Self {
+            Block::builder().color(color)
+        }
+    }
+    /// Equivalent to `Block::builder().color(color.with_alpha_one())`.
+    impl From<RGB> for BlockBuilder<RGBA> {
+        fn from(color: RGB) -> Self {
+            Block::builder().color(color.with_alpha_one())
+        }
+    }
+
+    /// Placeholder type for an incomplete [`BlockBuilder`]'s content. The builder
+    /// cannot create an actual block until this is replaced.
+    #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq)]
+    pub struct NeedsColorOrVoxels;
+    /// Content of a [`BlockBuilder`] that can build a block without a [`Universe`].
+    pub trait BuilderContentIndependent {
+        fn build_i(self, attributes: BlockAttributes) -> Block;
+    }
+    /// Content of a [`BlockBuilder`] that can only build a block with a [`Universe`].
+    pub trait BuilderContentInUniverse {
+        fn build_u(self, attributes: BlockAttributes, universe: &mut Universe) -> Block;
+    }
+    /// Every `BuilderContentIndependent` can act as `BuilderContentInUniverse`.
+    impl<T: BuilderContentIndependent> BuilderContentInUniverse for T {
+        fn build_u(self, attributes: BlockAttributes, _: &mut Universe) -> Block {
+            self.build_i(attributes)
+        }
+    }
+    /// Used by [`BlockBuilder::color`].
+    impl BuilderContentIndependent for RGBA {
+        fn build_i(self, attributes: BlockAttributes) -> Block {
+            Block::Atom(attributes, self)
+        }
+    }
+
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    pub struct BlockBuilderVoxels {
+        space: URef<Space>,
+        resolution: Resolution,
+        offset: GridPoint,
+    }
+    impl BuilderContentIndependent for BlockBuilderVoxels {
+        fn build_i(self, attributes: BlockAttributes) -> Block {
+            Block::Recur {
+                attributes,
+                offset: self.offset,
+                resolution: self.resolution,
+                space: self.space,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -699,4 +957,59 @@ mod tests {
     }
 
     // TODO: test of evaluate where the block's space is the wrong size
+
+    #[test]
+    fn builder_defaults() {
+        let color = RGBA::new(0.1, 0.2, 0.3, 0.4);
+        assert_eq!(
+            Block::builder().color(color).build(),
+            Block::Atom(BlockAttributes::default(), color),
+        );
+    }
+
+    #[test]
+    fn builder_every_field() {
+        let color = RGBA::new(0.1, 0.2, 0.3, 0.4);
+        let light_emission = RGB::new(0.1, 3.0, 0.1);
+        assert_eq!(
+            Block::builder()
+                .display_name("hello world")
+                .solid(false)
+                .color(color)
+                .selectable(false)
+                .light_emission(light_emission)
+                .build(),
+            Block::Atom(
+                BlockAttributes {
+                    display_name: "hello world".into(),
+                    solid: false,
+                    selectable: false,
+                    light_emission
+                },
+                color
+            ),
+        );
+    }
+
+    #[test]
+    fn builder_voxels_from_space() {
+        let mut universe = Universe::new();
+        let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+
+        assert_eq!(
+            Block::builder()
+                .display_name("hello world")
+                .voxels_ref(2, space_ref.clone())
+                .build(),
+            Block::Recur {
+                attributes: BlockAttributes {
+                    display_name: "hello world".into(),
+                    ..BlockAttributes::default()
+                },
+                offset: GridPoint::origin(),
+                resolution: 2, // not same as space size
+                space: space_ref
+            },
+        );
+    }
 }
