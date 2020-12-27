@@ -313,10 +313,8 @@ pub(crate) fn draw_background(space: &mut Space) {
 
     let display = &mut VoxelDisplayAdapter::new(space, GridPoint::new(0, 0, grid.lower_bounds().z));
 
-    let background =
-        VoxelBrush::single(Block::Atom(BlockAttributes::default(), palette::MENU_BACK));
-    let frame = VoxelBrush::single(Block::Atom(BlockAttributes::default(), palette::MENU_FRAME))
-        .translate((0, 0, 1));
+    let background = VoxelBrush::single(Block::from(palette::MENU_BACK));
+    let frame = VoxelBrush::single(Block::from(palette::MENU_FRAME)).translate((0, 0, 1));
 
     background_rect
         .into_styled(

@@ -99,7 +99,7 @@ impl ChunkChart {
     #[rustfmt::skip]
     #[cfg(test)]
     fn visualization(&self) -> crate::space::Space {
-        use crate::block::{Block, BlockAttributes};
+        use crate::block::{Block};
         use crate::math::RGBA;
 
         let extent = GridVector::new(
@@ -107,14 +107,11 @@ impl ChunkChart {
             self.octant_chunks.iter().map(|v| v.y).max().unwrap_or(0) + 1,
             self.octant_chunks.iter().map(|v| v.z).max().unwrap_or(0) + 1);
         let mut space = crate::space::Space::empty(Grid::new(Point3::from_vec(-extent), extent * 2));
-        let block = Block::Atom(
-            // TODO use wireframe blocks instead
-            BlockAttributes {
-                display_name: "Chunk".into(),
-                ..BlockAttributes::default()
-            },
-            RGBA::new(0.5, 0.5, 0.5, 1.0),
-        );
+        // TODO use wireframe blocks instead
+        let block = Block::builder()
+            .display_name("Chunk")
+            .color(RGBA::new(0.5, 0.5, 0.5, 1.0))
+            .build();
         for ChunkPos(chunk) in self.chunks(ChunkPos::new(0, 0, 0)) {
             space.set(chunk, &block).unwrap();
         }

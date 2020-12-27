@@ -522,9 +522,9 @@ impl TextureTile for TestTextureTile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, BlockAttributes};
+    use crate::block::Block;
     use crate::blockgen::make_some_blocks;
-    use crate::math::GridPoint;
+
     use crate::universe::Universe;
     use cgmath::MetricSpace as _;
 
@@ -590,12 +590,9 @@ mod tests {
         inner_block_space
             .set((0, 0, 0), &make_some_blocks(1)[0])
             .unwrap();
-        let inner_block = Block::Recur {
-            attributes: BlockAttributes::default(),
-            offset: GridPoint::origin(),
-            resolution: 1,
-            space: u.insert_anonymous(inner_block_space),
-        };
+        let inner_block = Block::builder()
+            .voxels_ref(1, u.insert_anonymous(inner_block_space))
+            .build();
         let mut outer_space = Space::empty_positive(1, 1, 1);
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 
@@ -635,12 +632,9 @@ mod tests {
         inner_block_space
             .fill(Grid::new((2, 2, 2), (4, 4, 4)), |_| Some(&filler_block))
             .unwrap();
-        let inner_block = Block::Recur {
-            attributes: BlockAttributes::default(),
-            offset: GridPoint::origin(),
-            resolution: 16,
-            space: u.insert_anonymous(inner_block_space),
-        };
+        let inner_block = Block::builder()
+            .voxels_ref(16, u.insert_anonymous(inner_block_space))
+            .build();
         let mut outer_space = Space::empty_positive(1, 1, 1);
         outer_space.set((0, 0, 0), &inner_block).unwrap();
 

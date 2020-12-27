@@ -92,14 +92,11 @@ fn cornell_box(universe: &mut Universe) -> Space {
     let white: Block = RGBA::new(1.0, 1.0, 1.0, 1.0).into();
     let red: Block = RGBA::new(0.57, 0.025, 0.025, 1.0).into();
     let green: Block = RGBA::new(0.025, 0.236, 0.025, 1.0).into();
-    let light: Block = Block::Atom(
-        BlockAttributes {
-            display_name: "Light".into(),
-            light_emission: RGB::new(100., 100., 100.),
-            ..BlockAttributes::default()
-        },
-        RGBA::new(1.0, 1.0, 1.0, 1.0),
-    );
+    let light: Block = Block::builder()
+        .display_name("Light")
+        .light_emission(RGB::new(100., 100., 100.))
+        .color(RGBA::new(1.0, 1.0, 1.0, 1.0))
+        .build();
 
     // Floor.
     space.fill(Grid::new((0, -1, 0), (box_size, 1, box_size)), |_| Some(&white)).unwrap();

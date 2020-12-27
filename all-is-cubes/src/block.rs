@@ -783,19 +783,16 @@ mod tests {
         let mut universe = Universe::new();
         let mut bg: BlockGen = BlockGen::new(&mut universe, 4);
         let block = bg.block_from_function(BlockAttributes::default(), |_ctx, point, _random| {
-            Block::Atom(
-                BlockAttributes::default(),
-                RGBA::new(
-                    0.0,
-                    0.0,
-                    0.0,
-                    if point == GridPoint::new(1, 1, 1) {
-                        1.0
-                    } else {
-                        0.0
-                    },
-                ),
-            )
+            Block::from(RGBA::new(
+                0.0,
+                0.0,
+                0.0,
+                if point == GridPoint::new(1, 1, 1) {
+                    1.0
+                } else {
+                    0.0
+                },
+            ))
         });
 
         let e = block.evaluate().unwrap();
@@ -850,19 +847,13 @@ mod tests {
         space
             .fill(space.grid(), |point| {
                 let point = point.cast::<f32>().unwrap();
-                Some(Block::Atom(
-                    BlockAttributes::default(),
-                    RGBA::new(point.x, point.y, point.z, 1.0),
-                ))
+                Some(Block::from(RGBA::new(point.x, point.y, point.z, 1.0)))
             })
             .unwrap();
         let space_ref = universe.insert_anonymous(space);
-        let block = Block::Recur {
-            attributes: BlockAttributes::default(),
-            offset: GridPoint::origin(),
-            resolution: resolution as Resolution,
-            space: space_ref.clone(),
-        };
+        let block = Block::builder()
+            .voxels_ref(resolution as Resolution, space_ref.clone())
+            .build();
         let eval_bare = block.evaluate();
         let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
         let eval_def = block_def_ref.borrow().block.evaluate();
@@ -871,7 +862,7 @@ mod tests {
 
     #[test]
     fn listen_atom() {
-        let block = Block::Atom(BlockAttributes::default(), RGBA::WHITE);
+        let block = Block::from(RGBA::WHITE);
         let mut sink = Sink::new();
         block.listen(sink.listener()).unwrap();
         assert_eq!(None, sink.next());
@@ -881,18 +872,14 @@ mod tests {
     #[test]
     fn listen_indirect_atom() {
         let mut universe = Universe::new();
-        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::Atom(
-            BlockAttributes::default(),
-            RGBA::WHITE,
-        )));
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(RGBA::WHITE)));
         let indirect = Block::Indirect(block_def_ref.clone());
         let mut sink = Sink::new();
         indirect.listen(sink.listener()).unwrap();
         assert_eq!(None, sink.next());
 
         // Now mutate it and we should see a notification.
-        *(block_def_ref.borrow_mut().modify()) =
-            Block::Atom(BlockAttributes::default(), RGBA::BLACK);
+        *(block_def_ref.borrow_mut().modify()) = Block::from(RGBA::BLACK);
         assert!(sink.next().is_some());
     }
 
@@ -901,10 +888,7 @@ mod tests {
     #[test]
     fn listen_indirect_double() {
         let mut universe = Universe::new();
-        let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::Atom(
-            BlockAttributes::default(),
-            RGBA::WHITE,
-        )));
+        let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::from(RGBA::WHITE)));
         let block_def_ref2 =
             universe.insert_anonymous(BlockDef::new(Block::Indirect(block_def_ref1.clone())));
         let indirect2 = Block::Indirect(block_def_ref2.clone());
@@ -913,18 +897,15 @@ mod tests {
         assert_eq!(None, sink.next());
 
         // Now mutate the original block and we should see a notification.
-        *(block_def_ref1.borrow_mut().modify()) =
-            Block::Atom(BlockAttributes::default(), RGBA::BLACK);
+        *(block_def_ref1.borrow_mut().modify()) = Block::from(RGBA::BLACK);
         assert!(sink.next().is_some());
 
         // Remove block_def_ref1 from the contents of block_def_ref2...
-        *(block_def_ref2.borrow_mut().modify()) =
-            Block::Atom(BlockAttributes::default(), RGBA::BLACK);
+        *(block_def_ref2.borrow_mut().modify()) = Block::from(RGBA::BLACK);
         assert!(sink.next().is_some());
         assert!(sink.next().is_none());
         // ...and then block_def_ref1's changes should NOT be forwarded.
-        *(block_def_ref1.borrow_mut().modify()) =
-            Block::Atom(BlockAttributes::default(), RGBA::WHITE);
+        *(block_def_ref1.borrow_mut().modify()) = Block::from(RGBA::WHITE);
         assert!(sink.next().is_none());
     }
 
@@ -933,12 +914,7 @@ mod tests {
     fn listen_recur() {
         let mut universe = Universe::new();
         let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let block = Block::Recur {
-            attributes: BlockAttributes::default(),
-            offset: GridPoint::origin(),
-            resolution: 1,
-            space: space_ref.clone(),
-        };
+        let block = Block::builder().voxels_ref(1, space_ref.clone()).build();
         let mut sink = Sink::new();
         block.listen(sink.listener()).unwrap();
         assert_eq!(None, sink.next());
@@ -946,10 +922,7 @@ mod tests {
         // Now mutate the space and we should see a notification.
         space_ref
             .borrow_mut()
-            .set(
-                (0, 0, 0),
-                Block::Atom(BlockAttributes::default(), RGBA::new(0.1, 0.2, 0.3, 0.4)),
-            )
+            .set((0, 0, 0), Block::from(RGBA::new(0.1, 0.2, 0.3, 0.4)))
             .unwrap();
         assert!(sink.next().is_some());
 

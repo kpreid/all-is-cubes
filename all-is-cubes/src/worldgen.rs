@@ -5,11 +5,11 @@
 
 use cgmath::{Point3, Vector3, Vector4};
 use std::borrow::Cow;
-use std::convert::TryInto;
+use std::convert::TryFrom;
 
-use crate::block::{Block, BlockAttributes};
+use crate::block::Block;
 use crate::blockgen::LandscapeBlocks;
-use crate::math::{FreeCoordinate, GridCoordinate, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, RGB, RGBA};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, Space};
 
@@ -55,14 +55,11 @@ pub fn axes(space: &mut Space) {
             space
                 .set(
                     step.cube_ahead(),
-                    &Block::Atom(
-                        BlockAttributes {
-                            display_name,
-                            light_emission: light.try_into().unwrap(),
-                            ..BlockAttributes::default()
-                        },
-                        color.try_into().expect("axes() color generation failed"),
-                    ),
+                    Block::builder()
+                        .display_name(display_name)
+                        .light_emission(RGB::try_from(light).unwrap())
+                        .color(RGBA::try_from(color).expect("axes() color generation failed"))
+                        .build(),
                 )
                 .unwrap();
         }
@@ -132,27 +129,18 @@ fn physics_lab(shell_radius: u16, planet_radius: u16) -> Space {
     let shell_radius: GridCoordinate = shell_radius.into();
     let planet_radius: GridCoordinate = planet_radius.into();
 
-    let outer_wall_block = Block::Atom(
-        BlockAttributes {
-            display_name: "Celestial Cube".into(),
-            ..BlockAttributes::default()
-        },
-        RGBA::new(0.2, 0.2, 0.2, 1.0),
-    );
-    let floor_1 = Block::Atom(
-        BlockAttributes {
-            display_name: "Floor".into(),
-            ..BlockAttributes::default()
-        },
-        RGBA::new(0.5, 0.5, 0.5, 1.0),
-    );
-    let floor_2 = Block::Atom(
-        BlockAttributes {
-            display_name: "Floor".into(),
-            ..BlockAttributes::default()
-        },
-        RGBA::new(0.95, 0.95, 0.95, 1.0),
-    );
+    let outer_wall_block = Block::builder()
+        .display_name("Celestial Cube")
+        .color(RGBA::new(0.2, 0.2, 0.2, 1.0))
+        .build();
+    let floor_1 = Block::builder()
+        .display_name("Floor")
+        .color(RGBA::new(0.5, 0.5, 0.5, 1.0))
+        .build();
+    let floor_2 = Block::builder()
+        .display_name("Floor")
+        .color(RGBA::new(0.95, 0.95, 0.95, 1.0))
+        .build();
 
     // Outer walls
     // TODO: Build some utilities for symmetric systematic constructions so we don't have to handcode this.

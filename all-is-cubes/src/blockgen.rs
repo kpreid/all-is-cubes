@@ -39,6 +39,7 @@ impl<'a> BlockGen<'a> {
     }
 
     /// Create a [`Block`] referring to a [`Space`] and return the [`Space`] for modification.
+    // TODO: Can we replace this with BlockBuilder?
     pub fn new_recursive_block(
         &mut self,
         attributes: BlockAttributes,
@@ -102,13 +103,12 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
         } else {
             0.5
         };
-        vec.push(Block::Atom(
-            BlockAttributes {
-                display_name: i.to_string().into(),
-                ..BlockAttributes::default()
-            },
-            RGBA::new(luminance, luminance, luminance, 1.0),
-        ));
+        vec.push(
+            Block::builder()
+                .display_name(i.to_string())
+                .color(RGBA::new(luminance, luminance, luminance, 1.0))
+                .build(),
+        );
     }
     vec
 }
@@ -169,13 +169,10 @@ impl Default for LandscapeBlocks {
     /// Generate a bland instance of [`LandscapeBlocks`] with single color blocks.
     fn default() -> LandscapeBlocks {
         fn color_and_name(color: RGB, name: &'static str) -> Block {
-            Block::Atom(
-                BlockAttributes {
-                    display_name: name.into(),
-                    ..BlockAttributes::default()
-                },
-                color.with_alpha_one(),
-            )
+            Block::builder()
+                .display_name(name)
+                .color(color.with_alpha_one())
+                .build()
         }
 
         LandscapeBlocks {

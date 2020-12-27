@@ -20,7 +20,7 @@ use std::convert::TryInto;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{Block, BlockAttributes};
+use crate::block::Block;
 use crate::blockgen::BlockGen;
 use crate::math::{GridPoint, GridVector, RGB, RGBA};
 use crate::space::{Grid, SetCubeError, Space};
@@ -91,13 +91,10 @@ where
         output_space
             .set(
                 cube,
-                // TODO: Allow attribute alteration.
-                &Block::Recur {
-                    attributes: BlockAttributes::default(),
-                    offset: GridPoint::origin(),
-                    resolution: ctx.resolution,
-                    space: ctx.universe.insert_anonymous(block_space),
-                },
+                // TODO: Allow attribute configuration.
+                &Block::builder()
+                    .voxels_ref(ctx.resolution, ctx.universe.insert_anonymous(block_space))
+                    .build(),
             )
             .expect("can't happen: draw_to_blocks failed to write to its own output space");
     }

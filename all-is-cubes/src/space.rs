@@ -239,9 +239,7 @@ impl Space {
     /// use all_is_cubes::math::RGBA;
     /// use all_is_cubes::space::Space;
     /// let mut space = Space::empty_positive(1, 1, 1);
-    /// let a_block = Block::Atom(
-    ///     BlockAttributes::default(),
-    ///     RGBA::new(1.0, 0.0, 0.0, 1.0));
+    /// let a_block = Block::builder().color(RGBA::new(1.0, 0.0, 0.0, 1.0)).build();
     /// space.set((0, 0, 0), &a_block);
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// ```
@@ -710,12 +708,9 @@ mod tests {
     fn set_failure_borrow() {
         let mut u = Universe::new();
         let inner_space_ref = u.insert("bs".into(), Space::empty_positive(1, 1, 1));
-        let block = Block::Recur {
-            attributes: BlockAttributes::default(),
-            offset: GridPoint::origin(),
-            resolution: 1,
-            space: inner_space_ref.clone(),
-        };
+        let block = Block::builder()
+            .voxels_ref(1, inner_space_ref.clone())
+            .build();
         let mut outer_space = Space::empty_positive(1, 1, 1);
 
         let borrow = inner_space_ref.borrow_mut();
@@ -847,10 +842,7 @@ mod tests {
     fn listens_to_block_changes() {
         // Set up indirect block
         let mut universe = Universe::new();
-        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::Atom(
-            BlockAttributes::default(),
-            RGBA::WHITE,
-        )));
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(RGBA::WHITE)));
         let indirect = Block::Indirect(block_def_ref.clone());
 
         // Set up space and listener
@@ -861,7 +853,7 @@ mod tests {
         assert_eq!(None, sink.next());
 
         // Now mutate the block def .
-        let new_block = Block::Atom(BlockAttributes::default(), RGBA::BLACK);
+        let new_block = Block::from(RGBA::BLACK);
         let new_evaluated = new_block.evaluate().unwrap();
         *(block_def_ref.borrow_mut().modify()) = new_block;
         // This does not result in an outgoing notification, because we don't want
