@@ -159,10 +159,7 @@ impl TextureAllocator for BlockGLTexture {
     type Tile = GLTile;
 
     fn resolution(&self) -> GridCoordinate {
-        self.layout
-            .resolution
-            .try_into()
-            .expect("probably bogus resolution")
+        self.layout.resolution.into()
     }
 
     fn allocate(&mut self) -> GLTile {
