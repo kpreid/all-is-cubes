@@ -249,12 +249,12 @@ impl HudBlocks {
             .stroke_color(&pointer_stroke)
             .stroke_width(stroke_width as u32)
             .build();
-        Triangle::new(Point::new(-5, 10), Point::new(5, 10), Point::new(0, 0))
+        Triangle::new(Point::new(-5, 5), Point::new(5, 5), Point::new(0, 0))
             .into_styled(pointer_style)
             .translate(pointer_offset)
             .draw(display)
             .unwrap();
-        Triangle::new(Point::new(-5, -10), Point::new(0, 0), Point::new(5, -10))
+        Triangle::new(Point::new(-5, -5), Point::new(0, 0), Point::new(5, -5))
             .into_styled(pointer_style)
             .translate(Point::new(0, -resolution)) // position point at top of block
             .translate(pointer_offset)
