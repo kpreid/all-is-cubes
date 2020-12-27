@@ -131,35 +131,32 @@ impl LandscapeBlocks {
     /// TODO: Improve and document
     pub fn new(ctx: &mut BlockGen) -> Self {
         let mut result = Self::default();
+        let resolution = ctx.resolution;
 
         let grass_color = result.grass.clone();
         let dirt_color = result.dirt.clone();
 
         // TODO: this needs to become a lot shorter
-        result.grass = ctx.block_from_function(
-            BlockAttributes {
-                display_name: grass_color
-                    .evaluate()
-                    .unwrap()
-                    .attributes
-                    .display_name
-                    .clone(),
-                ..BlockAttributes::default()
-            },
-            |ctx, point, random| {
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+        result.grass = Block::builder()
+            .attributes(grass_color.evaluate().unwrap().attributes)
+            .voxels_fn(&mut ctx.universe, resolution, |point| {
+                // TODO: replace PRNG with noise functions
+                let random: f32 = rng.gen_range(0.0, 1.0);
                 // Discrete randomization so that we don't generate too many distinct
                 // block types. TODO: Better strategy, perhaps palette-based.
                 let color_randomization =
                     NotNan::new(1.0 + ((random * 5.0).floor() - 2.0) * 0.05).unwrap();
                 if point.y
-                    >= GridCoordinate::from(ctx.resolution) - (random * 3.0 + 1.0) as GridCoordinate
+                    >= GridCoordinate::from(resolution) - (random * 3.0 + 1.0) as GridCoordinate
                 {
                     scale_color(grass_color.clone(), color_randomization)
                 } else {
                     scale_color(dirt_color.clone(), color_randomization)
                 }
-            },
-        );
+            })
+            .unwrap()
+            .build();
 
         result
     }

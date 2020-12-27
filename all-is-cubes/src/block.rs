@@ -675,7 +675,6 @@ pub mod builder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockgen::BlockGen;
     use crate::listen::Sink;
     use crate::math::{GridPoint, GridVector};
     use crate::space::Grid;
@@ -726,19 +725,19 @@ mod tests {
     fn evaluate_voxels_checked_individually() {
         let resolution = 4;
         let mut universe = Universe::new();
-        let mut bg: BlockGen = BlockGen::new(&mut universe, resolution);
 
         let attributes = BlockAttributes {
             display_name: Cow::Borrowed(&"hello world"),
             ..BlockAttributes::default()
         };
-        let block = bg.block_from_function(attributes.clone(), |_ctx, point, _random| {
-            let point = point.cast::<f32>().unwrap();
-            Block::Atom(
-                BlockAttributes::default(),
-                RGBA::new(point.x, point.y, point.z, 1.0),
-            )
-        });
+        let block = Block::builder()
+            .attributes(attributes.clone())
+            .voxels_fn(&mut universe, resolution, |point| {
+                let point = point.cast::<f32>().unwrap();
+                Block::from(RGBA::new(point.x, point.y, point.z, 1.0))
+            })
+            .unwrap()
+            .build();
 
         let e = block.evaluate().unwrap();
         assert_eq!(e.attributes, attributes);
@@ -756,11 +755,10 @@ mod tests {
     #[test]
     fn evaluate_transparent_voxels() {
         let mut universe = Universe::new();
-        let mut bg: BlockGen = BlockGen::new(&mut universe, 4);
-        let block = bg.block_from_function(BlockAttributes::default(), |_ctx, point, _random| {
-            Block::Atom(
-                BlockAttributes::default(),
-                RGBA::new(
+        let resolution = 4;
+        let block = Block::builder()
+            .voxels_fn(&mut universe, resolution, |point| {
+                Block::from(RGBA::new(
                     0.0,
                     0.0,
                     0.0,
@@ -769,9 +767,10 @@ mod tests {
                     } else {
                         1.0
                     },
-                ),
-            )
-        });
+                ))
+            })
+            .unwrap()
+            .build();
 
         let e = block.evaluate().unwrap();
         assert_eq!(e.opaque, false);
@@ -781,19 +780,21 @@ mod tests {
     #[test]
     fn evaluate_voxels_not_filling_block() {
         let mut universe = Universe::new();
-        let mut bg: BlockGen = BlockGen::new(&mut universe, 4);
-        let block = bg.block_from_function(BlockAttributes::default(), |_ctx, point, _random| {
-            Block::from(RGBA::new(
-                0.0,
-                0.0,
-                0.0,
-                if point == GridPoint::new(1, 1, 1) {
-                    1.0
-                } else {
-                    0.0
-                },
-            ))
-        });
+        let block = Block::builder()
+            .voxels_fn(&mut universe, 4, |point| {
+                Block::from(RGBA::new(
+                    0.0,
+                    0.0,
+                    0.0,
+                    if point == GridPoint::new(1, 1, 1) {
+                        1.0
+                    } else {
+                        0.0
+                    },
+                ))
+            })
+            .unwrap()
+            .build();
 
         let e = block.evaluate().unwrap();
         assert_eq!(e.opaque, false);

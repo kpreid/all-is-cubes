@@ -10,7 +10,7 @@ use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
 
-use crate::block::{Block, BlockAttributes};
+use crate::block::Block;
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
 use crate::content::logo_text;
@@ -43,9 +43,12 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
     .unwrap();
 
     let axis_block = {
-        let (axis_block, mut axis_space) = bg.new_recursive_block(BlockAttributes::default());
-        axes(&mut *axis_space);
-        axis_block
+        let mut space = bg.new_block_space();
+        axes(&mut space);
+        Block::builder()
+            .display_name("Block Axes Test")
+            .voxels_ref(bg.resolution, bg.universe.insert_anonymous(space))
+            .build()
     };
 
     let radius_xz = 50;
