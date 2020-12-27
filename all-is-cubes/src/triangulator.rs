@@ -310,7 +310,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     }
                     if layer_is_visible_somewhere {
                         // Actually store and use the texels we just computed.
-                        let mut texture_tile = texture_allocator.allocate();
+                        // TODO: handle error
+                        let mut texture_tile = texture_allocator.allocate().expect("Ran out of tile space!");
                         texture_tile.write(tile_texels.as_ref());
                         push_quad_textured(
                             // Only the surface faces go anywhere but WITHIN.
@@ -442,7 +443,9 @@ pub trait TextureAllocator {
 
     /// Allocate a tile, whose texture coordinates will be available as long as the `Tile`
     /// value, and its clones, are not dropped.
-    fn allocate(&mut self) -> Self::Tile;
+    ///
+    /// Returns `None` if no space is available for another tile.
+    fn allocate(&mut self) -> Option<Self::Tile>;
 }
 
 /// 2D texture to paint block faces into. It is assumed that when this value is dropped,
@@ -488,11 +491,11 @@ impl TextureAllocator for TestTextureAllocator {
         self.resolution
     }
 
-    fn allocate(&mut self) -> Self::Tile {
+    fn allocate(&mut self) -> Option<Self::Tile> {
         self.count_allocated += 1;
-        TestTextureTile {
+        Some(TestTextureTile {
             data_length: usize::try_from(self.resolution()).unwrap().pow(2),
-        }
+        })
     }
 }
 

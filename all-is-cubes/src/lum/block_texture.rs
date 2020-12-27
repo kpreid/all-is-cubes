@@ -162,12 +162,13 @@ impl TextureAllocator for BlockGLTexture {
         self.layout.resolution.into()
     }
 
-    fn allocate(&mut self) -> GLTile {
+    fn allocate(&mut self) -> Option<GLTile> {
         let mut index_allocator = self.index_allocator.borrow_mut();
         let index = index_allocator.allocate().unwrap();
         if index >= self.layout.tile_count() {
+            // TODO: Attempt expansion of the atlas.
             index_allocator.free(index);
-            todo!("ran out of tile space, but reallocation is not implemented");
+            return None;
         }
         let result = GLTile {
             backing: Rc::new(RefCell::new(TileBacking {
@@ -179,7 +180,7 @@ impl TextureAllocator for BlockGLTexture {
             })),
         };
         self.in_use.push(Rc::downgrade(&result.backing));
-        result
+        Some(result)
     }
 }
 impl TextureTile for GLTile {
