@@ -467,6 +467,7 @@ pub trait TextureTile: Clone {
 #[derive(Debug, Eq, PartialEq)]
 pub struct TestTextureAllocator {
     resolution: GridCoordinate,
+    capacity: usize,
     count_allocated: usize,
 }
 
@@ -474,8 +475,14 @@ impl TestTextureAllocator {
     pub fn new(resolution: Resolution) -> Self {
         Self {
             resolution: resolution.into(),
+            capacity: usize::MAX,
             count_allocated: 0,
         }
+    }
+
+    /// Fail after allocating this many tiles. (Currently does not track deallocations.)
+    pub fn set_capacity(&mut self, capacity: usize) {
+        self.capacity = capacity;
     }
 
     /// Number of tiles allocated. Does not decrement for deallocations.
@@ -492,10 +499,14 @@ impl TextureAllocator for TestTextureAllocator {
     }
 
     fn allocate(&mut self) -> Option<Self::Tile> {
-        self.count_allocated += 1;
-        Some(TestTextureTile {
-            data_length: usize::try_from(self.resolution()).unwrap().pow(2),
-        })
+        if self.count_allocated == self.capacity {
+            None
+        } else {
+            self.count_allocated += 1;
+            Some(TestTextureTile {
+                data_length: usize::try_from(self.resolution()).unwrap().pow(2),
+            })
+        }
     }
 }
 
@@ -676,9 +687,12 @@ mod tests {
         let mut allocator = TestTextureAllocator::new(123);
         assert_eq!(allocator.resolution(), 123);
         assert_eq!(allocator.count_allocated(), 0);
-        let _ = allocator.allocate();
-        let _ = allocator.allocate();
+        assert!(allocator.allocate().is_some());
+        assert!(allocator.allocate().is_some());
         assert_eq!(allocator.count_allocated(), 2);
+        allocator.set_capacity(3);
+        assert!(allocator.allocate().is_some());
+        assert!(allocator.allocate().is_none());
     }
 
     // TODO: more tests
