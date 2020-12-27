@@ -457,6 +457,8 @@ pub mod builder {
     ///
     /// ```
     /// use all_is_cubes::block::Block;
+    /// use all_is_cubes::math::RGBA;
+    /// use std::borrow::Cow;
     ///
     /// let block = Block::builder()
     ///    .display_name("BROWN")
