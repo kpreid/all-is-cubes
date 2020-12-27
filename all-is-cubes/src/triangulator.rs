@@ -12,7 +12,9 @@
 //! other operation in OpenGL graphics programming, and “triangulation” seems to
 //! be the more commonly used terms.
 
-use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
+use cgmath::{
+    ElementWise as _, EuclideanSpace as _, Point2, Point3, Transform as _, Vector2, Vector3,
+};
 use std::convert::TryFrom;
 
 use crate::block::{EvaluatedBlock, Resolution};
@@ -154,18 +156,18 @@ impl<V, T> Default for BlockTriangulation<V, T> {
 /// Pass it to [`triangulate_space`] to use it.
 pub type BlockTriangulations<V, A> = Box<[BlockTriangulation<V, A>]>;
 
-const QUAD_VERTICES: &[Point3<FreeCoordinate>; 6] = &[
+const QUAD_VERTICES: &[Vector2<FreeCoordinate>; 6] = &[
     // Two-triangle quad.
     // Note that looked at from a X-right Y-up view, these triangles are
     // clockwise, but they're properly counterclockwise from the perspective
     // that we're drawing the face _facing towards negative Z_ (into the screen),
     // which is how cube faces as implicitly defined by Face::matrix work.
-    Point3::new(0.0, 0.0, 0.0),
-    Point3::new(0.0, 1.0, 0.0),
-    Point3::new(1.0, 0.0, 0.0),
-    Point3::new(1.0, 0.0, 0.0),
-    Point3::new(0.0, 1.0, 0.0),
-    Point3::new(1.0, 1.0, 0.0),
+    Vector2::new(0.0, 0.0),
+    Vector2::new(0.0, 1.0),
+    Vector2::new(1.0, 0.0),
+    Vector2::new(1.0, 0.0),
+    Vector2::new(0.0, 1.0),
+    Vector2::new(1.0, 1.0),
 ];
 
 #[inline]
@@ -173,12 +175,19 @@ fn push_quad<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
     face: Face,
     depth: FreeCoordinate,
+    low_corner: Point2<FreeCoordinate>,
+    high_corner: Point2<FreeCoordinate>,
     coloring: QuadColoring<impl TextureTile>,
 ) {
     let transform = face.matrix();
     for &p in QUAD_VERTICES {
+        // Apply bounding rectangle
+        let p = low_corner.to_vec() + p.mul_element_wise(high_corner - low_corner);
+        // Apply depth
+        let p = Point3::from_vec(p.extend(depth));
+
         vertices.push(V::from(BlockVertex {
-            position: transform.transform_point(p + Vector3::new(0.0, 0.0, depth)),
+            position: transform.transform_point(p),
             normal: face.normal_vector(),
             coloring: match coloring {
                 // Note: if we're ever looking for microöptimizations, we could try
@@ -225,7 +234,9 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         push_quad(
                             &mut face_vertices,
                             face,
-                            0.,
+                            /* depth= */ 0.,
+                            Point2 { x: 0., y: 0. },
+                            Point2 { x: 1., y: 1. },
                             QuadColoring::<A::Tile>::Solid(block.color),
                         );
                         face_vertices
@@ -271,8 +282,16 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     let mut tile_texels: Vec<(u8, u8, u8, u8)> =
                         Vec::with_capacity((resolution as usize).pow(2));
                     let mut layer_is_visible_somewhere = false;
+
+                    // Track the bounding box of the layer that's actually occupied.
+                    // Uses inclusive-exclusive coordinates.
+                    // Invariant: If layer_is_visible_somewhere, then visible_low_corner < visible_high_corner.
+                    let mut visible_low_corner = Point2::new(resolution, resolution);
+                    let mut visible_high_corner = Point2::new(0, 0);
+
                     for t in 0..resolution {
                         for s in 0..resolution {
+                            let texel_coord = Point2::new(s, t);
                             // TODO: Matrix4 isn't allowed to be integer. Make Face provide a better strategy.
                             // While we're at it, also implement the optimization that positive and negative
                             // faces can share a texture sometimes (which requires dropping the property
@@ -304,6 +323,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                     .unwrap_or(false)
                             } {
                                 layer_is_visible_somewhere = true;
+                                for axis in 0..2 {
+                                    visible_low_corner[axis] =
+                                        visible_low_corner[axis].min(texel_coord[axis]);
+                                    visible_high_corner[axis] =
+                                        visible_high_corner[axis].max(texel_coord[axis] + 1);
+                                }
                             }
 
                             if layer == 0 && !color.fully_opaque() {
@@ -327,6 +352,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             face_vertices,
                             face,
                             depth,
+                            visible_low_corner.map(|c| {
+                                FreeCoordinate::from(c) / FreeCoordinate::from(resolution)
+                            }),
+                            visible_high_corner.map(|c| {
+                                FreeCoordinate::from(c) / FreeCoordinate::from(resolution)
+                            }),
                             if let Some(ref mut texture_tile) = maybe_texture_tile {
                                 texture_tile.write(tile_texels.as_ref());
                                 QuadColoring::Texture(texture_tile)
@@ -561,6 +592,19 @@ mod tests {
     use crate::universe::Universe;
     use cgmath::MetricSpace as _;
 
+    /// Shorthand for writing out an entire [`BlockVertex`].
+    fn v_t(
+        position: [FreeCoordinate; 3],
+        normal: [FreeCoordinate; 3],
+        texture: [TextureCoordinate; 3],
+    ) -> BlockVertex {
+        BlockVertex {
+            position: position.into(),
+            normal: normal.into(),
+            coloring: Coloring::Texture(texture.into()),
+        }
+    }
+
     #[test]
     fn excludes_interior_faces() {
         let block = make_some_blocks(1).swap_remove(0);
@@ -660,8 +704,10 @@ mod tests {
     }
 
     /// Check for hidden surfaces being given textures.
+    /// Exercise the “shrinkwrap” logic that generates geometry no larger than necessary.
     #[test]
-    fn no_extraneous_layers() {
+    #[rustfmt::skip]
+    fn shrunken_box_has_no_extras() {
         // Construct a box whose faces don't touch the outer extent of the volume.
         let resolution = 8;
         let mut u = Universe::new();
@@ -698,6 +744,55 @@ mod tests {
             tex.count_allocated(),
             6,
             "Should be only 6 cube face textures"
+        );
+        assert_eq!(
+            space_rendered,
+            FaceMap {
+                within: vec![
+                    v_t([0.250, 0.250, 0.250], [-1.,  0.,  0.], [0.250, 0.250, 0.000]),
+                    v_t([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.250, 0.750, 0.000]),
+                    v_t([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.750, 0.250, 0.000]),
+                    v_t([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.750, 0.250, 0.000]),
+                    v_t([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.250, 0.750, 0.000]),
+                    v_t([0.250, 0.750, 0.750], [-1.,  0.,  0.], [0.750, 0.750, 0.000]),
+                    v_t([0.250, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.250, 0.000]),
+                    v_t([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.750, 0.000]),
+                    v_t([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.250, 0.000]),
+                    v_t([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.250, 0.000]),
+                    v_t([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.750, 0.000]),
+                    v_t([0.750, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.750, 0.000]),
+                    v_t([0.250, 0.250, 0.250], [ 0.,  0., -1.], [0.250, 0.250, 0.000]),
+                    v_t([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.250, 0.750, 0.000]),
+                    v_t([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.750, 0.250, 0.000]),
+                    v_t([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.750, 0.250, 0.000]),
+                    v_t([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.250, 0.750, 0.000]),
+                    v_t([0.750, 0.750, 0.250], [ 0.,  0., -1.], [0.750, 0.750, 0.000]),
+                    v_t([0.750, 0.750, 0.250], [ 1.,  0.,  0.], [0.250, 0.250, 0.000]),
+                    v_t([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.250, 0.750, 0.000]),
+                    v_t([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.750, 0.250, 0.000]),
+                    v_t([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.750, 0.250, 0.000]),
+                    v_t([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.250, 0.750, 0.000]),
+                    v_t([0.750, 0.250, 0.750], [ 1.,  0.,  0.], [0.750, 0.750, 0.000]),
+                    v_t([0.750, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.250, 0.000]),
+                    v_t([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.750, 0.000]),
+                    v_t([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.250, 0.000]),
+                    v_t([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.250, 0.000]),
+                    v_t([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.750, 0.000]),
+                    v_t([0.250, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.750, 0.000]),
+                    v_t([0.250, 0.750, 0.750], [ 0.,  0.,  1.], [0.250, 0.250, 0.000]),
+                    v_t([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.250, 0.750, 0.000]),
+                    v_t([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.750, 0.250, 0.000]),
+                    v_t([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.750, 0.250, 0.000]),
+                    v_t([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.250, 0.750, 0.000]),
+                    v_t([0.750, 0.250, 0.750], [ 0.,  0.,  1.], [0.750, 0.750, 0.000]),
+                ],
+                nx: vec![],
+                ny: vec![],
+                nz: vec![],
+                px: vec![],
+                py: vec![],
+                pz: vec![],
+            },
         );
     }
 
