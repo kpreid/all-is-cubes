@@ -16,6 +16,7 @@ use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector2, Vector3};
 use std::convert::TryFrom;
 
 use crate::block::{EvaluatedBlock, Resolution};
+use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
 use crate::util::ConciseDebug as _;
@@ -168,11 +169,16 @@ const QUAD_VERTICES: &[Point3<FreeCoordinate>; 6] = &[
 ];
 
 #[inline]
-fn push_quad_solid<V: From<BlockVertex>>(vertices: &mut Vec<V>, face: Face, color: RGBA) {
+fn push_quad_solid<V: From<BlockVertex>>(
+    vertices: &mut Vec<V>,
+    face: Face,
+    depth: FreeCoordinate,
+    color: RGBA,
+) {
     let transform = face.matrix();
     for &p in QUAD_VERTICES {
         vertices.push(V::from(BlockVertex {
-            position: transform.transform_point(p),
+            position: transform.transform_point(p + Vector3::new(0.0, 0.0, depth)),
             normal: face.normal_vector(),
             coloring: Coloring::Solid(color),
         }));
@@ -220,7 +226,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
                     vertices: if fully_opaque {
                         let mut face_vertices: Vec<V> = Vec::with_capacity(6);
-                        push_quad_solid(&mut face_vertices, face, block.color);
+                        push_quad_solid(&mut face_vertices, face, 0., block.color);
                         face_vertices
                     } else {
                         Vec::new()
@@ -252,8 +258,6 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // because this won't panic and the other strategy will. TODO: Implement
             // dynamic choice of texture size.
             let resolution: GridCoordinate = texture_allocator.resolution();
-
-            let out_of_bounds_color = RGBA::new(1.0, 1.0, 0.0, 1.0);
 
             for &face in Face::ALL_SIX {
                 let transform = face.matrix();
@@ -287,7 +291,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
                             // Diagnose out-of-space accesses. TODO: Tidy this up and document it, or remove it:
                             // it will happen whenever the space is the wrong size for the textures.
-                            let color = voxels.get(cube).unwrap_or(&out_of_bounds_color);
+                            let color =
+                                voxels.get(cube).unwrap_or(&palette::MISSING_VOXEL_FALLBACK);
 
                             if !color.fully_transparent() && {
                                 // Compute whether this voxel is not hidden behind another
@@ -310,18 +315,34 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     }
                     if layer_is_visible_somewhere {
                         // Actually store and use the texels we just computed.
-                        // TODO: handle error
-                        let mut texture_tile = texture_allocator.allocate().expect("Ran out of tile space!");
-                        texture_tile.write(tile_texels.as_ref());
-                        push_quad_textured(
-                            // Only the surface faces go anywhere but WITHIN.
-                            &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }]
-                                .vertices,
-                            face,
-                            FreeCoordinate::from(layer) / FreeCoordinate::from(resolution),
-                            &texture_tile,
-                        );
-                        textures_used.push(texture_tile);
+                        let face_vertices = &mut output_by_face
+                            [if layer == 0 { face } else { Face::WITHIN }]
+                        .vertices;
+                        let depth = FreeCoordinate::from(layer) / FreeCoordinate::from(resolution);
+                        if let Some(mut texture_tile) = texture_allocator.allocate() {
+                            texture_tile.write(tile_texels.as_ref());
+                            push_quad_textured(
+                                // Only the surface faces go anywhere but WITHIN.
+                                face_vertices,
+                                face,
+                                depth,
+                                &texture_tile,
+                            );
+                            textures_used.push(texture_tile);
+                        } else {
+                            // Texture allocation failure.
+                            // TODO: Mark this triangulation as defective in the return value, so
+                            // that when more space is available, it can be retried, rather than
+                            // having lingering failures.
+                            // TODO: Add other fallback strategies such as using vertices instead
+                            // of textures.
+                            push_quad_solid(
+                                face_vertices,
+                                face,
+                                depth,
+                                palette::MISSING_TEXTURE_FALLBACK,
+                            );
+                        }
                     }
                 }
             }
@@ -680,6 +701,38 @@ mod tests {
             6,
             "Should be only 6 cube face textures"
         );
+    }
+
+    #[test]
+    fn handling_allocation_failure() {
+        let resolution = 8;
+        let mut u = Universe::new();
+        let complex_block = Block::builder()
+            .voxels_fn(&mut u, resolution, |cube| {
+                if (cube.x + cube.y + cube.z) % 2 == 0 {
+                    RGBA::WHITE.into()
+                } else {
+                    AIR
+                }
+            })
+            .unwrap()
+            .build();
+
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set((0, 0, 0), &complex_block).unwrap();
+
+        let mut tex = TestTextureAllocator::new(resolution);
+        // Actual capacity needed is resolution * 6, so this will fail.
+        let capacity = resolution as usize * 2;
+        tex.set_capacity(capacity);
+        let block_triangulations: BlockTriangulations<BlockVertex, _> =
+            triangulate_blocks(&space, &mut tex);
+
+        // Check results.
+        assert_eq!(tex.count_allocated(), capacity);
+        assert_eq!(1, block_triangulations.len());
+        // TODO: Check that the triangulation includes the failure marker/fallback color.
+        let _complex_block_triangulation = &block_triangulations[0];
     }
 
     #[test]

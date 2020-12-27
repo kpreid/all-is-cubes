@@ -12,6 +12,12 @@ use crate::math::{RGB, RGBA};
 /// Default sky color for new [`Space`](crate::space::Space)s.
 pub const DAY_SKY_COLOR: RGB = rgb_const!(0.9, 0.9, 1.4);
 
+// Rendering fallbacks.
+/// Used when there should be a texture but we ran out of texture space.
+pub const MISSING_TEXTURE_FALLBACK: RGBA = rgba_const!(1.0, 0.0, 0.8, 1.0);
+/// Used when a recursive block definition should have provided a voxel color but did not.
+pub const MISSING_VOXEL_FALLBACK: RGBA = rgba_const!(0.8, 0.0, 1.0, 1.0);
+
 // "Natural" "landscape" colors.
 // TODO: Some of these haven't ever been tried out and are probably especially bad.
 pub const GRASS: RGB = rgb_const!(0.3, 0.8, 0.3);
