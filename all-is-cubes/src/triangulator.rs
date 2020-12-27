@@ -522,7 +522,7 @@ impl TextureTile for TestTextureTile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Block;
+    use crate::block::{Block, AIR};
     use crate::blockgen::make_some_blocks;
 
     use crate::universe::Universe;
@@ -583,18 +583,22 @@ mod tests {
 
     /// Construct a 1x1 recursive block and test that this is equivalent in geometry
     /// to an atom block.
+    ///
+    /// TODO: That's not what this test does; it actually asserts that triangulate_space
+    /// of a 1x1 space has the same geometry as the contents, which is _also_ interesting
+    /// so we should have both.
     #[test]
-    fn trivial_subcube_rendering() {
+    fn trivial_voxels_rendering() {
+        // Construct recursive block.
         let mut u = Universe::new();
-        let mut inner_block_space = Space::empty_positive(1, 1, 1);
-        inner_block_space
-            .set((0, 0, 0), &make_some_blocks(1)[0])
-            .unwrap();
-        let inner_block = Block::builder()
-            .voxels_ref(1, u.insert_anonymous(inner_block_space))
+        let trivial_recursive_block = Block::builder()
+            .voxels_fn(&mut u, 1, |_| make_some_blocks(1).swap_remove(0))
+            .unwrap()
             .build();
         let mut outer_space = Space::empty_positive(1, 1, 1);
-        outer_space.set((0, 0, 0), &inner_block).unwrap();
+        outer_space
+            .set((0, 0, 0), &trivial_recursive_block)
+            .unwrap();
 
         let mut tex = TestTextureAllocator::new(1);
         let block_triangulations: BlockTriangulations<BlockVertex, _> =
@@ -625,18 +629,23 @@ mod tests {
     /// Check for hidden surfaces being given textures.
     #[test]
     fn no_extraneous_layers() {
+        // Construct a box whose faces don't touch the outer extent of the volume.
         let resolution = 8;
         let mut u = Universe::new();
-        let mut inner_block_space = Space::empty(Grid::for_block(resolution));
         let filler_block = make_some_blocks(1).swap_remove(0);
-        inner_block_space
-            .fill(Grid::new((2, 2, 2), (4, 4, 4)), |_| Some(&filler_block))
-            .unwrap();
-        let inner_block = Block::builder()
-            .voxels_ref(16, u.insert_anonymous(inner_block_space))
+        let less_than_full_volume = Grid::new((2, 2, 2), (4, 4, 4));
+        let less_than_full_block = Block::builder()
+            .voxels_fn(&mut u, resolution, |cube| {
+                if less_than_full_volume.contains_cube(cube) {
+                    &filler_block
+                } else {
+                    &AIR
+                }
+            })
+            .unwrap()
             .build();
         let mut outer_space = Space::empty_positive(1, 1, 1);
-        outer_space.set((0, 0, 0), &inner_block).unwrap();
+        outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
 
         let mut tex = TestTextureAllocator::new(resolution);
         let block_triangulations: BlockTriangulations<BlockVertex, _> =
