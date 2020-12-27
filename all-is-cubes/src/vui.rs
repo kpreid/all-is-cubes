@@ -83,7 +83,8 @@ struct HudLayout {
 impl Default for HudLayout {
     fn default() -> Self {
         Self {
-            size: Vector2::new(24, 18),
+            // Odd width benefits the toolbar.
+            size: Vector2::new(25, 18),
             toolbar_positions: 10,
         }
     }
@@ -152,7 +153,7 @@ impl HudLayout {
 
     fn tool_icon_position(&self, index: usize) -> GridPoint {
         let x_start =
-            (self.size.x - (self.toolbar_positions as GridCoordinate - 1) * TOOLBAR_STEP + 1) / 2;
+            (self.size.x - (self.toolbar_positions as GridCoordinate) * TOOLBAR_STEP + 1) / 2;
         // TODO: set depth sensibly
         GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 0, 9)
     }
