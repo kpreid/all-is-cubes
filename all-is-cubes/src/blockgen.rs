@@ -4,16 +4,18 @@
 //! Procedural block generation. See the `worldgen` module for code that uses the results
 //! of this.
 
-use cgmath::EuclideanSpace as _;
 use rand::{Rng, SeedableRng as _};
 
-use crate::block::{Block, BlockAttributes, Resolution, AIR};
+use crate::block::{Block, Resolution, AIR};
 use crate::content::palette;
-use crate::math::{GridCoordinate, GridPoint, NotNan, RGB, RGBA};
+use crate::math::{GridCoordinate, NotNan, RGB, RGBA};
 use crate::space::{Grid, Space};
-use crate::universe::{UBorrowMut, Universe};
+use crate::universe::Universe;
 
 /// Utilities for generating [`Block`]s that are compatible with each other.
+///
+/// TODO: This is in a bit of an awkward state because most of its job has been
+/// taken over by [`crate::block::BlockBuilder`].
 pub struct BlockGen<'a> {
     /// The `Universe` in which block spaces live.
     pub universe: &'a mut Universe,
@@ -36,41 +38,6 @@ impl<'a> BlockGen<'a> {
     /// Create a [`Space`] of a suitable size for a block.
     pub fn new_block_space(&self) -> Space {
         Space::empty(Grid::for_block(self.resolution))
-    }
-
-    /// Create a [`Block`] referring to a [`Space`] and return the [`Space`] for modification.
-    // TODO: Can we replace this with BlockBuilder?
-    pub fn new_recursive_block(
-        &mut self,
-        attributes: BlockAttributes,
-    ) -> (Block, UBorrowMut<Space>) {
-        let space_ref = self.universe.insert_anonymous(self.new_block_space());
-        (
-            Block::Recur {
-                attributes,
-                offset: GridPoint::origin(),
-                resolution: self.resolution,
-                space: space_ref.clone(),
-            },
-            space_ref.borrow_mut(),
-        )
-    }
-
-    /// Create a [`Block`] referring to a [`Space`] filled with sub-blocks chosen by the
-    /// given function. The third argument to the function is a random value in \[0.0, 1.0).
-    pub fn block_from_function(
-        &mut self,
-        attributes: BlockAttributes,
-        f: impl Fn(&BlockGen, GridPoint, f32) -> Block,
-    ) -> Block {
-        let (block, mut space) = self.new_recursive_block(attributes);
-        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
-        // TODO: Make this use closer to the same function interface as Space::fill?
-        let grid = space.grid();
-        space
-            .fill(grid, |point| Some(f(self, point, rng.gen_range(0.0, 1.0))))
-            .unwrap();
-        block
     }
 }
 
@@ -186,6 +153,7 @@ impl Default for LandscapeBlocks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::BlockAttributes;
     use crate::space::Grid;
 
     #[test]
@@ -197,8 +165,6 @@ mod tests {
             Grid::new((0, 0, 0), (10, 10, 10))
         );
     }
-
-    // TODO: test block_from_function
 
     #[test]
     fn make_some_blocks_0() {
