@@ -19,7 +19,7 @@ use crate::chunking::{
     cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE, CHUNK_SIZE_FREE,
 };
 use crate::listen::Listener;
-use crate::lum::block_texture::{LumAtlasAllocator, BlockTexture, BoundBlockTexture, LumAtlasTile};
+use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
@@ -403,8 +403,13 @@ impl<'a> TrackingBlockProvider<'a> {
         self.seen.iter_ones()
     }
 }
-impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, LumAtlasTile> for &mut TrackingBlockProvider<'a> {
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<GLBlockVertex, LumAtlasTile>> {
+impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, LumAtlasTile>
+    for &mut TrackingBlockProvider<'a>
+{
+    fn get(
+        &mut self,
+        index: BlockIndex,
+    ) -> Option<&'a BlockTriangulation<GLBlockVertex, LumAtlasTile>> {
         let index = usize::from(index);
         if index >= self.seen.len() {
             self.seen.resize(index + 1, false);

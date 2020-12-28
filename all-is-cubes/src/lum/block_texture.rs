@@ -36,7 +36,7 @@ pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim2Array, NormRGBA8UI>;
 pub struct LumAtlasAllocator {
     pub texture: BlockTexture,
     layout: AtlasLayout,
-    index_allocator: Rc<RefCell<IntAllocator<u32>>>,
+    backing: Rc<RefCell<AllocatorBacking>>,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
 }
 /// Texture tile handle used by [`LumAtlasAllocator`].
@@ -59,9 +59,16 @@ struct TileBacking {
     /// Scale factor for tile coordinates (0..1) to texture coordinates (some fraction of that).
     scale: f32,
     data: Option<Box<[Texel]>>,
-    /// Reference to the allocator so we can free our index.
+    /// Reference to the allocator so we can coordinate.
     /// Weak because if the allocator is dropped, nobody cares.
-    index_allocator: Weak<RefCell<IntAllocator<u32>>>,
+    allocator: Weak<RefCell<AllocatorBacking>>,
+}
+/// Data shared by [`LumAtlasAllocator`] and all its [`LumAtlasTile`]s.
+#[derive(Debug)]
+struct AllocatorBacking {
+    /// Whether flush needs to do anything.
+    dirty: bool,
+    index_allocator: IntAllocator<u32>,
 }
 
 impl LumAtlasAllocator {
@@ -90,13 +97,22 @@ impl LumAtlasAllocator {
                 },
             )?,
             layout,
-            index_allocator: Rc::new(RefCell::new(IntAllocator::new())),
+            backing: Rc::new(RefCell::new(AllocatorBacking {
+                dirty: false,
+                index_allocator: IntAllocator::new(),
+            })),
             in_use: Vec::new(),
         })
     }
 
     // TODO: Should this be part of the TextureAllocator trait?
     pub fn flush(&mut self) -> Result<String, TextureError> {
+        let dirty = &mut self.backing.borrow_mut().dirty;
+        if !*dirty {
+            return Ok("no change".to_string());
+        }
+        *dirty = false;
+
         let layout = self.layout;
         // Allocate contiguous storage for uploading.
         // TODO: Should we keep this allocated? Probably
@@ -160,7 +176,7 @@ impl TextureAllocator for LumAtlasAllocator {
     }
 
     fn allocate(&mut self) -> Option<LumAtlasTile> {
-        let mut index_allocator = self.index_allocator.borrow_mut();
+        let index_allocator = &mut self.backing.borrow_mut().index_allocator;
         let index = index_allocator.allocate().unwrap();
         if index >= self.layout.tile_count() {
             // TODO: Attempt expansion of the atlas.
@@ -173,7 +189,7 @@ impl TextureAllocator for LumAtlasAllocator {
                 origin: self.layout.index_to_origin(index),
                 scale: self.layout.texcoord_scale(),
                 data: None,
-                index_allocator: Rc::downgrade(&self.index_allocator),
+                allocator: Rc::downgrade(&self.backing),
             })),
         };
         self.in_use.push(Rc::downgrade(&result.backing));
@@ -186,13 +202,17 @@ impl TextureTile for LumAtlasTile {
         (in_tile * backing.scale).extend(0.0) + backing.origin
     }
     fn write(&mut self, data: &[Texel]) {
-        self.backing.borrow_mut().data = Some(data.into());
+        let mut backing = self.backing.borrow_mut();
+        backing.data = Some(data.into());
+        if let Some(allocator_backing_ref) = backing.allocator.upgrade() {
+            allocator_backing_ref.borrow_mut().dirty = true;
+        }
     }
 }
 impl Drop for TileBacking {
     fn drop(&mut self) {
-        if let Some(index_allocator) = self.index_allocator.upgrade() {
-            index_allocator.borrow_mut().free(self.index);
+        if let Some(ab) = self.allocator.upgrade() {
+            ab.borrow_mut().index_allocator.free(self.index);
         }
     }
 }
