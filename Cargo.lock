@@ -46,6 +46,7 @@ dependencies = [
  "itertools 0.10.0",
  "luminance",
  "luminance-front",
+ "noise",
  "num-traits",
  "once_cell",
  "ordered-float",
@@ -1121,6 +1122,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "noise"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82051dd6745d5184c6efb7bc8be14892a7f6d4f3ad6dbf754d1c7d7d5fe24b43"
+dependencies = [
+ "rand 0.7.3",
+ "rand_xorshift 0.2.0",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1354,7 +1365,7 @@ dependencies = [
  "rand_jitter",
  "rand_os",
  "rand_pcg",
- "rand_xorshift",
+ "rand_xorshift 0.1.1",
  "winapi 0.3.9",
 ]
 
@@ -1484,6 +1495,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbf7e9e623549b0e21f6e97cf8ecf247c1a8fd2e8a992ae265314300b2455d5c"
 dependencies = [
  "rand_core 0.3.1",
+]
+
+[[package]]
+name = "rand_xorshift"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77d416b86801d23dde1aa643023b775c3a462efc0ed96443add11546cdf1dca8"
+dependencies = [
+ "rand_core 0.5.1",
 ]
 
 [[package]]

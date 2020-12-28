@@ -4,11 +4,11 @@
 //! Procedural block generation. See the `worldgen` module for code that uses the results
 //! of this.
 
-use rand::{Rng, SeedableRng as _};
+use noise::Seedable as _;
 
 use crate::block::{Block, Resolution, AIR};
 use crate::content::palette;
-use crate::math::{GridCoordinate, NotNan, RGB, RGBA};
+use crate::math::{NoiseFnExt as _, NotNan, RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::Universe;
 
@@ -42,13 +42,19 @@ impl<'a> BlockGen<'a> {
 }
 
 /// Generate a copy of a [`Block::Atom`] with its color scaled by the given scalar.
-pub fn scale_color(block: Block, scalar: NotNan<f32>) -> Block {
-    match block {
-        Block::Atom(attributes, color) => Block::Atom(
+///
+/// The scalar is rounded to steps of `quantization`, to reduce the number of distinct
+/// block types generated.
+///
+/// If the computation is NaN or the block is not an atom, it is returned unchanged.
+pub fn scale_color(block: Block, scalar: f64, quantization: f64) -> Block {
+    let scalar = (scalar / quantization).round() * quantization;
+    match (block, NotNan::new(scalar as f32)) {
+        (Block::Atom(attributes, color), Ok(scalar)) => Block::Atom(
             attributes,
             (color.to_rgb() * scalar).with_alpha(color.alpha()),
         ),
-        _ => unimplemented!("scale_color({:?})", block),
+        (block, _) => block,
     }
 }
 
@@ -99,27 +105,45 @@ impl LandscapeBlocks {
     pub fn new(ctx: &mut BlockGen) -> Self {
         let mut result = Self::default();
         let resolution = ctx.resolution;
-
         let grass_color = result.grass.clone();
         let dirt_color = result.dirt.clone();
+        let stone_color = result.stone.clone();
 
-        // TODO: this needs to become a lot shorter
-        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+        let stone_noise_v = noise::Value::new().set_seed(0x21b5cc6b);
+        let stone_noise = noise::ScaleBias::new(&stone_noise_v)
+            .set_bias(1.0)
+            .set_scale(0.04);
+        result.stone = Block::builder()
+            .attributes(stone_color.evaluate().unwrap().attributes)
+            .voxels_fn(&mut ctx.universe, resolution, |cube| {
+                scale_color(stone_color.clone(), stone_noise.at_grid(cube), 0.02)
+            })
+            .unwrap()
+            .build();
+
+        let dirt_noise_v = noise::Value::new().set_seed(0x2e240365);
+        let dirt_noise = noise::ScaleBias::new(&dirt_noise_v)
+            .set_bias(1.0)
+            .set_scale(0.12);
+        result.dirt = Block::builder()
+            .attributes(dirt_color.evaluate().unwrap().attributes)
+            .voxels_fn(&mut ctx.universe, resolution, |cube| {
+                scale_color(dirt_color.clone(), dirt_noise.at_grid(cube), 0.02)
+            })
+            .unwrap()
+            .build();
+
+        let overhang_noise_v = noise::Value::new();
+        let overhang_noise = noise::ScaleBias::new(&overhang_noise_v)
+            .set_bias(f64::from(resolution) * 0.75)
+            .set_scale(2.5);
         result.grass = Block::builder()
             .attributes(grass_color.evaluate().unwrap().attributes)
-            .voxels_fn(&mut ctx.universe, resolution, |point| {
-                // TODO: replace PRNG with noise functions
-                let random: f32 = rng.gen_range(0.0, 1.0);
-                // Discrete randomization so that we don't generate too many distinct
-                // block types. TODO: Better strategy, perhaps palette-based.
-                let color_randomization =
-                    NotNan::new(1.0 + ((random * 5.0).floor() - 2.0) * 0.05).unwrap();
-                if point.y
-                    >= GridCoordinate::from(resolution) - (random * 3.0 + 1.0) as GridCoordinate
-                {
-                    scale_color(grass_color.clone(), color_randomization)
+            .voxels_fn(&mut ctx.universe, resolution, |cube| {
+                if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
+                    scale_color(grass_color.clone(), dirt_noise.at_grid(cube), 0.02)
                 } else {
-                    scale_color(dirt_color.clone(), color_randomization)
+                    scale_color(dirt_color.clone(), dirt_noise.at_grid(cube), 0.02)
                 }
             })
             .unwrap()
