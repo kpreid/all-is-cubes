@@ -43,6 +43,9 @@ pub struct SpaceRenderer {
     block_texture: Option<LumAtlasAllocator>,
     chunks: HashMap<ChunkPos, Chunk>,
     chunk_chart: ChunkChart,
+    /// Whether, on the previous frame, some chunks were unavailable.
+    /// If so, then we prioritize adding new chunks over updating existing ones.
+    chunks_were_missing: bool,
 }
 
 impl SpaceRenderer {
@@ -68,6 +71,7 @@ impl SpaceRenderer {
             chunks: HashMap::new(),
             // TODO: Use the actual draw distance!
             chunk_chart: ChunkChart::new(200.),
+            chunks_were_missing: true,
         }
     }
 
@@ -154,6 +158,7 @@ impl SpaceRenderer {
         // Update some chunk geometry.
         let chunk_grid = space.grid().divide(CHUNK_SIZE);
         let mut chunk_update_count = 0;
+        let mut chunks_are_missing = false;
         for p in self.chunk_chart.chunks(view_chunk) {
             if !chunk_grid.contains_cube(p.0) {
                 // Chunk not in the Space
@@ -167,10 +172,13 @@ impl SpaceRenderer {
 
             let chunk_entry = self.chunks.entry(p);
             // If the chunk needs updating or never existed, update it.
-            if todo.chunks.remove(&p)
+            if (todo.chunks.remove(&p) && !self.chunks_were_missing)
                 || matches!(chunk_entry, Vacant(_))
                 || matches!(chunk_entry, Occupied(ref oe) if oe.get().stale_blocks(&self.block_versioning))
             {
+                if matches!(chunk_entry, Vacant(_)) {
+                    chunks_are_missing = true;
+                }
                 chunk_entry.or_insert_with(|| Chunk::new(p)).update(
                     context,
                     &space,
@@ -180,6 +188,7 @@ impl SpaceRenderer {
                 chunk_update_count += 1;
             }
         }
+        self.chunks_were_missing = chunks_are_missing;
 
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
