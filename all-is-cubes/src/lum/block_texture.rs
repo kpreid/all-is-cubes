@@ -1,7 +1,7 @@
 // Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! Block texture atlas management: provides [`BlockGLTexture`], the
+//! Block texture atlas management: provides [`LumAtlasAllocator`], the
 //! [`TextureAllocator`] implementation for use with [`luminance_front`].
 
 use cgmath::{Vector2, Vector3, Zero as _};
@@ -31,22 +31,19 @@ pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim2Array, NormRGBA8UI>;
 /// Manages a block face texture, which is an atlased array texture (to minimize
 /// the chance of hitting any size limits) and implements [`TextureAllocator`].
 ///
-/// After any allocations, you must call [`BlockGLTexture::flush`] to write the
+/// After any allocations, you must call [`LumAtlasAllocator::flush`] to write the
 /// updates to the actual GPU texture for drawing.
-///
-/// TODO: Rename this for accuracy (luminance is theoretically abstract) and to
-/// distinguish it from [`BlockTexture`].
-pub struct BlockGLTexture {
+pub struct LumAtlasAllocator {
     pub texture: BlockTexture,
     layout: AtlasLayout,
     index_allocator: Rc<RefCell<IntAllocator<u32>>>,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
 }
-/// Texture tile handle used by [`BlockGLTexture`].
+/// Texture tile handle used by [`LumAtlasAllocator`].
 ///
 /// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
-pub struct GLTile {
+pub struct LumAtlasTile {
     /// Actual storage and metadata about the tile; may be updated as needed by the
     /// allocator to grow the texture.
     backing: Rc<RefCell<TileBacking>>,
@@ -67,7 +64,7 @@ struct TileBacking {
     index_allocator: Weak<RefCell<IntAllocator<u32>>>,
 }
 
-impl BlockGLTexture {
+impl LumAtlasAllocator {
     pub fn new<C>(context: &mut C) -> Result<Self, TextureError>
     where
         C: GraphicsContext<Backend = Backend>,
@@ -155,14 +152,14 @@ impl BlockGLTexture {
     }
 }
 
-impl TextureAllocator for BlockGLTexture {
-    type Tile = GLTile;
+impl TextureAllocator for LumAtlasAllocator {
+    type Tile = LumAtlasTile;
 
     fn resolution(&self) -> GridCoordinate {
         self.layout.resolution.into()
     }
 
-    fn allocate(&mut self) -> Option<GLTile> {
+    fn allocate(&mut self) -> Option<LumAtlasTile> {
         let mut index_allocator = self.index_allocator.borrow_mut();
         let index = index_allocator.allocate().unwrap();
         if index >= self.layout.tile_count() {
@@ -170,7 +167,7 @@ impl TextureAllocator for BlockGLTexture {
             index_allocator.free(index);
             return None;
         }
-        let result = GLTile {
+        let result = LumAtlasTile {
             backing: Rc::new(RefCell::new(TileBacking {
                 index,
                 origin: self.layout.index_to_origin(index),
@@ -183,7 +180,7 @@ impl TextureAllocator for BlockGLTexture {
         Some(result)
     }
 }
-impl TextureTile for GLTile {
+impl TextureTile for LumAtlasTile {
     fn texcoord(&self, in_tile: Vector2<TextureCoordinate>) -> Vector3<TextureCoordinate> {
         let backing = self.backing.borrow();
         (in_tile * backing.scale).extend(0.0) + backing.origin

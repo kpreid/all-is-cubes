@@ -19,7 +19,7 @@ use crate::chunking::{
     cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE, CHUNK_SIZE_FREE,
 };
 use crate::listen::Listener;
-use crate::lum::block_texture::{BlockGLTexture, BlockTexture, BoundBlockTexture, GLTile};
+use crate::lum::block_texture::{LumAtlasAllocator, BlockTexture, BoundBlockTexture, LumAtlasTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
@@ -33,12 +33,12 @@ use crate::universe::URef;
 pub struct SpaceRenderer {
     space: URef<Space>,
     todo: Rc<RefCell<SpaceRendererTodo>>,
-    block_triangulations: Vec<BlockTriangulation<GLBlockVertex, GLTile>>,
+    block_triangulations: Vec<BlockTriangulation<GLBlockVertex, LumAtlasTile>>,
     /// Version IDs used to track whether chunks have stale block triangulations.
     /// Indices are block indices and values are version numbers.
     block_versioning: Vec<u32>,
     block_version_counter: u32,
-    block_texture: Option<BlockGLTexture>,
+    block_texture: Option<LumAtlasAllocator>,
     chunks: HashMap<ChunkPos, Chunk>,
     chunk_chart: ChunkChart,
 }
@@ -92,7 +92,7 @@ impl SpaceRenderer {
 
         let block_texture_allocator = self.block_texture.get_or_insert_with(|| {
             // TODO: friendlier error
-            BlockGLTexture::new(context).expect("texture setup failure")
+            LumAtlasAllocator::new(context).expect("texture setup failure")
         });
 
         let mut todo = self.todo.borrow_mut();
@@ -287,7 +287,7 @@ pub struct Chunk {
     vertices: FaceMap<Vec<Vertex>>,
     tesses: FaceMap<Option<Tess<Vertex>>>,
     /// Texture tiles that our vertices' texture coordinates refer to.
-    tile_dependencies: Vec<GLTile>,
+    tile_dependencies: Vec<LumAtlasTile>,
     block_dependencies: Vec<(BlockIndex, u32)>,
 }
 
@@ -313,7 +313,7 @@ impl Chunk {
         &mut self,
         context: &mut C,
         space: &Space,
-        block_triangulations: &[BlockTriangulation<GLBlockVertex, GLTile>],
+        block_triangulations: &[BlockTriangulation<GLBlockVertex, LumAtlasTile>],
         block_versioning: &[u32],
     ) {
         let mut block_provider = TrackingBlockProvider::new(block_triangulations);
@@ -384,11 +384,11 @@ impl Chunk {
 
 /// Helper for [`Chunk`]'s dependency tracking.
 struct TrackingBlockProvider<'a> {
-    block_triangulations: &'a [BlockTriangulation<GLBlockVertex, GLTile>],
+    block_triangulations: &'a [BlockTriangulation<GLBlockVertex, LumAtlasTile>],
     seen: BitVec,
 }
 impl<'a> TrackingBlockProvider<'a> {
-    fn new(block_triangulations: &'a [BlockTriangulation<GLBlockVertex, GLTile>]) -> Self {
+    fn new(block_triangulations: &'a [BlockTriangulation<GLBlockVertex, LumAtlasTile>]) -> Self {
         Self {
             block_triangulations,
             seen: BitVec::with_capacity(256), // TODO: cleverer choice
@@ -403,8 +403,8 @@ impl<'a> TrackingBlockProvider<'a> {
         self.seen.iter_ones()
     }
 }
-impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, GLTile> for &mut TrackingBlockProvider<'a> {
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<GLBlockVertex, GLTile>> {
+impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, LumAtlasTile> for &mut TrackingBlockProvider<'a> {
+    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<GLBlockVertex, LumAtlasTile>> {
         let index = usize::from(index);
         if index >= self.seen.len() {
             self.seen.resize(index + 1, false);
