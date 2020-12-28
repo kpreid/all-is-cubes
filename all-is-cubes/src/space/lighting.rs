@@ -152,13 +152,16 @@ pub(crate) struct LightUpdateRequest {
     priority: PackedLightScalar,
     cube: GridPoint,
 }
+impl LightUpdateRequest {
+    fn fallback_priority(&self) -> GridCoordinate {
+        -(self.cube[0].abs() + self.cube[2].abs() + self.cube[2].abs())
+    }
+}
 impl Ord for LightUpdateRequest {
     fn cmp(&self, other: &LightUpdateRequest) -> std::cmp::Ordering {
         self.priority
             .cmp(&other.priority)
-            .then_with(|| self.cube[0].cmp(&other.cube[0]))
-            .then_with(|| self.cube[1].cmp(&other.cube[1]))
-            .then_with(|| self.cube[2].cmp(&other.cube[2]))
+            .then_with(|| self.fallback_priority().cmp(&other.fallback_priority()))
     }
 }
 impl PartialOrd for LightUpdateRequest {
