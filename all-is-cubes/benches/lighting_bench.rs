@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::time::Duration;
 
-use all_is_cubes::blockgen::{BlockGen, LandscapeBlocks};
+use all_is_cubes::content::demo::install_landscape_blocks;
 use all_is_cubes::space::{Grid, Space, SpaceStepInfo};
 use all_is_cubes::universe::{Universe, UniverseIndex as _};
 use all_is_cubes::worldgen::{axes, wavy_landscape};
@@ -34,12 +34,7 @@ fn universe_for_lighting_test() -> Universe {
     // (no "a landscape").
 
     let mut universe = Universe::new();
-
-    let mut bg = BlockGen {
-        universe: &mut universe,
-        resolution: 16,
-    };
-    let blocks = LandscapeBlocks::new(&mut bg);
+    let blocks = install_landscape_blocks(&mut universe, 16).unwrap();
 
     let radius = 20;
     let diameter = radius * 2 + 1;

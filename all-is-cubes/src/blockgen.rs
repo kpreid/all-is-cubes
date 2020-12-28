@@ -4,11 +4,9 @@
 //! Procedural block generation. See the `worldgen` module for code that uses the results
 //! of this.
 
-use noise::Seedable as _;
-
 use crate::block::{Block, Resolution, AIR};
 use crate::content::palette;
-use crate::math::{NoiseFnExt as _, NotNan, RGB, RGBA};
+use crate::math::{RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::Universe;
 
@@ -38,23 +36,6 @@ impl<'a> BlockGen<'a> {
     /// Create a [`Space`] of a suitable size for a block.
     pub fn new_block_space(&self) -> Space {
         Space::empty(Grid::for_block(self.resolution))
-    }
-}
-
-/// Generate a copy of a [`Block::Atom`] with its color scaled by the given scalar.
-///
-/// The scalar is rounded to steps of `quantization`, to reduce the number of distinct
-/// block types generated.
-///
-/// If the computation is NaN or the block is not an atom, it is returned unchanged.
-pub fn scale_color(block: Block, scalar: f64, quantization: f64) -> Block {
-    let scalar = (scalar / quantization).round() * quantization;
-    match (block, NotNan::new(scalar as f32)) {
-        (Block::Atom(attributes, color), Ok(scalar)) => Block::Atom(
-            attributes,
-            (color.to_rgb() * scalar).with_alpha(color.alpha()),
-        ),
-        (block, _) => block,
     }
 }
 
@@ -98,59 +79,6 @@ pub struct LandscapeBlocks {
     pub stone: Block,
     pub trunk: Block,
     pub leaves: Block,
-}
-
-impl LandscapeBlocks {
-    /// TODO: Improve and document
-    pub fn new(ctx: &mut BlockGen) -> Self {
-        let mut result = Self::default();
-        let resolution = ctx.resolution;
-        let grass_color = result.grass.clone();
-        let dirt_color = result.dirt.clone();
-        let stone_color = result.stone.clone();
-
-        let stone_noise_v = noise::Value::new().set_seed(0x21b5cc6b);
-        let stone_noise = noise::ScaleBias::new(&stone_noise_v)
-            .set_bias(1.0)
-            .set_scale(0.04);
-        result.stone = Block::builder()
-            .attributes(stone_color.evaluate().unwrap().attributes)
-            .voxels_fn(&mut ctx.universe, resolution, |cube| {
-                scale_color(stone_color.clone(), stone_noise.at_grid(cube), 0.02)
-            })
-            .unwrap()
-            .build();
-
-        let dirt_noise_v = noise::Value::new().set_seed(0x2e240365);
-        let dirt_noise = noise::ScaleBias::new(&dirt_noise_v)
-            .set_bias(1.0)
-            .set_scale(0.12);
-        result.dirt = Block::builder()
-            .attributes(dirt_color.evaluate().unwrap().attributes)
-            .voxels_fn(&mut ctx.universe, resolution, |cube| {
-                scale_color(dirt_color.clone(), dirt_noise.at_grid(cube), 0.02)
-            })
-            .unwrap()
-            .build();
-
-        let overhang_noise_v = noise::Value::new();
-        let overhang_noise = noise::ScaleBias::new(&overhang_noise_v)
-            .set_bias(f64::from(resolution) * 0.75)
-            .set_scale(2.5);
-        result.grass = Block::builder()
-            .attributes(grass_color.evaluate().unwrap().attributes)
-            .voxels_fn(&mut ctx.universe, resolution, |cube| {
-                if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
-                    scale_color(grass_color.clone(), dirt_noise.at_grid(cube), 0.02)
-                } else {
-                    scale_color(dirt_color.clone(), dirt_noise.at_grid(cube), 0.02)
-                }
-            })
-            .unwrap()
-            .build();
-
-        result
-    }
 }
 
 impl Default for LandscapeBlocks {

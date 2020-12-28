@@ -9,15 +9,16 @@ use embedded_graphics::fonts::Text;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
+use noise::Seedable as _;
 
-use crate::block::Block;
+use crate::block::{Block, BlockDef, Resolution, AIR};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
 use crate::content::logo_text;
 use crate::drawing::draw_to_blocks;
-use crate::math::{GridPoint, GridVector, RGB, RGBA};
+use crate::math::{GridPoint, GridVector, NoiseFnExt as _, NotNan, RGB, RGBA};
 use crate::space::{Grid, Space};
-use crate::universe::{Universe, UniverseIndex};
+use crate::universe::{InsertError, Universe, UniverseIndex};
 use crate::worldgen::{axes, wavy_landscape};
 
 /// Creates a [`Universe`] with some content for a "new game", as much as that can exist.
@@ -30,7 +31,7 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
         universe,
         resolution: 16,
     };
-    let blocks = LandscapeBlocks::new(&mut bg);
+    let blocks = extract_landscape_blocks(bg.universe);
 
     let text_blocks: Space = draw_to_blocks(
         &mut bg,
@@ -129,6 +130,8 @@ where
     F: FnOnce(&mut Universe) -> Space,
 {
     let mut universe = Universe::new();
+    install_demo_blocks(&mut universe).unwrap();
+
     let space: Space = space_fn(&mut universe);
     let position = space.grid().center() + Vector3::new(-3.0, 3.0, -3.0);
     let space_ref = universe.insert("space".into(), space).unwrap();
@@ -136,6 +139,112 @@ where
     let camera = Camera::new(space_ref, position);
     universe.insert("camera".into(), camera).unwrap();
     universe
+}
+
+/// Add to `universe` demo-content blocks, that might be used by demo worldgen or offered to the player.
+fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
+    let resolution = 16;
+    install_landscape_blocks(universe, resolution)?;
+    Ok(())
+}
+
+/// Construct blocks for [`LandscapeBlocks`] with some detail and add block definitions to the universe.
+// TODO: migrate away from returning the structure
+// TODO: not sure if we want this to be a public interface; is currently in use by lighting_bench
+#[doc(hidden)]
+pub fn install_landscape_blocks(
+    universe: &mut Universe,
+    resolution: Resolution,
+) -> Result<LandscapeBlocks, InsertError> {
+    let colors = LandscapeBlocks::default();
+
+    let stone_noise_v = noise::Value::new().set_seed(0x21b5cc6b);
+    let stone_noise = noise::ScaleBias::new(&stone_noise_v)
+        .set_bias(1.0)
+        .set_scale(0.04);
+    let dirt_noise_v = noise::Value::new().set_seed(0x2e240365);
+    let dirt_noise = noise::ScaleBias::new(&dirt_noise_v)
+        .set_bias(1.0)
+        .set_scale(0.12);
+    let overhang_noise_v = noise::Value::new();
+    let overhang_noise = noise::ScaleBias::new(&overhang_noise_v)
+        .set_bias(f64::from(resolution) * 0.75)
+        .set_scale(2.5);
+
+    Block::builder()
+        .attributes(colors.stone.evaluate().unwrap().attributes)
+        .voxels_fn(universe, resolution, |cube| {
+            scale_color(colors.stone.clone(), stone_noise.at_grid(cube), 0.02)
+        })
+        .unwrap()
+        .into_named_definition(universe, "all-is-cubes/demo/stone")?;
+
+    Block::builder()
+        .attributes(colors.grass.evaluate().unwrap().attributes)
+        .voxels_fn(universe, resolution, |cube| {
+            if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
+                scale_color(colors.grass.clone(), dirt_noise.at_grid(cube), 0.02)
+            } else {
+                scale_color(colors.dirt.clone(), dirt_noise.at_grid(cube), 0.02)
+            }
+        })
+        .unwrap()
+        .into_named_definition(universe, "all-is-cubes/demo/grass")?;
+
+    Block::builder()
+        .attributes(colors.dirt.evaluate().unwrap().attributes)
+        .voxels_fn(universe, resolution, |cube| {
+            scale_color(colors.dirt.clone(), dirt_noise.at_grid(cube), 0.02)
+        })
+        .unwrap()
+        .into_named_definition(universe, "all-is-cubes/demo/dirt")?;
+
+    universe.insert(
+        "all-is-cubes/demo/trunk".into(),
+        BlockDef::new(colors.trunk),
+    )?;
+
+    universe.insert(
+        "all-is-cubes/demo/leaves".into(),
+        BlockDef::new(colors.leaves),
+    )?;
+
+    Ok(extract_landscape_blocks(universe))
+}
+
+// TODO: This is a kludge which we should replace with having a systematic approach to well-known
+// block names and fetching references to them.
+fn extract_landscape_blocks(universe: &Universe) -> LandscapeBlocks {
+    let get = |name: &str| {
+        // TODO: the &* mess should not be required
+        let name = (&*format!("all-is-cubes/demo/{}", name)).into();
+        Block::Indirect(universe.get(&name).ok_or(&name).expect("missing block"))
+    };
+    LandscapeBlocks {
+        air: AIR,
+        grass: get("grass"),
+        dirt: get("dirt"),
+        stone: get("stone"),
+        trunk: get("trunk"),
+        leaves: get("leaves"),
+    }
+}
+
+/// Generate a copy of a [`Block::Atom`] with its color scaled by the given scalar.
+///
+/// The scalar is rounded to steps of `quantization`, to reduce the number of distinct
+/// block types generated.
+///
+/// If the computation is NaN or the block is not an atom, it is returned unchanged.
+fn scale_color(block: Block, scalar: f64, quantization: f64) -> Block {
+    let scalar = (scalar / quantization).round() * quantization;
+    match (block, NotNan::new(scalar as f32)) {
+        (Block::Atom(attributes, color), Ok(scalar)) => Block::Atom(
+            attributes,
+            (color.to_rgb() * scalar).with_alpha(color.alpha()),
+        ),
+        (block, _) => block,
+    }
 }
 
 #[cfg(test)]
@@ -150,5 +259,12 @@ mod tests {
         let _ = u.get_default_camera().borrow();
         let _ = u.get_default_space().borrow();
         u.step(Duration::from_millis(10));
+    }
+
+    #[test]
+    pub fn install_demo_blocks_test() {
+        let mut universe = Universe::new();
+        install_demo_blocks(&mut universe).unwrap();
+        // TODO: assert what entries were created, once Universe has iteration
     }
 }
