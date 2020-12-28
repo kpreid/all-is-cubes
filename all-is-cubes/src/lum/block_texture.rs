@@ -106,12 +106,15 @@ impl LumAtlasAllocator {
     }
 
     // TODO: Should this be part of the TextureAllocator trait?
-    pub fn flush(&mut self) -> Result<String, TextureError> {
+    pub fn flush(&mut self) -> Result<AtlasFlushInfo, TextureError> {
         let dirty = &mut self.backing.borrow_mut().dirty;
         if !*dirty {
-            return Ok("no change".to_string());
+            return Ok(AtlasFlushInfo {
+                flushed: 0,
+                in_use: self.in_use.len(),
+                capacity: self.layout.tile_count() as usize,
+            });
         }
-        *dirty = false;
 
         let layout = self.layout;
         // Allocate contiguous storage for uploading.
@@ -119,7 +122,8 @@ impl LumAtlasAllocator {
         let mut texels = vec![(255, 0, 255, 255); layout.texel_count()];
         let mut count_written = 0;
 
-        // TODO: Add dirty flags to enable deciding not to upload after all
+        // TODO: Add dirty rectangle tracking so we can do a partial upload...but not until
+        // a benchmark shows it's useful.
         self.in_use.retain(|weak_backing| {
             // Process the non-dropped weak references
             weak_backing.upgrade().map_or(false, |strong_backing| {
@@ -134,12 +138,12 @@ impl LumAtlasAllocator {
 
         self.texture.upload(GenMipmaps::No, &texels)?;
 
-        // TODO: refactoring temporary: String is a bad return format
-        Ok(format!(
-            "flushed block texture with {:?} tiles out of {:?}",
-            count_written,
-            self.in_use.len()
-        ))
+        *dirty = false;
+        Ok(AtlasFlushInfo {
+            flushed: count_written,
+            in_use: self.in_use.len(),
+            capacity: self.layout.tile_count() as usize,
+        })
     }
 
     #[allow(dead_code)]
@@ -215,6 +219,13 @@ impl Drop for TileBacking {
             ab.borrow_mut().index_allocator.free(self.index);
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AtlasFlushInfo {
+    flushed: usize,
+    in_use: usize,
+    capacity: usize,
 }
 
 /// Does the coordinate math for a texture atlas of uniform tiles.

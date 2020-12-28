@@ -302,7 +302,7 @@ where
 }
 
 /// Information about render performance.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RenderInfo {
     space: SpaceRenderInfo,
 }

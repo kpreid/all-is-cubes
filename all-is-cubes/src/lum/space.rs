@@ -29,6 +29,8 @@ use crate::triangulator::{
 };
 use crate::universe::URef;
 
+use super::block_texture::AtlasFlushInfo;
+
 /// Manages cached data and GPU resources for drawing a single [`Space`].
 pub struct SpaceRenderer {
     space: URef<Space>,
@@ -138,15 +140,9 @@ impl SpaceRenderer {
             }
         }
 
-        if block_update_count > 0 {
-            // TODO: recoverable error
-            // TODO: We wouldn't need to flush conditionally if the allocator was smart enough
-            // to not copy unmodified tiles.
-            let _flush_info = block_texture_allocator
-                .flush()
-                .expect("texture write failure");
-            // TODO propagate flush_info
-        }
+        let texture_info = block_texture_allocator
+            .flush()
+            .expect("texture write failure"); // TODO: recover from this error
 
         // TODO: tested function for this matrix op mess
         // TODO: replace unwrap()s with falling back to drawing nothing or drawing the origin
@@ -200,6 +196,7 @@ impl SpaceRenderer {
                 block_update_count,
                 chunks_drawn: 0,
                 squares_drawn: 0, // filled later
+                texture_info,
             },
         }
     }
@@ -247,7 +244,7 @@ impl<'a> SpaceRendererOutput<'a> {
 }
 impl<'a> SpaceRendererBound<'a> {
     /// Use a [`TessGate`] to actually draw the space.
-    pub fn render<E>(&self, tess_gate: &mut TessGate) -> Result<SpaceRenderInfo, E> {
+    pub fn render<E>(self, tess_gate: &mut TessGate) -> Result<SpaceRenderInfo, E> {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
         for p in self.chunk_chart.chunks(self.view_chunk) {
@@ -266,7 +263,7 @@ impl<'a> SpaceRendererBound<'a> {
 }
 
 /// Performance info from a [`SpaceRenderer`] drawing one frame.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SpaceRenderInfo {
     /// How many chunks need to be recomputed (redrawn) but are still waiting in queue.
     pub chunk_queue_count: usize,
@@ -278,6 +275,8 @@ pub struct SpaceRenderInfo {
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
     /// to draw this frame.
     pub squares_drawn: usize,
+    /// Status of the texture atlas.
+    pub texture_info: AtlasFlushInfo,
 }
 
 /// Storage for rendering of part of a [`Space`].
