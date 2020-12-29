@@ -321,29 +321,26 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             [if layer == 0 { face } else { Face::WITHIN }]
                         .vertices;
                         let depth = FreeCoordinate::from(layer) / FreeCoordinate::from(resolution);
-                        if let Some(mut texture_tile) = texture_allocator.allocate() {
-                            texture_tile.write(tile_texels.as_ref());
-                            push_quad(
-                                face_vertices,
-                                face,
-                                depth,
-                                QuadColoring::Texture(&texture_tile),
-                            );
-                            textures_used.push(texture_tile);
-                        } else {
-                            // Texture allocation failure.
-                            // TODO: Mark this triangulation as defective in the return value, so
-                            // that when more space is available, it can be retried, rather than
-                            // having lingering failures.
-                            // TODO: Add other fallback strategies such as using vertices instead
-                            // of textures.
-                            push_quad(
-                                face_vertices,
-                                face,
-                                depth,
-                                QuadColoring::<A::Tile>::Solid(palette::MISSING_TEXTURE_FALLBACK),
-                            );
-                        }
+                        let mut maybe_texture_tile = texture_allocator.allocate();
+
+                        push_quad(
+                            face_vertices,
+                            face,
+                            depth,
+                            if let Some(ref mut texture_tile) = maybe_texture_tile {
+                                texture_tile.write(tile_texels.as_ref());
+                                QuadColoring::Texture(texture_tile)
+                            } else {
+                                // Texture allocation failure.
+                                // TODO: Mark this triangulation as defective in the return value, so
+                                // that when more space is available, it can be retried, rather than
+                                // having lingering failures.
+                                // TODO: Add other fallback strategies such as using vertices instead
+                                // of textures.
+                                QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
+                            },
+                        );
+                        textures_used.extend(maybe_texture_tile);
                     }
                 }
             }
