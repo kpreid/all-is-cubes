@@ -583,21 +583,20 @@ pub mod builder {
             self.content.build_i(self.attributes)
         }
 
-        /// Converts this builder into a block value and stores it as a [`BlockDef`] in the
-        /// given [`Universe`] with the given name.
-        ///
-        /// TODO: this has no tests and no usage...because we don't use BlockDef enough yet.
-        /// And it should probably return a `Block::Indirect` for convenience.
+        /// Converts this builder into a block value and stores it as a [`BlockDef`] in
+        /// the given [`Universe`] with the given name, then returns a [`Block::Indirect`]
+        /// referring to it.
         pub fn into_named_definition(
             self,
             universe: &mut Universe,
             name: impl Into<Name>,
-        ) -> URef<BlockDef>
+        ) -> Result<Block, crate::universe::InsertError>
         where
             C: BuilderContentInUniverse,
         {
             let block = self.content.build_u(self.attributes, universe);
-            universe.insert(name.into(), BlockDef::new(block))
+            let def_ref = universe.insert(name.into(), BlockDef::new(block))?;
+            Ok(Block::Indirect(def_ref))
         }
     }
 

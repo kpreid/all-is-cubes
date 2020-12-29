@@ -707,7 +707,9 @@ mod tests {
     #[test]
     fn set_failure_borrow() {
         let mut u = Universe::new();
-        let inner_space_ref = u.insert("bs".into(), Space::empty_positive(1, 1, 1));
+        let inner_space_ref = u
+            .insert("bs".into(), Space::empty_positive(1, 1, 1))
+            .unwrap();
         let block = Block::builder()
             .voxels_ref(1, inner_space_ref.clone())
             .build();

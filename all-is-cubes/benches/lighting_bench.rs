@@ -48,7 +48,7 @@ fn universe_for_lighting_test() -> Universe {
     wavy_landscape(&mut space, &blocks, 1.0);
     axes(&mut space);
 
-    universe.insert("space".into(), space);
+    universe.insert("space".into(), space).unwrap();
     universe
 }
 

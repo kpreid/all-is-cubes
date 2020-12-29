@@ -97,6 +97,7 @@ impl Universe {
         let name = Name::Anonym(self.next_anonym);
         self.next_anonym += 1;
         self.insert(name, value)
+            .expect("shouldn't happen: newly created anonym already in use")
     }
 }
 
@@ -143,16 +144,16 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
     /// Returns [`None`] if no object exists for the name.
     fn get(&self, name: &Name) -> Option<URef<T>>;
 
-    /// Insert a new object with a specific name.
+    /// Inserts a new object with a specific name.
     ///
-    /// TODO: Implement failure on already-existing names.
-    fn insert(&mut self, name: Name, value: T) -> URef<T>;
+    /// Returns an error if the name is already in use.
+    fn insert(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>;
 }
 impl UniverseIndex<BlockDef> for Universe {
     fn get(&self, name: &Name) -> Option<URef<BlockDef>> {
         index_get(self, name)
     }
-    fn insert(&mut self, name: Name, value: BlockDef) -> URef<BlockDef> {
+    fn insert(&mut self, name: Name, value: BlockDef) -> Result<URef<BlockDef>, InsertError> {
         index_insert(self, name, value)
     }
 }
@@ -160,7 +161,7 @@ impl UniverseIndex<Camera> for Universe {
     fn get(&self, name: &Name) -> Option<URef<Camera>> {
         index_get(self, name)
     }
-    fn insert(&mut self, name: Name, value: Camera) -> URef<Camera> {
+    fn insert(&mut self, name: Name, value: Camera) -> Result<URef<Camera>, InsertError> {
         index_insert(self, name, value)
     }
 }
@@ -168,7 +169,7 @@ impl UniverseIndex<Space> for Universe {
     fn get(&self, name: &Name) -> Option<URef<Space>> {
         index_get(self, name)
     }
-    fn insert(&mut self, name: Name, value: Space) -> URef<Space> {
+    fn insert(&mut self, name: Name, value: Space) -> Result<URef<Space>, InsertError> {
         index_insert(self, name, value)
     }
 }
@@ -181,21 +182,35 @@ where
 {
     this.table().get(name).map(URootRef::downgrade)
 }
-fn index_insert<T>(this: &mut Universe, name: Name, value: T) -> URef<T>
+fn index_insert<T>(this: &mut Universe, name: Name, value: T) -> Result<URef<T>, InsertError>
 where
     Universe: UniverseTable<T>,
 {
-    // TODO: prohibit existing names under any type
-    let root_ref = URootRef::new(name.clone(), value);
-    let returned_ref = root_ref.downgrade();
-    this.table_mut().insert(name, root_ref);
-    returned_ref
+    use std::collections::hash_map::Entry::*;
+    // TODO: prohibit existing names under any type, not just the same type
+    let table = this.table_mut();
+    match table.entry(name.clone()) {
+        Occupied(_) => Err(InsertError::AlreadyExists(name)),
+        Vacant(vacant) => {
+            let root_ref = URootRef::new(name, value);
+            let returned_ref = root_ref.downgrade();
+            vacant.insert(root_ref);
+            Ok(returned_ref)
+        }
+    }
 }
 
 impl Default for Universe {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Errors resulting from attempting to insert an object in a `Universe`.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+pub enum InsertError {
+    #[error("an object already exists with name {0}")]
+    AlreadyExists(Name),
 }
 
 /// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
@@ -519,6 +534,7 @@ mod sealed_gimmick {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::AIR;
     use crate::blockgen::make_some_blocks;
 
     #[test]
@@ -585,6 +601,16 @@ mod tests {
         assert!(
             ref_a.borrow()[(0, 0, 0)] != ref_b.borrow()[(0, 0, 0)],
             "different values"
+        );
+    }
+
+    #[test]
+    fn insert_duplicate_name() {
+        let mut u = Universe::new();
+        u.insert("test_block".into(), BlockDef::new(AIR)).unwrap();
+        assert_eq!(
+            u.insert("test_block".into(), BlockDef::new(AIR)),
+            Err(InsertError::AlreadyExists("test_block".into()))
         );
     }
 }
