@@ -169,40 +169,36 @@ const QUAD_VERTICES: &[Point3<FreeCoordinate>; 6] = &[
 ];
 
 #[inline]
-fn push_quad_solid<V: From<BlockVertex>>(
+fn push_quad<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
     face: Face,
     depth: FreeCoordinate,
-    color: RGBA,
+    coloring: QuadColoring<impl TextureTile>,
 ) {
     let transform = face.matrix();
     for &p in QUAD_VERTICES {
         vertices.push(V::from(BlockVertex {
             position: transform.transform_point(p + Vector3::new(0.0, 0.0, depth)),
             normal: face.normal_vector(),
-            coloring: Coloring::Solid(color),
+            coloring: match coloring {
+                // Note: if we're ever looking for microöptimizations, we could try
+                // converting this to a trait for static dispatch.
+                QuadColoring::Solid(color) => Coloring::Solid(color),
+                QuadColoring::Texture(tile) => Coloring::Texture(tile.texcoord(Vector2::new(
+                    p.x as TextureCoordinate,
+                    p.y as TextureCoordinate,
+                ))),
+            },
         }));
     }
 }
 
-#[inline]
-fn push_quad_textured<V: From<BlockVertex>>(
-    vertices: &mut Vec<V>,
-    face: Face,
-    depth: FreeCoordinate,
-    texture_tile: &impl TextureTile,
-) {
-    let transform = face.matrix();
-    for &p in QUAD_VERTICES {
-        vertices.push(V::from(BlockVertex {
-            position: transform.transform_point(p + Vector3::new(0.0, 0.0, depth)),
-            normal: face.normal_vector(),
-            coloring: Coloring::Texture(texture_tile.texcoord(Vector2::new(
-                p.x as TextureCoordinate,
-                p.y as TextureCoordinate,
-            ))),
-        }));
-    }
+/// Helper for [`push_quad`] which offers the alternatives of solid color or texturing.
+/// Compared to [`Coloring`], it describes texturing for an entire quad rather than a vertex.
+#[derive(Copy, Clone, Debug)]
+enum QuadColoring<'a, T> {
+    Solid(RGBA),
+    Texture(&'a T),
 }
 
 /// Generate [`BlockTriangulation`] for a block.
@@ -226,7 +222,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
                     vertices: if fully_opaque {
                         let mut face_vertices: Vec<V> = Vec::with_capacity(6);
-                        push_quad_solid(&mut face_vertices, face, 0., block.color);
+                        push_quad(
+                            &mut face_vertices,
+                            face,
+                            0.,
+                            QuadColoring::<A::Tile>::Solid(block.color),
+                        );
                         face_vertices
                     } else {
                         Vec::new()
@@ -315,18 +316,18 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     }
                     if layer_is_visible_somewhere {
                         // Actually store and use the texels we just computed.
+                        // Only the surface faces go anywhere but WITHIN.
                         let face_vertices = &mut output_by_face
                             [if layer == 0 { face } else { Face::WITHIN }]
                         .vertices;
                         let depth = FreeCoordinate::from(layer) / FreeCoordinate::from(resolution);
                         if let Some(mut texture_tile) = texture_allocator.allocate() {
                             texture_tile.write(tile_texels.as_ref());
-                            push_quad_textured(
-                                // Only the surface faces go anywhere but WITHIN.
+                            push_quad(
                                 face_vertices,
                                 face,
                                 depth,
-                                &texture_tile,
+                                QuadColoring::Texture(&texture_tile),
                             );
                             textures_used.push(texture_tile);
                         } else {
@@ -336,11 +337,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             // having lingering failures.
                             // TODO: Add other fallback strategies such as using vertices instead
                             // of textures.
-                            push_quad_solid(
+                            push_quad(
                                 face_vertices,
                                 face,
                                 depth,
-                                palette::MISSING_TEXTURE_FALLBACK,
+                                QuadColoring::<A::Tile>::Solid(palette::MISSING_TEXTURE_FALLBACK),
                             );
                         }
                     }
