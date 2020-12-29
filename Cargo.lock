@@ -43,7 +43,7 @@ dependencies = [
  "criterion",
  "embedded-graphics",
  "indexmap",
- "itertools",
+ "itertools 0.10.0",
  "luminance",
  "luminance-front",
  "num-traits",
@@ -62,7 +62,7 @@ name = "all-is-cubes-server"
 version = "0.1.2"
 dependencies = [
  "all-is-cubes",
- "itertools",
+ "itertools 0.10.0",
  "num-traits",
  "once_cell",
  "ordered-float",
@@ -319,7 +319,7 @@ dependencies = [
  "clap",
  "criterion-plot",
  "csv",
- "itertools",
+ "itertools 0.9.0",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -341,7 +341,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e022feadec601fba1649cfa83586381a4ad31c6bf3a9ab7d408118b05dd9889d"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.9.0",
 ]
 
 [[package]]
@@ -871,6 +871,15 @@ name = "itertools"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37d572918e350e82412fe766d24b15e6682fb2ed2bbe018280caa810397cb319"
 dependencies = [
  "either",
 ]
