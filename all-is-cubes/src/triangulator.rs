@@ -627,7 +627,7 @@ impl TextureTile for TestTextureTile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{AIR, Block, BlockAttributes};
+    use crate::block::{Block, BlockAttributes, AIR};
     use crate::blockgen::make_some_blocks;
     use crate::math::GridPoint;
     use crate::universe::Universe;
@@ -682,14 +682,8 @@ mod tests {
 
     fn non_uniform_fill(cube: GridPoint) -> &'static Block {
         const BLOCKS: &[Block] = &[
-                Block::Atom(
-                BlockAttributes::default(),
-                rgba_const!(1., 1., 1., 1.),
-            ),
-            Block::Atom(
-                BlockAttributes::default(),
-                rgba_const!(0., 0., 0., 1.),
-            ),
+            Block::Atom(BlockAttributes::default(), rgba_const!(1., 1., 1., 1.)),
+            Block::Atom(BlockAttributes::default(), rgba_const!(0., 0., 0., 1.)),
         ];
         &BLOCKS[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
     }
@@ -697,7 +691,9 @@ mod tests {
     #[test]
     fn excludes_hidden_faces_of_blocks() {
         let mut space = Space::empty_positive(2, 2, 2);
-        space.fill(space.grid(), |p| Some(non_uniform_fill(p))).unwrap();
+        space
+            .fill(space.grid(), |p| Some(non_uniform_fill(p)))
+            .unwrap();
         let (_, _, space_tri) = triangulate_blocks_and_space(&space, 7);
 
         let space_tri_flattened: Vec<BlockVertex> = space_tri
