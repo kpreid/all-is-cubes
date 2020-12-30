@@ -4,8 +4,12 @@
 //! Procedural block generation. See the `worldgen` module for code that uses the results
 //! of this.
 
+use std::borrow::Cow;
+use std::hash::Hash;
+
 use crate::block::{Block, Resolution, AIR};
 use crate::content::palette;
+use crate::linking::{BlockModule, DefaultProvision};
 use crate::math::{RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::Universe;
@@ -67,37 +71,46 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
     vec
 }
 
-/// A collection of block types assigned specific roles in generating outdoor landscapes.
+/// Names for blocks assigned specific roles in generating outdoor landscapes.
 ///
 /// TODO: This is probably too specific to be useful in the long term; call it a
 /// placeholder.
-#[allow(missing_docs)]
-pub struct LandscapeBlocks {
-    pub air: Block,
-    pub grass: Block,
-    pub dirt: Block,
-    pub stone: Block,
-    pub trunk: Block,
-    pub leaves: Block,
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
+#[strum(serialize_all = "snake_case")]
+pub enum LandscapeBlocks {
+    Air,
+    Grass,
+    Dirt,
+    Stone,
+    Trunk,
+    Leaves,
 }
 
-impl Default for LandscapeBlocks {
-    /// Generate a bland instance of [`LandscapeBlocks`] with single color blocks.
-    fn default() -> LandscapeBlocks {
-        fn color_and_name(color: RGB, name: &'static str) -> Block {
+impl BlockModule for LandscapeBlocks {
+    fn namespace() -> &'static str {
+        "all-is-cubes/landscape"
+    }
+}
+
+/// Provides a bland instance of [`LandscapeBlocks`] with single color blocks.
+impl DefaultProvision for LandscapeBlocks {
+    fn default(self) -> Cow<'static, Block> {
+        fn color_and_name(color: RGB, name: &'static str) -> Cow<'static, Block> {
             Block::builder()
                 .display_name(name)
                 .color(color.with_alpha_one())
                 .build()
+                .into()
         }
 
-        LandscapeBlocks {
-            air: AIR.clone(),
-            grass: color_and_name(palette::GRASS, "Grass"),
-            dirt: color_and_name(palette::DIRT, "Dirt"),
-            stone: color_and_name(palette::STONE, "Stone"),
-            trunk: color_and_name(palette::TREE_BARK, "Wood"),
-            leaves: color_and_name(palette::TREE_LEAVES, "Leaves"),
+        use LandscapeBlocks::*;
+        match self {
+            Air => Cow::Borrowed(&AIR),
+            Grass => color_and_name(palette::GRASS, "Grass"),
+            Dirt => color_and_name(palette::DIRT, "Dirt"),
+            Stone => color_and_name(palette::STONE, "Stone"),
+            Trunk => color_and_name(palette::TREE_BARK, "Wood"),
+            Leaves => color_and_name(palette::TREE_LEAVES, "Leaves"),
         }
     }
 }

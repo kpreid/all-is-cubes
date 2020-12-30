@@ -11,11 +11,12 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
 use noise::Seedable as _;
 
-use crate::block::{Block, BlockDef, Resolution, AIR};
+use crate::block::{Block, Resolution, AIR};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
 use crate::content::logo_text;
 use crate::drawing::draw_to_blocks;
+use crate::linking::BlockProvider;
 use crate::math::{GridPoint, GridVector, NoiseFnExt as _, NotNan, RGB, RGBA};
 use crate::space::{Grid, Space};
 use crate::universe::{InsertError, Universe, UniverseIndex};
@@ -31,7 +32,7 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
         universe,
         resolution: 16,
     };
-    let blocks = extract_landscape_blocks(bg.universe);
+    let blocks = BlockProvider::<LandscapeBlocks>::using(bg.universe).unwrap();
 
     let text_blocks: Space = draw_to_blocks(
         &mut bg,
@@ -155,8 +156,9 @@ fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
 pub fn install_landscape_blocks(
     universe: &mut Universe,
     resolution: Resolution,
-) -> Result<LandscapeBlocks, InsertError> {
-    let colors = LandscapeBlocks::default();
+) -> Result<(), InsertError> {
+    use LandscapeBlocks::*;
+    let colors = BlockProvider::<LandscapeBlocks>::default();
 
     let stone_noise_v = noise::Value::new().set_seed(0x21b5cc6b);
     let stone_noise = noise::ScaleBias::new(&stone_noise_v)
@@ -171,63 +173,43 @@ pub fn install_landscape_blocks(
         .set_bias(f64::from(resolution) * 0.75)
         .set_scale(2.5);
 
-    Block::builder()
-        .attributes(colors.stone.evaluate().unwrap().attributes)
-        .voxels_fn(universe, resolution, |cube| {
-            scale_color(colors.stone.clone(), stone_noise.at_grid(cube), 0.02)
-        })
-        .unwrap()
-        .into_named_definition(universe, "all-is-cubes/demo/stone")?;
+    BlockProvider::<LandscapeBlocks>::new(|key| match key {
+        Stone => Block::builder()
+            .attributes(colors[Stone].evaluate().unwrap().attributes)
+            .voxels_fn(universe, resolution, |cube| {
+                scale_color((*colors[Stone]).clone(), stone_noise.at_grid(cube), 0.02)
+            })
+            .unwrap()
+            .build(),
 
-    Block::builder()
-        .attributes(colors.grass.evaluate().unwrap().attributes)
-        .voxels_fn(universe, resolution, |cube| {
-            if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
-                scale_color(colors.grass.clone(), dirt_noise.at_grid(cube), 0.02)
-            } else {
-                scale_color(colors.dirt.clone(), dirt_noise.at_grid(cube), 0.02)
-            }
-        })
-        .unwrap()
-        .into_named_definition(universe, "all-is-cubes/demo/grass")?;
+        Grass => Block::builder()
+            .attributes(colors[Grass].evaluate().unwrap().attributes)
+            .voxels_fn(universe, resolution, |cube| {
+                if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
+                    scale_color((*colors[Grass]).clone(), dirt_noise.at_grid(cube), 0.02)
+                } else {
+                    scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
+                }
+            })
+            .unwrap()
+            .build(),
 
-    Block::builder()
-        .attributes(colors.dirt.evaluate().unwrap().attributes)
-        .voxels_fn(universe, resolution, |cube| {
-            scale_color(colors.dirt.clone(), dirt_noise.at_grid(cube), 0.02)
-        })
-        .unwrap()
-        .into_named_definition(universe, "all-is-cubes/demo/dirt")?;
+        Dirt => Block::builder()
+            .attributes(colors[Dirt].evaluate().unwrap().attributes)
+            .voxels_fn(universe, resolution, |cube| {
+                scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
+            })
+            .unwrap()
+            .build(),
 
-    universe.insert(
-        "all-is-cubes/demo/trunk".into(),
-        BlockDef::new(colors.trunk),
-    )?;
+        Trunk => (*colors[Trunk]).clone(),
 
-    universe.insert(
-        "all-is-cubes/demo/leaves".into(),
-        BlockDef::new(colors.leaves),
-    )?;
+        Leaves => (*colors[Leaves]).clone(),
 
-    Ok(extract_landscape_blocks(universe))
-}
-
-// TODO: This is a kludge which we should replace with having a systematic approach to well-known
-// block names and fetching references to them.
-fn extract_landscape_blocks(universe: &Universe) -> LandscapeBlocks {
-    let get = |name: &str| {
-        // TODO: the &* mess should not be required
-        let name = (&*format!("all-is-cubes/demo/{}", name)).into();
-        Block::Indirect(universe.get(&name).ok_or(&name).expect("missing block"))
-    };
-    LandscapeBlocks {
-        air: AIR,
-        grass: get("grass"),
-        dirt: get("dirt"),
-        stone: get("stone"),
-        trunk: get("trunk"),
-        leaves: get("leaves"),
-    }
+        Air => AIR,
+    })
+    .install(universe)?;
+    Ok(())
 }
 
 /// Generate a copy of a [`Block::Atom`] with its color scaled by the given scalar.

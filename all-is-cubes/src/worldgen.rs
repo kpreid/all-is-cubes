@@ -9,6 +9,7 @@ use std::convert::TryFrom;
 
 use crate::block::Block;
 use crate::blockgen::LandscapeBlocks;
+use crate::linking::BlockProvider;
 use crate::math::{FreeCoordinate, GridCoordinate, RGB, RGBA};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, Space};
@@ -72,13 +73,18 @@ pub fn axes(space: &mut Space) {
 /// ```
 /// use all_is_cubes::space::Space;
 /// use all_is_cubes::blockgen::LandscapeBlocks;
+/// use all_is_cubes::linking::BlockProvider;
 /// use all_is_cubes::worldgen::wavy_landscape;
 ///
 /// let mut space = Space::empty_positive(10, 10, 10);
-/// wavy_landscape(&mut space, &LandscapeBlocks::default(), 1.0);
+/// wavy_landscape(&mut space, &BlockProvider::<LandscapeBlocks>::default(), 1.0);
 /// # // TODO: It didn't panic, but how about some assertions?
 /// ```
-pub fn wavy_landscape(space: &mut Space, blocks: &LandscapeBlocks, max_slope: FreeCoordinate) {
+pub fn wavy_landscape(
+    space: &mut Space,
+    blocks: &BlockProvider<LandscapeBlocks>,
+    max_slope: FreeCoordinate,
+) {
     // TODO: justify this constant (came from cubes v1 code).
     let slope_scaled = max_slope / 0.904087;
     let middle_y = (space.grid().lower_bounds().y + space.grid().upper_bounds().y) / 2;
@@ -94,15 +100,16 @@ pub fn wavy_landscape(space: &mut Space, blocks: &LandscapeBlocks, max_slope: Fr
             let surface_y = middle_y + (terrain_variation as GridCoordinate);
             for y in space.grid().y_range() {
                 let altitude = y - surface_y;
+                use LandscapeBlocks::*;
                 let block: &Block = if altitude > 0 {
                     // TODO: Consider swapping over to "leave the block untouched" to allow more composition
-                    &blocks.air
+                    &blocks[Air]
                 } else if altitude == 0 {
-                    &blocks.grass
+                    &blocks[Grass]
                 } else if altitude == -1 {
-                    &blocks.dirt
+                    &blocks[Dirt]
                 } else {
-                    &blocks.stone
+                    &blocks[Stone]
                 };
                 space.set((x, y, z), block).unwrap();
                 // TODO: Add various decorations on the ground. And trees.

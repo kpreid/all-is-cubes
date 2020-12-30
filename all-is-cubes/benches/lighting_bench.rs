@@ -1,3 +1,4 @@
+use all_is_cubes::linking::BlockProvider;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::time::Duration;
 
@@ -34,7 +35,8 @@ fn universe_for_lighting_test() -> Universe {
     // (no "a landscape").
 
     let mut universe = Universe::new();
-    let blocks = install_landscape_blocks(&mut universe, 16).unwrap();
+    install_landscape_blocks(&mut universe, 16).unwrap();
+    let blocks = BlockProvider::using(&universe).unwrap();
 
     let radius = 20;
     let diameter = radius * 2 + 1;
