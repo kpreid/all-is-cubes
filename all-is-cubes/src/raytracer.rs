@@ -20,6 +20,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
+use crate::block::Evoxel;
 use crate::camera::{eye_for_look_at, ProjectionHelper};
 use crate::math::{Face, FreeCoordinate, GridPoint, RGB, RGBA};
 use crate::raycast::Ray;
@@ -93,7 +94,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                             if s.count_step_should_stop() {
                                 break;
                             }
-                            let color = array[subcube_hit.cube_ahead()];
+                            let color = array[subcube_hit.cube_ahead()].color;
                             s.trace_through_surface(
                                 pixel_block_data,
                                 color,
@@ -308,7 +309,7 @@ struct TracingCubeData<'a, B: 'static> {
 #[derive(Clone, Debug)]
 enum TracingBlock<B: 'static> {
     Atom(B, RGBA),
-    Recur(B, GridArray<RGBA>),
+    Recur(B, GridArray<Evoxel>),
 }
 
 #[derive(Clone, Debug, Default)]

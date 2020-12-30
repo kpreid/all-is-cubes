@@ -95,7 +95,12 @@ impl Block {
                 let voxels = block_space
                     .extract(grid, |_index, sub_block_data, _lighting| {
                         // TODO: need to also extract solidity info once we start doing collision
-                        sub_block_data.evaluated().color
+                        let sub_evaluated = sub_block_data.evaluated();
+                        Evoxel {
+                            color: sub_evaluated.color,
+                            selectable: sub_evaluated.attributes.selectable,
+                            solid: sub_evaluated.attributes.solid,
+                        }
                     })
                     .translate(-offset.to_vec());
                 Ok(EvaluatedBlock {
@@ -105,11 +110,11 @@ impl Block {
                     opaque: voxels
                         .grid()
                         .interior_iter()
-                        .all(|p| voxels[p].fully_opaque()),
+                        .all(|p| voxels[p].color.fully_opaque()),
                     visible: voxels
                         .grid()
                         .interior_iter()
-                        .any(|p| !voxels[p].fully_transparent()),
+                        .any(|p| !voxels[p].color.fully_transparent()),
 
                     voxels: Some(voxels),
                 })
@@ -298,7 +303,7 @@ pub struct EvaluatedBlock {
     ///
     /// TODO: Specify how it should be handled if the grid has unsuitable dimensions
     /// (not cubical, not having an origin of 0, etc.).
-    pub voxels: Option<GridArray<RGBA>>,
+    pub voxels: Option<GridArray<Evoxel>>,
     /// Whether the block is known to be completely opaque to light on all six faces.
     ///
     /// Currently, this is defined to be that each of the surfaces of the block are
@@ -319,6 +324,36 @@ impl ConciseDebug for EvaluatedBlock {
             .field("visible", &self.visible)
             .field("voxels", &"...")
             .finish()
+    }
+}
+
+/// Properties of an individual voxel within [`EvaluatedBlock`].
+///
+/// This is essentially a subset of the information in a full [`EvaluatedBlock`] and
+/// its [`BlockAttributes`].
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct Evoxel {
+    // TODO: Maybe we should convert to a smaller color format at this point?
+    // These are frequently going to be copied into 32-bit texture color anyway.
+    pub color: RGBA,
+    pub selectable: bool,
+    pub solid: bool,
+}
+
+impl Evoxel {
+    /// Construct the [`Evoxel`] that would have resulted from evaluating a voxel block
+    /// with the given color and default attributes.
+    pub const fn new(color: RGBA) -> Self {
+        // Use the values from BlockAttributes's default for consistency.
+        // Force constant promotion so that this doesn't look like a
+        // feature(const_precise_live_drops) requirement
+        const DA: &BlockAttributes = &BlockAttributes::default();
+        Self {
+            color,
+            selectable: DA.selectable,
+            solid: DA.solid,
+        }
     }
 }
 
@@ -758,7 +793,11 @@ mod tests {
             e.voxels,
             Some(GridArray::generate(Grid::for_block(resolution), |point| {
                 let point = point.cast::<f32>().unwrap();
-                RGBA::new(point.x, point.y, point.z, 1.0)
+                Evoxel {
+                    color: RGBA::new(point.x, point.y, point.z, 1.0),
+                    selectable: true,
+                    solid: true,
+                }
             }))
         );
         assert_eq!(e.opaque, true);
@@ -845,7 +884,11 @@ mod tests {
                 Grid::for_block(resolution as Resolution),
                 |point| {
                     let point = (point + offset).cast::<f32>().unwrap();
-                    RGBA::new(point.x, point.y, point.z, 1.0)
+                    Evoxel {
+                        color: RGBA::new(point.x, point.y, point.z, 1.0),
+                        selectable: true,
+                        solid: true,
+                    }
                 }
             ))
         );

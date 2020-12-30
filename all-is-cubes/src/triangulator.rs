@@ -17,7 +17,7 @@ use cgmath::{
 };
 use std::convert::TryFrom;
 
-use crate::block::{EvaluatedBlock, Resolution};
+use crate::block::{EvaluatedBlock, Evoxel, Resolution};
 use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
@@ -311,15 +311,17 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
                             // Diagnose out-of-space accesses. TODO: Tidy this up and document it, or remove it:
                             // it will happen whenever the space is the wrong size for the textures.
-                            let color =
-                                voxels.get(cube).unwrap_or(&palette::MISSING_VOXEL_FALLBACK);
+                            let color = voxels
+                                .get(cube)
+                                .unwrap_or(&Evoxel::new(palette::MISSING_VOXEL_FALLBACK))
+                                .color;
 
                             if !color.fully_transparent() && {
                                 // Compute whether this voxel is not hidden behind another
                                 let obscuring_cube = cube + face.normal_vector();
                                 !voxels
                                     .get(obscuring_cube)
-                                    .map(|c| c.fully_opaque())
+                                    .map(|ev| ev.color.fully_opaque())
                                     .unwrap_or(false)
                             } {
                                 layer_is_visible_somewhere = true;
