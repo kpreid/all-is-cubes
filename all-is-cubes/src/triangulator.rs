@@ -279,7 +279,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 for layer in 0..resolution {
                     // TODO: JS version would detect fully-opaque blocks (a derived property of Block)
                     // and only scan the first and last faces
-                    let mut tile_texels: Vec<(u8, u8, u8, u8)> =
+                    let mut tile_texels: Vec<Texel> =
                         Vec::with_capacity((resolution as usize).pow(2));
                     let mut layer_is_visible_somewhere = false;
 
@@ -339,6 +339,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             tile_texels.push(color.to_saturating_32bit());
                         }
                     }
+
+                    // TODO: To reduce artifacts, process tile_texels to add an anti-bleed border
+                    // outside of the visible rectangle. (See if we can reuse the texture allocator
+                    // blitting code.)
+
                     if layer_is_visible_somewhere {
                         // Actually store and use the texels we just computed.
                         // Only the surface faces go anywhere but WITHIN.
@@ -346,18 +351,19 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             [if layer == 0 { face } else { Face::WITHIN }]
                         .vertices;
                         let depth = FreeCoordinate::from(layer) / FreeCoordinate::from(resolution);
-                        let mut maybe_texture_tile = texture_allocator.allocate();
 
-                        push_quad(
-                            face_vertices,
-                            face,
-                            depth,
-                            visible_low_corner.map(|c| {
-                                FreeCoordinate::from(c) / FreeCoordinate::from(resolution)
-                            }),
-                            visible_high_corner.map(|c| {
-                                FreeCoordinate::from(c) / FreeCoordinate::from(resolution)
-                            }),
+                        let mut maybe_texture_tile = None;
+                        let coloring = if let Some(uniform_color) = rectangle_is_uniform_color(
+                            &tile_texels,
+                            resolution,
+                            visible_low_corner,
+                            visible_high_corner,
+                        ) {
+                            // The quad we're going to draw has identical texels, so we might as
+                            // well use a solid color and skip allocating a texture tile.
+                            QuadColoring::<A::Tile>::Solid(RGBA::from_32bit(uniform_color))
+                        } else {
+                            maybe_texture_tile = texture_allocator.allocate();
                             if let Some(ref mut texture_tile) = maybe_texture_tile {
                                 texture_tile.write(tile_texels.as_ref());
                                 QuadColoring::Texture(texture_tile)
@@ -369,7 +375,20 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 // TODO: Add other fallback strategies such as using vertices instead
                                 // of textures.
                                 QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
-                            },
+                            }
+                        };
+
+                        push_quad(
+                            face_vertices,
+                            face,
+                            depth,
+                            visible_low_corner.map(|c| {
+                                FreeCoordinate::from(c) / FreeCoordinate::from(resolution)
+                            }),
+                            visible_high_corner.map(|c| {
+                                FreeCoordinate::from(c) / FreeCoordinate::from(resolution)
+                            }),
+                            coloring,
                         );
                         textures_used.extend(maybe_texture_tile);
                     }
@@ -382,6 +401,28 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             }
         }
     }
+}
+
+fn rectangle_is_uniform_color(
+    texels: &[Texel],
+    resolution: i32,
+    low_corner: Point2<i32>,
+    high_corner: Point2<i32>,
+) -> Option<Texel> {
+    let mut first = None;
+    for y in low_corner.y..high_corner.y {
+        // a.k.a. texture coordinate s
+        let row: usize = y as usize * resolution as usize;
+        for x in low_corner.x..high_corner.x {
+            // a.k.a. texture coordinate t
+            let index: usize = row + x as usize;
+            let texel = texels[index];
+            if texel != *first.get_or_insert(texel) {
+                return None;
+            }
+        }
+    }
+    first
 }
 
 /// Precomputes vertices for blocks present in a space.
@@ -586,13 +627,26 @@ impl TextureTile for TestTextureTile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, AIR};
+    use crate::block::{AIR, Block, BlockAttributes};
     use crate::blockgen::make_some_blocks;
-
+    use crate::math::GridPoint;
     use crate::universe::Universe;
     use cgmath::MetricSpace as _;
 
-    /// Shorthand for writing out an entire [`BlockVertex`].
+    /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
+    fn v_c(
+        position: [FreeCoordinate; 3],
+        normal: [FreeCoordinate; 3],
+        color: [f32; 4],
+    ) -> BlockVertex {
+        BlockVertex {
+            position: position.into(),
+            normal: normal.into(),
+            coloring: Coloring::Solid(RGBA::new(color[0], color[1], color[2], color[3])),
+        }
+    }
+
+    /// Shorthand for writing out an entire [`BlockVertex`] with texturing.
     fn v_t(
         position: [FreeCoordinate; 3],
         normal: [FreeCoordinate; 3],
@@ -626,11 +680,24 @@ mod tests {
         (tex, block_triangulations, space_triangulation)
     }
 
+    fn non_uniform_fill(cube: GridPoint) -> &'static Block {
+        const BLOCKS: &[Block] = &[
+                Block::Atom(
+                BlockAttributes::default(),
+                rgba_const!(1., 1., 1., 1.),
+            ),
+            Block::Atom(
+                BlockAttributes::default(),
+                rgba_const!(0., 0., 0., 1.),
+            ),
+        ];
+        &BLOCKS[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
+    }
+
     #[test]
     fn excludes_hidden_faces_of_blocks() {
-        let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 2, 2);
-        space.fill(space.grid(), |_| Some(&block)).unwrap();
+        space.fill(space.grid(), |p| Some(non_uniform_fill(p))).unwrap();
         let (_, _, space_tri) = triangulate_blocks_and_space(&space, 7);
 
         let space_tri_flattened: Vec<BlockVertex> = space_tri
@@ -708,11 +775,7 @@ mod tests {
                 .clone()
                 .map(|_, frd| frd.vertices.to_vec())
         );
-        assert_eq!(
-            tex.count_allocated(),
-            6,
-            "Should be only 6 cube face textures"
-        );
+        assert_eq!(tex.count_allocated(), 0);
     }
 
     /// Check for hidden surfaces being given textures.
@@ -723,11 +786,10 @@ mod tests {
         // Construct a box whose faces don't touch the outer extent of the volume.
         let resolution = 8;
         let mut u = Universe::new();
-        let filler_block = make_some_blocks(1).swap_remove(0);
         let less_than_full_block = Block::builder()
             .voxels_fn(&mut u, resolution, |cube| {
                 if Grid::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
-                    &filler_block
+                    non_uniform_fill(cube)
                 } else {
                     &AIR
                 }
@@ -784,6 +846,89 @@ mod tests {
                     v_t([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.750, 0.250, 0.000]),
                     v_t([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.250, 0.750, 0.000]),
                     v_t([0.750, 0.250, 0.750], [ 0.,  0.,  1.], [0.750, 0.750, 0.000]),
+                ],
+                nx: vec![],
+                ny: vec![],
+                nz: vec![],
+                px: vec![],
+                py: vec![],
+                pz: vec![],
+            },
+        );
+    }
+
+    /// Exercise the case where textures are skipped because the color is uniform.
+    /// TODO: There are more subcases such as still using textures for irregular
+    /// shapes.
+    #[test]
+    #[rustfmt::skip]
+    fn shrunken_box_uniform_color() {
+        // Construct a box whose faces don't touch the outer extent of the volume.
+        let resolution = 8;
+        let mut u = Universe::new();
+        let filler_block = Block::Atom(
+            BlockAttributes::default(),
+            // Caution: the conversion involves a round trip through 8-bit color.
+            // This exercises that rounding consciously but we might decide to
+            // get rid of it.
+            RGBA::new(0.0, 1.0, 0.5, 1.0),
+        );
+        let less_than_full_block = Block::builder()
+            .voxels_fn(&mut u, resolution, |cube| {
+                if Grid::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
+                    &filler_block
+                } else {
+                    &AIR
+                }
+            })
+            .unwrap()
+            .build();
+        let mut outer_space = Space::empty_positive(1, 1, 1);
+        outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
+
+        let (tex, _, space_rendered) = triangulate_blocks_and_space(&outer_space, resolution);
+
+        assert_eq!(tex.count_allocated(), 0, "Should be no cube face textures");
+        assert_eq!(
+            space_rendered,
+            FaceMap {
+                within: vec![
+                    v_c([0.250, 0.250, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                    v_c([0.750, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
                 ],
                 nx: vec![],
                 ny: vec![],

@@ -494,6 +494,7 @@ impl RGBA {
         RGB(self.0.truncate())
     }
 
+    // TODO: This and the code depending on it should use [u8; 4] instead.
     /// Converts this color lossily to linear 8-bits-per-component color.
     #[inline]
     pub fn to_saturating_32bit(self) -> (u8, u8, u8, u8) {
@@ -508,6 +509,20 @@ impl RGBA {
             convert_component(self.blue()),
             convert_component(self.alpha()),
         )
+    }
+
+    #[inline]
+    pub fn from_32bit((r, g, b, a): (u8, u8, u8, u8)) -> Self {
+        #[inline]
+        fn convert_component(x: u8) -> NotNan<f32> {
+            NotNan::new(f32::from(x) / 255.0).unwrap()
+        }
+        Self(Vector4::new(
+            convert_component(r),
+            convert_component(g),
+            convert_component(b),
+            convert_component(a),
+        ))
     }
 }
 
