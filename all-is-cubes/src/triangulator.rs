@@ -605,34 +605,51 @@ mod tests {
         }
     }
 
+    /// Test helper to call `triangulate_blocks` followed directly by `triangulate_space`.
+    fn triangulate_blocks_and_space(
+        space: &Space,
+        texture_resolution: Resolution,
+    ) -> (
+        TestTextureAllocator,
+        BlockTriangulations<BlockVertex, TestTextureTile>,
+        FaceMap<Vec<BlockVertex>>,
+    ) {
+        let mut tex = TestTextureAllocator::new(texture_resolution);
+        let block_triangulations = triangulate_blocks(space, &mut tex);
+        let mut space_triangulation = new_space_buffer();
+        triangulate_space::<BlockVertex, BlockVertex, TestTextureTile, _>(
+            space,
+            space.grid(),
+            &*block_triangulations,
+            &mut space_triangulation,
+        );
+        (tex, block_triangulations, space_triangulation)
+    }
+
     #[test]
-    fn excludes_interior_faces() {
+    fn excludes_hidden_faces_of_blocks() {
         let block = make_some_blocks(1).swap_remove(0);
         let mut space = Space::empty_positive(2, 2, 2);
         space.fill(space.grid(), |_| Some(&block)).unwrap();
+        let (_, _, space_tri) = triangulate_blocks_and_space(&space, 7);
 
-        let mut rendering = new_space_buffer();
-        triangulate_space::<BlockVertex, BlockVertex, TestTextureTile, _>(
-            &space,
-            space.grid(),
-            &*triangulate_blocks(&space, &mut TestTextureAllocator::new(43)),
-            &mut rendering,
-        );
-        let rendering_flattened: Vec<BlockVertex> = rendering
+        let space_tri_flattened: Vec<BlockVertex> = space_tri
             .values()
             .iter()
             .flat_map(|r| (*r).clone())
             .collect();
+
+        // The space rendering should be a 2×2×2 cube of tiles, without any hidden interior faces.
         assert_eq!(
             Vec::<&BlockVertex>::new(),
-            rendering_flattened
+            space_tri_flattened
                 .iter()
                 .filter(|vertex| vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
                 .collect::<Vec<&BlockVertex>>(),
             "found an interior point"
         );
         assert_eq!(
-            rendering_flattened.len(),
+            space_tri_flattened.len(),
             6 /* vertices per face */
             * 4 /* block faces per exterior side of space */
             * 6, /* sides of space */
@@ -640,6 +657,7 @@ mod tests {
         );
     }
 
+    /// Run [`triangulate_space`] with stale block data and confirm it does not panic.
     #[test]
     fn no_panic_on_missing_blocks() {
         let block = make_some_blocks(1).swap_remove(0);
@@ -677,24 +695,18 @@ mod tests {
             .set((0, 0, 0), &trivial_recursive_block)
             .unwrap();
 
-        let mut tex = TestTextureAllocator::new(1);
-        let block_triangulations: BlockTriangulations<BlockVertex, _> =
-            triangulate_blocks(&outer_space, &mut tex);
-        let block_render_data: BlockTriangulation<_, _> = block_triangulations[0].clone();
+        let (tex, block_triangulations, space_rendered) =
+            triangulate_blocks_and_space(&outer_space, 1);
 
         eprintln!("{:#?}", block_triangulations);
-        let mut space_rendered = new_space_buffer();
-        triangulate_space(
-            &outer_space,
-            outer_space.grid(),
-            &*block_triangulations,
-            &mut space_rendered,
-        );
         eprintln!("{:#?}", space_rendered);
 
         assert_eq!(
             space_rendered,
-            block_render_data.faces.map(|_, frd| frd.vertices.to_vec())
+            block_triangulations[0]
+                .faces
+                .clone()
+                .map(|_, frd| frd.vertices.to_vec())
         );
         assert_eq!(
             tex.count_allocated(),
@@ -712,10 +724,9 @@ mod tests {
         let resolution = 8;
         let mut u = Universe::new();
         let filler_block = make_some_blocks(1).swap_remove(0);
-        let less_than_full_volume = Grid::new((2, 2, 2), (4, 4, 4));
         let less_than_full_block = Block::builder()
             .voxels_fn(&mut u, resolution, |cube| {
-                if less_than_full_volume.contains_cube(cube) {
+                if Grid::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
                     &filler_block
                 } else {
                     &AIR
@@ -726,19 +737,7 @@ mod tests {
         let mut outer_space = Space::empty_positive(1, 1, 1);
         outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
 
-        let mut tex = TestTextureAllocator::new(resolution);
-        let block_triangulations: BlockTriangulations<BlockVertex, _> =
-            triangulate_blocks(&outer_space, &mut tex);
-
-        eprintln!("{:#?}", block_triangulations);
-        let mut space_rendered = new_space_buffer();
-        triangulate_space(
-            &outer_space,
-            outer_space.grid(),
-            &*block_triangulations,
-            &mut space_rendered,
-        );
-        eprintln!("{:#?}", space_rendered);
+        let (tex, _, space_rendered) = triangulate_blocks_and_space(&outer_space, resolution);
 
         assert_eq!(
             tex.count_allocated(),
@@ -828,6 +827,7 @@ mod tests {
         let _complex_block_triangulation = &block_triangulations[0];
     }
 
+    /// Test the [`TestTextureAllocator`].
     #[test]
     fn test_texture_allocator() {
         let mut allocator = TestTextureAllocator::new(123);
