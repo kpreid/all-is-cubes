@@ -60,7 +60,7 @@ impl Block {
     /// Returns a new [`BlockBuilder`] which may be used to construct a [`Block`] value
     /// from various inputs with convenient syntax.
     pub const fn builder() -> BlockBuilder<builder::NeedsColorOrVoxels> {
-        builder::DEFAULT
+        BlockBuilder::<builder::NeedsColorOrVoxels>::default()
     }
 
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
@@ -232,17 +232,26 @@ pub struct BlockAttributes {
     // TODO: add 'behavior' functionality, if we don't come up with something else
 }
 
-const DEFAULT_ATTRIBUTES: BlockAttributes = BlockAttributes {
-    display_name: Cow::Borrowed(""),
-    selectable: true,
-    solid: true,
-    light_emission: RGB::ZERO,
-};
+impl BlockAttributes {
+    /// Block attributes suitable as default values for in-game use.
+    ///
+    /// This function differs from the [`Default::default`] trait implementation only
+    /// in that it is a `const fn`.
+    pub const fn default() -> BlockAttributes {
+        BlockAttributes {
+            display_name: Cow::Borrowed(""),
+            selectable: true,
+            solid: true,
+            light_emission: RGB::ZERO,
+        }
+    }
+}
 
 impl Default for BlockAttributes {
     /// Block attributes suitable as default values for in-game use.
     fn default() -> BlockAttributes {
-        DEFAULT_ATTRIBUTES
+        // Delegate to the inherent impl `const fn`.
+        BlockAttributes::default()
     }
 }
 
@@ -445,11 +454,6 @@ pub mod builder {
 
     use super::*;
 
-    pub(crate) const DEFAULT: BlockBuilder<NeedsColorOrVoxels> = BlockBuilder {
-        attributes: DEFAULT_ATTRIBUTES,
-        content: NeedsColorOrVoxels,
-    };
-
     /// Tool for constructing [`Block`] values conveniently.
     ///
     /// To create one, call [`Block::builder()`].
@@ -471,7 +475,7 @@ pub mod builder {
     ///     Cow::Borrowed("BROWN"),
     /// );
     /// ```
-    #[derive(Clone, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct BlockBuilder<C> {
         attributes: BlockAttributes,
         content: C,
@@ -479,18 +483,26 @@ pub mod builder {
 
     impl Default for BlockBuilder<NeedsColorOrVoxels> {
         fn default() -> Self {
-            DEFAULT
+            // Delegate to inherent impl const fn
+            Self::default()
+        }
+    }
+
+    impl BlockBuilder<NeedsColorOrVoxels> {
+        pub const fn default() -> BlockBuilder<NeedsColorOrVoxels> {
+            BlockBuilder {
+                attributes: BlockAttributes::default(),
+                content: NeedsColorOrVoxels,
+            }
         }
     }
 
     impl<C> BlockBuilder<C> {
         // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make
-        // this builder usable in const contexts.
+        // this builder mostly usable in const contexts.
         // https://github.com/rust-lang/rust/issues/73255
         // Doing that will also require creating non-trait-using alternate methods,
         // until const traits https://github.com/rust-lang/rust/issues/67792 is also available.
-
-        // TODO: Document all of these methods
 
         /// Sets the value for [`BlockAttributes::display_name`].
         pub fn attributes(mut self, value: BlockAttributes) -> Self {
@@ -985,6 +997,22 @@ mod tests {
                 resolution: 2, // not same as space size
                 space: space_ref
             },
+        );
+    }
+
+    #[test]
+    fn builder_default_equivalent() {
+        assert_eq!(
+            BlockBuilder::<builder::NeedsColorOrVoxels>::default(),
+            <BlockBuilder<builder::NeedsColorOrVoxels> as Default>::default()
+        );
+    }
+
+    #[test]
+    fn attributes_default_equivalent() {
+        assert_eq!(
+            BlockAttributes::default(),
+            <BlockAttributes as Default>::default()
         );
     }
 }
