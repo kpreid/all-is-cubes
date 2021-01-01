@@ -4,6 +4,7 @@
 //! Continuously moving objects and collision.
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
+use ordered_float::NotNan;
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -117,9 +118,17 @@ impl Body {
         if !self.flying {
             self.velocity += GRAVITY * dt;
         }
+
+        let push_out_info = if let Some(space) = colliding_space {
+            self.push_out(space)
+        } else {
+            None
+        };
+
         if self.velocity.magnitude2() <= VELOCITY_EPSILON_SQUARED {
             return BodyStepInfo {
                 quiescent: true,
+                push_out: push_out_info,
                 move_segments,
             };
         }
@@ -154,6 +163,7 @@ impl Body {
 
         BodyStepInfo {
             quiescent: false,
+            push_out: push_out_info,
             move_segments,
         }
     }
@@ -174,7 +184,7 @@ impl Body {
         let ray = Ray::new(self.position, delta_position);
         // Note: no `.within_grid()` because that would not work when the leading
         // corner is not within the grid.
-        for (ray_step, step_aab) in aab_raycast(self.collision_box, ray) {
+        for (ray_step, step_aab) in aab_raycast(self.collision_box, ray, false) {
             if ray_step.t_distance() >= 1.0 {
                 // Movement is unobstructed in this timestep.
                 break;
@@ -248,6 +258,69 @@ impl Body {
         )
     }
 
+    /// Check if we're intersecting any blocks and fix that if so.
+    fn push_out(&mut self, space: &Space) -> Option<Vector3<FreeCoordinate>> {
+        if self
+            .collision_box_abs()
+            .round_up_to_grid()
+            .interior_iter()
+            .any(|cube| {
+                // TODO: Have collision test logic in common with the movement routine
+                space.get_evaluated(cube).attributes.collision == BlockCollision::Hard
+            })
+        {
+            let exit_backwards = -self.velocity;
+            let shortest_push_out = (-1..=1)
+                .flat_map(move |dx| {
+                    (-1..=1).flat_map(move |dy| {
+                        (-1..=1).map(move |dz| {
+                            let direction = Vector3::new(dx, dy, dz).map(FreeCoordinate::from);
+                            if direction == Vector3::zero() {
+                                // We've got an extra case, and an item to delete from the combinations,
+                                // so substitute the one from the other.
+                                exit_backwards
+                            } else {
+                                direction
+                            }
+                        })
+                    })
+                })
+                .flat_map(|direction| self.attempt_push_out(space, direction))
+                .min_by_key(|(_, distance)| *distance);
+
+            if let Some((new_position, _)) = shortest_push_out {
+                let old_position = self.position;
+                self.position = new_position;
+                return Some(new_position - old_position);
+            }
+        }
+        None
+    }
+
+    fn attempt_push_out(
+        &self,
+        space: &Space,
+        direction: Vector3<FreeCoordinate>,
+    ) -> Option<(Point3<FreeCoordinate>, NotNan<FreeCoordinate>)> {
+        let ray = Ray::new(self.position, direction);
+        'raycast: for (ray_step, step_aab) in aab_raycast(self.collision_box, ray, true) {
+            for cube in step_aab.round_up_to_grid().interior_iter() {
+                // TODO: refactor to combine this with other collision attribute tests
+                if space.get_evaluated(cube).attributes.collision == BlockCollision::Hard {
+                    // Not a clear space
+                    continue 'raycast;
+                }
+            }
+            // No collisions, so we can use this.
+            return Some((
+                self.position + direction * ray_step.t_distance(),
+                NotNan::new(ray_step.t_distance() * direction.magnitude()).ok()?,
+            ));
+        }
+
+        None
+    }
+
     /// Returns the body's collision box in world coordinates
     /// (`collision_box` translated by `position`).
     ///
@@ -285,6 +358,7 @@ impl Body {
 pub struct BodyStepInfo {
     /// Whether movement computation was skipped due to approximately zero velocity.
     pub quiescent: bool,
+    pub push_out: Option<Vector3<FreeCoordinate>>,
     /// Details on movement and collision. A single frame's movement may have up to three
     /// segments as differently oriented faces are collided with.
     pub move_segments: [MoveSegment; 3],
@@ -292,8 +366,18 @@ pub struct BodyStepInfo {
 
 /// Given a ray describing movement of the origin of an AAB, perform a raycast to find
 /// the positions where the AAB moves into new cubes.
-fn aab_raycast(aab: AAB, origin_ray: Ray) -> impl Iterator<Item = (RaycastStep, AAB)> {
-    let (leading_corner, trailing_box) = aab.leading_corner_trailing_box(origin_ray.direction);
+///
+/// If `reversed` is true, find positions where it leaves cubes.
+fn aab_raycast(
+    aab: AAB,
+    origin_ray: Ray,
+    reversed: bool,
+) -> impl Iterator<Item = (RaycastStep, AAB)> {
+    let (leading_corner, trailing_box) = aab.leading_corner_trailing_box(if reversed {
+        -origin_ray.direction
+    } else {
+        origin_ray.direction
+    });
     let leading_ray = origin_ray.translate(leading_corner);
     leading_ray.cast().map(move |step| {
         // TODO: The POSITION_EPSILON is a quick kludge to get a result that
