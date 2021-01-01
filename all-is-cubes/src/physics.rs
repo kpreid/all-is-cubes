@@ -129,7 +129,6 @@ impl Body {
 
         // Do collision detection and resolution.
         if let Some(space) = colliding_space {
-            // TODO: Axis-aligned box collision volume.
             let mut i = 0;
             let mut delta_position = unobstructed_delta_position;
             while delta_position != Vector3::zero() {
