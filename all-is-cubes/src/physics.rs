@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use crate::block::BlockCollision;
 use crate::math::{CubeFace, Face, FreeCoordinate, Geometry as _, AAB};
-use crate::raycast::Ray;
+use crate::raycast::{Ray, RaycastStep};
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
 
@@ -170,22 +170,11 @@ impl Body {
         CC: FnMut(Contact),
     {
         let mut already_colliding: HashSet<Contact> = HashSet::new();
-        let (leading_corner, trailing_box) = self
-            .collision_box
-            .leading_corner_trailing_box(delta_position);
 
-        let collision_iter = |point: Point3<FreeCoordinate>| {
-            trailing_box
-                .translate(point.to_vec())
-                .round_up_to_grid()
-                .interior_iter()
-        };
-
-        let leading_corner_abs = self.position + leading_corner;
-        let ray = Ray::new(leading_corner_abs, delta_position);
+        let ray = Ray::new(self.position, delta_position);
         // Note: no `.within_grid()` because that would not work when the leading
         // corner is not within the grid.
-        for ray_step in ray.cast() {
+        for (ray_step, step_aab) in aab_raycast(self.collision_box, ray) {
             if ray_step.t_distance() >= 1.0 {
                 // Movement is unobstructed in this timestep.
                 break;
@@ -194,7 +183,7 @@ impl Body {
                 // If we are intersecting a block, we are allowed to leave it; pretend
                 // it doesn't exist.
                 // TODO: Implement pushing out of shallow collisions.
-                for box_cube in collision_iter(ray_step.intersection_point(ray)) {
+                for box_cube in step_aab.round_up_to_grid().interior_iter() {
                     already_colliding.insert(Contact {
                         cube: box_cube,
                         face: ray_step.face(),
@@ -206,12 +195,7 @@ impl Body {
             // Loop over all the cubes that our AAB is just now intersecting and check if
             // any of them are solid.
             let mut hit_something = false;
-            // TODO: The + POSITION_EPSILON is a quick kludge to get a result that
-            // *includes* the cubes we are advancing towards. Replace it with something
-            // more precisely what we need.
-            for box_cube in
-                collision_iter(ray_step.intersection_point(ray) + delta_position * POSITION_EPSILON)
-            {
+            for box_cube in step_aab.round_up_to_grid().interior_iter() {
                 let contact = Contact {
                     cube: box_cube,
                     face: ray_step.face(),
@@ -304,6 +288,27 @@ pub struct BodyStepInfo {
     /// Details on movement and collision. A single frame's movement may have up to three
     /// segments as differently oriented faces are collided with.
     pub move_segments: [MoveSegment; 3],
+}
+
+/// Given a ray describing movement of the origin of an AAB, perform a raycast to find
+/// the positions where the AAB moves into new cubes.
+fn aab_raycast(aab: AAB, origin_ray: Ray) -> impl Iterator<Item = (RaycastStep, AAB)> {
+    let (leading_corner, trailing_box) = aab.leading_corner_trailing_box(origin_ray.direction);
+    let leading_ray = origin_ray.translate(leading_corner);
+    leading_ray.cast().map(move |step| {
+        // TODO: The POSITION_EPSILON is a quick kludge to get a result that
+        // *includes* the cubes we are advancing towards. Replace it with something
+        // more precisely what we need.
+        let nudge = if step.face() != Face::WITHIN {
+            origin_ray.direction * POSITION_EPSILON
+        } else {
+            Vector3::zero()
+        };
+        (
+            step,
+            trailing_box.translate((step.intersection_point(leading_ray) + nudge).to_vec()),
+        )
+    })
 }
 
 /// One of the individual straight-line movement segments of a [`BodyStepInfo`].
