@@ -94,12 +94,11 @@ impl Block {
                 let grid = Grid::new(offset, (resolution, resolution, resolution));
                 let voxels = block_space
                     .extract(grid, |_index, sub_block_data, _lighting| {
-                        // TODO: need to also extract solidity info once we start doing collision
                         let sub_evaluated = sub_block_data.evaluated();
                         Evoxel {
                             color: sub_evaluated.color,
                             selectable: sub_evaluated.attributes.selectable,
-                            solid: sub_evaluated.attributes.solid,
+                            collision: sub_evaluated.attributes.collision,
                         }
                     })
                     .translate(-offset.to_vec());
@@ -225,10 +224,10 @@ pub struct BlockAttributes {
     /// The default value is `true`.
     pub selectable: bool,
 
-    /// Whether the block is a physical obstacle.
+    /// The effect on a [`Body`] of colliding with this block.
     ///
-    /// The default value is `true`.
-    pub solid: bool,
+    /// The default value is [`BlockCollision::Hard`].
+    pub collision: BlockCollision,
 
     /// Light emitted by the block.
     ///
@@ -246,7 +245,7 @@ impl BlockAttributes {
         BlockAttributes {
             display_name: Cow::Borrowed(""),
             selectable: true,
-            solid: true,
+            collision: BlockCollision::Hard,
             light_emission: RGB::ZERO,
         }
     }
@@ -258,6 +257,18 @@ impl Default for BlockAttributes {
         // Delegate to the inherent impl `const fn`.
         BlockAttributes::default()
     }
+}
+
+/// Specifies the effect on a [`Body`] of colliding with the [`Block`] this applies to.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum BlockCollision {
+    /// No effect.
+    None,
+    /// The block is a perfectly solid obstacle.
+    /// TODO: Define the effect on recursive blocks once we have voxel collision.
+    Hard,
+    // Future values might include bouncy solid, water-like resistance, force fields, etc.
 }
 
 /// Generic 'empty'/'null' block. It is used by [`Space`] to respond to out-of-bounds requests.
@@ -285,7 +296,7 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
 const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: Cow::Borrowed("<air>"),
     selectable: false,
-    solid: false,
+    collision: BlockCollision::None,
     light_emission: RGB::ZERO,
 };
 
@@ -338,7 +349,7 @@ pub struct Evoxel {
     // These are frequently going to be copied into 32-bit texture color anyway.
     pub color: RGBA,
     pub selectable: bool,
-    pub solid: bool,
+    pub collision: BlockCollision,
 }
 
 impl Evoxel {
@@ -352,7 +363,7 @@ impl Evoxel {
         Self {
             color,
             selectable: DA.selectable,
-            solid: DA.solid,
+            collision: DA.collision,
         }
     }
 }
@@ -557,9 +568,9 @@ pub mod builder {
             self
         }
 
-        /// Sets the value for [`BlockAttributes::solid`].
-        pub const fn solid(mut self, value: bool) -> Self {
-            self.attributes.solid = value;
+        /// Sets the value for [`BlockAttributes::collision`].
+        pub const fn collision(mut self, value: BlockCollision) -> Self {
+            self.attributes.collision = value;
             self
         }
 
@@ -735,7 +746,7 @@ mod tests {
         let attributes = BlockAttributes {
             display_name: Cow::Borrowed(&"hello world"),
             selectable: false,
-            solid: false,
+            collision: BlockCollision::None,
             light_emission: RGB::ONE,
             ..BlockAttributes::default()
         };
@@ -796,7 +807,7 @@ mod tests {
                 Evoxel {
                     color: RGBA::new(point.x, point.y, point.z, 1.0),
                     selectable: true,
-                    solid: true,
+                    collision: BlockCollision::Hard,
                 }
             }))
         );
@@ -887,7 +898,7 @@ mod tests {
                     Evoxel {
                         color: RGBA::new(point.x, point.y, point.z, 1.0),
                         selectable: true,
-                        solid: true,
+                        collision: BlockCollision::Hard,
                     }
                 }
             ))
@@ -1004,7 +1015,7 @@ mod tests {
         assert_eq!(
             Block::builder()
                 .display_name("hello world")
-                .solid(false)
+                .collision(BlockCollision::None) // TODO: when we have more interesting values, use one
                 .color(color)
                 .selectable(false)
                 .light_emission(light_emission)
@@ -1012,7 +1023,7 @@ mod tests {
             Block::Atom(
                 BlockAttributes {
                     display_name: "hello world".into(),
-                    solid: false,
+                    collision: BlockCollision::None,
                     selectable: false,
                     light_emission
                 },

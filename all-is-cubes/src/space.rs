@@ -887,7 +887,7 @@ mod tests {
             \x20               BlockAttributes {\n\
             \x20                   display_name: \"<air>\",\n\
             \x20                   selectable: false,\n\
-            \x20                   solid: false,\n\
+            \x20                   collision: None,\n\
             \x20                   light_emission: RGB(0.0, 0.0, 0.0),\n\
             \x20               },\n\
             \x20               RGBA(0.0, 0.0, 0.0, 0.0),\n\

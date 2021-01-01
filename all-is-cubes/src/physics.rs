@@ -7,6 +7,7 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use std::collections::HashSet;
 use std::time::Duration;
 
+use crate::block::BlockCollision;
 use crate::math::{CubeFace, Face, FreeCoordinate, Geometry as _, AAB};
 use crate::raycast::Ray;
 use crate::space::Space;
@@ -216,7 +217,8 @@ impl Body {
                     cube: box_cube,
                     face: ray_step.face(),
                 };
-                if space.get_evaluated(box_cube).attributes.solid
+                // TODO: change this from `==` to `match` to allow for expansion of the enum
+                if space.get_evaluated(box_cube).attributes.collision == BlockCollision::Hard
                     && !already_colliding.contains(&contact)
                 {
                     hit_something = true;
