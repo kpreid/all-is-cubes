@@ -1,4 +1,4 @@
-// Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
+// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks

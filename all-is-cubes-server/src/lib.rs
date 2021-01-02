@@ -1,4 +1,4 @@
-// Copyright 2020 Kevin Reid under the terms of the MIT License as detailed
+// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
 //! The primary purpose of this crate is to be a web server and game server
