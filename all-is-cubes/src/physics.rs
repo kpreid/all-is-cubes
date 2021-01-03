@@ -335,9 +335,12 @@ impl Default for MoveSegment {
 
 #[cfg(test)]
 mod tests {
+    use rand::{Rng, SeedableRng};
+
     use super::*;
+    use crate::block::AIR;
     use crate::blockgen::make_some_blocks;
-    use crate::space::Space;
+    use crate::space::{Grid, Space};
 
     fn collision_noop(_: Contact) {}
 
@@ -392,6 +395,92 @@ mod tests {
         assert_eq!(body.position.z, 0.0);
         assert!((body.position.y - 1.5).abs() < 1e-6, "{:?}", body.position);
         assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);
+    }
+
+    #[test]
+    #[ignore]  // TODO: currently broken test
+    fn no_passing_through_blocks() {
+        // Construct cubical box. TODO: worldgen utilities for this?
+        let mut space = Space::empty(Grid::new((-3, -3, -3), (6, 6, 6)));
+        let wall_block = make_some_blocks(1).swap_remove(0);
+        space.fill(space.grid(), |_| Some(&wall_block)).unwrap();
+        space
+            .fill(Grid::new((-2, -2, -2), (4, 4, 4)), |_| Some(&AIR))
+            .unwrap();
+
+        let one_test = |velocity: Vector3<FreeCoordinate>| {
+            print!("Velocity {:?}... ", velocity);
+            let mut body = Body {
+                flying: true,
+                position: Point3::origin(),
+                ..test_body()
+            };
+            let mut iterations = 0;
+            loop {
+                iterations += 1;
+                assert!(
+                    iterations < 10000,
+                    "didn't terminate after {:?} iterations; reached {:?}",
+                    iterations,
+                    body.position,
+                );
+                // Reset velocity every frame as an approximation of the effect of player input.
+                body.velocity = velocity;
+                let previous_position = body.position;
+                body.step(
+                    Duration::from_micros(1_000_000 / 60),
+                    Some(&space),
+                    |_contact| {},
+                );
+
+                let distance_from_origin = max_norm(body.position.to_vec());
+                assert!(distance_from_origin < 1.6, "escaped to {:?}", body.position);
+                if body.position == previous_position {
+                    // Reached steady state.
+                    break;
+                }
+            }
+            println!("{:?} iterations to {:?}", iterations, body.position);
+            let distance_from_origin = max_norm(body.position.to_vec());
+            assert!(
+                distance_from_origin > 1.4,
+                "too close: {}",
+                distance_from_origin
+            );
+        };
+
+        for case in (&[[1.0, 1.0, 1.0], [1.0, 0.1, 0.1], [0.1, -0.1, -0.047]])
+            .iter()
+            .copied()
+            .map(Vector3::from)
+        {
+            for &variant in &[case, -case] {
+                one_test(variant.into());
+            }
+        }
+
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+        for _ in 0..1000 {
+            // TODO: When cgmath gets updated, use cgmath's random vectors
+            let random_velocity = Vector3::new(
+                rng.gen_range(-1., 1.),
+                rng.gen_range(-1., 1.),
+                rng.gen_range(-1., 1.),
+            );
+            if random_velocity.magnitude() < 0.01 {
+                // Too slow
+                continue;
+            }
+            one_test(random_velocity);
+        }
+    }
+
+    /// Takes the maximum length on all coordinate axes; all points forming a cube
+    /// centered on the origin will have the same value for this norm.
+    ///
+    /// https://en.wikipedia.org/wiki/Uniform_norm
+    fn max_norm<S: num_traits::real::Real>(v: Vector3<S>) -> S {
+        v[0].abs().max(v[1].abs()).max(v[2].abs())
     }
 
     // TODO: test collision more
