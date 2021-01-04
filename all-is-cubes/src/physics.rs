@@ -485,6 +485,27 @@ mod tests {
     }
 
     #[test]
+    fn push_out_simple() {
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set((0, 0, 0), &make_some_blocks(1)[0]).unwrap();
+        let mut body = Body {
+            position: Point3::new(1.25, 0.5, 0.5), // intersection of 0.25
+            velocity: Vector3::zero(),
+            flying: true,
+            ..test_body()
+        };
+
+        let mut contacts = Vec::new();
+        let info = body.step(Duration::from_secs(1), Some(&space), |c| contacts.push(c));
+        dbg!(info);
+
+        assert_eq!(body.position, Point3::new(1.5, 0.5, 0.5));
+        assert_eq!(body.velocity, Vector3::zero());
+        // TODO: push out should create report contacts just like normal collision
+        // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);
+    }
+
+    #[test]
     fn no_passing_through_blocks() {
         // Construct cubical box. TODO: worldgen utilities for this?
         let mut space = Space::empty(Grid::new((-1, -1, -1), (3, 3, 3)));
@@ -495,11 +516,18 @@ mod tests {
         let one_test = |velocity: Vector3<FreeCoordinate>| {
             print!("Velocity {:?}... ", velocity);
             let start = Point3::new(0.5, 0.5, 0.5);
-            let box_radius = 0.375;  // use an exact float to minimize complications
+            let box_radius = 0.375; // use an exact float to minimize complications
             let mut body = Body {
                 flying: true,
                 position: start,
-                collision_box: AAB::new(-box_radius, box_radius, -box_radius, box_radius, -box_radius, box_radius),
+                collision_box: AAB::new(
+                    -box_radius,
+                    box_radius,
+                    -box_radius,
+                    box_radius,
+                    -box_radius,
+                    box_radius,
+                ),
                 ..test_body()
             };
             let mut iterations = 0;
