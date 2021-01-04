@@ -260,15 +260,15 @@ impl Body {
 
     /// Check if we're intersecting any blocks and fix that if so.
     fn push_out(&mut self, space: &Space) -> Option<Vector3<FreeCoordinate>> {
-        if self
+        let colliding = self
             .collision_box_abs()
             .round_up_to_grid()
             .interior_iter()
             .any(|cube| {
                 // TODO: Have collision test logic in common with the movement routine
                 space.get_evaluated(cube).attributes.collision == BlockCollision::Hard
-            })
-        {
+            });
+        if colliding {
             let exit_backwards = -self.velocity;
             let shortest_push_out = (-1..=1)
                 .flat_map(move |dx| {
