@@ -433,6 +433,19 @@ impl BlockDef {
     }
 }
 
+impl Deref for BlockDef {
+    type Target = Block;
+
+    fn deref(&self) -> &Block {
+        &self.block
+    }
+}
+impl AsRef<Block> for BlockDef {
+    fn as_ref(&self) -> &Block {
+        &self.block
+    }
+}
+
 /// Mutable borrow of the [`Block`] inside a [`BlockDefMut`].
 ///
 /// Provides the functionality of delivering change notifications when mutations are

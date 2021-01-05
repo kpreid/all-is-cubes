@@ -148,6 +148,32 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
     ///
     /// Returns an error if the name is already in use.
     fn insert(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>;
+
+    /// Iterate over all of the objects of type `T`.
+    /// Note that this includes anonymous objects.
+    ///
+    /// ```
+    /// use all_is_cubes::block::{Block, BlockDef};
+    /// use all_is_cubes::blockgen::make_some_blocks;
+    /// use all_is_cubes::universe::{Name, Universe, UniverseIndex, URef};
+    ///
+    /// let mut universe = Universe::new();
+    /// let blocks = make_some_blocks(2);
+    /// universe.insert(Name::from("b1"), BlockDef::new(blocks[0].clone()));
+    /// universe.insert(Name::from("b2"), BlockDef::new(blocks[1].clone()));
+    ///
+    /// let mut found_blocks = universe.iter_by_type()
+    ///     .map(|(name, value): (Name, URef<BlockDef>)| (name, Block::clone(&value.borrow())))
+    ///     .collect::<Vec<_>>();
+    /// found_blocks.sort_by_key(|(name, _)| name.to_string());
+    /// assert_eq!(
+    ///     found_blocks,
+    ///     vec![Name::from("b1"), Name::from("b2")].into_iter()
+    ///         .zip(blocks.into_iter())
+    ///         .collect::<Vec<_>>(),
+    /// );
+    /// ```
+    fn iter_by_type(&self) -> UniverseIter<T>;
 }
 impl UniverseIndex<BlockDef> for Universe {
     fn get(&self, name: &Name) -> Option<URef<BlockDef>> {
@@ -155,6 +181,9 @@ impl UniverseIndex<BlockDef> for Universe {
     }
     fn insert(&mut self, name: Name, value: BlockDef) -> Result<URef<BlockDef>, InsertError> {
         index_insert(self, name, value)
+    }
+    fn iter_by_type(&self) -> UniverseIter<BlockDef> {
+        UniverseIter(self.table().iter())
     }
 }
 impl UniverseIndex<Camera> for Universe {
@@ -164,6 +193,9 @@ impl UniverseIndex<Camera> for Universe {
     fn insert(&mut self, name: Name, value: Camera) -> Result<URef<Camera>, InsertError> {
         index_insert(self, name, value)
     }
+    fn iter_by_type(&self) -> UniverseIter<Camera> {
+        UniverseIter(self.table().iter())
+    }
 }
 impl UniverseIndex<Space> for Universe {
     fn get(&self, name: &Name) -> Option<URef<Space>> {
@@ -171,6 +203,9 @@ impl UniverseIndex<Space> for Universe {
     }
     fn insert(&mut self, name: Name, value: Space) -> Result<URef<Space>, InsertError> {
         index_insert(self, name, value)
+    }
+    fn iter_by_type(&self) -> UniverseIter<Space> {
+        UniverseIter(self.table().iter())
     }
 }
 
@@ -197,6 +232,17 @@ where
             vacant.insert(root_ref);
             Ok(returned_ref)
         }
+    }
+}
+
+/// Iterator type for [`UniverseIndex::iter_by_type`].
+pub struct UniverseIter<'u, T: 'u>(std::collections::hash_map::Iter<'u, Name, URootRef<T>>);
+impl<'u, T> Iterator for UniverseIter<'u, T> {
+    type Item = (Name, URef<T>);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0
+            .next()
+            .map(|(name, root)| (name.clone(), root.downgrade()))
     }
 }
 
