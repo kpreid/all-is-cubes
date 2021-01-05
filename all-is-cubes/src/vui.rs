@@ -9,7 +9,7 @@
 use cgmath::{EuclideanSpace as _, Vector2};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Pixel, Primitive, Transform as _};
-use embedded_graphics::primitives::{Rectangle, Triangle};
+use embedded_graphics::primitives::{Circle, Line, Rectangle, Triangle};
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
@@ -17,7 +17,8 @@ use crate::block::{space_to_blocks, Block, BlockAttributes, AIR};
 use crate::blockgen::BlockGen;
 use crate::content::palette;
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, RGBA};
+use crate::linking::{BlockModule, BlockProvider};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, RGBA};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -177,7 +178,7 @@ impl HudLayout {
 
             let position = self.tool_icon_position(index);
             // Draw icon
-            space.set(position, &*tool.icon())?;
+            space.set(position, &*tool.icon(&hud_blocks.icons))?;
             // Draw pointers.
             let toolbar_disp = &mut VoxelDisplayAdapter::new(space, position);
             for sel in 0..2 {
@@ -193,6 +194,7 @@ impl HudLayout {
 
 #[derive(Debug, Clone)]
 struct HudBlocks {
+    icons: BlockProvider<Icons>,
     toolbar_left_cap: VoxelBrush<'static>,
     toolbar_right_cap: VoxelBrush<'static>,
     toolbar_divider: VoxelBrush<'static>,
@@ -204,6 +206,11 @@ struct HudBlocks {
 impl HudBlocks {
     fn new(blockgen: &mut BlockGen) -> Self {
         let resolution = GridCoordinate::from(blockgen.resolution);
+
+        let icons = Icons::new(blockgen)
+            .install(&mut blockgen.universe)
+            .unwrap();
+
         // TODO: This toolbar graphic is a "get the bugs in the drawing tools worked out"
         // placeholder for better art...
 
@@ -281,6 +288,7 @@ impl HudBlocks {
 
         // TODO: reconcile: the hud space has the icons "flush with the front" but these slice coordinates assume a 1-block fringe around the icons in all directions.
         Self {
+            icons,
             toolbar_middle: slice_drawing(Grid::from_lower_upper((0, -1, -1), (1, 2, 2))),
             toolbar_divider: slice_drawing(Grid::from_lower_upper((1, -1, -1), (2, 2, 2)))
                 .translate((-1, 0, 0)),
@@ -327,6 +335,81 @@ pub(crate) fn draw_background(space: &mut Space) {
         )
         .draw(display)
         .unwrap();
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
+#[strum(serialize_all = "snake_case")]
+pub enum Icons {
+    Delete,
+}
+impl BlockModule for Icons {
+    fn namespace() -> &'static str {
+        "all-is-cubes/vui/icons"
+    }
+}
+impl Icons {
+    fn new(blockgen: &mut BlockGen) -> BlockProvider<Icons> {
+        BlockProvider::new(|key| {
+            match key {
+                Icons::Delete => {
+                    let resolution = blockgen.resolution;
+                    let x_radius = i32::from(resolution) * 3 / 16;
+                    let background_block_1: Block = RGBA::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
+                    let background_block_2: Block = RGBA::new(0.8, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
+                    let background_brush = VoxelBrush::new(vec![
+                        ((0, 0, 1), &background_block_1),
+                        ((1, 0, 0), &background_block_2),
+                        ((-1, 0, 0), &background_block_2),
+                        ((0, 1, 0), &background_block_2),
+                        ((0, -1, 0), &background_block_2),
+                    ]);
+                    let line_brush = VoxelBrush::single(Block::from(RGBA::BLACK))
+                        .translate(GridVector::new(0, 0, 2));
+                    let line_style = PrimitiveStyleBuilder::new()
+                        .stroke_color(&line_brush)
+                        .stroke_width(1)
+                        .build();
+
+                    let mut space = blockgen.new_block_space();
+                    let display = &mut VoxelDisplayAdapter::new(
+                        &mut space,
+                        GridPoint::new(1, 1, 1) * GridCoordinate::from(resolution / 2),
+                    );
+
+                    // Draw X on circle
+                    Circle::new(Point::new(0, 0), (resolution / 2 - 2).into())
+                        .into_styled(
+                            PrimitiveStyleBuilder::new()
+                                .fill_color(&background_brush)
+                                .build(),
+                        )
+                        .draw(display)
+                        .unwrap();
+                    Line::new(
+                        Point::new(-x_radius, -x_radius),
+                        Point::new(x_radius, x_radius),
+                    )
+                    .into_styled(line_style)
+                    .draw(display)
+                    .unwrap();
+                    Line::new(
+                        Point::new(x_radius, -x_radius),
+                        Point::new(-x_radius, x_radius),
+                    )
+                    .into_styled(line_style)
+                    .draw(display)
+                    .unwrap();
+
+                    Block::builder()
+                        .voxels_ref(
+                            blockgen.resolution,
+                            blockgen.universe.insert_anonymous(space),
+                        )
+                        .build()
+                }
+            }
+        })
+    }
 }
 
 #[cfg(test)]

@@ -7,9 +7,11 @@ use std::borrow::Cow;
 
 use crate::block::{Block, AIR};
 use crate::camera::Cursor;
+use crate::linking::BlockProvider;
 use crate::math::{GridPoint, RGBA};
 use crate::space::{SetCubeError, Space};
 use crate::universe::{RefError, URef};
+use crate::vui::Icons;
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
 /// such as placing or removing a block. In particular, a tool use usually corresponds
@@ -54,11 +56,11 @@ impl Tool {
     /// TODO (API instability): Eventually we will want additional decorations like "use
     /// count" that probably should not need to be painted into the block itself.
 
-    pub fn icon(&self) -> Cow<Block> {
+    pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
             Self::None => Cow::Borrowed(&AIR),
             // TODO: icon
-            Self::DeleteBlock => Cow::Owned(RGBA::new(1., 0., 0., 1.).into()),
+            Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             Self::PlaceBlock(block) => Cow::Borrowed(&block),
             // TODO: icon
@@ -256,7 +258,8 @@ mod tests {
 
     #[test]
     fn icon_none() {
-        assert_eq!(*Tool::None.icon(), AIR);
+        let dummy_icons = BlockProvider::new(|_| make_some_blocks(1).swap_remove(0));
+        assert_eq!(*Tool::None.icon(&dummy_icons), AIR);
     }
 
     #[test]
@@ -275,8 +278,11 @@ mod tests {
 
     #[test]
     fn icon_delete_block() {
-        // TODO: Check "is the right resolution" once there's an actual icon.
-        let _ = Tool::DeleteBlock.icon();
+        let dummy_icons = BlockProvider::new(|_| make_some_blocks(1).swap_remove(0));
+        assert_eq!(
+            Tool::DeleteBlock.icon(&dummy_icons),
+            dummy_icons[Icons::Delete]
+        );
     }
 
     #[test]
@@ -292,8 +298,9 @@ mod tests {
 
     #[test]
     fn icon_place_block() {
+        let dummy_icons = BlockProvider::new(|_| make_some_blocks(1).swap_remove(0));
         let [block]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
-        assert_eq!(*Tool::PlaceBlock(block.clone()).icon(), block);
+        assert_eq!(*Tool::PlaceBlock(block.clone()).icon(&dummy_icons), block);
     }
 
     #[test]
