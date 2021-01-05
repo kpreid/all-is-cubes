@@ -19,7 +19,8 @@ use crate::drawing::draw_to_blocks;
 use crate::linking::BlockProvider;
 use crate::math::{GridPoint, GridVector, NoiseFnExt as _, NotNan, RGB, RGBA};
 use crate::space::{Grid, Space};
-use crate::universe::{InsertError, Universe, UniverseIndex};
+use crate::tools::Tool;
+use crate::universe::{InsertError, Name, Universe, UniverseIndex};
 use crate::worldgen::{axes, wavy_landscape};
 
 /// Creates a [`Universe`] with some content for a "new game", as much as that can exist.
@@ -136,9 +137,24 @@ where
     let space: Space = space_fn(&mut universe);
     let position = space.grid().center() + Vector3::new(-3.0, 3.0, -3.0);
     let space_ref = universe.insert("space".into(), space).unwrap();
+
     //let camera = Camera::looking_at_space(space_ref, Vector3::new(0.5, 0.5, 1.0));
-    let camera = Camera::new(space_ref, position);
+    let mut camera = Camera::new(space_ref, position);
+    // Copy all named block defs into inventory.
+    for (name, block_def_ref) in universe.iter_by_type() {
+        if matches!(name, Name::Anonym(_)) {
+            continue;
+        }
+        match camera.try_add_item(Tool::PlaceBlock(Block::Indirect(block_def_ref))) {
+            Ok(()) => {}
+            Err(_) => {
+                // Out of space
+                break;
+            }
+        }
+    }
     universe.insert("camera".into(), camera).unwrap();
+
     universe
 }
 

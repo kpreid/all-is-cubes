@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
 use crate::listen::{Listener, Notifier};
-use crate::math::{Face, FreeCoordinate, AAB, RGBA};
+use crate::math::{Face, FreeCoordinate, AAB};
 use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray, Raycaster};
 use crate::space::{Grid, Space};
@@ -91,10 +91,11 @@ impl Camera {
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
             inventory: Inventory::from_items(vec![
-                // TODO: placeholder inventory should be set up some other way.
-                Tool::DeleteBlock,
-                Tool::PlaceBlock(RGBA::new(1.0, 0.0, 0.5, 1.0).into()),
-                Tool::PlaceBlock(RGBA::new(0.0, 1.0, 0.5, 1.0).into()),
+                // TODO: special inventory slots should be set up some other way.
+                // The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
+                Tool::None,
+                Tool::None,
+                Tool::None,
                 Tool::None,
                 Tool::None,
                 Tool::None,
@@ -154,6 +155,13 @@ impl Camera {
             self.selected_slots[which_selection] = slot;
             self.notifier.notify(CameraChange::Selections);
         }
+    }
+
+    /// Adds an item to the inventory. TODO: Quick kludge and we should find a better strategy for inventory mutations.
+    pub(crate) fn try_add_item(&mut self, item: Tool) -> Result<(), Tool> {
+        self.inventory.try_add_item(item)?;
+        self.notifier.notify(CameraChange::Inventory);
+        Ok(())
     }
 
     /// Advances time.
