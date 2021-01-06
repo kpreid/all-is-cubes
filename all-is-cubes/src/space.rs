@@ -479,10 +479,7 @@ impl Space {
                 }
             }
             if high_mark >= BlockIndex::MAX as usize {
-                todo!(
-                    "more than {} block types is not yet supported",
-                    BlockIndex::MAX as usize + 1
-                );
+                return Err(SetCubeError::TooManyBlocks());
             }
             let new_index = high_mark as BlockIndex;
             // Evaluate the new block type. Can fail, but we haven't done any mutation yet.
@@ -596,6 +593,9 @@ pub enum SetCubeError {
     /// The block data could not be read.
     #[error("block data could not be read: {0}")]
     BlockDataAccess(#[from] RefError),
+    /// More distinct blocks were added than currently supported.
+    #[error("more than {} block types is not yet supported", BlockIndex::MAX as usize + 1)]
+    TooManyBlocks(),
 }
 
 /// Description of a change to a [`Space`] for use in listeners.
@@ -726,6 +726,20 @@ mod tests {
     }
 
     #[test]
+    fn set_failure_too_many() {
+        let n = 300_u16;
+        let blocks = make_some_blocks(n.into());
+        let mut space = Space::empty_positive(n.into(), 1, 1);
+        for i in 0..n {
+            match space.set([i.into(), 0, 0], &blocks[usize::from(i)]) {
+                Ok(true) => {}
+                Err(SetCubeError::TooManyBlocks()) => break,
+                unexpected => panic!("unexpected result: {:?}", unexpected),
+            }
+        }
+    }
+
+    #[test]
     fn set_error_format() {
         assert_eq!(
             SetCubeError::OutOfBounds(GridPoint::new(1, 2, 3)).to_string(),
@@ -734,6 +748,10 @@ mod tests {
         assert_eq!(
             SetCubeError::BlockDataAccess(RefError::Gone(Rc::new("foo".into()))).to_string(),
             "block data could not be read: object was deleted: 'foo'"
+        );
+        assert_eq!(
+            SetCubeError::TooManyBlocks().to_string(),
+            "more than 256 block types is not yet supported"
         );
     }
 
