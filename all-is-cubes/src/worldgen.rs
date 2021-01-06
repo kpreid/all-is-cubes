@@ -68,7 +68,7 @@ pub fn axes(space: &mut Space) {
 }
 
 /// Generate a landscape of grass-on-top-of-rock with some bumps to it.
-/// Replaces the entire contents of `space`.
+/// Replaces all blocks except for those intended to be “air”.
 ///
 /// ```
 /// use all_is_cubes::space::Space;
@@ -102,8 +102,7 @@ pub fn wavy_landscape(
                 let altitude = y - surface_y;
                 use LandscapeBlocks::*;
                 let block: &Block = if altitude > 0 {
-                    // TODO: Consider swapping over to "leave the block untouched" to allow more composition
-                    &blocks[Air]
+                    continue;
                 } else if altitude == 0 {
                     &blocks[Grass]
                 } else if altitude == -1 {

@@ -7,7 +7,7 @@
 use std::borrow::Cow;
 use std::hash::Hash;
 
-use crate::block::{Block, Resolution, AIR};
+use crate::block::{Block, Resolution};
 use crate::content::palette;
 use crate::linking::{BlockModule, DefaultProvision};
 use crate::math::{RGB, RGBA};
@@ -78,7 +78,6 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "snake_case")]
 pub enum LandscapeBlocks {
-    Air,
     Grass,
     Dirt,
     Stone,
@@ -105,7 +104,6 @@ impl DefaultProvision for LandscapeBlocks {
 
         use LandscapeBlocks::*;
         match self {
-            Air => Cow::Borrowed(&AIR),
             Grass => color_and_name(palette::GRASS, "Grass"),
             Dirt => color_and_name(palette::DIRT, "Dirt"),
             Stone => color_and_name(palette::STONE, "Stone"),

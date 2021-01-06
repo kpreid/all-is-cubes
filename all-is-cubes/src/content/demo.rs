@@ -11,7 +11,7 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
 use noise::Seedable as _;
 
-use crate::block::{Block, Resolution, AIR};
+use crate::block::{Block, Resolution};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
 use crate::camera::Camera;
 use crate::content::logo_text;
@@ -221,8 +221,6 @@ pub fn install_landscape_blocks(
         Trunk => (*colors[Trunk]).clone(),
 
         Leaves => (*colors[Leaves]).clone(),
-
-        Air => AIR,
     })
     .install(universe)?;
     Ok(())
