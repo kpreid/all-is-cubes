@@ -61,7 +61,7 @@ fn new_landscape_space(universe: &mut Universe) -> Space {
         (diameter_xz, 33, diameter_xz),
     );
     let mut space = Space::empty(grid);
-    wavy_landscape(&mut space, &blocks, 1.0);
+    wavy_landscape(grid, &mut space, &blocks, 1.0);
     axes(&mut space);
     let _ = space.set((-1, 3, -1), axis_block);
 
