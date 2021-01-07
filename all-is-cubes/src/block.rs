@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
 use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
-use crate::space::{Grid, GridArray, Space, SpaceChange};
+use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
 use crate::universe::{Name, RefError, URef, Universe, UniverseIndex as _};
 use crate::util::ConciseDebug;
 
@@ -480,27 +480,28 @@ impl Drop for BlockDefMut<'_> {
 /// The returned [`Space`] contains each of the blocks; its coordinates will correspond to
 /// those of the input, scaled down by `resolution`.
 ///
+/// Returns [`SetCubeError::BlockDataAccess`] if the `Space` cannot be accessed, and
+/// [`SetCubeError::TooManyBlocks`] if the dimensions would result in too many blocks.
+///
 /// TODO: add doc test for this
 pub fn space_to_blocks(
     resolution: Resolution,
     attributes: BlockAttributes,
     space_ref: URef<Space>,
-) -> Result<Space, RefError> {
+) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
     let source_grid = space_ref.try_borrow()?.grid();
     let destination_grid = source_grid.divide(resolution_g);
 
     let mut destination_space = Space::empty(destination_grid);
-    destination_space
-        .fill(destination_grid, move |cube| {
-            Some(Block::Recur {
-                attributes: attributes.clone(),
-                offset: GridPoint::from_vec(cube.to_vec() * resolution_g),
-                resolution,
-                space: space_ref.clone(),
-            })
+    destination_space.fill(destination_grid, move |cube| {
+        Some(Block::Recur {
+            attributes: attributes.clone(),
+            offset: GridPoint::from_vec(cube.to_vec() * resolution_g),
+            resolution,
+            space: space_ref.clone(),
         })
-        .expect("can't happen: space_to_blocks failed to write to its own output space");
+    })?;
     Ok(destination_space)
 }
 
@@ -509,8 +510,6 @@ pub use builder::BlockBuilder;
 
 /// Lesser-used helpers for [`BlockBuilder`].
 pub mod builder {
-    use crate::space::SetCubeError;
-
     use super::*;
 
     /// Tool for constructing [`Block`] values conveniently.
