@@ -24,6 +24,14 @@ pub type GridVector = Vector3<GridCoordinate>;
 /// Coordinates that are not locked to the cube grid.
 pub type FreeCoordinate = f64;
 
+/// Compute the squared magnitude of a [`GridVector`].
+///
+/// [`cgmath::InnerSpace::magnitude2`] would do the same but only for floats.
+#[inline]
+pub(crate) fn int_magnitude_squared(v: GridVector) -> GridCoordinate {
+    v.x * v.x + v.y * v.y + v.z * v.z
+}
+
 /// Common features of objects that have a location and shape in space.
 pub trait Geometry {
     /// Type of coordinates; generally determines whether this object can be translated by a

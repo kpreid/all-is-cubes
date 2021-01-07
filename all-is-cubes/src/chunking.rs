@@ -9,7 +9,7 @@ use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
 use std::convert::TryFrom;
 
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector};
+use crate::math::{int_magnitude_squared, FreeCoordinate, GridCoordinate, GridPoint, GridVector};
 use crate::space::Grid;
 
 /// Chunk size (side length), fixed at compile time.
@@ -117,14 +117,6 @@ impl ChunkChart {
         }
         space
     }
-}
-
-/// Compute the squared magnitude of a [`GridVector`].
-///
-/// [`cgmath::InnerSpace::magnitude2`] would do the same but only for floats.
-#[inline]
-fn int_magnitude_squared(v: GridVector) -> GridCoordinate {
-    v.x * v.x + v.y * v.y + v.z * v.z
 }
 
 /// An iterator that owns its items and has at most two of them.
