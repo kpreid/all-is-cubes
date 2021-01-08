@@ -5,7 +5,9 @@
 
 use std::error::Error;
 
-use cgmath::{Basis2, EuclideanSpace, InnerSpace, Rad, Rotation, Rotation2, Vector2, Vector3};
+use cgmath::{
+    Basis2, EuclideanSpace as _, InnerSpace as _, Rad, Rotation, Rotation2, Vector2, Vector3,
+};
 use embedded_graphics::fonts::Font8x16;
 use embedded_graphics::fonts::Text;
 use embedded_graphics::geometry::Point;
@@ -21,7 +23,8 @@ use crate::content::logo_text;
 use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::BlockProvider;
 use crate::math::{
-    Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+    Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector, Rgb,
+    Rgba,
 };
 use crate::raycast::Raycaster;
 use crate::space::{Grid, Space};
@@ -81,7 +84,7 @@ fn demo_city(universe: &mut Universe) -> Space {
         .unwrap();
 
     // Roads and lamps
-    for face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
+    for &face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
         let forward: GridVector = face.normal_vector();
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within_grid(space.grid());
@@ -92,6 +95,25 @@ fn demo_city(universe: &mut Universe) -> Space {
                 space
                     .set(step.cube_ahead() + perpendicular * p, &*demo_blocks[Road])
                     .unwrap();
+            }
+            if i > road_radius {
+                // Curbs
+                for (side, &p) in [-(road_radius + 1), road_radius + 1].iter().enumerate() {
+                    // TODO: blocks should have a .rotate() method
+                    let mut rotation =
+                        GridRotation::from_basis([face.cross(Face::PY), Face::PY, face]);
+                    if side == 0 {
+                        rotation =
+                            rotation * GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]);
+                    }
+                    let r = Block::Rotated(rotation, Box::new((*demo_blocks[Curb]).clone()));
+                    space
+                        .set(
+                            step.cube_ahead() + perpendicular * p + GridVector::unit_y(),
+                            r,
+                        )
+                        .unwrap();
+                }
             }
 
             if (i - lamp_position_radius) % lamp_spacing == 0 {
