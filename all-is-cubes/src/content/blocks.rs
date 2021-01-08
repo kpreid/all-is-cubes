@@ -31,7 +31,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
     install_landscape_blocks(universe, resolution)?;
 
     use DemoBlocks::*;
-    let stone_color: Block = RGBA::new(0.4, 0.4, 0.4, 1.0).into();
+    let stone_color: Block = RGBA::new(0.314, 0.306, 0.353, 1.0).into();
     let road_noise_v = noise::Value::new().set_seed(0x51b19f6a);
     let road_noise = noise::ScaleBias::new(&road_noise_v)
         .set_bias(1.0)
