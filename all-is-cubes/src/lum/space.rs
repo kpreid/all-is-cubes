@@ -21,7 +21,7 @@ use crate::chunking::{
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
-use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, RGB};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
     triangulate_block, triangulate_blocks, triangulate_space, BlockTriangulation,
@@ -215,7 +215,7 @@ impl SpaceRenderer {
 /// [`SpaceRenderer::prepare_frame`].
 pub struct SpaceRendererOutput<'a> {
     /// Space's sky color, to be used as clear color when drawing a frame (if applicable).
-    pub sky_color: RGB,
+    pub sky_color: Rgb,
 
     block_texture: &'a mut BlockTexture,
     view_matrix: Matrix4<FreeCoordinate>,

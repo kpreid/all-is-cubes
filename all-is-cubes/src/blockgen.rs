@@ -10,7 +10,7 @@ use std::hash::Hash;
 use crate::block::{Block, Resolution};
 use crate::content::palette;
 use crate::linking::{BlockModule, DefaultProvision};
-use crate::math::{RGB, RGBA};
+use crate::math::{Rgb, Rgba};
 use crate::space::{Grid, Space};
 use crate::universe::Universe;
 
@@ -64,7 +64,7 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
         vec.push(
             Block::builder()
                 .display_name(i.to_string())
-                .color(RGBA::new(luminance, luminance, luminance, 1.0))
+                .color(Rgba::new(luminance, luminance, luminance, 1.0))
                 .build(),
         );
     }
@@ -94,7 +94,7 @@ impl BlockModule for LandscapeBlocks {
 /// Provides a bland instance of [`LandscapeBlocks`] with single color blocks.
 impl DefaultProvision for LandscapeBlocks {
     fn default(self) -> Cow<'static, Block> {
-        fn color_and_name(color: RGB, name: &'static str) -> Cow<'static, Block> {
+        fn color_and_name(color: Rgb, name: &'static str) -> Cow<'static, Block> {
             Block::builder()
                 .display_name(name)
                 .color(color.with_alpha_one())
@@ -145,7 +145,7 @@ mod tests {
                     display_name: "0".into(),
                     ..BlockAttributes::default()
                 },
-                RGBA::new(0.5, 0.5, 0.5, 1.0)
+                Rgba::new(0.5, 0.5, 0.5, 1.0)
             )
         );
     }
@@ -160,7 +160,7 @@ mod tests {
                     display_name: "0".into(),
                     ..BlockAttributes::default()
                 },
-                RGBA::new(0.0, 0.0, 0.0, 1.0)
+                Rgba::new(0.0, 0.0, 0.0, 1.0)
             )
         );
         assert_eq!(
@@ -170,7 +170,7 @@ mod tests {
                     display_name: "1".into(),
                     ..BlockAttributes::default()
                 },
-                RGBA::new(1.0, 1.0, 1.0, 1.0)
+                Rgba::new(1.0, 1.0, 1.0, 1.0)
             )
         );
     }

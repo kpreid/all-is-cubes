@@ -16,7 +16,7 @@ use luminance_front::Backend;
 use crate::camera::Cursor;
 use crate::content::palette;
 use crate::lum::types::{empty_tess, Vertex};
-use crate::math::{Geometry, AAB, RGBA};
+use crate::math::{Geometry, AAB, Rgba};
 use crate::util::MapExtend;
 
 pub mod block_texture;
@@ -51,7 +51,7 @@ where
 
 /// Add the wireframe of `geometry` to `vertices` (to be drawn in [`Line`](Mode::Line)
 /// mode) with the given `color`.
-pub fn wireframe_vertices<E, G>(vertices: &mut E, color: RGBA, geometry: G)
+pub fn wireframe_vertices<E, G>(vertices: &mut E, color: Rgba, geometry: G)
 where
     E: Extend<Vertex>,
     G: Geometry,

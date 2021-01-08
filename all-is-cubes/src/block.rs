@@ -10,7 +10,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
-use crate::math::{GridCoordinate, GridPoint, RGB, RGBA};
+use crate::math::{GridCoordinate, GridPoint, Rgb, Rgba};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
 use crate::universe::{Name, RefError, URef, Universe, UniverseIndex as _};
 use crate::util::ConciseDebug;
@@ -41,7 +41,7 @@ pub enum Block {
 
     /// A block that is a single-colored unit cube. (It may still be be transparent or
     /// non-solid to physics.)
-    Atom(BlockAttributes, RGBA),
+    Atom(BlockAttributes, Rgba),
 
     /// A block that is composed of smaller blocks, defined by the referenced `Space`.
     Recur {
@@ -104,7 +104,7 @@ impl Block {
                     .translate(-offset.to_vec());
                 Ok(EvaluatedBlock {
                     attributes: attributes.clone(),
-                    color: RGBA::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels
+                    color: Rgba::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels
                     // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
                     opaque: voxels
                         .grid()
@@ -156,10 +156,10 @@ impl Block {
         Ok(())
     }
 
-    /// Returns the single [RGBA] color of this block, or panics if it does not have a
+    /// Returns the single [Rgba] color of this block, or panics if it does not have a
     /// single color. For use in tests only.
     #[cfg(test)]
-    pub fn color(&self) -> RGBA {
+    pub fn color(&self) -> Rgba {
         match self {
             Block::Atom(_, c) => *c,
             _ => panic!("Block::color not defined for non-atom blocks"),
@@ -182,26 +182,26 @@ impl<'a> From<&'a Block> for Cow<'a, Block> {
     }
 }
 /// Convert a color to a block with default attributes.
-impl From<RGB> for Block {
-    fn from(color: RGB) -> Self {
+impl From<Rgb> for Block {
+    fn from(color: Rgb) -> Self {
         Block::from(color.with_alpha_one())
     }
 }
 /// Convert a color to a block with default attributes.
-impl From<RGBA> for Block {
-    fn from(color: RGBA) -> Self {
+impl From<Rgba> for Block {
+    fn from(color: Rgba) -> Self {
         Block::Atom(BlockAttributes::default(), color)
     }
 }
 /// Convert a color to a block with default attributes.
-impl From<RGB> for Cow<'_, Block> {
-    fn from(color: RGB) -> Self {
+impl From<Rgb> for Cow<'_, Block> {
+    fn from(color: Rgb) -> Self {
         Cow::Owned(Block::from(color))
     }
 }
 /// Convert a color to a block with default attributes.
-impl From<RGBA> for Cow<'_, Block> {
-    fn from(color: RGBA) -> Self {
+impl From<Rgba> for Cow<'_, Block> {
+    fn from(color: Rgba) -> Self {
         Cow::Owned(Block::from(color))
     }
 }
@@ -231,8 +231,8 @@ pub struct BlockAttributes {
 
     /// Light emitted by the block.
     ///
-    /// The default value is [`RGB::ZERO`].
-    pub light_emission: RGB,
+    /// The default value is [`Rgb::ZERO`].
+    pub light_emission: Rgb,
     // TODO: add 'behavior' functionality, if we don't come up with something else
 }
 
@@ -246,7 +246,7 @@ impl BlockAttributes {
             display_name: Cow::Borrowed(""),
             selectable: true,
             collision: BlockCollision::Hard,
-            light_emission: RGB::ZERO,
+            light_emission: Rgb::ZERO,
         }
     }
 }
@@ -275,7 +275,7 @@ pub enum BlockCollision {
 /// Generic 'empty'/'null' block. It is used by [`Space`] to respond to out-of-bounds requests.
 ///
 /// See also [`AIR_EVALUATED`].
-pub const AIR: Block = Block::Atom(AIR_ATTRIBUTES, RGBA::TRANSPARENT);
+pub const AIR: Block = Block::Atom(AIR_ATTRIBUTES, Rgba::TRANSPARENT);
 
 /// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
 /// This may be used when an [`EvaluatedBlock`] value is needed but there is no block
@@ -288,7 +288,7 @@ pub const AIR: Block = Block::Atom(AIR_ATTRIBUTES, RGBA::TRANSPARENT);
 /// ```
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     attributes: AIR_ATTRIBUTES,
-    color: RGBA::TRANSPARENT,
+    color: Rgba::TRANSPARENT,
     voxels: None,
     opaque: false,
     visible: false,
@@ -298,7 +298,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: Cow::Borrowed("<air>"),
     selectable: false,
     collision: BlockCollision::None,
-    light_emission: RGB::ZERO,
+    light_emission: Rgb::ZERO,
 };
 
 /// A “flattened” and snapshotted form of [`Block`] which contains all information needed
@@ -309,7 +309,7 @@ pub struct EvaluatedBlock {
     pub attributes: BlockAttributes,
     /// The block's color; if made of multiple voxels, then an average or representative
     /// color.
-    pub color: RGBA,
+    pub color: Rgba,
     /// The voxels making up the block, if any; if [`None`], then `self.color` should be
     /// used as a uniform color value.
     ///
@@ -348,7 +348,7 @@ impl ConciseDebug for EvaluatedBlock {
 pub struct Evoxel {
     // TODO: Maybe we should convert to a smaller color format at this point?
     // These are frequently going to be copied into 32-bit texture color anyway.
-    pub color: RGBA,
+    pub color: Rgba,
     pub selectable: bool,
     pub collision: BlockCollision,
 }
@@ -356,7 +356,7 @@ pub struct Evoxel {
 impl Evoxel {
     /// Construct the [`Evoxel`] that would have resulted from evaluating a voxel block
     /// with the given color and default attributes.
-    pub const fn new(color: RGBA) -> Self {
+    pub const fn new(color: Rgba) -> Self {
         // Use the values from BlockAttributes's default for consistency.
         // Force constant promotion so that this doesn't look like a
         // feature(const_precise_live_drops) requirement
@@ -520,15 +520,15 @@ pub mod builder {
     ///
     /// ```
     /// use all_is_cubes::block::Block;
-    /// use all_is_cubes::math::RGBA;
+    /// use all_is_cubes::math::Rgba;
     /// use std::borrow::Cow;
     ///
     /// let block = Block::builder()
     ///    .display_name("BROWN")
-    ///    .color(RGBA::new(0.5, 0.5, 0., 1.))
+    ///    .color(Rgba::new(0.5, 0.5, 0., 1.))
     ///    .build();
     ///
-    /// assert_eq!(block.evaluate().unwrap().color, RGBA::new(0.5, 0.5, 0., 1.));
+    /// assert_eq!(block.evaluate().unwrap().color, Rgba::new(0.5, 0.5, 0., 1.));
     /// assert_eq!(
     ///     block.evaluate().unwrap().attributes.display_name,
     ///     Cow::Borrowed("BROWN"),
@@ -588,7 +588,7 @@ pub mod builder {
         }
 
         /// Sets the value for [`BlockAttributes::light_emission`].
-        pub fn light_emission(mut self, value: impl Into<RGB>) -> Self {
+        pub fn light_emission(mut self, value: impl Into<Rgb>) -> Self {
             self.attributes.light_emission = value.into();
             self
         }
@@ -596,7 +596,7 @@ pub mod builder {
         /// Sets the color value for building a [`Block::Atom`].
         ///
         /// This will replace any previous color **or voxels.**
-        pub fn color(self, color: impl Into<RGBA>) -> BlockBuilder<RGBA> {
+        pub fn color(self, color: impl Into<Rgba>) -> BlockBuilder<Rgba> {
             BlockBuilder {
                 attributes: self.attributes,
                 content: color.into(),
@@ -689,14 +689,14 @@ pub mod builder {
         }
     }
     /// Equivalent to `Block::builder().color(color)`.
-    impl From<RGBA> for BlockBuilder<RGBA> {
-        fn from(color: RGBA) -> Self {
+    impl From<Rgba> for BlockBuilder<Rgba> {
+        fn from(color: Rgba) -> Self {
             Block::builder().color(color)
         }
     }
     /// Equivalent to `Block::builder().color(color.with_alpha_one())`.
-    impl From<RGB> for BlockBuilder<RGBA> {
-        fn from(color: RGB) -> Self {
+    impl From<Rgb> for BlockBuilder<Rgba> {
+        fn from(color: Rgb) -> Self {
             Block::builder().color(color.with_alpha_one())
         }
     }
@@ -720,7 +720,7 @@ pub mod builder {
         }
     }
     /// Used by [`BlockBuilder::color`].
-    impl BuilderContentIndependent for RGBA {
+    impl BuilderContentIndependent for Rgba {
         fn build_i(self, attributes: BlockAttributes) -> Block {
             Block::Atom(attributes, self)
         }
@@ -755,12 +755,12 @@ mod tests {
 
     #[test]
     fn evaluate_opaque_atom_and_attributes() {
-        let color = RGBA::new(1.0, 2.0, 3.0, 1.0);
+        let color = Rgba::new(1.0, 2.0, 3.0, 1.0);
         let attributes = BlockAttributes {
             display_name: Cow::Borrowed(&"hello world"),
             selectable: false,
             collision: BlockCollision::None,
-            light_emission: RGB::ONE,
+            light_emission: Rgb::ONE,
             ..BlockAttributes::default()
         };
         let block = Block::Atom(attributes.clone(), color);
@@ -774,7 +774,7 @@ mod tests {
 
     #[test]
     fn evaluate_transparent_atom() {
-        let color = RGBA::new(1.0, 2.0, 3.0, 0.5);
+        let color = Rgba::new(1.0, 2.0, 3.0, 0.5);
         let block = Block::Atom(BlockAttributes::default(), color);
         let e = block.evaluate().unwrap();
         assert_eq!(e.color, block.color());
@@ -785,9 +785,9 @@ mod tests {
 
     #[test]
     fn evaluate_invisible_atom() {
-        let block = Block::Atom(BlockAttributes::default(), RGBA::TRANSPARENT);
+        let block = Block::Atom(BlockAttributes::default(), Rgba::TRANSPARENT);
         let e = block.evaluate().unwrap();
-        assert_eq!(e.color, RGBA::TRANSPARENT);
+        assert_eq!(e.color, Rgba::TRANSPARENT);
         assert!(e.voxels.is_none());
         assert_eq!(e.opaque, false);
         assert_eq!(e.visible, false);
@@ -806,7 +806,7 @@ mod tests {
             .attributes(attributes.clone())
             .voxels_fn(&mut universe, resolution, |point| {
                 let point = point.cast::<f32>().unwrap();
-                Block::from(RGBA::new(point.x, point.y, point.z, 1.0))
+                Block::from(Rgba::new(point.x, point.y, point.z, 1.0))
             })
             .unwrap()
             .build();
@@ -818,7 +818,7 @@ mod tests {
             Some(GridArray::generate(Grid::for_block(resolution), |point| {
                 let point = point.cast::<f32>().unwrap();
                 Evoxel {
-                    color: RGBA::new(point.x, point.y, point.z, 1.0),
+                    color: Rgba::new(point.x, point.y, point.z, 1.0),
                     selectable: true,
                     collision: BlockCollision::Hard,
                 }
@@ -834,7 +834,7 @@ mod tests {
         let resolution = 4;
         let block = Block::builder()
             .voxels_fn(&mut universe, resolution, |point| {
-                Block::from(RGBA::new(
+                Block::from(Rgba::new(
                     0.0,
                     0.0,
                     0.0,
@@ -858,7 +858,7 @@ mod tests {
         let mut universe = Universe::new();
         let block = Block::builder()
             .voxels_fn(&mut universe, 4, |point| {
-                Block::from(RGBA::new(
+                Block::from(Rgba::new(
                     0.0,
                     0.0,
                     0.0,
@@ -889,7 +889,7 @@ mod tests {
                 let point = point.cast::<f32>().unwrap();
                 Some(Block::Atom(
                     BlockAttributes::default(),
-                    RGBA::new(point.x, point.y, point.z, 1.0),
+                    Rgba::new(point.x, point.y, point.z, 1.0),
                 ))
             })
             .unwrap();
@@ -909,7 +909,7 @@ mod tests {
                 |point| {
                     let point = (point + offset).cast::<f32>().unwrap();
                     Evoxel {
-                        color: RGBA::new(point.x, point.y, point.z, 1.0),
+                        color: Rgba::new(point.x, point.y, point.z, 1.0),
                         selectable: true,
                         collision: BlockCollision::Hard,
                     }
@@ -928,7 +928,7 @@ mod tests {
         space
             .fill(space.grid(), |point| {
                 let point = point.cast::<f32>().unwrap();
-                Some(Block::from(RGBA::new(point.x, point.y, point.z, 1.0)))
+                Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
             })
             .unwrap();
         let space_ref = universe.insert_anonymous(space);
@@ -943,7 +943,7 @@ mod tests {
 
     #[test]
     fn listen_atom() {
-        let block = Block::from(RGBA::WHITE);
+        let block = Block::from(Rgba::WHITE);
         let mut sink = Sink::new();
         block.listen(sink.listener()).unwrap();
         assert_eq!(None, sink.next());
@@ -953,14 +953,14 @@ mod tests {
     #[test]
     fn listen_indirect_atom() {
         let mut universe = Universe::new();
-        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(RGBA::WHITE)));
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
         let indirect = Block::Indirect(block_def_ref.clone());
         let mut sink = Sink::new();
         indirect.listen(sink.listener()).unwrap();
         assert_eq!(None, sink.next());
 
         // Now mutate it and we should see a notification.
-        *(block_def_ref.borrow_mut().modify()) = Block::from(RGBA::BLACK);
+        *(block_def_ref.borrow_mut().modify()) = Block::from(Rgba::BLACK);
         assert!(sink.next().is_some());
     }
 
@@ -969,7 +969,7 @@ mod tests {
     #[test]
     fn listen_indirect_double() {
         let mut universe = Universe::new();
-        let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::from(RGBA::WHITE)));
+        let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
         let block_def_ref2 =
             universe.insert_anonymous(BlockDef::new(Block::Indirect(block_def_ref1.clone())));
         let indirect2 = Block::Indirect(block_def_ref2.clone());
@@ -978,15 +978,15 @@ mod tests {
         assert_eq!(None, sink.next());
 
         // Now mutate the original block and we should see a notification.
-        *(block_def_ref1.borrow_mut().modify()) = Block::from(RGBA::BLACK);
+        *(block_def_ref1.borrow_mut().modify()) = Block::from(Rgba::BLACK);
         assert!(sink.next().is_some());
 
         // Remove block_def_ref1 from the contents of block_def_ref2...
-        *(block_def_ref2.borrow_mut().modify()) = Block::from(RGBA::BLACK);
+        *(block_def_ref2.borrow_mut().modify()) = Block::from(Rgba::BLACK);
         assert!(sink.next().is_some());
         assert!(sink.next().is_none());
         // ...and then block_def_ref1's changes should NOT be forwarded.
-        *(block_def_ref1.borrow_mut().modify()) = Block::from(RGBA::WHITE);
+        *(block_def_ref1.borrow_mut().modify()) = Block::from(Rgba::WHITE);
         assert!(sink.next().is_none());
     }
 
@@ -1003,7 +1003,7 @@ mod tests {
         // Now mutate the space and we should see a notification.
         space_ref
             .borrow_mut()
-            .set((0, 0, 0), Block::from(RGBA::new(0.1, 0.2, 0.3, 0.4)))
+            .set((0, 0, 0), Block::from(Rgba::new(0.1, 0.2, 0.3, 0.4)))
             .unwrap();
         assert!(sink.next().is_some());
 
@@ -1014,7 +1014,7 @@ mod tests {
 
     #[test]
     fn builder_defaults() {
-        let color = RGBA::new(0.1, 0.2, 0.3, 0.4);
+        let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
         assert_eq!(
             Block::builder().color(color).build(),
             Block::Atom(BlockAttributes::default(), color),
@@ -1023,8 +1023,8 @@ mod tests {
 
     #[test]
     fn builder_every_field() {
-        let color = RGBA::new(0.1, 0.2, 0.3, 0.4);
-        let light_emission = RGB::new(0.1, 3.0, 0.1);
+        let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
+        let light_emission = Rgb::new(0.1, 3.0, 0.1);
         assert_eq!(
             Block::builder()
                 .display_name("hello world")

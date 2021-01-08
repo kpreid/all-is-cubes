@@ -22,8 +22,7 @@ const SURFACE_ABSORPTION: f32 = 0.75;
 /// One component of a `PackedLight`.
 pub(crate) type PackedLightScalar = u8;
 
-/// Lighting within a `Space`; an `all_is_cubes::math::RGB` value stored with reduced
-/// precision and range.
+/// Lighting within a [`Space`]; an [`Rgb`] value stored with reduced precision and range.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PackedLight(Vector3<PackedLightScalar>);
 // TODO: Once we've built out the rest of the game, do some performance testing and
@@ -62,9 +61,9 @@ impl PackedLight {
     }
 }
 
-impl From<RGB> for PackedLight {
+impl From<Rgb> for PackedLight {
     #[inline]
-    fn from(value: RGB) -> Self {
+    fn from(value: Rgb) -> Self {
         PackedLight(Vector3::new(
             Self::scalar_in(value.red()),
             Self::scalar_in(value.green()),
@@ -82,10 +81,10 @@ impl From<PackedLight> for [f32; 3] {
         ]
     }
 }
-impl From<PackedLight> for RGB {
+impl From<PackedLight> for Rgb {
     #[inline]
     fn from(value: PackedLight) -> Self {
-        RGB::new(
+        Rgb::new(
             PackedLight::scalar_out(value.0[0]),
             PackedLight::scalar_out(value.0[1]),
             PackedLight::scalar_out(value.0[2]),
@@ -235,7 +234,7 @@ impl Space {
         cube: GridPoint,
     ) -> (PackedLight, Vec<GridPoint>, usize, LightingUpdateInfo) {
         // Accumulator of incoming light encountered.
-        let mut incoming_light: RGB = RGB::ZERO;
+        let mut incoming_light: Rgb = Rgb::ZERO;
         // Number of rays contributing to incoming_light.
         let mut total_rays = 0;
         // Cubes whose lighting value contributed to the incoming_light value.
@@ -265,7 +264,7 @@ impl Space {
                         .get_evaluated(cube + face.normal_vector())
                         .attributes
                         .light_emission
-                        == RGB::ZERO
+                        == Rgb::ZERO
                 {
                     continue;
                 }
@@ -302,9 +301,9 @@ impl Space {
                             let stored_light = self.get_lighting(light_cube);
 
                             let surface_color = ev_hit.color.to_rgb() * SURFACE_ABSORPTION
-                                + RGB::ONE * (1. - SURFACE_ABSORPTION);
+                                + Rgb::ONE * (1. - SURFACE_ABSORPTION);
                             let light_from_struck_face = ev_hit.attributes.light_emission
-                                + RGB::from(stored_light) * surface_color;
+                                + Rgb::from(stored_light) * surface_color;
                             incoming_light += light_from_struck_face * ray_alpha;
                             dependencies.push(light_cube);
                             cost += 10;
@@ -497,10 +496,10 @@ mod tests {
     fn step() {
         let mut space = Space::empty_positive(3, 1, 1);
         let former_sky_light = PackedLight::from(space.sky_color());
-        space.set_sky_color(RGB::new(1.0, 0.0, 0.0));
+        space.set_sky_color(Rgb::new(1.0, 0.0, 0.0));
         let new_sky_light = PackedLight::from(space.sky_color());
 
-        space.set((0, 0, 0), RGB::ONE).unwrap();
+        space.set((0, 0, 0), Rgb::ONE).unwrap();
         // Not changed yet... except for the now-opaque block
         assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::ZERO);
         assert_eq!(space.get_lighting((1, 0, 0)), former_sky_light);

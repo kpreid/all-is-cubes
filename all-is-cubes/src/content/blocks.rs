@@ -9,7 +9,7 @@ use noise::Seedable as _;
 use crate::block::{Block, Resolution, AIR};
 use crate::blockgen::LandscapeBlocks;
 use crate::linking::{BlockModule, BlockProvider};
-use crate::math::{int_magnitude_squared, GridPoint, NoiseFnExt as _, NotNan, RGB, RGBA};
+use crate::math::{int_magnitude_squared, GridPoint, NoiseFnExt as _, NotNan, Rgb, Rgba};
 use crate::universe::{InsertError, Universe};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
@@ -31,7 +31,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
     install_landscape_blocks(universe, resolution)?;
 
     use DemoBlocks::*;
-    let stone_color: Block = RGBA::new(0.314, 0.306, 0.353, 1.0).into();
+    let stone_color: Block = Rgba::new(0.314, 0.306, 0.353, 1.0).into();
     let road_noise_v = noise::Value::new().set_seed(0x51b19f6a);
     let road_noise = noise::ScaleBias::new(&road_noise_v)
         .set_bias(1.0)
@@ -47,12 +47,12 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
 
         Lamp => Block::builder()
             .display_name("Lamp")
-            .light_emission(RGB::new(20.0, 20.0, 20.0))
+            .light_emission(Rgb::new(20.0, 20.0, 20.0))
             .voxels_fn(universe, resolution, |p| {
                 if int_magnitude_squared(p - GridPoint::new(8, 8, 8)) <= 8 * 8 + 3
                 /* fudge */
                 {
-                    RGBA::WHITE.into()
+                    Rgba::WHITE.into()
                 } else {
                     AIR.clone()
                 }
@@ -62,11 +62,11 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
 
         Lamppost => Block::builder()
             .display_name("Lamppost")
-            .light_emission(RGB::new(3.0, 3.0, 3.0))
+            .light_emission(Rgb::new(3.0, 3.0, 3.0))
             .voxels_fn(universe, resolution, |p| {
                 let central = p - GridPoint::new(8, 8, 8);
                 if (central.x.pow(2) + central.z.pow(2)) < 2 * 2 {
-                    RGBA::BLACK.into()
+                    Rgba::BLACK.into()
                 } else {
                     AIR.clone()
                 }

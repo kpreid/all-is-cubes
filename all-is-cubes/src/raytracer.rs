@@ -22,7 +22,7 @@ use std::convert::TryFrom;
 
 use crate::block::Evoxel;
 use crate::camera::{eye_for_look_at, ProjectionHelper};
-use crate::math::{Face, FreeCoordinate, GridPoint, RGB, RGBA};
+use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
 
@@ -37,7 +37,7 @@ struct SpaceRaytracerImpl<P: PixelBuf> {
     blocks: Box<[TracingBlock<P::BlockData>]>,
     #[borrows(blocks)]
     cubes: GridArray<TracingCubeData<'this, P::BlockData>>,
-    sky_color: RGB,
+    sky_color: Rgb,
 }
 
 impl<P: PixelBuf> SpaceRaytracer<P> {
@@ -110,7 +110,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 
     #[inline]
-    fn get_lighting(&self, cube: GridPoint) -> RGB {
+    fn get_lighting(&self, cube: GridPoint) -> Rgb {
         self.0.with(|impl_fields| {
             impl_fields
                 .cubes
@@ -308,7 +308,7 @@ struct TracingCubeData<'a, B: 'static> {
 
 #[derive(Clone, Debug)]
 enum TracingBlock<B: 'static> {
-    Atom(B, RGBA),
+    Atom(B, Rgba),
     Recur(B, GridArray<Evoxel>),
 }
 
@@ -327,14 +327,14 @@ impl<P: PixelBuf> TracingState<P> {
             // Abort excessively long traces.
             self.pixel_buf = Default::default();
             self.pixel_buf
-                .add(RGBA::new(1.0, 1.0, 1.0, 1.0), &P::error_block_data());
+                .add(Rgba::new(1.0, 1.0, 1.0, 1.0), &P::error_block_data());
             true
         } else {
             self.pixel_buf.opaque()
         }
     }
 
-    fn finish(mut self, sky_color: RGB) -> (P::Pixel, RaytraceInfo) {
+    fn finish(mut self, sky_color: Rgb) -> (P::Pixel, RaytraceInfo) {
         if self.cubes_traced == 0 {
             // Didn't intersect the world at all. Draw these as plain background.
             // TODO: Switch to using the sky color, unless debugging options are set.
@@ -360,8 +360,8 @@ impl<P: PixelBuf> TracingState<P> {
     fn trace_through_surface(
         &mut self,
         block_data: &P::BlockData,
-        surface: RGBA,
-        lighting: RGB,
+        surface: Rgba,
+        lighting: Rgb,
         face: Face,
     ) {
         if surface.fully_transparent() {
@@ -373,14 +373,14 @@ impl<P: PixelBuf> TracingState<P> {
     }
 }
 
-fn fake_lighting_adjustment(rgb: RGB, face: Face) -> RGB {
+fn fake_lighting_adjustment(rgb: Rgb, face: Face) -> Rgb {
     // TODO: notion of "one step" is less coherent ...
     let one_step = 1.0 / 5.0;
     let modifier = match face {
-        Face::PY => RGB::ONE * one_step * 2.0,
-        Face::NY => RGB::ONE * one_step * -1.0,
-        Face::NX | Face::PX => RGB::ONE * one_step * 1.0,
-        _ => RGB::ONE * 0.0,
+        Face::PY => Rgb::ONE * one_step * 2.0,
+        Face::NY => Rgb::ONE * one_step * -1.0,
+        Face::NX | Face::PX => Rgb::ONE * one_step * 1.0,
+        _ => Rgb::ONE * 0.0,
     };
     rgb + modifier
 }
@@ -437,7 +437,7 @@ pub trait PixelBuf: Default {
     ///
     /// TODO: this interface might want even more information; generalize it to be
     /// more future-proof.
-    fn add(&mut self, surface_color: RGBA, block_data: &Self::BlockData);
+    fn add(&mut self, surface_color: Rgba, block_data: &Self::BlockData);
 
     /// Indicates that the trace did not intersect any space that could have contained
     /// anything to draw. May be used for special diagnostic drawing. If used, should
@@ -454,7 +454,7 @@ pub struct ColorBuf {
     /// is `1.0 - self.ray_alpha`, or equivalently we can say that it is the color to
     /// display supposing that everything not already traced is black.
     ///
-    /// Note: Not using the `RGB` type so as to skip NaN checks.
+    /// Note: Not using the [`Rgb`] type so as to skip NaN checks.
     color_accumulator: Vector3<f32>,
 
     /// Fraction of the color value that is to be determined by future, rather than past,
@@ -463,7 +463,7 @@ pub struct ColorBuf {
 }
 
 impl PixelBuf for ColorBuf {
-    type Pixel = RGBA;
+    type Pixel = Rgba;
     type BlockData = ();
 
     fn compute_block_data(_: &SpaceBlockData) {}
@@ -473,15 +473,15 @@ impl PixelBuf for ColorBuf {
     fn sky_block_data() {}
 
     #[inline]
-    fn result(self) -> RGBA {
+    fn result(self) -> Rgba {
         if self.ray_alpha >= 1.0 {
             // Special case to avoid dividing by zero
-            RGBA::TRANSPARENT
+            Rgba::TRANSPARENT
         } else {
             let color_alpha = 1.0 - self.ray_alpha;
             let non_premultiplied_color = self.color_accumulator / color_alpha;
-            RGBA::try_from(non_premultiplied_color.extend(color_alpha))
-                .unwrap_or_else(|_| RGBA::new(1.0, 0.0, 0.0, 1.0))
+            Rgba::try_from(non_premultiplied_color.extend(color_alpha))
+                .unwrap_or_else(|_| Rgba::new(1.0, 0.0, 0.0, 1.0))
         }
     }
 
@@ -493,7 +493,7 @@ impl PixelBuf for ColorBuf {
     }
 
     #[inline]
-    fn add(&mut self, surface_color: RGBA, _block_data: &Self::BlockData) {
+    fn add(&mut self, surface_color: Rgba, _block_data: &Self::BlockData) {
         let color_vector: Vector3<f32> = surface_color.to_rgb().into();
         let surface_alpha = surface_color.alpha().into_inner();
         let alpha_for_add = surface_alpha * self.ray_alpha;
@@ -555,7 +555,7 @@ impl PixelBuf for CharacterBuf {
     }
 
     #[inline]
-    fn add(&mut self, _surface_color: RGBA, text: &Self::BlockData) {
+    fn add(&mut self, _surface_color: Rgba, text: &Self::BlockData) {
         if self.hit_text.is_none() {
             self.hit_text = Some(text.to_owned().to_string());
         }
@@ -609,12 +609,12 @@ mod tests {
 
     #[test]
     fn color_buf() {
-        let color_1 = RGBA::new(1.0, 0.0, 0.0, 0.75);
-        let color_2 = RGBA::new(0.0, 1.0, 0.0, 0.5);
-        let color_3 = RGBA::new(0.0, 0.0, 1.0, 1.0);
+        let color_1 = Rgba::new(1.0, 0.0, 0.0, 0.75);
+        let color_2 = Rgba::new(0.0, 1.0, 0.0, 0.5);
+        let color_3 = Rgba::new(0.0, 0.0, 1.0, 1.0);
 
         let mut buf = ColorBuf::default();
-        assert_eq!(buf.clone().result(), RGBA::TRANSPARENT);
+        assert_eq!(buf.clone().result(), Rgba::TRANSPARENT);
         assert!(!buf.opaque());
 
         buf.add(color_1, &());

@@ -19,7 +19,7 @@ use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::Vertex;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
-use crate::math::{FreeCoordinate, AAB, RGBA};
+use crate::math::{FreeCoordinate, AAB, Rgba};
 use crate::space::Space;
 use crate::universe::URef;
 use crate::util::WarningsResult;
@@ -190,7 +190,7 @@ where
                 if let Some(cursor) = &self.cursor_result {
                     let space = camera.space.borrow();
                     let (_, _, _, lighting_info) = space.compute_lighting(cursor.place.adjacent());
-                    wireframe_vertices(&mut v, RGBA::new(0.8, 0.8, 1.0, 1.0), lighting_info);
+                    wireframe_vertices(&mut v, Rgba::new(0.8, 0.8, 1.0, 1.0), lighting_info);
                 }
             }
 

@@ -9,7 +9,7 @@ use luminance_front::context::GraphicsContext;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
 
-use crate::math::{FreeCoordinate, RGBA};
+use crate::math::{FreeCoordinate, Rgba};
 use crate::space::PackedLight;
 use crate::triangulator::{BlockVertex, Coloring, ToGfxVertex};
 
@@ -67,7 +67,7 @@ impl Vertex {
     pub fn new_colored(
         position: Point3<FreeCoordinate>,
         normal: Vector3<FreeCoordinate>,
-        color: RGBA,
+        color: Rgba,
     ) -> Self {
         Self {
             position: VertexPosition::new(position.cast::<f32>().unwrap().into()),
@@ -168,7 +168,7 @@ where
 mod tests {
     use super::*;
     use cgmath::Vector3;
-    use crate::math::RGB;
+    use crate::math::Rgb;
 
     #[test]
     fn vertex_dummy() {
@@ -180,7 +180,7 @@ mod tests {
         let vertex = Vertex::new_colored(
             Point3::new(1.0, 2.0, 3.0),
             Vector3::new(4.0, 5.0, 6.0),
-            RGBA::new(7.0, 8.0, 9.0, 0.5),
+            Rgba::new(7.0, 8.0, 9.0, 0.5),
         );
         assert_eq!(vertex.position.repr, [1.0, 2.0, 3.0]);
         assert_eq!(vertex.normal.repr, [4.0, 5.0, 6.0]);
@@ -194,11 +194,11 @@ mod tests {
         let block_vertex = BlockVertex {
             position: Point3::new(1.0, 2.0, 3.0),
             normal: Vector3::new(4.0, 5.0, 6.0),
-            coloring: Coloring::Solid(RGBA::new(7.0, 8.0, 9.0, 0.5)),
+            coloring: Coloring::Solid(Rgba::new(7.0, 8.0, 9.0, 0.5)),
         };
         let vertex = GLBlockVertex::from(block_vertex).instantiate(
             Vector3::new(0.1, 0.2, 0.3),
-            RGB::new(1.0, 0.0, 2.0).into(),
+            Rgb::new(1.0, 0.0, 2.0).into(),
         );
         assert_eq!(vertex.position.repr, [1.1, 2.2, 3.3]);
         assert_eq!(vertex.normal.repr, [4.0, 5.0, 6.0]);

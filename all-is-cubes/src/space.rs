@@ -56,7 +56,7 @@ pub struct Space {
     // either bundle them all into one struct field, or move them *outside* the
     // Space into some higher-level concept. (For example, block spaces arguably
     // should be "abstract" and not have either lighting or a sky color.)
-    sky_color: RGB,
+    sky_color: Rgb,
     packed_sky_color: PackedLight,
 
     notifier: Notifier<SpaceChange>,
@@ -236,10 +236,10 @@ impl Space {
     ///
     /// ```
     /// use all_is_cubes::block::*;
-    /// use all_is_cubes::math::RGBA;
+    /// use all_is_cubes::math::Rgba;
     /// use all_is_cubes::space::Space;
     /// let mut space = Space::empty_positive(1, 1, 1);
-    /// let a_block = Block::builder().color(RGBA::new(1.0, 0.0, 0.0, 1.0)).build();
+    /// let a_block = Block::builder().color(Rgba::new(1.0, 0.0, 0.0, 1.0)).build();
     /// space.set((0, 0, 0), &a_block);
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// ```
@@ -361,11 +361,11 @@ impl Space {
     ///
     /// ```
     /// use all_is_cubes::block::{AIR, Block};
-    /// use all_is_cubes::math::RGBA;
+    /// use all_is_cubes::math::Rgba;
     /// use all_is_cubes::space::{Grid, Space};
     ///
     /// let mut space = Space::empty_positive(10, 10, 10);
-    /// let a_block: Block = RGBA::new(1.0, 0.0, 0.0, 1.0).into();
+    /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
     ///
     /// space.fill(Grid::new((0, 0, 0), (2, 1, 1)), |_point| Some(&a_block)).unwrap();
     ///
@@ -440,7 +440,7 @@ impl Space {
 
     /// Returns the sky color; for lighting purposes, this is the illumination assumed
     /// to arrive from all directions outside the bounds of this space.
-    pub fn sky_color(&self) -> RGB {
+    pub fn sky_color(&self) -> Rgb {
         self.sky_color
     }
 
@@ -448,7 +448,7 @@ impl Space {
     ///
     /// This function does not currently cause any recomputation of cube lighting,
     /// but \[TODO:\] it may later be improved to do so.
-    pub fn set_sky_color(&mut self, color: RGB) {
+    pub fn set_sky_color(&mut self, color: Rgb) {
         self.sky_color = color;
         self.packed_sky_color = self.sky_color.into();
         // TODO: Also send out a SpaceChange.
@@ -862,7 +862,7 @@ mod tests {
     fn listens_to_block_changes() {
         // Set up indirect block
         let mut universe = Universe::new();
-        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(RGBA::WHITE)));
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
         let indirect = Block::Indirect(block_def_ref.clone());
 
         // Set up space and listener
@@ -873,7 +873,7 @@ mod tests {
         assert_eq!(None, sink.next());
 
         // Now mutate the block def .
-        let new_block = Block::from(RGBA::BLACK);
+        let new_block = Block::from(Rgba::BLACK);
         let new_evaluated = new_block.evaluate().unwrap();
         *(block_def_ref.borrow_mut().modify()) = new_block;
         // This does not result in an outgoing notification, because we don't want
@@ -906,13 +906,13 @@ mod tests {
             \x20                   display_name: \"<air>\",\n\
             \x20                   selectable: false,\n\
             \x20                   collision: None,\n\
-            \x20                   light_emission: RGB(0.0, 0.0, 0.0),\n\
+            \x20                   light_emission: Rgb(0.0, 0.0, 0.0),\n\
             \x20               },\n\
-            \x20               RGBA(0.0, 0.0, 0.0, 0.0),\n\
+            \x20               Rgba(0.0, 0.0, 0.0, 0.0),\n\
             \x20           ),\n\
             \x20       },\n\
             \x20   ],\n\
-            \x20   sky_color: RGB(0.9, 0.9, 1.4),\n\
+            \x20   sky_color: Rgb(0.9, 0.9, 1.4),\n\
             }"
         );
     }

@@ -19,7 +19,7 @@ use std::convert::TryFrom;
 
 use crate::block::{EvaluatedBlock, Evoxel, Resolution};
 use crate::content::palette;
-use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, RGBA};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
 use crate::util::ConciseDebug as _;
 
@@ -45,7 +45,7 @@ pub struct BlockVertex {
 #[derive(Clone, Copy, PartialEq)]
 pub enum Coloring {
     /// Solid color.
-    Solid(RGBA),
+    Solid(Rgba),
     /// Texture coordinates provided by the [`TextureAllocator`] for this vertex.
     Texture(Vector3<TextureCoordinate>),
 }
@@ -206,7 +206,7 @@ fn push_quad<V: From<BlockVertex>>(
 /// Compared to [`Coloring`], it describes texturing for an entire quad rather than a vertex.
 #[derive(Copy, Clone, Debug)]
 enum QuadColoring<'a, T> {
-    Solid(RGBA),
+    Solid(Rgba),
     Texture(&'a T),
 }
 
@@ -363,7 +363,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         ) {
                             // The quad we're going to draw has identical texels, so we might as
                             // well use a solid color and skip allocating a texture tile.
-                            QuadColoring::<A::Tile>::Solid(RGBA::from_32bit(uniform_color))
+                            QuadColoring::<A::Tile>::Solid(Rgba::from_32bit(uniform_color))
                         } else {
                             maybe_texture_tile = texture_allocator.allocate();
                             if let Some(ref mut texture_tile) = maybe_texture_tile {
@@ -644,7 +644,7 @@ mod tests {
         BlockVertex {
             position: position.into(),
             normal: normal.into(),
-            coloring: Coloring::Solid(RGBA::new(color[0], color[1], color[2], color[3])),
+            coloring: Coloring::Solid(Rgba::new(color[0], color[1], color[2], color[3])),
         }
     }
 
@@ -869,7 +869,7 @@ mod tests {
             // Caution: the conversion involves a round trip through 8-bit color.
             // This exercises that rounding consciously but we might decide to
             // get rid of it.
-            RGBA::new(0.0, 1.0, 0.5, 1.0),
+            Rgba::new(0.0, 1.0, 0.5, 1.0),
         );
         let less_than_full_block = Block::builder()
             .voxels_fn(&mut u, resolution, |cube| {
@@ -945,7 +945,7 @@ mod tests {
         let complex_block = Block::builder()
             .voxels_fn(&mut u, resolution, |cube| {
                 if (cube.x + cube.y + cube.z) % 2 == 0 {
-                    RGBA::WHITE.into()
+                    Rgba::WHITE.into()
                 } else {
                     AIR
                 }

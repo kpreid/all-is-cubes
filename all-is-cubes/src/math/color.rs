@@ -8,7 +8,7 @@ pub use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
 use std::ops::{Add, AddAssign, Mul, Sub};
 
-/// Allows writing a constant [`RGB`] color value, provided that its components are float
+/// Allows writing a constant [`Rgb`] color value, provided that its components are float
 /// literals.
 ///
 /// TODO: examples
@@ -18,7 +18,7 @@ macro_rules! rgb_const {
         unsafe {
             // Safety: Only literal values are allowed, which will either be a non-NaN
             // float or a type mismatch.
-            $crate::math::RGB::new_nn(
+            $crate::math::Rgb::new_nn(
                 $crate::math::NotNan::unchecked_new($r),
                 $crate::math::NotNan::unchecked_new($g),
                 $crate::math::NotNan::unchecked_new($b),
@@ -27,13 +27,13 @@ macro_rules! rgb_const {
     };
 }
 
-/// Allows writing a constant [`RGB`] color value, provided that its components are float
+/// Allows writing a constant [`Rgba`] color value, provided that its components are float
 /// literals.
 #[macro_export]
 macro_rules! rgba_const {
     ($r:literal, $g:literal, $b:literal, $a:literal) => {
         unsafe {
-            $crate::math::RGBA::new_nn(
+            $crate::math::Rgba::new_nn(
                 $crate::math::NotNan::unchecked_new($r),
                 $crate::math::NotNan::unchecked_new($g),
                 $crate::math::NotNan::unchecked_new($b),
@@ -52,7 +52,7 @@ macro_rules! rgba_const {
 /// * NaN is banned so that [`Eq`] may be implemented. (Infinities are permitted.)
 /// * Color values are linear (gamma = 1).
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct RGB(Vector3<NotNan<f32>>);
+pub struct Rgb(Vector3<NotNan<f32>>);
 
 /// A floating-point RGBA color value.
 ///
@@ -66,17 +66,17 @@ pub struct RGB(Vector3<NotNan<f32>>);
 /// * Alpha values less than zero and greater than one will be treated equivalently to
 ///   zero and one, respectively, but are preserved rather than clipped.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct RGBA(Vector4<NotNan<f32>>);
+pub struct Rgba(Vector4<NotNan<f32>>);
 
 // NotNan::zero() and one() exist, but only via traits, which can't be used in const
 const NN0: NotNan<f32> = unsafe { NotNan::unchecked_new(0.0) };
 const NN1: NotNan<f32> = unsafe { NotNan::unchecked_new(1.0) };
 
-impl RGB {
+impl Rgb {
     /// Black.
-    pub const ZERO: RGB = RGB(Vector3::new(NN0, NN0, NN0));
+    pub const ZERO: Rgb = Rgb(Vector3::new(NN0, NN0, NN0));
     /// White (unity brightness).
-    pub const ONE: RGB = RGB(Vector3::new(NN1, NN1, NN1));
+    pub const ONE: Rgb = Rgb(Vector3::new(NN1, NN1, NN1));
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.
@@ -95,14 +95,14 @@ impl RGB {
         Self(Vector3::new(r, g, b))
     }
 
-    /// Adds an alpha component to produce an [RGBA] color.
+    /// Adds an alpha component to produce an [Rgba] color.
     #[inline]
-    pub const fn with_alpha(self, alpha: NotNan<f32>) -> RGBA {
-        RGBA(Vector4::new(self.0.x, self.0.y, self.0.z, alpha))
+    pub const fn with_alpha(self, alpha: NotNan<f32>) -> Rgba {
+        Rgba(Vector4::new(self.0.x, self.0.y, self.0.z, alpha))
     }
-    /// Adds an alpha component of `1.0` (fully opaque) to produce an [RGBA] color.
+    /// Adds an alpha component of `1.0` (fully opaque) to produce an [Rgba] color.
     #[inline]
-    pub const fn with_alpha_one(self) -> RGBA {
+    pub const fn with_alpha_one(self) -> Rgba {
         self.with_alpha(NN1)
     }
 
@@ -122,16 +122,16 @@ impl RGB {
         self.0.z
     }
 }
-impl RGBA {
+impl Rgba {
     /// Transparent black (all components zero); identical to
-    /// `RGBA::new(0.0, 0.0, 0.0, 0.0)` except for being a constant.
-    pub const TRANSPARENT: RGBA = RGBA(Vector4::new(NN0, NN0, NN0, NN0));
-    /// Black; identical to `RGBA::new(0.0, 0.0, 0.0, 1.0)` except for being a constant.
-    pub const BLACK: RGBA = RGBA(Vector4::new(NN0, NN0, NN0, NN1));
-    /// White; identical to `RGBA::new(1.0, 1.0, 1.0, 1.0)` except for being a constant.
+    /// `Rgba::new(0.0, 0.0, 0.0, 0.0)` except for being a constant.
+    pub const TRANSPARENT: Rgba = Rgba(Vector4::new(NN0, NN0, NN0, NN0));
+    /// Black; identical to `Rgba::new(0.0, 0.0, 0.0, 1.0)` except for being a constant.
+    pub const BLACK: Rgba = Rgba(Vector4::new(NN0, NN0, NN0, NN1));
+    /// White; identical to `Rgba::new(1.0, 1.0, 1.0, 1.0)` except for being a constant.
     ///
     /// Note that brighter values may exist; this is only a "nominal" white.
-    pub const WHITE: RGBA = RGBA(Vector4::new(NN1, NN1, NN1, NN1));
+    pub const WHITE: Rgba = Rgba(Vector4::new(NN1, NN1, NN1, NN1));
 
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.
@@ -193,8 +193,8 @@ impl RGBA {
     /// Note that if alpha is 0 then the components could be any value and yet be “hidden”
     /// by the transparency.
     #[inline]
-    pub fn to_rgb(self) -> RGB {
-        RGB(self.0.truncate())
+    pub fn to_rgb(self) -> Rgb {
+        Rgb(self.0.truncate())
     }
 
     // TODO: This and the code depending on it should use [u8; 4] instead.
@@ -229,40 +229,40 @@ impl RGBA {
     }
 }
 
-impl From<Vector3<NotNan<f32>>> for RGB {
+impl From<Vector3<NotNan<f32>>> for Rgb {
     fn from(value: Vector3<NotNan<f32>>) -> Self {
         Self(value)
     }
 }
-impl From<Vector4<NotNan<f32>>> for RGBA {
+impl From<Vector4<NotNan<f32>>> for Rgba {
     fn from(value: Vector4<NotNan<f32>>) -> Self {
         Self(value)
     }
 }
 
-impl From<RGB> for Vector3<f32> {
-    fn from(value: RGB) -> Self {
+impl From<Rgb> for Vector3<f32> {
+    fn from(value: Rgb) -> Self {
         value.0.map(NotNan::into_inner)
     }
 }
-impl From<RGBA> for Vector4<f32> {
-    fn from(value: RGBA) -> Self {
+impl From<Rgba> for Vector4<f32> {
+    fn from(value: Rgba) -> Self {
         value.0.map(NotNan::into_inner)
     }
 }
 
-impl From<RGB> for [f32; 3] {
-    fn from(value: RGB) -> Self {
+impl From<Rgb> for [f32; 3] {
+    fn from(value: Rgb) -> Self {
         value.0.map(NotNan::into_inner).into()
     }
 }
-impl From<RGBA> for [f32; 4] {
-    fn from(value: RGBA) -> Self {
+impl From<Rgba> for [f32; 4] {
+    fn from(value: Rgba) -> Self {
         value.0.map(NotNan::into_inner).into()
     }
 }
 
-impl TryFrom<Vector3<f32>> for RGB {
+impl TryFrom<Vector3<f32>> for Rgb {
     type Error = FloatIsNan;
     fn try_from(value: Vector3<f32>) -> Result<Self, Self::Error> {
         Ok(Self(Vector3::new(
@@ -272,7 +272,7 @@ impl TryFrom<Vector3<f32>> for RGB {
         )))
     }
 }
-impl TryFrom<Vector4<f32>> for RGBA {
+impl TryFrom<Vector4<f32>> for Rgba {
     type Error = FloatIsNan;
     fn try_from(value: Vector4<f32>) -> Result<Self, Self::Error> {
         Ok(Self(Vector4::new(
@@ -284,50 +284,50 @@ impl TryFrom<Vector4<f32>> for RGBA {
     }
 }
 
-impl Add<RGB> for RGB {
+impl Add<Rgb> for Rgb {
     type Output = Self;
     fn add(self, other: Self) -> Self {
         Self(self.0 + other.0)
     }
 }
-impl Add<RGBA> for RGBA {
+impl Add<Rgba> for Rgba {
     type Output = Self;
     fn add(self, other: Self) -> Self {
         Self(self.0 + other.0)
     }
 }
-impl AddAssign<RGB> for RGB {
+impl AddAssign<Rgb> for Rgb {
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
-impl AddAssign<RGBA> for RGBA {
+impl AddAssign<Rgba> for Rgba {
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
-impl Sub<RGB> for RGB {
+impl Sub<Rgb> for Rgb {
     type Output = Self;
     fn sub(self, other: Self) -> Self {
         Self(self.0 - other.0)
     }
 }
-impl Sub<RGBA> for RGBA {
+impl Sub<Rgba> for Rgba {
     type Output = Self;
     fn sub(self, other: Self) -> Self {
         Self(self.0 - other.0)
     }
 }
 /// Multiplies two color values componentwise.
-impl Mul<RGB> for RGB {
+impl Mul<Rgb> for Rgb {
     type Output = Self;
     /// Multiplies two color values componentwise.
-    fn mul(self, other: RGB) -> Self {
+    fn mul(self, other: Rgb) -> Self {
         Self(self.0.mul_element_wise(other.0))
     }
 }
 /// Multiplies this color value by a scalar.
-impl Mul<NotNan<f32>> for RGB {
+impl Mul<NotNan<f32>> for Rgb {
     type Output = Self;
     /// Multiplies this color value by a scalar.
     fn mul(self, scalar: NotNan<f32>) -> Self {
@@ -335,7 +335,7 @@ impl Mul<NotNan<f32>> for RGB {
     }
 }
 /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
-impl Mul<f32> for RGB {
+impl Mul<f32> for Rgb {
     type Output = Self;
     /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
     fn mul(self, scalar: f32) -> Self {
@@ -343,22 +343,22 @@ impl Mul<f32> for RGB {
     }
 }
 
-impl std::fmt::Debug for RGB {
+impl std::fmt::Debug for Rgb {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             fmt,
-            "RGB({:?}, {:?}, {:?})",
+            "Rgb({:?}, {:?}, {:?})",
             self.red().into_inner(),
             self.green().into_inner(),
             self.blue().into_inner()
         )
     }
 }
-impl std::fmt::Debug for RGBA {
+impl std::fmt::Debug for Rgba {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             fmt,
-            "RGBA({:?}, {:?}, {:?}, {:?})",
+            "Rgba({:?}, {:?}, {:?}, {:?})",
             self.red().into_inner(),
             self.green().into_inner(),
             self.blue().into_inner(),
@@ -376,13 +376,13 @@ mod tests {
     #[test]
     fn rgba_to_saturating_32bit() {
         assert_eq!(
-            RGBA::new(0.125, 0.25, 0.5, 0.75).to_saturating_32bit(),
+            Rgba::new(0.125, 0.25, 0.5, 0.75).to_saturating_32bit(),
             (31, 63, 127, 191)
         );
 
         // Test saturation
         assert_eq!(
-            RGBA::new(0.5, -1.0, 10.0, 1.0).to_saturating_32bit(),
+            Rgba::new(0.5, -1.0, 10.0, 1.0).to_saturating_32bit(),
             (127, 0, 255, 255)
         );
     }
@@ -390,12 +390,12 @@ mod tests {
     #[test]
     fn rgb_rgba_debug() {
         assert_eq!(
-            format!("{:#?}", RGB::new(0.1, 0.2, 0.3)),
-            "RGB(0.1, 0.2, 0.3)"
+            format!("{:#?}", Rgb::new(0.1, 0.2, 0.3)),
+            "Rgb(0.1, 0.2, 0.3)"
         );
         assert_eq!(
-            format!("{:#?}", RGBA::new(0.1, 0.2, 0.3, 0.4)),
-            "RGBA(0.1, 0.2, 0.3, 0.4)"
+            format!("{:#?}", Rgba::new(0.1, 0.2, 0.3, 0.4)),
+            "Rgba(0.1, 0.2, 0.3, 0.4)"
         );
     }
 }

@@ -11,7 +11,7 @@ use termion::event::{Event, Key as TermionKey};
 
 use all_is_cubes::camera::{Camera, Key, ProjectionHelper};
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::math::{NotNan, RGBA};
+use all_is_cubes::math::{NotNan, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
@@ -133,7 +133,7 @@ impl PixelBuf for ColorCharacterBuf {
     }
 
     #[inline]
-    fn add(&mut self, surface_color: RGBA, text: &Self::BlockData) {
+    fn add(&mut self, surface_color: Rgba, text: &Self::BlockData) {
         if self.override_color {
             return;
         }
@@ -144,7 +144,7 @@ impl PixelBuf for ColorCharacterBuf {
 
     fn hit_nothing(&mut self) {
         self.text.add(
-            RGBA::TRANSPARENT,
+            Rgba::TRANSPARENT,
             &Cow::Owned(format!(
                 "{}{} ",
                 color::Bg(color::Reset),

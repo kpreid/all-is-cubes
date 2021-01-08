@@ -100,7 +100,7 @@ impl ChunkChart {
     #[cfg(test)]
     fn visualization(&self) -> crate::space::Space {
         use crate::block::{Block};
-        use crate::math::RGBA;
+        use crate::math::Rgba;
 
         let extent = GridVector::new(
             self.octant_chunks.iter().map(|v| v.x).max().unwrap_or(0) + 1,
@@ -110,7 +110,7 @@ impl ChunkChart {
         // TODO use wireframe blocks instead
         let block = Block::builder()
             .display_name("Chunk")
-            .color(RGBA::new(0.5, 0.5, 0.5, 1.0))
+            .color(Rgba::new(0.5, 0.5, 0.5, 1.0))
             .build();
         for ChunkPos(chunk) in self.chunks(ChunkPos::new(0, 0, 0)) {
             space.set(chunk, &block).unwrap();

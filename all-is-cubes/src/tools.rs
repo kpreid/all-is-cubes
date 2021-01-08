@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use crate::block::{Block, AIR};
 use crate::camera::Cursor;
 use crate::linking::BlockProvider;
-use crate::math::{GridPoint, RGBA};
+use crate::math::{GridPoint, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::universe::{RefError, URef};
 use crate::vui::Icons;
@@ -64,7 +64,7 @@ impl Tool {
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             Self::PlaceBlock(block) => Cow::Borrowed(&block),
             // TODO: icon
-            Self::CopyFromSpace => Cow::Owned(RGBA::new(0., 1., 0., 1.).into()),
+            Self::CopyFromSpace => Cow::Owned(Rgba::new(0., 1., 0., 1.).into()),
         }
     }
 }
@@ -359,7 +359,7 @@ mod tests {
             Tool::DeleteBlock,
             Tool::None,
         ]);
-        let new_item = Tool::PlaceBlock(RGBA::WHITE.into());
+        let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
 
         assert_eq!(inventory.slots[2], Tool::None);
         assert_eq!(Ok(()), inventory.try_add_item(new_item.clone()));
@@ -370,7 +370,7 @@ mod tests {
     fn inventory_add_item_no_space() {
         let contents = vec![Tool::DeleteBlock, Tool::DeleteBlock];
         let mut inventory = Inventory::from_items(contents.clone());
-        let new_item = Tool::PlaceBlock(RGBA::WHITE.into());
+        let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
 
         assert_eq!(inventory.slots, contents);
         assert_eq!(Err(new_item.clone()), inventory.try_add_item(new_item));

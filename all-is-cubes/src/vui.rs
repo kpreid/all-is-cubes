@@ -18,7 +18,7 @@ use crate::blockgen::BlockGen;
 use crate::content::palette;
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
 use crate::linking::{BlockModule, BlockProvider};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -109,7 +109,7 @@ impl HudLayout {
 
         if false {
             // Visualization of the bounds of the space we're drawing.
-            let frame_block = Block::from(RGBA::new(0.0, 1.0, 1.0, 1.0));
+            let frame_block = Block::from(Rgba::new(0.0, 1.0, 1.0, 1.0));
             let mut add_frame = |z| {
                 space
                     .fill(Grid::new((-1, -1, z), (w + 2, h + 2, 1)), |_| {
@@ -354,8 +354,8 @@ impl Icons {
                 Icons::Delete => {
                     let resolution = blockgen.resolution;
                     let x_radius = i32::from(resolution) * 3 / 16;
-                    let background_block_1: Block = RGBA::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
-                    let background_block_2: Block = RGBA::new(0.8, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
+                    let background_block_1: Block = Rgba::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
+                    let background_block_2: Block = Rgba::new(0.8, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
                     let background_brush = VoxelBrush::new(vec![
                         ((0, 0, 1), &background_block_1),
                         ((1, 0, 0), &background_block_2),
@@ -363,7 +363,7 @@ impl Icons {
                         ((0, 1, 0), &background_block_2),
                         ((0, -1, 0), &background_block_2),
                     ]);
-                    let line_brush = VoxelBrush::single(Block::from(RGBA::BLACK))
+                    let line_brush = VoxelBrush::single(Block::from(Rgba::BLACK))
                         .translate(GridVector::new(0, 0, 2));
                     let line_style = PrimitiveStyleBuilder::new()
                         .stroke_color(&line_brush)

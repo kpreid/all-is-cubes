@@ -19,7 +19,7 @@ use crate::content::blocks::{install_demo_blocks, DemoBlocks};
 use crate::content::logo_text;
 use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::BlockProvider;
-use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, RGB, RGBA};
+use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use crate::raycast::Raycaster;
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
@@ -62,7 +62,7 @@ fn demo_city(universe: &mut Universe) -> Space {
         (-radius_xz, -ground_depth, -radius_xz),
         (radius_xz, sky_height, radius_xz),
     ));
-    space.set_sky_color(RGB::new(0.9, 0.9, 1.4));
+    space.set_sky_color(Rgb::new(0.9, 0.9, 1.4));
 
     // Fill in flat ground
     space
@@ -193,7 +193,7 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
             let twists = 2.5;
 
             let mut drawing_space = Space::empty(this.footprint.multiply(resolution));
-            let paint = Block::from(RGBA::new(0.9, 0.9, 0.9, 1.0));
+            let paint = Block::from(Rgba::new(0.9, 0.9, 0.9, 1.0));
             drawing_space.fill(drawing_space.grid(), |p| {
                 // Measure from midpoint of odd dimension space
                 let p = p - Vector3::new(1, 1, 1) * (resolution / 2);
@@ -262,15 +262,15 @@ fn cornell_box(universe: &mut Universe) -> Space {
     );
     let mut space = Space::empty(grid);
     // There shall be no light but that which we make for ourselves!
-    space.set_sky_color(RGB::new(0., 0., 0.));
+    space.set_sky_color(Rgb::new(0., 0., 0.));
 
-    let white: Block = RGBA::new(1.0, 1.0, 1.0, 1.0).into();
-    let red: Block = RGBA::new(0.57, 0.025, 0.025, 1.0).into();
-    let green: Block = RGBA::new(0.025, 0.236, 0.025, 1.0).into();
+    let white: Block = Rgba::new(1.0, 1.0, 1.0, 1.0).into();
+    let red: Block = Rgba::new(0.57, 0.025, 0.025, 1.0).into();
+    let green: Block = Rgba::new(0.025, 0.236, 0.025, 1.0).into();
     let light: Block = Block::builder()
         .display_name("Light")
-        .light_emission(RGB::new(100., 100., 100.))
-        .color(RGBA::new(1.0, 1.0, 1.0, 1.0))
+        .light_emission(Rgb::new(100., 100., 100.))
+        .color(Rgba::new(1.0, 1.0, 1.0, 1.0))
         .build();
 
     // Floor.

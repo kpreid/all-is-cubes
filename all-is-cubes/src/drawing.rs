@@ -22,7 +22,7 @@ pub use embedded_graphics;
 
 use crate::block::Block;
 use crate::blockgen::BlockGen;
-use crate::math::{GridPoint, GridVector, RGB, RGBA};
+use crate::math::{GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, SetCubeError, Space};
 
 /// Draw text into a [`Space`], extending in the +X and -Y directions from `origin`.
@@ -80,7 +80,7 @@ where
             // For debugging block bounds chosen for the graphic. TODO: Keep this around
             // as an option but draw a full bounding box instead.
             block_space
-                .set((0, 0, 0), Block::from(RGBA::new(1.0, 0.0, 0.0, 1.0)))
+                .set((0, 0, 0), Block::from(Rgba::new(1.0, 0.0, 0.0, 1.0)))
                 .expect("can't happen: draw_to_blocks failed to write to its own block space");
         }
 
@@ -182,9 +182,9 @@ impl DrawTarget<&'_ VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
 
 /// Adapt embedded_graphics's most general color type to ours.
 // TODO: Also adapt the other types, so that if someone wants to use them they can.
-impl From<Rgb888> for RGB {
-    fn from(color: Rgb888) -> RGB {
-        RGB::new(
+impl From<Rgb888> for Rgb {
+    fn from(color: Rgb888) -> Rgb {
+        Rgb::new(
             f32::from(color.r()) / 255.0,
             f32::from(color.g()) / 255.0,
             f32::from(color.b()) / 255.0,
@@ -196,7 +196,7 @@ impl From<Rgb888> for RGB {
 /// it can be matched if desired.
 impl From<Rgb888> for Block {
     fn from(color: Rgb888) -> Block {
-        Block::from(RGB::from(color))
+        Block::from(Rgb::from(color))
     }
 }
 
@@ -205,11 +205,11 @@ impl<'a> PixelColor for &'a Block {
     type Raw = ();
 }
 
-impl PixelColor for RGB {
+impl PixelColor for Rgb {
     type Raw = ();
 }
 
-impl PixelColor for RGBA {
+impl PixelColor for Rgba {
     type Raw = ();
 }
 
@@ -316,7 +316,7 @@ fn floor_divide(a: i32, b: i32) -> i32 {
 mod tests {
     use super::*;
     use crate::blockgen::make_some_blocks;
-    use crate::math::RGBA;
+    use crate::math::Rgba;
     use crate::raytracer::print_space;
     use crate::universe::Universe;
     use embedded_graphics::primitives::{Primitive, Rectangle};
@@ -347,19 +347,19 @@ mod tests {
     fn draw_with_eg_rgb888() {
         test_color_drawing(
             Rgb888::new(0, 127, 255),
-            &RGBA::new(0.0, 127.0 / 255.0, 1.0, 1.0).into(),
+            &Rgba::new(0.0, 127.0 / 255.0, 1.0, 1.0).into(),
         );
     }
 
     #[test]
     fn draw_with_our_rgb() {
-        let color = RGB::new(0.73, 0.27, 0.11);
+        let color = Rgb::new(0.73, 0.27, 0.11);
         test_color_drawing(color, &color.into());
     }
 
     #[test]
     fn draw_with_our_rgba() {
-        let color = RGBA::new(0.73, 0.27, 0.11, 0.9);
+        let color = Rgba::new(0.73, 0.27, 0.11, 0.9);
         test_color_drawing(color, &color.into());
     }
 
@@ -403,8 +403,8 @@ mod tests {
             .build()
     }
     /// Cube color corresponding to a_primitive_style().
-    fn a_primitive_color() -> RGBA {
-        RGBA::new(0.0, 127.0 / 255.0, 1.0, 1.0)
+    fn a_primitive_color() -> Rgba {
+        Rgba::new(0.0, 127.0 / 255.0, 1.0, 1.0)
     }
 
     #[test]

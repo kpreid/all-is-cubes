@@ -10,7 +10,7 @@ use std::convert::TryFrom;
 use crate::block::Block;
 use crate::blockgen::LandscapeBlocks;
 use crate::linking::BlockProvider;
-use crate::math::{FreeCoordinate, GridCoordinate, RGB, RGBA};
+use crate::math::{FreeCoordinate, GridCoordinate, Rgb, Rgba};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, Space};
 
@@ -58,8 +58,8 @@ pub fn axes(space: &mut Space) {
                     step.cube_ahead(),
                     Block::builder()
                         .display_name(display_name)
-                        .light_emission(RGB::try_from(light).unwrap())
-                        .color(RGBA::try_from(color).expect("axes() color generation failed"))
+                        .light_emission(Rgb::try_from(light).unwrap())
+                        .color(Rgba::try_from(color).expect("axes() color generation failed"))
                         .build(),
                 )
                 .unwrap();
@@ -142,15 +142,15 @@ fn physics_lab(shell_radius: u16, planet_radius: u16) -> Space {
 
     let outer_wall_block = Block::builder()
         .display_name("Celestial Cube")
-        .color(RGBA::new(0.2, 0.2, 0.2, 1.0))
+        .color(Rgba::new(0.2, 0.2, 0.2, 1.0))
         .build();
     let floor_1 = Block::builder()
         .display_name("Floor")
-        .color(RGBA::new(0.5, 0.5, 0.5, 1.0))
+        .color(Rgba::new(0.5, 0.5, 0.5, 1.0))
         .build();
     let floor_2 = Block::builder()
         .display_name("Floor")
-        .color(RGBA::new(0.95, 0.95, 0.95, 1.0))
+        .color(Rgba::new(0.95, 0.95, 0.95, 1.0))
         .build();
 
     // Outer walls
