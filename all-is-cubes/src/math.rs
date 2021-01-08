@@ -319,7 +319,7 @@ impl std::fmt::Debug for CubeFace {
 /// Note that this has continuous coordinates, and a discrete analogue exists as
 /// [`Grid`](crate::space::Grid).
 #[derive(Copy, Clone, PartialEq)]
-pub struct AAB {
+pub struct Aab {
     // TODO: Should we be using NotNan coordinates?
     // The upper > lower checks will reject NaNs anyway.
     lower_bounds: Point3<FreeCoordinate>,
@@ -328,9 +328,9 @@ pub struct AAB {
     sizes: Vector3<FreeCoordinate>,
 }
 
-impl AAB {
-    /// The [`AAB`] of zero size at the origin.
-    pub const ZERO: AAB = AAB {
+impl Aab {
+    /// The [`Aab`] of zero size at the origin.
+    pub const ZERO: Aab = Aab {
         lower_bounds: Point3 {
             x: 0.0,
             y: 0.0,
@@ -348,7 +348,7 @@ impl AAB {
         },
     };
 
-    /// Constructs an [`AAB`] from individual coordinates.
+    /// Constructs an [`Aab`] from individual coordinates.
     #[track_caller]
     pub fn new(
         lx: FreeCoordinate,
@@ -361,7 +361,7 @@ impl AAB {
         Self::from_lower_upper(Point3::new(lx, ly, lz), Point3::new(hx, hy, hz))
     }
 
-    /// Constructs an [`AAB`] from most-negative and most-positive corner points.
+    /// Constructs an [`Aab`] from most-negative and most-positive corner points.
     #[track_caller]
     #[rustfmt::skip]
     pub fn from_lower_upper(
@@ -382,11 +382,11 @@ impl AAB {
     /// directions from the given point.
     ///
     /// ```
-    /// use all_is_cubes::math::{AAB, GridPoint};
+    /// use all_is_cubes::math::{Aab, GridPoint};
     ///
     /// assert_eq!(
-    ///     AAB::from_cube(GridPoint::new(10, 20, -30)),
-    ///     AAB::new(10.0, 11.0, 20.0, 21.0, -30.0, -29.0)
+    ///     Aab::from_cube(GridPoint::new(10, 20, -30)),
+    ///     Aab::new(10.0, 11.0, 20.0, 21.0, -30.0, -29.0)
     /// );
     /// ```
     pub fn from_cube(cube: GridPoint) -> Self {
@@ -427,16 +427,16 @@ impl AAB {
     /// will be a separate operation).
     ///
     /// ```
-    /// use all_is_cubes::math::AAB;
+    /// use all_is_cubes::math::Aab;
     ///
     /// assert_eq!(
-    ///     AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(0.25),
-    ///     AAB::new(0.75, 2.25, 2.75, 4.25, 4.75, 6.25)
+    ///     Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(0.25),
+    ///     Aab::new(0.75, 2.25, 2.75, 4.25, 4.75, 6.25)
     /// );
     /// ````
     pub fn enlarge(self, distance: FreeCoordinate) -> Self {
         // We could imagine a non-uniform version of this, but the fully general one
-        // looks a lot like generally constructing a new AAB.
+        // looks a lot like generally constructing a new Aab.
         assert!(
             distance >= 0.0,
             "distance must be nonnegative, not {}",
@@ -454,7 +454,7 @@ impl AAB {
     pub(crate) fn leading_corner_trailing_box(
         &self,
         direction: Vector3<FreeCoordinate>,
-    ) -> (Vector3<FreeCoordinate>, AAB) {
+    ) -> (Vector3<FreeCoordinate>, Aab) {
         let mut leading_corner = Vector3::zero();
         let mut trailing_box_lower = Point3::origin();
         let mut trailing_box_upper = Point3::origin();
@@ -471,7 +471,7 @@ impl AAB {
         }
         (
             leading_corner,
-            AAB::from_lower_upper(trailing_box_lower, trailing_box_upper),
+            Aab::from_lower_upper(trailing_box_lower, trailing_box_upper),
         )
     }
 
@@ -483,18 +483,18 @@ impl AAB {
     }
 }
 
-impl std::fmt::Debug for AAB {
+impl std::fmt::Debug for Aab {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             fmt,
-            "AAB({:?} to {:?})",
+            "Aab({:?} to {:?})",
             self.lower_bounds.as_concise_debug(),
             self.upper_bounds.as_concise_debug(),
         )
     }
 }
 
-impl Geometry for AAB {
+impl Geometry for Aab {
     type Coord = FreeCoordinate;
 
     fn translate(self, offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
@@ -598,35 +598,35 @@ mod tests {
     #[test]
     fn aab_debug() {
         assert_eq!(
-            format!("{:#?}", AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)),
-            "AAB((+1.000, +3.000, +5.000) to (+2.000, +4.000, +6.000))"
+            format!("{:#?}", Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)),
+            "Aab((+1.000, +3.000, +5.000) to (+2.000, +4.000, +6.000))"
         );
     }
 
     #[test]
     #[should_panic]
     fn aab_enlarge_nan() {
-        AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(FreeCoordinate::NAN);
+        Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(FreeCoordinate::NAN);
     }
 
     #[test]
     #[should_panic]
     fn aab_enlarge_negative() {
-        AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(-0.1);
+        Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(-0.1);
     }
 
     #[test]
     fn aab_enlarge_inf() {
         const INF: FreeCoordinate = FreeCoordinate::INFINITY;
         assert_eq!(
-            AAB::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(INF),
-            AAB::new(-INF, INF, -INF, INF, -INF, INF),
+            Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(INF),
+            Aab::new(-INF, INF, -INF, INF, -INF, INF),
         );
     }
 
     #[test]
     fn aab_wireframe_smoke_test() {
-        let aab = AAB::from_cube(Point3::new(1, 2, 3));
+        let aab = Aab::from_cube(Point3::new(1, 2, 3));
         let mut wireframe: Vec<Point3<FreeCoordinate>> = Vec::new();
         aab.wireframe_points(&mut wireframe);
         for vertex in wireframe {
@@ -638,7 +638,7 @@ mod tests {
 
     #[test]
     fn aab_leading_corner_consistency() {
-        let aab = AAB::new(-1.1, 2.2, -3.3, 4.4, -5.5, 6.6);
+        let aab = Aab::new(-1.1, 2.2, -3.3, 4.4, -5.5, 6.6);
         let expected_size = aab.leading_corner_trailing_box(Vector3::zero()).1.size();
         for direction in (-1..=1)
             .zip(-1..=1)

@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::block::BlockCollision;
-use crate::math::{CubeFace, Face, FreeCoordinate, Geometry as _, AAB};
+use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::Space;
 use crate::util::ConciseDebug as _;
@@ -40,7 +40,7 @@ pub struct Body {
     /// Collision volume, defined with `position` as the origin.
     // Thought for the future: switching to a "cylinder" representation (height + radius)
     // would allow for simultaneous collision with multiple spaces with different axes.
-    pub collision_box: AAB,
+    pub collision_box: Aab,
 
     /// Is this body not subject to gravity?
     pub flying: bool,
@@ -82,7 +82,7 @@ impl Body {
     /// Constructs a [`Body`] requiring only information that can't be reasonably defaulted.
     pub fn new_minimal(
         position: impl Into<Point3<FreeCoordinate>>,
-        collision_box: impl Into<AAB>,
+        collision_box: impl Into<Aab>,
     ) -> Self {
         Self {
             position: position.into(),
@@ -325,16 +325,16 @@ impl Body {
     /// (`collision_box` translated by `position`).
     ///
     /// ```
-    /// use all_is_cubes::math::AAB;
+    /// use all_is_cubes::math::Aab;
     /// use all_is_cubes::physics::Body;
     ///
     /// let body = Body::new_minimal(
     ///     (0.0, 20.0, 0.0),
-    ///     AAB::new(-1.0, 1.0, -2.0, 2.0, -3.0, 3.0)
+    ///     Aab::new(-1.0, 1.0, -2.0, 2.0, -3.0, 3.0)
     /// );
-    /// assert_eq!(body.collision_box_abs(), AAB::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
+    /// assert_eq!(body.collision_box_abs(), Aab::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
     /// ```
-    pub fn collision_box_abs(&self) -> AAB {
+    pub fn collision_box_abs(&self) -> Aab {
         self.collision_box.translate(self.position.to_vec())
     }
 
@@ -369,10 +369,10 @@ pub struct BodyStepInfo {
 ///
 /// If `reversed` is true, find positions where it leaves cubes.
 fn aab_raycast(
-    aab: AAB,
+    aab: Aab,
     origin_ray: Ray,
     reversed: bool,
-) -> impl Iterator<Item = (RaycastStep, AAB)> {
+) -> impl Iterator<Item = (RaycastStep, Aab)> {
     let (leading_corner, trailing_box) = aab.leading_corner_trailing_box(if reversed {
         -origin_ray.direction
     } else {
@@ -435,7 +435,7 @@ mod tests {
         Body {
             flying: false,
             noclip: false,
-            ..Body::new_minimal((0., 2., 0.), AAB::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
+            ..Body::new_minimal((0., 2., 0.), Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
         }
     }
 
@@ -520,7 +520,7 @@ mod tests {
             let mut body = Body {
                 flying: true,
                 position: start,
-                collision_box: AAB::new(
+                collision_box: Aab::new(
                     -box_radius,
                     box_radius,
                     -box_radius,
@@ -610,7 +610,7 @@ mod tests {
     #[test]
     fn look_at() {
         let do_test = |direction, yaw, pitch| {
-            let mut body = Body::new_minimal((10., 0., 0.), AAB::ZERO);
+            let mut body = Body::new_minimal((10., 0., 0.), Aab::ZERO);
             body.look_at(Point3::new(10., 0., 0.) + Vector3::from(direction));
             println!("{:?} {} {}", direction, yaw, pitch);
             assert_eq!(body.yaw, yaw);

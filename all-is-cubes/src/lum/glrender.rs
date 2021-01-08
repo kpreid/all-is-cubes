@@ -19,7 +19,7 @@ use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::Vertex;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
-use crate::math::{FreeCoordinate, AAB, Rgba};
+use crate::math::{Aab, FreeCoordinate, Rgba};
 use crate::space::Space;
 use crate::universe::URef;
 use crate::util::WarningsResult;
@@ -181,7 +181,7 @@ where
                 wireframe_vertices(
                     &mut v,
                     palette::DEBUG_COLLISION_CUBES,
-                    AAB::from_cube(contact.cube).enlarge(0.005),
+                    Aab::from_cube(contact.cube).enlarge(0.005),
                 );
             }
 

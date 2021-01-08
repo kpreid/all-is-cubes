@@ -16,7 +16,7 @@ use luminance_front::Backend;
 use crate::camera::Cursor;
 use crate::content::palette;
 use crate::lum::types::{empty_tess, Vertex};
-use crate::math::{Geometry, AAB, Rgba};
+use crate::math::{Aab, Geometry, Rgba};
 use crate::util::MapExtend;
 
 pub mod block_texture;
@@ -35,7 +35,7 @@ where
         wireframe_vertices(
             &mut vertices,
             palette::CURSOR_OUTLINE,
-            AAB::from_cube(cursor.place.cube).enlarge(0.01),
+            Aab::from_cube(cursor.place.cube).enlarge(0.01),
         );
         // TODO: draw the selected face
         context

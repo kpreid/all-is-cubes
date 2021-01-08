@@ -392,7 +392,7 @@ impl Geometry for LightingUpdateInfo {
         E: Extend<Point3<FreeCoordinate>>,
     {
         // Draw output cube
-        AAB::from_cube(self.cube)
+        Aab::from_cube(self.cube)
             .enlarge(0.1)
             .wireframe_points(output);
         // Draw rays
@@ -424,7 +424,7 @@ impl Geometry for LightingUpdateRayInfo {
         E: Extend<Point3<FreeCoordinate>>,
     {
         // TODO: represent self.value somehoe
-        AAB::from_cube(self.value_cube)
+        Aab::from_cube(self.value_cube)
             .enlarge(0.01)
             .wireframe_points(output);
         self.ray.wireframe_points(output);

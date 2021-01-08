@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
 use crate::listen::{Listener, Notifier};
-use crate::math::{Face, FreeCoordinate, AAB};
+use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray, Raycaster};
 use crate::space::{Grid, Space};
@@ -83,7 +83,7 @@ impl Camera {
                 // flying: true,
                 ..Body::new_minimal(
                     position.into(),
-                    AAB::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
+                    Aab::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
                 )
             },
             space,
