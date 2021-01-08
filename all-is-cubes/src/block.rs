@@ -224,7 +224,7 @@ pub struct BlockAttributes {
     /// The default value is `true`.
     pub selectable: bool,
 
-    /// The effect on a [`Body`] of colliding with this block.
+    /// The effect on a [`Body`](crate::physics::Body) of colliding with this block.
     ///
     /// The default value is [`BlockCollision::Hard`].
     pub collision: BlockCollision,
@@ -259,7 +259,8 @@ impl Default for BlockAttributes {
     }
 }
 
-/// Specifies the effect on a [`Body`] of colliding with the [`Block`] this applies to.
+/// Specifies the effect on a [`Body`](crate::physics::Body) of colliding with the
+/// [`Block`] this applies to.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum BlockCollision {
