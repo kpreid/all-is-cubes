@@ -8,7 +8,7 @@
 //! looking for *raytracing*, forming an image from many rays, that's
 //! `all_is_cubes::raytracer`.
 
-use cgmath::{Point3, Vector3};
+use cgmath::{EuclideanSpace, Point3, Vector3};
 use num_traits::identities::Zero as _;
 
 use crate::math::{FreeCoordinate, Geometry, GridCoordinate};
@@ -167,7 +167,7 @@ impl Raycaster {
             emit_current: true,
             cube: origin.map(|x| x.floor() as GridCoordinate),
             step: direction.map(improved_signum),
-            t_max: scale_to_integer_step_componentwise(origin, direction),
+            t_max: origin.to_vec().zip(direction, scale_to_integer_step),
             t_delta: direction.map(|x| x.abs().recip()),
             last_face: Face::WITHIN,
             last_t_distance: 0.0,
@@ -470,18 +470,6 @@ fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeC
         result
     );
     result
-}
-
-fn scale_to_integer_step_componentwise(
-    s: Point3<FreeCoordinate>,
-    ds: Vector3<FreeCoordinate>,
-) -> Vector3<FreeCoordinate> {
-    // Note: There is a 'zip' method which does this but hasn't made it to a released version of cgmath yet.
-    Vector3::new(
-        scale_to_integer_step(s.x, ds.x),
-        scale_to_integer_step(s.y, ds.y),
-        scale_to_integer_step(s.z, ds.z),
-    )
 }
 
 #[cfg(test)]
