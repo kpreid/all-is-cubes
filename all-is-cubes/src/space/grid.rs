@@ -288,9 +288,9 @@ impl Grid {
     pub fn random_cube(&self, rng: &mut impl rand::Rng) -> GridPoint {
         let upper_bounds = self.upper_bounds();
         GridPoint::new(
-            rng.gen_range(self.lower_bounds[0], upper_bounds[0]),
-            rng.gen_range(self.lower_bounds[1], upper_bounds[1]),
-            rng.gen_range(self.lower_bounds[2], upper_bounds[2]),
+            rng.gen_range(self.lower_bounds[0]..upper_bounds[0]),
+            rng.gen_range(self.lower_bounds[1]..upper_bounds[1]),
+            rng.gen_range(self.lower_bounds[2]..upper_bounds[2]),
         )
     }
 

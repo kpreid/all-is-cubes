@@ -725,14 +725,14 @@ mod tests {
             // TODO: When/if cgmath gets updated, use cgmath's random vectors
             let ray = Ray::new(
                 Point3::new(
-                    rng.gen_range(-1., 2.),
-                    rng.gen_range(-1., 2.),
-                    rng.gen_range(-1., 2.),
+                    rng.gen_range(-1. ..=2.),
+                    rng.gen_range(-1. ..=2.),
+                    rng.gen_range(-1. ..=2.),
                 ),
                 Vector3::new(
-                    rng.gen_range(-1., 1.),
-                    rng.gen_range(-1., 1.),
-                    rng.gen_range(-1., 1.),
+                    rng.gen_range(-1. ..=1.),
+                    rng.gen_range(-1. ..=1.),
+                    rng.gen_range(-1. ..=1.),
                 ),
             );
             let steps: Vec<RaycastStep> = ray.cast().within_grid(grid).collect();

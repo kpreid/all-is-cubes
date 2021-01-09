@@ -586,7 +586,7 @@ mod tests {
             let random_velocity = Vector3::<f32 /* dummy */>::zero().map(|_| {
                 // Generate vector components which are not too close to zero
                 // to finish the test promptly
-                rng.gen_range(0.04, 1.) * [-1., 1.].choose(&mut rng).unwrap()
+                rng.gen_range(0.04..=1.) * [-1., 1.].choose(&mut rng).unwrap()
             });
             if random_velocity.magnitude() < 0.05 {
                 // Too slow
