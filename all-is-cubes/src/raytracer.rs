@@ -20,7 +20,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
-use crate::block::Evoxel;
+use crate::block::{evaluated_block_resolution, Evoxel};
 use crate::camera::{eye_for_look_at, ProjectionHelper};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
@@ -84,7 +84,10 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         let adjusted_ray = Ray {
                             origin: Point3::from_vec(
                                 (ray.origin - hit.cube_ahead().cast::<FreeCoordinate>().unwrap())
-                                    * FreeCoordinate::from(array.grid().size().x),
+                                    * FreeCoordinate::from(
+                                        evaluated_block_resolution(array.grid())
+                                            .expect("bad block array"),
+                                    ),
                             ),
                             ..ray
                         };

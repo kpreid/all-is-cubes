@@ -6,6 +6,7 @@
 
 use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
+use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
@@ -367,6 +368,24 @@ impl Evoxel {
             collision: DA.collision,
         }
     }
+}
+
+/// Computes the [`Resolution`] implied by a [`Grid`] of block voxels.
+///
+/// If the grid is of a proper “n × n × n” shape, this returns n. In case it isn't, the
+/// returned value is the minimum of the [`Grid::upper_bounds`], or [`None`] if that value
+/// would be less than 1 or if the lower bounds do not include the cube `[0, 0, 0]`.
+/// This definition is intended to prevent out-of-bounds accesses.
+pub(crate) fn evaluated_block_resolution(grid: Grid) -> Option<Resolution> {
+    if !grid.contains_cube(GridPoint::origin()) {
+        return None;
+    }
+    let u = grid.upper_bounds();
+    let min_upper = u.x.min(u.y).min(u.z);
+    if min_upper < 1 {
+        return None;
+    }
+    Some(Resolution::try_from(min_upper).unwrap_or(Resolution::MAX))
 }
 
 /// Notification when an [`EvaluatedBlock`] result changes.
@@ -939,6 +958,41 @@ mod tests {
         let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
         let eval_def = block_def_ref.borrow().block.evaluate();
         assert_eq!(eval_bare, eval_def);
+    }
+
+    #[test]
+    fn evaluated_block_resolution_test() {
+        assert_eq!(
+            Some(1),
+            evaluated_block_resolution(Grid::new([0, 0, 0], [1, 1, 1]))
+        );
+        assert_eq!(
+            Some(16),
+            evaluated_block_resolution(Grid::new([0, 0, 0], [16, 16, 16]))
+        );
+        assert_eq!(
+            Some(7),
+            evaluated_block_resolution(Grid::new([0, 0, 0], [7, 8, 9]))
+        );
+        // Overflow
+        assert_eq!(
+            Some(Resolution::MAX),
+            evaluated_block_resolution(Grid::new([0, 0, 0], [65536, 65536, 10000000]))
+        );
+        assert_eq!(
+            Some(4),
+            evaluated_block_resolution(Grid::new([0, -12, 0], [16, 16, 16]))
+        );
+        // Does not contain even one block in the positive octant
+        assert_eq!(
+            None,
+            evaluated_block_resolution(Grid::new([0, -16, 0], [16, 16, 16]))
+        );
+        // Lower bounds too high
+        assert_eq!(
+            None,
+            evaluated_block_resolution(Grid::new([8, 8, 8], [8, 8, 8]))
+        );
     }
 
     #[test]
