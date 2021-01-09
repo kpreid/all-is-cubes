@@ -109,7 +109,7 @@ where
             let view_distance =
                 FreeCoordinate::from(grid.size().y) * (self.ui_proj.fov_y() / 2.).cot() / 2.;
 
-            self.ui_proj.set_view_matrix(Matrix4::look_at(
+            self.ui_proj.set_view_matrix(Matrix4::look_at_rh(
                 ui_center + Vector3::new(0., 0., view_distance),
                 ui_center,
                 Vector3::new(0., 1., 0.),

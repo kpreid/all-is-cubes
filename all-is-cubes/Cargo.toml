@@ -35,7 +35,7 @@ lum = ["luminance", "luminance-front"]
 
 [dependencies]
 bitvec = "0.20.1"
-cgmath = "0.17.0"
+cgmath = "0.18.0"
 embedded-graphics = "0.6.2"
 indexmap = "1.6.1"
 itertools = "0.10.0"

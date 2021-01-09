@@ -255,7 +255,7 @@ fn print_space_impl<F: FnMut(&str)>(
 ) -> RaytraceInfo {
     // TODO: optimize height (and thus aspect ratio) for the shape of the space
     let mut projection = ProjectionHelper::new(0.5, (80, 40));
-    projection.set_view_matrix(Matrix4::look_at(
+    projection.set_view_matrix(Matrix4::look_at_rh(
         eye_for_look_at(space.grid(), direction.into()),
         space.grid().center(),
         Vector3::new(0., 1., 0.),
