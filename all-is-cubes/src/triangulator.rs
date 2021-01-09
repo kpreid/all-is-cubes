@@ -806,6 +806,38 @@ mod tests {
         assert_eq!(tex.count_allocated(), 0);
     }
 
+    #[test]
+    fn block_resolution_less_than_tile() {
+        let block_resolution = 4;
+        let tile_resolution = 8;
+        let mut u = Universe::new();
+        let block = Block::builder()
+            .voxels_fn(&mut u, block_resolution, non_uniform_fill)
+            .unwrap()
+            .build();
+        let mut outer_space = Space::empty_positive(1, 1, 1);
+        outer_space.set((0, 0, 0), &block).unwrap();
+
+        let (_, _, _) = triangulate_blocks_and_space(&outer_space, tile_resolution);
+        // TODO: Figure out how to make a useful assert. At least this is "it doesn't panic".
+    }
+
+    #[test]
+    fn block_resolution_greater_than_tile() {
+        let block_resolution = 8;
+        let tile_resolution = 4;
+        let mut u = Universe::new();
+        let block = Block::builder()
+            .voxels_fn(&mut u, block_resolution, non_uniform_fill)
+            .unwrap()
+            .build();
+        let mut outer_space = Space::empty_positive(1, 1, 1);
+        outer_space.set((0, 0, 0), &block).unwrap();
+
+        let (_, _, _) = triangulate_blocks_and_space(&outer_space, tile_resolution);
+        // TODO: Figure out how to make a useful assert. At least this is "it doesn't panic".
+    }
+
     /// Check for hidden surfaces being given textures.
     /// Exercise the “shrinkwrap” logic that generates geometry no larger than necessary.
     #[test]
