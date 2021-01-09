@@ -5,12 +5,13 @@
 
 use std::error::Error;
 
-use cgmath::{Basis2, InnerSpace, Rad, Rotation, Rotation2, Vector2, Vector3};
+use cgmath::{Basis2, EuclideanSpace, InnerSpace, Rad, Rotation, Rotation2, Vector2, Vector3};
 use embedded_graphics::fonts::Font8x16;
 use embedded_graphics::fonts::Text;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
+use ordered_float::NotNan;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
 use crate::blockgen::{BlockGen, LandscapeBlocks};
@@ -173,16 +174,6 @@ struct Exhibit {
 
 static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     Exhibit {
-        name: "Placeholder",
-        footprint: Grid::new_c([0, 0, 0], [1, 1, 1]),
-        factory: |_, universe| {
-            let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
-            let mut space = Space::empty_positive(1, 1, 1);
-            space.set([0, 0, 0], demo_blocks[DemoBlocks::Lamp].clone())?;
-            Ok(space)
-        },
-    },
-    Exhibit {
         name: "Knot",
         footprint: Grid::new_c([-2, -2, -1], [5, 5, 3]),
         factory: |this, universe| {
@@ -243,6 +234,54 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                         .build(),
                 ),
             )?;
+            Ok(space)
+        },
+    },
+    Exhibit {
+        name: "Resolutions",
+        footprint: Grid::new_c([0, 0, 0], [5, 2, 3]),
+        factory: |this, universe| {
+            let mut space = Space::empty(this.footprint);
+
+            for (i, &resolution) in [1, 2, 3, 8, 16, 32].iter().enumerate() {
+                let i = i as GridCoordinate;
+                let location = GridPoint::new(i.rem_euclid(3) * 2, 0, i.div_euclid(3) * 2);
+                space.set(
+                    location,
+                    Block::builder()
+                        .voxels_fn(universe, resolution, |p| {
+                            if p.x + p.y + p.z >= GridCoordinate::from(resolution) {
+                                return AIR.clone();
+                            }
+                            let rescale = if resolution > 8 { 4 } else { 1 };
+                            let color = Rgb::from(p.to_vec().map(|s| {
+                                NotNan::new(
+                                    (s / GridCoordinate::from(rescale)) as f32
+                                        / f32::from(resolution / rescale - 1).max(1.),
+                                )
+                                .unwrap()
+                            }));
+                            Block::from(color)
+                        })?
+                        .build(),
+                )?;
+
+                space.set(
+                    location + GridVector::unit_y(),
+                    &draw_to_blocks(
+                        &mut BlockGen {
+                            universe,
+                            resolution: 16,
+                        },
+                        Text::new(&resolution.to_string(), Point::new(0, -16)).into_styled(
+                            TextStyleBuilder::new(Font8x16)
+                                .text_color(Rgb888::new(10, 10, 10))
+                                .build(),
+                        ),
+                    )?[GridPoint::origin()],
+                )?;
+            }
+
             Ok(space)
         },
     },
