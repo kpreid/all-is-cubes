@@ -17,7 +17,7 @@ use cgmath::{
 };
 use std::convert::TryFrom;
 
-use crate::block::{EvaluatedBlock, Evoxel, Resolution};
+use crate::block::{evaluated_block_resolution, EvaluatedBlock, Evoxel, Resolution};
 use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
@@ -193,10 +193,12 @@ fn push_quad<V: From<BlockVertex>>(
                 // Note: if we're ever looking for microöptimizations, we could try
                 // converting this to a trait for static dispatch.
                 QuadColoring::Solid(color) => Coloring::Solid(color),
-                QuadColoring::Texture(tile) => Coloring::Texture(tile.texcoord(Vector2::new(
-                    p.x as TextureCoordinate,
-                    p.y as TextureCoordinate,
-                ))),
+                QuadColoring::Texture(tile, scale) => {
+                    Coloring::Texture(tile.texcoord(Vector2::new(
+                        p.x as TextureCoordinate * scale,
+                        p.y as TextureCoordinate * scale,
+                    )))
+                }
             },
         }));
     }
@@ -207,7 +209,7 @@ fn push_quad<V: From<BlockVertex>>(
 #[derive(Copy, Clone, Debug)]
 enum QuadColoring<'a, T> {
     Solid(Rgba),
-    Texture(&'a T),
+    Texture(&'a T, TextureCoordinate),
 }
 
 /// Generate [`BlockTriangulation`] for a block.
@@ -269,28 +271,40 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // Use the size from the textures, regardless of what the actual tile size is,
             // because this won't panic and the other strategy will. TODO: Implement
             // dynamic choice of texture size.
-            let resolution: GridCoordinate = texture_allocator.resolution();
+            let tile_resolution: GridCoordinate = texture_allocator.resolution();
+            let mut block_resolution = match evaluated_block_resolution(voxels.grid()) {
+                Some(r) => GridCoordinate::from(r),
+                // TODO: return an invalid block marker.
+                None => return BlockTriangulation::default(),
+            };
+
+            // TODO: Temporarily implementing only the lower-resolution case
+            // To implement higher resolution, refactor so that we first generate an arbitrary size
+            // texture, then slice or pad it as necessary.
+            if block_resolution > tile_resolution {
+                block_resolution = tile_resolution;
+            }
 
             for &face in Face::ALL_SIX {
                 let transform = face.matrix();
 
                 // Layer 0 is the outside surface of the cube and successive layers are
                 // deeper inside.
-                for layer in 0..resolution {
+                for layer in 0..block_resolution {
                     // TODO: JS version would detect fully-opaque blocks (a derived property of Block)
                     // and only scan the first and last faces
                     let mut tile_texels: Vec<Texel> =
-                        Vec::with_capacity((resolution as usize).pow(2));
+                        Vec::with_capacity((tile_resolution as usize).pow(2));
                     let mut layer_is_visible_somewhere = false;
 
                     // Track the bounding box of the layer that's actually occupied.
                     // Uses inclusive-exclusive coordinates.
                     // Invariant: If layer_is_visible_somewhere, then visible_low_corner < visible_high_corner.
-                    let mut visible_low_corner = Point2::new(resolution, resolution);
+                    let mut visible_low_corner = Point2::new(block_resolution, block_resolution);
                     let mut visible_high_corner = Point2::new(0, 0);
 
-                    for t in 0..resolution {
-                        for s in 0..resolution {
+                    for t in 0..block_resolution {
+                        for s in 0..block_resolution {
                             let texel_coord = Point2::new(s, t);
                             // TODO: Matrix4 isn't allowed to be integer. Make Face provide a better strategy.
                             // While we're at it, also implement the optimization that positive and negative
@@ -302,9 +316,9 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                     FreeCoordinate::from(t),
                                     FreeCoordinate::from(layer),
                                 ) + Vector3::new(0.5, 0.5, 0.5))
-                                    / FreeCoordinate::from(resolution),
+                                    / FreeCoordinate::from(block_resolution),
                             ) * FreeCoordinate::from(
-                                resolution,
+                                block_resolution,
                             ) - Vector3::new(0.5, 0.5, 0.5))
                             .cast::<GridCoordinate>()
                             .unwrap();
@@ -340,7 +354,26 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
                             tile_texels.push(color.to_saturating_32bit());
                         }
+                        if block_resolution < tile_resolution {
+                            // Pad texture out
+                            let last_color = *tile_texels.last().unwrap();
+                            tile_texels
+                                .extend((block_resolution..tile_resolution).map(|_| last_color));
+                        }
                     }
+                    if block_resolution < tile_resolution {
+                        // Pad texture out
+                        let last_row = Vec::from(
+                            &tile_texels[(tile_texels.len() - tile_resolution as usize)..],
+                        );
+                        for _ in block_resolution..tile_resolution {
+                            tile_texels.extend(&last_row);
+                        }
+                    }
+                    debug_assert_eq!(
+                        tile_texels.len(),
+                        (tile_resolution * tile_resolution) as usize
+                    );
 
                     // TODO: To reduce artifacts, process tile_texels to add an anti-bleed border
                     // outside of the visible rectangle. (See if we can reuse the texture allocator
@@ -352,12 +385,13 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         let face_vertices = &mut output_by_face
                             [if layer == 0 { face } else { Face::WITHIN }]
                         .vertices;
-                        let depth = FreeCoordinate::from(layer) / FreeCoordinate::from(resolution);
+                        let depth =
+                            FreeCoordinate::from(layer) / FreeCoordinate::from(block_resolution);
 
                         let mut maybe_texture_tile = None;
                         let coloring = if let Some(uniform_color) = rectangle_is_uniform_color(
                             &tile_texels,
-                            resolution,
+                            tile_resolution,
                             visible_low_corner,
                             visible_high_corner,
                         ) {
@@ -368,7 +402,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             maybe_texture_tile = texture_allocator.allocate();
                             if let Some(ref mut texture_tile) = maybe_texture_tile {
                                 texture_tile.write(tile_texels.as_ref());
-                                QuadColoring::Texture(texture_tile)
+                                QuadColoring::Texture(
+                                    texture_tile,
+                                    block_resolution as TextureCoordinate
+                                        / tile_resolution as TextureCoordinate,
+                                )
                             } else {
                                 // Texture allocation failure.
                                 // TODO: Mark this triangulation as defective in the return value, so
@@ -385,10 +423,10 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             face,
                             depth,
                             visible_low_corner.map(|c| {
-                                FreeCoordinate::from(c) / FreeCoordinate::from(resolution)
+                                FreeCoordinate::from(c) / FreeCoordinate::from(block_resolution)
                             }),
                             visible_high_corner.map(|c| {
-                                FreeCoordinate::from(c) / FreeCoordinate::from(resolution)
+                                FreeCoordinate::from(c) / FreeCoordinate::from(block_resolution)
                             }),
                             coloring,
                         );
