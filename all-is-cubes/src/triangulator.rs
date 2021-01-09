@@ -743,22 +743,52 @@ mod tests {
 
     /// Construct a 1x1 recursive block and test that this is equivalent in geometry
     /// to an atom block.
-    ///
-    /// TODO: That's not what this test does; it actually asserts that triangulate_space
-    /// of a 1x1 space has the same geometry as the contents, which is _also_ interesting
-    /// so we should have both.
     #[test]
-    fn trivial_voxels_rendering() {
+    fn trivial_voxels_equals_atom() {
         // Construct recursive block.
         let mut u = Universe::new();
+        let atom_block = Block::from(Rgba::new(0.0, 1.0, 0.0, 1.0));
         let trivial_recursive_block = Block::builder()
-            .voxels_fn(&mut u, 1, |_| make_some_blocks(1).swap_remove(0))
+            .voxels_fn(&mut u, 1, |_| &atom_block)
+            .unwrap()
+            .build();
+
+        let (_, _, space_rendered_a) = triangulate_blocks_and_space(
+            &{
+                let mut space = Space::empty_positive(1, 1, 1);
+                space.set((0, 0, 0), &atom_block).unwrap();
+                space
+            },
+            1,
+        );
+        let (tex, _, space_rendered_r) = triangulate_blocks_and_space(
+            &{
+                let mut space = Space::empty_positive(1, 1, 1);
+                space.set((0, 0, 0), &trivial_recursive_block).unwrap();
+                space
+            },
+            1,
+        );
+
+        assert_eq!(space_rendered_a, space_rendered_r);
+        assert_eq!(tex.count_allocated(), 0);
+    }
+
+    /// [`triangulate_space`] of a 1×1×1 space has the same geometry as the contents.
+    #[test]
+    fn space_tri_equals_block_tri() {
+        // Construct recursive block.
+        let mut u = Universe::new();
+        let mut blocks = make_some_blocks(2);
+        blocks.push(AIR);
+        let recursive_block = Block::builder()
+            .voxels_fn(&mut u, 4, |p| {
+                &blocks[(p.x as usize).rem_euclid(blocks.len())]
+            })
             .unwrap()
             .build();
         let mut outer_space = Space::empty_positive(1, 1, 1);
-        outer_space
-            .set((0, 0, 0), &trivial_recursive_block)
-            .unwrap();
+        outer_space.set((0, 0, 0), &recursive_block).unwrap();
 
         let (tex, block_triangulations, space_rendered) =
             triangulate_blocks_and_space(&outer_space, 1);
