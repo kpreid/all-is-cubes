@@ -24,8 +24,9 @@ use crate::space::Space;
 use crate::universe::URef;
 use crate::util::WarningsResult;
 
-// TODO: Make this a runtime toggle
+// TODO: Make these a runtime toggle
 const DRAW_LIGHTING_DEBUG: bool = false;
+const DRAW_COLLISION_BOXES: bool = false;
 
 /// Viewport dimensions for `GLRenderer`.
 /// Field types at the whim of what's useful for the code that uses it.
@@ -170,19 +171,21 @@ where
         let debug_lines_tess = {
             let mut v: Vec<Vertex> = Vec::new();
 
-            // Collision box
-            wireframe_vertices(
-                &mut v,
-                palette::DEBUG_COLLISION_BOX,
-                camera.body.collision_box_abs(),
-            );
-            // What it collided with
-            for contact in &camera.colliding_cubes {
+            if DRAW_COLLISION_BOXES {
+                // Camera collision box
                 wireframe_vertices(
                     &mut v,
-                    palette::DEBUG_COLLISION_CUBES,
-                    Aab::from_cube(contact.cube).enlarge(0.005),
+                    palette::DEBUG_COLLISION_BOX,
+                    camera.body.collision_box_abs(),
                 );
+                // What it collided with
+                for contact in &camera.colliding_cubes {
+                    wireframe_vertices(
+                        &mut v,
+                        palette::DEBUG_COLLISION_CUBES,
+                        Aab::from_cube(contact.cube).enlarge(0.005),
+                    );
+                }
             }
 
             // Lighting trace at cursor
