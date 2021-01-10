@@ -32,6 +32,8 @@ pub const LOGO_STROKE: Rgb = rgb_const!(0.20, 0.20, 0.20);
 // UI elements
 pub const CURSOR_OUTLINE: Rgba = Rgba::BLACK;
 pub const HUD_SKY: Rgb = Rgb::ONE;
+pub const HUD_TEXT_FILL: Rgba = Rgba::BLACK;
+pub const HUD_TEXT_STROKE: Rgba = Rgba::WHITE;
 pub const HUD_TOOLBAR_BACK: Rgba = rgba_const!(0.5, 0.5, 0.5, 1.);
 pub const HUD_TOOLBAR_FRAME: Rgba = rgba_const!(0.87, 0.87, 0.87, 1.);
 pub const MENU_BACK: Rgba = rgba_const!(0.5, 0.5, 0.5, 1.0);

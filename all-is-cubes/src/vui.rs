@@ -7,10 +7,12 @@
 //! GUI as well as the game.
 
 use cgmath::{Angle as _, Deg, EuclideanSpace as _, Matrix4, Vector2, Vector3};
+use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
-use embedded_graphics::prelude::{Drawable, Pixel, Primitive, Transform as _};
+use embedded_graphics::prelude::{Drawable, Font, Pixel, Primitive, Transform as _};
 use embedded_graphics::primitives::{Circle, Line, Rectangle, Triangle};
-use embedded_graphics::style::PrimitiveStyleBuilder;
+use embedded_graphics::style::{PrimitiveStyleBuilder, TextStyleBuilder};
+use std::borrow::Cow;
 use std::time::Duration;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR, AIR_EVALUATED};
@@ -121,6 +123,10 @@ impl HudLayout {
         Grid::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
     }
 
+    fn text_resolution(&self) -> Resolution {
+        16
+    }
+
     // TODO: taking the entire Universe doesn't seem like the best interface
     // but we want room to set up new blocks. Figure out a route for that.
     // TODO: validate this doesn't crash on wonky sizes.
@@ -175,6 +181,34 @@ impl HudLayout {
             }
         }
 
+        // Set up toolbar info text space
+        let frame = self.toolbar_text_frame();
+        let mut toolbar_text_space = Space::empty(Grid::new(
+            GridPoint::origin(),
+            GridVector::new(
+                frame.size().x * GridCoordinate::from(self.text_resolution()),
+                frame.size().y * GridCoordinate::from(self.text_resolution()),
+                2,
+            ),
+        ));
+        toolbar_text_space
+            .fill(toolbar_text_space.grid(), |_| {
+                Some(Block::from(Rgba::WHITE))
+            })
+            .unwrap();
+        let toolbar_text_blocks = space_to_blocks(
+            self.text_resolution(),
+            BlockAttributes::default(),
+            universe.insert_anonymous(toolbar_text_space),
+        )
+        .unwrap();
+        debug_assert_eq!(toolbar_text_blocks.grid().size(), frame.size());
+        space
+            .fill(frame, |p| {
+                Some(&toolbar_text_blocks[p - frame.lower_bounds().to_vec()])
+            })
+            .unwrap();
+
         universe.insert_anonymous(space)
     }
 
@@ -183,6 +217,10 @@ impl HudLayout {
             (self.size.x - (self.toolbar_positions as GridCoordinate) * TOOLBAR_STEP + 1) / 2;
         // TODO: set depth sensibly
         GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 1, 1)
+    }
+
+    fn toolbar_text_frame(&self) -> Grid {
+        Grid::new((0, 3, 0), (self.size.x, 1, 1))
     }
 
     /// Repaint the toolbar with a new set of tools and selected tools.
@@ -216,6 +254,39 @@ impl HudLayout {
                 Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
             }
         }
+
+        // Display tool-tip text.
+        // TODO: This should be "last changed selection" not "selections[1]"
+        // TODO: It's inefficient to perform a non-cached block evaluation just for the sake of
+        // getting the text — should we have a partial evaluation? Should tools keep evaluated
+        // icons on offer?
+        let text = selections
+            .get(1)
+            .and_then(|&i| tools.get(i))
+            .and_then(|tool| tool.icon(&hud_blocks.icons).evaluate().ok())
+            .map(|ev_block| ev_block.attributes.display_name)
+            .unwrap_or(Cow::Borrowed(""));
+        let mut toolbar_text_space =
+            if let Block::Recur { space, .. } = &space[self.toolbar_text_frame().lower_bounds()] {
+                space.borrow_mut()
+            } else {
+                panic!("failed to retrieve toolbar space")
+            };
+        let grid = toolbar_text_space.grid();
+        toolbar_text_space.fill(grid, |_| Some(&AIR)).unwrap();
+
+        let text_width =
+            text.len() as GridCoordinate * Font8x16::CHARACTER_SIZE.width as GridCoordinate;
+        let text_start_x = (grid.size().x - text_width) / 2;
+
+        Text::new(&text, Point::new(text_start_x, -16))
+            .into_styled(
+                TextStyleBuilder::new(Font8x16)
+                    .text_color(&hud_blocks.text)
+                    .build(),
+            )
+            .draw(&mut toolbar_text_space.draw_target(GridMatrix::FLIP_Y))?;
+
         Ok(())
     }
 }
@@ -223,6 +294,7 @@ impl HudLayout {
 #[derive(Debug, Clone)]
 struct HudBlocks {
     icons: BlockProvider<Icons>,
+    text: VoxelBrush<'static>,
     toolbar_left_cap: VoxelBrush<'static>,
     toolbar_right_cap: VoxelBrush<'static>,
     toolbar_divider: VoxelBrush<'static>,
@@ -236,6 +308,14 @@ impl HudBlocks {
         let resolution_g = GridCoordinate::from(resolution);
 
         let icons = Icons::new(universe).install(universe).unwrap();
+
+        let text_brush = VoxelBrush::new::<_, Block>(vec![
+            ([0, 0, 1], palette::HUD_TEXT_FILL.into()),
+            ([1, 0, 0], palette::HUD_TEXT_STROKE.into()),
+            ([-1, 0, 0], palette::HUD_TEXT_STROKE.into()),
+            ([0, 1, 0], palette::HUD_TEXT_STROKE.into()),
+            ([0, -1, 0], palette::HUD_TEXT_STROKE.into()),
+        ]);
 
         // TODO: This toolbar graphic is a "get the bugs in the drawing tools worked out"
         // placeholder for better art...
@@ -312,9 +392,9 @@ impl HudBlocks {
             )
         };
 
-        // TODO: reconcile: the hud space has the icons "flush with the front" but these slice coordinates assume a 1-block fringe around the icons in all directions.
         Self {
             icons,
+            text: text_brush,
             toolbar_middle: slice_drawing(Grid::from_lower_upper((0, -1, -1), (1, 2, 2))),
             toolbar_divider: slice_drawing(Grid::from_lower_upper((1, -1, -1), (2, 2, 2)))
                 .translate((-1, 0, 0)),
