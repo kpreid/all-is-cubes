@@ -370,7 +370,7 @@ impl Icons {
                         .stroke_width(1)
                         .build();
 
-                    let mut space = blockgen.new_block_space();
+                    let mut space = Space::empty(Grid::for_block(resolution));
                     let display = &mut VoxelDisplayAdapter::new(
                         &mut space,
                         GridPoint::new(1, 1, 1) * GridCoordinate::from(resolution / 2),

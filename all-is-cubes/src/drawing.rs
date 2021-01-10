@@ -74,7 +74,7 @@ where
     let mut output_space = Space::empty(block_grid);
 
     for cube in block_grid.interior_iter() {
-        let mut block_space = ctx.new_block_space();
+        let mut block_space = Space::empty(Grid::for_block(ctx.resolution));
 
         if false {
             // For debugging block bounds chosen for the graphic. TODO: Keep this around

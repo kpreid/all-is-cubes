@@ -8,7 +8,6 @@
 
 use crate::block::{Block, Resolution};
 use crate::math::Rgba;
-use crate::space::{Grid, Space};
 use crate::universe::Universe;
 
 /// Utilities for generating [`Block`]s that are compatible with each other.
@@ -32,11 +31,6 @@ impl<'a> BlockGen<'a> {
             universe,
             resolution,
         }
-    }
-
-    /// Create a [`Space`] of a suitable size for a block.
-    pub fn new_block_space(&self) -> Space {
-        Space::empty(Grid::for_block(self.resolution))
     }
 }
 
@@ -72,17 +66,6 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 mod tests {
     use super::*;
     use crate::block::BlockAttributes;
-    use crate::space::Grid;
-
-    #[test]
-    fn blockgen_new_block_space() {
-        let mut universe = Universe::new();
-        let ctx = BlockGen::new(&mut universe, 10);
-        assert_eq!(
-            ctx.new_block_space().grid(),
-            Grid::new((0, 0, 0), (10, 10, 10))
-        );
-    }
 
     #[test]
     fn make_some_blocks_0() {
