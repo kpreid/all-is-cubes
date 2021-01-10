@@ -76,7 +76,7 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 /// TODO: This is probably too specific to be useful in the long term; call it a
 /// placeholder.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "kebab-case")]
 pub enum LandscapeBlocks {
     Grass,
     Dirt,

@@ -338,7 +338,7 @@ pub(crate) fn draw_background(space: &mut Space) {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "kebab-case")]
 pub enum Icons {
     Delete,
 }
