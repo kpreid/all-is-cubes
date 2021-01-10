@@ -1,16 +1,13 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
 
-//! Procedural block generation. See the `worldgen` module for code that uses the results
-//! of this.
-
-use std::borrow::Cow;
-use std::hash::Hash;
+//! Procedural block generation tools.
+//!
+//! TODO: This module will probably go away or become different because its former
+//! jobs have been taken over by the `block` and `content` modules.
 
 use crate::block::{Block, Resolution};
-use crate::content::palette;
-use crate::linking::{BlockModule, DefaultProvision};
-use crate::math::{Rgb, Rgba};
+use crate::math::Rgba;
 use crate::space::{Grid, Space};
 use crate::universe::Universe;
 
@@ -69,48 +66,6 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
         );
     }
     vec
-}
-
-/// Names for blocks assigned specific roles in generating outdoor landscapes.
-///
-/// TODO: This is probably too specific to be useful in the long term; call it a
-/// placeholder.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
-#[strum(serialize_all = "kebab-case")]
-pub enum LandscapeBlocks {
-    Grass,
-    Dirt,
-    Stone,
-    Trunk,
-    Leaves,
-}
-
-impl BlockModule for LandscapeBlocks {
-    fn namespace() -> &'static str {
-        "all-is-cubes/landscape"
-    }
-}
-
-/// Provides a bland instance of [`LandscapeBlocks`] with single color blocks.
-impl DefaultProvision for LandscapeBlocks {
-    fn default(self) -> Cow<'static, Block> {
-        fn color_and_name(color: Rgb, name: &'static str) -> Cow<'static, Block> {
-            Block::builder()
-                .display_name(name)
-                .color(color.with_alpha_one())
-                .build()
-                .into()
-        }
-
-        use LandscapeBlocks::*;
-        match self {
-            Grass => color_and_name(palette::GRASS, "Grass"),
-            Dirt => color_and_name(palette::DIRT, "Dirt"),
-            Stone => color_and_name(palette::STONE, "Stone"),
-            Trunk => color_and_name(palette::TREE_BARK, "Wood"),
-            Leaves => color_and_name(palette::TREE_LEAVES, "Leaves"),
-        }
-    }
 }
 
 #[cfg(test)]

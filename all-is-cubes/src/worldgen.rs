@@ -8,8 +8,6 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 
 use crate::block::Block;
-use crate::blockgen::LandscapeBlocks;
-use crate::linking::BlockProvider;
 use crate::math::{FreeCoordinate, GridCoordinate, Rgb, Rgba};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, Space};
@@ -63,61 +61,6 @@ pub fn axes(space: &mut Space) {
                         .build(),
                 )
                 .unwrap();
-        }
-    }
-}
-
-/// Generate a landscape of grass-on-top-of-rock with some bumps to it.
-/// Replaces all blocks in the specified region except for those intended to be “air”.
-///
-/// ```
-/// use all_is_cubes::space::Space;
-/// use all_is_cubes::blockgen::LandscapeBlocks;
-/// use all_is_cubes::linking::BlockProvider;
-/// use all_is_cubes::worldgen::wavy_landscape;
-///
-/// let mut space = Space::empty_positive(10, 10, 10);
-/// wavy_landscape(
-///     space.grid(),
-///     &mut space,
-///     &BlockProvider::<LandscapeBlocks>::default(),
-///     1.0);
-/// # // TODO: It didn't panic, but how about some assertions?
-/// ```
-pub fn wavy_landscape(
-    region: Grid,
-    space: &mut Space,
-    blocks: &BlockProvider<LandscapeBlocks>,
-    max_slope: FreeCoordinate,
-) {
-    // TODO: justify this constant (came from cubes v1 code).
-    let slope_scaled = max_slope / 0.904087;
-    let middle_y = (region.lower_bounds().y + region.upper_bounds().y) / 2;
-
-    for x in region.x_range() {
-        for z in region.z_range() {
-            let fx = FreeCoordinate::from(x);
-            let fz = FreeCoordinate::from(z);
-            let terrain_variation = slope_scaled
-                * (((fx / 8.0).sin() + (fz / 8.0).sin()) * 1.0
-                    + ((fx / 14.0).sin() + (fz / 14.0).sin()) * 3.0
-                    + ((fx / 2.0).sin() + (fz / 2.0).sin()) * 0.6);
-            let surface_y = middle_y + (terrain_variation as GridCoordinate);
-            for y in region.y_range() {
-                let altitude = y - surface_y;
-                use LandscapeBlocks::*;
-                let block: &Block = if altitude > 0 {
-                    continue;
-                } else if altitude == 0 {
-                    &blocks[Grass]
-                } else if altitude == -1 {
-                    &blocks[Dirt]
-                } else {
-                    &blocks[Stone]
-                };
-                space.set((x, y, z), block).unwrap();
-                // TODO: Add various decorations on the ground. And trees.
-            }
         }
     }
 }

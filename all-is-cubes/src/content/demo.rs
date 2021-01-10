@@ -14,9 +14,10 @@ use embedded_graphics::style::TextStyleBuilder;
 use ordered_float::NotNan;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
-use crate::blockgen::{BlockGen, LandscapeBlocks};
+use crate::blockgen::BlockGen;
 use crate::camera::Camera;
 use crate::content::blocks::{install_demo_blocks, DemoBlocks};
+use crate::content::landscape::{wavy_landscape, LandscapeBlocks};
 use crate::content::logo_text;
 use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::BlockProvider;
@@ -25,7 +26,7 @@ use crate::raycast::Raycaster;
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
 use crate::universe::{Name, Universe, UniverseIndex};
-use crate::worldgen::{axes, wavy_landscape};
+use crate::worldgen::axes;
 
 /// Creates a [`Universe`] with some content for a "new game", as much as that can exist.
 pub fn new_universe_with_stuff() -> Universe {

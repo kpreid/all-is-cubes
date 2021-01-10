@@ -14,6 +14,7 @@ use crate::space::Space;
 
 pub mod blocks;
 pub mod demo;
+pub mod landscape;
 pub mod palette;
 
 /// Draw the All Is Cubes logo text.

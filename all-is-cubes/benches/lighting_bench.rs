@@ -2,10 +2,10 @@ use all_is_cubes::linking::BlockProvider;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::time::Duration;
 
-use all_is_cubes::content::blocks::install_landscape_blocks;
+use all_is_cubes::content::landscape::{install_landscape_blocks, wavy_landscape};
 use all_is_cubes::space::{Grid, Space, SpaceStepInfo};
 use all_is_cubes::universe::{Universe, UniverseIndex as _};
-use all_is_cubes::worldgen::{axes, wavy_landscape};
+use all_is_cubes::worldgen::axes;
 
 pub fn lighting_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("slow");
