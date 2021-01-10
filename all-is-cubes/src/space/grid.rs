@@ -466,6 +466,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn for_block() {
+        assert_eq!(Grid::for_block(1), Grid::new((0, 0, 0), (1, 1, 1)));
+        assert_eq!(Grid::for_block(10), Grid::new((0, 0, 0), (10, 10, 10)));
+        assert_eq!(
+            Grid::for_block(Resolution::MAX),
+            Grid::new((0, 0, 0), (255, 255, 255))
+        );
+    }
+
+    #[test]
     fn divide_to_one_cube() {
         assert_eq!(
             Grid::new((11, 22, 33), (1, 1, 1)).divide(10),
