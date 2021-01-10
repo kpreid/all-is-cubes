@@ -14,7 +14,6 @@ use embedded_graphics::style::TextStyleBuilder;
 use ordered_float::NotNan;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
-use crate::blockgen::BlockGen;
 use crate::camera::Camera;
 use crate::content::blocks::{install_demo_blocks, DemoBlocks};
 use crate::content::landscape::{wavy_landscape, LandscapeBlocks};
@@ -34,12 +33,8 @@ pub fn new_universe_with_stuff() -> Universe {
 }
 
 fn demo_city(universe: &mut Universe) -> Space {
-    let bg = BlockGen {
-        universe,
-        resolution: 16,
-    };
-    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(bg.universe).unwrap();
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(bg.universe).unwrap();
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe).unwrap();
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe).unwrap();
     use DemoBlocks::*;
 
     // Layout parameters
@@ -225,10 +220,8 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
         footprint: Grid::new_c([0, 0, 0], [9, 1, 1]),
         factory: |_, universe| {
             let space = draw_to_blocks(
-                &mut BlockGen {
-                    universe,
-                    resolution: 16,
-                },
+                universe,
+                16,
                 Text::new("Hello block world", Point::new(0, -16)).into_styled(
                     TextStyleBuilder::new(Font8x16)
                         .text_color(Rgb888::new(120, 100, 200))
@@ -270,10 +263,8 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                 space.set(
                     location + GridVector::unit_y(),
                     &draw_to_blocks(
-                        &mut BlockGen {
-                            universe,
-                            resolution: 16,
-                        },
+                        universe,
+                        16,
                         Text::new(&resolution.to_string(), Point::new(0, -16)).into_styled(
                             TextStyleBuilder::new(Font8x16)
                                 .text_color(Rgb888::new(10, 10, 10))

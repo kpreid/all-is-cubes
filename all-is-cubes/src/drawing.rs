@@ -20,10 +20,10 @@ use std::convert::TryInto;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::Block;
-use crate::blockgen::BlockGen;
+use crate::block::{Block, Resolution};
 use crate::math::{GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, SetCubeError, Space};
+use crate::universe::Universe;
 
 /// Draw text into a [`Space`], extending in the +X and -Y directions from `origin`.
 pub fn draw_text<F, C>(
@@ -48,33 +48,37 @@ where
 
 /// Generate a set of blocks which together display the given [`Drawable`] which may be
 /// larger than one block. The Z position is always the middle of the block.
-pub fn draw_to_blocks<D, C>(ctx: &mut BlockGen, object: D) -> Result<Space, SetCubeError>
+pub fn draw_to_blocks<D, C>(
+    universe: &mut Universe,
+    resolution: Resolution,
+    object: D,
+) -> Result<Space, SetCubeError>
 where
     for<'a> &'a D: Drawable<C>,
     D: Dimensions + Transform,
     C: PixelColor,
     for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
 {
-    let resolution: i32 = ctx.resolution.into();
+    let resolution_g: i32 = resolution.into();
     let top_left_2d = object.top_left();
     let bottom_right_2d = object.bottom_right();
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
     // for text drawing, embedded_graphics assumes a Y-down coordinate system.
     let low_block = GridPoint::new(
-        floor_divide(top_left_2d.x, resolution),
-        floor_divide(-bottom_right_2d.y, resolution),
+        floor_divide(top_left_2d.x, resolution_g),
+        floor_divide(-bottom_right_2d.y, resolution_g),
         0,
     );
     let high_block = GridPoint::new(
-        ceil_divide(bottom_right_2d.x, resolution),
-        ceil_divide(-top_left_2d.y, resolution),
+        ceil_divide(bottom_right_2d.x, resolution_g),
+        ceil_divide(-top_left_2d.y, resolution_g),
         1,
     );
     let block_grid = Grid::new(low_block, high_block - low_block);
     let mut output_space = Space::empty(block_grid);
 
     for cube in block_grid.interior_iter() {
-        let mut block_space = Space::empty(Grid::for_block(ctx.resolution));
+        let mut block_space = Space::empty(Grid::for_block(resolution));
 
         if false {
             // For debugging block bounds chosen for the graphic. TODO: Keep this around
@@ -86,14 +90,18 @@ where
 
         object.draw(&mut VoxelDisplayAdapter::new(
             &mut block_space,
-            GridPoint::new(-cube.x * resolution, -cube.y * resolution, resolution / 2),
+            GridPoint::new(
+                -cube.x * resolution_g,
+                -cube.y * resolution_g,
+                resolution_g / 2,
+            ),
         ))?;
         output_space
             .set(
                 cube,
                 // TODO: Allow attribute configuration.
                 &Block::builder()
-                    .voxels_ref(ctx.resolution, ctx.universe.insert_anonymous(block_space))
+                    .voxels_ref(resolution, universe.insert_anonymous(block_space))
                     .build(),
             )
             .expect("can't happen: draw_to_blocks failed to write to its own output space");
@@ -410,10 +418,9 @@ mod tests {
     #[test]
     fn draw_to_blocks_bounds_one_block() {
         let mut universe = Universe::new();
-        let mut ctx: BlockGen = BlockGen::new(&mut universe, 16);
         let drawable =
             Rectangle::new(Point::new(0, 0), Point::new(2, 3)).into_styled(a_primitive_style());
-        let space = draw_to_blocks(&mut ctx, drawable).unwrap();
+        let space = draw_to_blocks(&mut universe, 16, drawable).unwrap();
         // Output is at negative Y because coordinate system is flipped.
         assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
         if let Block::Recur {
@@ -435,10 +442,9 @@ mod tests {
     #[test]
     fn draw_to_blocks_bounds_negative_coords_one_block() {
         let mut universe = Universe::new();
-        let mut ctx: BlockGen = BlockGen::new(&mut universe, 16);
         let drawable =
             Rectangle::new(Point::new(-3, -2), Point::new(0, 0)).into_styled(a_primitive_style());
-        let space = draw_to_blocks(&mut ctx, drawable).unwrap();
+        let space = draw_to_blocks(&mut universe, 16, drawable).unwrap();
         assert_eq!(space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
         if let Block::Recur {
             space: block_space_ref,

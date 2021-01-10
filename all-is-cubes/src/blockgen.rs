@@ -6,33 +6,8 @@
 //! TODO: This module will probably go away or become different because its former
 //! jobs have been taken over by the `block` and `content` modules.
 
-use crate::block::{Block, Resolution};
+use crate::block::Block;
 use crate::math::Rgba;
-use crate::universe::Universe;
-
-/// Utilities for generating [`Block`]s that are compatible with each other.
-///
-/// TODO: This is in a bit of an awkward state because most of its job has been
-/// taken over by [`crate::block::BlockBuilder`].
-pub struct BlockGen<'a> {
-    /// The `Universe` in which block spaces live.
-    pub universe: &'a mut Universe,
-    /// The side length of block spaces.
-    pub resolution: Resolution,
-}
-
-impl<'a> BlockGen<'a> {
-    /// Constructs a [`BlockGen`] to generate blocks for the given universe.
-    ///
-    /// `resolution` is the side length of block spaces; the cube root of the number of
-    /// voxels making up a block.
-    pub fn new(universe: &'a mut Universe, resolution: Resolution) -> Self {
-        Self {
-            universe,
-            resolution,
-        }
-    }
-}
 
 /// Generate some atom blocks with unspecified contents for testing.
 ///

@@ -13,8 +13,7 @@ use embedded_graphics::primitives::{Circle, Line, Rectangle, Triangle};
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
-use crate::block::{space_to_blocks, Block, BlockAttributes, AIR};
-use crate::blockgen::BlockGen;
+use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
 use crate::content::palette;
 use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
 use crate::linking::{BlockModule, BlockProvider};
@@ -37,7 +36,7 @@ pub(crate) struct Vui {
 impl Vui {
     pub fn new() -> Self {
         let mut universe = Universe::new();
-        let hud_blocks = HudBlocks::new(&mut BlockGen::new(&mut universe, 16));
+        let hud_blocks = HudBlocks::new(&mut universe, 16);
         let hud_space = HudLayout::default().new_space(&mut universe, &hud_blocks);
 
         Self {
@@ -204,19 +203,17 @@ struct HudBlocks {
 }
 
 impl HudBlocks {
-    fn new(blockgen: &mut BlockGen) -> Self {
-        let resolution = GridCoordinate::from(blockgen.resolution);
+    fn new(universe: &mut Universe, resolution: Resolution) -> Self {
+        let resolution_g = resolution as GridCoordinate;
 
-        let icons = Icons::new(blockgen)
-            .install(&mut blockgen.universe)
-            .unwrap();
+        let icons = Icons::new(universe).install(universe).unwrap();
 
         // TODO: This toolbar graphic is a "get the bugs in the drawing tools worked out"
         // placeholder for better art...
 
         // Draw toolbar icon frame, twice so we can have start-middle-end shapes.
         let toolbar_frame_block_grid = Grid::new((-1, -1, -1), (5, 3, 3));
-        let toolbar_frame_voxel_grid = toolbar_frame_block_grid.multiply(resolution);
+        let toolbar_frame_voxel_grid = toolbar_frame_block_grid.multiply(resolution_g);
         let mut toolbar_drawing_space = Space::empty(toolbar_frame_voxel_grid);
         let display =
             &mut VoxelDisplayAdapter::new(&mut toolbar_drawing_space, GridPoint::origin());
@@ -227,8 +224,8 @@ impl HudBlocks {
         let background_stroke = VoxelBrush::single(palette::HUD_TOOLBAR_FRAME);
         let icon_background_rectangle = Rectangle::new(
             // TODO: confirm these offsets are exactly right
-            Point::new(-padding - stroke_width, -padding - resolution),
-            Point::new(resolution + padding, padding + stroke_width),
+            Point::new(-padding - stroke_width, -padding - resolution_g),
+            Point::new(resolution_g + padding, padding + stroke_width),
         )
         .into_styled(
             PrimitiveStyleBuilder::new()
@@ -239,18 +236,18 @@ impl HudBlocks {
         );
         icon_background_rectangle.draw(display).unwrap();
         icon_background_rectangle
-            .translate(Point::new(resolution * 2, 0))
+            .translate(Point::new(resolution_g * 2, 0))
             .draw(display)
             .unwrap();
 
         // Draw pointers. The pointers are placed above and below the second
         // icon frame.
-        let pointer_offset = Point::new(resolution * 5 / 2, 0);
+        let pointer_offset = Point::new(resolution_g * 5 / 2, 0);
         // TODO: use different related colors
         let pointer_fill =
-            VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, resolution - 1));
+            VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, resolution_g - 1));
         let pointer_stroke =
-            VoxelBrush::single(palette::HUD_TOOLBAR_FRAME).translate((0, 0, resolution - 1));
+            VoxelBrush::single(palette::HUD_TOOLBAR_FRAME).translate((0, 0, resolution_g - 1));
         let pointer_style = PrimitiveStyleBuilder::new()
             .fill_color(&pointer_fill)
             .stroke_color(&pointer_stroke)
@@ -263,16 +260,16 @@ impl HudBlocks {
             .unwrap();
         Triangle::new(Point::new(-5, -5), Point::new(0, 0), Point::new(5, -5))
             .into_styled(pointer_style)
-            .translate(Point::new(0, -resolution)) // position point at top of block
+            .translate(Point::new(0, -resolution_g)) // position point at top of block
             .translate(pointer_offset)
             .draw(display)
             .unwrap();
 
         // TODO: use a name for the space
         let toolbar_blocks_space = space_to_blocks(
-            blockgen.resolution,
+            resolution,
             BlockAttributes::default(),
-            blockgen.universe.insert_anonymous(toolbar_drawing_space),
+            universe.insert_anonymous(toolbar_drawing_space),
         )
         .unwrap();
 
@@ -348,11 +345,11 @@ impl BlockModule for Icons {
     }
 }
 impl Icons {
-    fn new(blockgen: &mut BlockGen) -> BlockProvider<Icons> {
+    fn new(universe: &mut Universe) -> BlockProvider<Icons> {
+        let resolution = 16;
         BlockProvider::new(|key| {
             match key {
                 Icons::Delete => {
-                    let resolution = blockgen.resolution;
                     let x_radius = i32::from(resolution) * 3 / 16;
                     let background_block_1: Block = Rgba::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
                     let background_block_2: Block = Rgba::new(0.8, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
@@ -401,10 +398,7 @@ impl Icons {
                     .unwrap();
 
                     Block::builder()
-                        .voxels_ref(
-                            blockgen.resolution,
-                            blockgen.universe.insert_anonymous(space),
-                        )
+                        .voxels_ref(resolution, universe.insert_anonymous(space))
                         .build()
                 }
             }
