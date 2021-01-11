@@ -63,11 +63,12 @@ impl Vui {
     pub fn view_matrix(space: &Space, fov_y: Deg<FreeCoordinate>) -> Matrix4<FreeCoordinate> {
         let grid = space.grid();
         let mut ui_center = grid.center();
-        ui_center.z = grid.upper_bounds().z.into(); // align with "front" face.
 
-        // View distance which will put the front of the UI space exactly aligned with the viewport edges...at least vertically.
+        // Arrange a view distance which will place the Z=0 plane sized to fill the viewport
+        // (at least vertically, as we don't have aspect ratio support yet).
+        ui_center.z = 0.0;
+
         let view_distance = FreeCoordinate::from(grid.size().y) * (fov_y / 2.).cot() / 2.;
-
         Matrix4::look_at_rh(
             ui_center + Vector3::new(0., 0., view_distance),
             ui_center,
@@ -117,7 +118,7 @@ impl Default for HudLayout {
 const TOOLBAR_STEP: GridCoordinate = 2;
 impl HudLayout {
     fn grid(&self) -> Grid {
-        Grid::new((-1, -1, 0), (self.size.x + 2, self.size.y + 2, 10))
+        Grid::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
     }
 
     // TODO: taking the entire Universe doesn't seem like the best interface
@@ -132,24 +133,23 @@ impl HudLayout {
 
         if false {
             // Visualization of the bounds of the space we're drawing.
-            let frame_block = Block::from(Rgba::new(0.0, 1.0, 1.0, 1.0));
-            let mut add_frame = |z| {
+            let mut add_frame = |z, color| {
+                let frame_block = Block::from(color);
                 space
-                    .fill(Grid::new((-1, -1, z), (w + 2, h + 2, 1)), |_| {
+                    .fill(Grid::new((0, 0, z), (w, h, 1)), |_| {
                         Some(&frame_block)
                     })
                     .unwrap();
                 space
-                    .fill(Grid::new((0, 0, z), (w, h, 1)), |_| Some(&AIR))
+                    .fill(Grid::new((1, 1, z), (w - 2, h - 2, 1)), |_| Some(&AIR))
                     .unwrap();
             };
-            add_frame(0);
-            add_frame(grid.upper_bounds().z - 1);
+            add_frame(grid.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
+            add_frame(-1, Rgba::new(0.5, 0.5, 0.5, 1.));
+            add_frame(grid.upper_bounds().z - 1, Rgba::new(0., 1., 1., 1.));
         }
 
         // Draw background for toolbar.
-        // TODO: give this more shape and decoration (custom outline blocks).
-        // And a selected-highlight.
         let toolbar_disp = &mut VoxelDisplayAdapter::new(&mut space, self.tool_icon_position(0));
         Pixel(Point::new(-1, 0), &hud_blocks.toolbar_left_cap)
             .draw(toolbar_disp)
@@ -179,7 +179,7 @@ impl HudLayout {
         let x_start =
             (self.size.x - (self.toolbar_positions as GridCoordinate) * TOOLBAR_STEP + 1) / 2;
         // TODO: set depth sensibly
-        GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 0, 9)
+        GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 1, 1)
     }
 
     /// Repaint the toolbar with a new set of tools and selected tools.
