@@ -142,15 +142,26 @@ impl Block {
                 // operation.
             }
             Block::Recur {
-                space: space_ref, ..
+                resolution,
+                offset,
+                space: space_ref,
+                ..
             } => {
+                let relevant_cubes = Grid::for_block(*resolution).translate(offset.to_vec());
                 space_ref
                     .try_borrow_mut()?
-                    .listen(listener.filter(|msg| match msg {
-                        SpaceChange::Block(_) => Some(BlockChange::new()),
-                        SpaceChange::BlockValue(_) => Some(BlockChange::new()),
-                        SpaceChange::Lighting(_) => None,
-                        SpaceChange::Number(_) => None,
+                    .listen(listener.filter(move |msg| {
+                        match msg {
+                            SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
+                                Some(BlockChange::new())
+                            }
+                            SpaceChange::Block(_) => None,
+                            // TODO: It would be nice if the space gave more precise updates such that we could conclude
+                            // e.g. "this is a new/removed block in an unaffected area" without needing to store any data.
+                            SpaceChange::BlockValue(_) => Some(BlockChange::new()),
+                            SpaceChange::Lighting(_) => None,
+                            SpaceChange::Number(_) => None,
+                        }
                     }));
             }
         }
@@ -766,6 +777,7 @@ pub mod builder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockgen::make_some_blocks;
     use crate::listen::Sink;
     use crate::math::{GridPoint, GridVector};
     use crate::space::Grid;
@@ -1048,7 +1060,8 @@ mod tests {
     #[test]
     fn listen_recur() {
         let mut universe = Universe::new();
-        let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let some_blocks = make_some_blocks(2);
+        let space_ref = universe.insert_anonymous(Space::empty_positive(2, 1, 1));
         let block = Block::builder().voxels_ref(1, space_ref.clone()).build();
         let mut sink = Sink::new();
         block.listen(sink.listener()).unwrap();
@@ -1057,11 +1070,18 @@ mod tests {
         // Now mutate the space and we should see a notification.
         space_ref
             .borrow_mut()
-            .set((0, 0, 0), Block::from(Rgba::new(0.1, 0.2, 0.3, 0.4)))
+            .set((0, 0, 0), &some_blocks[0])
             .unwrap();
         assert!(sink.next().is_some());
 
         // TODO: Also test that we don't propagate lighting changes
+
+        // A mutation out of bounds should not trigger a notification
+        space_ref
+            .borrow_mut()
+            .set((1, 0, 0), &some_blocks[1])
+            .unwrap();
+        assert_eq!(sink.next(), None);
     }
 
     // TODO: test of evaluate where the block's space is the wrong size
