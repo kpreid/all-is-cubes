@@ -16,6 +16,8 @@ mod color;
 pub use color::*;
 mod face;
 pub use face::*;
+mod matrix;
+pub use matrix::*;
 
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = i32;

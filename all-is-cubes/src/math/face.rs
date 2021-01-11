@@ -4,7 +4,7 @@
 //! [`Face`] type and related items.
 //! This module is private but reexported by its parent.
 
-use cgmath::{BaseFloat, BaseNum, Matrix4, Vector3};
+use cgmath::{BaseNum, Vector3};
 pub use ordered_float::{FloatIsNan, NotNan};
 use std::ops::{Index, IndexMut};
 
@@ -93,58 +93,58 @@ impl Face {
     }
 
     /// Returns a homogeneous transformation matrix which, if given points on the square
-    /// with x ∈ [0, 1], y ∈ [0, 1] and z = 0, converts them to points that lie on the
-    /// faces of the cube with x ∈ [0, 1], y ∈ [0, 1], and z ∈ [0, 1].
+    /// with x ∈ [0, scale], y ∈ [0, scale] and z = 0, converts them to points that lie
+    /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].
     ///
-    /// Specifically, `Face::NZ.matrix()` is the identity matrix and all others are
+    /// Specifically, `Face::NZ.gmatrix()` is the identity matrix and all others are
     /// consistent with that. Note that there are arbitrary choices in the rotation
     /// of all other faces. (TODO: Document those choices and test them.)
+    ///
+    /// To work with floating-point coordinates, use `.matrix(1).to_free()`.
     #[rustfmt::skip]
-    pub fn matrix<S: BaseFloat>(&self) -> Matrix4<S> {
-        // Note: This is not generalized to BaseNum + Neg like normal_vector is because
-        // cgmath itself requires BaseFloat for matrices.
+    pub const fn matrix(&self, scale: GridCoordinate) -> GridMatrix {
         match self {
-            Face::WITHIN => Matrix4::zero(),
-            Face::NX => Matrix4::new(
-                S::zero(), S::one(), S::zero(), S::zero(),
-                S::zero(), S::zero(), S::one(), S::zero(),
-                S::one(), S::zero(), S::zero(), S::zero(),
-                S::zero(), S::zero(), S::zero(), S::one(),
+            Face::WITHIN => GridMatrix::ZERO,
+            Face::NX => GridMatrix::new(
+                0, 1, 0,
+                0, 0, 1,
+                1, 0, 0,
+                0, 0, 0,
             ),
-            Face::NY => Matrix4::new(
-                S::zero(), S::zero(), S::one(), S::zero(),
-                S::one(), S::zero(), S::zero(), S::zero(),
-                S::zero(), S::one(), S::zero(), S::zero(),
-                S::zero(), S::zero(), S::zero(), S::one(),
+            Face::NY => GridMatrix::new(
+                0, 0, 1,
+                1, 0, 0,
+                0, 1, 0,
+                0, 0, 0,
             ),
-            Face::NZ => Matrix4::new(
+            Face::NZ => GridMatrix::new(
                 // Z face leaves X and Y unchanged!
-                S::one(), S::zero(), S::zero(), S::zero(),
-                S::zero(), S::one(), S::zero(), S::zero(),
-                S::zero(), S::zero(), S::one(), S::zero(),
-                S::zero(), S::zero(), S::zero(), S::one(),
+                1, 0, 0,
+                0, 1, 0,
+                0, 0, 1,
+                0, 0, 0,
             ),
             // Positives are same as negatives but with translation and an arbitrary choice of rotation.
             // PX rotates about Y.
-            Face::PX => Matrix4::new(
-                S::zero(), -S::one(), S::zero(), S::zero(),
-                S::zero(), S::zero(), S::one(), S::zero(),
-                -S::one(), S::zero(), S::zero(), S::zero(),
-                S::one(), S::one(), S::zero(), S::one(),
+            Face::PX => GridMatrix::new(
+                0, -1, 0,
+                0, 0, 1,
+                -1, 0, 0,
+                scale, scale, 0,
             ),
             // PY rotates about X.
-            Face::PY => Matrix4::new(
-                S::zero(), S::zero(), S::one(), S::zero(),
-                -S::one(), S::zero(), S::zero(), S::zero(),
-                S::zero(), -S::one(), S::zero(), S::zero(),
-                S::one(), S::one(), S::zero(), S::one(),
+            Face::PY => GridMatrix::new(
+                0, 0, 1,
+                -1, 0, 0,
+                0, -1, 0,
+                scale, scale, 0,
             ),
             // PZ rotates about Y.
-            Face::PZ => Matrix4::new(
-                S::one(), S::zero(), S::zero(), S::zero(),
-                S::zero(), -S::one(), S::zero(), S::zero(),
-                S::zero(), S::zero(), -S::one(), S::zero(),
-                S::zero(), S::one(), S::one(), S::one(),
+            Face::PZ => GridMatrix::new(
+                1, 0, 0,
+                0, -1, 0,
+                0, 0, -1,
+                0, scale, scale,
             ),
         }
     }
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn face_matrix_does_not_scale_or_reflect() {
         for &face in Face::ALL_SIX {
-            assert_eq!(1.0, face.matrix().determinant());
+            assert_eq!(1.0, face.matrix(7).to_free().determinant());
         }
     }
 

@@ -122,7 +122,7 @@ static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
                 // TODO: we can simplify this if we add "transform ray by matrix".
                 face_ray_data.rays[i] = Ray {
                     origin,
-                    direction: face.matrix().transform_vector(Vector3::new(
+                    direction: face.matrix(1).to_free().transform_vector(Vector3::new(
                         rayx as FreeCoordinate,
                         rayy as FreeCoordinate,
                         // Constrain the light ray angle to be at most 45° off axis — in fact,

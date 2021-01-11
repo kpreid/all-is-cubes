@@ -179,7 +179,7 @@ fn push_quad<V: From<BlockVertex>>(
     high_corner: Point2<FreeCoordinate>,
     coloring: QuadColoring<impl TextureTile>,
 ) {
-    let transform = face.matrix();
+    let transform = face.matrix(1).to_free();
     for &p in QUAD_VERTICES {
         // Apply bounding rectangle
         let p = low_corner.to_vec() + p.mul_element_wise(high_corner - low_corner);
@@ -286,7 +286,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             }
 
             for &face in Face::ALL_SIX {
-                let transform = face.matrix();
+                let transform = face.matrix(block_resolution - 1);
 
                 // Layer 0 is the outside surface of the cube and successive layers are
                 // deeper inside.
@@ -310,18 +310,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             // While we're at it, also implement the optimization that positive and negative
                             // faces can share a texture sometimes (which requires dropping the property
                             // Face::matrix provides where all transforms contain no mirroring).
-                            let cube: Point3<GridCoordinate> = (transform.transform_point(
-                                (Point3::new(
-                                    FreeCoordinate::from(s),
-                                    FreeCoordinate::from(t),
-                                    FreeCoordinate::from(layer),
-                                ) + Vector3::new(0.5, 0.5, 0.5))
-                                    / FreeCoordinate::from(block_resolution),
-                            ) * FreeCoordinate::from(
-                                block_resolution,
-                            ) - Vector3::new(0.5, 0.5, 0.5))
-                            .cast::<GridCoordinate>()
-                            .unwrap();
+                            let cube: Point3<GridCoordinate> =
+                                transform.transform_point(Point3::new(s, t, layer));
 
                             // Diagnose out-of-space accesses. TODO: Tidy this up and document it, or remove it:
                             // it will happen whenever the space is the wrong size for the textures.
