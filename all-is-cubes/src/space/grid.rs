@@ -83,7 +83,6 @@ impl Grid {
 
     /// Constructor constrained to be able to be `const fn`: limited numeric ranges
     /// cannot overflow and there are no implicit `Into` conversions.
-    #[allow(dead_code)] // TODO: expecting to use this in demo content or make public
     pub(crate) const fn new_c(lower_bounds: [i16; 3], sizes: [u16; 3]) -> Self {
         Self {
             lower_bounds: GridPoint {
@@ -99,6 +98,14 @@ impl Grid {
         }
     }
 
+    /// Constructs a [`Grid`] with a volume of 1, containing the specified cube.
+    pub const fn single_cube(cube: GridPoint) -> Grid {
+        Grid {
+            lower_bounds: cube,
+            sizes: GridVector::new(1, 1, 1),
+        }
+    }
+
     /// Constructs a [`Grid`] with a cubical volume in the positive octant, as is used
     /// for recursive blocks.
     ///
@@ -106,7 +113,7 @@ impl Grid {
     /// [`Grid::translate`].
     pub fn for_block(resolution: Resolution) -> Grid {
         let size = GridCoordinate::from(resolution);
-        Grid::new((0, 0, 0), (size, size, size))
+        Grid::new([0, 0, 0], [size, size, size])
     }
 
     /// Compute volume with checked arithmetic. In a function solely for the convenience

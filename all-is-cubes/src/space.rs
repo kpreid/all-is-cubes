@@ -15,7 +15,6 @@ use crate::content::palette;
 use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
 use crate::math::*;
 use crate::universe::RefError;
-use crate::util::ConciseDebug as _;
 
 mod grid;
 pub use grid::*;
@@ -312,7 +311,7 @@ impl Space {
             self.side_effects_of_set(new_block_index, position, contents_index);
             Ok(true)
         } else {
-            Err(SetCubeError::OutOfBounds(position))
+            Err(SetCubeError::OutOfBounds(Grid::single_cube(position)))
         }
     }
 
@@ -382,9 +381,7 @@ impl Space {
     {
         if !self.grid().contains_grid(region) {
             // TODO: Compute a cube that's *actually* out of bounds. Or change the definition of OutOfBounds.
-            return Err(SetCubeError::OutOfBounds(
-                region.interior_iter().next().unwrap(),
-            ));
+            return Err(SetCubeError::OutOfBounds(region));
         }
         for cube in region.interior_iter() {
             if let Some(block) = function(cube) {
@@ -587,9 +584,9 @@ impl SpaceBlockData {
 /// Note that "already contained the given block" is considered a success.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 pub enum SetCubeError {
-    /// The given cube is out of the bounds of this Space.
-    #[error("{:?} is out of bounds", .0.as_concise_debug())]
-    OutOfBounds(GridPoint),
+    /// The given cube or region is out of the bounds of this Space.
+    #[error("{:?} is out of bounds", .0)]
+    OutOfBounds(Grid),
     /// The block data could not be read.
     #[error("block data could not be read: {0}")]
     BlockDataAccess(#[from] RefError),
@@ -698,9 +695,10 @@ mod tests {
     fn set_failure_out_of_bounds() {
         let block = make_some_blocks(1).swap_remove(0);
         let pt = GridPoint::new(1, 0, 0);
+        let ptg = Grid::single_cube(pt);
         let mut space = Space::empty_positive(1, 1, 1);
-        assert_eq!(Err(SetCubeError::OutOfBounds(pt)), space.set(pt, &block));
-        assert_eq!(Err(SetCubeError::OutOfBounds(pt)), space.set(pt, &AIR));
+        assert_eq!(Err(SetCubeError::OutOfBounds(ptg)), space.set(pt, &block));
+        assert_eq!(Err(SetCubeError::OutOfBounds(ptg)), space.set(pt, &AIR));
     }
 
     /// This test case should also cover `RefError::Gone`.
@@ -742,8 +740,9 @@ mod tests {
     #[test]
     fn set_error_format() {
         assert_eq!(
-            SetCubeError::OutOfBounds(GridPoint::new(1, 2, 3)).to_string(),
-            "(+1, +2, +3) is out of bounds"
+            SetCubeError::OutOfBounds(Grid::single_cube(GridPoint::new(1, 2, 3))).to_string(),
+            // TODO: simplify the single cube case
+            "Grid(1..2, 2..3, 3..4) is out of bounds"
         );
         assert_eq!(
             SetCubeError::BlockDataAccess(RefError::Gone(Rc::new("foo".into()))).to_string(),
@@ -856,6 +855,14 @@ mod tests {
         assert_eq!(extracted.grid(), extract_grid);
         assert_eq!(&extracted[(1, 0, 0)], &blocks[1]);
         assert_eq!(&extracted[(1, 1, 0)], &AIR);
+    }
+
+    #[test]
+    fn fill_out_of_bounds() {
+        let mut space = Space::empty_positive(2, 1, 1);
+        let fill_grid = Grid::new((1, 0, 0), (1, 2, 1));
+        let result = space.fill(fill_grid, |_| None::<Block>);
+        assert_eq!(result, Err(SetCubeError::OutOfBounds(fill_grid)));
     }
 
     #[test]
