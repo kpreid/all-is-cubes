@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Angle as _, Deg, Matrix4, Point2, Vector2, Vector3};
+use cgmath::{Point2, Vector2};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
@@ -19,10 +19,11 @@ use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::Vertex;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
-use crate::math::{Aab, FreeCoordinate, Rgba};
+use crate::math::{Aab, Rgba};
 use crate::space::Space;
 use crate::universe::URef;
 use crate::util::WarningsResult;
+use crate::vui::Vui;
 
 // TODO: Make these a runtime toggle
 const DRAW_LIGHTING_DEBUG: bool = false;
@@ -73,9 +74,8 @@ where
             luminance::framebuffer::Framebuffer::back_buffer(&mut surface, viewport.viewport_dev)
                 .unwrap(); // TODO error handling
 
-        // TODO: this belongs in UI setup code
         let mut ui_proj = ProjectionHelper::new(1.0, viewport.viewport_px);
-        ui_proj.set_fov_y(Deg(30.));
+        ui_proj.set_fov_y(Vui::SUGGESTED_FOV_Y);
 
         Ok((
             Self {
@@ -99,20 +99,9 @@ where
 
         if let Some(ui_renderer) = &self.ui_renderer {
             self.ui_proj.set_viewport(viewport.viewport_px);
-
-            // TODO: this belongs in apps code
-            let grid = ui_renderer.space().borrow().grid();
-            let mut ui_center = grid.center();
-            ui_center.z = grid.upper_bounds().z.into(); // align with "front" face.
-
-            // View distance which will put the front of the UI space exactly aligned with the viewport edges...at least vertically.
-            let view_distance =
-                FreeCoordinate::from(grid.size().y) * (self.ui_proj.fov_y() / 2.).cot() / 2.;
-
-            self.ui_proj.set_view_matrix(Matrix4::look_at_rh(
-                ui_center + Vector3::new(0., 0., view_distance),
-                ui_center,
-                Vector3::new(0., 1., 0.),
+            self.ui_proj.set_view_matrix(Vui::view_matrix(
+                &*ui_renderer.space().borrow(),
+                self.ui_proj.fov_y(),
             ));
         }
 

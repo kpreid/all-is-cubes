@@ -6,7 +6,7 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
-use cgmath::{EuclideanSpace as _, Vector2};
+use cgmath::{Angle as _, Deg, EuclideanSpace as _, Matrix4, Vector2, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Pixel, Primitive, Transform as _};
 use embedded_graphics::primitives::{Circle, Line, Rectangle, Triangle};
@@ -52,6 +52,30 @@ impl Vui {
     pub fn current_space(&self) -> &URef<Space> {
         &self.current_space
     }
+
+    /// Computes an OpenGL style view matrix that should be used to display the
+    /// [`Vui::current_space`].
+    ///
+    /// It does not need to be rechecked other than on aspect ratio changes.
+    ///
+    /// TODO: This is not a method because the code structure makes it inconvenient for
+    /// renderers to get access to `Vui` itself. Add some other communication path.
+    pub fn view_matrix(space: &Space, fov_y: Deg<FreeCoordinate>) -> Matrix4<FreeCoordinate> {
+        let grid = space.grid();
+        let mut ui_center = grid.center();
+        ui_center.z = grid.upper_bounds().z.into(); // align with "front" face.
+
+        // View distance which will put the front of the UI space exactly aligned with the viewport edges...at least vertically.
+        let view_distance = FreeCoordinate::from(grid.size().y) * (fov_y / 2.).cot() / 2.;
+
+        Matrix4::look_at_rh(
+            ui_center + Vector3::new(0., 0., view_distance),
+            ui_center,
+            Vector3::new(0., 1., 0.),
+        )
+    }
+
+    pub const SUGGESTED_FOV_Y: Deg<FreeCoordinate> = Deg(30.);
 
     pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
         self.universe.step(timestep)
