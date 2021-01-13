@@ -136,9 +136,7 @@ impl HudLayout {
             let mut add_frame = |z, color| {
                 let frame_block = Block::from(color);
                 space
-                    .fill(Grid::new((0, 0, z), (w, h, 1)), |_| {
-                        Some(&frame_block)
-                    })
+                    .fill(Grid::new((0, 0, z), (w, h, 1)), |_| Some(&frame_block))
                     .unwrap();
                 space
                     .fill(Grid::new((1, 1, z), (w - 2, h - 2, 1)), |_| Some(&AIR))
