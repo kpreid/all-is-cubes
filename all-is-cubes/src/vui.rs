@@ -226,7 +226,7 @@ struct HudBlocks {
 
 impl HudBlocks {
     fn new(universe: &mut Universe, resolution: Resolution) -> Self {
-        let resolution_g = resolution as GridCoordinate;
+        let resolution_g = GridCoordinate::from(resolution);
 
         let icons = Icons::new(universe).install(universe).unwrap();
 

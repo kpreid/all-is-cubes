@@ -162,6 +162,7 @@ fn demo_city(universe: &mut Universe) -> Space {
     space
 }
 
+#[allow(clippy::type_complexity)]
 struct Exhibit {
     name: &'static str,
     footprint: Grid,
