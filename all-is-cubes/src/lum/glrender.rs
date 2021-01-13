@@ -97,8 +97,10 @@ where
     pub fn set_viewport(&mut self, viewport: Viewport) {
         self.world_proj.set_viewport(viewport.viewport_px);
 
+        self.ui_proj.set_viewport(viewport.viewport_px);
         if let Some(ui_renderer) = &self.ui_renderer {
-            self.ui_proj.set_viewport(viewport.viewport_px);
+            // Note: Since this is conditional, we also have to set it up in
+            // set_ui_space when ui_renderer becomes Some.
             self.ui_proj.set_view_matrix(Vui::view_matrix(
                 &*ui_renderer.space().borrow(),
                 self.ui_proj.fov_y(),
@@ -118,7 +120,11 @@ where
     }
 
     pub fn set_ui_space(&mut self, space: Option<URef<Space>>) {
-        self.ui_renderer = space.map(SpaceRenderer::new);
+        self.ui_renderer = space.map(|space| {
+            self.ui_proj
+                .set_view_matrix(Vui::view_matrix(&*space.borrow(), self.ui_proj.fov_y()));
+            SpaceRenderer::new(space)
+        });
     }
 
     /// Draw a frame.
@@ -150,7 +156,6 @@ where
         let world_renderer = self.world_renderer.as_mut().unwrap();
         let world_output = world_renderer.prepare_frame(surface, camera.view());
 
-        // TODO: wrong view matrix
         let ui_output = if let Some(ui_renderer) = &mut self.ui_renderer {
             Some(ui_renderer.prepare_frame(surface, self.ui_proj.view()))
         } else {
