@@ -15,9 +15,9 @@ use std::time::Duration;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
 use crate::content::palette;
-use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
+use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
+use crate::math::{Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgba};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -148,7 +148,12 @@ impl HudLayout {
         }
 
         // Draw background for toolbar.
-        let toolbar_disp = &mut VoxelDisplayAdapter::new(&mut space, self.tool_icon_position(0));
+        let toolbar_disp = &mut space.draw_target(GridMatrix::from_origin(
+            self.tool_icon_position(0),
+            Face::PX,
+            Face::NY,
+            Face::PZ,
+        ));
         Pixel(Point::new(-1, 0), &hud_blocks.toolbar_left_cap)
             .draw(toolbar_disp)
             .unwrap();
@@ -201,7 +206,9 @@ impl HudLayout {
             // Draw icon
             space.set(position, &*tool.icon(&hud_blocks.icons))?;
             // Draw pointers.
-            let toolbar_disp = &mut VoxelDisplayAdapter::new(space, position);
+            // TODO: refactor to not use FLIP_Y now that it isn't a hardcoded feature
+            let toolbar_disp = &mut space
+                .draw_target(GridMatrix::from_translation(position.to_vec()) * GridMatrix::FLIP_Y);
             for sel in 0..2 {
                 let slot = selections.get(sel).copied().unwrap_or(usize::MAX);
                 let brush: &VoxelBrush =
@@ -237,8 +244,8 @@ impl HudBlocks {
         let toolbar_frame_block_grid = Grid::new((-1, -1, -1), (5, 3, 3));
         let toolbar_frame_voxel_grid = toolbar_frame_block_grid.multiply(resolution_g);
         let mut toolbar_drawing_space = Space::empty(toolbar_frame_voxel_grid);
-        let display =
-            &mut VoxelDisplayAdapter::new(&mut toolbar_drawing_space, GridPoint::origin());
+        // TODO: remove y flip
+        let display = &mut toolbar_drawing_space.draw_target(GridMatrix::FLIP_Y);
 
         let padding = 3;
         let stroke_width = 1;
@@ -335,11 +342,12 @@ impl HudBlocks {
 pub(crate) fn draw_background(space: &mut Space) {
     let grid = space.grid();
     let background_rect = Rectangle::new(
-        Point::new(grid.lower_bounds().x, -grid.upper_bounds().y + 1),
-        Point::new(grid.upper_bounds().x - 1, -grid.lower_bounds().y),
+        Point::new(grid.lower_bounds().x, grid.lower_bounds().y),
+        Point::new(grid.upper_bounds().x - 1, grid.upper_bounds().y - 1),
     );
 
-    let display = &mut VoxelDisplayAdapter::new(space, GridPoint::new(0, 0, grid.lower_bounds().z));
+    let display =
+        &mut space.draw_target(GridMatrix::from_translation([0, 0, grid.lower_bounds().z]));
 
     let background = VoxelBrush::single(Block::from(palette::MENU_BACK));
     let frame = VoxelBrush::single(Block::from(palette::MENU_FRAME)).translate((0, 0, 1));
@@ -390,10 +398,12 @@ impl Icons {
                         .build();
 
                     let mut space = Space::empty(Grid::for_block(resolution));
-                    let display = &mut VoxelDisplayAdapter::new(
-                        &mut space,
+                    let display = &mut space.draw_target(GridMatrix::from_origin(
                         GridPoint::new(1, 1, 1) * GridCoordinate::from(resolution / 2),
-                    );
+                        Face::PX,
+                        Face::NY,
+                        Face::PZ,
+                    ));
 
                     // Draw X on circle
                     Circle::new(Point::new(0, 0), (resolution / 2 - 2).into())

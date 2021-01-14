@@ -20,7 +20,9 @@ use crate::content::landscape::{wavy_landscape, LandscapeBlocks};
 use crate::content::logo_text;
 use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::BlockProvider;
-use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
+use crate::math::{
+    Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+};
 use crate::raycast::Raycaster;
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
@@ -157,7 +159,10 @@ fn demo_city(universe: &mut Universe) -> Space {
         exhibit_x += exhibit.footprint.upper_bounds().x + 3;
     }
 
-    logo_text(GridPoint::new(0, 12, -radius_xz), &mut space);
+    logo_text(
+        GridMatrix::from_translation([0, 12, -radius_xz]),
+        &mut space,
+    );
 
     space
 }

@@ -33,6 +33,13 @@ impl GridMatrix {
         z: Vector3::new(0, 0, 0),
         w: Vector3::new(0, 0, 0),
     };
+    /// For Y-down drawing
+    pub(crate) const FLIP_Y: Self = Self {
+        x: Vector3::new(1, 0, 0),
+        y: Vector3::new(0, -1, 0),
+        z: Vector3::new(0, 0, 1),
+        w: Vector3::new(0, 0, 0),
+    };
 
     /// Note: This takes the same column-major ordering as [`cgmath`], so the argument order
     /// is transposed relative to a conventional textual display of a matrix.
@@ -57,6 +64,38 @@ impl GridMatrix {
             y: Vector3::new(y0, y1, y2),
             z: Vector3::new(z0, z1, z2),
             w: Vector3::new(w0, w1, w2),
+        }
+    }
+
+    /// Construct a translation matrix.
+    pub fn from_translation(offset: impl Into<GridVector>) -> Self {
+        Self {
+            w: offset.into(),
+            ..Self::one()
+        }
+    }
+
+    /// Construct a transformation to a translated and rotated coordinate system from
+    /// an origin in the target coordinate system and basis vectors expressed as [`Face`]s.
+    ///
+    /// Skews or scaling cannot be performed using this constructor.
+    ///
+    /// ```
+    /// use cgmath::Transform as _;  // trait method Transform::transform_point
+    /// use all_is_cubes::math::{Face::*, GridMatrix, GridPoint};
+    ///
+    /// let transform = GridMatrix::from_origin([10, 10, 10], PX, PZ, NY);
+    /// assert_eq!(
+    ///     transform.transform_point(GridPoint::new(1, 2, 3)),
+    ///     GridPoint::new(11, 7, 12),
+    /// );
+    /// ```
+    pub fn from_origin(origin: impl Into<GridPoint>, x: Face, y: Face, z: Face) -> Self {
+        Self {
+            x: x.normal_vector(),
+            y: y.normal_vector(),
+            z: z.normal_vector(),
+            w: origin.into().to_vec(),
         }
     }
 

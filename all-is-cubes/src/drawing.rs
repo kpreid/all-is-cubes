@@ -6,12 +6,10 @@
 //!
 //! The [`VoxelBrush`] type can also be useful in direct 3D drawing.
 
-use cgmath::EuclideanSpace as _;
+use cgmath::{EuclideanSpace as _, Transform as _};
 use embedded_graphics::drawable::{Drawable, Pixel};
-use embedded_graphics::fonts::{Font, Text};
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
-use embedded_graphics::style::TextStyleBuilder;
 use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
 use std::borrow::{Borrow, Cow};
@@ -21,30 +19,9 @@ use std::convert::TryInto;
 pub use embedded_graphics;
 
 use crate::block::{Block, Resolution};
-use crate::math::{GridPoint, GridVector, Rgb, Rgba};
+use crate::math::{GridMatrix, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
-
-/// Draw text into a [`Space`], extending in the +X and -Y directions from `origin`.
-pub fn draw_text<F, C>(
-    space: &mut Space,
-    color: C,
-    origin: GridPoint,
-    font: F,
-    text: impl AsRef<str>,
-) -> Result<(), SetCubeError>
-where
-    C: PixelColor,
-    for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
-    F: Font + Copy,
-{
-    let style = TextStyleBuilder::new(font).text_color(color).build();
-    Text::new(text.as_ref(), Point::new(0, 0))
-        .into_styled(style)
-        .draw(&mut VoxelDisplayAdapter::new(space, origin))
-    // Note: unwrap() is currently safe because there's no way for setting an atom cube
-    // to fail, but if we generalize that later then we might need more error handling.
-}
 
 /// Generate a set of blocks which together display the given [`Drawable`] which may be
 /// larger than one block. The Z position is always the middle of the block.
@@ -64,6 +41,8 @@ where
     let bottom_right_2d = object.bottom_right();
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
     // for text drawing, embedded_graphics assumes a Y-down coordinate system.
+    // TODO: Now that we have user-provide matrix transforms we should let this be
+    // an option.
     let low_block = GridPoint::new(
         floor_divide(top_left_2d.x, resolution_g),
         floor_divide(-bottom_right_2d.y, resolution_g),
@@ -88,13 +67,12 @@ where
                 .expect("can't happen: draw_to_blocks failed to write to its own block space");
         }
 
-        object.draw(&mut VoxelDisplayAdapter::new(
-            &mut block_space,
-            GridPoint::new(
+        object.draw(&mut block_space.draw_target(
+            GridMatrix::from_translation([
                 -cube.x * resolution_g,
                 -cube.y * resolution_g,
                 resolution_g / 2,
-            ),
+            ]) * GridMatrix::FLIP_Y,
         ))?;
         output_space
             .set(
@@ -110,25 +88,21 @@ where
 }
 
 /// Adapter to use a [`Space`] as a [`DrawTarget`].
-///
-/// The coordinate system is currently fixed to map X to X, Y to -Y, and a constant to Z.
-/// The vertical flip is because embedded_graphics assumes Y-down coordinates for text.
 pub struct VoxelDisplayAdapter<'a> {
-    space: &'a mut Space,
-    origin: GridPoint,
+    pub(crate) space: &'a mut Space,
+    /// Defines the coordinate transformation from 2D graphics to the [`Space`].
+    pub(crate) transform: GridMatrix,
 }
 
 impl<'a> VoxelDisplayAdapter<'a> {
-    // TODO: need public interface to construct it, possibly a method on Space.
-    pub(crate) fn new(space: &'a mut Space, origin: GridPoint) -> Self {
-        Self { space, origin }
-    }
+    // TODO: We should probably have ways to stack more transforms
 }
 
 impl VoxelDisplayAdapter<'_> {
     /// Converts 2D point to 3D point. Helper for multiple `impl DrawTarget`s.
     fn convert_point(&self, point: Point) -> GridPoint {
-        self.origin + GridVector::new(point.x, -point.y, 0)
+        self.transform
+            .transform_point(GridPoint::new(point.x, point.y, 0))
     }
 
     /// Common implementation for the [`DrawTarget`] size methods.
@@ -180,6 +154,7 @@ impl DrawTarget<&'_ VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
 
     fn draw_pixel(&mut self, pixel: Pixel<&VoxelBrush>) -> Result<(), Self::Error> {
         let Pixel(point, brush) = pixel;
+        // TODO: Need to support rotation
         brush.paint(self.space, self.convert_point(point))
     }
 
@@ -338,8 +313,8 @@ mod tests {
         E: std::fmt::Debug,
     {
         let mut space = Space::empty_positive(100, 100, 100);
-        let mut display = VoxelDisplayAdapter::new(&mut space, GridPoint::new(1, 2, 4));
-        Pixel(Point::new(2, -3), color_value)
+        let mut display = space.draw_target(GridMatrix::from_translation([1, 2, 4]));
+        Pixel(Point::new(2, 3), color_value)
             .draw(&mut display)
             .unwrap();
         assert_eq!(space[(3, 5, 4)], *expected_block);
@@ -377,10 +352,8 @@ mod tests {
         let mut space = Space::empty_positive(100, 100, 100);
 
         let brush = VoxelBrush::new(vec![((0, 0, 0), &blocks[0]), ((0, 1, 1), &blocks[1])]);
-        Pixel(Point::new(2, -3), &brush).draw(&mut VoxelDisplayAdapter::new(
-            &mut space,
-            GridPoint::new(0, 0, 4),
-        ))?;
+        Pixel(Point::new(2, 3), &brush)
+            .draw(&mut space.draw_target(GridMatrix::from_translation([0, 0, 4])))?;
 
         assert_eq!(&space[(2, 3, 4)], &blocks[0]);
         assert_eq!(&space[(2, 4, 5)], &blocks[1]);
@@ -392,10 +365,8 @@ mod tests {
         let mut space = Space::empty_positive(100, 100, 100);
 
         // This should not fail with SetCubeError::OutOfBounds
-        Pixel(Point::new(-10, 0), Rgb888::new(0, 127, 255)).draw(&mut VoxelDisplayAdapter::new(
-            &mut space,
-            GridPoint::new(0, 0, 4),
-        ))?;
+        Pixel(Point::new(-10, 0), Rgb888::new(0, 127, 255))
+            .draw(&mut space.draw_target(GridMatrix::from_translation([0, 0, 4])))?;
         Ok(())
     }
 
@@ -421,7 +392,6 @@ mod tests {
         let drawable =
             Rectangle::new(Point::new(0, 0), Point::new(2, 3)).into_styled(a_primitive_style());
         let space = draw_to_blocks(&mut universe, 16, drawable).unwrap();
-        // Output is at negative Y because coordinate system is flipped.
         assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
         if let Block::Recur {
             space: block_space_ref,

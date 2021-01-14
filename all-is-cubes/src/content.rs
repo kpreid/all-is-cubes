@@ -8,8 +8,8 @@ use embedded_graphics::prelude::{Dimensions, Drawable, Point, Transform};
 use embedded_graphics::style::TextStyleBuilder;
 
 use crate::block::Block;
-use crate::drawing::{VoxelBrush, VoxelDisplayAdapter};
-use crate::math::GridPoint;
+use crate::drawing::VoxelBrush;
+use crate::math::GridMatrix;
 use crate::space::Space;
 
 pub mod blocks;
@@ -18,7 +18,7 @@ pub mod landscape;
 pub mod palette;
 
 /// Draw the All Is Cubes logo text.
-pub fn logo_text(midpoint: GridPoint, space: &mut Space) {
+pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) {
     let foreground_text_block: Block = palette::LOGO_FILL.into();
     let background_text_block: Block = palette::LOGO_STROKE.into();
     let brush = VoxelBrush::new(vec![
@@ -34,6 +34,6 @@ pub fn logo_text(midpoint: GridPoint, space: &mut Space) {
         .into_styled(TextStyleBuilder::new(Font8x16).text_color(&brush).build());
     styled_text = styled_text.translate(Point::zero() - styled_text.size() / 2);
     styled_text
-        .draw(&mut VoxelDisplayAdapter::new(space, midpoint))
+        .draw(&mut space.draw_target(midpoint_transform * GridMatrix::FLIP_Y))
         .unwrap();
 }
