@@ -102,6 +102,78 @@ impl Face {
         }
     }
 
+    /// Returns the face whose normal is the cross product of these faces' normals.
+    ///
+    /// ```
+    /// use all_is_cubes::math::Face;
+    ///
+    /// for &face1 in Face::ALL_SEVEN {
+    ///     for &face2 in Face::ALL_SEVEN {
+    ///         // Cross product of faces is identical to cross product of vectors.
+    ///         assert_eq!(
+    ///             face1.cross(face2).normal_vector::<f64>(),
+    ///             face1.normal_vector().cross(face2.normal_vector()),
+    ///             "{:?} cross {:?}", face1, face2,
+    ///         );
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    pub fn cross(self, other: Self) -> Self {
+        use Face::*;
+        match (self, other) {
+            // Zero input
+            (WITHIN, _) => WITHIN,
+            (_, WITHIN) => WITHIN,
+
+            // Equal vectors
+            (Face::NX, Face::NX) => WITHIN,
+            (Face::NY, Face::NY) => WITHIN,
+            (Face::NZ, Face::NZ) => WITHIN,
+            (Face::PX, Face::PX) => WITHIN,
+            (Face::PY, Face::PY) => WITHIN,
+            (Face::PZ, Face::PZ) => WITHIN,
+
+            // Opposite vectors
+            (Face::NX, Face::PX) => WITHIN,
+            (Face::NY, Face::PY) => WITHIN,
+            (Face::NZ, Face::PZ) => WITHIN,
+            (Face::PX, Face::NX) => WITHIN,
+            (Face::PY, Face::NY) => WITHIN,
+            (Face::PZ, Face::NZ) => WITHIN,
+
+            (Face::NX, Face::NY) => PZ,
+            (Face::NX, Face::NZ) => NY,
+            (Face::NX, Face::PY) => NZ,
+            (Face::NX, Face::PZ) => PY,
+
+            (Face::NY, Face::NX) => NZ,
+            (Face::NY, Face::NZ) => PX,
+            (Face::NY, Face::PX) => PZ,
+            (Face::NY, Face::PZ) => NX,
+
+            (Face::NZ, Face::NX) => PY,
+            (Face::NZ, Face::NY) => NX,
+            (Face::NZ, Face::PX) => NY,
+            (Face::NZ, Face::PY) => PX,
+
+            (Face::PX, Face::NY) => NZ,
+            (Face::PX, Face::NZ) => PY,
+            (Face::PX, Face::PY) => PZ,
+            (Face::PX, Face::PZ) => NY,
+
+            (Face::PY, Face::NX) => PZ,
+            (Face::PY, Face::NZ) => NX,
+            (Face::PY, Face::PX) => NZ,
+            (Face::PY, Face::PZ) => PX,
+
+            (Face::PZ, Face::NX) => NY,
+            (Face::PZ, Face::NY) => PX,
+            (Face::PZ, Face::PX) => PY,
+            (Face::PZ, Face::PY) => NX,
+        }
+    }
+
     /// Returns the vector normal to this face. [`WITHIN`](Self::WITHIN) is assigned the
     /// zero vector.
     #[inline]
