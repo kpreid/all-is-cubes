@@ -60,6 +60,34 @@ impl Face {
         }
     }
 
+    /// Returns whether this face is a “positive” face: one whose unit vector's nonzero
+    /// coordinate is positive.
+    ///
+    /// ```
+    /// use all_is_cubes::math::Face;
+    ///
+    /// assert_eq!(Face::PX.is_positive(), true);
+    /// assert_eq!(Face::NX.is_positive(), false);
+    /// assert_eq!(Face::WITHIN.is_positive(), false);
+    /// ```
+    pub fn is_positive(self) -> bool {
+        matches!(self, Face::PX | Face::PY | Face::PZ)
+    }
+
+    /// Returns whether this face is a negative face: one whose unit vector's nonzero
+    /// coordinate is negative.
+    ///
+    /// ```
+    /// use all_is_cubes::math::Face;
+    ///
+    /// assert_eq!(Face::PX.is_negative(), false);
+    /// assert_eq!(Face::NX.is_negative(), true);
+    /// assert_eq!(Face::WITHIN.is_negative(), false);
+    /// ```
+    pub fn is_negative(self) -> bool {
+        matches!(self, Face::NX | Face::NY | Face::NZ)
+    }
+
     /// Returns the opposite face (maps [`PX`](Self::PX) to [`NX`](Self::NX) and so on).
     #[inline]
     pub const fn opposite(self) -> Face {
