@@ -51,7 +51,7 @@ impl Face {
 
     /// Returns which axis this face's normal vector is parallel to, with the numbering
     /// X = 0, Y = 1, Z = 2. Panics if given [`Face::WITHIN`].
-    pub fn axis_number(&self) -> usize {
+    pub fn axis_number(self) -> usize {
         match self {
             Face::WITHIN => panic!("WITHIN has no axis number"),
             Face::NX | Face::PX => 0,
@@ -62,7 +62,7 @@ impl Face {
 
     /// Returns the opposite face (maps [`PX`](Self::PX) to [`NX`](Self::NX) and so on).
     #[inline]
-    pub const fn opposite(&self) -> Face {
+    pub const fn opposite(self) -> Face {
         match self {
             Face::WITHIN => Face::WITHIN,
             Face::NX => Face::PX,
@@ -77,7 +77,7 @@ impl Face {
     /// Returns the vector normal to this face. [`WITHIN`](Self::WITHIN) is assigned the
     /// zero vector.
     #[inline]
-    pub fn normal_vector<S>(&self) -> Vector3<S>
+    pub fn normal_vector<S>(self) -> Vector3<S>
     where
         S: BaseNum + std::ops::Neg<Output = S>,
     {
@@ -102,7 +102,7 @@ impl Face {
     ///
     /// To work with floating-point coordinates, use `.matrix(1).to_free()`.
     #[rustfmt::skip]
-    pub const fn matrix(&self, scale: GridCoordinate) -> GridMatrix {
+    pub const fn matrix(self, scale: GridCoordinate) -> GridMatrix {
         match self {
             Face::WITHIN => GridMatrix::ZERO,
             Face::NX => GridMatrix::new(
