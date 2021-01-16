@@ -282,27 +282,25 @@ impl GridRotation {
     }
 }
 
-/// Multiplication is concatenation: `self * rhs` is equivalent to
-/// applying `rhs` and then applying `self`.
-/// ```
-/// use all_is_cubes::math::{GridRotation, GridPoint};
-///
-/// let transform_1 = GridRotation::new(
-///     0, -1, 0,
-///     1, 0, 0,
-///     0, 0, 1,
-///     0, 0, 0,
-/// );
-/// let transform_2 = GridRotation::from_translation([10, 20, 30]);
-///
-/// // Demonstrate the directionality of concatenation.
-/// assert_eq!(
-///     transform_1.concat(&transform_2).transform(GridPoint::new(0, 3, 0)),
-///     transform_1.transform(transform_2.transform(GridPoint::new(0, 3, 0))),
-/// );
-/// ```
 impl Mul<Self> for GridRotation {
     type Output = Self;
+
+    /// Multiplication is concatenation: `self * rhs` is equivalent to
+    /// applying `rhs` and then applying `self`.
+    /// ```
+    /// use all_is_cubes::math::{Face, Face::*, GridRotation, GridPoint};
+    ///
+    /// let transform_1 = GridRotation::from_basis([NY, PX, PZ]);
+    /// let transform_2 = GridRotation::from_basis([PY, PZ, PX]);
+    ///
+    /// // Demonstrate the directionality of concatenation.
+    /// for &face in Face::ALL_SEVEN {
+    ///     assert_eq!(
+    ///         (transform_1 * transform_2).transform(face),
+    ///         transform_1.transform(transform_2.transform(face)),
+    ///     );
+    /// }
+    /// ```
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         Self {
