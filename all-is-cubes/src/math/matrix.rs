@@ -207,6 +207,114 @@ impl Transform<GridPoint> for GridMatrix {
     }
 }
 
+/// Represents a discrete (grid-aligned) rotation, or exchange of axes.
+///
+/// Compared to a matrix, this cannot specify scale, translation, or skew;
+/// it is used for identifying the rotations of blocks.
+///
+/// See also:
+///
+/// * [`Face`] is less general, in that it specifies a single axis but not
+///   yaw about that axis.
+/// * [`GridMatrix`] is more general, specifying an affine transformation.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct GridRotation {
+    // Each of these Faces specifies the unit vector to which the named input
+    // unit vector should be mapped to.
+    // TODO: This representation is too general as it can collapse axes.
+    x: Face,
+    y: Face,
+    z: Face,
+}
+
+impl GridRotation {
+    pub fn from_basis(basis: impl Into<Vector3<Face>>) -> Self {
+        let basis = basis.into();
+        Self {
+            x: basis.x,
+            y: basis.y,
+            z: basis.z,
+        }
+    }
+
+    /// Expresses this rotation as a matrix which rotates “in place” the
+    /// points within the volume defined by coordinates in the range [0, size).
+    // TODO: add tests
+    pub fn to_positive_octant_matrix(self, size: GridCoordinate) -> GridMatrix {
+        fn offset(face: Face, size: GridCoordinate) -> GridCoordinate {
+            if face.is_positive() {
+                0
+            } else {
+                size - 1
+            }
+        }
+        GridMatrix {
+            x: self.x.normal_vector(),
+            y: self.y.normal_vector(),
+            z: self.z.normal_vector(),
+            w: GridVector::new(
+                offset(self.x, size),
+                offset(self.y, size),
+                offset(self.z, size),
+            ),
+        }
+    }
+
+    // TODO: test equivalence with matrix
+    pub fn transform(self, face: Face) -> Face {
+        // TODO: there ought to be a much cleaner way to express this
+        // ... and it should be a const fn, too
+        if face == Face::WITHIN {
+            face
+        } else {
+            let p = match face.axis_number() {
+                0 => self.x,
+                1 => self.y,
+                2 => self.z,
+                _ => unreachable!(),
+            };
+            if face.is_negative() {
+                p.opposite()
+            } else {
+                p
+            }
+        }
+    }
+}
+
+/// Multiplication is concatenation: `self * rhs` is equivalent to
+/// applying `rhs` and then applying `self`.
+/// ```
+/// use all_is_cubes::math::{GridRotation, GridPoint};
+///
+/// let transform_1 = GridRotation::new(
+///     0, -1, 0,
+///     1, 0, 0,
+///     0, 0, 1,
+///     0, 0, 0,
+/// );
+/// let transform_2 = GridRotation::from_translation([10, 20, 30]);
+///
+/// // Demonstrate the directionality of concatenation.
+/// assert_eq!(
+///     transform_1.concat(&transform_2).transform(GridPoint::new(0, 3, 0)),
+///     transform_1.transform(transform_2.transform(GridPoint::new(0, 3, 0))),
+/// );
+/// ```
+impl Mul<Self> for GridRotation {
+    type Output = Self;
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.transform(rhs.x),
+            y: self.transform(rhs.y),
+            z: self.transform(rhs.z),
+        }
+    }
+}
+
+// TODO: consider implementing cgmath::Transform for GridRotation.
+
 #[cfg(test)]
 mod tests {
     use super::*;
