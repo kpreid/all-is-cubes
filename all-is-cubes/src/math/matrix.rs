@@ -14,7 +14,7 @@ use crate::math::*;
 /// [`cgmath::Matrix4`] requires.
 ///
 /// TODO: The operators implemented for this are very incomplete.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct GridMatrix {
     /// First column
     pub x: Vector3<GridCoordinate>,
