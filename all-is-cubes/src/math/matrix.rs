@@ -173,6 +173,24 @@ impl Transform<GridPoint> for GridMatrix {
         }
     }
 
+    /// ```
+    /// use all_is_cubes::math::{GridMatrix, GridPoint};
+    /// use cgmath::Transform as _;
+    ///
+    /// let transform_1 = GridMatrix::new(
+    ///     0, -1, 0,
+    ///     1, 0, 0,
+    ///     0, 0, 1,
+    ///     0, 0, 0,
+    /// );
+    /// let transform_2 = GridMatrix::from_translation([10, 20, 30]);
+    ///
+    /// // Demonstrate the directionality of concatenation.
+    /// assert_eq!(
+    ///     transform_1.concat(&transform_2).transform_point(GridPoint::new(0, 3, 0)),
+    ///     transform_1.transform_point(transform_2.transform_point(GridPoint::new(0, 3, 0))),
+    /// );
+    /// ```
     fn concat(&self, other: &Self) -> Self {
         GridMatrix {
             x: self.transform_vector(other.x),
