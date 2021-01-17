@@ -41,6 +41,8 @@ pub struct SpaceRenderer {
     block_versioning: Vec<u32>,
     block_version_counter: u32,
     block_texture: Option<LumAtlasAllocator>,
+    /// Invariant: the set of present chunks (keys here) is the same as the set of keys
+    /// in `todo.borrow().chunks`.
     chunks: HashMap<ChunkPos, Chunk>,
     chunk_chart: ChunkChart,
     /// Whether, on the previous frame, some chunks were unavailable.
@@ -172,19 +174,31 @@ impl SpaceRenderer {
 
             let chunk_entry = self.chunks.entry(p);
             // If the chunk needs updating or never existed, update it.
-            if (todo.chunks.remove(&p) && !self.chunks_were_missing)
+            if (todo
+                .chunks
+                .get(&p)
+                .map(|ct| ct.update_triangulation)
+                .unwrap_or(false)
+                && !self.chunks_were_missing)
                 || matches!(chunk_entry, Vacant(_))
                 || matches!(chunk_entry, Occupied(ref oe) if oe.get().stale_blocks(&self.block_versioning))
             {
-                if matches!(chunk_entry, Vacant(_)) {
-                    chunks_are_missing = true;
-                }
-                chunk_entry.or_insert_with(|| Chunk::new(p)).update(
-                    context,
-                    &space,
-                    &self.block_triangulations,
-                    &self.block_versioning,
-                );
+                chunk_entry
+                    .or_insert_with(|| {
+                        // Chunk is missing. Note this for update planning.
+                        chunks_are_missing = true;
+                        // Remember that we want to track dirty flags.
+                        todo.chunks.insert(p, ChunkTodo::CLEAN);
+                        // Generate new chunk.
+                        Chunk::new(p)
+                    })
+                    .update(
+                        context,
+                        todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
+                        &space,
+                        &self.block_triangulations,
+                        &self.block_versioning,
+                    );
                 chunk_update_count += 1;
             }
         }
@@ -200,7 +214,6 @@ impl SpaceRenderer {
             chunk_chart: &self.chunk_chart,
             view_chunk,
             info: SpaceRenderInfo {
-                chunk_queue_count: todo.chunks.len(),
                 chunk_update_count,
                 block_update_count,
                 chunks_drawn: 0,
@@ -274,9 +287,7 @@ impl<'a> SpaceRendererBound<'a> {
 /// Performance info from a [`SpaceRenderer`] drawing one frame.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SpaceRenderInfo {
-    /// How many chunks need to be recomputed (redrawn) but are still waiting in queue.
-    pub chunk_queue_count: usize,
-    /// How many chunks were recomputed this time.
+    /// How many chunks were recomputed this frame.
     pub chunk_update_count: usize,
     /// How many block triangulations were recomputed this time.
     pub block_update_count: usize,
@@ -320,6 +331,7 @@ impl Chunk {
     fn update<C: GraphicsContext<Backend = Backend>>(
         &mut self,
         context: &mut C,
+        chunk_todo: &mut ChunkTodo,
         space: &Space,
         block_triangulations: &[BlockTriangulation<GLBlockVertex, LumAtlasTile>],
         block_versioning: &[u32],
@@ -376,6 +388,8 @@ impl Chunk {
                 );
             }
         }
+
+        chunk_todo.update_triangulation = false;
     }
 
     fn render<E>(&self, tess_gate: &mut TessGate) -> Result<usize, E> {
@@ -428,14 +442,19 @@ impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, LumAtlasTile>
 }
 
 /// [`SpaceRenderer`]'s set of things that need recomputing.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct SpaceRendererTodo {
     blocks: HashSet<BlockIndex>,
-    chunks: HashSet<ChunkPos>,
+    /// Membership in this table indicates that the chunk *exists;* todos for chunks
+    /// outside of the view area are not tracked.
+    chunks: HashMap<ChunkPos, ChunkTodo>,
 }
 
 impl SpaceRendererTodo {
-    fn insert_block_and_adjacent(&mut self, cube: GridPoint) {
+    fn modify_block_and_adjacent<F>(&mut self, cube: GridPoint, mut f: F)
+    where
+        F: FnMut(&mut ChunkTodo),
+    {
         // Mark adjacent blocks to account for opaque faces hiding adjacent
         // blocks' faces. We don't need to bother with the current block since
         // the adjacent chunks will always include it (presuming that the chunk
@@ -444,10 +463,24 @@ impl SpaceRendererTodo {
             for offset in &[-1, 1] {
                 let mut adjacent = cube;
                 adjacent[axis] += offset;
-                self.chunks.insert(cube_to_chunk(adjacent));
+                if let Some(chunk) = self.chunks.get_mut(&cube_to_chunk(adjacent)) {
+                    f(chunk);
+                }
             }
         }
     }
+}
+
+/// What might be dirty about a single chunk.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+struct ChunkTodo {
+    update_triangulation: bool,
+}
+
+impl ChunkTodo {
+    const CLEAN: Self = Self {
+        update_triangulation: false,
+    };
 }
 
 /// [`Listener`] adapter for [`SpaceRendererTodo`].
@@ -459,10 +492,14 @@ impl Listener<SpaceChange> for TodoListener {
             let mut todo = cell.borrow_mut();
             match message {
                 SpaceChange::Block(p) => {
-                    todo.insert_block_and_adjacent(p);
+                    todo.modify_block_and_adjacent(p, |chunk_todo| {
+                        chunk_todo.update_triangulation = true;
+                    });
                 }
                 SpaceChange::Lighting(p) => {
-                    todo.insert_block_and_adjacent(p);
+                    todo.modify_block_and_adjacent(p, |chunk_todo| {
+                        chunk_todo.update_triangulation = true;
+                    });
                 }
                 SpaceChange::Number(index) => {
                     todo.blocks.insert(index);
@@ -481,24 +518,56 @@ impl Listener<SpaceChange> for TodoListener {
 
 #[cfg(test)]
 mod tests {
+    use super::ChunkTodo;
     use super::*;
+    use crate::math::GridCoordinate;
 
     // TODO: Arrange, somehow, to test the parts that need a GraphicsContext
+
+    fn read_todo_chunks(todo: &RefCell<SpaceRendererTodo>) -> Vec<(ChunkPos, ChunkTodo)> {
+        let mut v = todo
+            .borrow()
+            .chunks
+            .iter()
+            .map(|(&p, &ct)| (p, ct))
+            .collect::<Vec<_>>();
+        v.sort_by_key(|(p, _): &(ChunkPos, _)| <_ as Into<[GridCoordinate; 3]>>::into(p.0));
+        v
+    }
 
     #[test]
     fn update_adjacent_chunk_positive() {
         let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
         let listener = TodoListener(Rc::downgrade(&todo));
+        todo.borrow_mut().chunks.extend(vec![
+            (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
+            (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
+            (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
+        ]);
         listener.receive(SpaceChange::Block(GridPoint::new(
             CHUNK_SIZE - 1,
             CHUNK_SIZE / 2,
             CHUNK_SIZE / 2,
         )));
         assert_eq!(
-            todo.borrow().chunks,
-            vec![ChunkPos::new(0, 0, 0), ChunkPos::new(1, 0, 0)]
-                .into_iter()
-                .collect::<HashSet<_>>(),
+            read_todo_chunks(&todo),
+            vec![
+                (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
+                (
+                    ChunkPos::new(0, 0, 0),
+                    ChunkTodo {
+                        update_triangulation: true,
+                        ..ChunkTodo::CLEAN
+                    }
+                ),
+                (
+                    ChunkPos::new(1, 0, 0),
+                    ChunkTodo {
+                        update_triangulation: true,
+                        ..ChunkTodo::CLEAN
+                    }
+                ),
+            ],
         );
     }
 
@@ -506,16 +575,61 @@ mod tests {
     fn update_adjacent_chunk_negative() {
         let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
         let listener = TodoListener(Rc::downgrade(&todo));
+        todo.borrow_mut().chunks.extend(vec![
+            (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
+            (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
+            (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
+        ]);
         listener.receive(SpaceChange::Block(GridPoint::new(
             0,
             CHUNK_SIZE / 2,
             CHUNK_SIZE / 2,
         )));
         assert_eq!(
-            todo.borrow().chunks,
-            vec![ChunkPos::new(0, 0, 0), ChunkPos::new(-1, 0, 0)]
-                .into_iter()
-                .collect::<HashSet<_>>(),
+            read_todo_chunks(&todo),
+            vec![
+                (
+                    ChunkPos::new(-1, 0, 0),
+                    ChunkTodo {
+                        update_triangulation: true,
+                        ..ChunkTodo::CLEAN
+                    }
+                ),
+                (
+                    ChunkPos::new(0, 0, 0),
+                    ChunkTodo {
+                        update_triangulation: true,
+                        ..ChunkTodo::CLEAN
+                    }
+                ),
+                (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
+            ],
+        );
+    }
+
+    #[test]
+    fn todo_ignores_absent_chunks() {
+        let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
+        let listener = TodoListener(Rc::downgrade(&todo));
+
+        let p = GridPoint::new(1, 1, 1) * (CHUNK_SIZE / 2);
+        // Nothing happens...
+        listener.receive(SpaceChange::Block(p));
+        assert_eq!(read_todo_chunks(&todo), vec![]);
+        // until the chunk exists in the table already.
+        todo.borrow_mut()
+            .chunks
+            .insert(ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN);
+        listener.receive(SpaceChange::Block(p));
+        assert_eq!(
+            read_todo_chunks(&todo),
+            vec![(
+                ChunkPos::new(0, 0, 0),
+                ChunkTodo {
+                    update_triangulation: true,
+                    ..ChunkTodo::CLEAN
+                }
+            ),],
         );
     }
 }
