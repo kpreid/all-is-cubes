@@ -3,6 +3,7 @@
 
 //! Binary for All is Cubes desktop app.
 
+use clap::{arg_enum, value_t, Arg};
 use std::error::Error;
 
 use all_is_cubes::apps::AllIsCubesAppState;
@@ -10,10 +11,50 @@ use all_is_cubes::apps::AllIsCubesAppState;
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
 
+arg_enum! {
+    #[derive(Debug, PartialEq)]
+    pub enum GraphicsType {
+        Headless,
+        Window,
+        Terminal
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    // TODO: add command line argument processing (display options, initial world options)
+    // TODO: put version numbers in the title when used as a window title
+    let title = "All is Cubes";
+
+    let options = clap::App::new(title)
+        .version(clap::crate_version!()) // TODO: include all_is_cubes library version
+        .author(clap::crate_authors!())
+        .about(clap::crate_description!())
+        .arg(
+            Arg::with_name("graphics")
+                .long("graphics")
+                .short("g")
+                .possible_values(
+                    &GraphicsType::variants()
+                        .iter()
+                        .map(|s| s.to_ascii_lowercase())
+                        .collect::<Vec<_>>() // makes the strings live long enough
+                        .iter()
+                        .map(String::as_ref)
+                        .collect::<Vec<_>>(),
+                )
+                .case_insensitive(true)
+                .default_value("window")
+                .help("Graphics/UI mode."),
+        )
+        .get_matches();
 
     let app = AllIsCubesAppState::new();
-    // TODO: put version numbers in the title
-    glfw_main_loop(app, "All is Cubes")
+    match value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit()) {
+        GraphicsType::Window => glfw_main_loop(app, title),
+        GraphicsType::Terminal => {
+            unimplemented!("TTY mode not yet implemented");
+        }
+        GraphicsType::Headless => {
+            unimplemented!("Headless mode not yet implemented");
+        }
+    }
 }
