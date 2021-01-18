@@ -60,7 +60,27 @@ pub fn glfw_main_loop(
     let mut update_cursor = false;
 
     'app: loop {
-        renderer.surface.window.glfw.poll_events();
+        if resize {
+            resize = false;
+            renderer.set_viewport(map_glfw_viewport(&renderer.surface));
+        }
+        if update_cursor {
+            renderer.set_cursor_position(
+                Point2::from(renderer.surface.window.get_cursor_pos()).map(|x| x as usize),
+            );
+        }
+
+        app.frame_clock.advance_to(Instant::now());
+        app.maybe_step_universe();
+        if app.frame_clock.should_draw() {
+            let _render_info = renderer.render_frame();
+            renderer.surface.window.swap_buffers();
+            app.frame_clock.did_draw();
+        }
+
+        // Poll for events after drawing, so that on the first loop iteration we draw
+        // before the window is visible (at least on macOS).
+        glfw.poll_events();
         for (_, event) in renderer.surface.events_rx.try_iter() {
             match event {
                 WindowEvent::Close => break 'app,
@@ -120,24 +140,6 @@ pub fn glfw_main_loop(
                 WindowEvent::FileDrop(_) => {}
                 WindowEvent::Maximize(_) => {}
             }
-        }
-
-        if resize {
-            resize = false;
-            renderer.set_viewport(map_glfw_viewport(&renderer.surface));
-        }
-        if update_cursor {
-            renderer.set_cursor_position(
-                Point2::from(renderer.surface.window.get_cursor_pos()).map(|x| x as usize),
-            );
-        }
-
-        app.frame_clock.advance_to(Instant::now());
-        app.maybe_step_universe();
-        if app.frame_clock.should_draw() {
-            let _render_info = renderer.render_frame();
-            renderer.surface.window.swap_buffers();
-            app.frame_clock.did_draw();
         }
     }
 
