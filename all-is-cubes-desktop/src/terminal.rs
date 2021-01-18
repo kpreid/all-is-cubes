@@ -75,6 +75,7 @@ pub fn terminal_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Err
             }
         }
 
+        // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
         if app.frame_clock.should_draw() {

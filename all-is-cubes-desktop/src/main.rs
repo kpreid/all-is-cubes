@@ -7,6 +7,7 @@
 
 use clap::{arg_enum, value_t, Arg};
 use std::error::Error;
+use std::time::Instant;
 
 use all_is_cubes::apps::AllIsCubesAppState;
 
@@ -51,12 +52,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .get_matches();
 
-    let app = AllIsCubesAppState::new();
+    let mut app = AllIsCubesAppState::new();
     match value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit()) {
         GraphicsType::Window => glfw_main_loop(app, title),
         GraphicsType::Terminal => terminal_main_loop(app),
         GraphicsType::Headless => {
-            unimplemented!("Headless mode not yet implemented");
+            // TODO: Right now this is useless. Eventually, we may have other paths for side
+            // effects from the universe, or interesting logging.
+            eprintln!("Simulating a universe nobody's looking at...");
+
+            loop {
+                // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.
+                app.frame_clock.advance_to(Instant::now());
+                app.maybe_step_universe();
+            }
         }
     }
 }
