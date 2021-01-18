@@ -10,7 +10,6 @@ use cgmath::{EuclideanSpace as _, Transform as _};
 use embedded_graphics::drawable::{Drawable, Pixel};
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
-use embedded_graphics::transform::Transform;
 use embedded_graphics::DrawTarget;
 use std::borrow::{Borrow, Cow};
 use std::convert::TryInto;
@@ -18,13 +17,15 @@ use std::convert::TryInto;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{Block, Resolution};
-use crate::math::{GridMatrix, GridPoint, GridVector, Rgb, Rgba};
+use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
+use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
 
 /// Generate a set of blocks which together display the given [`Drawable`] which may be
 /// larger than one block. The Z position is always the middle of the block.
+///
+/// Returns an error if reading the `Drawable`'s blocks fails.
 pub fn draw_to_blocks<D, C>(
     universe: &mut Universe,
     resolution: Resolution,
@@ -32,59 +33,41 @@ pub fn draw_to_blocks<D, C>(
 ) -> Result<Space, SetCubeError>
 where
     for<'a> &'a D: Drawable<C>,
-    D: Dimensions + Transform,
+    D: Dimensions,
     C: PixelColor,
     for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
 {
-    let resolution_g: i32 = resolution.into();
     let top_left_2d = object.top_left();
     let bottom_right_2d = object.bottom_right();
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
     // for text drawing, embedded_graphics assumes a Y-down coordinate system.
-    // TODO: Now that we have user-provide matrix transforms we should let this be
-    // an option.
-    let low_block = GridPoint::new(
-        floor_divide(top_left_2d.x, resolution_g),
-        floor_divide(-bottom_right_2d.y, resolution_g),
-        0,
+    // TODO: Instead, apply matrix transform to bounds
+    let drawing_grid = Grid::from_lower_upper(
+        [top_left_2d.x, -bottom_right_2d.y, 0],
+        [
+            bottom_right_2d.x,
+            -top_left_2d.y,
+            GridCoordinate::from(resolution),
+        ],
     );
-    let high_block = GridPoint::new(
-        ceil_divide(bottom_right_2d.x, resolution_g),
-        ceil_divide(-top_left_2d.y, resolution_g),
-        1,
-    );
-    let block_grid = Grid::new(low_block, high_block - low_block);
-    let mut output_space = Space::empty(block_grid);
+    dbg!(top_left_2d, bottom_right_2d, drawing_grid);
 
-    for cube in block_grid.interior_iter() {
-        let mut block_space = Space::empty(Grid::for_block(resolution));
+    let mut drawing_space = Space::empty(drawing_grid);
+    object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
+        [0, 0, GridCoordinate::from(resolution) / 2],
+        Face::PX,
+        Face::NY,
+        Face::PZ,
+    )))?;
 
-        if false {
-            // For debugging block bounds chosen for the graphic. TODO: Keep this around
-            // as an option but draw a full bounding box instead.
-            block_space
-                .set((0, 0, 0), Block::from(Rgba::new(1.0, 0.0, 0.0, 1.0)))
-                .expect("can't happen: draw_to_blocks failed to write to its own block space");
-        }
-
-        object.draw(&mut block_space.draw_target(
-            GridMatrix::from_translation([
-                -cube.x * resolution_g,
-                -cube.y * resolution_g,
-                resolution_g / 2,
-            ]) * GridMatrix::FLIP_Y,
-        ))?;
-        output_space
-            .set(
-                cube,
-                // TODO: Allow attribute configuration.
-                &Block::builder()
-                    .voxels_ref(resolution, universe.insert_anonymous(block_space))
-                    .build(),
-            )
-            .expect("can't happen: draw_to_blocks failed to write to its own output space");
-    }
-    Ok(output_space)
+    Ok(space_to_blocks(
+        resolution,
+        // TODO: give caller control over attributes
+        BlockAttributes::default(),
+        // TODO: give caller control over name used
+        universe.insert_anonymous(drawing_space),
+    )
+    .unwrap())
 }
 
 /// Adapter to use a [`Space`] as a [`DrawTarget`].
@@ -277,24 +260,6 @@ fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCub
     }
 }
 
-// TODO: dig up a crate that does this?
-fn ceil_divide(a: i32, b: i32) -> i32 {
-    assert!(b > 0);
-    if a < 0 {
-        a / b
-    } else {
-        (a + b - 1) / b
-    }
-}
-fn floor_divide(a: i32, b: i32) -> i32 {
-    assert!(b > 0);
-    if a > 0 {
-        a / b
-    } else {
-        (a - (b - 1)) / b
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,20 +353,23 @@ mod tests {
 
     #[test]
     fn draw_to_blocks_bounds_one_block() {
+        let resolution: GridCoordinate = 16;
         let mut universe = Universe::new();
         let drawable =
             Rectangle::new(Point::new(0, 0), Point::new(2, 3)).into_styled(a_primitive_style());
-        let space = draw_to_blocks(&mut universe, 16, drawable).unwrap();
+        let space = draw_to_blocks(&mut universe, resolution as Resolution, drawable).unwrap();
         assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
         if let Block::Recur {
             space: block_space_ref,
+            offset,
             ..
         } = &space[(0, -1, 0)]
         {
             // TODO: This printing does not produce a useful result; fix it.
             print_space(&*block_space_ref.borrow(), (0., 0., -1.));
+            assert_eq!(*offset, GridPoint::new(0, -resolution, 0));
             assert_eq!(
-                block_space_ref.borrow()[(0, 15, 8)].color(),
+                block_space_ref.borrow()[(0, -2, resolution / 2)].color(),
                 a_primitive_color()
             );
         } else {
@@ -411,19 +379,22 @@ mod tests {
 
     #[test]
     fn draw_to_blocks_bounds_negative_coords_one_block() {
+        let resolution: GridCoordinate = 16;
         let mut universe = Universe::new();
         let drawable =
             Rectangle::new(Point::new(-3, -2), Point::new(0, 0)).into_styled(a_primitive_style());
-        let space = draw_to_blocks(&mut universe, 16, drawable).unwrap();
+        let space = draw_to_blocks(&mut universe, resolution as Resolution, drawable).unwrap();
         assert_eq!(space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
         if let Block::Recur {
             space: block_space_ref,
+            offset,
             ..
         } = &space[(-1, 0, 0)]
         {
             print_space(&*block_space_ref.borrow(), (0., 0., -1.));
+            assert_eq!(*offset, GridPoint::new(-resolution, 0, 0));
             assert_eq!(
-                block_space_ref.borrow()[(15, 0, 8)].color(),
+                block_space_ref.borrow()[(-2, 1, resolution / 2)].color(),
                 a_primitive_color()
             );
         } else {
