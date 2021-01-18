@@ -25,7 +25,7 @@ Because of the complication of having some wasm-specific code, some commands for
 
     Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-wasm/`.*
 
-*   Run the desktop game: `cargo run --bin all-is-cubes-desktop`
+*   Run the desktop game: `cargo run --bin all-is-cubes`
 
 *   Run the standalone game server: `make run-server`
 

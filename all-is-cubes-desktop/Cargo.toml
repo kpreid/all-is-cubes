@@ -12,6 +12,10 @@ license = "MIT"
 # TODO: revisit categories once it's more settled what's in this package
 categories = ["games", "rendering"]
 
+[[bin]]
+name = "all-is-cubes"
+path = "src/main.rs"
+
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.1.2" }
 cgmath = "0.18.0"
