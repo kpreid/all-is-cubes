@@ -50,7 +50,9 @@ where
             GridCoordinate::from(resolution),
         ],
     );
-    dbg!(top_left_2d, bottom_right_2d, drawing_grid);
+    if false {
+        dbg!(top_left_2d, bottom_right_2d, drawing_grid);
+    }
 
     let mut drawing_space = Space::empty(drawing_grid);
     object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
