@@ -1,0 +1,59 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "all-is-cubes: build all",
+			"type": "shell",
+			"command": "make",
+			"args": [],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "all-is-cubes: test all",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"test"
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "all-is-cubes: run desktop",
+			"type": "cargo",
+			"command": "run",
+			"args": [
+				"--bin",
+				"all-is-cubes",
+				"--",
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "test"
+		},
+		{
+			"label": "all-is-cubes: run dev-server",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"run-dev",
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "test"
+		},
+	]
+}
