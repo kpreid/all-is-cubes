@@ -5,6 +5,8 @@ This project is (will be) a game engine for worlds made of cubical blocks. The u
 
 Or rather, that's the plan; for now, this is just my very first project written in Rust, and I am aiming to duplicate and expand on the functionality of my previous work [Cubes](https://github.com/kpreid/cubes/). That was written in JavaScript; this compiles to WebAssembly so the result will still run in the browser (hopefully faster), but also support a multiplayer server and storage backend.
 
+![](https://switchb.org/kpreid/2020/all-is-cubes-10-13-progress.png)
+
 Project organization and development
 ------------------------------------
 
