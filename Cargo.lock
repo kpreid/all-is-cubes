@@ -71,6 +71,8 @@ dependencies = [
  "luminance-front",
  "luminance-glfw",
  "luminance-windowing",
+ "once_cell",
+ "termion",
 ]
 
 [[package]]
@@ -78,12 +80,7 @@ name = "all-is-cubes-server"
 version = "0.1.2"
 dependencies = [
  "all-is-cubes",
- "itertools 0.10.0",
- "num-traits",
- "once_cell",
- "ordered-float",
  "static_dir",
- "termion",
  "tokio",
  "warp",
 ]

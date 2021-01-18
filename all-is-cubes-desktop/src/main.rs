@@ -3,6 +3,8 @@
 
 //! Binary for All is Cubes desktop app.
 
+#![warn(clippy::cast_lossless)]
+
 use clap::{arg_enum, value_t, Arg};
 use std::error::Error;
 
@@ -10,6 +12,8 @@ use all_is_cubes::apps::AllIsCubesAppState;
 
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
+mod terminal;
+use terminal::terminal_main_loop;
 
 arg_enum! {
     #[derive(Debug, PartialEq)]
@@ -50,9 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let app = AllIsCubesAppState::new();
     match value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit()) {
         GraphicsType::Window => glfw_main_loop(app, title),
-        GraphicsType::Terminal => {
-            unimplemented!("TTY mode not yet implemented");
-        }
+        GraphicsType::Terminal => terminal_main_loop(app),
         GraphicsType::Headless => {
             unimplemented!("Headless mode not yet implemented");
         }

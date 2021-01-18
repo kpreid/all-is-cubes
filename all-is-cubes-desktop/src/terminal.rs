@@ -5,15 +5,84 @@
 
 use once_cell::sync::Lazy;
 use std::borrow::Cow;
+use std::error::Error;
 use std::io;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Instant;
 use termion::color;
 use termion::event::{Event, Key as TermionKey};
+use termion::input::TermRead;
+use termion::raw::IntoRawMode;
 
+use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::{Camera, Key, ProjectionHelper};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::math::{NotNan, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
+
+pub fn terminal_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
+    app.camera().borrow_mut().auto_rotate = true;
+
+    let mut proj: ProjectionHelper = ProjectionHelper::new(0.5, viewport_from_terminal_size()?);
+    let mut out = io::stdout().into_raw_mode()?;
+
+    // Park stdin blocking reads on another thread.
+    let (event_tx, event_rx) = mpsc::sync_channel(0);
+    thread::spawn(move || {
+        for event_result in io::stdin().lock().events() {
+            match event_result {
+                Ok(event) => event_tx.send(event).unwrap(),
+                Err(err) => {
+                    eprintln!("stdin read error: {}", err);
+                    break;
+                }
+            }
+        }
+        eprintln!("read thread exiting");
+    });
+
+    print!("{}", termion::clear::All);
+
+    loop {
+        'input: loop {
+            match event_rx.try_recv() {
+                Ok(event) => {
+                    if let Some(aic_event) = map_termion_event(&event) {
+                        if app.input_processor.key_momentary(aic_event) {
+                            // Handled by input_processor
+                            continue 'input;
+                        }
+                    }
+                    if let Event::Key(key) = event {
+                        use termion::event::Key;
+                        match key {
+                            Key::Esc | Key::Ctrl('c') | Key::Ctrl('d') => {
+                                return Ok(());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    eprintln!("input disconnected");
+                    return Ok(());
+                }
+                Err(mpsc::TryRecvError::Empty) => {
+                    break 'input;
+                }
+            }
+        }
+
+        app.frame_clock.advance_to(Instant::now());
+        app.maybe_step_universe();
+        if app.frame_clock.should_draw() {
+            draw_space(&mut proj, &*app.camera().borrow(), &mut out)?;
+            app.frame_clock.did_draw();
+        }
+    }
+}
 
 /// Converts `termion::Event` to `all_is_cubes::camera::Key`.
 ///
