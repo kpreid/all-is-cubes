@@ -4,13 +4,14 @@
 //! Axis-aligned integer-coordinate box volumes ([`Grid`]), arrays bounded by them
 //! ([`GridArray`]), and related.
 
-use cgmath::Point3;
+use cgmath::{Point3, Transform};
 use itertools::Itertools as _;
+use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::ops::Range;
 
 use crate::block::Resolution;
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector};
+use crate::math::{FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector};
 
 /// Specifies the coordinate extent of a [`Space`](super::Space), as an axis-aligned box
 /// with integer coordinates whose volume is between 1 and [`usize::MAX`].
@@ -318,6 +319,31 @@ impl Grid {
         }
     }
 
+    /// Transforms the grid.
+    ///
+    /// Caution: The results are undefined if the matrix mixes axes
+    /// rather than only swapping and scaling them.
+    /// TODO: Find the proper mathematical concept to explain that.
+    /// TODO: Check and error in that case.
+    ///
+    /// Returns [`None`] if the transformation resulted in zero volume.
+    pub fn transform(self, transform: GridMatrix) -> Option<Self> {
+        let mut p1 = transform.transform_point(self.lower_bounds());
+        let mut p2 = transform.transform_point(self.upper_bounds());
+        for axis in 0..3 {
+            match p1[axis].cmp(&p2[axis]) {
+                Ordering::Greater => {
+                    std::mem::swap(&mut p1[axis], &mut p2[axis]);
+                }
+                Ordering::Equal => {
+                    return None; // Result would be zero volume.
+                }
+                Ordering::Less => {}
+            }
+        }
+        Some(Self::from_lower_upper(p1, p2))
+    }
+
     /// Scales the grid down by the given factor, rounding outward.
     ///
     /// For example, this may be used to convert from voxels (subcubes) to blocks or
@@ -501,6 +527,34 @@ mod tests {
     fn divide_by_negative() {
         let _ = Grid::new((-10, -10, -10), (20, 20, 20)).divide(-10);
     }
+
+    #[test]
+    fn transform_general() {
+        assert_eq!(
+            Grid::new([1, 2, 3], [10, 20, 30]).transform(GridMatrix::new(
+                0, 1, 0,
+                2, 0, 0,
+                0, 0, -1,
+                100, 100, 100,
+            )),
+            Some(Grid::new([104, 101, 67], [40, 10, 30]))
+        );
+    }
+
+    #[test]
+    fn transform_error_simple() {
+        assert_eq!(
+            Grid::new([1, 2, 3], [10, 20, 30]).transform(GridMatrix::new(
+                1, 0, 0,
+                0, 0, 0,
+                0, 0, 1,
+                3, 4, 5
+            )),
+            None
+        );
+    }
+
+    // TODO: test and improve transform() on matrices with skew / other non-axis-swaps    
 
     #[test]
     fn debug() {
