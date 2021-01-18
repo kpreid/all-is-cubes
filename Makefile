@@ -5,10 +5,11 @@
 # bundled together with conventional names rather than a collection of shell
 # scripts.
 
-.PHONY: all lint test run-dev run-console run-game-server update try-publish-all
+.PHONY: all lint test run-dev run-game-server update try-publish-all
 
 all: all-is-cubes-wasm/node_modules/.bin/webpack
 	cargo build --package all-is-cubes
+	cargo build --package all-is-cubes-desktop
 	(cd all-is-cubes-wasm && npm run-script build)
 	# Server statically embeds results of wasm build, so it must be run last to be fresh, and
 	# we must copy the files into the actual package directory.
@@ -29,9 +30,6 @@ run-dev:
 	# Live-reloading webpack dev server; not a game server
 	(cd all-is-cubes-wasm && npm start)
 
-run-console:
-	cargo run --bin aic-console
-
 run-game-server: all
 	cargo run --bin aic-server
 
@@ -42,6 +40,7 @@ update:
 # This depends on `all` to ensure the server's static files are up to date.
 try-publish-all: all
 	(cd all-is-cubes && cargo publish --dry-run)
+	(cd all-is-cubes-desktop && cargo publish --dry-run)
 	# static-all-is-cubes-wasm counts as dirty despite .gitignore so we must use --allow-dirty
 	(cd all-is-cubes-server && cargo publish --dry-run --allow-dirty)
 
