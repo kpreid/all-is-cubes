@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes-desktop"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
 # TODO: better description
@@ -18,7 +18,7 @@ path = "src/main.rs"
 bench = false
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.1.2" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.2.0" }
 cgmath = "0.18.0"
 clap = "2.33.3"
 glfw = "0.41"
