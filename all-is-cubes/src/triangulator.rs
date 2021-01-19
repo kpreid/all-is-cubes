@@ -658,7 +658,7 @@ impl TextureTile for TestTextureTile {
 mod tests {
     use super::*;
     use crate::block::{Block, BlockAttributes, AIR};
-    use crate::blockgen::make_some_blocks;
+    use crate::content::make_some_blocks;
     use crate::math::GridPoint;
     use crate::universe::Universe;
     use cgmath::MetricSpace as _;

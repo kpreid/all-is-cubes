@@ -607,7 +607,7 @@ mod rayon_helper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockgen::make_some_blocks;
+    use crate::content::make_some_blocks;
     // use ordered_float::NotNan;
 
     #[test]

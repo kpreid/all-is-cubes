@@ -9,7 +9,7 @@ use embedded_graphics::style::TextStyleBuilder;
 
 use crate::block::Block;
 use crate::drawing::VoxelBrush;
-use crate::math::GridMatrix;
+use crate::math::{GridMatrix, Rgba};
 use crate::space::Space;
 
 pub mod blocks;
@@ -36,4 +36,85 @@ pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) {
     styled_text
         .draw(&mut space.draw_target(midpoint_transform * GridMatrix::FLIP_Y))
         .unwrap();
+}
+
+/// Generate a set of distinct atom blocks for use in tests. They will have distinct
+/// colors and names, and all other attributes default.
+///
+/// ```
+/// use all_is_cubes::block::Block;
+/// use all_is_cubes::content::make_some_blocks;
+///
+/// let blocks: Vec<Block> = make_some_blocks(3);
+/// assert_eq!(blocks.len(), 3);
+/// assert!(blocks[0] != blocks[1]);
+/// assert!(blocks[0] != blocks[2]);
+/// assert!(blocks[1] != blocks[2]);
+/// ```
+pub fn make_some_blocks(count: usize) -> Vec<Block> {
+    // TODO: should this return an iterator? would anyone care?
+    let mut vec: Vec<Block> = Vec::with_capacity(count);
+    for i in 0..count {
+        let luminance = if count > 1 {
+            i as f32 / (count - 1) as f32
+        } else {
+            0.5
+        };
+        vec.push(
+            Block::builder()
+                .display_name(i.to_string())
+                .color(Rgba::new(luminance, luminance, luminance, 1.0))
+                .build(),
+        );
+    }
+    vec
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::BlockAttributes;
+
+    #[test]
+    fn make_some_blocks_0() {
+        assert_eq!(make_some_blocks(0), vec![]);
+    }
+
+    #[test]
+    fn make_some_blocks_1() {
+        // Should succeed even though the normal range would be division-by-zero.
+        assert_eq!(
+            make_some_blocks(1),
+            vec![Block::Atom(
+                BlockAttributes {
+                    display_name: "0".into(),
+                    ..BlockAttributes::default()
+                },
+                Rgba::new(0.5, 0.5, 0.5, 1.0)
+            )]
+        );
+    }
+
+    #[test]
+    fn make_some_blocks_2() {
+        assert_eq!(
+            make_some_blocks(2),
+            vec![
+                Block::Atom(
+                    BlockAttributes {
+                        display_name: "0".into(),
+                        ..BlockAttributes::default()
+                    },
+                    Rgba::new(0.0, 0.0, 0.0, 1.0)
+                ),
+                Block::Atom(
+                    BlockAttributes {
+                        display_name: "1".into(),
+                        ..BlockAttributes::default()
+                    },
+                    Rgba::new(1.0, 1.0, 1.0, 1.0)
+                )
+            ]
+        );
+    }
 }

@@ -265,7 +265,7 @@ fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCub
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockgen::make_some_blocks;
+    use crate::content::make_some_blocks;
     use crate::math::Rgba;
     use crate::raytracer::print_space;
     use crate::universe::Universe;

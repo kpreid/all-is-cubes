@@ -426,7 +426,7 @@ mod tests {
 
     use super::*;
     use crate::block::AIR;
-    use crate::blockgen::make_some_blocks;
+    use crate::content::make_some_blocks;
     use crate::space::{Grid, Space};
 
     fn collision_noop(_: Contact) {}

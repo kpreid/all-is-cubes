@@ -675,7 +675,7 @@ impl Listener<BlockChange> for SpaceBlockChangeListener {
 mod tests {
     use super::*;
     use crate::block::AIR;
-    use crate::blockgen::make_some_blocks;
+    use crate::content::make_some_blocks;
     use crate::listen::Sink;
     use crate::math::GridPoint;
     use crate::universe::{Universe, UniverseIndex as _};

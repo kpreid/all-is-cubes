@@ -804,7 +804,7 @@ pub mod builder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockgen::make_some_blocks;
+    use crate::content::make_some_blocks;
     use crate::listen::Sink;
     use crate::math::{GridPoint, GridVector};
     use crate::space::Grid;

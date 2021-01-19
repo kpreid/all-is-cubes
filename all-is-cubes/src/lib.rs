@@ -19,7 +19,6 @@ pub mod math;
 
 pub mod apps;
 pub mod block;
-pub mod blockgen;
 pub mod camera;
 mod chunking;
 pub mod content;

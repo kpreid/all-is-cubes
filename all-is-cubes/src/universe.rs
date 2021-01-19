@@ -154,7 +154,7 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
     ///
     /// ```
     /// use all_is_cubes::block::{Block, BlockDef};
-    /// use all_is_cubes::blockgen::make_some_blocks;
+    /// use all_is_cubes::content::make_some_blocks;
     /// use all_is_cubes::universe::{Name, Universe, UniverseIndex, URef};
     ///
     /// let mut universe = Universe::new();
@@ -581,7 +581,7 @@ mod sealed_gimmick {
 mod tests {
     use super::*;
     use crate::block::AIR;
-    use crate::blockgen::make_some_blocks;
+    use crate::content::make_some_blocks;
 
     #[test]
     fn uref_try_borrow_in_use() {

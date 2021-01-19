@@ -207,8 +207,8 @@ impl Inventory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockgen::make_some_blocks;
     use crate::camera::cursor_raycast;
+    use crate::content::make_some_blocks;
     use crate::raycast::Raycaster;
     use crate::raytracer::print_space;
     use crate::universe::{UBorrow, UBorrowMut, Universe};

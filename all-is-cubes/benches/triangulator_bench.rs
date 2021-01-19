@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::AIR;
-use all_is_cubes::blockgen::make_some_blocks;
+use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::math::Face;
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::triangulator::{
