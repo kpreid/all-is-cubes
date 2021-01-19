@@ -127,18 +127,22 @@ fn demo_city(universe: &mut Universe) -> Space {
             if i > road_radius {
                 // Curbs
                 for (side, &p) in [-(road_radius + 1), road_radius + 1].iter().enumerate() {
-                    // TODO: blocks should have a .rotate() method
-                    let mut rotation =
-                        GridRotation::from_basis([face.cross(Face::PY), Face::PY, face]);
+                    // TODO: should be able to express this in look-at terms.
+                    let mut curb = (*demo_blocks[Curb])
+                        .clone()
+                        .rotate(GridRotation::from_basis([
+                            face.cross(Face::PY),
+                            Face::PY,
+                            face,
+                        ]));
                     if side == 0 {
-                        rotation =
-                            rotation * GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]);
+                        curb =
+                            curb.rotate(GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]));
                     }
-                    let r = Block::Rotated(rotation, Box::new((*demo_blocks[Curb]).clone()));
                     space
                         .set(
                             step.cube_ahead() + perpendicular * p + GridVector::unit_y(),
-                            r,
+                            curb,
                         )
                         .unwrap();
                 }
