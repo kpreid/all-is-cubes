@@ -79,7 +79,7 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 /// ```
 /// use all_is_cubes::block::AIR;
 /// use all_is_cubes::space::{Grid, Space};
-/// use all_is_cubes::worldgen::axes;
+/// use all_is_cubes::content::axes;
 ///
 /// let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));
 /// axes(&mut space);
