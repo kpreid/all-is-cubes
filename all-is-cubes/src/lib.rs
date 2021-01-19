@@ -36,7 +36,6 @@ pub mod triangulator;
 pub mod universe;
 pub mod util;
 pub mod vui;
-pub mod worldgen;
 
 /// Re-export the version of the `cgmath` crate we're using.
 pub use cgmath;

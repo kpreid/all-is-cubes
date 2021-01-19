@@ -3,13 +3,17 @@
 
 //! Built-in content: either demos or basic shapes and colors used in the UI.
 
+use cgmath::{Vector3, Vector4};
 use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::prelude::{Dimensions, Drawable, Point, Transform};
 use embedded_graphics::style::TextStyleBuilder;
+use std::borrow::Cow;
+use std::convert::TryFrom;
 
 use crate::block::Block;
 use crate::drawing::VoxelBrush;
-use crate::math::{GridMatrix, Rgba};
+use crate::math::{FreeCoordinate, GridCoordinate, GridMatrix, Rgb, Rgba};
+use crate::raycast::{Face, Raycaster};
 use crate::space::Space;
 
 pub mod blocks;
@@ -68,6 +72,59 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
         );
     }
     vec
+}
+
+/// Draw the Space's axes as lines of blocks centered on (0, 0, 0).
+///
+/// ```
+/// use all_is_cubes::block::AIR;
+/// use all_is_cubes::space::{Grid, Space};
+/// use all_is_cubes::worldgen::axes;
+///
+/// let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));
+/// axes(&mut space);
+///
+/// assert!(space[(10, 0, 0)] != AIR);
+/// assert!(space[(0, 10, 0)] != AIR);
+/// assert!(space[(0, 0, 10)] != AIR);
+/// assert!(space[(-10, 0, 0)] != AIR);
+/// assert!(space[(0, -10, 0)] != AIR);
+/// assert!(space[(0, 0, -10)] != AIR);
+/// ```
+pub fn axes(space: &mut Space) {
+    for &face in Face::ALL_SIX {
+        let axis = face.axis_number();
+        let direction = face.normal_vector::<GridCoordinate>()[axis];
+        let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
+            .within_grid(space.grid());
+        for step in raycaster {
+            let i = step.cube_ahead()[axis] * direction; // always positive
+            let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
+            let mut light = Vector3::new(0.0, 0.0, 0.0);
+            let mut display_name: Cow<'static, str> = (i % 10).to_string().into();
+            if i % 2 == 0 {
+                color[axis] = if direction > 0 { 1.0 } else { 0.9 };
+            } else {
+                if direction > 0 {
+                    color = Vector4::new(1.0, 1.0, 1.0, 1.0);
+                    display_name = ["X", "Y", "Z"][axis].into();
+                } else {
+                    display_name = ["x", "y", "z"][axis].into();
+                };
+            }
+            light[axis] = 3.0;
+            space
+                .set(
+                    step.cube_ahead(),
+                    Block::builder()
+                        .display_name(display_name)
+                        .light_emission(Rgb::try_from(light).unwrap())
+                        .color(Rgba::try_from(color).expect("axes() color generation failed"))
+                        .build(),
+                )
+                .unwrap();
+        }
+    }
 }
 
 #[cfg(test)]
