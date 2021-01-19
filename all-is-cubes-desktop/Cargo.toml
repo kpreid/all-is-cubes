@@ -14,6 +14,7 @@ categories = ["games", "rendering"]
 [[bin]]
 name = "all-is-cubes"
 path = "src/main.rs"
+doc = false  # Do not overwrite library crate's documentation
 bench = false
 
 [dependencies]
