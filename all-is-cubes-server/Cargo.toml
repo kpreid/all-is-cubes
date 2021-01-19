@@ -4,7 +4,6 @@ version = "0.2.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
 description = "Game server for the recursive voxel game All is Cubes."
-readme = "../README.md"
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"

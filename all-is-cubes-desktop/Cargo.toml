@@ -5,7 +5,6 @@ authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
 # TODO: better description
 description = "Recursive voxel game."
-readme = "../README.md"
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"
