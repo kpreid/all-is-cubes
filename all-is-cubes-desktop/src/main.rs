@@ -5,24 +5,25 @@
 
 #![warn(clippy::cast_lossless)]
 
-use clap::{arg_enum, value_t, Arg};
+use clap::{value_t, Arg};
 use std::error::Error;
 use std::time::Instant;
+use strum::IntoEnumIterator;
 
 use all_is_cubes::apps::AllIsCubesAppState;
+use all_is_cubes::content::demo::UniverseTemplate;
 
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
 mod terminal;
 use terminal::terminal_main_loop;
 
-arg_enum! {
-    #[derive(Debug, PartialEq)]
-    pub enum GraphicsType {
-        Headless,
-        Window,
-        Terminal
-    }
+#[derive(Debug, PartialEq, strum::EnumString, strum::EnumIter, strum::IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum GraphicsType {
+    Headless,
+    Window,
+    Terminal,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -38,21 +39,30 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .long("graphics")
                 .short("g")
                 .possible_values(
-                    &GraphicsType::variants()
-                        .iter()
-                        .map(|s| s.to_ascii_lowercase())
-                        .collect::<Vec<_>>() // makes the strings live long enough
-                        .iter()
-                        .map(String::as_ref)
+                    &GraphicsType::iter()
+                        .map(|t| <&str>::from(t))
                         .collect::<Vec<_>>(),
                 )
-                .case_insensitive(true)
                 .default_value("window")
                 .help("Graphics/UI mode."),
         )
+        .arg(
+            Arg::with_name("template")
+                .long("template")
+                .short("t")
+                .possible_values(
+                    &UniverseTemplate::iter()
+                        .map(|t| <&str>::from(t))
+                        .collect::<Vec<_>>(),
+                )
+                .default_value("demo-city")
+                .help("Which world template to use."),
+        )
         .get_matches();
 
-    let mut app = AllIsCubesAppState::new();
+    let mut app = AllIsCubesAppState::new(
+        value_t!(options, "template", UniverseTemplate).unwrap_or_else(|e| e.exit()),
+    );
     match value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit()) {
         GraphicsType::Window => glfw_main_loop(app, title),
         GraphicsType::Terminal => terminal_main_loop(app),

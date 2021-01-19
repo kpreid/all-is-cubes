@@ -30,11 +30,40 @@ use crate::raycast::Raycaster;
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
 use crate::universe::{Name, Universe, UniverseIndex};
-use crate::worldgen::axes;
+use crate::worldgen::{axes, physics_lab};
 
-/// Creates a [`Universe`] with some content for a "new game", as much as that can exist.
-pub fn new_universe_with_stuff() -> Universe {
-    new_universe_with_space_setup(demo_city)
+/// Selection of initial content for constructing a new [`Universe`].
+//
+// TODO: Stop using strum, because we will eventually want parameterized templates.
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    Hash,
+    PartialEq,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::IntoStaticStr,
+)]
+#[strum(serialize_all = "kebab-case")]
+#[non_exhaustive]
+pub enum UniverseTemplate {
+    DemoCity,
+    CornellBox,
+    PhysicsLab,
+    // TODO: add an "nothing, you get a blank editor" option once we have enough editing support.
+}
+
+impl UniverseTemplate {
+    pub fn build(self) -> Universe {
+        use UniverseTemplate::*;
+        match self {
+            DemoCity => new_universe_with_space_setup(demo_city),
+            CornellBox => new_universe_with_space_setup(cornell_box),
+            PhysicsLab => new_universe_with_space_setup(|_| physics_lab(50, 16)),
+        }
+    }
 }
 
 fn demo_city(universe: &mut Universe) -> Space {
@@ -308,8 +337,7 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
 ];
 
 #[rustfmt::skip]
-#[allow(unused)]  // TODO: Make a scene selector menu somehow so this can be used without recompiling.
-fn cornell_box(universe: &mut Universe) -> Space {
+fn cornell_box(_universe: &mut Universe) -> Space {
     // Coordinates are set up based on this dimension because, being blocks, we're not
     // going to *exactly* replicate the original data, but we might want to adjust the
     // scale to something else entirely.
@@ -391,13 +419,15 @@ where
 mod tests {
     use super::*;
     use std::time::Duration;
+    use strum::IntoEnumIterator as _;
 
-    /// Check that it doesn't panic, at least.
     #[test]
-    pub fn new_universe_smoke_test() {
-        let mut u = new_universe_with_stuff();
-        let _ = u.get_default_camera().borrow();
-        let _ = u.get_default_space().borrow();
-        u.step(Duration::from_millis(10));
+    pub fn template_smoke_test() {
+        for template in UniverseTemplate::iter() {
+            let mut u = template.build();
+            let _ = u.get_default_camera().borrow();
+            let _ = u.get_default_space().borrow();
+            u.step(Duration::from_millis(10));
+        }
     }
 }

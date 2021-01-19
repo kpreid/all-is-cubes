@@ -72,8 +72,7 @@ pub fn axes(space: &mut Space) {
 /// that this design is useful.
 /// TODO: Add some lights.
 /// TODO: Define exactly what the radii mean so users can build things on surfaces.
-#[allow(unused)]
-fn physics_lab(shell_radius: u16, planet_radius: u16) -> Space {
+pub(crate) fn physics_lab(shell_radius: u16, planet_radius: u16) -> Space {
     assert!(shell_radius > planet_radius);
     let space_radius = shell_radius + 1; // TODO check off-by-one consistency
     let mut space = Space::empty(Grid::new(

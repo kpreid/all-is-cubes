@@ -16,6 +16,7 @@ use web_sys::{
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::Key;
 use all_is_cubes::cgmath::Point2;
+use all_is_cubes::content::demo::UniverseTemplate;
 use all_is_cubes::lum::glrender::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::Warnings;
@@ -39,11 +40,15 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them.
     let static_dom = StaticDom::new(&document)?;
 
+    // TODO: This progress message will never be seen more than instantaneously because
+    // the expensive actions (worldgen, shader compilation...) are done synchronously after
+    // it.
     static_dom
         .scene_info_text_node
         .append_data("\nRusting...")?;
 
-    let app = AllIsCubesAppState::new();
+    // TODO: Get template choice from URL
+    let app = AllIsCubesAppState::new(UniverseTemplate::DemoCity);
 
     let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;

@@ -4,7 +4,7 @@
 //! Components for "apps", or game clients: user interface and top-level state.
 
 use crate::camera::{Camera, CameraChange, InputProcessor};
-use crate::content::demo::new_universe_with_stuff;
+use crate::content::demo::UniverseTemplate;
 use crate::listen::{DirtyFlag, ListenerHelper as _};
 use crate::space::Space;
 use crate::universe::{FrameClock, URef, Universe, UniverseStepInfo};
@@ -32,10 +32,10 @@ pub struct AllIsCubesAppState {
 }
 
 impl AllIsCubesAppState {
-    /// Construct a new `AllIsCubesAppState` using the result of
-    /// [`new_universe_with_stuff()`] as initial content.
-    pub fn new() -> Self {
-        let game_universe = new_universe_with_stuff();
+    /// Construct a new `AllIsCubesAppState` with a new [`Universe`] from the given
+    /// template.
+    pub fn new(template: UniverseTemplate) -> Self {
+        let game_universe = template.build();
 
         let mut new_self = Self {
             frame_clock: FrameClock::new(),
@@ -100,11 +100,5 @@ impl AllIsCubesAppState {
                 .set_toolbar(&camera.inventory().slots, &camera.selected_slots())
                 .unwrap();
         }
-    }
-}
-
-impl Default for AllIsCubesAppState {
-    fn default() -> Self {
-        Self::new()
     }
 }

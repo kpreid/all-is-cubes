@@ -72,6 +72,7 @@ dependencies = [
  "luminance-glfw",
  "luminance-windowing",
  "once_cell",
+ "strum",
  "termion",
 ]
 
