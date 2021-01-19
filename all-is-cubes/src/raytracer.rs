@@ -36,6 +36,7 @@ pub struct SpaceRaytracer<P: PixelBuf>(SpaceRaytracerImpl<P>);
 struct SpaceRaytracerImpl<P: PixelBuf> {
     blocks: Box<[TracingBlock<P::BlockData>]>,
     #[borrows(blocks)]
+    #[covariant]
     cubes: GridArray<TracingCubeData<'this, P::BlockData>>,
     sky_color: Rgb,
 }
