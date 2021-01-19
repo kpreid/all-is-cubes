@@ -16,14 +16,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Install rust
+    - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
           toolchain: stable
           target: wasm32-unknown-unknown
           override: true
           components: rustfmt, clippy
-    - name: Install tools
+    - name: Install native libraries
+      run: |
+          sudo apt-get -y install libxrandr-dev xorg-dev libglfw3-dev 
+    - name: Install wasm-pack
       run: cargo install wasm-pack
     - name: Build
       run: make
