@@ -1300,9 +1300,9 @@ dependencies = [
 
 [[package]]
 name = "ouroboros"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0b666c900ea45a357bc7915a4dc8fab7e295f2e756e843aa3c0788d94aa3a29"
+checksum = "069fb33e127cabdc8ad6a287eed9719b85c612d36199777f6dc41ad91f7be41a"
 dependencies = [
  "ouroboros_macro",
  "stable_deref_trait",
@@ -1310,11 +1310,12 @@ dependencies = [
 
 [[package]]
 name = "ouroboros_macro"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfc618f205c0adc415923c74369d45f5f298462fc473711dfc33056a23f23619"
+checksum = "ad938cc920f299d6dce91e43d3ce316e785f4aa4bc4243555634dc2967098fc6"
 dependencies = [
  "Inflector",
+ "proc-macro-error",
  "proc-macro2",
  "quote",
  "syn",
@@ -1410,6 +1411,30 @@ name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
+
+[[package]]
+name = "proc-macro-error"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
+dependencies = [
+ "proc-macro-error-attr",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "version_check",
+]
+
+[[package]]
+name = "proc-macro-error-attr"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "version_check",
+]
 
 [[package]]
 name = "proc-macro-hack"
