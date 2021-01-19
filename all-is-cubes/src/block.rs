@@ -72,6 +72,64 @@ impl Block {
         BlockBuilder::<builder::NeedsColorOrVoxels>::default()
     }
 
+    /// Rotates this block by the specified rotation.
+    ///
+    /// Compared to direct use of the [`Block::Rotated`] variant, this will:
+    /// * Avoid constructing chains of `Block::Rotated(Block::Rotated(...))`.
+    /// * TODO: Not rotate blocks that should never appear rotated
+    ///   (atom blocks and explicitly declared ones).
+    ///
+    /// ```
+    /// use all_is_cubes::block::Block;
+    /// use all_is_cubes::content::make_some_blocks;
+    /// use all_is_cubes::math::{Face::*, GridRotation};
+    ///
+    /// let block = make_some_blocks(1).swap_remove(0);
+    /// let clockwise = GridRotation::from_basis([PZ, PY, NX]);
+    ///
+    /// // Basic rotation
+    /// let rotated = block.clone().rotate(clockwise);
+    /// assert_eq!(rotated, Block::Rotated(clockwise, Box::new(block.clone())));
+    ///
+    /// // Multiple rotations are combined
+    /// let double = rotated.clone().rotate(clockwise);
+    /// assert_eq!(double, Block::Rotated(clockwise * clockwise, Box::new(block.clone())));
+    /// ```
+    pub fn rotate(self, rotation: GridRotation) -> Self {
+        match self {
+            // TODO: Block::Atom(..) => self,
+            Block::Rotated(existing_rotation, boxed_block) => {
+                // TODO: If the combined rotation is the identity, simplify
+                Block::Rotated(rotation * existing_rotation, boxed_block)
+            }
+            _ => Block::Rotated(rotation, Box::new(self)),
+        }
+    }
+
+    /// Standardizes any characteristics of this block which may be presumed to be
+    /// specific to its usage in its current location, so that it can be used elsewhere
+    /// or compared with others. Currently, this means removing rotation, but in the
+    /// there may be additional or customizable changes (hence the abstract name).
+    ///
+    /// ```
+    /// use all_is_cubes::block::Block;
+    /// use all_is_cubes::content::make_some_blocks;
+    /// use all_is_cubes::math::{Face::*, GridRotation};
+    ///
+    /// let block = make_some_blocks(1).swap_remove(0);
+    /// let clockwise = GridRotation::from_basis([PZ, PY, NX]);
+    /// let rotated = block.clone().rotate(clockwise);
+    /// assert!(&block != &rotated);
+    /// assert_eq!(block, rotated.clone().unspecialize());
+    /// assert_eq!(block, rotated.clone().unspecialize().unspecialize());
+    /// ```
+    pub fn unspecialize(self) -> Self {
+        match self {
+            Block::Rotated(_rotation, boxed_block) => *boxed_block,
+            other => other,
+        }
+    }
+
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require [`URef`] access
     /// to other objects.
