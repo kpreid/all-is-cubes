@@ -4,7 +4,7 @@
 //! Components for "apps", or game clients: user interface and top-level state.
 
 use crate::camera::{Camera, CameraChange, InputProcessor};
-use crate::content::demo::UniverseTemplate;
+use crate::content::UniverseTemplate;
 use crate::listen::{DirtyFlag, ListenerHelper as _};
 use crate::space::Space;
 use crate::universe::{FrameClock, URef, Universe, UniverseStepInfo};

@@ -16,9 +16,12 @@ use crate::math::{FreeCoordinate, GridCoordinate, GridMatrix, Rgb, Rgba};
 use crate::raycast::{Face, Raycaster};
 use crate::space::Space;
 
-pub mod blocks;
-pub mod demo;
-pub mod landscape;
+mod blocks;
+pub use blocks::*;
+mod demo;
+pub use demo::*;
+mod landscape;
+pub use landscape::*;
 pub mod palette;
 
 /// Draw the All Is Cubes logo text.

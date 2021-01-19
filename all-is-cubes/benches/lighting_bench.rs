@@ -3,7 +3,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::time::Duration;
 
 use all_is_cubes::content::axes;
-use all_is_cubes::content::landscape::{install_landscape_blocks, wavy_landscape};
+use all_is_cubes::content::{install_landscape_blocks, wavy_landscape};
 use all_is_cubes::space::{Grid, Space, SpaceStepInfo};
 use all_is_cubes::universe::{Universe, UniverseIndex as _};
 

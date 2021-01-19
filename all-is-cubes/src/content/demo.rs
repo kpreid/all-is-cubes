@@ -18,9 +18,9 @@ use ordered_float::NotNan;
 use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
 use crate::camera::Camera;
 use crate::content::axes;
-use crate::content::blocks::{install_demo_blocks, DemoBlocks};
-use crate::content::landscape::{wavy_landscape, LandscapeBlocks};
 use crate::content::logo_text;
+use crate::content::{install_demo_blocks, DemoBlocks};
+use crate::content::{wavy_landscape, LandscapeBlocks};
 use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::BlockProvider;
 use crate::math::{

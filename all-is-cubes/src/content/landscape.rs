@@ -119,7 +119,7 @@ pub fn install_landscape_blocks(
 ///
 /// ```
 /// use all_is_cubes::space::Space;
-/// use all_is_cubes::content::landscape::{LandscapeBlocks, wavy_landscape};
+/// use all_is_cubes::content::{LandscapeBlocks, wavy_landscape};
 /// use all_is_cubes::linking::BlockProvider;
 ///
 /// let mut space = Space::empty_positive(10, 10, 10);

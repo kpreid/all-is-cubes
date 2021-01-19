@@ -11,7 +11,7 @@ use std::time::Instant;
 use strum::IntoEnumIterator;
 
 use all_is_cubes::apps::AllIsCubesAppState;
-use all_is_cubes::content::demo::UniverseTemplate;
+use all_is_cubes::content::UniverseTemplate;
 
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
