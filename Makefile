@@ -5,7 +5,7 @@
 # bundled together with conventional names rather than a collection of shell
 # scripts.
 
-.PHONY: all lint test run-dev run-game-server update try-publish-all
+.PHONY: all lint test run-dev run-game-server update try-publish-all actually-publish-all
 
 all: all-is-cubes-wasm/node_modules/.bin/webpack
 	cargo build --package all-is-cubes
@@ -43,6 +43,12 @@ try-publish-all: all
 	(cd all-is-cubes-desktop && cargo publish --dry-run)
 	# static-all-is-cubes-wasm counts as dirty despite .gitignore so we must use --allow-dirty
 	(cd all-is-cubes-server && cargo publish --dry-run --allow-dirty)
+actually-publish-all: all
+	(cd all-is-cubes && cargo publish)
+	sleep 10  # Let crates.io pick up the new all-is-cubes version or dependents will fail
+	(cd all-is-cubes-desktop && cargo publish)
+	# static-all-is-cubes-wasm counts as dirty despite .gitignore so we must use --allow-dirty
+	(cd all-is-cubes-server && cargo publish --allow-dirty)
 
 # Run npm install if needed to get build commands
 all-is-cubes-wasm/node_modules/.bin/webpack:
