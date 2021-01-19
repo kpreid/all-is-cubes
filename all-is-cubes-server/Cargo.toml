@@ -1,9 +1,9 @@
 [package]
 name = "all-is-cubes-server"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
-description = "Game server for the recursive voxel game All is Cubes."
+description = "Game server for the web edition of the recursive voxel game All is Cubes."
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"
