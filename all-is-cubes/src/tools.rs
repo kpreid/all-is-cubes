@@ -40,7 +40,9 @@ impl Tool {
             }
             Self::PlaceBlock(block) => input.set_cube(input.cursor().place.adjacent(), &AIR, block),
             Self::CopyFromSpace => {
-                input.produce_item(Tool::PlaceBlock(input.cursor().block.clone()));
+                input.produce_item(Tool::PlaceBlock(
+                    input.cursor().block.clone().unspecialize(),
+                ));
                 Ok(())
             }
         }
