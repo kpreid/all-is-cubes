@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use crate::block::{Block, AIR};
 use crate::camera::Cursor;
 use crate::linking::BlockProvider;
-use crate::math::{GridPoint, Rgba};
+use crate::math::GridPoint;
 use crate::space::{SetCubeError, Space};
 use crate::universe::{RefError, URef};
 use crate::vui::Icons;
@@ -49,24 +49,19 @@ impl Tool {
     }
 
     /// Return a block to use as an icon for this tool. For [`Tool::PlaceBlock`], has the
-    /// same appearance as the block to be placed.
-    ///
-    /// TODO (API instability): When we have fully implemented generalized block sizes we
-    /// will need a parameter
-    /// here to be able to rescale the icon to match.
+    /// same appearance as the block to be placed. The display name of the block should be
+    /// the display name of the tool.
     ///
     /// TODO (API instability): Eventually we will want additional decorations like "use
     /// count" that probably should not need to be painted into the block itself.
 
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
-            Self::None => Cow::Borrowed(&AIR),
-            // TODO: icon
+            Self::None => Cow::Borrowed(&predefined[Icons::EmptySlot]),
             Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             Self::PlaceBlock(block) => Cow::Borrowed(&block),
-            // TODO: icon
-            Self::CopyFromSpace => Cow::Owned(Rgba::new(0., 1., 0., 1.).into()),
+            Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
         }
     }
 }
@@ -211,6 +206,7 @@ mod tests {
     use super::*;
     use crate::camera::cursor_raycast;
     use crate::content::make_some_blocks;
+    use crate::math::Rgba;
     use crate::raycast::Raycaster;
     use crate::raytracer::print_space;
     use crate::universe::{UBorrow, UBorrowMut, Universe};
@@ -261,7 +257,7 @@ mod tests {
     #[test]
     fn icon_none() {
         let dummy_icons = BlockProvider::new(|_| make_some_blocks(1).swap_remove(0));
-        assert_eq!(*Tool::None.icon(&dummy_icons), AIR);
+        assert_eq!(Tool::None.icon(&dummy_icons), dummy_icons[Icons::EmptySlot]);
     }
 
     #[test]

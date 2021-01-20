@@ -13,7 +13,7 @@ use embedded_graphics::primitives::{Circle, Line, Rectangle, Triangle};
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use std::time::Duration;
 
-use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
+use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR, AIR_EVALUATED};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
@@ -367,7 +367,9 @@ pub(crate) fn draw_background(space: &mut Space) {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Icons {
+    EmptySlot,
     Delete,
+    CopyFromSpace,
 }
 impl BlockModule for Icons {
     fn namespace() -> &'static str {
@@ -379,6 +381,11 @@ impl Icons {
         let resolution = 16;
         BlockProvider::new(|key| {
             match key {
+                Icons::EmptySlot => Block::builder()
+                    .attributes(AIR_EVALUATED.attributes)
+                    .display_name("")
+                    .color(Rgba::TRANSPARENT)
+                    .build(),
                 Icons::Delete => {
                     let x_radius = i32::from(resolution) * 3 / 16;
                     let background_block_1: Block = Rgba::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
@@ -430,9 +437,15 @@ impl Icons {
                     .unwrap();
 
                     Block::builder()
+                        .display_name("Delete Block")
                         .voxels_ref(resolution, universe.insert_anonymous(space))
                         .build()
                 }
+                Icons::CopyFromSpace => Block::builder()
+                    .display_name("Copy Block from Cursor")
+                    // TODO: design actual icon
+                    .color(Rgba::new(0., 1., 0., 1.))
+                    .build(),
             }
         })
     }
