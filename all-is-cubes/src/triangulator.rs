@@ -227,11 +227,9 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     return FaceTriangulation::default();
                 }
 
-                let fully_opaque = block.color.fully_opaque();
                 FaceTriangulation {
-                    // TODO: Port over pseudo-transparency mechanism, then change this to a
-                    // within-epsilon-of-zero test. ...conditional on `GfxVertex` specifying support.
-                    vertices: if fully_opaque {
+                    fully_opaque: block.color.fully_opaque(),
+                    vertices: if !block.color.fully_transparent() {
                         let mut face_vertices: Vec<V> = Vec::with_capacity(6);
                         push_quad(
                             &mut face_vertices,
@@ -245,7 +243,6 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     } else {
                         Vec::new()
                     },
-                    fully_opaque,
                 }
             });
 

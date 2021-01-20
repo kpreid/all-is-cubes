@@ -25,6 +25,8 @@ lowp vec3 lighting() {
 
 void main(void) {
   // Parse multipurpose v_color_or_texture.
+  // In either case, the colors given are non-premultiplied-alpha.
+  // TODO: Consider changing that.
   mediump vec4 diffuse_color;
   if (v_color_or_texture[3] < -0.5) {
     // Texture coordinates.
@@ -35,13 +37,13 @@ void main(void) {
   }
 
   if (diffuse_color.a <= 0.0001) {
-    // Fully transparent.
+    // Prevent (effectively) fully transparent areas from writing to the depth buffer.
+    // This allows using binary opacity in color or texture without depth sorting.
     discard;
-  } else {
-    // We don't support partial transparency, so in case it arises, force to opaque.
-    diffuse_color.a = 1.0;
   }
-  
+  // Multiply alpha because our blend function choice is premultiplied alpha.
+  diffuse_color.rgb *= diffuse_color.a;
 
+  // Output fragment color is in premultiplied alpha.
   fragment_color = diffuse_color * vec4(lighting(), 1.0);
 }

@@ -4,6 +4,7 @@
 //! OpenGL-based graphics rendering.
 
 use cgmath::Point2;
+use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
@@ -199,10 +200,20 @@ where
             }
         };
 
-        let render_state = RenderState::default().set_face_culling(FaceCulling {
-            order: FaceCullingOrder::CCW,
-            mode: FaceCullingMode::Back,
-        });
+        // TODO: Add drawing opaque things in a separate pass from transparent things.
+        // (Opaque gets no blending and is drawn front to back; transparent is drawn back to front.)
+        let render_state = RenderState::default()
+            .set_face_culling(FaceCulling {
+                order: FaceCullingOrder::CCW,
+                mode: FaceCullingMode::Back,
+            })
+            .set_blending(Some(Blending {
+                // Note that this blending configuration is for premultiplied alpha.
+                // The fragment shaders are responsible for producing premultiplied alpha outputs.
+                equation: Equation::Additive,
+                src: Factor::One,
+                dst: Factor::SrcAlphaComplement,
+            }));
 
         // TODO: cache
         let cursor_tess = make_cursor_tess(surface, &self.cursor_result);

@@ -125,9 +125,9 @@ impl From<BlockVertex> for GLBlockVertex {
             color_or_texture: match vertex.coloring {
                 Coloring::Solid(color) => {
                     let mut color_attribute = VertexColorOrTexture::new(color.into());
-                    // Force alpha to 1 until we have a better transparency answer. When we do,
-                    // also make sure to clamp it to meet the VertexColorOrTexture protocol.
-                    color_attribute[3] = 1.0;
+                    // Clamp out-of-range alpha values so they fit into the
+                    // VertexColorOrTexture protocol (not less than zero).
+                    color_attribute[3] = color_attribute[3].min(1.).max(0.);
                     color_attribute
                 }
                 Coloring::Texture(tc) => VertexColorOrTexture::new([tc[0], tc[1], tc[2], -1.0]),
@@ -202,7 +202,7 @@ mod tests {
         );
         assert_eq!(vertex.position.repr, [1.1, 2.2, 3.3]);
         assert_eq!(vertex.normal.repr, [4.0, 5.0, 6.0]);
-        assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 1.0]);  // alpha is currently locked to 1
+        assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 0.5]);
         assert_eq!(vertex.lighting.repr, [1.0, 0.0, 2.0]);
     }
 }
