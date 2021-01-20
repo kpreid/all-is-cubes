@@ -18,6 +18,8 @@ use crate::space::Space;
 
 mod blocks;
 pub use blocks::*;
+mod city;
+pub(crate) use city::*;
 mod demo;
 pub use demo::*;
 mod landscape;
