@@ -33,6 +33,9 @@ pub(crate) struct Vui {
     hud_blocks: HudBlocks,
     hud_space: URef<Space>,
     aspect_ratio: FreeCoordinate,
+
+    /// None if the tooltip is blanked
+    tooltip_age: Option<Duration>,
 }
 
 impl Vui {
@@ -47,6 +50,8 @@ impl Vui {
             hud_blocks,
             hud_space,
             aspect_ratio: 4. / 3., // arbitrary placeholder assumption
+
+            tooltip_age: None,
         }
     }
 
@@ -81,6 +86,15 @@ impl Vui {
     pub const SUGGESTED_FOV_Y: Deg<FreeCoordinate> = Deg(30.);
 
     pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
+        if let Some(ref mut age) = self.tooltip_age {
+            *age += timestep;
+            if *age > Duration::from_secs(1) {
+                // TODO: log errors
+                let _ = self.set_tooltip_text("");
+                self.tooltip_age = None;
+            }
+        }
+
         self.universe.step(timestep)
     }
 
@@ -96,6 +110,31 @@ impl Vui {
             &self.hud_blocks,
             tools,
             selections,
+        )?;
+
+        // TODO: We should do this only if the actual selected item changed (but we don't yet
+        // have enough state information to track that).
+        // TODO: It's inefficient to perform a non-cached block evaluation just for the sake of
+        // getting the text — should we have a partial evaluation? Should tools keep evaluated
+        // icons on offer?
+        let text = selections
+            .get(1)
+            .and_then(|&i| tools.get(i))
+            .and_then(|tool| tool.icon(&self.hud_blocks.icons).evaluate().ok())
+            .map(|ev_block| ev_block.attributes.display_name)
+            .unwrap_or(Cow::Borrowed(""));
+        self.set_tooltip_text(&text)?;
+
+        Ok(())
+    }
+
+    // TODO: handle errors in a local/transient way instead of propagating
+    pub fn set_tooltip_text(&mut self, text: &str) -> Result<(), SetCubeError> {
+        self.tooltip_age = Some(Duration::from_secs(0));
+        HudLayout::default().set_tooltip_text(
+            &mut *self.hud_space.borrow_mut(),
+            &self.hud_blocks,
+            text,
         )
     }
 }
@@ -260,17 +299,15 @@ impl HudLayout {
             }
         }
 
-        // Display tool-tip text.
-        // TODO: This should be "last changed selection" not "selections[1]"
-        // TODO: It's inefficient to perform a non-cached block evaluation just for the sake of
-        // getting the text — should we have a partial evaluation? Should tools keep evaluated
-        // icons on offer?
-        let text = selections
-            .get(1)
-            .and_then(|&i| tools.get(i))
-            .and_then(|tool| tool.icon(&hud_blocks.icons).evaluate().ok())
-            .map(|ev_block| ev_block.attributes.display_name)
-            .unwrap_or(Cow::Borrowed(""));
+        Ok(())
+    }
+
+    fn set_tooltip_text(
+        &self,
+        space: &mut Space,
+        hud_blocks: &HudBlocks,
+        text: &str,
+    ) -> Result<(), SetCubeError> {
         let mut toolbar_text_space =
             if let Block::Recur { space, .. } = &space[self.toolbar_text_frame().lower_bounds()] {
                 space.borrow_mut()
@@ -549,5 +586,17 @@ mod tests {
     fn background_smoke_test() {
         let mut space = Space::empty_positive(100, 100, 10);
         draw_background(&mut space);
+    }
+
+    #[test]
+    fn tooltip_timeout() {
+        let mut vui = Vui::new();
+        assert_eq!(vui.tooltip_age, None);
+        vui.set_tooltip_text("Hello world").unwrap();
+        assert_eq!(vui.tooltip_age, Some(Duration::from_secs(0)));
+        vui.step(Duration::from_millis(500));
+        assert_eq!(vui.tooltip_age, Some(Duration::from_millis(500)));
+        vui.step(Duration::from_millis(501));
+        assert_eq!(vui.tooltip_age, None);
     }
 }
