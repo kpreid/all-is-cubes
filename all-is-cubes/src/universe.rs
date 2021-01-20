@@ -17,7 +17,7 @@ use crate::camera::Camera;
 use crate::space::{Space, SpaceStepInfo};
 
 /// Name/key of an object in a [`Universe`].
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Name {
     /// An explicitly set name.
     Specific(String),

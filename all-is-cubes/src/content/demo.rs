@@ -5,13 +5,13 @@
 
 use cgmath::Vector3;
 
-use crate::block::Block;
+use crate::block::{Block, BlockDef};
 use crate::camera::Camera;
 use crate::content::{demo_city, install_demo_blocks};
 use crate::math::{GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
-use crate::universe::{Name, Universe, UniverseIndex};
+use crate::universe::{Name, URef, Universe, UniverseIndex};
 
 /// Selection of initial content for constructing a new [`Universe`].
 //
@@ -109,10 +109,12 @@ where
     //let camera = Camera::looking_at_space(space_ref, Vector3::new(0.5, 0.5, 1.0));
     let mut camera = Camera::new(space_ref, position);
     // Copy all named block defs into inventory.
-    for (name, block_def_ref) in universe.iter_by_type() {
-        if matches!(name, Name::Anonym(_)) {
-            continue;
-        }
+    let mut items: Vec<(Name, URef<BlockDef>)> = universe
+        .iter_by_type()
+        .filter(|(name, _)| !matches!(name, Name::Anonym(_)))
+        .collect();
+    items.sort_by(|(a, _), (b, _)| a.cmp(&b));
+    for (_, block_def_ref) in items {
         match camera.try_add_item(Tool::PlaceBlock(Block::Indirect(block_def_ref))) {
             Ok(()) => {}
             Err(_) => {
