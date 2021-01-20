@@ -100,6 +100,11 @@ impl Vui {
     }
 }
 
+/// Knows where and how to place graphics within the HUD space, but does not store
+/// the space or any related state itself; depends only on the screen size and other
+/// parameters not primarily dependent on user interaction. This split is intended to
+/// simplify the problem of adapting to size changes (though right now there is no
+/// actual such handling).
 #[derive(Clone, Debug, PartialEq)]
 struct HudLayout {
     size: Vector2<GridCoordinate>,
