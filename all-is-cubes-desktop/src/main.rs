@@ -38,11 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Arg::with_name("graphics")
                 .long("graphics")
                 .short("g")
-                .possible_values(
-                    &GraphicsType::iter()
-                        .map(|t| <&str>::from(t))
-                        .collect::<Vec<_>>(),
-                )
+                .possible_values(&GraphicsType::iter().map(<&str>::from).collect::<Vec<_>>())
                 .default_value("window")
                 .help("Graphics/UI mode."),
         )
@@ -52,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .short("t")
                 .possible_values(
                     &UniverseTemplate::iter()
-                        .map(|t| <&str>::from(t))
+                        .map(<&str>::from)
                         .collect::<Vec<_>>(),
                 )
                 .default_value("demo-city")
