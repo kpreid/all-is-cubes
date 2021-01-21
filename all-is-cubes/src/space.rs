@@ -258,7 +258,9 @@ impl Space {
                 return Ok(false);
             }
 
-            if self.block_data[old_block_index as usize].count == 1 {
+            if self.block_data[old_block_index as usize].count == 1
+                && !self.block_to_index.contains_key(&*block)
+            {
                 // Replacing one unique block with a new one.
                 //
                 // This special case is worth having because it means that if a block is
