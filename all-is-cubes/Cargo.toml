@@ -15,11 +15,11 @@ categories = ["games", "graphics"]
 bench = false
 
 [[bench]]
-name = "lighting_bench"
+name = "raycast_bench"
 harness = false
 
 [[bench]]
-name = "raycast_bench"
+name = "space_bench"
 harness = false
 
 [[bench]]
@@ -53,4 +53,4 @@ strum = { version = "0.20.0", features = ["derive"] }
 thiserror = "1.0.22"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.3.3"

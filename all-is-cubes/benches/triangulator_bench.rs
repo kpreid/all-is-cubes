@@ -1,3 +1,6 @@
+// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
+// in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
+
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::AIR;
