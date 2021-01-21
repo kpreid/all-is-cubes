@@ -507,6 +507,75 @@ impl Space {
             index,
         }
     }
+
+    #[cfg(test)]
+    #[track_caller]
+    pub(crate) fn consistency_check(&self) {
+        let mut problems = Vec::new();
+
+        let mut actual_counts: HashMap<BlockIndex, usize> = HashMap::new();
+        for index in self.contents.iter().copied() {
+            *actual_counts.entry(index).or_insert(0) += 1;
+        }
+
+        // Check that block_data has only correct counts.
+        for (index, data) in self.block_data.iter().enumerate() {
+            let index = index as BlockIndex;
+
+            let actual_count = actual_counts.remove(&index).unwrap_or(0);
+            if data.count != actual_count {
+                problems.push(format!(
+                    "Index {} appears {} times but {:?}",
+                    index, actual_count, &data
+                ));
+            }
+        }
+
+        // Check that block_data isn't missing any indexes that appeared in contents.
+        // (The previous section should have drained actual_counts).
+        if actual_counts.len() != 0 {
+            problems.push(format!(
+                "Block indexes were not indexed in block_data: {:?}",
+                &actual_counts
+            ));
+        }
+
+        // Check that block_to_index contains all entries it should.
+        for (index, data) in self.block_data.iter().enumerate() {
+            if data.count == 0 {
+                // Zero entries are tombstone entries that should not be expected in the mapping.
+                continue;
+            }
+            let bti_index = self.block_to_index.get(&data.block).copied();
+            if bti_index != Some(index as BlockIndex) {
+                problems.push(format!(
+                    "block_to_index[{:?}] should have been {:?}={:?} but was {:?}={:?}",
+                    &data.block,
+                    index,
+                    data,
+                    bti_index,
+                    bti_index.map(|i| self.block_data.get(usize::from(i))),
+                ));
+            }
+        }
+        // Check that block_to_index contains no incorrect entries.
+        for (block, &index) in self.block_to_index.iter() {
+            let data = self.block_data.get(usize::from(index));
+            if Some(block) != data.map(|data| &data.block) {
+                problems.push(format!(
+                    "block_to_index[{:?}] points to {} : {:?}",
+                    block, index, data
+                ));
+            }
+        }
+
+        if !problems.is_empty() {
+            panic!(
+                "Space consistency check failed:\n • {}\n",
+                problems.join("\n • ")
+            );
+        }
+    }
 }
 
 impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
@@ -698,6 +767,8 @@ mod tests {
         assert_eq!(&space[pt], &first);
         assert_eq!(Ok(true), space.set(pt, &second));
         assert_eq!(&space[pt], &second);
+
+        space.consistency_check(); // bonus testing
     }
 
     #[test]
@@ -708,6 +779,8 @@ mod tests {
         let mut space = Space::empty_positive(1, 1, 1);
         assert_eq!(Err(SetCubeError::OutOfBounds(ptg)), space.set(pt, &block));
         assert_eq!(Err(SetCubeError::OutOfBounds(ptg)), space.set(pt, &AIR));
+
+        space.consistency_check(); // bonus testing
     }
 
     /// This test case should also cover `RefError::Gone`.
@@ -730,6 +803,8 @@ mod tests {
             outer_space.set((0, 0, 0), &block)
         );
         drop(borrow);
+
+        outer_space.consistency_check(); // bonus testing
     }
 
     #[test]
@@ -744,6 +819,7 @@ mod tests {
                 unexpected => panic!("unexpected result: {:?}", unexpected),
             }
         }
+        space.consistency_check(); // bonus testing
     }
 
     #[test]
@@ -774,6 +850,7 @@ mod tests {
         assert_eq!(Some(0), space.get_block_index((1, 0, 0)));
         // Confirm the data is correct
         assert_eq!(space.get_evaluated((0, 0, 0)), &block.evaluate().unwrap());
+        space.consistency_check(); // bonus testing
     }
 
     /// EvaluatedBlock data is updated when a block index is reused.
@@ -786,6 +863,7 @@ mod tests {
         assert_eq!(Some(0), space.get_block_index((0, 0, 0)));
         // Confirm the data is correct
         assert_eq!(space.get_evaluated((0, 0, 0)), &block.evaluate().unwrap());
+        space.consistency_check(); // bonus testing
     }
 
     #[test]
@@ -797,18 +875,21 @@ mod tests {
         // TODO: This test depends on block allocation order. distinct_blocks() ought to be stable or explicitly return a HashSet or something.
         assert_eq!(space.distinct_blocks(), vec![AIR.clone()], "step 1");
         space.set(pt1, &blocks[0]).unwrap();
+        space.consistency_check();
         assert_eq!(
             space.distinct_blocks(),
             vec![AIR.clone(), blocks[0].clone()],
             "step 2"
         );
         space.set(pt2, &blocks[1]).unwrap();
+        space.consistency_check();
         assert_eq!(
             space.distinct_blocks(),
             vec![blocks[1].clone(), blocks[0].clone()],
             "step 3"
         );
         space.set(pt1, &blocks[2]).unwrap();
+        space.consistency_check();
         assert_eq!(
             space.distinct_blocks(),
             vec![blocks[1].clone(), blocks[2].clone()],
@@ -817,6 +898,7 @@ mod tests {
 
         // Make sure that reinserting an old block correctly allocates an index rather than using the old one.
         space.set(pt2, &blocks[0]).unwrap();
+        space.consistency_check();
         assert_eq!(
             space.distinct_blocks(),
             vec![blocks[0].clone(), blocks[2].clone()],
