@@ -307,7 +307,7 @@ impl From<Rgba> for Cow<'_, Block> {
 ///
 /// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
 /// blocks.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct BlockAttributes {
     /// The name that should be displayed to players.
@@ -331,6 +331,34 @@ pub struct BlockAttributes {
     /// The default value is [`Rgb::ZERO`].
     pub light_emission: Rgb,
     // TODO: add 'behavior' functionality, if we don't come up with something else
+
+    // Reminder: When adding new fields, add them to the Debug implementation.
+}
+
+impl std::fmt::Debug for BlockAttributes {
+    /// Only attributes which differ from the default are shown.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self == &Self::default() {
+            // Avoid the braceless formatting used for structs with literally no fields.
+            write!(f, "BlockAttributes {{}}")
+        } else {
+            let mut s = f.debug_struct("BlockAttributes");
+            if self.display_name != Self::default().display_name {
+                // Unwrap the `Cow` for tidier formatting.
+                s.field("display_name", &&*self.display_name);
+            }
+            if self.selectable != Self::default().selectable {
+                s.field("selectable", &self.selectable);
+            }
+            if self.collision != Self::default().collision {
+                s.field("collision", &self.collision);
+            }
+            if self.light_emission != Self::default().light_emission {
+                s.field("light_emission", &self.light_emission);
+            }
+            s.finish()
+        }
+    }
 }
 
 impl BlockAttributes {
@@ -1239,6 +1267,53 @@ mod tests {
         assert_eq!(
             BlockAttributes::default(),
             <BlockAttributes as Default>::default()
+        );
+    }
+
+    #[test]
+    fn attributes_debug() {
+        let default = BlockAttributes::default;
+        fn debug(a: BlockAttributes) -> String {
+            format!("{:?}", a)
+        }
+        assert_eq!(&*debug(BlockAttributes::default()), "BlockAttributes {}",);
+        assert_eq!(
+            &*debug(BlockAttributes {
+                display_name: "x".into(),
+                ..default()
+            }),
+            "BlockAttributes { display_name: \"x\" }",
+        );
+        assert_eq!(
+            &*debug(BlockAttributes {
+                selectable: false,
+                ..default()
+            }),
+            "BlockAttributes { selectable: false }",
+        );
+        assert_eq!(
+            &*debug(BlockAttributes {
+                collision: BlockCollision::None,
+                ..default()
+            }),
+            "BlockAttributes { collision: None }",
+        );
+        assert_eq!(
+            &*debug(BlockAttributes {
+                light_emission: Rgb::new(1.0, 2.0, 3.0),
+                ..default()
+            }),
+            "BlockAttributes { light_emission: Rgb(1.0, 2.0, 3.0) }",
+        );
+
+        // Test a case of multiple attributes
+        assert_eq!(
+            &*debug(BlockAttributes {
+                display_name: "y".into(),
+                selectable: false,
+                ..default()
+            }),
+            "BlockAttributes { display_name: \"y\", selectable: false }",
         );
     }
 }

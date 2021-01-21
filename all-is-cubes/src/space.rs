@@ -922,7 +922,6 @@ mod tests {
             \x20                   display_name: \"<air>\",\n\
             \x20                   selectable: false,\n\
             \x20                   collision: None,\n\
-            \x20                   light_emission: Rgb(0.0, 0.0, 0.0),\n\
             \x20               },\n\
             \x20               Rgba(0.0, 0.0, 0.0, 0.0),\n\
             \x20           ),\n\
