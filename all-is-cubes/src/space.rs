@@ -956,6 +956,28 @@ mod tests {
         assert_eq!(result, Err(SetCubeError::OutOfBounds(fill_grid)));
     }
 
+    /// There was a bug triggered when the last instance of a block was replaced with
+    /// a block already in the space.
+    #[test]
+    fn fill_entire_space_regression() {
+        let block = make_some_blocks(1).swap_remove(0);
+        let grid = Grid::new((0, 3, 0), (25 * 16, 16, 2));
+        let mut space = Space::empty(grid);
+        space.fill(grid, |_| Some(&block)).unwrap();
+        space.consistency_check();
+    }
+
+    #[test]
+    fn fill_entire_space_regression_without_using_fill() {
+        let block = make_some_blocks(1).swap_remove(0);
+        let grid = Grid::new([0, 0, 0], [3, 1, 1]);
+        let mut space = Space::empty(grid);
+        for i in 0..3 {
+            space.set([i, 0, 0], &block).unwrap();
+            space.consistency_check();
+        }
+    }
+
     #[test]
     fn listens_to_block_changes() {
         // Set up indirect block
