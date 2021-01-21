@@ -233,6 +233,7 @@ impl TextureAllocator for LumAtlasAllocator {
         Some(result)
     }
 }
+
 impl TextureTile for LumAtlasTile {
     fn texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
         let backing = self.backing.borrow();
@@ -247,6 +248,16 @@ impl TextureTile for LumAtlasTile {
         }
     }
 }
+
+/// Compared by reference. This definition of equality is cheaper and non-panicking
+/// vs. the derived behavior of RefCell::eq which is to borrow and compare the contents.
+impl PartialEq for LumAtlasTile {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.backing, &other.backing)
+    }
+}
+impl Eq for LumAtlasTile {}
+
 impl Drop for TileBacking {
     fn drop(&mut self) {
         if let Some(ab) = self.allocator.upgrade() {

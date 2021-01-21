@@ -154,9 +154,25 @@ impl SpaceRenderer {
 
             for index in todo.blocks.drain() {
                 let index: usize = index.into();
-                self.block_triangulations[index] =
+                let new_triangulation =
                     triangulate_block(block_data[index].evaluated(), block_texture_allocator);
-                self.block_versioning[index] = self.block_version_counter;
+
+                // Only invalidate the chunks if we actually have different data.
+                // Note: This comparison depends on such things as the definition of PartialEq
+                // for LumAtlasTile, which compares by texture tile reference rather than contents.
+                // TODO: We don't currently make use of this optimally because the triangulator
+                // never reuses textures. (If it did, we'd need to consider what we want to do
+                // about stale chunks with fresh textures, which might have geometry gaps or
+                // otherwise be obviously inconsistent.)
+                if new_triangulation != self.block_triangulations[index] {
+                    self.block_triangulations[index] = new_triangulation;
+                    self.block_versioning[index] = self.block_version_counter;
+                } else {
+                    // The new triangulation is identical to the old one (which might happen because
+                    // interior voxels or non-rendered attributes were changed), so don't invalidate
+                    // the chunks.
+                }
+
                 block_update_count += 1;
             }
         }
