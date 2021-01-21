@@ -238,6 +238,8 @@ impl Block {
                                 Some(BlockChange::new())
                             }
                             SpaceChange::Block(_) => None,
+                            SpaceChange::EveryBlock => Some(BlockChange::new()),
+
                             // TODO: It would be nice if the space gave more precise updates such that we could conclude
                             // e.g. "this is a new/removed block in an unaffected area" without needing to store any data.
                             SpaceChange::BlockValue(_) => Some(BlockChange::new()),

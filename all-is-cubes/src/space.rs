@@ -711,6 +711,9 @@ pub enum SpaceChange {
     /// The definition of the block referred to by the given block index number was
     /// changed; the result of [`Space::get_evaluated`] may differ.
     BlockValue(BlockIndex),
+    /// Equivalent to [`SpaceChange::Block`] for every cube and [`SpaceChange::Number`]
+    /// for every index.
+    EveryBlock,
 }
 
 /// Performance data returned by [`Space::step`]. The exact contents of this structure

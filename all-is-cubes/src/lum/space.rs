@@ -103,10 +103,21 @@ impl SpaceRenderer {
 
         let mut todo = self.todo.borrow_mut();
 
+        if todo.everything {
+            todo.everything = false;
+            self.block_triangulations.clear();
+            self.block_version_counter = self.block_version_counter.wrapping_add(1);
+            // We don't need to clear self.chunks because they will automatically be considered
+            // stale by the new block versioning value.
+        }
+
         let mut block_update_count = 0;
         if self.block_triangulations.is_empty() {
-            // Must be first run and we haven't prepared the blocks at all.
-            // (Or somehow the space has zero blocks in which case this is trivial anyway.)
+            // One of the following cases:
+            // * It's the first run and we haven't prepared the blocks at all.
+            // * The space somehow has zero blocks, in which case this is trivial anyway.
+            // * The space signaled SpaceChange::EveryBlock.
+            todo.everything = false;
             self.block_triangulations =
                 Vec::from(triangulate_blocks(space, block_texture_allocator));
             self.block_versioning =
@@ -441,6 +452,7 @@ impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, LumAtlasTile>
 /// [`SpaceRenderer`]'s set of things that need recomputing.
 #[derive(Debug, Default)]
 struct SpaceRendererTodo {
+    everything: bool,
     blocks: HashSet<BlockIndex>,
     /// Membership in this table indicates that the chunk *exists;* todos for chunks
     /// outside of the view area are not tracked.
@@ -488,6 +500,11 @@ impl Listener<SpaceChange> for TodoListener {
         if let Some(cell) = self.0.upgrade() {
             let mut todo = cell.borrow_mut();
             match message {
+                SpaceChange::EveryBlock => {
+                    todo.everything = true;
+                    todo.blocks.clear();
+                    todo.chunks.clear();
+                }
                 SpaceChange::Block(p) => {
                     todo.modify_block_and_adjacent(p, |chunk_todo| {
                         chunk_todo.update_triangulation = true;
