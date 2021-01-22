@@ -12,7 +12,7 @@ use all_is_cubes::universe::{Universe, UniverseIndex as _};
 pub fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
 
-    for mutation_size in [1, 4, 16, 32].iter().copied() {
+    for mutation_size in [1, 4, 16, 24, 32].iter().copied() {
         let grid = Grid::new([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
         let size_description = format!("{}×{}×{}", mutation_size, mutation_size, mutation_size);
         let mutation_volume = grid.volume();
@@ -40,6 +40,34 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
                     || Space::empty(grid.multiply(2)),
                     |mut space| {
                         space.fill(grid, |_| Some(&block)).unwrap();
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+
+        group.bench_function(
+            BenchmarkId::new("fill_uniform() entire space", &size_description),
+            |b| {
+                let block = make_some_blocks(1).swap_remove(0);
+                b.iter_batched(
+                    || Space::empty(grid),
+                    |mut space| {
+                        space.fill_uniform(space.grid(), &block).unwrap();
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+
+        group.bench_function(
+            BenchmarkId::new("fill_uniform() part of space", &size_description),
+            |b| {
+                let block = make_some_blocks(1).swap_remove(0);
+                b.iter_batched(
+                    || Space::empty(grid.multiply(2)),
+                    |mut space| {
+                        space.fill_uniform(grid, &block).unwrap();
                     },
                     BatchSize::SmallInput,
                 )

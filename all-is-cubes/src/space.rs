@@ -379,6 +379,8 @@ impl Space {
     /// ```
     ///
     /// TODO: Support providing the previous block as a parameter (take cues from `extract`).
+    ///
+    /// See also [`Space::fill_uniform`] for filling a region with one block.
     pub fn fill<F, B>(&mut self, region: Grid, mut function: F) -> Result<(), SetCubeError>
     where
         F: FnMut(GridPoint) -> Option<B>,
@@ -395,6 +397,63 @@ impl Space {
             }
         }
         Ok(())
+    }
+
+    /// Replace blocks in `region` with the given block.
+    ///
+    /// TODO: Document error behavior
+    ///
+    /// ```
+    /// use all_is_cubes::block::{AIR, Block};
+    /// use all_is_cubes::math::Rgba;
+    /// use all_is_cubes::space::{Grid, Space};
+    ///
+    /// let mut space = Space::empty_positive(10, 10, 10);
+    /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
+    ///
+    /// space.fill_uniform(Grid::new((0, 0, 0), (2, 1, 1)), &a_block).unwrap();
+    ///
+    /// assert_eq!(&space[(0, 0, 0)], &a_block);
+    /// assert_eq!(&space[(1, 0, 0)], &a_block);
+    /// assert_eq!(&space[(0, 1, 0)], &AIR);
+    /// ```
+    ///
+    /// See also [`Space::fill`] for non-uniform fill and bulk copies.
+    pub fn fill_uniform<'b>(
+        &mut self,
+        region: Grid,
+        block: impl Into<Cow<'b, Block>>,
+    ) -> Result<(), SetCubeError> {
+        if !self.grid().contains_grid(region) {
+            Err(SetCubeError::OutOfBounds(region))
+        } else if self.grid() == region {
+            // We're overwriting the entire space, so we might as well re-initialize it.
+            let block = block.into();
+            let new_block_index = 0;
+            let new_block_data = SpaceBlockData::new(
+                block.clone().into_owned(),
+                self.listener_for_block(new_block_index),
+            )?;
+
+            self.block_to_index = {
+                let mut map = HashMap::new();
+                map.insert(block.into_owned(), new_block_index);
+                map
+            };
+            self.block_data = vec![SpaceBlockData {
+                count: region.volume(),
+                ..new_block_data
+            }];
+            for i in self.contents.iter_mut() {
+                *i = new_block_index;
+            }
+            self.notifier.notify(SpaceChange::EveryBlock);
+            Ok(())
+        } else {
+            // Fall back to the generic strategy.
+            let block = block.into().into_owned();
+            self.fill(region, |_| Some(&block))
+        }
     }
 
     /// Provides an [`embedded_graphics::DrawTarget`] adapter for 2.5D drawing.
@@ -983,19 +1042,43 @@ mod tests {
         assert_eq!(result, Err(SetCubeError::OutOfBounds(fill_grid)));
     }
 
-    /// There was a bug triggered when the last instance of a block was replaced with
-    /// a block already in the space.
+    /// Test filling an entire space with one block using [`Space::fill`].
     #[test]
-    fn fill_entire_space_regression() {
+    fn fill_entire_space() {
         let block = make_some_blocks(1).swap_remove(0);
         let grid = Grid::new((0, 3, 0), (25 * 16, 16, 2));
         let mut space = Space::empty(grid);
         space.fill(grid, |_| Some(&block)).unwrap();
         space.consistency_check();
+        for cube in grid.interior_iter() {
+            assert_eq!(&space[cube], &block);
+        }
     }
 
+    /// Test filling an entire space with one block using [`Space::fill_uniform`].
     #[test]
-    fn fill_entire_space_regression_without_using_fill() {
+    fn fill_uniform_entire_space() {
+        let block = make_some_blocks(1).swap_remove(0);
+        let grid = Grid::new((0, 3, 0), (25 * 16, 16, 2));
+        let mut space = Space::empty(grid);
+        let mut sink = Sink::new();
+        space.listen(sink.listener());
+
+        space.fill_uniform(grid, &block).unwrap();
+
+        assert_eq!(sink.next(), Some(SpaceChange::EveryBlock));
+        assert_eq!(sink.next(), None);
+        space.consistency_check();
+        for cube in grid.interior_iter() {
+            assert_eq!(&space[cube], &block);
+        }
+    }
+
+    /// There was a bug triggered when the last instance of a block was replaced with
+    /// a block already in the space. This specifically runs a consistency check in that
+    /// case.
+    #[test]
+    fn replace_last_block_regression() {
         let block = make_some_blocks(1).swap_remove(0);
         let grid = Grid::new([0, 0, 0], [3, 1, 1]);
         let mut space = Space::empty(grid);
