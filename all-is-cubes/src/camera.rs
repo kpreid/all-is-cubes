@@ -481,6 +481,17 @@ impl std::fmt::Display for Cursor {
 }
 
 /// Parse input events, particularly key-down/up pairs, into camera control and such.
+///
+/// This is designed to be a leaf of the dependency graph: it does not own or send
+/// messages to any other elements of the application. Instead, the following steps
+/// must occur in the given order.
+///
+/// 1. The platform-specific code should call [`InputProcessor::key_down`] and such to
+///    to provide input information.
+/// 2. The game loop should call [`InputProcessor::apply_input`] to apply the effects
+///    of input on the relevant [`Camera`].
+/// 3. The game loop should call [`InputProcessor::step`] to apply the effects of time
+///    on the input processor.
 #[derive(Clone, Debug, Default)]
 pub struct InputProcessor {
     keys_held: HashSet<Key>,
