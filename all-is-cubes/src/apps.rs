@@ -180,6 +180,20 @@ impl InputProcessor {
         self.key_down(key)
     }
 
+    /// Handles the keyboard focus being gained or lost. If the platform does not have
+    /// a concept of focus, you need not call this method, but may call it with `true`.
+    ///
+    /// `InputProcessor` will assume that if focus is lost, key-up events may be lost and
+    /// so currently held keys should stop taking effect.
+    pub fn key_focus(&mut self, has_focus: bool) {
+        if has_focus {
+            // Nothing to do.
+        } else {
+            self.keys_held.clear();
+            self.momentary_timeout.clear();
+        }
+    }
+
     /// Provide relative movement information for mouselook.
     ///
     /// This value is an accumulated displacement, not an angular velocity, so it is not
@@ -299,6 +313,23 @@ mod tests {
         assert_eq!(input.movement(), Vector3::new(0.0, 0.0, 0.0));
         input.key_up(Key::Character('d'));
         assert_eq!(input.movement(), Vector3::new(-1.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn input_focus_lost_cancels_keys() {
+        let mut input = InputProcessor::new();
+        assert_eq!(input.movement(), Vector3::zero());
+        input.key_down(Key::Character('d'));
+        assert_eq!(input.movement(), Vector3::unit_x());
+        input.key_focus(false);
+        assert_eq!(input.movement(), Vector3::zero()); // Lost focus, no movement.
+
+        // Confirm that keys work again afterward.
+        input.key_focus(true);
+        assert_eq!(input.movement(), Vector3::zero());
+        input.key_down(Key::Character('d'));
+        assert_eq!(input.movement(), Vector3::unit_x());
+        // TODO: test (and handle) key events arriving while focus is lost, just in case.
     }
 
     // TODO: test jump and flying logic

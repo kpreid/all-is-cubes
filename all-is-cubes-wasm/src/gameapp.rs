@@ -10,7 +10,8 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
-    console, AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, Text,
+    console, AddEventListenerOptions, Document, Event, FocusEvent, HtmlElement, KeyboardEvent,
+    MouseEvent, Text,
 };
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
@@ -179,6 +180,20 @@ impl WebGameRoot {
                 }
             }
         }, &AddEventListenerOptions::new());
+
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"focus", move |_: FocusEvent| {
+            if let Some(refcell_ref) = self_ref.upgrade() {
+                refcell_ref.borrow_mut().app.input_processor.key_focus(true);
+            }
+        }, &AddEventListenerOptions::new().passive(true));
+
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"blur", move |_: FocusEvent| {
+            if let Some(refcell_ref) = self_ref.upgrade() {
+                refcell_ref.borrow_mut().app.input_processor.key_focus(false);
+            }
+        }, &AddEventListenerOptions::new().passive(true));
 
         let self_ref = self.self_ref.clone();
         add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mousemove", move |event: MouseEvent| {

@@ -104,6 +104,9 @@ pub fn glfw_main_loop(
                 WindowEvent::CharModifiers(..) => {}
 
                 // Mouse input
+                WindowEvent::CursorPos(..) => {
+                    update_cursor = true;
+                }
                 WindowEvent::MouseButton(button, Action::Press, _) => {
                     if let Some(cursor) = &renderer.cursor_result {
                         // TODO: This should go through InputProcessor for consistency and duplicated code
@@ -122,12 +125,12 @@ pub fn glfw_main_loop(
                     // or otherwise something to do with it
                 }
 
-                // Things to synchronize
+                // Window state
                 WindowEvent::FramebufferSize(..) | WindowEvent::ContentScale(..) => {
                     resize = true;
                 }
-                WindowEvent::CursorPos(..) => {
-                    update_cursor = true;
+                WindowEvent::Focus(has_focus) => {
+                    app.input_processor.key_focus(has_focus);
                 }
 
                 // Unused
@@ -135,7 +138,6 @@ pub fn glfw_main_loop(
                 WindowEvent::Size(..) => {}
                 WindowEvent::Refresh => {}
                 WindowEvent::CursorEnter(_) => {}
-                WindowEvent::Focus(_) => {}
                 WindowEvent::Iconify(_) => {}
                 WindowEvent::FileDrop(_) => {}
                 WindowEvent::Maximize(_) => {}

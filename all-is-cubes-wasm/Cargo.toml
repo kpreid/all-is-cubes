@@ -36,6 +36,7 @@ features = [
   "Document",
   "Element",
   "EventTarget",
+  "FocusEvent",
   "HtmlElement",
   "KeyboardEvent",
   "MouseEvent",
