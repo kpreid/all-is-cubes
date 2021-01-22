@@ -15,8 +15,8 @@ use termion::event::{Event, Key as TermionKey};
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
-use all_is_cubes::apps::AllIsCubesAppState;
-use all_is_cubes::camera::{Camera, Key, ProjectionHelper};
+use all_is_cubes::apps::{AllIsCubesAppState, Key};
+use all_is_cubes::camera::{Camera, ProjectionHelper};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::math::{NotNan, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};

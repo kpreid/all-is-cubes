@@ -169,8 +169,8 @@ pub fn map_glfw_button(button: glfw::MouseButton) -> usize {
     }
 }
 
-pub fn map_glfw_key(key: glfw::Key) -> Option<all_is_cubes::camera::Key> {
-    use all_is_cubes::camera::Key as A;
+pub fn map_glfw_key(key: glfw::Key) -> Option<all_is_cubes::apps::Key> {
+    use all_is_cubes::apps::Key as A;
     use glfw::Key as G;
     Some(match key {
         G::Space => A::Character(' '),

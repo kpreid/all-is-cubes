@@ -13,8 +13,7 @@ use web_sys::{
     console, AddEventListenerOptions, Document, Event, HtmlElement, KeyboardEvent, MouseEvent, Text,
 };
 
-use all_is_cubes::apps::AllIsCubesAppState;
-use all_is_cubes::camera::Key;
+use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::cgmath::Point2;
 use all_is_cubes::content::UniverseTemplate;
 use all_is_cubes::lum::glrender::GLRenderer;

@@ -8,7 +8,7 @@ use cgmath::{
     SquareMatrix, Transform, Vector2, Vector3, Vector4,
 };
 use num_traits::identities::Zero;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
@@ -229,7 +229,8 @@ impl Camera {
 
     // TODO: this code's location is driven by colliding_cubes being here, which is probably wrong
     // If nothing else, the jump height probably belongs elsewhere.
-    fn jump_if_able(&mut self) {
+    // Figure out what the correct overall thing is and make it public
+    pub(crate) fn jump_if_able(&mut self) {
         if self.is_on_ground() {
             self.body.velocity += Vector3 {
                 x: 0.,
@@ -478,181 +479,4 @@ impl std::fmt::Display for Cursor {
             self.evaluated.as_concise_debug(),
         )
     }
-}
-
-/// Parse input events, particularly key-down/up pairs, into camera control and such.
-///
-/// This is designed to be a leaf of the dependency graph: it does not own or send
-/// messages to any other elements of the application. Instead, the following steps
-/// must occur in the given order.
-///
-/// 1. The platform-specific code should call [`InputProcessor::key_down`] and such to
-///    to provide input information.
-/// 2. The game loop should call [`InputProcessor::apply_input`] to apply the effects
-///    of input on the relevant [`Camera`].
-/// 3. The game loop should call [`InputProcessor::step`] to apply the effects of time
-///    on the input processor.
-#[derive(Clone, Debug, Default)]
-pub struct InputProcessor {
-    keys_held: HashSet<Key>,
-    momentary_timeout: HashMap<Key, Duration>,
-}
-
-impl InputProcessor {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    fn is_bound(key: Key) -> bool {
-        // Eventually we'll have actual configurable keybindings...
-        match key {
-            // Used in `InputProcessor::movement()`.
-            Key::Character('w') => true,
-            Key::Character('a') => true,
-            Key::Character('s') => true,
-            Key::Character('d') => true,
-            Key::Character('e') => true,
-            Key::Character('c') => true,
-            // Used in `InputProcessor::apply_input()`.
-            Key::Left => true,
-            Key::Right => true,
-            Key::Up => true,
-            Key::Down => true,
-            Key::Character(' ') => true,
-            Key::Character(d) if d.is_ascii_digit() => true,
-            _ => false,
-        }
-    }
-
-    /// Handles incoming key-down events. Returns whether the key was unbound.
-    pub fn key_down(&mut self, key: Key) -> bool {
-        let bound = Self::is_bound(key);
-        if bound {
-            self.keys_held.insert(key);
-        }
-        bound
-    }
-
-    /// Handles incoming key-up events.
-    pub fn key_up(&mut self, key: Key) {
-        self.keys_held.remove(&key);
-    }
-
-    /// Handles incoming key events in the case where key-up events are not available,
-    /// such that an assumption about equivalent press duration must be made.
-    pub fn key_momentary(&mut self, key: Key) -> bool {
-        self.momentary_timeout
-            .insert(key, Duration::from_millis(200));
-        self.key_up(key);
-        self.key_down(key)
-    }
-
-    /// Returns the character movement velocity that input is currently requesting.
-    pub fn movement(&self) -> Vector3<FreeCoordinate> {
-        Vector3::new(
-            self.net_movement(Key::Character('a'), Key::Character('d')),
-            self.net_movement(Key::Character('c'), Key::Character('e')),
-            self.net_movement(Key::Character('w'), Key::Character('s')),
-        )
-    }
-
-    /// Advance time insofar as input interpretation is affected by time.
-    ///
-    /// This method should be called *after* [`apply_input`](Self::apply_input), when
-    /// applicable.
-    pub fn step(&mut self, timestep: Duration) {
-        let mut to_drop = Vec::new();
-        for (key, duration) in self.momentary_timeout.iter_mut() {
-            if let Some(reduced) = duration.checked_sub(timestep) {
-                *duration = reduced;
-            } else {
-                to_drop.push(*key);
-            }
-        }
-        for key in to_drop.drain(..) {
-            self.momentary_timeout.remove(&key);
-            self.key_up(key);
-        }
-    }
-
-    /// Applies the current input to the given `Camera`.
-    pub fn apply_input(&self, camera: &mut Camera, timestep: Duration) {
-        let movement = self.movement();
-        if movement != Vector3::zero() {
-            camera.auto_rotate = false;
-        }
-        camera.set_velocity_input(movement);
-
-        let turning_step = 80.0 * timestep.as_secs_f64();
-        camera.body.yaw = (camera.body.yaw
-            + turning_step * self.net_movement(Key::Left, Key::Right))
-        .rem_euclid(360.0);
-        camera.body.pitch = (camera.body.pitch
-            + turning_step * self.net_movement(Key::Up, Key::Down))
-        .min(90.0)
-        .max(-90.0);
-
-        if self.keys_held.contains(&Key::Character(' ')) {
-            camera.jump_if_able();
-        }
-
-        // TODO: would be nice to express this in a more straightforward fashion
-        // (though it's probably fast enough that the O(n) doesn't matter)
-        for slot in 0..=9 {
-            let digit = if slot == 9 {
-                '0'
-            } else {
-                std::char::from_digit(slot as u32 + 1, 10).unwrap()
-            };
-            if self.keys_held.contains(&Key::Character(digit)) {
-                camera.set_selected_slot(1, slot);
-            }
-        }
-    }
-
-    /// Computes the net effect of a pair of opposed inputs (e.g. "forward" and "back").
-    fn net_movement(&self, negative: Key, positive: Key) -> FreeCoordinate {
-        match (
-            self.keys_held.contains(&negative),
-            self.keys_held.contains(&positive),
-        ) {
-            (true, false) => -1.0,
-            (false, true) => 1.0,
-            _ => 0.0,
-        }
-    }
-}
-
-/// A platform-neutral representation of keyboard keys for [`InputProcessor`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Key {
-    /// Letters should be lowercase.
-    Character(char),
-    /// Left arrow key.
-    Left,
-    /// Right arrow key.
-    Right,
-    /// Up arrow key.
-    Up,
-    /// Down arrow key.
-    Down,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn input_movement() {
-        let mut input = InputProcessor::new();
-        assert_eq!(input.movement(), Vector3::new(0.0, 0.0, 0.0));
-        input.key_down(Key::Character('d'));
-        assert_eq!(input.movement(), Vector3::new(1.0, 0.0, 0.0));
-        input.key_down(Key::Character('a'));
-        assert_eq!(input.movement(), Vector3::new(0.0, 0.0, 0.0));
-        input.key_up(Key::Character('d'));
-        assert_eq!(input.movement(), Vector3::new(-1.0, 0.0, 0.0));
-    }
-
-    // TODO: test jump and flying logic
 }
