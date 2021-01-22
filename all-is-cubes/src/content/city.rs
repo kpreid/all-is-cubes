@@ -61,18 +61,18 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
 
     // Fill in flat ground
     space
-        .fill(
+        .fill_uniform(
             Grid::from_lower_upper(
                 (-radius_xz, -ground_depth, -radius_xz),
                 (radius_xz, 0, radius_xz),
             ),
-            |_| Some(landscape_blocks[LandscapeBlocks::Stone].clone()), // TODO: fix design so no clone needed
+            &*landscape_blocks[LandscapeBlocks::Stone],
         )
         .unwrap();
     space
-        .fill(
+        .fill_uniform(
             Grid::from_lower_upper((-radius_xz, 0, -radius_xz), (radius_xz, 1, radius_xz)),
-            |_| Some(landscape_blocks[LandscapeBlocks::Grass].clone()), // TODO: fix design so no clone needed
+            &*landscape_blocks[LandscapeBlocks::Grass],
         )
         .unwrap();
 
@@ -141,7 +141,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
         [-radius_xz, -ground_depth * 8 / 10, -radius_xz],
         [-exhibit_front_radius, sky_height, -exhibit_front_radius],
     );
-    space.fill(landscape_region, |_| Some(&AIR)).unwrap();
+    space.fill_uniform(landscape_region, AIR).unwrap();
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0);
     planner.occupied_plots.push(landscape_region);
 
@@ -161,9 +161,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
             [plot.upper_bounds().x + 1, 1, plot.upper_bounds().z + 1],
         );
         space
-            .fill(enclosure, |_| {
-                Some(&*landscape_blocks[LandscapeBlocks::Stone])
-            })
+            .fill_uniform(enclosure, &*landscape_blocks[LandscapeBlocks::Stone])
             .unwrap();
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.

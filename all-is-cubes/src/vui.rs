@@ -186,10 +186,10 @@ impl HudLayout {
             let mut add_frame = |z, color| {
                 let frame_block = Block::from(color);
                 space
-                    .fill(Grid::new((0, 0, z), (w, h, 1)), |_| Some(&frame_block))
+                    .fill_uniform(Grid::new((0, 0, z), (w, h, 1)), frame_block)
                     .unwrap();
                 space
-                    .fill(Grid::new((1, 1, z), (w - 2, h - 2, 1)), |_| Some(&AIR))
+                    .fill_uniform(Grid::new((1, 1, z), (w - 2, h - 2, 1)), &AIR)
                     .unwrap();
             };
             add_frame(grid.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
@@ -236,9 +236,7 @@ impl HudLayout {
             ),
         ));
         toolbar_text_space
-            .fill(toolbar_text_space.grid(), |_| {
-                Some(Block::from(Rgba::WHITE))
-            })
+            .fill_uniform(toolbar_text_space.grid(), Block::from(Rgba::WHITE))
             .unwrap();
         let toolbar_text_blocks = space_to_blocks(
             self.text_resolution(),
@@ -315,7 +313,7 @@ impl HudLayout {
                 panic!("failed to retrieve toolbar space")
             };
         let grid = toolbar_text_space.grid();
-        toolbar_text_space.fill(grid, |_| Some(&AIR)).unwrap();
+        toolbar_text_space.fill_uniform(grid, &AIR).unwrap();
 
         let text_width =
             text.len() as GridCoordinate * Font8x16::CHARACTER_SIZE.width as GridCoordinate;

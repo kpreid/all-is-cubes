@@ -72,22 +72,22 @@ fn cornell_box(_universe: &mut Universe) -> Space {
         .build();
 
     // Floor.
-    space.fill(Grid::new((0, -1, 0), (box_size, 1, box_size)), |_| Some(&white)).unwrap();
+    space.fill_uniform(Grid::new((0, -1, 0), (box_size, 1, box_size)), &white).unwrap();
     // Ceiling.
-    space.fill(Grid::new((0, box_size, 0), (box_size, 1, box_size)), |_| Some(&white)).unwrap();
+    space.fill_uniform(Grid::new((0, box_size, 0), (box_size, 1, box_size)), &white).unwrap();
     // Light in ceiling.
-    space.fill(Grid::from_lower_upper((21, box_size, 23), (34, box_size + 1, 33)), |_| Some(&light)).unwrap();
+    space.fill_uniform(Grid::from_lower_upper((21, box_size, 23), (34, box_size + 1, 33)), &light).unwrap();
     // Back wall.
-    space.fill(Grid::new((0, 0, -1), (box_size, box_size, 1)), |_| Some(&white)).unwrap();
+    space.fill_uniform(Grid::new((0, 0, -1), (box_size, box_size, 1)), &white).unwrap();
     // Right wall (green).
-    space.fill(Grid::new((box_size, 0, 0), (1, box_size, box_size)), |_| Some(&green)).unwrap();
+    space.fill_uniform(Grid::new((box_size, 0, 0), (1, box_size, box_size)), &green).unwrap();
     // Left wall (red).
-    space.fill(Grid::new((-1, 0, 0), (1, box_size, box_size)), |_| Some(&red)).unwrap();
+    space.fill_uniform(Grid::new((-1, 0, 0), (1, box_size, box_size)), &red).unwrap();
 
     // Block #1
-    space.fill(Grid::new((29, 0, 36), (16, 16, 15)), |_| Some(&white)).unwrap();
+    space.fill_uniform(Grid::new((29, 0, 36), (16, 16, 15)), &white).unwrap();
     // Block #2
-    space.fill(Grid::new((10, 0, 13), (18, 33, 15)), |_| Some(&white)).unwrap();
+    space.fill_uniform(Grid::new((10, 0, 13), (18, 33, 15)), &white).unwrap();
 
     // TODO: Explicitly define camera.
 
