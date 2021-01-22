@@ -3,7 +3,7 @@
 
 //! Components for "apps", or game clients: user interface and top-level state.
 
-use cgmath::{Vector3, Zero as _};
+use cgmath::{Vector2, Vector3, Zero as _};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
@@ -120,15 +120,20 @@ impl AllIsCubesAppState {
 ///    of input on the relevant [`Camera`].
 /// 3. The game loop should call [`InputProcessor::step`] to apply the effects of time
 ///    on the input processor.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct InputProcessor {
     keys_held: HashSet<Key>,
     momentary_timeout: HashMap<Key, Duration>,
+    mouselook_buffer: Vector2<FreeCoordinate>,
 }
 
 impl InputProcessor {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            keys_held: HashSet::new(),
+            momentary_timeout: HashMap::new(),
+            mouselook_buffer: Vector2::zero(),
+        }
     }
 
     fn is_bound(key: Key) -> bool {
@@ -175,6 +180,15 @@ impl InputProcessor {
         self.key_down(key)
     }
 
+    /// Provide relative movement information for mouselook.
+    ///
+    /// This value is an accumulated displacement, not an angular velocity, so it is not
+    /// suitable for joystick-type input.
+    pub fn mouselook_delta(&mut self, delta: Vector2<FreeCoordinate>) {
+        // TODO: sensitivity option
+        self.mouselook_buffer += delta * 0.2;
+    }
+
     /// Returns the character movement velocity that input is currently requesting.
     pub fn movement(&self) -> Vector3<FreeCoordinate> {
         Vector3::new(
@@ -201,24 +215,29 @@ impl InputProcessor {
             self.momentary_timeout.remove(&key);
             self.key_up(key);
         }
+
+        self.mouselook_buffer = Vector2::zero();
     }
 
     /// Applies the current input to the given `Camera`.
-    pub fn apply_input(&self, camera: &mut Camera, timestep: Duration) {
+    pub fn apply_input(&mut self, camera: &mut Camera, timestep: Duration) {
         let movement = self.movement();
         if movement != Vector3::zero() {
             camera.auto_rotate = false;
         }
         camera.set_velocity_input(movement);
 
-        let turning_step = 80.0 * timestep.as_secs_f64();
+        let dt = timestep.as_secs_f64();
+        let key_turning_step = 80.0 * dt;
         camera.body.yaw = (camera.body.yaw
-            + turning_step * self.net_movement(Key::Left, Key::Right))
-        .rem_euclid(360.0);
+            + key_turning_step * self.net_movement(Key::Left, Key::Right)
+            + self.mouselook_buffer.x)
+            .rem_euclid(360.0);
         camera.body.pitch = (camera.body.pitch
-            + turning_step * self.net_movement(Key::Up, Key::Down))
-        .min(90.0)
-        .max(-90.0);
+            + key_turning_step * self.net_movement(Key::Up, Key::Down)
+            + self.mouselook_buffer.y)
+            .min(90.0)
+            .max(-90.0);
 
         if self.keys_held.contains(&Key::Character(' ')) {
             camera.jump_if_able();
