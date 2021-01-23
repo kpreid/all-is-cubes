@@ -4,7 +4,7 @@
 //! Glue between [`all_is_cubes`] and [`glfw`] & [`luminance_glfw`].
 
 use cgmath::{Point2, Vector2};
-use glfw::{Action, Context as _, WindowEvent};
+use glfw::{Action, Context as _, Window, WindowEvent};
 use luminance_glfw::GlfwSurface;
 use luminance_windowing::{WindowDim, WindowOpt};
 use std::error::Error;
@@ -40,7 +40,7 @@ pub fn glfw_main_loop(
     });
 
     let surface = GlfwSurface::new_gl33(window_title, WindowOpt::default().set_dim(dim))?;
-    let viewport = map_glfw_viewport(&surface);
+    let viewport = map_glfw_viewport(&surface.window);
     // TODO: this is duplicated code with the wasm version; use a logging system to remove it
     let mut renderer = GLRenderer::new(surface, viewport)
         .handle_warnings(|warning| {
@@ -62,7 +62,7 @@ pub fn glfw_main_loop(
     'app: loop {
         if resize {
             resize = false;
-            renderer.set_viewport(map_glfw_viewport(&renderer.surface));
+            renderer.set_viewport(map_glfw_viewport(&renderer.surface.window));
         }
         if update_cursor {
             renderer.set_cursor_position(
@@ -148,10 +148,10 @@ pub fn glfw_main_loop(
     Ok(())
 }
 
-pub fn map_glfw_viewport(surface: &GlfwSurface) -> Viewport {
+pub fn map_glfw_viewport(window: &Window) -> Viewport {
     Viewport {
-        viewport_px: Vector2::from(surface.window.get_size()).map(|x| x as usize),
-        viewport_dev: Vector2::from(surface.window.get_framebuffer_size())
+        viewport_px: Vector2::from(window.get_size()).map(|x| x as usize),
+        viewport_dev: Vector2::from(window.get_framebuffer_size())
             .map(|x| x as u32)
             .into(),
     }
