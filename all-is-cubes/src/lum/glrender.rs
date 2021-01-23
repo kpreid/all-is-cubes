@@ -3,7 +3,7 @@
 
 //! OpenGL-based graphics rendering.
 
-use cgmath::{Point2, Vector2};
+use cgmath::Point2;
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
@@ -13,7 +13,7 @@ use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
-use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper};
+use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper, Viewport};
 use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
@@ -28,15 +28,6 @@ use crate::vui::Vui;
 // TODO: Make these a runtime toggle
 const DRAW_LIGHTING_DEBUG: bool = false;
 const DRAW_COLLISION_BOXES: bool = false;
-
-/// Viewport dimensions for `GLRenderer`.
-/// Field types at the whim of what's useful for the code that uses it.
-pub struct Viewport {
-    /// Viewport dimensions to use for aspect ratio and click calculations.
-    pub viewport_px: Vector2<usize>,
-    /// Viewport dimensions to use for framebuffer configuration.
-    pub viewport_dev: [u32; 2],
-}
 
 /// Game world/UI renderer targeting `luminance`.
 // TODO: give this and its module a better name
@@ -70,11 +61,13 @@ where
     pub fn new(mut surface: C, viewport: Viewport) -> WarningsResult<Self, String, String> {
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
         let (block_program, warnings) = prepare_block_program(&mut surface)?;
-        let back_buffer =
-            luminance::framebuffer::Framebuffer::back_buffer(&mut surface, viewport.viewport_dev)
-                .unwrap(); // TODO error handling
+        let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
+            &mut surface,
+            viewport.framebuffer_size.into(),
+        )
+        .unwrap(); // TODO error handling
 
-        let mut ui_proj = ProjectionHelper::new(1.0, viewport.viewport_px);
+        let mut ui_proj = ProjectionHelper::new(viewport);
         ui_proj.set_fov_y(Vui::SUGGESTED_FOV_Y);
 
         Ok((
@@ -85,7 +78,7 @@ where
                 camera: None,
                 world_renderer: None,
                 ui_renderer: None,
-                world_proj: ProjectionHelper::new(1.0, viewport.viewport_px),
+                world_proj: ProjectionHelper::new(viewport),
                 ui_proj,
                 cursor_result: None,
             },
@@ -95,9 +88,9 @@ where
 
     /// Sets the expected viewport dimensions. Use in case of window resizing.
     pub fn set_viewport(&mut self, viewport: Viewport) {
-        self.world_proj.set_viewport(viewport.viewport_px);
+        self.world_proj.set_viewport(viewport);
 
-        self.ui_proj.set_viewport(viewport.viewport_px);
+        self.ui_proj.set_viewport(viewport);
         if let Some(ui_renderer) = &self.ui_renderer {
             // Note: Since this is conditional, we also have to set it up in
             // set_ui_space when ui_renderer becomes Some.
@@ -109,7 +102,7 @@ where
 
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut self.surface,
-            viewport.viewport_dev,
+            viewport.framebuffer_size.into(),
         )
         .unwrap(); // TODO error handling
     }

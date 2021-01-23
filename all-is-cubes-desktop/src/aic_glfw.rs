@@ -11,7 +11,8 @@ use std::error::Error;
 use std::time::Instant;
 
 use all_is_cubes::apps::AllIsCubesAppState;
-use all_is_cubes::lum::glrender::{GLRenderer, Viewport};
+use all_is_cubes::camera::Viewport;
+use all_is_cubes::lum::glrender::GLRenderer;
 use all_is_cubes::util::Warnings;
 
 /// Run GLFW-based rendering and event loop.
@@ -150,10 +151,8 @@ pub fn glfw_main_loop(
 
 pub fn map_glfw_viewport(window: &Window) -> Viewport {
     Viewport {
-        viewport_px: Vector2::from(window.get_size()).map(|x| x as usize),
-        viewport_dev: Vector2::from(window.get_framebuffer_size())
-            .map(|x| x as u32)
-            .into(),
+        nominal_size: Vector2::from(window.get_size()).map(|s| s.into()),
+        framebuffer_size: Vector2::from(window.get_framebuffer_size()).map(|s| s as u32),
     }
 }
 

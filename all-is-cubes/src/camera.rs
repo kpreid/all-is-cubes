@@ -264,12 +264,10 @@ type M = Matrix4<FreeCoordinate>;
 ///
 /// Also stores an externally-provided view matrix (world space to camera space).
 /// If not needed, can be ignored.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct ProjectionHelper {
     // Caller-provided data
-    viewport: Vector2<usize>,
-    /// Width divided by height of a single pixel.
-    pixel_aspect_ratio: FreeCoordinate,
+    viewport: Viewport,
     view: M,
     fov_y: Deg<FreeCoordinate>,
 
@@ -285,18 +283,9 @@ pub struct ProjectionHelper {
 
 #[allow(clippy::cast_lossless)]
 impl ProjectionHelper {
-    /// `pixel_aspect_ratio` is the width divided by the height
-    pub fn new(pixel_aspect_ratio: FreeCoordinate, viewport: impl Into<Vector2<usize>>) -> Self {
-        let viewport = viewport.into();
-        assert!(
-            pixel_aspect_ratio.is_finite(),
-            "pixel_aspect_ratio must be finite"
-        );
-        assert!(viewport.x > 0, "viewport.x must be > 0");
-        assert!(viewport.y > 0, "viewport.y must be > 0");
+    pub fn new(viewport: Viewport) -> Self {
         let mut new_self = Self {
             viewport,
-            pixel_aspect_ratio,
             fov_y: Deg(90.0),
             projection: M::identity(), // overwritten immediately
             view: M::identity(),
@@ -308,17 +297,13 @@ impl ProjectionHelper {
     }
 
     /// Returns the viewport value last provided.
-    pub fn viewport(&self) -> Vector2<usize> {
+    pub fn viewport(&self) -> Viewport {
         self.viewport
     }
 
-    /// Sets the viewport, and recalculates matrices to be suitable for the new viewport's
-    /// aspect ratio.
-    ///
-    /// The viewport dimensions are assumed to be in “pixels” — this determines the
-    /// scale of the integer values passed to [`normalize_pixel_x`](Self::normalize_pixel_x)
-    /// and [`normalize_pixel_y`](Self::normalize_pixel_y).
-    pub fn set_viewport(&mut self, viewport: Vector2<usize>) {
+    /// Sets the contained viewport value, and recalculates matrices to be suitable for
+    /// the new viewport's aspect ratio.
+    pub fn set_viewport(&mut self, viewport: Viewport) {
         if viewport != self.viewport {
             self.viewport = viewport;
             self.compute_matrices();
@@ -343,10 +328,7 @@ impl ProjectionHelper {
 
     /// Set the current cursor position. In the same pixel units as `set_viewport`.
     pub fn set_cursor_position(&mut self, position: Point2<usize>) {
-        self.cursor_ndc_position = Vector2::new(
-            self.normalize_pixel_x(position.x),
-            self.normalize_pixel_y(position.y),
-        );
+        self.cursor_ndc_position = self.viewport.normalize_nominal_point(position);
     }
 
     /// Sets the view matrix.
@@ -359,16 +341,6 @@ impl ProjectionHelper {
             self.view = view;
             self.compute_matrices();
         }
-    }
-
-    /// As per OpenGL normalized device coordinates, output ranges from -1 to 1.
-    pub fn normalize_pixel_x(&self, x: usize) -> FreeCoordinate {
-        (x as FreeCoordinate + 0.5) / (self.viewport.x as FreeCoordinate) * 2.0 - 1.0
-    }
-
-    /// As per OpenGL normalized device coordinates, output ranges from -1 to 1.
-    pub fn normalize_pixel_y(&self, y: usize) -> FreeCoordinate {
-        -((y as FreeCoordinate + 0.5) / (self.viewport.y as FreeCoordinate) * 2.0 - 1.0)
     }
 
     /// Returns a projection matrix suitable for OpenGL use.
@@ -405,11 +377,9 @@ impl ProjectionHelper {
     }
 
     fn compute_matrices(&mut self) {
-        let aspect_ratio = self.pixel_aspect_ratio
-            * ((self.viewport.x as FreeCoordinate) / (self.viewport.y as FreeCoordinate));
         self.projection = cgmath::perspective(
             self.fov_y(),
-            aspect_ratio,
+            self.viewport.nominal_aspect_ratio(),
             /* near: */ 0.1,
             /* far: */ 2000.0,
         );
@@ -417,6 +387,58 @@ impl ProjectionHelper {
             .inverse_transform()
             .expect("projection and view matrix was not invertible");
     }
+}
+
+/// Viewport dimensions for rendering and UI layout with the correct resolution and
+/// aspect ratio.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Viewport {
+    /// Viewport dimensions to use for determining aspect ratio and interpreting
+    /// pointer events.
+    pub nominal_size: Vector2<FreeCoordinate>,
+    /// Viewport dimensions to use for framebuffer configuration.
+    /// This aspect ratio may differ to represent non-square pixels.
+    pub framebuffer_size: Vector2<u32>,
+}
+
+impl Viewport {
+    #![allow(clippy::cast_lossless)] // lossiness depends on size of usize
+
+    /// Calculates the aspect ratio (width divided by height) of the `nominal_size` of this
+    /// viewport.
+    #[inline]
+    pub fn nominal_aspect_ratio(&self) -> FreeCoordinate {
+        self.nominal_size.x / self.nominal_size.y
+    }
+
+    /// Convert an *x* coordinate from the range `0..self.framebuffer_size.x` (upper exclusive)
+    /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel centers).
+    #[inline]
+    pub fn normalize_fb_x(&self, x: usize) -> FreeCoordinate {
+        (x as FreeCoordinate + 0.5) / FreeCoordinate::from(self.framebuffer_size.x) * 2.0 - 1.0
+    }
+
+    /// Convert a *y* coordinate from the range `0..self.framebuffer_size.y` (upper exclusive)
+    /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel centers) and flipped.
+    #[inline]
+    pub fn normalize_fb_y(&self, y: usize) -> FreeCoordinate {
+        -((y as FreeCoordinate + 0.5) / FreeCoordinate::from(self.framebuffer_size.y) * 2.0 - 1.0)
+    }
+
+    /// Convert a point in the `self.nominal_size` coordinate system to
+    /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel centers) with Y flipped.
+    ///
+    /// TODO: this should take float input, probably
+    #[inline]
+    pub fn normalize_nominal_point(&self, nominal_point: Point2<usize>) -> Vector2<FreeCoordinate> {
+        Vector2::new(
+            (nominal_point.x as FreeCoordinate + 0.5) / self.nominal_size.x * 2.0 - 1.0,
+            -((nominal_point.y as FreeCoordinate + 0.5) / self.nominal_size.y * 2.0 - 1.0),
+        )
+    }
+
+    // TODO: Maybe have a validate() that checks if the data is not fit for producing an
+    // invertible transform.
 }
 
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.

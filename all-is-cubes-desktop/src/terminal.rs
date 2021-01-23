@@ -16,16 +16,16 @@ use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
-use all_is_cubes::camera::{Camera, ProjectionHelper};
+use all_is_cubes::camera::{Camera, ProjectionHelper, Viewport};
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::math::{NotNan, Rgba};
+use all_is_cubes::math::{FreeCoordinate, NotNan, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
 pub fn terminal_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
     app.camera().borrow_mut().auto_rotate = true;
 
-    let mut proj: ProjectionHelper = ProjectionHelper::new(0.5, viewport_from_terminal_size()?);
+    let mut proj: ProjectionHelper = ProjectionHelper::new(viewport_from_terminal_size()?);
     let mut out = io::stdout().into_raw_mode()?;
 
     // Park stdin blocking reads on another thread.
@@ -104,11 +104,16 @@ pub fn map_termion_event(event: &Event) -> Option<Key> {
 
 /// Obtain the terminal size and adjust it such that it is suitable for a
 /// `ProjectionHelper::set_viewport` followed by `draw_space`.
-pub fn viewport_from_terminal_size() -> io::Result<Vector2<usize>> {
+pub fn viewport_from_terminal_size() -> io::Result<Viewport> {
     let (w, h) = termion::terminal_size()?;
     // max(1) is to keep the projection math from blowing up.
     // Subtracting some height allows for info text.
-    Ok(Vector2::new(w.max(1) as usize, (h - 5).max(1) as usize))
+    let w = w.max(1);
+    let h = (h - 5).max(1);
+    Ok(Viewport {
+        framebuffer_size: Vector2::new(w.into(), h.into()),
+        nominal_size: Vector2::new(FreeCoordinate::from(w) * 0.5, h.into()),
+    })
 }
 
 /// Draw the camera's space to an ANSI terminal using raytracing.

@@ -13,7 +13,7 @@
 //! In the future (or currently, if I forgot to update this comment), it will be used
 //! as a means to display the state of `Space`s used for testing inline in test output.
 
-use cgmath::{EuclideanSpace as _, Matrix4, Point3, Vector3, Zero as _};
+use cgmath::{EuclideanSpace as _, Matrix4, Point3, Vector2, Vector3, Zero as _};
 use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
@@ -21,7 +21,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 
 use crate::block::{evaluated_block_resolution, Evoxel};
-use crate::camera::{eye_for_look_at, ProjectionHelper};
+use crate::camera::{eye_for_look_at, ProjectionHelper, Viewport};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
@@ -158,14 +158,15 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
         F: FnMut(&str) -> Result<(), E>,
     {
         let viewport = projection.viewport();
-        let output_iterator = (0..viewport.y)
+        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
+        let output_iterator = (0..viewport_size.y)
             .into_par_iter()
             .map(move |ych| {
-                let y = projection.normalize_pixel_y(ych);
-                (0..viewport.x)
+                let y = viewport.normalize_fb_y(ych);
+                (0..viewport_size.x)
                     .into_par_iter()
                     .map(move |xch| {
-                        let x = projection.normalize_pixel_x(xch);
+                        let x = viewport.normalize_fb_x(xch);
                         self.trace_ray(projection.project_ndc_into_world(x, y))
                     })
                     .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
@@ -192,10 +193,11 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
         let mut total_info = RaytraceInfo::default();
 
         let viewport = projection.viewport();
-        for ych in 0..viewport.y {
-            let y = projection.normalize_pixel_y(ych);
-            for xch in 0..viewport.x {
-                let x = projection.normalize_pixel_x(xch);
+        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
+        for ych in 0..viewport_size.y {
+            let y = viewport.normalize_fb_y(ych);
+            for xch in 0..viewport_size.x {
+                let x = viewport.normalize_fb_x(xch);
                 let (text, info) = self.trace_ray(projection.project_ndc_into_world(x, y));
                 total_info += info;
                 write(text.as_ref())?;
@@ -255,7 +257,10 @@ fn print_space_impl<F: FnMut(&str)>(
     mut write: F,
 ) -> RaytraceInfo {
     // TODO: optimize height (and thus aspect ratio) for the shape of the space
-    let mut projection = ProjectionHelper::new(0.5, (80, 40));
+    let mut projection = ProjectionHelper::new(Viewport {
+        nominal_size: Vector2::new(40., 40.),
+        framebuffer_size: Vector2::new(80, 40),
+    });
     projection.set_view_matrix(Matrix4::look_at_rh(
         eye_for_look_at(space.grid(), direction.into()),
         space.grid().center(),

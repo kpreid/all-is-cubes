@@ -5,8 +5,8 @@
 use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::lum::glrender::Viewport;
 use all_is_cubes::math::FreeCoordinate;
 
 #[wasm_bindgen(raw_module = "gui")]
@@ -29,21 +29,12 @@ extern "C" {
 }
 
 impl CanvasHelper {
-    pub fn viewport_px(&self) -> Vector2<usize> {
-        let raw = self.viewport_px_raw();
-        Vector2::new(raw[0] as usize, raw[1] as usize)
-    }
-
-    // TODO: return type is at the whim of what's useful for luminance right now
-    pub fn viewport_dev(&self) -> [u32; 2] {
-        let raw = self.viewport_dev_raw();
-        [raw[0] as u32, raw[1] as u32]
-    }
-
     pub fn viewport(&self) -> Viewport {
+        let raw_px = self.viewport_px_raw();
+        let raw_dev = self.viewport_dev_raw();
         Viewport {
-            viewport_px: self.viewport_px(),
-            viewport_dev: self.viewport_dev(),
+            nominal_size: Vector2::new(raw_px[0], raw_px[1]),
+            framebuffer_size: Vector2::new(raw_dev[0] as u32, raw_dev[1] as u32),
         }
     }
 
