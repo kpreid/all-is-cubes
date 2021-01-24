@@ -354,8 +354,7 @@ impl ProjectionHelper {
     }
 
     /// Converts a screen position in normalized device coordinates (as produced by
-    /// [`normalize_pixel_x`](Self::normalize_pixel_x) and
-    /// [`normalize_pixel_y`](Self::normalize_pixel_y)) into a ray in world space.
+    /// [`Viewport::normalize_nominal_point`]) into a ray in world space.
     /// Uses the view transformation given by [`set_view_matrix`](Self::set_view_matrix).
     pub fn project_ndc_into_world(&self, ndc_x: FreeCoordinate, ndc_y: FreeCoordinate) -> Ray {
         let ndc_near = Vector4::new(ndc_x, ndc_y, -1.0, 1.0);
