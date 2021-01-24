@@ -383,7 +383,6 @@ impl Space {
         B: std::borrow::Borrow<Block>,
     {
         if !self.grid().contains_grid(region) {
-            // TODO: Compute a cube that's *actually* out of bounds. Or change the definition of OutOfBounds.
             return Err(SetCubeError::OutOfBounds(region));
         }
         for cube in region.interior_iter() {
