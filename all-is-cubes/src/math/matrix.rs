@@ -228,6 +228,12 @@ pub struct GridRotation {
 }
 
 impl GridRotation {
+    pub const IDENTITY: Self = Self {
+        x: Face::PX,
+        y: Face::PY,
+        z: Face::PZ,
+    };
+
     pub fn from_basis(basis: impl Into<Vector3<Face>>) -> Self {
         let basis = basis.into();
         Self {
@@ -282,6 +288,21 @@ impl GridRotation {
     }
 }
 
+impl Default for GridRotation {
+    /// Returns the identity (no rotation).
+    #[doc(inline)]
+    fn default() -> Self {
+        Self::IDENTITY
+    }
+}
+
+impl One for GridRotation {
+    /// Returns the identity (no rotation).
+    fn one() -> Self {
+        Self::IDENTITY
+    }
+}
+
 impl Mul<Self> for GridRotation {
     type Output = Self;
 
@@ -317,6 +338,7 @@ impl Mul<Self> for GridRotation {
 mod tests {
     use super::*;
     use rand::{Rng, SeedableRng as _};
+    use Face::*;
 
     fn random_grid_matrix(mut rng: impl Rng) -> GridMatrix {
         let mut r = || rng.gen_range(-100..=100);
@@ -367,5 +389,15 @@ mod tests {
             let m2 = random_grid_matrix(&mut rng);
             assert_eq!(m1.concat(&m2).to_free(), m1.to_free().concat(&m2.to_free()),);
         }
+    }
+
+    #[test]
+    fn rotation_identity() {
+        assert_eq!(GridRotation::IDENTITY, GridRotation::one());
+        assert_eq!(GridRotation::IDENTITY, GridRotation::default());
+        assert_eq!(
+            GridRotation::IDENTITY,
+            GridRotation::from_basis([PX, PY, PZ])
+        );
     }
 }
