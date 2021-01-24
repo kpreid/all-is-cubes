@@ -532,9 +532,9 @@ mod tests {
     fn transform_general() {
         assert_eq!(
             Grid::new([1, 2, 3], [10, 20, 30]).transform(GridMatrix::new(
-                0, 1, 0,
-                2, 0, 0,
-                0, 0, -1,
+                0, 1, 0, //
+                2, 0, 0, //
+                0, 0, -1, //
                 100, 100, 100,
             )),
             Some(Grid::new([104, 101, 67], [40, 10, 30]))
@@ -545,16 +545,16 @@ mod tests {
     fn transform_error_simple() {
         assert_eq!(
             Grid::new([1, 2, 3], [10, 20, 30]).transform(GridMatrix::new(
-                1, 0, 0,
-                0, 0, 0,
-                0, 0, 1,
+                1, 0, 0, //
+                0, 0, 0, //
+                0, 0, 1, //
                 3, 4, 5
             )),
             None
         );
     }
 
-    // TODO: test and improve transform() on matrices with skew / other non-axis-swaps    
+    // TODO: test and improve transform() on matrices with skew / other non-axis-swaps
 
     #[test]
     fn debug() {
