@@ -130,7 +130,7 @@ impl AllIsCubesAppState {
         let character = self.game_character.borrow_mut();
         self.cursor_result = self
             .input_processor
-            .mouse_ndc_position // TODO accessor
+            .cursor_ndc_position() // TODO accessor
             .map(|p| camera.project_ndc_into_world(p))
             .and_then(|ray| cursor_raycast(ray.cast(), &*character.space.borrow()));
     }
@@ -164,9 +164,11 @@ pub struct InputProcessor {
     /// once per press rather than while held.
     command_buffer: Vec<Key>,
 
+    mouselook_mode: bool,
     /// Net mouse movement since the last [`Self::apply_input`].
     mouselook_buffer: Vector2<FreeCoordinate>,
 
+    /// Mouse position in NDC. None if out of bounds/lost focus.
     mouse_ndc_position: Option<Point2<FreeCoordinate>>,
 }
 
@@ -177,6 +179,7 @@ impl InputProcessor {
             keys_held: HashSet::new(),
             momentary_timeout: HashMap::new(),
             command_buffer: Vec::new(),
+            mouselook_mode: false, // TODO: might want a parameter
             mouselook_buffer: Vector2::zero(),
             mouse_ndc_position: Some(Point2::origin()),
         }
@@ -199,6 +202,7 @@ impl InputProcessor {
             Key::Down => true,
             Key::Character(' ') => true,
             Key::Character(d) if d.is_ascii_digit() => true,
+            Key::Character('l') => true,
             _ => false,
         }
     }
@@ -208,6 +212,7 @@ impl InputProcessor {
         #[allow(clippy::match_like_matches_macro)]
         match key {
             Key::Character(d) if d.is_ascii_digit() => true,
+            Key::Character('l') => true,
             _ => false,
         }
     }
@@ -250,6 +255,13 @@ impl InputProcessor {
             self.keys_held.clear();
             self.momentary_timeout.clear();
         }
+    }
+
+    /// True when the UI is in a state which _should_ have mouse pointer
+    /// lock/capture/disable. This is not the same as actually having it since the window
+    /// may lack focus, the application may lack permission, etc.
+    pub fn wants_pointer_lock(&self) -> bool {
+        self.mouselook_mode
     }
 
     /// Provide relative movement information for mouselook.
@@ -350,6 +362,10 @@ impl InputProcessor {
 
         for key in self.command_buffer.drain(..) {
             match key {
+                Key::Character('l') => {
+                    self.mouselook_mode = !self.mouselook_mode;
+                    dbg!(self.mouselook_mode);
+                }
                 Key::Character(numeral) if numeral.is_digit(10) => {
                     let digit = numeral.to_digit(10).unwrap() as usize;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
@@ -357,6 +373,19 @@ impl InputProcessor {
                 }
                 _ => {}
             }
+        }
+    }
+
+    /// Returns the position which should be used for click/cursor raycasting.
+    /// This is not necessarily equal to the tracked mouse position.
+    ///
+    /// Returns [`None`] if the mouse position is out of bounds, the window has lost
+    /// focus, or similar conditions under which no cursor should be shown.
+    pub fn cursor_ndc_position(&self) -> Option<Point2<FreeCoordinate>> {
+        if self.mouselook_mode {
+            Some(Point2::origin())
+        } else {
+            self.mouse_ndc_position
         }
     }
 

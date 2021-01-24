@@ -64,7 +64,10 @@ pub fn glfw_main_loop(
     renderer.set_character(Some(app.character().clone()));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
+    // TODO: InputProcessor should help with this ... though the need for delta is a GLFW quirk
     let mut cursor_in_window = true;
+    let mut prev_cursor = None;
+
     'app: loop {
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
@@ -76,6 +79,17 @@ pub fn glfw_main_loop(
         } else {
             std::thread::yield_now();
         }
+
+        // Sync UI state back to glfw
+        renderer
+            .surface
+            .window
+            .set_cursor_mode(if app.input_processor.wants_pointer_lock() {
+                glfw::CursorMode::Disabled
+            } else {
+                prev_cursor = None;
+                glfw::CursorMode::Normal
+            });
 
         // Poll for events after drawing, so that on the first loop iteration we draw
         // before the window is visible (at least on macOS).
@@ -103,9 +117,17 @@ pub fn glfw_main_loop(
                 WindowEvent::CharModifiers(..) => {}
 
                 // Mouse input
-                WindowEvent::CursorPos(..) => {
+                WindowEvent::CursorPos(x, y) => {
                     // TODO: Now that InputProcessor does its own framing checks, can we skip having the cursor_in_window flag?
-                    if cursor_in_window {
+                    if app.input_processor.wants_pointer_lock() {
+                        let new_cursor = Vector2::new(x, y);
+                        if let Some(prev_cursor) = prev_cursor {
+                            let delta = new_cursor - prev_cursor;
+                            // TODO: Make input_processor responsible for tracking deltas.
+                            app.input_processor.mouselook_delta(delta);
+                        }
+                        prev_cursor = Some(new_cursor);
+                    } else if cursor_in_window {
                         app.input_processor.mouse_pixel_position(
                             renderer.viewport(),
                             Some(
