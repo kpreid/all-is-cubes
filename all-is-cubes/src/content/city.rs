@@ -75,11 +75,12 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
     // Roads and lamps
     for &face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
         let forward: GridVector = face.normal_vector();
+        let perpendicular: GridVector = forward.cross(Face::PY.normal_vector());
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within_grid(space.grid());
+        let curb_y = GridVector::unit_y();
         for (i, step) in raycaster.enumerate() {
             let i = i as GridCoordinate;
-            let perpendicular: GridVector = forward.cross(Face::PY.normal_vector());
             for p in -road_radius..=road_radius {
                 space
                     .set(step.cube_ahead() + perpendicular * p, &*demo_blocks[Road])
@@ -101,10 +102,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
                             curb.rotate(GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]));
                     }
                     space
-                        .set(
-                            step.cube_ahead() + perpendicular * p + GridVector::unit_y(),
-                            curb,
-                        )
+                        .set(step.cube_ahead() + perpendicular * p + curb_y, curb)
                         .unwrap();
                 }
             }
@@ -119,6 +117,16 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
                         .unwrap();
                 }
             }
+        }
+
+        // Patch up curb corners
+        for &p in &[-(road_radius + 1), road_radius + 1] {
+            space
+                .set(
+                    GridPoint::origin() + curb_y + forward * (road_radius + 1) + perpendicular * p,
+                    &*demo_blocks[CurbCorner],
+                )
+                .unwrap();
         }
     }
 

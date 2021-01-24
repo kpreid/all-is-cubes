@@ -4,15 +4,15 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-use cgmath::ElementWise as _;
+use cgmath::{ElementWise as _, Transform as _};
 use noise::Seedable as _;
 
 use crate::block::{Block, BlockCollision, AIR};
 use crate::content::landscape::install_landscape_blocks;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
-    int_magnitude_squared, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, NotNan, Rgb,
-    Rgba,
+    int_magnitude_squared, Face, GridCoordinate, GridPoint, GridRotation, GridVector,
+    NoiseFnExt as _, NotNan, Rgb, Rgba,
 };
 use crate::universe::{InsertError, Universe};
 
@@ -23,6 +23,7 @@ pub enum DemoBlocks {
     Lamppost,
     Road,
     Curb,
+    CurbCorner,
 }
 impl BlockModule for DemoBlocks {
     fn namespace() -> &'static str {
@@ -44,6 +45,19 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
     let road_noise = noise::ScaleBias::new(&road_noise_v)
         .set_bias(1.0)
         .set_scale(0.04);
+
+    let curb_fn = |cube: GridPoint| {
+        let width = resolution_g / 3;
+        if int_magnitude_squared(
+            (cube - GridPoint::new(width / 2 + 2, 0, 0)).mul_element_wise(GridVector::new(1, 2, 0)),
+        ) < width.pow(2)
+        {
+            scale_color(curb_color.clone(), road_noise.at_grid(cube), 0.02)
+        } else {
+            AIR
+        }
+    };
+
     BlockProvider::<DemoBlocks>::new(|key| match key {
         Road => Block::builder()
             .display_name("Road")
@@ -87,17 +101,29 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
         Curb => Block::builder()
             .display_name("Curb")
             .collision(BlockCollision::None) // TODO: make solid when we have voxel-level collision
+            .voxels_fn(universe, resolution, curb_fn)
+            .unwrap()
+            .build(),
+
+        CurbCorner => Block::builder()
+            .display_name("Curb Corner")
+            .collision(BlockCollision::None) // TODO: make solid when we have voxel-level collision
             .voxels_fn(universe, resolution, |cube| {
-                let width = resolution_g / 3;
-                if int_magnitude_squared(
-                    (cube - GridPoint::new(width / 2 + 2, 0, 0))
-                        .mul_element_wise(GridVector::new(1, 2, 0)),
-                ) < width.pow(2)
-                {
-                    scale_color(curb_color.clone(), road_noise.at_grid(cube), 0.02)
-                } else {
-                    AIR
+                // TODO: rework so this isn't redoing the rotation calculations for every single voxel
+                // We should have tools for composing blocks instead...
+                let mut rot = GridRotation::IDENTITY;
+                for _ in 0..4 {
+                    let block = curb_fn(
+                        rot.to_positive_octant_matrix(resolution.into())
+                            .transform_point(cube),
+                    );
+                    if block != AIR {
+                        return block;
+                    }
+                    rot = rot * GridRotation::from_basis([Face::PZ, Face::PY, Face::NX]);
+                    // 90° around Y
                 }
+                AIR
             })
             .unwrap()
             .build(),
