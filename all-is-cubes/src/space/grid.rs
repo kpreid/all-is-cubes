@@ -283,6 +283,36 @@ impl Grid {
         true
     }
 
+    /// Returns the intersection of two grids, or None if they have no cubes in common.
+    ///
+    /// ```
+    /// use all_is_cubes::space::Grid;
+    ///
+    /// let g1 = Grid::new([1, 2, 3], [4, 5, 6]);
+    /// assert_eq!(g1.intersection(g1), Some(g1));
+    /// assert_eq!(
+    ///     Grid::new((0, 0, 0), (2, 2, 2)).intersection(
+    ///        Grid::new([2, 0, 0], (2, 1, 2))),
+    ///     None);
+    /// assert_eq!(Grid::new([0, 0, 0], [2, 2, 2]).intersection(
+    ///     Grid::new([1, 0, 0], [2, 1, 2])),
+    ///     Some(Grid::new([1, 0, 0], [1, 1, 2])));
+    /// ```
+    pub fn intersection(&self, other: Grid) -> Option<Grid> {
+        let lower = self
+            .lower_bounds()
+            .zip(other.lower_bounds(), GridCoordinate::max);
+        let upper = self
+            .upper_bounds()
+            .zip(other.upper_bounds(), GridCoordinate::min);
+        for axis in 0..3 {
+            if upper[axis] <= lower[axis] {
+                return None;
+            }
+        }
+        Some(Grid::from_lower_upper(lower, upper))
+    }
+
     /// Returns a random cube contained by the grid.
     ///
     /// ```
