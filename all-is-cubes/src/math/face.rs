@@ -6,6 +6,7 @@
 
 use cgmath::{BaseNum, Vector3};
 pub use ordered_float::{FloatIsNan, NotNan};
+use std::convert::TryFrom;
 use std::ops::{Index, IndexMut};
 
 use crate::math::*;
@@ -246,6 +247,42 @@ impl Face {
                 0, 0, -1,
                 0, scale, scale,
             ),
+        }
+    }
+}
+
+impl TryFrom<GridVector> for Face {
+    /// Returns the original vector on failure.
+    /// (An error message would probably be too lacking context to be helpful.)
+    type Error = GridVector;
+
+    /// Recovers a `Face` from its corresponding unit normal vector. All other vectors
+    /// are rejected.
+    ///
+    /// ```
+    /// use all_is_cubes::math::{Face, GridVector};
+    /// use std::convert::TryFrom;
+    ///
+    /// // A Face may be converted from its normal vector.
+    /// for &face in Face::ALL_SEVEN {
+    ///     assert_eq!(Face::try_from(face.normal_vector()), Ok(face));
+    /// }
+    ///
+    /// // If the vector does not correspond to any Face, it is returned.
+    /// let v = GridVector::new(1, 2, 3);
+    /// assert_eq!(Face::try_from(v), Err(v));
+    /// ```
+    fn try_from(value: GridVector) -> Result<Self, Self::Error> {
+        use Face::*;
+        match value {
+            GridVector { x: 0, y: 0, z: 0 } => Ok(WITHIN),
+            GridVector { x: 1, y: 0, z: 0 } => Ok(PX),
+            GridVector { x: 0, y: 1, z: 0 } => Ok(PY),
+            GridVector { x: 0, y: 0, z: 1 } => Ok(PZ),
+            GridVector { x: -1, y: 0, z: 0 } => Ok(NX),
+            GridVector { x: 0, y: -1, z: 0 } => Ok(NY),
+            GridVector { x: 0, y: 0, z: -1 } => Ok(NZ),
+            not_unit_vector => Err(not_unit_vector),
         }
     }
 }
