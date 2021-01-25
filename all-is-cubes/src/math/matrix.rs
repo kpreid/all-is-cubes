@@ -7,6 +7,7 @@
 use cgmath::{InnerSpace, Matrix4, One, Transform, Vector3, Vector4, Zero as _};
 pub use ordered_float::{FloatIsNan, NotNan};
 use std::cmp::Ordering;
+use std::convert::TryFrom as _;
 use std::ops::Mul;
 
 use crate::math::*;
@@ -143,6 +144,36 @@ impl GridMatrix {
     pub fn transform_cube(&self, cube: GridPoint) -> GridPoint {
         self.transform_point(cube + Vector3::new(1, 1, 1))
             .zip(self.transform_point(cube), |a, b| a.min(b))
+    }
+
+    /// Decomposes a matrix into its rotation and translation components.
+    /// Returns `None` if the matrix has any scaling or skew.
+    ///
+    /// ```
+    /// use all_is_cubes::math::{Face::*, GridMatrix, GridRotation, GridVector};
+    ///
+    /// assert_eq!(
+    ///     GridMatrix::new(
+    ///         0, -1,  0,
+    ///         1,  0,  0,
+    ///         0,  0,  1,
+    ///         7,  3, -8,
+    ///     ).decompose(),
+    ///     Some((
+    ///         GridRotation::from_basis([NY, PX, PZ]),
+    ///         GridVector::new(7, 3, -8),
+    ///     )),
+    /// );
+    /// ```
+    pub fn decompose(self) -> Option<(GridRotation, GridVector)> {
+        Some((
+            GridRotation::from_basis([
+                Face::try_from(self.x).ok()?,
+                Face::try_from(self.y).ok()?,
+                Face::try_from(self.z).ok()?,
+            ]),
+            self.w,
+        ))
     }
 }
 
