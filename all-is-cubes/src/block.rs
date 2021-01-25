@@ -85,7 +85,7 @@ impl Block {
     /// use all_is_cubes::math::{Face::*, GridRotation};
     ///
     /// let block = make_some_blocks(1).swap_remove(0);
-    /// let clockwise = GridRotation::from_basis([PZ, PY, NX]);
+    /// let clockwise = GridRotation::CLOCKWISE;
     ///
     /// // Basic rotation
     /// let rotated = block.clone().rotate(clockwise);

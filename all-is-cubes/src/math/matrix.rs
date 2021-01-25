@@ -266,6 +266,42 @@ impl GridRotation {
         z: Face::PZ,
     };
 
+    /// The rotation that is clockwise in our Y-up right-handed coordinate system.
+    ///
+    /// ```
+    /// use all_is_cubes::math::{Face::*, GridRotation};
+    ///
+    /// assert_eq!(GridRotation::CLOCKWISE.transform(PX), PZ);
+    /// assert_eq!(GridRotation::CLOCKWISE.transform(PZ), NX);
+    /// assert_eq!(GridRotation::CLOCKWISE.transform(NX), NZ);
+    /// assert_eq!(GridRotation::CLOCKWISE.transform(NZ), PX);
+    ///
+    /// assert_eq!(GridRotation::CLOCKWISE.transform(PY), PY);
+    /// ```
+    pub const CLOCKWISE: Self = Self {
+        x: Face::PZ,
+        y: Face::PY,
+        z: Face::NX,
+    };
+
+    /// The rotation that is counterclockwise in our Y-up right-handed coordinate system.
+    ///
+    /// ```
+    /// use all_is_cubes::math::{Face::*, GridRotation};
+    ///
+    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PX), NZ);
+    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(NZ), NX);
+    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(NX), PZ);
+    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PZ), PX);
+    ///
+    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PY), PY);
+    /// ```
+    pub const COUNTERCLOCKWISE: Self = Self {
+        x: Face::NZ,
+        y: Face::PY,
+        z: Face::PX,
+    };
+
     pub fn from_basis(basis: impl Into<Vector3<Face>>) -> Self {
         let basis = basis.into();
         Self {
@@ -476,6 +512,14 @@ mod tests {
         assert_eq!(
             GridRotation::IDENTITY,
             GridRotation::from_basis([PX, PY, PZ])
+        );
+    }
+
+    #[test]
+    fn rotation_ccw_cw() {
+        assert_eq!(
+            GridRotation::IDENTITY,
+            GridRotation::COUNTERCLOCKWISE * GridRotation::CLOCKWISE
         );
     }
 }

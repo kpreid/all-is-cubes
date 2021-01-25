@@ -11,8 +11,8 @@ use crate::block::{Block, BlockCollision, AIR};
 use crate::content::landscape::install_landscape_blocks;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
-    int_magnitude_squared, Face, GridCoordinate, GridPoint, GridRotation, GridVector,
-    NoiseFnExt as _, NotNan, Rgb, Rgba,
+    int_magnitude_squared, GridCoordinate, GridPoint, GridRotation, GridVector, NoiseFnExt as _,
+    NotNan, Rgb, Rgba,
 };
 use crate::universe::{InsertError, Universe};
 
@@ -120,7 +120,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
                     if block != AIR {
                         return block;
                     }
-                    rot = rot * GridRotation::from_basis([Face::PZ, Face::PY, Face::NX]);
+                    rot = rot * GridRotation::CLOCKWISE;
                     // 90° around Y
                 }
                 AIR
