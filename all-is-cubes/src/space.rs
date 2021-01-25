@@ -103,7 +103,9 @@ impl std::fmt::Debug for SpaceBlockData {
 }
 
 /// Number used to compactly store blocks.
-pub(crate) type BlockIndex = u8;
+///
+/// TODO: This should be replaced with a dynamically variable size for efficient storage.
+pub(crate) type BlockIndex = u16;
 
 impl Space {
     /// Constructs a [`Space`] that is entirely filled with [`AIR`].
@@ -836,7 +838,7 @@ mod tests {
         );
         assert_eq!(
             SetCubeError::TooManyBlocks().to_string(),
-            "more than 256 block types is not yet supported"
+            "more than 65536 block types is not yet supported"
         );
     }
 
