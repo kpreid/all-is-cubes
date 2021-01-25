@@ -11,7 +11,9 @@ use std::convert::TryFrom;
 use std::ops::Range;
 
 use crate::block::Resolution;
-use crate::math::{FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use crate::math::{
+    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
+};
 
 /// Specifies the coordinate extent of a [`Space`](super::Space), as an axis-aligned box
 /// with integer coordinates whose volume is between 1 and [`usize::MAX`].
@@ -437,6 +439,36 @@ impl Grid {
         // permitted, and if we change that, this should match.
         assert!(scale != 0, "Grid::multiply: scale must be != 0");
         Self::new(self.lower_bounds * scale, self.sizes * scale)
+    }
+
+    /// Moves all bounds outward or inward by the specified distances.
+    ///
+    /// TODO: Currently this will panic if the result is empty. Make it return Option
+    /// instead.
+    ///
+    /// ```
+    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::FaceMap;
+    ///
+    /// assert_eq!(
+    ///     Grid::from_lower_upper([10, 10, 10], [20, 20, 20])
+    ///         .expand(FaceMap {
+    ///             within: 999, // This value is not used.
+    ///             nx: 1, ny: 2, nz: 3,
+    ///             px: 4, py: 5, pz: 6,
+    ///         }),
+    ///     Grid::from_lower_upper([9, 8, 7], [24, 25, 26]),
+    /// );
+    /// ```
+    #[inline]
+    pub fn expand(self, deltas: FaceMap<GridCoordinate>) -> Self {
+        use Face::*;
+        let l = self.lower_bounds();
+        let u = self.upper_bounds();
+        Self::from_lower_upper(
+            [l.x - deltas[NX], l.y - deltas[NY], l.z - deltas[NZ]],
+            [u.x + deltas[PX], u.y + deltas[PY], u.z + deltas[PZ]],
+        )
     }
 }
 
