@@ -4,8 +4,9 @@
 //! Integer-coordinate matrices.
 //! This module is private but reexported by its parent.
 
-use cgmath::{InnerSpace, Matrix4, One, Transform, Vector3, Vector4};
+use cgmath::{InnerSpace, Matrix4, One, Transform, Vector3, Vector4, Zero as _};
 pub use ordered_float::{FloatIsNan, NotNan};
+use std::cmp::Ordering;
 use std::ops::Mul;
 
 use crate::math::*;
@@ -203,7 +204,38 @@ impl Transform<GridPoint> for GridMatrix {
     }
 
     fn inverse_transform(&self) -> Option<Self> {
-        todo!()
+        // For now, implement this the expensive but simple way of borrowing float matrix ops.
+
+        const INVERSE_EPSILON: FreeCoordinate = 0.25 / (GridCoordinate::MAX as FreeCoordinate);
+        fn try_round(v: Vector4<FreeCoordinate>, expected_w: FreeCoordinate) -> Option<GridVector> {
+            let mut result = GridVector::zero();
+            for axis in 0..4 {
+                let rounded = v[axis].round();
+                let remainder = v[axis] - rounded;
+                if remainder.abs().partial_cmp(&INVERSE_EPSILON) != Some(Ordering::Less) {
+                    // The inverse matrix has a non-integer element.
+                    return None;
+                }
+                if axis == 3 {
+                    #[allow(clippy::float_cmp)]
+                    if rounded != expected_w {
+                        return None;
+                    }
+                } else {
+                    // TODO: check for overflow
+                    result[axis] = rounded as GridCoordinate;
+                }
+            }
+            Some(result)
+        }
+
+        let fi = self.to_free().inverse_transform()?;
+        Some(GridMatrix {
+            x: try_round(fi.x, 0.0)?,
+            y: try_round(fi.y, 0.0)?,
+            z: try_round(fi.z, 0.0)?,
+            w: try_round(fi.w, 1.0)?,
+        })
     }
 }
 
@@ -338,11 +370,30 @@ impl Mul<Self> for GridRotation {
 mod tests {
     use super::*;
     use rand::{Rng, SeedableRng as _};
+    use rand_xoshiro::Xoshiro256Plus;
     use Face::*;
 
     fn random_grid_matrix(mut rng: impl Rng) -> GridMatrix {
         let mut r = || rng.gen_range(-100..=100);
         GridMatrix::new(r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r())
+    }
+
+    fn random_possibly_invertible_matrix(mut rng: impl Rng) -> GridMatrix {
+        let mut r = |n: GridCoordinate| rng.gen_range(-n..=n);
+        GridMatrix::new(
+            r(1),
+            r(1),
+            r(1),
+            r(1),
+            r(1),
+            r(1),
+            r(1),
+            r(1),
+            r(1),
+            r(GridCoordinate::MAX / 10),
+            r(GridCoordinate::MAX / 10),
+            r(GridCoordinate::MAX / 10),
+        )
     }
 
     #[test]
@@ -364,7 +415,7 @@ mod tests {
 
     #[test]
     fn equivalent_transform() {
-        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(2897358920346590823);
+        let mut rng = Xoshiro256Plus::seed_from_u64(2897358920346590823);
         for _ in 1..100 {
             let m = random_grid_matrix(&mut rng);
             dbg!(m, m.to_free());
@@ -383,12 +434,32 @@ mod tests {
 
     #[test]
     fn equivalent_concat() {
-        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(5933089223468901296);
+        let mut rng = Xoshiro256Plus::seed_from_u64(5933089223468901296);
         for _ in 1..100 {
             let m1 = random_grid_matrix(&mut rng);
             let m2 = random_grid_matrix(&mut rng);
             assert_eq!(m1.concat(&m2).to_free(), m1.to_free().concat(&m2.to_free()),);
         }
+    }
+
+    #[test]
+    fn equivalent_inverse() {
+        let mut rng = Xoshiro256Plus::seed_from_u64(0xca9bd0d289b4700e);
+        let mut nontrivial = 0;
+        for _ in 1..500 {
+            let m = random_possibly_invertible_matrix(&mut rng);
+            let inv = m.inverse_transform();
+            if let Some(inv) = inv {
+                assert_eq!(
+                    Some(inv.to_free()),
+                    m.to_free().inverse_transform(),
+                    "inverse of {:?}",
+                    m,
+                );
+                nontrivial += 1;
+            }
+        }
+        assert!(nontrivial > 100, "got {} inverses", nontrivial);
     }
 
     #[test]
