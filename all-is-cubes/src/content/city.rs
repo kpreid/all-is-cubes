@@ -6,7 +6,8 @@
 use std::error::Error;
 
 use cgmath::{
-    Basis2, EuclideanSpace as _, InnerSpace as _, Rad, Rotation, Rotation2, Vector2, Vector3,
+    Basis2, EuclideanSpace as _, InnerSpace as _, One as _, Rad, Rotation as _, Rotation2,
+    Transform as _, Vector2, Vector3,
 };
 use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
@@ -19,8 +20,8 @@ use crate::content::{axes, logo_text, wavy_landscape, DemoBlocks, LandscapeBlock
 use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::BlockProvider;
 use crate::math::{
-    Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector, Rgb,
-    Rgba,
+    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
+    Rgb, Rgba,
 };
 use crate::raycast::Raycaster;
 use crate::space::{Grid, Space};
@@ -32,13 +33,20 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
     use DemoBlocks::*;
 
     // Layout parameters
-    let road_radius = 2;
-    let lamp_position_radius = road_radius + 2;
-    let exhibit_front_radius = lamp_position_radius + 2;
+    // TODO: move to CityPlanner
+    let road_radius = CityPlanner::ROAD_RADIUS;
+    let lamp_position_radius = CityPlanner::LAMP_POSITION_RADIUS;
+    let exhibit_front_radius = CityPlanner::PLOT_FRONT_RADIUS;
     let lamp_spacing = 20;
     let sky_height = 30;
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
     let radius_xz = 60;
+    let grid = Grid::from_lower_upper(
+        (-radius_xz, -ground_depth, -radius_xz),
+        (radius_xz, sky_height, radius_xz),
+    );
+
+    let mut planner = CityPlanner::new(grid);
 
     // Prepare brushes.
     let lamp_brush = VoxelBrush::new(vec![
@@ -49,10 +57,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
     ]);
 
     // Construct space.
-    let mut space = Space::empty(Grid::from_lower_upper(
-        (-radius_xz, -ground_depth, -radius_xz),
-        (radius_xz, sky_height, radius_xz),
-    ));
+    let mut space = Space::empty(grid);
     space.set_sky_color(Rgb::new(0.9, 0.9, 1.4));
 
     // Fill in flat ground
@@ -139,29 +144,24 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
     );
     space.fill(landscape_region, |_| Some(&AIR)).unwrap();
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0);
+    planner.occupied_plots.push(landscape_region);
 
     // Exhibits
     // TODO: Generalize this so it can use all directions and sides of roads
-    let mut exhibit_x = exhibit_front_radius + 1;
-    for exhibit in DEMO_CITY_EXHIBITS {
-        // Align lower bound of footprint with starting point
-        exhibit_x -= exhibit.footprint.lower_bounds().x;
-        let translation = GridVector::new(
-            exhibit_x,
-            1,
-            -exhibit_front_radius - exhibit.footprint.upper_bounds().z,
-        );
-        let translated_footprint = exhibit.footprint.translate(translation);
+    for exhibit in DEMO_CITY_EXHIBITS.iter() {
+        let enclosure_footprint = exhibit.footprint.expand(FaceMap::generate(|_| 1));
+
+        let transform = planner
+            .find_plot(enclosure_footprint)
+            .expect("Out of city space!");
+        let inverse_transform = transform.inverse_transform().unwrap();
+        let plot = exhibit.footprint.transform(transform).unwrap();
 
         // Mark the exhibit bounds
         // TODO: Design a unique block for this
         let enclosure = Grid::from_lower_upper(
-            translated_footprint.lower_bounds().map(|x| x - 1),
-            [
-                translated_footprint.upper_bounds().x + 1,
-                1,
-                translated_footprint.upper_bounds().z + 1,
-            ],
+            plot.lower_bounds().map(|x| x - 1),
+            [plot.upper_bounds().x + 1, 1, plot.upper_bounds().z + 1],
         );
         space
             .fill(enclosure, |_| {
@@ -169,17 +169,26 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
             })
             .unwrap();
 
+        // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
+        // TODO: Add signs with names.
+
         // Write exhibit content
+        let (block_rotation, _) = transform
+            .inverse_transform()
+            .unwrap()
+            .decompose()
+            .expect("can't happen: exhibit transform didn't decompose");
         let exhibit_space = (exhibit.factory)(exhibit, universe)
             .expect("TODO: place an error marker and continue instead");
         space
-            .fill(translated_footprint, |p| {
-                Some(&exhibit_space[p - translation])
+            .fill(plot, |p| {
+                Some(
+                    exhibit_space[inverse_transform.transform_cube(p)]
+                        .clone()
+                        .rotate(block_rotation),
+                )
             })
             .expect("TODO: place an error marker and continue instead");
-
-        // Line up for the next exhibit
-        exhibit_x += exhibit.footprint.upper_bounds().x + 3;
     }
 
     logo_text(
@@ -307,3 +316,93 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
         },
     },
 ];
+
+/// Tracks available land while the city is being generated.
+#[derive(Clone, Debug, PartialEq)]
+struct CityPlanner {
+    space_grid: Grid,
+    /// Count of blocks beyond the origin that are included in the city space.
+    city_radius: GridCoordinate, // TODO redundant with grid
+    /// Each plot/exhibit that has already been placed. (This could be a spatial data structure but we're not that big yet.)
+    occupied_plots: Vec<Grid>,
+}
+
+impl CityPlanner {
+    const ROAD_RADIUS: GridCoordinate = 2;
+    const LAMP_POSITION_RADIUS: GridCoordinate = Self::ROAD_RADIUS + 2;
+    const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS + 2;
+    const GAP_BETWEEN_PLOTS: GridCoordinate = 1;
+
+    pub fn new(space_grid: Grid) -> Self {
+        let city_radius = space_grid.upper_bounds().x; // TODO: compare everything and take the max
+
+        let mut occupied_plots = Vec::new();
+        let road = Grid::from_lower_upper(
+            [-Self::LAMP_POSITION_RADIUS, 0, -city_radius],
+            [Self::LAMP_POSITION_RADIUS + 1, 2, city_radius + 1],
+        );
+        occupied_plots.push(road);
+        occupied_plots.push(
+            road.transform(GridRotation::CLOCKWISE.to_rotation_matrix())
+                .unwrap(),
+        );
+        Self {
+            space_grid,
+            city_radius,
+            occupied_plots,
+        }
+    }
+
+    pub fn find_plot(&mut self, plot_shape: Grid) -> Option<GridMatrix> {
+        // TODO: We'd like to resume the search from _when we left off_, but that's tricky since a
+        // smaller plot might fit where a large one didn't. So, quadratic search it is for now.
+        for d in 0..=self.city_radius {
+            for street_axis in 0..4 {
+                // TODO exercising opposite sides logic
+                'search: for &left_side in &[false, true] {
+                    // The translation is expressed along the +X axis street, so
+                    // "left" is -Z and "right" is +Z.
+                    let mut transform = GridMatrix::from_translation(GridVector::new(
+                        d,
+                        1,
+                        if left_side {
+                            -Self::PLOT_FRONT_RADIUS - plot_shape.upper_bounds().z
+                        } else {
+                            Self::PLOT_FRONT_RADIUS + plot_shape.upper_bounds().z
+                        },
+                    )) * if left_side {
+                        GridMatrix::one()
+                    } else {
+                        (GridRotation::COUNTERCLOCKWISE * GridRotation::COUNTERCLOCKWISE)
+                            .to_rotation_matrix()
+                    };
+                    // Rotate to match street
+                    for _ in 0..street_axis {
+                        transform = GridRotation::COUNTERCLOCKWISE.to_rotation_matrix() * transform;
+                    }
+
+                    let transformed = plot_shape
+                        .transform(transform)
+                        .expect("can't happen: city plot transformation failure");
+
+                    if !self.space_grid.contains_grid(transformed) {
+                        continue 'search;
+                    }
+
+                    let for_occupancy_check =
+                        transformed.expand(FaceMap::generate(|_| Self::GAP_BETWEEN_PLOTS));
+
+                    for occupied in self.occupied_plots.iter() {
+                        if occupied.intersection(for_occupancy_check).is_some() {
+                            continue 'search;
+                        }
+                    }
+
+                    self.occupied_plots.push(transformed);
+                    return Some(transform);
+                }
+            }
+        }
+        None
+    }
+}
