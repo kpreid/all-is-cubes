@@ -277,6 +277,7 @@ impl GridRotation {
 
     /// Expresses this rotation as a matrix which rotates “in place” the
     /// points within the volume defined by coordinates in the range [0, size).
+    /// Such matrices are suitable for rotating the voxels of a block.
     // TODO: add tests
     pub fn to_positive_octant_matrix(self, size: GridCoordinate) -> GridMatrix {
         fn offset(face: Face, size: GridCoordinate) -> GridCoordinate {
@@ -296,6 +297,12 @@ impl GridRotation {
                 offset(self.z, size),
             ),
         }
+    }
+
+    /// Expresses this rotation as a matrix without any translation.
+    // TODO: add tests
+    pub fn to_rotation_matrix(self) -> GridMatrix {
+        self.to_positive_octant_matrix(1)
     }
 
     // TODO: test equivalence with matrix
