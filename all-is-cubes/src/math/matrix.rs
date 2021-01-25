@@ -117,6 +117,33 @@ impl GridMatrix {
     pub fn row(&self, r: usize) -> Vector4<GridCoordinate> {
         Vector4::new(self.x[r], self.y[r], self.z[r], self.w[r])
     }
+
+    /// Equivalent to temporarily applying an offset of `[0.5, 0.5, 0.5]` while
+    /// transforming `cube` as per [`GridMatrix::transform_point`], despite the fact that
+    /// integer arithmetic is being used.
+    ///
+    /// This operation thus transforms the standard positive-octant unit cube identified
+    /// by its most negative corner the same way as the [`Grid::single_cube`] containing
+    /// that cube.
+    ///
+    /// ```
+    /// use all_is_cubes::math::{Face::*, GridMatrix, GridPoint};
+    /// use cgmath::Transform; // for transform_point
+    ///
+    /// // Translation without rotation has the usual definition.
+    /// let matrix = GridMatrix::from_translation([10, 0, 0]);
+    /// assert_eq!(matrix.transform_cube(GridPoint::new(1, 1, 1)), GridPoint::new(11, 1, 1));
+    ///
+    /// // With a rotation or reflection, the results are different.
+    /// // TODO: Come up with a better example and explanation.
+    /// let reflected = GridMatrix::from_origin([10, 0, 0], NX, PY, PZ);
+    /// assert_eq!(reflected.transform_point(GridPoint::new(1, 5, 5)), GridPoint::new(9, 5, 5));
+    /// assert_eq!(reflected.transform_cube(GridPoint::new(1, 5, 5)), GridPoint::new(8, 5, 5));
+    /// ```
+    pub fn transform_cube(&self, cube: GridPoint) -> GridPoint {
+        self.transform_point(cube + Vector3::new(1, 1, 1))
+            .zip(self.transform_point(cube), |a, b| a.min(b))
+    }
 }
 
 impl Mul<Self> for GridMatrix {
