@@ -53,4 +53,4 @@ strum = { version = "0.20.0", features = ["derive"] }
 thiserror = "1.0.22"
 
 [dev-dependencies]
-criterion = "0.3.3"
+criterion = "0.3.4"
