@@ -21,12 +21,12 @@ crate-type = ["cdylib"]
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.2.0" }
 console_error_panic_hook = "0.1.5"
-js-sys = "0.3.44"
+js-sys = "0.3.47"
 luminance = "0.43.2"
 luminance-front = "0.3.1"
 luminance-web-sys = "0.2.2"
 luminance-webgl = "0.3.1"
-wasm-bindgen = "0.2.67"
+wasm-bindgen = "0.2.70"
 
 [dependencies.web-sys]
 version = "0.3.22"

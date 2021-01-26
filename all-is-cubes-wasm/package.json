@@ -12,8 +12,8 @@
     "@wasm-tool/wasm-pack-plugin": "^1.1.0",
     "copy-webpack-plugin": "^6.4.1",
     "rimraf": "^3.0.0",
-    "webpack": "^4.45.0",
-    "webpack-cli": "^4.3.1",
-    "webpack-dev-server": "^3.11.1"
+    "webpack": "^4.46.0",
+    "webpack-cli": "^4.4.0",
+    "webpack-dev-server": "^3.11.2"
   }
 }
