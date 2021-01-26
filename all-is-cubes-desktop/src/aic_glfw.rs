@@ -77,6 +77,8 @@ pub fn glfw_main_loop(
             let _render_info = renderer.render_frame();
             renderer.surface.window.swap_buffers();
             app.frame_clock.did_draw();
+        } else {
+            std::thread::yield_now();
         }
 
         // Poll for events after drawing, so that on the first loop iteration we draw

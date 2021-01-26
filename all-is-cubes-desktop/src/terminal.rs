@@ -81,6 +81,8 @@ pub fn terminal_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Err
         if app.frame_clock.should_draw() {
             draw_space(&mut proj, &*app.camera().borrow(), &mut out)?;
             app.frame_clock.did_draw();
+        } else {
+            std::thread::yield_now();
         }
     }
 }
