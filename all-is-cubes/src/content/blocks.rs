@@ -4,7 +4,7 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-use cgmath::{ElementWise as _, Transform as _};
+use cgmath::ElementWise as _;
 use noise::Seedable as _;
 
 use crate::block::{Block, BlockCollision, AIR};
@@ -115,7 +115,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
                 for _ in 0..4 {
                     let block = curb_fn(
                         rot.to_positive_octant_matrix(resolution.into())
-                            .transform_point(cube),
+                            .transform_cube(cube),
                     );
                     if block != AIR {
                         return block;

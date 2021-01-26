@@ -4,7 +4,7 @@
 //! Definition of blocks, which are game objects which live in the grid of a
 //! [`Space`]. See [`Block`] for details.
 
-use cgmath::{EuclideanSpace as _, Transform as _};
+use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
@@ -195,7 +195,7 @@ impl Block {
                         let matrix = rotation.to_positive_octant_matrix(resolution);
                         // TODO: Use a rotated grid on the output, which will prevent the function from panicking if the grid size is incorrect
                         GridArray::generate(voxels.grid(), |cube| {
-                            voxels[matrix.transform_point(cube)]
+                            voxels[matrix.transform_cube(cube)]
                         })
                     }),
                     ..base

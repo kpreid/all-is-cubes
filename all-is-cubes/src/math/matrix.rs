@@ -339,33 +339,52 @@ impl GridRotation {
     }
 
     /// Expresses this rotation as a matrix which rotates “in place” the
-    /// points within the volume defined by coordinates in the range [0, size).
-    /// Such matrices are suitable for rotating the voxels of a block.
+    /// points within the volume defined by coordinates in the range [0, size].
+    ///
+    /// That is, a `Grid` of that volume will be unchanged by rotation:
+    ///
+    /// ```
+    /// use all_is_cubes::{math::GridRotation, space::Grid};
+    ///
+    /// let grid = Grid::for_block(8);
+    /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_matrix(8);
+    /// assert_eq!(grid.transform(rotation), Some(grid));
+    /// ```
+    ///
+    /// Such matrices are suitable for rotating the voxels of a block, provided
+    /// that the coordinates are then transformed with [`GridMatrix::transform_cube`],
+    /// *not* [`GridMatrix::transform_point`] (due to the lower-corner format of cube
+    /// coordinates).
+    /// ```
+    /// # use all_is_cubes::{math::{GridPoint, GridRotation}, space::Grid};
+    /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_matrix(4);
+    /// assert_eq!(rotation.transform_cube(GridPoint::new(0, 0, 0)), GridPoint::new(3, 0, 0));
+    /// assert_eq!(rotation.transform_cube(GridPoint::new(3, 0, 0)), GridPoint::new(3, 0, 3));
+    /// assert_eq!(rotation.transform_cube(GridPoint::new(3, 0, 3)), GridPoint::new(0, 0, 3));
+    /// assert_eq!(rotation.transform_cube(GridPoint::new(0, 0, 3)), GridPoint::new(0, 0, 0));
+    /// ```
+    ///
     // TODO: add tests
     pub fn to_positive_octant_matrix(self, size: GridCoordinate) -> GridMatrix {
-        fn offset(face: Face, size: GridCoordinate) -> GridCoordinate {
+        fn offset(face: Face, size: GridCoordinate) -> GridVector {
             if face.is_positive() {
-                0
+                GridVector::zero()
             } else {
-                size - 1
+                face.normal_vector() * -size
             }
         }
         GridMatrix {
             x: self.x.normal_vector(),
             y: self.y.normal_vector(),
             z: self.z.normal_vector(),
-            w: GridVector::new(
-                offset(self.x, size),
-                offset(self.y, size),
-                offset(self.z, size),
-            ),
+            w: offset(self.x, size) + offset(self.y, size) + offset(self.z, size),
         }
     }
 
     /// Expresses this rotation as a matrix without any translation.
     // TODO: add tests
     pub fn to_rotation_matrix(self) -> GridMatrix {
-        self.to_positive_octant_matrix(1)
+        self.to_positive_octant_matrix(0)
     }
 
     // TODO: test equivalence with matrix
