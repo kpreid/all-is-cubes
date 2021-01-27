@@ -70,6 +70,7 @@ impl GridMatrix {
     }
 
     /// Construct a translation matrix.
+    #[inline]
     pub fn from_translation(offset: impl Into<GridVector>) -> Self {
         Self {
             w: offset.into(),
@@ -92,6 +93,7 @@ impl GridMatrix {
     ///     GridPoint::new(11, 7, 12),
     /// );
     /// ```
+    #[inline]
     pub fn from_origin(origin: impl Into<GridPoint>, x: Face, y: Face, z: Face) -> Self {
         Self {
             x: x.normal_vector(),
@@ -141,6 +143,7 @@ impl GridMatrix {
     /// assert_eq!(reflected.transform_point(GridPoint::new(1, 5, 5)), GridPoint::new(9, 5, 5));
     /// assert_eq!(reflected.transform_cube(GridPoint::new(1, 5, 5)), GridPoint::new(8, 5, 5));
     /// ```
+    #[inline]
     pub fn transform_cube(&self, cube: GridPoint) -> GridPoint {
         self.transform_point(cube + Vector3::new(1, 1, 1))
             .zip(self.transform_point(cube), |a, b| a.min(b))
@@ -360,6 +363,7 @@ impl GridRotation {
         z: Face::PX,
     };
 
+    #[inline]
     pub fn from_basis(basis: impl Into<Vector3<Face>>) -> Self {
         let basis = basis.into();
         Self {
@@ -419,6 +423,7 @@ impl GridRotation {
     }
 
     // TODO: test equivalence with matrix
+    #[inline]
     pub fn transform(self, face: Face) -> Face {
         // TODO: there ought to be a much cleaner way to express this
         // ... and it should be a const fn, too
@@ -442,7 +447,7 @@ impl GridRotation {
 
 impl Default for GridRotation {
     /// Returns the identity (no rotation).
-    #[doc(inline)]
+    #[inline]
     fn default() -> Self {
         Self::IDENTITY
     }
@@ -450,6 +455,7 @@ impl Default for GridRotation {
 
 impl One for GridRotation {
     /// Returns the identity (no rotation).
+    #[inline]
     fn one() -> Self {
         Self::IDENTITY
     }
