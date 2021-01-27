@@ -178,7 +178,13 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
             .to_rotation_matrix();
         let name_blocks = draw_to_blocks(
             universe,
-            16,
+            16, // TODO: use a higher resolution once it's supported
+            0,
+            BlockAttributes {
+                display_name: format!("Exhibit name {:?}", exhibit.name).into(),
+                collision: BlockCollision::None,
+                ..BlockAttributes::default()
+            },
             Text::new(exhibit.name, Point::new(0, -16)).into_styled(
                 TextStyleBuilder::new(Font8x16)
                     .text_color(Rgb888::new(0, 0, 0))
@@ -297,6 +303,8 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
             let space = draw_to_blocks(
                 universe,
                 16,
+                8,
+                BlockAttributes::default(),
                 Text::new("Hello block world", Point::new(0, -16)).into_styled(
                     TextStyleBuilder::new(Font8x16)
                         .text_color(Rgb888::new(120, 100, 200))
@@ -340,6 +348,12 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                     &draw_to_blocks(
                         universe,
                         16,
+                        0,
+                        BlockAttributes {
+                            display_name: resolution.to_string().into(),
+                            collision: BlockCollision::None,
+                            ..BlockAttributes::default()
+                        },
                         Text::new(&resolution.to_string(), Point::new(0, -16)).into_styled(
                             TextStyleBuilder::new(Font8x16)
                                 .text_color(Rgb888::new(10, 10, 10))

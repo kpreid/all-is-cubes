@@ -23,12 +23,14 @@ use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
 
 /// Generate a set of blocks which together display the given [`Drawable`] which may be
-/// larger than one block. The Z position is always the middle of the block.
+/// larger than one block.
 ///
 /// Returns an error if reading the `Drawable`'s blocks fails.
 pub fn draw_to_blocks<D, C>(
     universe: &mut Universe,
     resolution: Resolution,
+    z: GridCoordinate,
+    attributes: BlockAttributes,
     object: D,
 ) -> Result<Space, SetCubeError>
 where
@@ -56,7 +58,7 @@ where
 
     let mut drawing_space = Space::empty(drawing_grid);
     object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
-        [0, 0, GridCoordinate::from(resolution) / 2],
+        [0, 0, z],
         Face::PX,
         Face::NY,
         Face::PZ,
@@ -64,8 +66,7 @@ where
 
     Ok(space_to_blocks(
         resolution,
-        // TODO: give caller control over attributes
-        BlockAttributes::default(),
+        attributes,
         // TODO: give caller control over name used
         universe.insert_anonymous(drawing_space),
     )
@@ -356,10 +357,18 @@ mod tests {
     #[test]
     fn draw_to_blocks_bounds_one_block() {
         let resolution: GridCoordinate = 16;
+        let z = 4;
         let mut universe = Universe::new();
         let drawable =
             Rectangle::new(Point::new(0, 0), Point::new(2, 3)).into_styled(a_primitive_style());
-        let space = draw_to_blocks(&mut universe, resolution as Resolution, drawable).unwrap();
+        let space = draw_to_blocks(
+            &mut universe,
+            resolution as Resolution,
+            z,
+            BlockAttributes::default(),
+            drawable,
+        )
+        .unwrap();
         assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
         if let Block::Recur {
             space: block_space_ref,
@@ -371,7 +380,7 @@ mod tests {
             print_space(&*block_space_ref.borrow(), (0., 0., -1.));
             assert_eq!(*offset, GridPoint::new(0, -resolution, 0));
             assert_eq!(
-                block_space_ref.borrow()[(0, -2, resolution / 2)].color(),
+                block_space_ref.borrow()[(0, -2, z)].color(),
                 a_primitive_color()
             );
         } else {
@@ -382,10 +391,18 @@ mod tests {
     #[test]
     fn draw_to_blocks_bounds_negative_coords_one_block() {
         let resolution: GridCoordinate = 16;
+        let z = 4;
         let mut universe = Universe::new();
         let drawable =
             Rectangle::new(Point::new(-3, -2), Point::new(0, 0)).into_styled(a_primitive_style());
-        let space = draw_to_blocks(&mut universe, resolution as Resolution, drawable).unwrap();
+        let space = draw_to_blocks(
+            &mut universe,
+            resolution as Resolution,
+            z,
+            BlockAttributes::default(),
+            drawable,
+        )
+        .unwrap();
         assert_eq!(space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
         if let Block::Recur {
             space: block_space_ref,
@@ -396,7 +413,7 @@ mod tests {
             print_space(&*block_space_ref.borrow(), (0., 0., -1.));
             assert_eq!(*offset, GridPoint::new(-resolution, 0, 0));
             assert_eq!(
-                block_space_ref.borrow()[(-2, 1, resolution / 2)].color(),
+                block_space_ref.borrow()[(-2, 1, z)].color(),
                 a_primitive_color()
             );
         } else {
