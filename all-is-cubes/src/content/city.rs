@@ -150,10 +150,10 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
     for exhibit in DEMO_CITY_EXHIBITS.iter() {
         let enclosure_footprint = exhibit.footprint.expand(FaceMap::generate(|_| 1));
 
-        let transform = planner
+        let plot_transform = planner
             .find_plot(enclosure_footprint)
             .expect("Out of city space!");
-        let plot = exhibit.footprint.transform(transform).unwrap();
+        let plot = exhibit.footprint.transform(plot_transform).unwrap();
 
         // Mark the exhibit bounds
         // TODO: Design a unique block for this
@@ -168,13 +168,43 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
             .unwrap();
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
-        // TODO: Add signs with names.
+
+        // Draw exhibit name
+        let name_transform = GridMatrix::from_translation([
+            exhibit.footprint.lower_bounds().x - 1,
+            0,
+            exhibit.footprint.upper_bounds().z + 2,
+        ]) * GridRotation::from_basis([Face::PX, Face::NZ, Face::PY])
+            .to_rotation_matrix();
+        let name_blocks = draw_to_blocks(
+            universe,
+            16,
+            Text::new(exhibit.name, Point::new(0, -16)).into_styled(
+                TextStyleBuilder::new(Font8x16)
+                    .text_color(Rgb888::new(0, 0, 0))
+                    .build(),
+            ),
+        )
+        .expect("name drawing failure");
+        // TODO: give this an offset of a suitable rotation that won't collide...
+        space_to_space_copy(
+            &name_blocks,
+            name_blocks.grid(),
+            &mut space,
+            plot_transform * name_transform,
+        )
+        .expect("name drawing failure");
 
         // Place exhibit content
         let exhibit_space = (exhibit.factory)(exhibit, universe)
             .expect("exhibit generation failure. TODO: place an error marker and continue instead");
-        space_to_space_copy(&exhibit_space, exhibit.footprint, &mut space, transform)
-            .expect("copy failure. TODO: place an error marker and continue instead");
+        space_to_space_copy(
+            &exhibit_space,
+            exhibit.footprint,
+            &mut space,
+            plot_transform,
+        )
+        .expect("copy failure. TODO: place an error marker and continue instead");
     }
 
     logo_text(
