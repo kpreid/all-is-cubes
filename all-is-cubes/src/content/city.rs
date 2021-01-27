@@ -24,7 +24,7 @@ use crate::math::{
     Rgb, Rgba,
 };
 use crate::raycast::Raycaster;
-use crate::space::{Grid, Space};
+use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
 
 pub(crate) fn demo_city(universe: &mut Universe) -> Space {
@@ -147,14 +147,12 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
     planner.occupied_plots.push(landscape_region);
 
     // Exhibits
-    // TODO: Generalize this so it can use all directions and sides of roads
     for exhibit in DEMO_CITY_EXHIBITS.iter() {
         let enclosure_footprint = exhibit.footprint.expand(FaceMap::generate(|_| 1));
 
         let transform = planner
             .find_plot(enclosure_footprint)
             .expect("Out of city space!");
-        let inverse_transform = transform.inverse_transform().unwrap();
         let plot = exhibit.footprint.transform(transform).unwrap();
 
         // Mark the exhibit bounds
@@ -172,23 +170,11 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
         // TODO: Add signs with names.
 
-        // Write exhibit content
-        let (block_rotation, _) = transform
-            .inverse_transform()
-            .unwrap()
-            .decompose()
-            .expect("can't happen: exhibit transform didn't decompose");
+        // Place exhibit content
         let exhibit_space = (exhibit.factory)(exhibit, universe)
-            .expect("TODO: place an error marker and continue instead");
-        space
-            .fill(plot, |p| {
-                Some(
-                    exhibit_space[inverse_transform.transform_cube(p)]
-                        .clone()
-                        .rotate(block_rotation),
-                )
-            })
-            .expect("TODO: place an error marker and continue instead");
+            .expect("exhibit generation failure. TODO: place an error marker and continue instead");
+        space_to_space_copy(&exhibit_space, exhibit.footprint, &mut space, transform)
+            .expect("copy failure. TODO: place an error marker and continue instead");
     }
 
     logo_text(
@@ -197,6 +183,27 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
     );
 
     space
+}
+
+// TODO: move this since it is a generally useful utility
+fn space_to_space_copy(
+    src: &Space,
+    src_grid: Grid,
+    dst: &mut Space,
+    src_to_dst_transform: GridMatrix,
+) -> Result<(), SetCubeError> {
+    // TODO: don't panic
+    let dst_to_src_transform = src_to_dst_transform.inverse_transform().unwrap();
+    let (block_rotation, _) = dst_to_src_transform
+        .decompose()
+        .expect("could not decompose transform");
+    dst.fill(src_grid.transform(src_to_dst_transform).unwrap(), |p| {
+        Some(
+            src[dst_to_src_transform.transform_cube(p)]
+                .clone()
+                .rotate(block_rotation),
+        )
+    })
 }
 
 #[allow(clippy::type_complexity)]
