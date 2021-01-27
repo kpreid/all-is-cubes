@@ -56,9 +56,9 @@ pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) {
 ///
 /// let blocks: Vec<Block> = make_some_blocks(3);
 /// assert_eq!(blocks.len(), 3);
-/// assert!(blocks[0] != blocks[1]);
-/// assert!(blocks[0] != blocks[2]);
-/// assert!(blocks[1] != blocks[2]);
+/// assert_ne!(blocks[0], blocks[1]);
+/// assert_ne!(blocks[0], blocks[2]);
+/// assert_ne!(blocks[1], blocks[2]);
 /// ```
 pub fn make_some_blocks(count: usize) -> Vec<Block> {
     // TODO: should this return an iterator? would anyone care?
@@ -89,12 +89,12 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 /// let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));
 /// axes(&mut space);
 ///
-/// assert!(space[(10, 0, 0)] != AIR);
-/// assert!(space[(0, 10, 0)] != AIR);
-/// assert!(space[(0, 0, 10)] != AIR);
-/// assert!(space[(-10, 0, 0)] != AIR);
-/// assert!(space[(0, -10, 0)] != AIR);
-/// assert!(space[(0, 0, -10)] != AIR);
+/// assert_ne!(space[(10, 0, 0)], AIR);
+/// assert_ne!(space[(0, 10, 0)], AIR);
+/// assert_ne!(space[(0, 0, 10)], AIR);
+/// assert_ne!(space[(-10, 0, 0)], AIR);
+/// assert_ne!(space[(0, -10, 0)], AIR);
+/// assert_ne!(space[(0, 0, -10)], AIR);
 /// ```
 pub fn axes(space: &mut Space) {
     for &face in Face::ALL_SIX {

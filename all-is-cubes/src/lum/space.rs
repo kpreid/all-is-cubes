@@ -135,7 +135,7 @@ impl SpaceRenderer {
                 }
                 Ordering::Equal => {}
             }
-            assert!(self.block_triangulations.len() == new_length);
+            assert_eq!(self.block_triangulations.len(), new_length);
 
             for index in todo.blocks.drain() {
                 let index: usize = index.into();

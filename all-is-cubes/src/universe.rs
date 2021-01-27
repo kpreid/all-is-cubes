@@ -643,9 +643,10 @@ mod tests {
         let ref_b = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         ref_a.borrow_mut().set((0, 0, 0), &blocks[0]).unwrap();
         ref_b.borrow_mut().set((0, 0, 0), &blocks[1]).unwrap();
-        assert!(ref_a != ref_b, "not equal");
-        assert!(
-            ref_a.borrow()[(0, 0, 0)] != ref_b.borrow()[(0, 0, 0)],
+        assert_ne!(ref_a, ref_b, "not equal");
+        assert_ne!(
+            ref_a.borrow()[(0, 0, 0)],
+            ref_b.borrow()[(0, 0, 0)],
             "different values"
         );
     }

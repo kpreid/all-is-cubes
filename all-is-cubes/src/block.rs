@@ -119,7 +119,7 @@ impl Block {
     /// let block = make_some_blocks(1).swap_remove(0);
     /// let clockwise = GridRotation::from_basis([PZ, PY, NX]);
     /// let rotated = block.clone().rotate(clockwise);
-    /// assert!(&block != &rotated);
+    /// assert_ne!(&block, &rotated);
     /// assert_eq!(block, rotated.clone().unspecialize());
     /// assert_eq!(block, rotated.clone().unspecialize().unspecialize());
     /// ```
