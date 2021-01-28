@@ -305,27 +305,30 @@ impl Transform<GridPoint> for GridMatrix {
 /// Compared to a matrix, this cannot specify scale, translation, or skew;
 /// it is used for identifying the rotations of blocks.
 ///
+/// Each of the names specifies the three unit vectors which (*x*, *y*, *z*),
+/// respectively, should be multiplied by to perform the rotation.
+/// Lowercase refers to a negated unit vector.
+///
 /// See also:
 ///
 /// * [`Face`] is less general, in that it specifies a single axis but not
-///   yaw about that axis.
+///   rotation about that axis.
 /// * [`GridMatrix`] is more general, specifying an affine transformation.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct GridRotation {
-    // Each of these Faces specifies the unit vector to which the named input
-    // unit vector should be mapped to.
-    // TODO: This representation is too general as it can collapse axes.
-    x: Face,
-    y: Face,
-    z: Face,
+#[rustfmt::skip]
+#[repr(u8)]
+pub enum GridRotation {
+    // TODO: shuffle or explicitly number these to choose a meaningful numbering
+    RXYZ, RXYz, RXyZ, RXyz, RxYZ, RxYz, RxyZ, Rxyz,
+    RXZY, RXZy, RXzY, RXzy, RxZY, RxZy, RxzY, Rxzy,
+    RYXZ, RYXz, RYxZ, RYxz, RyXZ, RyXz, RyxZ, Ryxz,
+    RYZX, RYZx, RYzX, RYzx, RyZX, RyZx, RyzX, Ryzx,
+    RZXY, RZXy, RZxY, RZxy, RzXY, RzXy, RzxY, Rzxy,
+    RZYX, RZYx, RZyX, RZyx, RzYX, RzYx, RzyX, Rzyx,
 }
 
 impl GridRotation {
-    pub const IDENTITY: Self = Self {
-        x: Face::PX,
-        y: Face::PY,
-        z: Face::PZ,
-    };
+    pub const IDENTITY: Self = Self::RXYZ;
 
     /// The rotation that is clockwise in our Y-up right-handed coordinate system.
     ///
@@ -339,11 +342,7 @@ impl GridRotation {
     ///
     /// assert_eq!(GridRotation::CLOCKWISE.transform(PY), PY);
     /// ```
-    pub const CLOCKWISE: Self = Self {
-        x: Face::PZ,
-        y: Face::PY,
-        z: Face::NX,
-    };
+    pub const CLOCKWISE: Self = Self::RZYx;
 
     /// The rotation that is counterclockwise in our Y-up right-handed coordinate system.
     ///
@@ -357,20 +356,138 @@ impl GridRotation {
     ///
     /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PY), PY);
     /// ```
-    pub const COUNTERCLOCKWISE: Self = Self {
-        x: Face::NZ,
-        y: Face::PY,
-        z: Face::PX,
-    };
+    pub const COUNTERCLOCKWISE: Self = Self::RzYX;
 
     #[inline]
     pub fn from_basis(basis: impl Into<Vector3<Face>>) -> Self {
-        let basis = basis.into();
-        Self {
-            x: basis.x,
-            y: basis.y,
-            z: basis.z,
+        let basis: Vector3<Face> = basis.into();
+        let basis: [Face; 3] = basis.into(); // for concise matching
+        use {Face::*, GridRotation::*};
+        match basis {
+            [PX, PY, PZ] => RXYZ,
+            [PX, PZ, PY] => RXZY,
+            [PY, PX, PZ] => RYXZ,
+            [PY, PZ, PX] => RYZX,
+            [PZ, PX, PY] => RZXY,
+            [PZ, PY, PX] => RZYX,
+
+            [PX, PY, NZ] => RXYz,
+            [PX, PZ, NY] => RXZy,
+            [PY, PX, NZ] => RYXz,
+            [PY, PZ, NX] => RYZx,
+            [PZ, PX, NY] => RZXy,
+            [PZ, PY, NX] => RZYx,
+
+            [PX, NY, PZ] => RXyZ,
+            [PX, NZ, PY] => RXzY,
+            [PY, NX, PZ] => RYxZ,
+            [PY, NZ, PX] => RYzX,
+            [PZ, NX, PY] => RZxY,
+            [PZ, NY, PX] => RZyX,
+
+            [PX, NY, NZ] => RXyz,
+            [PX, NZ, NY] => RXzy,
+            [PY, NX, NZ] => RYxz,
+            [PY, NZ, NX] => RYzx,
+            [PZ, NX, NY] => RZxy,
+            [PZ, NY, NX] => RZyx,
+
+            [NX, PY, PZ] => RxYZ,
+            [NX, PZ, PY] => RxZY,
+            [NY, PX, PZ] => RyXZ,
+            [NY, PZ, PX] => RyZX,
+            [NZ, PX, PY] => RzXY,
+            [NZ, PY, PX] => RzYX,
+
+            [NX, PY, NZ] => RxYz,
+            [NX, PZ, NY] => RxZy,
+            [NY, PX, NZ] => RyXz,
+            [NY, PZ, NX] => RyZx,
+            [NZ, PX, NY] => RzXy,
+            [NZ, PY, NX] => RzYx,
+
+            [NX, NY, PZ] => RxyZ,
+            [NX, NZ, PY] => RxzY,
+            [NY, NX, PZ] => RyxZ,
+            [NY, NZ, PX] => RyzX,
+            [NZ, NX, PY] => RzxY,
+            [NZ, NY, PX] => RzyX,
+
+            [NX, NY, NZ] => Rxyz,
+            [NX, NZ, NY] => Rxzy,
+            [NY, NX, NZ] => Ryxz,
+            [NY, NZ, NX] => Ryzx,
+            [NZ, NX, NY] => Rzxy,
+            [NZ, NY, NX] => Rzyx,
+
+            _ => panic!(
+                "Invalid basis given to GridRotation::from_basis: {:?}",
+                basis
+            ),
         }
+    }
+
+    // TODO: public? do we want this to be our API? should this also be a From impl?
+    #[inline]
+    fn to_basis(self) -> Vector3<Face> {
+        use {Face::*, GridRotation::*};
+        Vector3::from(match self {
+            RXYZ => [PX, PY, PZ],
+            RXZY => [PX, PZ, PY],
+            RYXZ => [PY, PX, PZ],
+            RYZX => [PY, PZ, PX],
+            RZXY => [PZ, PX, PY],
+            RZYX => [PZ, PY, PX],
+
+            RXYz => [PX, PY, NZ],
+            RXZy => [PX, PZ, NY],
+            RYXz => [PY, PX, NZ],
+            RYZx => [PY, PZ, NX],
+            RZXy => [PZ, PX, NY],
+            RZYx => [PZ, PY, NX],
+
+            RXyZ => [PX, NY, PZ],
+            RXzY => [PX, NZ, PY],
+            RYxZ => [PY, NX, PZ],
+            RYzX => [PY, NZ, PX],
+            RZxY => [PZ, NX, PY],
+            RZyX => [PZ, NY, PX],
+
+            RXyz => [PX, NY, NZ],
+            RXzy => [PX, NZ, NY],
+            RYxz => [PY, NX, NZ],
+            RYzx => [PY, NZ, NX],
+            RZxy => [PZ, NX, NY],
+            RZyx => [PZ, NY, NX],
+
+            RxYZ => [NX, PY, PZ],
+            RxZY => [NX, PZ, PY],
+            RyXZ => [NY, PX, PZ],
+            RyZX => [NY, PZ, PX],
+            RzXY => [NZ, PX, PY],
+            RzYX => [NZ, PY, PX],
+
+            RxYz => [NX, PY, NZ],
+            RxZy => [NX, PZ, NY],
+            RyXz => [NY, PX, NZ],
+            RyZx => [NY, PZ, NX],
+            RzXy => [NZ, PX, NY],
+            RzYx => [NZ, PY, NX],
+
+            RxyZ => [NX, NY, PZ],
+            RxzY => [NX, NZ, PY],
+            RyxZ => [NY, NX, PZ],
+            RyzX => [NY, NZ, PX],
+            RzxY => [NZ, NX, PY],
+            RzyX => [NZ, NY, PX],
+
+            Rxyz => [NX, NY, NZ],
+            Rxzy => [NX, NZ, NY],
+            Ryxz => [NY, NX, NZ],
+            Ryzx => [NY, NZ, NX],
+            Rzxy => [NZ, NX, NY],
+            Rzyx => [NZ, NY, NX],
+        })
     }
 
     /// Expresses this rotation as a matrix which rotates “in place” the
@@ -408,11 +525,12 @@ impl GridRotation {
                 face.normal_vector() * -size
             }
         }
+        let basis = self.to_basis();
         GridMatrix {
-            x: self.x.normal_vector(),
-            y: self.y.normal_vector(),
-            z: self.z.normal_vector(),
-            w: offset(self.x, size) + offset(self.y, size) + offset(self.z, size),
+            x: basis.x.normal_vector(),
+            y: basis.y.normal_vector(),
+            z: basis.z.normal_vector(),
+            w: offset(basis.x, size) + offset(basis.y, size) + offset(basis.z, size),
         }
     }
 
@@ -430,12 +548,7 @@ impl GridRotation {
         if face == Face::WITHIN {
             face
         } else {
-            let p = match face.axis_number() {
-                0 => self.x,
-                1 => self.y,
-                2 => self.z,
-                _ => unreachable!(),
-            };
+            let p = self.to_basis()[face.axis_number()];
             if face.is_negative() {
                 p.opposite()
             } else {
@@ -527,11 +640,7 @@ impl Mul<Self> for GridRotation {
     /// ```
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.transform(rhs.x),
-            y: self.transform(rhs.y),
-            z: self.transform(rhs.z),
-        }
+        Self::from_basis(rhs.to_basis().map(|v| self.transform(v)))
     }
 }
 
