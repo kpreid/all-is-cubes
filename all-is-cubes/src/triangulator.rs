@@ -10,7 +10,7 @@
 //! Note on terminology: Some sources say that “tesselation” would be a better name
 //! for this operation than “triangulation”. However, “tesselation” means a specific
 //! other operation in OpenGL graphics programming, and “triangulation” seems to
-//! be the more commonly used terms.
+//! be the more commonly used term.
 
 use cgmath::{
     ElementWise as _, EuclideanSpace as _, Point2, Point3, Transform as _, Vector2, Vector3,
@@ -23,7 +23,7 @@ use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
 use crate::util::ConciseDebug as _;
 
-/// Numeric type used to store texture coordinates.
+/// Numeric type used to store texture coordinates in vertices.
 pub type TextureCoordinate = f32;
 
 /// Generic structure of output from triangulator. Implement
