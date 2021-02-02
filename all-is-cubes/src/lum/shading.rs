@@ -9,7 +9,7 @@ use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::TextureBinding;
 use luminance_front::pixel::NormUnsigned;
 use luminance_front::shader::{BuiltProgram, Program, ProgramError, ProgramInterface, Uniform};
-use luminance_front::texture::Dim2Array;
+use luminance_front::texture::Dim3;
 use luminance_front::Backend;
 
 use crate::camera::ProjectionHelper;
@@ -62,7 +62,7 @@ const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 pub struct BlockUniformInterface {
     projection_matrix: Uniform<[[f32; 4]; 4]>,
     view_matrix: Uniform<[[f32; 4]; 4]>,
-    block_texture: Uniform<TextureBinding<Dim2Array, NormUnsigned>>,
+    block_texture: Uniform<TextureBinding<Dim3, NormUnsigned>>,
 
     /// How far out should be fully fogged?
     fog_distance: Uniform<f32>,

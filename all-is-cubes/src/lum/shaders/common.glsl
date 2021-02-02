@@ -4,7 +4,7 @@
 uniform highp mat4 projection_matrix;
 uniform highp mat4 view_matrix;
 
-uniform lowp sampler2DArray block_texture;
+uniform lowp sampler3D block_texture;
 
 // How far out should be fully fogged?
 uniform highp float fog_distance;
