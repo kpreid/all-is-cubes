@@ -1,5 +1,5 @@
 # Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
-# in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
+# in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 # This Makefile contains no cleverness and is merely a set of useful commands
 # bundled together with conventional names rather than a collection of shell

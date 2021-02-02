@@ -1,5 +1,5 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
+// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 // This is the "root" _module_ which is loaded by js/index.js and imports all others.
 

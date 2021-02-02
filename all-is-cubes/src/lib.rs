@@ -1,5 +1,5 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
+// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks
 //! are themselves made of “smaller” blocks that define their appearance and behavior.
