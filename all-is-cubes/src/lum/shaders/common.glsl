@@ -1,5 +1,6 @@
-// TODO: Passing the projection matrix as four vectors due to bug
-//     https://github.com/phaazon/luminance-rs/issues/434
+// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
+// in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
+
 uniform highp mat4 projection_matrix;
 uniform highp mat4 view_matrix;
 

@@ -1,3 +1,6 @@
+// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
+// in the accompanying file README.md or <http://opensource.org/licenses/MIT>.
+
 in highp vec3 a_position;
 in lowp vec3 a_normal;
 in mediump vec4 a_color_or_texture;
