@@ -111,8 +111,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
             .voxels_fn(universe, resolution, |cube| {
                 // TODO: rework so this isn't redoing the rotation calculations for every single voxel
                 // We should have tools for composing blocks instead...
-                let mut rot = GridRotation::IDENTITY;
-                for _ in 0..4 {
+                for rot in GridRotation::CLOCKWISE.iterate() {
                     let block = curb_fn(
                         rot.to_positive_octant_matrix(resolution.into())
                             .transform_cube(cube),
@@ -120,8 +119,6 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
                     if block != AIR {
                         return block;
                     }
-                    rot = rot * GridRotation::CLOCKWISE;
-                    // 90° around Y
                 }
                 AIR
             })

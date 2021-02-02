@@ -408,7 +408,7 @@ impl CityPlanner {
         // TODO: We'd like to resume the search from _when we left off_, but that's tricky since a
         // smaller plot might fit where a large one didn't. So, quadratic search it is for now.
         for d in 0..=self.city_radius {
-            for street_axis in 0..4 {
+            for street_axis in GridRotation::COUNTERCLOCKWISE.iterate() {
                 // TODO exercising opposite sides logic
                 'search: for &left_side in &[false, true] {
                     // The translation is expressed along the +X axis street, so
@@ -428,9 +428,7 @@ impl CityPlanner {
                             .to_rotation_matrix()
                     };
                     // Rotate to match street
-                    for _ in 0..street_axis {
-                        transform = GridRotation::COUNTERCLOCKWISE.to_rotation_matrix() * transform;
-                    }
+                    transform = street_axis.to_rotation_matrix() * transform;
 
                     let transformed = plot_shape
                         .transform(transform)
