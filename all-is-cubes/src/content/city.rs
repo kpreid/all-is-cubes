@@ -251,6 +251,26 @@ struct Exhibit {
 
 static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     Exhibit {
+        name: "Transparency WIP",
+        footprint: Grid::new_c([-3, 0, -3], [7, 5, 7]),
+        factory: |this, _universe| {
+            let mut space = Space::empty(this.footprint);
+
+            let glass = Block::from(Rgba::new(0.9, 0.9, 0.9, 0.25));
+            for rot in GridRotation::CLOCKWISE.iterate() {
+                let windowpane = Grid::from_lower_upper([-1, 0, 3], [2, 5, 4]);
+                space.fill(
+                    windowpane
+                        .transform(rot.to_positive_octant_matrix(1))
+                        .unwrap(),
+                    |_| Some(&glass),
+                )?;
+            }
+
+            Ok(space)
+        },
+    },
+    Exhibit {
         name: "Knot",
         footprint: Grid::new_c([-2, -2, -1], [5, 5, 3]),
         factory: |this, universe| {
