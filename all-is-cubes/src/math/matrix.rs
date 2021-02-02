@@ -443,6 +443,51 @@ impl GridRotation {
             }
         }
     }
+
+    /// Generates the sequence of rotations that may be obtained by concatenating/multiplying
+    /// this rotation with itself repeatedly.
+    ///
+    /// The first element of the iterator will always be the identity, i.e. this rotation
+    /// applied zero times. The iterator ends when the sequence would repeat itself, i.e.
+    /// just before it would produce the identity again.
+    ///
+    /// ```
+    /// use all_is_cubes::math::Face::*;
+    /// use all_is_cubes::math::GridRotation;
+    ///
+    /// assert_eq!(
+    ///     GridRotation::IDENTITY.iterate().collect::<Vec<_>>(),
+    ///     vec![GridRotation::IDENTITY],
+    /// );
+    ///
+    /// let x_reflection = GridRotation::from_basis([NX, PY, PZ]);
+    /// assert_eq!(
+    ///     x_reflection.iterate().collect::<Vec<_>>(),
+    ///     vec![GridRotation::IDENTITY, x_reflection],
+    /// );
+    ///
+    /// assert_eq!(
+    ///     GridRotation::CLOCKWISE.iterate().collect::<Vec<_>>(),
+    ///     vec![
+    ///         GridRotation::IDENTITY,
+    ///         GridRotation::CLOCKWISE,
+    ///         GridRotation::CLOCKWISE * GridRotation::CLOCKWISE,
+    ///         GridRotation::COUNTERCLOCKWISE,
+    ///    ],
+    /// );
+    /// ```
+    pub fn iterate(self) -> impl Iterator<Item = Self> {
+        let mut item = Self::IDENTITY;
+        std::iter::once(Self::IDENTITY).chain(std::iter::from_fn(move || {
+            item = item * self;
+            if item == Self::IDENTITY {
+                // Cycled back to start; time to stop
+                None
+            } else {
+                Some(item)
+            }
+        }))
+    }
 }
 
 impl Default for GridRotation {
