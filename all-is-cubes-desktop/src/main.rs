@@ -9,14 +9,19 @@ use cgmath::Vector2;
 use clap::{value_t, Arg};
 use std::convert::TryInto;
 use std::error::Error;
+use std::path::PathBuf;
 use std::time::Instant;
 use strum::IntoEnumIterator;
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::content::UniverseTemplate;
 
+use crate::record::RecordOptions;
+
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
+mod record;
+use record::record_main;
 mod terminal;
 use terminal::terminal_main_loop;
 
@@ -26,6 +31,7 @@ pub enum GraphicsType {
     Headless,
     Window,
     Terminal,
+    Record,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -42,7 +48,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .short("g")
                 .possible_values(&GraphicsType::iter().map(<&str>::from).collect::<Vec<_>>())
                 .default_value("window")
-                .help("Graphics/UI mode."),
+                .value_name("MODE")
+                .hide_possible_values(true)
+                .help(
+                    "Graphics/UI mode; one of the following keywords:\n\
+                    window   - Open a window (uses OpenGL)\n\
+                    terminal - Colored text in this terminal (uses raytracing)\n\
+                    headless - Non-interactive; don't draw anything but only simulates\n\
+                    record   - Non-interactive; save an image or video (uses raytracing)\n\
+                    ",
+                ),
         )
         .arg(
             Arg::with_name("display_size")
@@ -64,6 +79,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .default_value("demo-city")
                 .help("Which world template to use."),
         )
+        .arg(
+            Arg::with_name("output")
+                .long("output")
+                .short("o")
+                .required_if("graphics", "record")
+                .value_name("FILE")
+                .help("Output file name for 'record' mode."),
+        )
         .get_matches();
     let display_size = parse_dimensions(options.value_of("display_size").unwrap()).unwrap();
 
@@ -73,6 +96,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     match value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit()) {
         GraphicsType::Window => glfw_main_loop(app, title, display_size),
         GraphicsType::Terminal => terminal_main_loop(app),
+        GraphicsType::Record => record_main(
+            app,
+            RecordOptions {
+                output_path: PathBuf::from(options.value_of_os("output").unwrap()),
+                image_size: display_size.unwrap_or(Vector2::new(640, 480)),
+                animation: None,
+            },
+        ),
         GraphicsType::Headless => {
             // TODO: Right now this is useless. Eventually, we may have other paths for side
             // effects from the universe, or interesting logging.
