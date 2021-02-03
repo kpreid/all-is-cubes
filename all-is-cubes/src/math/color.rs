@@ -198,12 +198,14 @@ impl Rgba {
     }
 
     // TODO: This and the code depending on it should use [u8; 4] instead.
+    // TODO: We should probably use sRGB rather than linear everywhere.
     /// Converts this color lossily to linear 8-bits-per-component color.
     #[inline]
-    pub fn to_saturating_32bit(self) -> (u8, u8, u8, u8) {
+    pub fn to_linear_32bit(self) -> (u8, u8, u8, u8) {
         #[inline]
         fn convert_component(x: NotNan<f32>) -> u8 {
-            // As of Rust 1.45, `as` on float to int is saturating
+            // As of Rust 1.45, `as` on float to int is saturating, which is safe and what
+            // we want.
             (x.into_inner() * 255.0) as u8
         }
         (
@@ -215,7 +217,7 @@ impl Rgba {
     }
 
     #[inline]
-    pub fn from_32bit((r, g, b, a): (u8, u8, u8, u8)) -> Self {
+    pub fn from_linear_32bit((r, g, b, a): (u8, u8, u8, u8)) -> Self {
         #[inline]
         fn convert_component(x: u8) -> NotNan<f32> {
             NotNan::new(f32::from(x) / 255.0).unwrap()
@@ -374,15 +376,15 @@ mod tests {
     // TODO: Add tests of the color not-NaN mechanisms.
 
     #[test]
-    fn rgba_to_saturating_32bit() {
+    fn rgba_to_linear_32bit() {
         assert_eq!(
-            Rgba::new(0.125, 0.25, 0.5, 0.75).to_saturating_32bit(),
+            Rgba::new(0.125, 0.25, 0.5, 0.75).to_linear_32bit(),
             (31, 63, 127, 191)
         );
 
         // Test saturation
         assert_eq!(
-            Rgba::new(0.5, -1.0, 10.0, 1.0).to_saturating_32bit(),
+            Rgba::new(0.5, -1.0, 10.0, 1.0).to_linear_32bit(),
             (127, 0, 255, 255)
         );
     }

@@ -342,7 +342,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 output_by_face[face].fully_opaque = false;
                             }
 
-                            tile_texels.push(color.to_saturating_32bit());
+                            tile_texels.push(color.to_linear_32bit());
                         }
                         if block_resolution < tile_resolution {
                             // Pad texture out
@@ -387,7 +387,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         ) {
                             // The quad we're going to draw has identical texels, so we might as
                             // well use a solid color and skip allocating a texture tile.
-                            QuadColoring::<A::Tile>::Solid(Rgba::from_32bit(uniform_color))
+                            QuadColoring::<A::Tile>::Solid(Rgba::from_linear_32bit(uniform_color))
                         } else {
                             maybe_texture_tile = texture_allocator.allocate();
                             if let Some(ref mut texture_tile) = maybe_texture_tile {
