@@ -229,6 +229,17 @@ impl Rgba {
             convert_component(a),
         ))
     }
+
+    /// Converts this color lossily to sRGB 8-bits-per-component color.
+    #[inline]
+    pub fn to_srgb_32bit(self) -> [u8; 4] {
+        [
+            component_to_srgb_8bit(self.0.x),
+            component_to_srgb_8bit(self.0.y),
+            component_to_srgb_8bit(self.0.z),
+            (self.0.w.into_inner() * 255.0) as u8,
+        ]
+    }
 }
 
 impl From<Vector3<NotNan<f32>>> for Rgb {
@@ -369,6 +380,20 @@ impl std::fmt::Debug for Rgba {
     }
 }
 
+fn component_to_srgb_8bit(c: NotNan<f32>) -> u8 {
+    // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_forward_transformation_(CIE_XYZ_to_sRGB)> (version as of Feb 3, 2020)
+    // Strip NotNan
+    let c = c.into_inner();
+    // Apply sRGB gamma curve
+    let c = if c < 0.0031308 {
+        c * (323. / 25.)
+    } else {
+        (211. * c.powf(5. / 12.) - 11.) / 200.
+    };
+    // Convert to integer
+    (c * 255.) as u8
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -386,6 +411,20 @@ mod tests {
         assert_eq!(
             Rgba::new(0.5, -1.0, 10.0, 1.0).to_linear_32bit(),
             (127, 0, 255, 255)
+        );
+    }
+
+    #[test]
+    fn rgba_to_srgb_32bit() {
+        assert_eq!(
+            Rgba::new(0.125, 0.25, 0.5, 0.75).to_srgb_32bit(),
+            [99, 136, 187, 191]
+        );
+
+        // Test saturation
+        assert_eq!(
+            Rgba::new(0.5, -1.0, 10.0, 1.0).to_srgb_32bit(),
+            [187, 0, 255, 255]
         );
     }
 
