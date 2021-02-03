@@ -113,6 +113,71 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         })
     }
 
+    /// Compute a full image, using the dimensions, projection, and viewpoint defined by
+    /// `projection`.
+    ///
+    /// The returned `[P::Pixel]` is in the usual left-right then top-bottom raster order;
+    /// its dimensions are `projection.framebuffer_size`.
+    ///
+    /// TODO: Add a mechanism for incrementally rendering into a mutable buffer instead of
+    /// all-at-once into a newly allocated one, for interactive use.
+    pub fn trace_scene_to_image(
+        &self,
+        projection: &ProjectionHelper,
+    ) -> (Box<[P::Pixel]>, RaytraceInfo) {
+        // This wrapper function ensures that the two implementations have consistent
+        // signatures.
+        self.trace_scene_to_image_impl(projection)
+    }
+
+    #[cfg(feature = "rayon")]
+    fn trace_scene_to_image_impl(
+        &self,
+        projection: &ProjectionHelper,
+    ) -> (Box<[P::Pixel]>, RaytraceInfo) {
+        let viewport = projection.viewport();
+        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
+
+        let output_iterator = (0..viewport_size.y)
+            .into_par_iter()
+            .map(move |ych| {
+                let y = viewport.normalize_fb_y(ych);
+                (0..viewport_size.x).into_par_iter().map(move |xch| {
+                    let x = viewport.normalize_fb_x(xch);
+                    self.trace_ray(projection.project_ndc_into_world(x, y))
+                })
+            })
+            .flatten();
+
+        let (image, info_sum): (Vec<P::Pixel>, rayon_helper::ParExtSum<RaytraceInfo>) =
+            output_iterator.unzip();
+
+        (image.into_boxed_slice(), info_sum.result())
+    }
+
+    #[cfg(not(feature = "rayon"))]
+    fn trace_scene_to_image_impl(
+        &self,
+        projection: &ProjectionHelper,
+    ) -> (Box<[P::Pixel]>, RaytraceInfo) {
+        let viewport = projection.viewport();
+        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
+        let mut image = Vec::with_capacity(viewport_size.x.checked_add(viewport_size.y).unwrap());
+
+        let mut total_info = RaytraceInfo::default();
+        for ych in 0..viewport_size.y {
+            let y = viewport.normalize_fb_y(ych);
+            for xch in 0..viewport_size.x {
+                let x = viewport.normalize_fb_x(xch);
+                let (pixel, info) = self.trace_ray(projection.project_ndc_into_world(x, y));
+                total_info += info;
+                image.push(pixel);
+            }
+        }
+
+        (image.into_boxed_slice(), total_info)
+    }
+
     #[inline]
     fn get_lighting(&self, cube: GridPoint) -> Rgb {
         self.0.with(|impl_fields| {
