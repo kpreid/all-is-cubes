@@ -21,11 +21,11 @@ use crate::chunking::{
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
-use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb};
+use crate::math::{FreeCoordinate, GridPoint, Rgb};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
-    triangulate_block, triangulate_blocks, triangulate_space, BlockTriangulation,
-    BlockTriangulationProvider,
+    triangulate_block, triangulate_blocks, BlockTriangulation, BlockTriangulationProvider,
+    SpaceTriangulation,
 };
 use crate::universe::URef;
 
@@ -302,9 +302,8 @@ pub struct SpaceRenderInfo {
 /// Storage for rendering of part of a [`Space`].
 pub struct Chunk {
     bounds: Grid,
-    /// Vertices grouped by the direction they face
-    vertices: FaceMap<Vec<Vertex>>,
-    tesses: FaceMap<Option<Tess<Vertex>>>,
+    triangulation: SpaceTriangulation<Vertex>,
+    tess: Option<Tess<Vertex>>,
     /// Texture tiles that our vertices' texture coordinates refer to.
     tile_dependencies: Vec<LumAtlasTile>,
     block_dependencies: Vec<(BlockIndex, u32)>,
@@ -314,8 +313,8 @@ impl Chunk {
     fn new(chunk_pos: ChunkPos) -> Self {
         Chunk {
             bounds: chunk_pos.grid(),
-            vertices: FaceMap::default(),
-            tesses: FaceMap::default(),
+            triangulation: SpaceTriangulation::new(),
+            tess: None,
             tile_dependencies: Vec::new(),
             block_dependencies: Vec::new(),
         }
@@ -337,7 +336,8 @@ impl Chunk {
         block_versioning: &[u32],
     ) {
         let mut block_provider = TrackingBlockProvider::new(block_triangulations);
-        triangulate_space(space, self.bounds, &mut block_provider, &mut self.vertices);
+        self.triangulation
+            .compute(space, self.bounds, &mut block_provider);
 
         // Stash all the texture tiles so they aren't deallocated out from under us.
         // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
@@ -356,37 +356,35 @@ impl Chunk {
                 .map(|index| (index as BlockIndex, block_versioning[index])),
         );
 
-        for &face in Face::ALL_SEVEN {
-            let tess_option = &mut self.tesses[face];
-            let new_vertices: &[Vertex] = self.vertices[face].as_ref();
+        let tess_option = &mut self.tess;
+        let new_vertices: &[Vertex] = self.triangulation.vertices();
 
-            if tess_option.as_ref().map(|tess| tess.vert_nb()) != Some(new_vertices.len()) {
-                // Existing buffer, if any, is not the right length. Discard it.
-                *tess_option = None;
-            }
+        if tess_option.as_ref().map(|tess| tess.vert_nb()) != Some(new_vertices.len()) {
+            // Existing buffer, if any, is not the right length. Discard it.
+            *tess_option = None;
+        }
 
-            // TODO: replace unwrap()s with an error logging/flagging mechanism
-            if new_vertices.is_empty() {
-                // Render zero vertices by not rendering anything.
-                *tess_option = None;
-            } else if let Some(tess) = tess_option.as_mut() {
-                // We already have a buffer, and it is a matching length.
-                // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
-                let mut buffer_slice: VerticesMut<Vertex, (), (), Interleaved, Vertex> = tess
-                    .vertices_mut()
-                    .expect("failed to map vertices for copying");
-                buffer_slice.copy_from_slice(new_vertices);
-            } else {
-                // Allocate and populate new buffer.
-                *tess_option = Some(
-                    context
-                        .new_tess()
-                        .set_vertices(self.vertices[face].clone())
-                        .set_mode(Mode::Triangle)
-                        .build()
-                        .unwrap(),
-                );
-            }
+        // TODO: replace unwrap()s with an error logging/flagging mechanism
+        if new_vertices.is_empty() {
+            // Render zero vertices by not rendering anything.
+            *tess_option = None;
+        } else if let Some(tess) = tess_option.as_mut() {
+            // We already have a buffer, and it is a matching length.
+            // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
+            let mut buffer_slice: VerticesMut<Vertex, (), (), Interleaved, Vertex> = tess
+                .vertices_mut()
+                .expect("failed to map vertices for copying");
+            buffer_slice.copy_from_slice(new_vertices);
+        } else {
+            // Allocate and populate new buffer.
+            *tess_option = Some(
+                context
+                    .new_tess()
+                    .set_vertices(new_vertices)
+                    .set_mode(Mode::Triangle)
+                    .build()
+                    .unwrap(),
+            );
         }
 
         chunk_todo.update_triangulation = false;
@@ -394,11 +392,9 @@ impl Chunk {
 
     fn render<E>(&self, tess_gate: &mut TessGate) -> Result<usize, E> {
         let mut count = 0;
-        for &face in Face::ALL_SEVEN {
-            if let Some(tess) = self.tesses[face].as_ref() {
-                count += tess.vert_nb() / 6;
-                tess_gate.render(tess)?;
-            }
+        if let Some(tess) = &self.tess {
+            count += tess.vert_nb() / 6;
+            tess_gate.render(tess)?;
         }
         Ok(count)
     }

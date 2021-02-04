@@ -466,78 +466,113 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
         .collect()
 }
 
-/// Allocate an empty output buffer for [`triangulate_space`] to write into.
-// TODO: Make this a struct's `Default`.
-pub fn new_space_buffer<V>() -> FaceMap<Vec<V>> {
-    FaceMap::generate(|_| Vec::new())
+/// Container for a triangle-based representation of a [`Space`] (or part of it) which may
+/// then be rasterized.
+///
+/// A `SpaceTriangulation` may be used multiple times as a [`Space`] is modified.
+/// Currently, the only benefit of this is avoiding reallocating memory.
+///
+/// Type parameter `GV` is the type of triangle vertices.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SpaceTriangulation<GV> {
+    // TODO: This struct is going to expand by having indices and by splitting indices into groups
+    // for opacity and depth sorting.
+    vertices: Vec<GV>,
 }
 
-/// Computes a triangle-based representation of a [`Space`] for rasterization.
-///
-/// `block_triangulations` should be the result of [`triangulate_blocks`] or equivalent,
-/// and must be up-to-date with the [`Space`]'s blocks or the result will be inaccurate
-/// and may contain severe lighting errors.
-///
-/// The triangles will be written into `output_vertices`, replacing the existing
-/// contents. This is intended to avoid memory reallocation in the common case of
-/// new geometry being similar to old geometry.
-///
-/// `output_vertices` is a [`FaceMap`] dividing the faces according to their normal
-/// vectors.
-///
-/// Note about edge case behavior: This algorithm does not use the [`Space`]'s block data
-/// at all. Thus, it always has a consistent interpretation based on
-/// `block_triangulations` (as opposed to, for example, using face opacity data not the
-/// same as the meshes and thus producing a rendering with gaps in it).
-pub fn triangulate_space<'p, BV, GV, T, P>(
-    space: &Space,
-    bounds: Grid,
-    mut block_triangulations: P,
-    output_vertices: &mut FaceMap<Vec<GV>>,
-) where
-    BV: ToGfxVertex<GV> + 'p,
-    P: BlockTriangulationProvider<'p, BV, T>,
-    T: 'p,
-{
-    // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
-    // If we do this, we'd make it the provider's responsibility
-    let empty_render = BlockTriangulation::<BV, T>::default();
-
-    for &face in Face::ALL_SEVEN.iter() {
-        // use the buffer but not the existing data
-        output_vertices[face].clear();
+impl<GV> SpaceTriangulation<GV> {
+    /// Construct an empty `SpaceTriangulation` which draws nothing.
+    pub const fn new() -> Self {
+        Self {
+            vertices: Vec::new(),
+        }
     }
-    for cube in bounds.interior_iter() {
-        let precomputed = space
-            .get_block_index(cube)
-            .and_then(|index| block_triangulations.get(index))
-            .unwrap_or(&empty_render);
-        let low_corner = cube.cast::<BV::Coordinate>().unwrap();
-        for &face in Face::ALL_SEVEN {
-            let adjacent_cube = cube + face.normal_vector();
-            if space
-                .get_block_index(adjacent_cube)
+
+    /// Shorthand for <code>[Self::new()].[compute](Self::compute)(...)</code>.
+    pub fn triangulate<'p, BV, T, P>(space: &Space, bounds: Grid, block_triangulations: P) -> Self
+    where
+        BV: ToGfxVertex<GV> + 'p,
+        P: BlockTriangulationProvider<'p, BV, T>,
+        T: 'p,
+    {
+        let mut this = Self::new();
+        this.compute(space, bounds, block_triangulations);
+        this
+    }
+
+    /// Computes triangles for the contents of `space` within `bounds` and stores them
+    /// in `self`.
+    ///
+    /// `block_triangulations` should be the result of [`triangulate_blocks`] or equivalent,
+    /// and must be up-to-date with the [`Space`]'s blocks or the result will be inaccurate
+    /// and may contain severe lighting errors.
+    ///
+    /// Note about edge case behavior: This algorithm does not use the [`Space`]'s block data
+    /// at all. Thus, it always has a consistent interpretation based on
+    /// `block_triangulations` (as opposed to, for example, using face opacity data not the
+    /// same as the meshes and thus producing a rendering with gaps in it).
+    pub fn compute<'p, BV, T, P>(
+        &mut self,
+        space: &Space,
+        bounds: Grid,
+        mut block_triangulations: P,
+    ) where
+        BV: ToGfxVertex<GV> + 'p,
+        P: BlockTriangulationProvider<'p, BV, T>,
+        T: 'p,
+    {
+        // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
+        // If we do this, we'd make it the provider's responsibility
+        let empty_render = BlockTriangulation::<BV, T>::default();
+
+        // use the buffer but not the existing data
+        self.vertices.clear();
+
+        for cube in bounds.interior_iter() {
+            let precomputed = space
+                .get_block_index(cube)
                 .and_then(|index| block_triangulations.get(index))
-                .map(|bt| bt.faces[face.opposite()].fully_opaque)
-                .unwrap_or(false)
-            {
-                // Don't draw obscured faces
-                continue;
-            }
+                .unwrap_or(&empty_render);
+            let low_corner = cube.cast::<BV::Coordinate>().unwrap();
+            for &face in Face::ALL_SEVEN {
+                let adjacent_cube = cube + face.normal_vector();
+                if space
+                    .get_block_index(adjacent_cube)
+                    .and_then(|index| block_triangulations.get(index))
+                    .map(|bt| bt.faces[face.opposite()].fully_opaque)
+                    .unwrap_or(false)
+                {
+                    // Don't draw obscured faces
+                    continue;
+                }
 
-            let lighting = space.get_lighting(adjacent_cube);
+                let lighting = space.get_lighting(adjacent_cube);
 
-            // Copy vertices, offset to the block position and with lighting
-            for vertex in precomputed.faces[face].vertices.iter() {
-                output_vertices[face].push(vertex.instantiate(low_corner.to_vec(), lighting));
+                // Copy vertices, offset to the block position and with lighting
+                for vertex in precomputed.faces[face].vertices.iter() {
+                    self.vertices
+                        .push(vertex.instantiate(low_corner.to_vec(), lighting));
+                }
             }
         }
     }
+
+    pub fn vertices(&self) -> &[GV] {
+        &self.vertices
+    }
 }
-/// Source of [`BlockTriangulation`] values for [`triangulate_space`].
+
+impl<GV> Default for SpaceTriangulation<GV> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source of [`BlockTriangulation`] values for [`SpaceTriangulation::compute`].
 ///
-/// This trait allows the caller of [`triangulate_space`] to provide an implementation
-/// which records which blocks were actually used, for precise invalidation.
+/// This trait allows the caller of [`SpaceTriangulation::compute`] to provide an
+/// implementation which records which blocks were actually used, for precise
+/// invalidation.
 pub trait BlockTriangulationProvider<'a, V, T> {
     fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<V, T>>;
 }
@@ -693,17 +728,15 @@ mod tests {
     ) -> (
         TestTextureAllocator,
         BlockTriangulations<BlockVertex, TestTextureTile>,
-        FaceMap<Vec<BlockVertex>>,
+        SpaceTriangulation<BlockVertex>,
     ) {
         let mut tex = TestTextureAllocator::new(texture_resolution);
         let block_triangulations = triangulate_blocks(space, &mut tex);
-        let mut space_triangulation = new_space_buffer();
-        triangulate_space::<BlockVertex, BlockVertex, TestTextureTile, _>(
-            space,
-            space.grid(),
-            &*block_triangulations,
-            &mut space_triangulation,
-        );
+        let space_triangulation = SpaceTriangulation::<BlockVertex>::triangulate::<
+            BlockVertex,
+            TestTextureTile,
+            _,
+        >(space, space.grid(), &*block_triangulations);
         (tex, block_triangulations, space_triangulation)
     }
 
@@ -723,23 +756,18 @@ mod tests {
             .unwrap();
         let (_, _, space_tri) = triangulate_blocks_and_space(&space, 7);
 
-        let space_tri_flattened: Vec<BlockVertex> = space_tri
-            .values()
-            .iter()
-            .flat_map(|r| (*r).clone())
-            .collect();
-
         // The space rendering should be a 2×2×2 cube of tiles, without any hidden interior faces.
         assert_eq!(
             Vec::<&BlockVertex>::new(),
-            space_tri_flattened
+            space_tri
+                .vertices()
                 .iter()
                 .filter(|vertex| vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
                 .collect::<Vec<&BlockVertex>>(),
             "found an interior point"
         );
         assert_eq!(
-            space_tri_flattened.len(),
+            space_tri.vertices().len(),
             6 /* vertices per face */
             * 4 /* block faces per exterior side of space */
             * 6, /* sides of space */
@@ -758,12 +786,7 @@ mod tests {
 
         // This should not panic; visual glitches are preferable to failure.
         space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
-        triangulate_space(
-            &space,
-            space.grid(),
-            &*block_triangulations,
-            &mut new_space_buffer(),
-        );
+        SpaceTriangulation::triangulate(&space, space.grid(), &*block_triangulations);
     }
 
     /// Construct a 1x1 recursive block and test that this is equivalent in geometry
@@ -822,11 +845,17 @@ mod tests {
         eprintln!("{:#?}", space_rendered);
 
         assert_eq!(
-            space_rendered,
+            space_rendered
+                .vertices()
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>(),
             block_triangulations[0]
                 .faces
-                .clone()
-                .map(|_, frd| frd.vertices.to_vec())
+                .values()
+                .iter()
+                .flat_map(|face_render| face_render.vertices.clone().into_iter())
+                .collect::<Vec<_>>()
         );
         assert_eq!(tex.count_allocated(), 0);
     }
@@ -892,53 +921,45 @@ mod tests {
             "Should be only 6 cube face textures"
         );
         assert_eq!(
-            space_rendered,
-            FaceMap {
-                within: vec![
-                    v_t([0.250, 0.250, 0.250], [-1.,  0.,  0.], [0.250, 0.250, 0.000]),
-                    v_t([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.250, 0.750, 0.000]),
-                    v_t([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.750, 0.250, 0.000]),
-                    v_t([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.750, 0.250, 0.000]),
-                    v_t([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.250, 0.750, 0.000]),
-                    v_t([0.250, 0.750, 0.750], [-1.,  0.,  0.], [0.750, 0.750, 0.000]),
-                    v_t([0.250, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.250, 0.000]),
-                    v_t([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.750, 0.000]),
-                    v_t([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.250, 0.000]),
-                    v_t([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.250, 0.000]),
-                    v_t([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.750, 0.000]),
-                    v_t([0.750, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.750, 0.000]),
-                    v_t([0.250, 0.250, 0.250], [ 0.,  0., -1.], [0.250, 0.250, 0.000]),
-                    v_t([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.250, 0.750, 0.000]),
-                    v_t([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.750, 0.250, 0.000]),
-                    v_t([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.750, 0.250, 0.000]),
-                    v_t([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.250, 0.750, 0.000]),
-                    v_t([0.750, 0.750, 0.250], [ 0.,  0., -1.], [0.750, 0.750, 0.000]),
-                    v_t([0.750, 0.750, 0.250], [ 1.,  0.,  0.], [0.250, 0.250, 0.000]),
-                    v_t([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.250, 0.750, 0.000]),
-                    v_t([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.750, 0.250, 0.000]),
-                    v_t([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.750, 0.250, 0.000]),
-                    v_t([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.250, 0.750, 0.000]),
-                    v_t([0.750, 0.250, 0.750], [ 1.,  0.,  0.], [0.750, 0.750, 0.000]),
-                    v_t([0.750, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.250, 0.000]),
-                    v_t([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.750, 0.000]),
-                    v_t([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.250, 0.000]),
-                    v_t([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.250, 0.000]),
-                    v_t([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.750, 0.000]),
-                    v_t([0.250, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.750, 0.000]),
-                    v_t([0.250, 0.750, 0.750], [ 0.,  0.,  1.], [0.250, 0.250, 0.000]),
-                    v_t([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.250, 0.750, 0.000]),
-                    v_t([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.750, 0.250, 0.000]),
-                    v_t([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.750, 0.250, 0.000]),
-                    v_t([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.250, 0.750, 0.000]),
-                    v_t([0.750, 0.250, 0.750], [ 0.,  0.,  1.], [0.750, 0.750, 0.000]),
-                ],
-                nx: vec![],
-                ny: vec![],
-                nz: vec![],
-                px: vec![],
-                py: vec![],
-                pz: vec![],
-            },
+            space_rendered.vertices().into_iter().cloned().collect::<Vec<_>>(),
+            vec![
+                v_t([0.250, 0.250, 0.250], [-1.,  0.,  0.], [0.250, 0.250, 0.000]),
+                v_t([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.250, 0.750, 0.000]),
+                v_t([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.750, 0.250, 0.000]),
+                v_t([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.750, 0.250, 0.000]),
+                v_t([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.250, 0.750, 0.000]),
+                v_t([0.250, 0.750, 0.750], [-1.,  0.,  0.], [0.750, 0.750, 0.000]),
+                v_t([0.250, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.250, 0.000]),
+                v_t([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.750, 0.000]),
+                v_t([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.250, 0.000]),
+                v_t([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.250, 0.000]),
+                v_t([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.250, 0.750, 0.000]),
+                v_t([0.750, 0.250, 0.750], [ 0., -1.,  0.], [0.750, 0.750, 0.000]),
+                v_t([0.250, 0.250, 0.250], [ 0.,  0., -1.], [0.250, 0.250, 0.000]),
+                v_t([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.250, 0.750, 0.000]),
+                v_t([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.750, 0.250, 0.000]),
+                v_t([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.750, 0.250, 0.000]),
+                v_t([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.250, 0.750, 0.000]),
+                v_t([0.750, 0.750, 0.250], [ 0.,  0., -1.], [0.750, 0.750, 0.000]),
+                v_t([0.750, 0.750, 0.250], [ 1.,  0.,  0.], [0.250, 0.250, 0.000]),
+                v_t([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.250, 0.750, 0.000]),
+                v_t([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.750, 0.250, 0.000]),
+                v_t([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.750, 0.250, 0.000]),
+                v_t([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.250, 0.750, 0.000]),
+                v_t([0.750, 0.250, 0.750], [ 1.,  0.,  0.], [0.750, 0.750, 0.000]),
+                v_t([0.750, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.250, 0.000]),
+                v_t([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.750, 0.000]),
+                v_t([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.250, 0.000]),
+                v_t([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.250, 0.000]),
+                v_t([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.250, 0.750, 0.000]),
+                v_t([0.250, 0.750, 0.750], [ 0.,  1.,  0.], [0.750, 0.750, 0.000]),
+                v_t([0.250, 0.750, 0.750], [ 0.,  0.,  1.], [0.250, 0.250, 0.000]),
+                v_t([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.250, 0.750, 0.000]),
+                v_t([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.750, 0.250, 0.000]),
+                v_t([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.750, 0.250, 0.000]),
+                v_t([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.250, 0.750, 0.000]),
+                v_t([0.750, 0.250, 0.750], [ 0.,  0.,  1.], [0.750, 0.750, 0.000]),
+            ],
         );
     }
 
@@ -975,53 +996,45 @@ mod tests {
 
         assert_eq!(tex.count_allocated(), 0, "Should be no cube face textures");
         assert_eq!(
-            space_rendered,
-            FaceMap {
-                within: vec![
-                    v_c([0.250, 0.250, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
-                    v_c([0.750, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
-                ],
-                nx: vec![],
-                ny: vec![],
-                nz: vec![],
-                px: vec![],
-                py: vec![],
-                pz: vec![],
-            },
+            space_rendered.vertices().into_iter().cloned().collect::<Vec<_>>(),
+            vec![
+                v_c([0.250, 0.250, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.250], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.250, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.750], [-1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.250], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.750], [ 0., -1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.250], [ 0.,  0., -1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.250], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.750], [ 1.,  0.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.250], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.750], [ 0.,  1.,  0.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.750, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+                v_c([0.750, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
+            ],
         );
     }
 
