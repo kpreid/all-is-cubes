@@ -128,6 +128,7 @@ pub struct InputProcessor {
 }
 
 impl InputProcessor {
+    #[allow(clippy::new_without_default)] // I expect it'll grow some parameters
     pub fn new() -> Self {
         Self {
             keys_held: HashSet::new(),
