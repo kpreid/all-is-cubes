@@ -85,7 +85,16 @@ impl ChunkChart {
         }
     }
 
-    pub fn chunks(&self, origin: ChunkPos) -> impl Iterator<Item = ChunkPos> + '_ {
+    /// Returns an iterator over the chunks in this chart — i.e. intersecting a sphere
+    /// around the given origin position.
+    ///
+    /// The chunks are ordered from nearest to farthest; the iterator is a
+    /// [`DoubleEndedIterator`] so that [`Iterator::rev`] may be used to iterate from
+    /// farthest to nearest.
+    pub fn chunks(
+        &self,
+        origin: ChunkPos,
+    ) -> impl Iterator<Item = ChunkPos> + DoubleEndedIterator + '_ {
         self.octant_chunks
             .iter()
             .copied()
@@ -141,6 +150,11 @@ impl<T> Iterator for TwoIter<T> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         let bound = self.a.is_some() as usize + self.b.is_some() as usize;
         (bound, Some(bound))
+    }
+}
+impl<T> DoubleEndedIterator for TwoIter<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.b.take().or_else(|| self.a.take())
     }
 }
 impl<T> std::iter::ExactSizeIterator for TwoIter<T> {}
@@ -222,5 +236,16 @@ mod tests {
 
         // TODO: ??? convince myself this shouldn't be 32
         assert_count(0.5000001, 56);
+    }
+
+    /// [`ChunkChart`]'s iterator should be consistent when reversed.
+    #[test]
+    fn chunk_chart_reverse_iteration() {
+        let chart = ChunkChart::new(7. * CHUNK_SIZE_FREE);
+        let p = ChunkPos::new(10, 3, 100);
+        let forward = chart.chunks(p).collect::<Vec<_>>();
+        let mut reverse = chart.chunks(p).rev().collect::<Vec<_>>();
+        reverse.reverse();
+        assert_eq!(forward, reverse);
     }
 }
