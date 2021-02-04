@@ -7,7 +7,7 @@ use bitvec::prelude::BitVec;
 use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as _};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::{Pipeline, PipelineError};
-use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
+use luminance_front::tess::{Mode, Tess};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::Backend;
 use std::cell::RefCell;
@@ -315,7 +315,7 @@ pub struct SpaceRenderInfo {
 pub struct Chunk {
     bounds: Grid,
     triangulation: SpaceTriangulation<Vertex>,
-    tess: Option<Tess<Vertex>>,
+    tess: Option<Tess<Vertex, u32>>,
     /// Texture tiles that our vertices' texture coordinates refer to.
     tile_dependencies: Vec<LumAtlasTile>,
     block_dependencies: Vec<(BlockIndex, u32)>,
@@ -348,6 +348,9 @@ impl Chunk {
         block_versioning: &[u32],
     ) {
         let mut block_provider = TrackingBlockProvider::new(block_triangulations);
+
+        let old_indices_len = self.triangulation.indices().len();
+
         self.triangulation
             .compute(space, self.bounds, &mut block_provider);
 
@@ -369,30 +372,43 @@ impl Chunk {
         );
 
         let tess_option = &mut self.tess;
-        let new_vertices: &[Vertex] = self.triangulation.vertices();
+        let new_triangulation = &self.triangulation;
 
-        if tess_option.as_ref().map(|tess| tess.vert_nb()) != Some(new_vertices.len()) {
+        // TODO: Theoretically, we should be able to reuse an existing vertex buffer that's too
+        // large, or even an index buffer that's too large via degenerate triangles.
+        // In practice, doing so seems to end up drawing some invalid vertices but only under
+        // luminance-webgl, and the copy_from_slice _doesn't report a length mismatch_,
+        // suggesting there's a subtle bug somewhere in our code (but how?), luminance, or rustc.
+        let existing_tess_size_ok = if let Some(tess) = tess_option.as_ref() {
+            tess.vert_nb() == new_triangulation.vertices().len()
+                && old_indices_len == new_triangulation.indices().len()
+        } else {
+            false
+        };
+        if !existing_tess_size_ok {
             // Existing buffer, if any, is not the right length. Discard it.
             *tess_option = None;
         }
 
         // TODO: replace unwrap()s with an error logging/flagging mechanism
-        if new_vertices.is_empty() {
+        if new_triangulation.is_empty() {
             // Render zero vertices by not rendering anything.
             *tess_option = None;
         } else if let Some(tess) = tess_option.as_mut() {
             // We already have a buffer, and it is a matching length.
-            // TODO: Generalize this to be able to shrink buffers via degenerate triangles.
-            let mut buffer_slice: VerticesMut<Vertex, (), (), Interleaved, Vertex> = tess
-                .vertices_mut()
-                .expect("failed to map vertices for copying");
-            buffer_slice.copy_from_slice(new_vertices);
+            tess.vertices_mut()
+                .expect("failed to map vertices for copying")
+                .copy_from_slice(new_triangulation.vertices());
+            tess.indices_mut()
+                .expect("failed to map indices for copying")
+                .copy_from_slice(new_triangulation.indices());
         } else {
             // Allocate and populate new buffer.
             *tess_option = Some(
                 context
                     .new_tess()
-                    .set_vertices(new_vertices)
+                    .set_vertices(new_triangulation.vertices())
+                    .set_indices(new_triangulation.indices())
                     .set_mode(Mode::Triangle)
                     .build()
                     .unwrap(),

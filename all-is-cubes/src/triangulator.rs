@@ -16,7 +16,7 @@ use cgmath::{
     ElementWise as _, EuclideanSpace as _, Point2, Point3, Transform as _, Vector2, Vector3,
     Zero as _,
 };
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use crate::block::{evaluated_block_resolution, EvaluatedBlock, Evoxel, Resolution};
 use crate::content::palette;
@@ -129,8 +129,11 @@ impl ToGfxVertex<BlockVertex> for BlockVertex {
 /// kept there.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FaceTriangulation<V> {
-    /// Vertices of triangles (i.e. length is a multiple of 3) in counterclockwise order.
+    /// Vertices, as used by `self.indices`.
     vertices: Vec<V>,
+    /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
+    /// in counterclockwise order.
+    indices: Vec<u32>,
     /// Whether the block entirely fills its cube, such that nothing can be seen through
     /// it and faces of adjacent blocks may be removed.
     fully_opaque: bool,
@@ -140,6 +143,7 @@ impl<V> Default for FaceTriangulation<V> {
     fn default() -> Self {
         FaceTriangulation {
             vertices: Vec::new(),
+            indices: Vec::new(),
             fully_opaque: false,
         }
     }
@@ -184,7 +188,7 @@ impl<V, T> Default for BlockTriangulation<V, T> {
 /// Pass it to [`triangulate_space`] to use it.
 pub type BlockTriangulations<V, A> = Box<[BlockTriangulation<V, A>]>;
 
-const QUAD_VERTICES: &[Vector2<FreeCoordinate>; 6] = &[
+const QUAD_VERTICES: &[Vector2<FreeCoordinate>; 4] = &[
     // Two-triangle quad.
     // Note that looked at from a X-right Y-up view, these triangles are
     // clockwise, but they're properly counterclockwise from the perspective
@@ -193,14 +197,14 @@ const QUAD_VERTICES: &[Vector2<FreeCoordinate>; 6] = &[
     Vector2::new(0.0, 0.0),
     Vector2::new(0.0, 1.0),
     Vector2::new(1.0, 0.0),
-    Vector2::new(1.0, 0.0),
-    Vector2::new(0.0, 1.0),
     Vector2::new(1.0, 1.0),
 ];
+const QUAD_INDICES: &[u32] = &[0, 1, 2, 2, 1, 3];
 
 #[inline]
 fn push_quad<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
+    indices: &mut Vec<u32>,
     face: Face,
     depth: FreeCoordinate,
     low_corner: Point2<FreeCoordinate>,
@@ -212,6 +216,7 @@ fn push_quad<V: From<BlockVertex>>(
     // This is tricky, though, since the coloring can vary per quad (though the scale _can_ be constant).
     let transform_f = face.matrix(1).to_free();
     let transform_t = transform_f.cast::<TextureCoordinate>().unwrap();
+    let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5 / (resolution as TextureCoordinate);
     let depth_fudge = Vector3::new(0., 0., half_texel);
 
@@ -267,6 +272,9 @@ fn push_quad<V: From<BlockVertex>>(
             },
         }));
     }
+    for &i in QUAD_INDICES {
+        indices.push(index_origin + i);
+    }
 }
 
 /// Helper for [`push_quad`] which offers the alternatives of solid color or texturing.
@@ -292,23 +300,26 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     return FaceTriangulation::default();
                 }
 
+                let mut vertices: Vec<V> = Vec::new();
+                let mut indices: Vec<u32> = Vec::new();
+                if !block.color.fully_transparent() {
+                    vertices.reserve_exact(4);
+                    indices.reserve_exact(6);
+                    push_quad(
+                        &mut vertices,
+                        &mut indices,
+                        face,
+                        /* depth= */ 0.,
+                        Point2 { x: 0., y: 0. },
+                        Point2 { x: 1., y: 1. },
+                        QuadColoring::<A::Tile>::Solid(block.color),
+                        1,
+                    );
+                }
                 FaceTriangulation {
                     fully_opaque: block.color.fully_opaque(),
-                    vertices: if !block.color.fully_transparent() {
-                        let mut face_vertices: Vec<V> = Vec::with_capacity(6);
-                        push_quad(
-                            &mut face_vertices,
-                            face,
-                            /* depth= */ 0.,
-                            Point2 { x: 0., y: 0. },
-                            Point2 { x: 1., y: 1. },
-                            QuadColoring::<A::Tile>::Solid(block.color),
-                            1,
-                        );
-                        face_vertices
-                    } else {
-                        Vec::new()
-                    },
+                    vertices,
+                    indices,
                 }
             });
 
@@ -322,6 +333,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // updating WITHIN independently of other faces.
             let mut output_by_face = FaceMap::generate(|face| FaceTriangulation {
                 vertices: Vec::new(),
+                indices: Vec::new(),
                 // Start assuming opacity; if we find any transparent pixels we'll set
                 // this to false. WITHIN is always "transparent" because the algorithm
                 // that consumes this structure will say "draw this face if its adjacent
@@ -405,9 +417,9 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
                     if layer_is_visible_somewhere {
                         // Only the surface faces go anywhere but WITHIN.
-                        let face_vertices = &mut output_by_face
-                            [if layer == 0 { face } else { Face::WITHIN }]
-                        .vertices;
+                        let FaceTriangulation {
+                            vertices, indices, ..
+                        } = &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }];
                         let depth =
                             FreeCoordinate::from(layer) / FreeCoordinate::from(block_resolution);
 
@@ -445,7 +457,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         };
 
                         push_quad(
-                            face_vertices,
+                            vertices,
+                            indices,
                             face,
                             depth,
                             visible_low_corner.map(|c| {
@@ -545,6 +558,7 @@ pub struct SpaceTriangulation<GV> {
     // TODO: This struct is going to expand by having indices and by splitting indices into groups
     // for opacity and depth sorting.
     vertices: Vec<GV>,
+    indices: Vec<u32>,
 }
 
 impl<GV> SpaceTriangulation<GV> {
@@ -552,6 +566,7 @@ impl<GV> SpaceTriangulation<GV> {
     pub const fn new() -> Self {
         Self {
             vertices: Vec::new(),
+            indices: Vec::new(),
         }
     }
 
@@ -616,9 +631,18 @@ impl<GV> SpaceTriangulation<GV> {
                 let lighting = space.get_lighting(adjacent_cube);
 
                 // Copy vertices, offset to the block position and with lighting
-                for vertex in precomputed.faces[face].vertices.iter() {
+                let face_triangulation = &precomputed.faces[face];
+                let index_offset: u32 = self
+                    .vertices
+                    .len()
+                    .try_into()
+                    .expect("vertex index overflow");
+                for vertex in face_triangulation.vertices.iter() {
                     self.vertices
                         .push(vertex.instantiate(low_corner.to_vec(), lighting));
+                }
+                for index in face_triangulation.indices.iter() {
+                    self.indices.push(index + index_offset);
                 }
             }
         }
@@ -626,6 +650,14 @@ impl<GV> SpaceTriangulation<GV> {
 
     pub fn vertices(&self) -> &[GV] {
         &self.vertices
+    }
+
+    pub fn indices(&self) -> &[u32] {
+        &self.indices
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.indices.is_empty()
     }
 }
 
@@ -845,7 +877,7 @@ mod tests {
         );
         assert_eq!(
             space_tri.vertices().len(),
-            6 /* vertices per face */
+            4 /* vertices per face */
             * 4 /* block faces per exterior side of space */
             * 6, /* sides of space */
             "wrong number of faces"
@@ -995,38 +1027,31 @@ mod tests {
                 v_t([0.250, 0.250, 0.250], NX, [0.3125, 0.2500, 0.2500]),
                 v_t([0.250, 0.250, 0.750], NX, [0.3125, 0.2500, 0.7500]),
                 v_t([0.250, 0.750, 0.250], NX, [0.3125, 0.7500, 0.2500]),
-                v_t([0.250, 0.750, 0.250], NX, [0.3125, 0.7500, 0.2500]),
-                v_t([0.250, 0.250, 0.750], NX, [0.3125, 0.2500, 0.7500]),
                 v_t([0.250, 0.750, 0.750], NX, [0.3125, 0.7500, 0.7500]),
+
                 v_t([0.250, 0.250, 0.250], NY, [0.2500, 0.3125, 0.2500]),
                 v_t([0.750, 0.250, 0.250], NY, [0.7500, 0.3125, 0.2500]),
                 v_t([0.250, 0.250, 0.750], NY, [0.2500, 0.3125, 0.7500]),
-                v_t([0.250, 0.250, 0.750], NY, [0.2500, 0.3125, 0.7500]),
-                v_t([0.750, 0.250, 0.250], NY, [0.7500, 0.3125, 0.2500]),
                 v_t([0.750, 0.250, 0.750], NY, [0.7500, 0.3125, 0.7500]),
+
                 v_t([0.250, 0.250, 0.250], NZ, [0.2500, 0.2500, 0.3125]),
                 v_t([0.250, 0.750, 0.250], NZ, [0.2500, 0.7500, 0.3125]),
                 v_t([0.750, 0.250, 0.250], NZ, [0.7500, 0.2500, 0.3125]),
-                v_t([0.750, 0.250, 0.250], NZ, [0.7500, 0.2500, 0.3125]),
-                v_t([0.250, 0.750, 0.250], NZ, [0.2500, 0.7500, 0.3125]),
                 v_t([0.750, 0.750, 0.250], NZ, [0.7500, 0.7500, 0.3125]),
+
                 v_t([0.750, 0.750, 0.250], PX, [0.6875, 0.7500, 0.2500]),
                 v_t([0.750, 0.750, 0.750], PX, [0.6875, 0.7500, 0.7500]),
                 v_t([0.750, 0.250, 0.250], PX, [0.6875, 0.2500, 0.2500]),
-                v_t([0.750, 0.250, 0.250], PX, [0.6875, 0.2500, 0.2500]),
-                v_t([0.750, 0.750, 0.750], PX, [0.6875, 0.7500, 0.7500]),
                 v_t([0.750, 0.250, 0.750], PX, [0.6875, 0.2500, 0.7500]),
+
                 v_t([0.750, 0.750, 0.250], PY, [0.7500, 0.6875, 0.2500]),
                 v_t([0.250, 0.750, 0.250], PY, [0.2500, 0.6875, 0.2500]),
                 v_t([0.750, 0.750, 0.750], PY, [0.7500, 0.6875, 0.7500]),
-                v_t([0.750, 0.750, 0.750], PY, [0.7500, 0.6875, 0.7500]),
-                v_t([0.250, 0.750, 0.250], PY, [0.2500, 0.6875, 0.2500]),
                 v_t([0.250, 0.750, 0.750], PY, [0.2500, 0.6875, 0.7500]),
+
                 v_t([0.250, 0.750, 0.750], PZ, [0.2500, 0.7500, 0.6875]),
                 v_t([0.250, 0.250, 0.750], PZ, [0.2500, 0.2500, 0.6875]),
                 v_t([0.750, 0.750, 0.750], PZ, [0.7500, 0.7500, 0.6875]),
-                v_t([0.750, 0.750, 0.750], PZ, [0.7500, 0.7500, 0.6875]),
-                v_t([0.250, 0.250, 0.750], PZ, [0.2500, 0.2500, 0.6875]),
                 v_t([0.750, 0.250, 0.750], PZ, [0.7500, 0.2500, 0.6875]),
             ],
         );
@@ -1064,38 +1089,31 @@ mod tests {
                 v_c([0.250, 0.250, 0.250], NX, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.250, 0.250, 0.750], NX, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.250, 0.750, 0.250], NX, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.250, 0.750, 0.250], NX, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.250, 0.250, 0.750], NX, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.250, 0.750, 0.750], NX, [0.0, 1.0, 0.5, 1.0]),
+
                 v_c([0.250, 0.250, 0.250], NY, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.250, 0.250], NY, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.250, 0.250, 0.750], NY, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.250, 0.250, 0.750], NY, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.750, 0.250, 0.250], NY, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.250, 0.750], NY, [0.0, 1.0, 0.5, 1.0]),
+
                 v_c([0.250, 0.250, 0.250], NZ, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.250, 0.750, 0.250], NZ, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.250, 0.250], NZ, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.750, 0.250, 0.250], NZ, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.250, 0.750, 0.250], NZ, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.750, 0.250], NZ, [0.0, 1.0, 0.5, 1.0]),
+
                 v_c([0.750, 0.750, 0.250], PX, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.750, 0.750], PX, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.250, 0.250], PX, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.750, 0.250, 0.250], PX, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.750, 0.750, 0.750], PX, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.250, 0.750], PX, [0.0, 1.0, 0.5, 1.0]),
+
                 v_c([0.750, 0.750, 0.250], PY, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.250, 0.750, 0.250], PY, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.750, 0.750], PY, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.750, 0.750, 0.750], PY, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.250, 0.750, 0.250], PY, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.250, 0.750, 0.750], PY, [0.0, 1.0, 0.5, 1.0]),
+
                 v_c([0.250, 0.750, 0.750], PZ, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.250, 0.250, 0.750], PZ, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.750, 0.750], PZ, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.750, 0.750, 0.750], PZ, [0.0, 1.0, 0.5, 1.0]),
-                v_c([0.250, 0.250, 0.750], PZ, [0.0, 1.0, 0.5, 1.0]),
                 v_c([0.750, 0.250, 0.750], PZ, [0.0, 1.0, 0.5, 1.0]),
             ],
         );
@@ -1196,6 +1214,19 @@ mod tests {
         assert_eq!(1, block_triangulations.len());
         // TODO: Check that the triangulation includes the failure marker/fallback color.
         let _complex_block_triangulation = &block_triangulations[0];
+    }
+
+    #[test]
+    fn space_triangulation_accessors() {
+        let mut t = SpaceTriangulation::<BlockVertex>::new();
+        assert!(t.is_empty());
+        assert_eq!(t.vertices(), &[]);
+        assert_eq!(t.indices(), &[]);
+
+        t.indices.push(0);
+        assert!(!t.is_empty());
+        assert_eq!(t.vertices(), &[]);
+        assert_eq!(t.indices(), &[0]);
     }
 
     /// Test the [`TestTextureAllocator`].
