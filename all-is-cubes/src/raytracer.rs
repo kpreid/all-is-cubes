@@ -13,7 +13,7 @@
 //! In the future (or currently, if I forgot to update this comment), it will be used
 //! as a means to display the state of `Space`s used for testing inline in test output.
 
-use cgmath::{EuclideanSpace as _, Matrix4, Point3, Vector2, Vector3, Zero as _};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Matrix4, Point3, Vector2, Vector3, Zero as _};
 use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
@@ -441,22 +441,20 @@ impl<P: PixelBuf> TracingState<P> {
         if surface.fully_transparent() {
             return;
         }
-        let adjusted_rgb = fake_lighting_adjustment(surface.to_rgb() * lighting, face);
+        let adjusted_rgb = surface.to_rgb() * lighting * fixed_directional_lighting(face);
         self.pixel_buf
             .add(adjusted_rgb.with_alpha(surface.alpha()), block_data);
     }
 }
 
-fn fake_lighting_adjustment(rgb: Rgb, face: Face) -> Rgb {
-    // TODO: notion of "one step" is less coherent ...
-    let one_step = 1.0 / 5.0;
-    let modifier = match face {
-        Face::PY => Rgb::ONE * one_step * 2.0,
-        Face::NY => Rgb::ONE * one_step * -1.0,
-        Face::NX | Face::PX => Rgb::ONE * one_step * 1.0,
-        _ => Rgb::ONE * 0.0,
-    };
-    rgb + modifier
+/// Simple directional lighting used to give corners extra definition.
+/// Note that this algorithm is also implemented in the fragment shader for GPU rendering.
+fn fixed_directional_lighting(face: Face) -> f32 {
+    let normal = face.normal_vector();
+    const LIGHT_1_DIRECTION: Vector3<f32> = Vector3::new(0.4, -0.1, 0.0);
+    const LIGHT_2_DIRECTION: Vector3<f32> = Vector3::new(-0.4, 0.35, 0.25);
+    (1.0 - 1.0 / 16.0)
+        + 0.25 * (LIGHT_1_DIRECTION.dot(normal).max(0.0) + LIGHT_2_DIRECTION.dot(normal).max(0.0))
 }
 
 /// Implementations of [`PixelBuf`] define output formats of the raytracer, by being

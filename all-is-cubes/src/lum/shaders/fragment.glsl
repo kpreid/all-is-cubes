@@ -7,19 +7,20 @@ in lowp vec3 v_lighting;
 
 out mediump vec4 fragment_color;
 
-// Simple directional lighting used to give corners definition.
-lowp float fixed_lighting_environment() {
+// Simple directional lighting used to give corners extra definition.
+// Note that this algorithm is also implemented in the Rust code.
+lowp float fixed_directional_lighting() {
   lowp vec3 normal = vec3(v_normal);
   const lowp vec3 light_1_direction = vec3(0.4,-0.1,0);
   const lowp vec3 light_2_direction = vec3(-0.4,0.35,0.25);
-  return 0.875 + 0.5 * (
+  return (1.0 - 1.0/16.0) + 0.25 * (
     max(0.0, dot(light_1_direction, normal))
     + max(0.0, dot(light_2_direction, normal))
   );
 }
 
 lowp vec3 lighting() {
-  return fixed_lighting_environment() * v_lighting;
+  return fixed_directional_lighting() * v_lighting;
 }
 
 void main(void) {
