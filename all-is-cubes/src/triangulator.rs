@@ -181,6 +181,7 @@ impl<V, T> BlockTriangulation<V, T> {
 }
 
 impl<V, T> Default for BlockTriangulation<V, T> {
+    #[inline]
     fn default() -> Self {
         Self {
             faces: FaceMap::generate(|_| FaceTriangulation::default()),
@@ -592,6 +593,7 @@ pub struct SpaceTriangulation<GV> {
 
 impl<GV> SpaceTriangulation<GV> {
     /// Construct an empty `SpaceTriangulation` which draws nothing.
+    #[inline]
     pub const fn new() -> Self {
         Self {
             vertices: Vec::new(),
@@ -601,6 +603,7 @@ impl<GV> SpaceTriangulation<GV> {
     }
 
     /// Shorthand for <code>[Self::new()].[compute](Self::compute)(...)</code>.
+    #[inline]
     pub fn triangulate<'p, BV, T, P>(space: &Space, bounds: Grid, block_triangulations: P) -> Self
     where
         BV: ToGfxVertex<GV> + 'p,
@@ -690,33 +693,39 @@ impl<GV> SpaceTriangulation<GV> {
         self.transparent_range = ts..self.indices.len();
     }
 
+    #[inline]
     pub fn vertices(&self) -> &[GV] {
         &self.vertices
     }
 
+    #[inline]
     pub fn indices(&self) -> &[u32] {
         &self.indices
     }
 
     /// True if there is nothing to draw.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.indices.is_empty()
     }
 
     /// The range of [`Self::indices`] which contains no alpha values other than 0 or 1
     /// and therefore may be drawn using a depth buffer rather than sorting.
+    #[inline]
     pub fn opaque_range(&self) -> Range<usize> {
         0..(self.transparent_range.start)
     }
 
     /// The range of [`Self::indices`] which contains alpha values other than 0 and 1
     /// and therefore must be drawn with consideration for ordering.
+    #[inline]
     pub fn transparent_range(&self) -> Range<usize> {
         self.transparent_range.clone()
     }
 }
 
 impl<GV> Default for SpaceTriangulation<GV> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
