@@ -721,6 +721,15 @@ mod tests {
         }
     }
 
+    /// Test helper to call `triangulate_block` alone without a `Space`.
+    fn test_triangulate_block(block: Block) -> BlockTriangulation<BlockVertex, TestTextureTile> {
+        let triangulation = triangulate_block(
+            &block.evaluate().unwrap(),
+            &mut TestTextureAllocator::new(16),
+        );
+        triangulation
+    }
+
     /// Test helper to call `triangulate_blocks` followed directly by `triangulate_space`.
     fn triangulate_blocks_and_space(
         space: &Space,
@@ -1035,6 +1044,71 @@ mod tests {
                 v_c([0.250, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
                 v_c([0.750, 0.250, 0.750], [ 0.,  0.,  1.], [0.0, 1.0, 0.49803922, 1.0]),
             ],
+        );
+    }
+
+    /// Make a `FaceMap` with uniform values except for `WITHIN`.
+    fn except_within<T: Clone>(without: T, within: T) -> FaceMap<T> {
+        FaceMap::generate(|face| {
+            if face == Face::WITHIN {
+                within.clone()
+            } else {
+                without.clone()
+            }
+        })
+    }
+
+    #[test]
+    fn fully_opaque_atom() {
+        assert_eq!(
+            test_triangulate_block(Block::from(Rgba::WHITE))
+                .faces
+                .map(|_, ft| ft.fully_opaque),
+            except_within(true, false)
+        );
+        assert_eq!(
+            test_triangulate_block(Block::from(Rgba::TRANSPARENT))
+                .faces
+                .map(|_, ft| ft.fully_opaque),
+            except_within(false, false)
+        );
+        assert_eq!(
+            test_triangulate_block(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.5)))
+                .faces
+                .map(|_, ft| ft.fully_opaque),
+            except_within(false, false)
+        );
+    }
+
+    #[test]
+    fn fully_opaque_voxels() {
+        let resolution = 8;
+        let mut u = Universe::new();
+        let block = Block::builder()
+            .voxels_fn(&mut u, resolution, |cube| {
+                // Make a cube-corner shape
+                // TODO: Also test partial alpha
+                if cube.x < 1 || cube.y < 1 || cube.z < 1 {
+                    Block::from(Rgba::BLACK)
+                } else {
+                    AIR
+                }
+            })
+            .unwrap()
+            .build();
+        assert_eq!(
+            test_triangulate_block(block)
+                .faces
+                .map(|_, ft| ft.fully_opaque),
+            FaceMap {
+                within: false,
+                nx: true,
+                ny: true,
+                nz: true,
+                px: false,
+                py: false,
+                pz: false,
+            }
         );
     }
 
