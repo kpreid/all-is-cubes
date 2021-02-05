@@ -4,12 +4,9 @@
 //! OpenGL-based graphics rendering.
 
 use cgmath::Point2;
-use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
-use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::framebuffer::Framebuffer;
 use luminance_front::pipeline::PipelineState;
-use luminance_front::render_state::RenderState;
 use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
@@ -17,7 +14,7 @@ use luminance_front::Backend;
 use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper, Viewport};
 use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
-use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
+use crate::lum::space::{SpaceRenderInfo, SpaceRenderer, SpaceRendererPass};
 use crate::lum::types::Vertex;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
@@ -198,21 +195,6 @@ where
             }
         };
 
-        // TODO: Add drawing opaque things in a separate pass from transparent things.
-        // (Opaque gets no blending and is drawn front to back; transparent is drawn back to front.)
-        let render_state = RenderState::default()
-            .set_face_culling(FaceCulling {
-                order: FaceCullingOrder::CCW,
-                mode: FaceCullingMode::Back,
-            })
-            .set_blending(Some(Blending {
-                // Note that this blending configuration is for premultiplied alpha.
-                // The fragment shaders are responsible for producing premultiplied alpha outputs.
-                equation: Equation::Additive,
-                src: Factor::One,
-                dst: Factor::SrcAlphaComplement,
-            }));
-
         // TODO: cache
         let cursor_tess = make_cursor_tess(surface, &self.cursor_result);
 
@@ -233,18 +215,24 @@ where
                         |ref mut program_iface, u, mut render_gate| {
                             // Render space (and cursor).
                             u.initialize(program_iface, &world_proj, &world_output_bound);
-                            render_gate.render(&render_state, |mut tess_gate| {
-                                // TODO: should be `info.space += ...`
-                                info.space = world_output_bound.render(&mut tess_gate)?;
+                            // TODO: refactor to fold the passes and render_gate.render into SpaceRenderer
+                            for &pass in
+                                &[SpaceRendererPass::Opaque, SpaceRendererPass::Transparent]
+                            {
+                                render_gate.render(&pass.render_state(), |mut tess_gate| {
+                                    // TODO: should be `info.space += ...`
+                                    info.space = world_output_bound.render(&mut tess_gate, pass)?;
 
-                                tess_gate.render(&cursor_tess)?;
+                                    tess_gate.render(&cursor_tess)?;
 
-                                if let Some(tess) = debug_lines_tess {
-                                    tess_gate.render(&tess)?;
-                                }
+                                    if let Some(tess) = &debug_lines_tess {
+                                        tess_gate.render(tess)?;
+                                    }
 
-                                Ok(())
-                            })
+                                    Ok(())
+                                })?;
+                            }
+                            Ok(())
                         },
                     )
                 },
@@ -267,10 +255,14 @@ where
                             block_program,
                             |ref mut program_iface, u, mut render_gate| {
                                 u.initialize(program_iface, &ui_proj, &ui_bound);
-                                render_gate.render(&render_state, |mut tess_gate| {
-                                    let _ = ui_bound.render(&mut tess_gate)?;
-                                    Ok(())
-                                })?;
+                                for &pass in
+                                    &[SpaceRendererPass::Opaque, SpaceRendererPass::Transparent]
+                                {
+                                    render_gate.render(&pass.render_state(), |mut tess_gate| {
+                                        let _ = ui_bound.render(&mut tess_gate, pass)?;
+                                        Ok(())
+                                    })?;
+                                }
 
                                 Ok(())
                             },

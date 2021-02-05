@@ -5,8 +5,12 @@
 
 use bitvec::prelude::BitVec;
 use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as _};
+use luminance::tess::View as _;
+use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
+use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::pipeline::{Pipeline, PipelineError};
+use luminance_front::render_state::RenderState;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::Backend;
@@ -278,20 +282,24 @@ impl<'a> SpaceRendererOutput<'a> {
 }
 impl<'a> SpaceRendererBound<'a> {
     /// Use a [`TessGate`] to actually draw the space.
-    pub fn render<E>(self, tess_gate: &mut TessGate) -> Result<SpaceRenderInfo, E> {
+    pub fn render<E>(
+        &self,
+        tess_gate: &mut TessGate,
+        pass: SpaceRendererPass,
+    ) -> Result<SpaceRenderInfo, E> {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
         for p in self.chunk_chart.chunks(self.view_chunk) {
             if let Some(chunk) = self.chunks.get(&p) {
                 chunks_drawn += 1;
-                squares_drawn += chunk.render(tess_gate)?;
+                squares_drawn += chunk.render(tess_gate, pass)?;
             }
             // TODO: If the chunk is missing, draw a blocking shape, possibly?
         }
         Ok(SpaceRenderInfo {
             chunks_drawn,
             squares_drawn,
-            ..self.info
+            ..self.info.clone()
         })
     }
 }
@@ -309,6 +317,30 @@ pub struct SpaceRenderInfo {
     pub squares_drawn: usize,
     /// Status of the texture atlas.
     pub texture_info: AtlasFlushInfo,
+}
+
+// Which drawing pass we're doing.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum SpaceRendererPass {
+    Opaque,
+    Transparent,
+}
+impl SpaceRendererPass {
+    /// Returns the [`RenderState`] to use for this pass.
+    pub fn render_state(self) -> RenderState {
+        RenderState::default()
+            .set_face_culling(FaceCulling {
+                order: FaceCullingOrder::CCW,
+                mode: FaceCullingMode::Back,
+            })
+            .set_blending(Some(Blending {
+                // Note that this blending configuration is for premultiplied alpha.
+                // The fragment shaders are responsible for producing premultiplied alpha outputs.
+                equation: Equation::Additive,
+                src: Factor::One,
+                dst: Factor::SrcAlphaComplement,
+            }))
+    }
 }
 
 /// Storage for rendering of part of a [`Space`].
@@ -418,11 +450,21 @@ impl Chunk {
         chunk_todo.update_triangulation = false;
     }
 
-    fn render<E>(&self, tess_gate: &mut TessGate) -> Result<usize, E> {
+    fn render<E>(&self, tess_gate: &mut TessGate, pass: SpaceRendererPass) -> Result<usize, E> {
         let mut count = 0;
         if let Some(tess) = &self.tess {
-            count += tess.vert_nb() / 6;
-            tess_gate.render(tess)?;
+            let range = match pass {
+                SpaceRendererPass::Opaque => self.triangulation.opaque_range(),
+                SpaceRendererPass::Transparent => self.triangulation.transparent_range(),
+            };
+            if range.is_empty() {
+                return Ok(0);
+            }
+            count += (range.end - range.start) / 6;
+            tess_gate.render(
+                tess.view(range)
+                    .expect("can't happen: inconsistent chunk index range"),
+            )?;
         }
         Ok(count)
     }
