@@ -17,6 +17,8 @@ use cgmath::{
     Zero as _,
 };
 use std::convert::{TryFrom, TryInto};
+use std::fmt::Debug;
+use std::ops::Range;
 
 use crate::block::{evaluated_block_resolution, EvaluatedBlock, Evoxel, Resolution};
 use crate::content::palette;
@@ -132,10 +134,13 @@ struct FaceTriangulation<V> {
     /// Vertices, as used by `self.indices`.
     vertices: Vec<V>,
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
-    /// in counterclockwise order.
-    indices: Vec<u32>,
-    /// Whether the block entirely fills its cube, such that nothing can be seen through
-    /// it and faces of adjacent blocks may be removed.
+    /// in counterclockwise order, for vertices whose coloring is fully opaque (or
+    /// textured with binary opacity).
+    indices_opaque: Vec<u32>,
+    /// Indices for partially transparent (alpha neither 0 nor 1) vertices.
+    indices_transparent: Vec<u32>,
+    /// Whether the graphic entirely fills its cube face, such that nothing can be seen
+    /// through it and faces of adjacent blocks may be removed.
     fully_opaque: bool,
 }
 
@@ -143,7 +148,8 @@ impl<V> Default for FaceTriangulation<V> {
     fn default() -> Self {
         FaceTriangulation {
             vertices: Vec::new(),
-            indices: Vec::new(),
+            indices_opaque: Vec::new(),
+            indices_transparent: Vec::new(),
             fully_opaque: false,
         }
     }
@@ -301,13 +307,19 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 }
 
                 let mut vertices: Vec<V> = Vec::new();
-                let mut indices: Vec<u32> = Vec::new();
+                let mut indices_opaque: Vec<u32> = Vec::new();
+                let mut indices_transparent: Vec<u32> = Vec::new();
                 if !block.color.fully_transparent() {
                     vertices.reserve_exact(4);
-                    indices.reserve_exact(6);
                     push_quad(
                         &mut vertices,
-                        &mut indices,
+                        if block.color.fully_opaque() {
+                            indices_opaque.reserve_exact(6);
+                            &mut indices_opaque
+                        } else {
+                            indices_transparent.reserve_exact(6);
+                            &mut indices_transparent
+                        },
                         face,
                         /* depth= */ 0.,
                         Point2 { x: 0., y: 0. },
@@ -319,7 +331,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 FaceTriangulation {
                     fully_opaque: block.color.fully_opaque(),
                     vertices,
-                    indices,
+                    indices_opaque,
+                    indices_transparent,
                 }
             });
 
@@ -333,7 +346,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // updating WITHIN independently of other faces.
             let mut output_by_face = FaceMap::generate(|face| FaceTriangulation {
                 vertices: Vec::new(),
-                indices: Vec::new(),
+                indices_opaque: Vec::new(),
+                indices_transparent: Vec::new(),
                 // Start assuming opacity; if we find any transparent pixels we'll set
                 // this to false. WITHIN is always "transparent" because the algorithm
                 // that consumes this structure will say "draw this face if its adjacent
@@ -378,6 +392,10 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     let mut visible_low_corner = Point2::new(block_resolution, block_resolution);
                     let mut visible_high_corner = Point2::new(0, 0);
 
+                    // By "transparent somewhere" we mean "visible and also transparent", i.e.
+                    // a surface with alpha between 0 and 1 that is not obscured.
+                    let mut layer_is_transparent_somewhere = false;
+
                     for t in 0..block_resolution {
                         for s in 0..block_resolution {
                             let layer_coord = Point2::new(s, t);
@@ -391,6 +409,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 .unwrap_or(&Evoxel::new(palette::MISSING_VOXEL_FALLBACK))
                                 .color;
 
+                            if layer == 0 && !color.fully_opaque() {
+                                // If the first layer is transparent in any cube at all, then the face is
+                                // not fully opaque
+                                output_by_face[face].fully_opaque = false;
+                            }
+
                             if !color.fully_transparent() && {
                                 // Compute whether this voxel is not hidden behind another
                                 let obscuring_cube = cube + face.normal_vector();
@@ -400,6 +424,9 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                     .unwrap_or(false)
                             } {
                                 layer_is_visible_somewhere = true;
+                                if !color.fully_opaque() {
+                                    layer_is_transparent_somewhere = true;
+                                }
                                 for axis in 0..2 {
                                     visible_low_corner[axis] =
                                         visible_low_corner[axis].min(layer_coord[axis]);
@@ -407,18 +434,16 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                         visible_high_corner[axis].max(layer_coord[axis] + 1);
                                 }
                             }
-
-                            if layer == 0 && !color.fully_opaque() {
-                                // If the first layer is transparent somewhere...
-                                output_by_face[face].fully_opaque = false;
-                            }
                         }
                     }
 
                     if layer_is_visible_somewhere {
                         // Only the surface faces go anywhere but WITHIN.
                         let FaceTriangulation {
-                            vertices, indices, ..
+                            vertices,
+                            indices_opaque,
+                            indices_transparent,
+                            ..
                         } = &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }];
                         let depth =
                             FreeCoordinate::from(layer) / FreeCoordinate::from(block_resolution);
@@ -458,7 +483,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
                         push_quad(
                             vertices,
-                            indices,
+                            if layer_is_transparent_somewhere {
+                                indices_transparent
+                            } else {
+                                indices_opaque
+                            },
                             face,
                             depth,
                             visible_low_corner.map(|c| {
@@ -555,10 +584,10 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
 /// Type parameter `GV` is the type of triangle vertices.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpaceTriangulation<GV> {
-    // TODO: This struct is going to expand by having indices and by splitting indices into groups
-    // for opacity and depth sorting.
     vertices: Vec<GV>,
     indices: Vec<u32>,
+    /// Where in `indices` the transparent vertices are bunched.
+    transparent_range: Range<usize>,
 }
 
 impl<GV> SpaceTriangulation<GV> {
@@ -567,6 +596,7 @@ impl<GV> SpaceTriangulation<GV> {
         Self {
             vertices: Vec::new(),
             indices: Vec::new(),
+            transparent_range: 0..0,
         }
     }
 
@@ -609,6 +639,11 @@ impl<GV> SpaceTriangulation<GV> {
 
         // use the buffer but not the existing data
         self.vertices.clear();
+        self.indices.clear();
+
+        // Use temporary buffer for positioning the transparent indices
+        // TODO: Consider reuse
+        let mut transparent_indices = Vec::new();
 
         for cube in bounds.interior_iter() {
             let precomputed = space
@@ -641,11 +676,18 @@ impl<GV> SpaceTriangulation<GV> {
                     self.vertices
                         .push(vertex.instantiate(low_corner.to_vec(), lighting));
                 }
-                for index in face_triangulation.indices.iter() {
+                for index in face_triangulation.indices_opaque.iter() {
                     self.indices.push(index + index_offset);
+                }
+                for index in face_triangulation.indices_transparent.iter() {
+                    transparent_indices.push(index + index_offset);
                 }
             }
         }
+
+        let ts = self.indices.len();
+        self.indices.extend(transparent_indices);
+        self.transparent_range = ts..self.indices.len();
     }
 
     pub fn vertices(&self) -> &[GV] {
@@ -656,8 +698,21 @@ impl<GV> SpaceTriangulation<GV> {
         &self.indices
     }
 
+    /// True if there is nothing to draw.
     pub fn is_empty(&self) -> bool {
         self.indices.is_empty()
+    }
+
+    /// The range of [`Self::indices`] which contains no alpha values other than 0 or 1
+    /// and therefore may be drawn using a depth buffer rather than sorting.
+    pub fn opaque_range(&self) -> Range<usize> {
+        0..(self.transparent_range.start)
+    }
+
+    /// The range of [`Self::indices`] which contains alpha values other than 0 and 1
+    /// and therefore must be drawn with consideration for ordering.
+    pub fn transparent_range(&self) -> Range<usize> {
+        self.transparent_range.clone()
     }
 }
 
@@ -1182,6 +1237,25 @@ mod tests {
                 pz: false,
             }
         );
+    }
+
+    #[test]
+    fn transparency_split() {
+        let mut space = Space::empty_positive(3, 1, 1);
+        // One opaque block and one transparent block
+        space
+            .set([0, 0, 0], Block::from(Rgba::new(1.0, 0.0, 0.0, 1.0)))
+            .unwrap();
+        space
+            .set([2, 0, 0], Block::from(Rgba::new(0.0, 0.0, 1.0, 0.5)))
+            .unwrap();
+
+        let (_, _, space_rendered) = triangulate_blocks_and_space(&space, 8);
+        // 2 cubes...
+        assert_eq!(space_rendered.vertices().len(), 6 * 4 * 2);
+        assert_eq!(space_rendered.indices().len(), 6 * 6 * 2);
+        // ...one of which is transparent
+        assert_eq!(space_rendered.transparent_range.len(), (6 * 6));
     }
 
     #[test]
