@@ -691,6 +691,9 @@ impl<GV> SpaceTriangulation<GV> {
         let ts = self.indices.len();
         self.indices.extend(transparent_indices);
         self.transparent_range = ts..self.indices.len();
+
+        // #[cfg(debug_assertions)]
+        self.consistency_check();
     }
 
     #[inline]
@@ -721,6 +724,17 @@ impl<GV> SpaceTriangulation<GV> {
     #[inline]
     pub fn transparent_range(&self) -> Range<usize> {
         self.transparent_range.clone()
+    }
+
+    fn consistency_check(&self) {
+        assert_eq!(self.opaque_range().start, 0);
+        assert_eq!(self.opaque_range().end, self.transparent_range().start);
+        assert_eq!(self.transparent_range().end, self.indices.len());
+        assert_eq!(self.opaque_range().end % 3, 0);
+        assert_eq!(self.indices.len() % 3, 0);
+        for index in self.indices.iter().copied() {
+            assert!(index < self.vertices.len() as u32);
+        }
     }
 }
 
