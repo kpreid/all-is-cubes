@@ -447,6 +447,27 @@ impl Space {
         self.update_lighting_from_queue()
     }
 
+    /// Perform lighting updates until there are none left to do. Returns the number of
+    /// updates performed.
+    ///
+    /// This may take a while. It is appropriate for when the goal is to
+    /// render a fully lit scene non-interactively.
+    pub fn evaluate_light(&mut self) -> usize {
+        let mut total = 0;
+        loop {
+            let SpaceStepInfo {
+                light_queue_count,
+                light_update_count,
+                ..
+            } = self.update_lighting_from_queue();
+            total += light_update_count;
+            if light_queue_count == 0 {
+                break;
+            }
+        }
+        total
+    }
+
     /// Returns the sky color; for lighting purposes, this is the illumination assumed
     /// to arrive from all directions outside the bounds of this space.
     pub fn sky_color(&self) -> Rgb {

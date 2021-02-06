@@ -2,12 +2,11 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
-use std::time::Duration;
 
 use all_is_cubes::content::{axes, make_some_blocks};
 use all_is_cubes::content::{install_landscape_blocks, wavy_landscape};
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::space::{Grid, Space, SpaceStepInfo};
+use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::universe::{Universe, UniverseIndex as _};
 
 pub fn space_bulk_mutation(c: &mut Criterion) {
@@ -77,15 +76,7 @@ pub fn lighting_bench(c: &mut Criterion) {
         b.iter_batched(
             universe_for_lighting_test,
             |universe| {
-                let space = &mut *universe.get_default_space().borrow_mut();
-                loop {
-                    let SpaceStepInfo {
-                        light_queue_count, ..
-                    } = space.step(Duration::from_millis(10));
-                    if light_queue_count == 0 {
-                        break;
-                    }
-                }
+                universe.get_default_space().borrow_mut().evaluate_light();
             },
             BatchSize::SmallInput,
         )

@@ -531,6 +531,17 @@ mod tests {
         assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light); // not updated
     }
 
+    #[test]
+    fn evaluate_light() {
+        let mut space = Space::empty_positive(3, 1, 1);
+        assert_eq!(0, space.evaluate_light());
+        space.set([1, 0, 0], Rgb::ONE).unwrap();
+        assert_eq!(2, space.evaluate_light());
+        assert_eq!(0, space.evaluate_light());
+        // This is just a smoke test, "is it plausible that it's working".
+        // Ideally we'd confirm identical results from repeated step() and single evaluate_light().
+    }
+
     // TODO: test sky lighting propagation onto blocks after quiescing
 
     // TODO: test a single semi-transparent block will receive and diffuse light
