@@ -152,8 +152,12 @@ pub(crate) struct LightUpdateRequest {
     cube: GridPoint,
 }
 impl LightUpdateRequest {
+    /// A priority comparison for entries with equal specified priority:
+    /// prefer cubes closer to the origin. (This is for prettier initial startup:
+    /// assuming the viewpoint starts close to the origin it will see good nearby
+    /// lighting sooner.)
     fn fallback_priority(&self) -> GridCoordinate {
-        -(self.cube[0].abs() + self.cube[2].abs() + self.cube[2].abs())
+        self.cube.map(|s| s.abs()).dot(Vector3::new(-1, -1, -1))
     }
 }
 impl Ord for LightUpdateRequest {
@@ -161,6 +165,11 @@ impl Ord for LightUpdateRequest {
         self.priority
             .cmp(&other.priority)
             .then_with(|| self.fallback_priority().cmp(&other.fallback_priority()))
+            // To obey Ord's contract we must not return equal ordering when unequal by Eq,
+            // so we must break all ties until only completely identical remains.
+            .then_with(|| self.cube.x.cmp(&other.cube.x))
+            .then_with(|| self.cube.y.cmp(&other.cube.y))
+            .then_with(|| self.cube.z.cmp(&other.cube.z))
     }
 }
 impl PartialOrd for LightUpdateRequest {
