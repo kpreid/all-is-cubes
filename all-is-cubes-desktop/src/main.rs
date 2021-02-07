@@ -5,7 +5,9 @@
 
 #![warn(clippy::cast_lossless)]
 
+use cgmath::Vector2;
 use clap::{value_t, Arg};
+use std::convert::TryInto;
 use std::error::Error;
 use std::time::Instant;
 use strum::IntoEnumIterator;
@@ -43,6 +45,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .help("Graphics/UI mode."),
         )
         .arg(
+            Arg::with_name("display_size")
+                .long("display-size")
+                .value_name("W×H")
+                .default_value("auto")
+                .validator(|s| parse_dimensions(&s).map(|_| ()))
+                .help("Window size, if applicable to the selected graphics mode."),
+        )
+        .arg(
             Arg::with_name("template")
                 .long("template")
                 .short("t")
@@ -55,12 +65,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .help("Which world template to use."),
         )
         .get_matches();
+    let display_size = parse_dimensions(options.value_of("display_size").unwrap()).unwrap();
 
     let mut app = AllIsCubesAppState::new(
         value_t!(options, "template", UniverseTemplate).unwrap_or_else(|e| e.exit()),
     );
     match value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit()) {
-        GraphicsType::Window => glfw_main_loop(app, title),
+        GraphicsType::Window => glfw_main_loop(app, title, display_size),
         GraphicsType::Terminal => terminal_main_loop(app),
         GraphicsType::Headless => {
             // TODO: Right now this is useless. Eventually, we may have other paths for side
@@ -73,5 +84,60 @@ fn main() -> Result<(), Box<dyn Error>> {
                 app.maybe_step_universe();
             }
         }
+    }
+}
+
+fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
+    if input.to_ascii_lowercase() == "auto" {
+        Ok(None)
+    } else {
+        let dims: [u32; 2] = input
+            .split(&['×', 'x', ',', ';', ' '][..])
+            .map(|s| {
+                s.parse::<u32>()
+                    .map_err(|_| format!("{:?} not an integer or \"auto\"", s))
+            })
+            .collect::<Result<Vec<u32>, String>>()?
+            .try_into()
+            .map_err(|_| String::from("must be two integers or \"auto\""))?;
+        Ok(Some(Vector2::from(dims)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_dimensions() {
+        let err = |s: &str| Err(s.to_owned());
+        assert_eq!(parse_dimensions("1,2"), Ok(Some(Vector2::new(1, 2))));
+        assert_eq!(parse_dimensions("30x93"), Ok(Some(Vector2::new(30, 93))));
+        assert_eq!(parse_dimensions("30×93"), Ok(Some(Vector2::new(30, 93))));
+        assert_eq!(parse_dimensions(""), err("\"\" not an integer or \"auto\""));
+        assert_eq!(
+            parse_dimensions("1"),
+            err("must be two integers or \"auto\"")
+        );
+        assert_eq!(
+            parse_dimensions("a"),
+            err("\"a\" not an integer or \"auto\"")
+        );
+        assert_eq!(
+            parse_dimensions("1a1"),
+            err("\"1a1\" not an integer or \"auto\"")
+        );
+        assert_eq!(
+            parse_dimensions("1×1×1"),
+            err("must be two integers or \"auto\"")
+        );
+        assert_eq!(
+            parse_dimensions("a×b"),
+            err("\"a\" not an integer or \"auto\"")
+        );
+        assert_eq!(
+            parse_dimensions("1×b"),
+            err("\"b\" not an integer or \"auto\"")
+        );
     }
 }

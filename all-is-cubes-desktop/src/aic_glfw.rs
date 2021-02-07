@@ -21,13 +21,20 @@ use all_is_cubes::util::Warnings;
 pub fn glfw_main_loop(
     mut app: AllIsCubesAppState,
     window_title: &str,
+    requested_size: Option<Vector2<u32>>,
 ) -> Result<(), Box<dyn Error>> {
     let mut glfw = glfw::init::<()>(None)?;
 
     // Pick a window size.
     let dim = glfw.with_primary_monitor(|_, monitor| {
-        if let Some(monitor) = monitor {
+        if let Some(size) = requested_size {
+            WindowDim::Windowed {
+                width: size.x.max(1),
+                height: size.y.max(1),
+            }
+        } else if let Some(monitor) = monitor {
             let (_, _, width, height) = monitor.get_workarea();
+            // TODO: consider constraining the aspect ratio, setting a maximum size, and other caveats
             WindowDim::Windowed {
                 width: width as u32 * 7 / 10,
                 height: height as u32 * 7 / 10,
