@@ -68,15 +68,16 @@ impl ChunkChart {
         // We can do the squared distance calculation in GridCoordinate integers but only after
         // the squaring.
         let distance_squared = chunk_distance_of_nearest_corner.powf(2.).ceil() as GridCoordinate;
-        let octant_chunks = Grid::new(
+        let candidates = Grid::new(
             (0, 0, 0),
             Vector3::new(1, 1, 1) * (chunk_distance_of_nearest_corner as GridCoordinate + 1),
-        )
-        .interior_iter()
-        .map(|gp| gp.to_vec())
-        .filter(|chunk| int_magnitude_squared(*chunk) <= distance_squared)
-        // TODO need to sort by distance...
-        .collect();
+        );
+        let mut octant_chunks: Vec<GridVector> = candidates
+            .interior_iter()
+            .map(|gp| gp.to_vec())
+            .filter(|&chunk| int_magnitude_squared(chunk) <= distance_squared)
+            .collect();
+        octant_chunks.sort_by_key(|&chunk| int_magnitude_squared(chunk));
         Self {
             view_distance,
             octant_chunks,
