@@ -42,16 +42,27 @@ pub fn point_to_chunk(cube: Point3<FreeCoordinate>) -> ChunkPos {
 
 /// Precomputed information about the spherical pattern of chunks within view distance.
 ///
-/// The actual view position is assumed to be anywhere within ± 1/2 chunk.
+/// In order to use the same pattern for all posible view positions, the view position is
+/// rounded to enclosing chunk position.
 #[derive(Clone, Debug, Eq, PartialEq)] // TODO: customize Debug and PartialEq
 pub struct ChunkChart {
     /// The maximum view distance which this chart is designed for.
     view_distance: NotNan<FreeCoordinate>,
 
     /// One octant of chunk positions (scaled down by CHUNK_SIZE) sorted by distance.
-    /// The full sphere can be constructed by mirroring this.
     /// (It could be further reduced to a 64th by mirroring across the diagonal,
-    /// but then the indexing gets more complicated
+    /// but then the indexing gets more complicated.)
+    ///
+    /// The full sphere can be constructed by mirroring this, minus the central plane.
+    /// That is, looking at a 2D slice we'd be storing the "#" and mirroring the "+" in:
+    ///
+    /// ```text
+    ///  +##
+    /// ++###
+    /// ++###
+    /// +++++
+    ///  +++
+    /// ```
     octant_chunks: Vec<GridVector>,
 }
 
@@ -62,32 +73,52 @@ impl ChunkChart {
         let view_distance =
             NotNan::try_from(view_distance.max(0.)).unwrap_or_else(|_| NotNan::zero());
 
-        // Add 1/2 chunk distance because so that the layout works for any position
-        // within 1/2 chunk of the origin of the grid.
-        let chunk_distance_of_nearest_corner = (view_distance.into_inner() / CHUNK_SIZE_FREE) + 0.5;
+        // We're going to compute in the zero-or-positive octant, which means that the chunk origin
+        // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
+        // each chunk.
+        let view_distance_in_chunks = view_distance.into_inner() / CHUNK_SIZE_FREE;
         // We can do the squared distance calculation in GridCoordinate integers but only after
         // the squaring.
-        let distance_squared = chunk_distance_of_nearest_corner.powf(2.).ceil() as GridCoordinate;
-        let candidates = Grid::new(
-            (0, 0, 0),
-            Vector3::new(1, 1, 1) * (chunk_distance_of_nearest_corner as GridCoordinate + 1),
-        );
+        let distance_squared = view_distance_in_chunks.powf(2.).ceil() as GridCoordinate;
+        let candidates = Grid::new((0, 0, 0), Vector3::new(1, 1, 1) * (distance_squared + 1));
         let mut octant_chunks: Vec<GridVector> = candidates
             .interior_iter()
             .map(|gp| gp.to_vec())
-            .filter(|&chunk| int_magnitude_squared(chunk) <= distance_squared)
+            .filter(|&chunk| {
+                // By subtracting 1 from all coordinates, we include the chunks intersecting
+                // the view sphere centered on the _farthest corner point_ of the
+                // viewpoint-containing chunk. By taking the max, we include those chunks
+                // visible from anywhere else in the chunk.
+                //
+                // The shape formed (after mirroring) is the Minkowski sum of the view sphere
+                // and the chunk cube.
+                int_magnitude_squared(chunk.map(|s| (s - 1).max(0))) <= distance_squared
+            })
             .collect();
-        octant_chunks.sort_by_key(|&chunk| int_magnitude_squared(chunk));
+        // Sort by distance, with coordinates for tiebreakers.
+        octant_chunks.sort_unstable_by_key(ChunkChart::sort_key);
         Self {
             view_distance,
             octant_chunks,
         }
     }
 
-    /// Returns an iterator over the chunks in this chart — i.e. intersecting a sphere
-    /// around the given origin position.
+    fn sort_key(
+        &chunk: &GridVector,
+    ) -> (
+        GridCoordinate,
+        GridCoordinate,
+        GridCoordinate,
+        GridCoordinate,
+    ) {
+        (int_magnitude_squared(chunk), chunk.x, chunk.y, chunk.z)
+    }
+
+    /// Returns an iterator over the chunks in this chart — i.e. those intersecting a sphere
+    /// (or more precisely, the Minkowski sum of a sphere and the chunk) around the given
+    /// origin chunk.
     ///
-    /// The chunks are ordered from nearest to farthest; the iterator is a
+    /// The chunks are ordered from nearest to farthest in Euclidean distance; the iterator is a
     /// [`DoubleEndedIterator`] so that [`Iterator::rev`] may be used to iterate from
     /// farthest to nearest.
     pub fn chunks(
@@ -97,9 +128,9 @@ impl ChunkChart {
         self.octant_chunks
             .iter()
             .copied()
-            .flat_map(|v| TwoIter::new(GridVector::new(-1 - v.x, v.y, v.z), v))
-            .flat_map(|v| TwoIter::new(GridVector::new(v.x, -1 - v.y, v.z), v))
-            .flat_map(|v| TwoIter::new(GridVector::new(v.x, v.y, -1 - v.z), v))
+            .flat_map(|v| TwoIter::distinct(GridVector::new(-v.x, v.y, v.z), v))
+            .flat_map(|v| TwoIter::distinct(GridVector::new(v.x, -v.y, v.z), v))
+            .flat_map(|v| TwoIter::distinct(GridVector::new(v.x, v.y, -v.z), v))
             .map(move |v| ChunkPos(origin.0 + v))
     }
 
@@ -151,10 +182,15 @@ struct TwoIter<T> {
     b: Option<T>,
 }
 impl<T> TwoIter<T> {
-    fn new(a: T, b: T) -> Self {
+    /// Yields `a`, then `b` only if it is unequal.
+    fn distinct(a: T, b: T) -> Self
+    where
+        T: Eq,
+    {
+        let unequal = a != b;
         Self {
             a: Some(a),
-            b: Some(b),
+            b: Some(b).filter(|_| unequal),
         }
     }
 }
@@ -179,6 +215,8 @@ impl<T> std::iter::FusedIterator for TwoIter<T> {}
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
     use crate::raytracer::print_space;
 
@@ -192,39 +230,52 @@ mod tests {
 
     // TODO: test for point_to_chunk
 
+    /// Zero distance means only the origin chunk.
+    /// This also tests that the origin position is added in.
     #[test]
     fn chunk_chart_zero_size() {
-        // A distance of zero still wants to include the chunks adjacent to zero.
         let chart = ChunkChart::new(0.0);
+        let chunk = ChunkPos::new(1, 2, 3);
+        assert_eq!(chart.chunks(chunk).collect::<Vec<_>>(), vec![chunk]);
+    }
+
+    /// If we look a tiny bit outside the origin chunk, there are 9³ - 1 neighbors.
+    #[test]
+    fn chunk_chart_epsilon_size() {
+        let chart = ChunkChart::new(0.00001);
         assert_eq!(
             chart.chunks(ChunkPos::new(0, 0, 0)).collect::<Vec<_>>(),
             vec![
-                ChunkPos::new(-1, -1, -1),
-                ChunkPos::new(-1, -1, 0),
-                ChunkPos::new(-1, 0, -1),
-                ChunkPos::new(-1, 0, 0),
-                ChunkPos::new(0, -1, -1),
-                ChunkPos::new(0, -1, 0),
-                ChunkPos::new(0, 0, -1),
                 ChunkPos::new(0, 0, 0),
-            ]
-        )
-    }
-
-    #[test]
-    fn chunk_chart_origin_addition() {
-        let chart = ChunkChart::new(0.0);
-        assert_eq!(
-            chart.chunks(ChunkPos::new(10, 0, 0)).collect::<Vec<_>>(),
-            vec![
-                ChunkPos::new(9, -1, -1),
-                ChunkPos::new(9, -1, 0),
-                ChunkPos::new(9, 0, -1),
-                ChunkPos::new(9, 0, 0),
-                ChunkPos::new(10, -1, -1),
-                ChunkPos::new(10, -1, 0),
-                ChunkPos::new(10, 0, -1),
-                ChunkPos::new(10, 0, 0),
+                // Face meetings.
+                ChunkPos::new(0, 0, -1),
+                ChunkPos::new(0, 0, 1),
+                ChunkPos::new(0, -1, 0),
+                ChunkPos::new(0, 1, 0),
+                ChunkPos::new(-1, 0, 0),
+                ChunkPos::new(1, 0, 0),
+                // Edge meetings.
+                ChunkPos::new(0, -1, -1),
+                ChunkPos::new(0, -1, 1),
+                ChunkPos::new(0, 1, -1),
+                ChunkPos::new(0, 1, 1),
+                ChunkPos::new(-1, 0, -1),
+                ChunkPos::new(-1, 0, 1),
+                ChunkPos::new(1, 0, -1),
+                ChunkPos::new(1, 0, 1),
+                ChunkPos::new(-1, -1, 0),
+                ChunkPos::new(-1, 1, 0),
+                ChunkPos::new(1, -1, 0),
+                ChunkPos::new(1, 1, 0),
+                // Corner meetings.
+                ChunkPos::new(-1, -1, -1),
+                ChunkPos::new(-1, -1, 1),
+                ChunkPos::new(-1, 1, -1),
+                ChunkPos::new(-1, 1, 1),
+                ChunkPos::new(1, -1, -1),
+                ChunkPos::new(1, -1, 1),
+                ChunkPos::new(1, 1, -1),
+                ChunkPos::new(1, 1, 1),
             ]
         )
     }
@@ -247,12 +298,16 @@ mod tests {
                 chunks
             );
         }
-        assert_count(0.0, 8);
-        assert_count(0.49, 8);
-        assert_count(0.5, 32);
-
-        // TODO: ??? convince myself this shouldn't be 32
-        assert_count(0.5000001, 56);
+        assert_count(0.00, 1);
+        // All neighbor chunks
+        assert_count(0.01, 3 * 3 * 3);
+        assert_count(0.99, 3 * 3 * 3);
+        assert_count(1.00, 3 * 3 * 3);
+        // Add more distant neighbors
+        // TODO: I would think that the math would work out to add the 3×3
+        // face neighbors before any additional edge neighbors appear.
+        // Dig into the math some more...?
+        assert_count(1.01, 3 * 3 * 3 + 3 * 3 * 6 + 3 * 12);
     }
 
     /// [`ChunkChart`]'s iterator should be consistent when reversed.
@@ -264,5 +319,30 @@ mod tests {
         let mut reverse = chart.chunks(p).rev().collect::<Vec<_>>();
         reverse.reverse();
         assert_eq!(forward, reverse);
+    }
+
+    #[test]
+    fn chunk_chart_sorting() {
+        // Caution: O(n^6) in the chart radius...
+        let chart = ChunkChart::new(4.0 * CHUNK_SIZE_FREE);
+        println!("{:?}", chart);
+
+        let mut seen: HashSet<GridPoint> = HashSet::new();
+        for ChunkPos(p) in chart.chunks(ChunkPos::new(0, 0, 0)) {
+            for &q in &seen {
+                assert!(
+                    // Either it's the same point mirrored,
+                    p.map(|s| s.abs()) == q.map(|s| s.abs())
+                        // or it has at least one greater coordinate.
+                        || p.x.abs() > q.x.abs()
+                        || p.y.abs() > q.y.abs()
+                        || p.z.abs() > q.z.abs(),
+                    "{:?} should be before {:?}",
+                    p,
+                    q
+                );
+            }
+            seen.insert(p);
+        }
     }
 }

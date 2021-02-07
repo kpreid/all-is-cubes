@@ -4,7 +4,7 @@
 //! Get from [`Space`] to [`Tess`].
 
 use bitvec::prelude::BitVec;
-use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as _, Vector3};
+use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as _};
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::{Pipeline, PipelineError};
 use luminance_front::tess::{Interleaved, Mode, Tess, VerticesMut};
@@ -15,9 +15,7 @@ use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
-use crate::chunking::{
-    cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE, CHUNK_SIZE_FREE,
-};
+use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
@@ -154,8 +152,7 @@ impl SpaceRenderer {
         // TODO: replace unwrap()s with falling back to drawing nothing or drawing the origin
         let view_point =
             Point3::from_vec(view_matrix.invert().unwrap().transpose().row(3).truncate());
-        // TODO: This coordinate tweak should be in ChunkChart since odd/even sizes are its business
-        let view_chunk = point_to_chunk(view_point + Vector3::new(0.5, 0.5, 0.5) * CHUNK_SIZE_FREE);
+        let view_chunk = point_to_chunk(view_point);
 
         // Update some chunk geometry.
         let chunk_grid = space.grid().divide(CHUNK_SIZE);
