@@ -22,6 +22,8 @@ mod city;
 pub(crate) use city::*;
 mod demo;
 pub use demo::*;
+mod exhibits;
+pub(crate) use exhibits::*;
 mod landscape;
 pub use landscape::*;
 pub mod palette;
