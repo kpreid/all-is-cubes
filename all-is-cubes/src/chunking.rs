@@ -22,8 +22,6 @@ pub struct ChunkPos(pub GridPoint);
 
 impl ChunkPos {
     /// Construct a ChunkPos from coordinates.
-    // Currently only used in tests
-    #[cfg(test)]
     pub const fn new(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Self {
         Self(GridPoint::new(x, y, z))
     }
@@ -105,24 +103,42 @@ impl ChunkChart {
     }
 
     /// Convert to a `Space` so it can be directly viewed; for tests.
-    #[rustfmt::skip]
-    #[cfg(test)]
-    fn visualization(&self) -> crate::space::Space {
-        use crate::block::{Block};
+    pub(crate) fn visualization(&self) -> crate::space::Space {
+        use crate::block::Block;
         use crate::math::Rgba;
 
         let extent = GridVector::new(
             self.octant_chunks.iter().map(|v| v.x).max().unwrap_or(0) + 1,
             self.octant_chunks.iter().map(|v| v.y).max().unwrap_or(0) + 1,
-            self.octant_chunks.iter().map(|v| v.z).max().unwrap_or(0) + 1);
-        let mut space = crate::space::Space::empty(Grid::new(Point3::from_vec(-extent), extent * 2));
-        // TODO use wireframe blocks instead
-        let block = Block::builder()
-            .display_name("Chunk")
+            self.octant_chunks.iter().map(|v| v.z).max().unwrap_or(0) + 1,
+        );
+        let mut space =
+            crate::space::Space::empty(Grid::new(Point3::from_vec(-extent), extent * 2));
+        // TODO: use wireframe blocks instead, or something that will highlight the counts better
+        let base_octant_chunk = Block::builder()
+            .display_name("Base octant chunk")
+            .color(Rgba::new(0.75, 0.4, 0.4, 1.0))
+            .build();
+        let other_octant_chunk_1 = Block::builder()
+            .display_name("Mirrored octant chunk")
             .color(Rgba::new(0.5, 0.5, 0.5, 1.0))
             .build();
-        for ChunkPos(chunk) in self.chunks(ChunkPos::new(0, 0, 0)) {
-            space.set(chunk, &block).unwrap();
+        let other_octant_chunk_2 = Block::builder()
+            .display_name("Mirrored octant chunk")
+            .color(Rgba::new(0.6, 0.6, 0.6, 1.0))
+            .build();
+        for ChunkPos(pos) in self.chunks(ChunkPos::new(0, 0, 0)) {
+            let px = pos.x >= 0;
+            let py = pos.y >= 0;
+            let pz = pos.z >= 0;
+            let block = if px && py && pz {
+                &base_octant_chunk
+            } else if px ^ py ^ pz {
+                &other_octant_chunk_1
+            } else {
+                &other_octant_chunk_2
+            };
+            space.set(pos, block).unwrap();
         }
         space
     }

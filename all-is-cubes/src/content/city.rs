@@ -386,6 +386,20 @@ static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
             Ok(space)
         },
     },
+    {
+        const RADIUS: i16 = 5;
+        const O: i16 = -RADIUS - 1;
+        const S: u16 = (RADIUS as u16 + 1) * 2 + 1;
+        Exhibit {
+            name: "Visible chunk chart",
+            footprint: Grid::new_c([O, O, O], [S, S, S]),
+            factory: |_this, _universe| {
+                use crate::chunking::{ChunkChart, CHUNK_SIZE_FREE};
+                let chart = ChunkChart::new(CHUNK_SIZE_FREE * (RADIUS as FreeCoordinate) - 0.1);
+                Ok(chart.visualization())
+            },
+        }
+    },
 ];
 
 /// Tracks available land while the city is being generated.
