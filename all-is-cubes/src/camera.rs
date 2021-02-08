@@ -26,6 +26,10 @@ const WALKING_SPEED: FreeCoordinate = 4.0;
 const FLYING_SPEED: FreeCoordinate = 10.0;
 const JUMP_SPEED: FreeCoordinate = 8.0;
 
+/// The maximum view distance used for all projections and renderers.
+/// TODO: Replace this with a user preference.
+pub(crate) const VIEW_DISTANCE: FreeCoordinate = 200.0;
+
 /// A slightly unfortunate grab-bag of “player character” stuff. A `Camera`:
 ///
 /// * knows what [`Space`] it is looking at, by reference,
@@ -380,7 +384,7 @@ impl ProjectionHelper {
             self.fov_y(),
             self.viewport.nominal_aspect_ratio(),
             /* near: */ 0.1,
-            /* far: */ 2000.0,
+            /* far: */ VIEW_DISTANCE,
         );
         self.inverse_projection_view = (self.projection * self.view)
             .inverse_transform()

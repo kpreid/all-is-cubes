@@ -15,6 +15,7 @@ use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
+use crate::camera::VIEW_DISTANCE;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
@@ -69,8 +70,7 @@ impl SpaceRenderer {
             block_version_counter: 0,
             block_texture: None,
             chunks: HashMap::new(),
-            // TODO: Use the actual draw distance!
-            chunk_chart: ChunkChart::new(200.),
+            chunk_chart: ChunkChart::new(VIEW_DISTANCE),
             chunks_were_missing: true,
         }
     }
