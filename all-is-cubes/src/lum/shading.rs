@@ -30,9 +30,9 @@ where
         .new_shader_program::<VertexSemantics, (), BlockUniformInterface>()
         .from_strings(
             &(SHADER_COMMON.to_owned()
-                + "#line 1 1\n"
+                + "\n#line 1 1\n"
                 + SHADER_VERTEX_COMMON
-                + "#line 1 2\n"
+                + "\n#line 1 2\n"
                 + SHADER_VERTEX_BLOCK),
             None,
             None,
