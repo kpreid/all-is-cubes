@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             app,
             RecordOptions {
                 output_path: PathBuf::from(options.value_of_os("output").unwrap()),
-                image_size: display_size.unwrap_or(Vector2::new(640, 480)),
+                image_size: display_size.unwrap_or_else(|| Vector2::new(640, 480)),
                 animation: None,
             },
         ),

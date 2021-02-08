@@ -36,7 +36,7 @@ pub struct RecordAnimationOptions {
 impl RecordOptions {
     fn viewport(&self) -> Viewport {
         Viewport {
-            nominal_size: self.image_size.map(|s| s as FreeCoordinate),
+            nominal_size: self.image_size.map(FreeCoordinate::from),
             framebuffer_size: self.image_size,
         }
     }
@@ -115,7 +115,10 @@ pub(crate) fn record_main(
 
         // Write image data to file
         let mut file_writer = BufWriter::new(File::create(&frame_path)?);
-        write_frame(&mut new_png_writer(&mut file_writer, viewport)?, image_data)?;
+        write_frame(
+            &mut new_png_writer(&mut file_writer, viewport)?,
+            &image_data,
+        )?;
         file_writer.into_inner()?.sync_all()?;
     }
 
@@ -127,10 +130,10 @@ pub(crate) fn record_main(
 
 fn write_frame(
     png_writer: &mut png::Writer<&mut BufWriter<File>>,
-    image_data: Box<[Rgba]>,
+    image_data: &[Rgba],
 ) -> Result<(), std::io::Error> {
     let byte_raster = image_data
-        .into_iter()
+        .iter()
         .flat_map(|c| {
             // TODO: In Rust 1.51, use std::array::IntoIter instead to avoid a heap allocation.
             Vec::from(c.to_srgb_32bit())
