@@ -5,3 +5,9 @@ uniform highp mat4 projection_matrix;
 uniform highp mat4 view_matrix;
 
 uniform lowp sampler2DArray block_texture;
+
+// How far out should be fully fogged?
+uniform highp float fog_distance;
+
+// What color should fog fade into?
+uniform mediump vec3 fog_color;

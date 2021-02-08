@@ -227,27 +227,29 @@ where
                     .set_clear_color(world_output.sky_color.with_alpha_one().into()),
                 |pipeline, mut shading_gate| {
                     let world_output_bound = world_output.bind(&pipeline)?;
-                    shading_gate.shade(block_program, |mut program_iface, u, mut render_gate| {
-                        // Render space (and cursor).
-                        u.set_projection_matrix(&mut program_iface, world_projection_matrix);
-                        u.set_view_matrix(&mut program_iface, world_output_bound.view_matrix);
-                        u.set_block_texture(
-                            &mut program_iface,
-                            &world_output_bound.bound_block_texture,
-                        );
-                        render_gate.render(&render_state, |mut tess_gate| {
-                            // TODO: should be `info.space += ...`
-                            info.space = world_output_bound.render(&mut tess_gate)?;
+                    shading_gate.shade(
+                        block_program,
+                        |ref mut program_iface, u, mut render_gate| {
+                            // Render space (and cursor).
+                            u.initialize(
+                                program_iface,
+                                world_projection_matrix,
+                                &world_output_bound,
+                            );
+                            render_gate.render(&render_state, |mut tess_gate| {
+                                // TODO: should be `info.space += ...`
+                                info.space = world_output_bound.render(&mut tess_gate)?;
 
-                            tess_gate.render(&cursor_tess)?;
+                                tess_gate.render(&cursor_tess)?;
 
-                            if let Some(tess) = debug_lines_tess {
-                                tess_gate.render(&tess)?;
-                            }
+                                if let Some(tess) = debug_lines_tess {
+                                    tess_gate.render(&tess)?;
+                                }
 
-                            Ok(())
-                        })
-                    })
+                                Ok(())
+                            })
+                        },
+                    )
                 },
             )
             .assume()
@@ -266,14 +268,8 @@ where
 
                         shading_gate.shade(
                             block_program,
-                            |mut program_iface, u, mut render_gate| {
-                                // TODO: duplicated code for uniform setup.
-                                u.set_projection_matrix(&mut program_iface, ui_projection_matrix);
-                                u.set_view_matrix(&mut program_iface, ui_bound.view_matrix);
-                                u.set_block_texture(
-                                    &mut program_iface,
-                                    &ui_bound.bound_block_texture,
-                                );
+                            |ref mut program_iface, u, mut render_gate| {
+                                u.initialize(program_iface, ui_projection_matrix, &ui_bound);
                                 render_gate.render(&render_state, |mut tess_gate| {
                                     let _ = ui_bound.render(&mut tess_gate)?;
                                     Ok(())

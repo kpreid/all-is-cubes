@@ -1,6 +1,35 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-void basicVertex(highp vec3 vertex_position) {
-  gl_Position = projection_matrix * view_matrix * vec4(vertex_position, 1.0);
+// What fraction of the fragment color should be fog?
+out lowp float fog_mix;
+
+// Physically realistic fog, but doesn't ever reach 1 (fully opaque).
+lowp float fog_exponential(highp float d) {
+  const lowp float fog_density = 1.6;
+  return 1 - exp(-fog_density * d);
+}
+
+// Fog that goes all the way from fully transparent to fully opaque.
+// The correction is smaller the denser the fog.
+lowp float fog_exp_fudged(highp float d) {
+  return fog_exponential(d) / fog_exponential(1);
+}
+
+lowp float fog_combo(highp float d) {
+  // Combination of realistic exponential (constant density) fog,
+  // and slower-starting fog so nearby stuff is clearer.
+  return mix(fog_exp_fudged(d), pow(d, 4.0), 0.5);
+}
+
+void basic_vertex(highp vec3 vertex_position) {
+  // Camera-relative position not transformed by projection.
+  highp vec4 eye_vertex_position = view_matrix * vec4(vertex_position, 1.0);
+  highp float distance_from_eye = length(vec3(eye_vertex_position));
+
+  // Distance in range 0 (camera position) to 1 (opaque fog position/far clip position).
+  highp float normalized_distance = distance_from_eye / fog_distance;
+  fog_mix = clamp(fog_combo(normalized_distance), 0.0, 1.0);
+
+  gl_Position = projection_matrix * eye_vertex_position;
 }

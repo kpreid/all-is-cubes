@@ -4,6 +4,8 @@
 in mediump vec4 v_color_or_texture;
 in mediump vec3 v_normal;
 in lowp vec3 v_lighting;
+// What fraction of the fragment color should be fog?
+in lowp float fog_mix;
 
 out mediump vec4 fragment_color;
 
@@ -41,9 +43,14 @@ void main(void) {
     // This allows using binary opacity in color or texture without depth sorting.
     discard;
   }
-  // Multiply alpha because our blend function choice is premultiplied alpha.
-  diffuse_color.rgb *= diffuse_color.a;
 
-  // Output fragment color is in premultiplied alpha.
-  fragment_color = diffuse_color * vec4(lighting(), 1.0);
+  // Lighting
+  // TODO: What's a better name for this variable?
+  mediump vec4 color = diffuse_color * vec4(lighting(), 1.0);
+  
+  // Fog
+  color.rgb = mix(color.rgb, fog_color, fog_mix);
+
+  // Multiply alpha because our blend function choice is premultiplied alpha.
+  fragment_color = vec4(color.rgb * color.a, color.a);
 }

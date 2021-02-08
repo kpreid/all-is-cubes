@@ -11,7 +11,7 @@ out lowp vec3 v_normal;
 out lowp vec3 v_lighting;
 
 void main(void) {
-  basicVertex(a_position);
+  basic_vertex(a_position);
   v_normal = a_normal;
   v_color_or_texture = a_color_or_texture;
   v_lighting = a_lighting;

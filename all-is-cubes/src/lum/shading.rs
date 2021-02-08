@@ -12,7 +12,9 @@ use luminance_front::shader::{BuiltProgram, Program, ProgramError, ProgramInterf
 use luminance_front::texture::Dim2Array;
 use luminance_front::Backend;
 
+use crate::camera::VIEW_DISTANCE;
 use crate::lum::block_texture::BoundBlockTexture;
+use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::VertexSemantics;
 use crate::math::FreeCoordinate;
 use crate::util::WarningsResult;
@@ -58,17 +60,31 @@ const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 /// Uniform interface for the block shader program.
 #[derive(Debug, UniformInterface)]
 pub struct BlockUniformInterface {
-    #[uniform(unbound)]
     projection_matrix: Uniform<[[f32; 4]; 4]>,
-
-    #[uniform(unbound)]
     view_matrix: Uniform<[[f32; 4]; 4]>,
-
-    #[uniform(unbound)]
     block_texture: Uniform<TextureBinding<Dim2Array, NormUnsigned>>,
+
+    /// How far out should be fully fogged?
+    fog_distance: Uniform<f32>,
+    /// Color for the fog.
+    fog_color: Uniform<[f32; 3]>,
 }
 
 impl BlockUniformInterface {
+    /// Set all the uniforms, given necessary parameters.
+    pub fn initialize(
+        &self,
+        program_iface: &mut ProgramInterface,
+        projection_matrix: Matrix4<FreeCoordinate>,
+        space: &SpaceRendererBound<'_>,
+    ) {
+        self.set_projection_matrix(program_iface, projection_matrix);
+        self.set_view_matrix(program_iface, space.view_matrix);
+        self.set_block_texture(program_iface, &space.bound_block_texture);
+        program_iface.set(&self.fog_distance, VIEW_DISTANCE as f32);
+        program_iface.set(&self.fog_color, space.sky_color.into());
+    }
+
     /// Type converting wrapper for [`Self::projection_matrix`].
     pub fn set_projection_matrix(
         &self,

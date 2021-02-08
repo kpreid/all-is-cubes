@@ -224,7 +224,7 @@ impl SpaceRenderer {
 /// Ingredients to actually draw the [`Space`] inside a luminance pipeline, produced by
 /// [`SpaceRenderer::prepare_frame`].
 pub struct SpaceRendererOutput<'a> {
-    /// Space's sky color, to be used as clear color when drawing a frame (if applicable).
+    /// Space's sky color, to be used as background color (clear color / fog).
     pub sky_color: Rgb,
 
     block_texture: &'a mut BlockTexture,
@@ -237,6 +237,9 @@ pub struct SpaceRendererOutput<'a> {
 }
 /// As [`SpaceRendererOutput`], but past the texture-binding stage of the pipeline.
 pub struct SpaceRendererBound<'a> {
+    /// Space's sky color, to be used as background color (clear color / fog).
+    pub sky_color: Rgb,
+
     /// Block texture to pass to the shader.
     pub bound_block_texture: BoundBlockTexture<'a>,
     /// View matrix to pass to the shader.
@@ -252,6 +255,7 @@ impl<'a> SpaceRendererOutput<'a> {
     /// [`ShadingGate`](luminance_front::shading_gate::ShadingGate).
     pub fn bind(self, pipeline: &'a Pipeline<'a>) -> Result<SpaceRendererBound<'a>, PipelineError> {
         Ok(SpaceRendererBound {
+            sky_color: self.sky_color,
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
             view_matrix: self.view_matrix,
             chunks: self.chunks,
