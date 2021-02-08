@@ -383,7 +383,7 @@ impl ProjectionHelper {
         self.projection = cgmath::perspective(
             self.fov_y(),
             self.viewport.nominal_aspect_ratio(),
-            /* near: */ 0.1,
+            /* near: */ 1. / 32., // half a voxel at resolution=16
             /* far: */ VIEW_DISTANCE,
         );
         self.inverse_projection_view = (self.projection * self.view)
