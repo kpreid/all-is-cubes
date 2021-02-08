@@ -121,7 +121,7 @@ impl From<BlockVertex> for GLBlockVertex {
     fn from(vertex: BlockVertex) -> Self {
         Self {
             position: vertex.position.cast::<f32>().unwrap().to_vec(),
-            normal: VertexNormal::new(vertex.normal.cast::<f32>().unwrap().into()),
+            normal: VertexNormal::new(vertex.face.normal_vector::<f32>().into()),
             color_or_texture: match vertex.coloring {
                 Coloring::Solid(color) => {
                     let mut color_attribute = VertexColorOrTexture::new(color.into());
@@ -164,11 +164,10 @@ where
 }
 
 #[cfg(test)]
-#[rustfmt::skip]
 mod tests {
     use super::*;
+    use crate::math::{Face, Rgb};
     use cgmath::Vector3;
-    use crate::math::Rgb;
 
     #[test]
     fn vertex_dummy() {
@@ -193,15 +192,13 @@ mod tests {
     fn vertex_from_block_vertex() {
         let block_vertex = BlockVertex {
             position: Point3::new(1.0, 2.0, 3.0),
-            normal: Vector3::new(4.0, 5.0, 6.0),
+            face: Face::PX,
             coloring: Coloring::Solid(Rgba::new(7.0, 8.0, 9.0, 0.5)),
         };
-        let vertex = GLBlockVertex::from(block_vertex).instantiate(
-            Vector3::new(0.1, 0.2, 0.3),
-            Rgb::new(1.0, 0.0, 2.0).into(),
-        );
+        let vertex = GLBlockVertex::from(block_vertex)
+            .instantiate(Vector3::new(0.1, 0.2, 0.3), Rgb::new(1.0, 0.0, 2.0).into());
         assert_eq!(vertex.position.repr, [1.1, 2.2, 3.3]);
-        assert_eq!(vertex.normal.repr, [4.0, 5.0, 6.0]);
+        assert_eq!(vertex.normal.repr, [1.0, 0.0, 0.0]);
         assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 0.5]);
         assert_eq!(vertex.lighting.repr, [1.0, 0.0, 2.0]);
     }
