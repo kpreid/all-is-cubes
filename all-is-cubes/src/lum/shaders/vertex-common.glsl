@@ -7,13 +7,13 @@ out lowp float fog_mix;
 // Physically realistic fog, but doesn't ever reach 1 (fully opaque).
 lowp float fog_exponential(highp float d) {
   const lowp float fog_density = 1.6;
-  return 1 - exp(-fog_density * d);
+  return 1.0 - exp(-fog_density * d);
 }
 
 // Fog that goes all the way from fully transparent to fully opaque.
 // The correction is smaller the denser the fog.
 lowp float fog_exp_fudged(highp float d) {
-  return fog_exponential(d) / fog_exponential(1);
+  return fog_exponential(d) / fog_exponential(1.0);
 }
 
 lowp float fog_combo(highp float d) {
