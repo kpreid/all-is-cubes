@@ -26,14 +26,19 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
         factory: |this, _universe| {
             let mut space = Space::empty(this.footprint);
 
-            let glass = Block::from(Rgba::new(0.9, 0.9, 0.9, 0.25));
-            for rot in GridRotation::CLOCKWISE.iterate() {
+            let colors = [
+                Block::from(Rgba::new(1.0, 0.5, 0.5, 0.25)),
+                Block::from(Rgba::new(0.5, 1.0, 0.5, 0.25)),
+                Block::from(Rgba::new(0.5, 0.5, 1.0, 0.25)),
+                Block::from(Rgba::new(0.9, 0.9, 0.9, 0.25)),
+            ];
+            for (rot, color) in GridRotation::CLOCKWISE.iterate().zip(&colors) {
                 let windowpane = Grid::from_lower_upper([-1, 0, 3], [2, 5, 4]);
                 space.fill(
                     windowpane
                         .transform(rot.to_positive_octant_matrix(1))
                         .unwrap(),
-                    |_| Some(&glass),
+                    |_| Some(color),
                 )?;
             }
 
