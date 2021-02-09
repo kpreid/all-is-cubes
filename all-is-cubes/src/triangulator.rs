@@ -716,11 +716,10 @@ mod tests {
 
     /// Test helper to call `triangulate_block` alone without a `Space`.
     fn test_triangulate_block(block: Block) -> BlockTriangulation<BlockVertex, TestTextureTile> {
-        let triangulation = triangulate_block(
+        triangulate_block(
             &block.evaluate().unwrap(),
             &mut TestTextureAllocator::new(16),
-        );
-        triangulation
+        )
     }
 
     /// Test helper to call `triangulate_blocks` followed directly by `triangulate_space`.
@@ -847,11 +846,7 @@ mod tests {
         eprintln!("{:#?}", space_rendered);
 
         assert_eq!(
-            space_rendered
-                .vertices()
-                .into_iter()
-                .copied()
-                .collect::<Vec<_>>(),
+            space_rendered.vertices().to_vec(),
             block_triangulations[0]
                 .faces
                 .values()
@@ -923,7 +918,7 @@ mod tests {
             "Should be only 6 cube face textures"
         );
         assert_eq!(
-            space_rendered.vertices().into_iter().cloned().collect::<Vec<_>>(),
+            space_rendered.vertices().to_vec(),
             vec![
                 v_t([0.250, 0.250, 0.250], NX, [0.250, 0.250, 0.000]),
                 v_t([0.250, 0.250, 0.750], NX, [0.250, 0.750, 0.000]),
@@ -998,7 +993,7 @@ mod tests {
 
         assert_eq!(tex.count_allocated(), 0, "Should be no cube face textures");
         assert_eq!(
-            space_rendered.vertices().into_iter().cloned().collect::<Vec<_>>(),
+            space_rendered.vertices().to_vec(),
             vec![
                 v_c([0.250, 0.250, 0.250], NX, [0.0, 1.0, 0.49803922, 1.0]),
                 v_c([0.250, 0.250, 0.750], NX, [0.0, 1.0, 0.49803922, 1.0]),

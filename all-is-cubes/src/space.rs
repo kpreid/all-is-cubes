@@ -616,7 +616,7 @@ impl Space {
 
         // Check that block_data isn't missing any indexes that appeared in contents.
         // (The previous section should have drained actual_counts).
-        if actual_counts.len() != 0 {
+        if !actual_counts.is_empty() {
             problems.push(format!(
                 "Block indexes were not indexed in block_data: {:?}",
                 &actual_counts

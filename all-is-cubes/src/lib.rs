@@ -8,7 +8,12 @@
 //! interface. Glue for displaying on specific platforms is kept in other crates.
 
 #![allow(clippy::collapsible_if)]
+#![allow(clippy::needless_update)]
 #![warn(clippy::cast_lossless)]
+#![cfg_attr(test,
+    allow(clippy::float_cmp), // Tests work with predictable floats
+    allow(clippy::redundant_clone), // Tests prefer regularity over efficiency
+)]
 
 // TODO: consider exporting individual symbols instead of the modules, because
 // the modules are mostly per-data-type rather than being convenient usage bundles.

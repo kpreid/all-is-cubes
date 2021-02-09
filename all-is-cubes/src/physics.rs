@@ -576,7 +576,7 @@ mod tests {
             .map(Vector3::from)
         {
             for &variant in &[case, -case] {
-                one_test(variant.into());
+                one_test(variant);
             }
         }
 

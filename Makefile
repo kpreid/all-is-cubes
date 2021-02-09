@@ -17,8 +17,8 @@ all: all-is-cubes-wasm/node_modules/.bin/webpack
 	cargo build --package all-is-cubes-server
 
 lint:
-	cargo clippy  # ignores wasm-only code
-	(cd all-is-cubes-wasm && cargo clippy --target=wasm32-unknown-unknown)
+	cargo clippy --all-targets  # ignores wasm-only code
+	(cd all-is-cubes-wasm && cargo clippy --target=wasm32-unknown-unknown --all-targets)
 	# TODO: add JS linting
 
 test:

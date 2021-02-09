@@ -622,6 +622,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::eq_op)]
     fn uref_equality_is_pointer_equality() {
         let root_a = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
         let root_b = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
