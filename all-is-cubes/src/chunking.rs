@@ -68,10 +68,7 @@ pub struct ChunkChart {
 
 impl ChunkChart {
     pub fn new(view_distance: FreeCoordinate) -> Self {
-        // Convert to NotNan and sanity check.
-        // TODO: What should we do about overly large inputs?
-        let view_distance =
-            NotNan::try_from(view_distance.max(0.)).unwrap_or_else(|_| NotNan::zero());
+        let view_distance = Self::sanitize_distance(view_distance);
 
         // We're going to compute in the zero-or-positive octant, which means that the chunk origin
         // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
@@ -103,6 +100,11 @@ impl ChunkChart {
         }
     }
 
+    fn sanitize_distance(view_distance: FreeCoordinate) -> NotNan<FreeCoordinate> {
+        // TODO: What should we do about overly large inputs?
+        NotNan::try_from(view_distance.max(0.)).unwrap_or_else(|_| NotNan::zero())
+    }
+
     fn sort_key(
         &chunk: &GridVector,
     ) -> (
@@ -112,6 +114,15 @@ impl ChunkChart {
         GridCoordinate,
     ) {
         (int_magnitude_squared(chunk), chunk.x, chunk.y, chunk.z)
+    }
+
+    /// Recalculate the chart if the provided distance is different.
+    ///
+    /// Equivalent to replacing `self` with a new chart from [`ChunkChart::new`].
+    pub fn resize_if_needed(&mut self, view_distance: FreeCoordinate) {
+        if Self::sanitize_distance(view_distance) != self.view_distance {
+            *self = Self::new(view_distance);
+        }
     }
 
     /// Returns an iterator over the chunks in this chart — i.e. those intersecting a sphere
@@ -344,5 +355,16 @@ mod tests {
             }
             seen.insert(p);
         }
+    }
+
+    #[test]
+    fn chunk_chart_resize() {
+        let chart1 = ChunkChart::new(200.0);
+        let mut chart2 = ChunkChart::new(300.0);
+        chart2.resize_if_needed(200.0);
+        assert_eq!(
+            chart1.chunks(ChunkPos::new(0, 0, 0)).collect::<Vec<_>>(),
+            chart2.chunks(ChunkPos::new(0, 0, 0)).collect::<Vec<_>>()
+        );
     }
 }
