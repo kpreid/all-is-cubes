@@ -54,7 +54,7 @@ impl std::fmt::Debug for BlockVertex {
             fmt,
             "{{ p: {:?} n: {:?} c: {:?} }}",
             self.position.as_concise_debug(),
-            self.face.normal_vector::<i8>().as_concise_debug(), // no decimals!
+            self.face,
             self.coloring
         )
     }
