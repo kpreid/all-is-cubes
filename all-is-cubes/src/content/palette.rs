@@ -14,9 +14,9 @@ pub const DAY_SKY_COLOR: Rgb = rgb_const!(0.9, 0.9, 1.4);
 
 // Rendering fallbacks.
 /// Used when there should be a texture but we ran out of texture space.
-pub const MISSING_TEXTURE_FALLBACK: Rgba = rgba_const!(1.0, 0.0, 0.8, 1.0);
+pub const MISSING_TEXTURE_FALLBACK: Rgba = rgba_const!(1.0, 0.0, 0.5, 1.0);
 /// Used when a recursive block definition should have provided a voxel color but did not.
-pub const MISSING_VOXEL_FALLBACK: Rgba = rgba_const!(0.8, 0.0, 1.0, 1.0);
+pub const MISSING_VOXEL_FALLBACK: Rgba = rgba_const!(0.5, 0.0, 1.0, 1.0);
 /// Used in unallocated texture atlas space.
 pub const UNPAINTED_TEXTURE_FALLBACK: Rgba = rgba_const!(0.0, 0.7, 0.7, 1.0);
 
