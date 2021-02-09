@@ -4,7 +4,6 @@
 //! Get from [`Space`] to [`Tess`].
 
 use bitvec::prelude::BitVec;
-use cgmath::Matrix4;
 use luminance::tess::View as _;
 use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
@@ -26,7 +25,7 @@ use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::types::{GLBlockVertex, Vertex};
-use crate::math::{FreeCoordinate, GridPoint, Rgb};
+use crate::math::{GridPoint, Rgb};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
     triangulate_block, triangulate_blocks, BlockTriangulation, BlockTriangulationProvider,
@@ -222,7 +221,7 @@ impl SpaceRenderer {
         SpaceRendererOutput {
             sky_color: space.sky_color(),
             block_texture: &mut block_texture_allocator.texture,
-            view_matrix: projection.view_matrix(),
+            ph: projection.clone(),
             chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
             chunk_chart: &self.chunk_chart,
             view_chunk,
@@ -244,7 +243,7 @@ pub struct SpaceRendererOutput<'a> {
     pub sky_color: Rgb,
 
     block_texture: &'a mut BlockTexture,
-    view_matrix: Matrix4<FreeCoordinate>,
+    ph: ProjectionHelper, // TODO: more info than we actually need (view matrix + view distance)
     /// Chunks are handy wrappers around some Tesses
     chunks: &'a HashMap<ChunkPos, Chunk>,
     chunk_chart: &'a ChunkChart,
@@ -258,8 +257,8 @@ pub struct SpaceRendererBound<'a> {
 
     /// Block texture to pass to the shader.
     pub bound_block_texture: BoundBlockTexture<'a>,
-    /// View matrix to pass to the shader.
-    pub view_matrix: Matrix4<FreeCoordinate>,
+    /// View information to pass to the shader.
+    pub ph: ProjectionHelper,
     chunks: &'a HashMap<ChunkPos, Chunk>,
     chunk_chart: &'a ChunkChart,
     view_chunk: ChunkPos,
@@ -273,7 +272,7 @@ impl<'a> SpaceRendererOutput<'a> {
         Ok(SpaceRendererBound {
             sky_color: self.sky_color,
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
-            view_matrix: self.view_matrix,
+            ph: self.ph,
             chunks: self.chunks,
             chunk_chart: self.chunk_chart,
             view_chunk: self.view_chunk,

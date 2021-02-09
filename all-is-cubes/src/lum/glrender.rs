@@ -199,9 +199,6 @@ where
         // TODO: cache
         let cursor_tess = make_cursor_tess(surface, &self.cursor_result);
 
-        let world_proj = &self.world_proj;
-        let ui_proj = &self.ui_proj;
-
         surface
             .new_pipeline_gate()
             .pipeline(
@@ -214,7 +211,7 @@ where
                     shading_gate.shade(
                         block_program,
                         |ref mut program_iface, u, mut render_gate| {
-                            u.initialize(program_iface, &world_proj, &world_output_bound);
+                            u.initialize(program_iface, &world_output_bound);
                             // Space
                             info.space = world_output_bound.render(&mut render_gate)?;
 
@@ -248,7 +245,7 @@ where
                         shading_gate.shade(
                             block_program,
                             |ref mut program_iface, u, mut render_gate| {
-                                u.initialize(program_iface, &ui_proj, &ui_bound);
+                                u.initialize(program_iface, &ui_bound);
                                 ui_bound.render(&mut render_gate)?;
                                 Ok(())
                             },
