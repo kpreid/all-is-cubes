@@ -18,6 +18,7 @@ use std::cell::RefCell;
 use std::convert::{TryFrom, TryInto};
 use std::rc::{Rc, Weak};
 
+use crate::content::palette;
 use crate::intalloc::IntAllocator;
 use crate::lum::types::Vertex;
 use crate::math::GridCoordinate;
@@ -119,7 +120,8 @@ impl LumAtlasAllocator {
         let layout = self.layout;
         // Allocate contiguous storage for uploading.
         // TODO: Should we keep this allocated? Probably
-        let mut texels = vec![(255, 0, 255, 255); layout.texel_count()];
+        let mut texels =
+            vec![palette::UNPAINTED_TEXTURE_FALLBACK.to_linear_32bit(); layout.texel_count()];
         let mut count_written = 0;
 
         // TODO: Add dirty rectangle tracking so we can do a partial upload...but not until
