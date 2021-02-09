@@ -30,6 +30,10 @@ pub enum VertexSemantics {
     /// * If `[3]` is -1.0, then the first three components are array texture coordinates.
     #[sem(name = "a_color_or_texture", repr = "[f32; 4]", wrapper = "VertexColorOrTexture")]
     ColorOrTexture,
+    #[sem(name = "a_clamp_min", repr = "[f32; 3]", wrapper = "VertexClampLow")]
+    ClampLow,
+    #[sem(name = "a_clamp_max", repr = "[f32; 3]", wrapper = "VertexClampHigh")]
+    ClampHigh,
     /// Diffuse lighting intensity; typically the color or texture should be multiplied by this.
     // TODO: look into packed repr for lighting, or switching to a 3D texture
     #[sem(name = "a_lighting", repr = "[f32; 3]", wrapper = "VertexLighting")]
@@ -40,16 +44,11 @@ pub enum VertexSemantics {
 #[derive(Clone, Copy, Debug, PartialEq, Vertex)]
 #[vertex(sem = "VertexSemantics")]
 pub struct Vertex {
-    #[allow(dead_code)] // read by shader
     position: VertexPosition,
-
-    #[allow(dead_code)] // read by shader
     normal: VertexNormal,
-
-    #[allow(dead_code)] // read by shader
     color_or_texture: VertexColorOrTexture,
-
-    #[allow(dead_code)] // read by shader
+    clamp_min: VertexClampLow,
+    clamp_max: VertexClampHigh,
     lighting: VertexLighting,
 }
 
@@ -57,9 +56,11 @@ impl Vertex {
     /// A vertex which will not be rendered.
     pub const DUMMY: Vertex = Vertex {
         position: VertexPosition::new([f32::INFINITY, f32::INFINITY, f32::INFINITY]),
-        normal: VertexNormal::new([0.0, 0.0, 0.0]),
-        color_or_texture: VertexColorOrTexture::new([0.0, 0.0, 0.0, 0.0]),
-        lighting: VertexLighting::new([0.0, 0.0, 0.0]),
+        normal: VertexNormal::new([0., 0., 0.]),
+        color_or_texture: VertexColorOrTexture::new([0., 0., 0., 0.]),
+        clamp_min: VertexClampLow::new([0., 0., 0.]),
+        clamp_max: VertexClampHigh::new([0., 0., 0.]),
+        lighting: VertexLighting::new([0., 0., 0.]),
     };
 
     /// Constructor taking our natural types instead of luminance specialized types.
@@ -73,6 +74,8 @@ impl Vertex {
             position: VertexPosition::new(position.cast::<f32>().unwrap().into()),
             normal: VertexNormal::new(normal.cast::<f32>().unwrap().into()),
             color_or_texture: VertexColorOrTexture::new(color.into()),
+            clamp_min: VertexClampLow::new([0., 0., 0.]),
+            clamp_max: VertexClampHigh::new([0., 0., 0.]),
             lighting: VertexLighting::new([1.0, 1.0, 1.0]),
         }
     }
@@ -95,6 +98,8 @@ impl Vertex {
             position: VertexPosition::new(p.into()),
             normal: VertexNormal::new(normal.into()),
             color_or_texture: VertexColorOrTexture::new(t.extend(-1.0).into()),
+            clamp_min: VertexClampLow::new([0., 0., 0.]),
+            clamp_max: VertexClampHigh::new([0., 0., 0.]),
             lighting: VertexLighting::new([1.0, 1.0, 1.0]),
         };
         Box::new([
@@ -114,23 +119,39 @@ pub struct GLBlockVertex {
     position: Vector3<f32>,
     normal: VertexNormal,
     color_or_texture: VertexColorOrTexture,
+    clamp_min: VertexClampLow,
+    clamp_max: VertexClampHigh,
 }
 
 impl From<BlockVertex> for GLBlockVertex {
     #[inline]
     fn from(vertex: BlockVertex) -> Self {
-        Self {
-            position: vertex.position.cast::<f32>().unwrap().to_vec(),
-            normal: VertexNormal::new(vertex.face.normal_vector::<f32>().into()),
-            color_or_texture: match vertex.coloring {
-                Coloring::Solid(color) => {
-                    let mut color_attribute = VertexColorOrTexture::new(color.into());
-                    // Clamp out-of-range alpha values so they fit into the
-                    // VertexColorOrTexture protocol (not less than zero).
-                    color_attribute[3] = color_attribute[3].min(1.).max(0.);
-                    color_attribute
+        let position = vertex.position.cast::<f32>().unwrap().to_vec();
+        let normal = VertexNormal::new(vertex.face.normal_vector::<f32>().into());
+        match vertex.coloring {
+            Coloring::Solid(color) => {
+                let mut color_attribute = VertexColorOrTexture::new(color.into());
+                // Clamp out-of-range alpha values so they fit into the
+                // VertexColorOrTexture protocol (not less than zero).
+                color_attribute[3] = color_attribute[3].min(1.).max(0.);
+                Self {
+                    position,
+                    normal,
+                    color_or_texture: color_attribute,
+                    clamp_min: VertexClampLow::new([0., 0., 0.]),
+                    clamp_max: VertexClampHigh::new([0., 0., 0.]),
                 }
-                Coloring::Texture(tc) => VertexColorOrTexture::new([tc[0], tc[1], tc[2], -1.0]),
+            }
+            Coloring::Texture {
+                pos: tc,
+                clamp_min,
+                clamp_max,
+            } => Self {
+                position,
+                normal,
+                color_or_texture: VertexColorOrTexture::new([tc[0], tc[1], tc[2], -1.0]),
+                clamp_min: VertexClampLow::new(clamp_min.into()),
+                clamp_max: VertexClampHigh::new(clamp_max.into()),
             },
         }
     }
@@ -145,6 +166,8 @@ impl ToGfxVertex<Vertex> for GLBlockVertex {
             position: VertexPosition::new((self.position + offset).into()),
             normal: self.normal,
             color_or_texture: self.color_or_texture,
+            clamp_min: self.clamp_min,
+            clamp_max: self.clamp_max,
             lighting: VertexLighting::new(lighting.into()),
         }
     }

@@ -3,6 +3,8 @@
 
 in mediump vec4 v_color_or_texture;
 in mediump vec3 v_normal;
+in mediump vec3 v_clamp_min;
+in mediump vec3 v_clamp_max;
 in lowp vec3 v_lighting;
 // What fraction of the fragment color should be fog?
 in lowp float fog_mix;
@@ -32,7 +34,8 @@ void main(void) {
   mediump vec4 diffuse_color;
   if (v_color_or_texture[3] < -0.5) {
     // Texture coordinates.
-    diffuse_color = texture(block_texture, v_color_or_texture.stp);
+    mediump vec3 texcoord = clamp(v_color_or_texture.stp, v_clamp_min, v_clamp_max);
+    diffuse_color = texture(block_texture, texcoord);
   } else {
     // Solid color.
     diffuse_color = v_color_or_texture;

@@ -38,13 +38,43 @@ pub struct BlockVertex {
     /// Surface color or texture coordinate.
     pub coloring: Coloring,
 }
+
+impl BlockVertex {
+    /// Remove the clamp information for the sake of tidier tests of one thing at a time.
+    #[cfg(test)]
+    fn remove_clamps(mut self) -> Self {
+        self.coloring = match self.coloring {
+            Coloring::Texture {
+                pos,
+                clamp_min: _,
+                clamp_max: _,
+            } => Coloring::Texture {
+                pos,
+                clamp_min: pos,
+                clamp_max: pos,
+            },
+            other => other,
+        };
+        self
+    }
+}
+
 /// Describes the two ways a [`BlockVertex`] may be colored; by a solid color or by a texture.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Coloring {
     /// Solid color.
     Solid(Rgba),
     /// Texture coordinates provided by the [`TextureAllocator`] for this vertex.
-    Texture(Vector3<TextureCoordinate>),
+    Texture {
+        /// Texture coordinates for this vertex.
+        pos: Vector3<TextureCoordinate>,
+        /// Lower bounds for clamping the entire surface's texture coordinates.
+        /// Used to avoid texture bleed.
+        clamp_min: Vector3<TextureCoordinate>,
+        /// Upper bounds for clamping the entire surface's texture coordinates.
+        /// Used to avoid texture bleed.
+        clamp_max: Vector3<TextureCoordinate>,
+    },
 }
 
 impl std::fmt::Debug for BlockVertex {
@@ -64,7 +94,7 @@ impl std::fmt::Debug for Coloring {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Coloring::Solid(color) => write!(fmt, "Solid({:?})", color),
-            Coloring::Texture(tc) => write!(fmt, "Texture({:?})", tc.as_concise_debug()),
+            Coloring::Texture { pos, .. } => write!(fmt, "Texture({:?})", pos.as_concise_debug()),
         }
     }
 }
@@ -193,22 +223,38 @@ fn push_quad<V: From<BlockVertex>>(
                 // Note: if we're ever looking for microöptimizations, we could try
                 // converting this to a trait for static dispatch.
                 QuadColoring::Solid(color) => Coloring::Solid(color),
-                QuadColoring::Texture(tile, scale) => Coloring::Texture(
-                    tile.texcoord(
-                        transform_t
-                            .transform_point(
-                                p.map(|s| s as TextureCoordinate)
-                                    + Vector3::new(
-                                        0.,
-                                        0.,
-                                        // half-texel inset into the plane
-                                        0.5 / (resolution as TextureCoordinate),
-                                    ),
-                            )
-                            .to_vec()
-                            * scale,
-                    ),
-                ),
+                QuadColoring::Texture(tile, scale) => {
+                    let half_texel = 0.5 / (resolution as TextureCoordinate);
+                    let depth_fudge = Vector3::new(0., 0., half_texel);
+                    Coloring::Texture {
+                        pos: tile.texcoord(
+                            transform_t
+                                .transform_point(p.map(|s| s as TextureCoordinate) + depth_fudge)
+                                .to_vec()
+                                * scale,
+                        ),
+                        clamp_min: tile.texcoord(
+                            transform_t
+                                .transform_point(Point3 {
+                                    x: low_corner.x as TextureCoordinate + half_texel,
+                                    y: low_corner.y as TextureCoordinate + half_texel,
+                                    z: depth as TextureCoordinate + half_texel,
+                                })
+                                .to_vec()
+                                * scale,
+                        ),
+                        clamp_max: tile.texcoord(
+                            transform_t
+                                .transform_point(Point3 {
+                                    x: high_corner.x as TextureCoordinate - half_texel,
+                                    y: high_corner.y as TextureCoordinate - half_texel,
+                                    z: depth as TextureCoordinate + half_texel,
+                                })
+                                .to_vec()
+                                * scale,
+                        ),
+                    }
+                }
             },
         }));
     }
@@ -719,10 +765,15 @@ mod tests {
         face: Face,
         texture: [TextureCoordinate; 3],
     ) -> BlockVertex {
+        let texture = texture.into();
         BlockVertex {
             position: position.into(),
             face,
-            coloring: Coloring::Texture(texture.into()),
+            coloring: Coloring::Texture {
+                pos: texture,
+                clamp_min: texture,
+                clamp_max: texture,
+            },
         }
     }
 
@@ -926,7 +977,7 @@ mod tests {
 
         assert_eq!(tex.count_allocated(), 1);
         assert_eq!(
-            space_rendered.vertices().to_vec(),
+            space_rendered.vertices().iter().map(|&v| v.remove_clamps()).collect::<Vec<_>>(),
             vec![
                 v_t([0.250, 0.250, 0.250], NX, [0.3125, 0.2500, 0.2500]),
                 v_t([0.250, 0.250, 0.750], NX, [0.3125, 0.2500, 0.7500]),
