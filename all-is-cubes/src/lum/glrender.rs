@@ -131,8 +131,6 @@ where
         });
         let surface = &mut self.surface;
         let block_program = &mut self.block_program;
-        let world_projection_matrix = self.world_proj.projection();
-        let ui_projection_matrix = self.ui_proj.projection();
 
         // Update cursor state. This is, strictly speaking, not rendering, but it is closely
         // related in that the cursor should match the pixels being drawn.
@@ -218,6 +216,9 @@ where
         // TODO: cache
         let cursor_tess = make_cursor_tess(surface, &self.cursor_result);
 
+        let world_proj = &self.world_proj;
+        let ui_proj = &self.ui_proj;
+
         surface
             .new_pipeline_gate()
             .pipeline(
@@ -231,11 +232,7 @@ where
                         block_program,
                         |ref mut program_iface, u, mut render_gate| {
                             // Render space (and cursor).
-                            u.initialize(
-                                program_iface,
-                                world_projection_matrix,
-                                &world_output_bound,
-                            );
+                            u.initialize(program_iface, &world_proj, &world_output_bound);
                             render_gate.render(&render_state, |mut tess_gate| {
                                 // TODO: should be `info.space += ...`
                                 info.space = world_output_bound.render(&mut tess_gate)?;
@@ -269,7 +266,7 @@ where
                         shading_gate.shade(
                             block_program,
                             |ref mut program_iface, u, mut render_gate| {
-                                u.initialize(program_iface, ui_projection_matrix, &ui_bound);
+                                u.initialize(program_iface, &ui_proj, &ui_bound);
                                 render_gate.render(&render_state, |mut tess_gate| {
                                     let _ = ui_bound.render(&mut tess_gate)?;
                                     Ok(())

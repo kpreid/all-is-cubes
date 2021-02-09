@@ -12,7 +12,7 @@ use luminance_front::shader::{BuiltProgram, Program, ProgramError, ProgramInterf
 use luminance_front::texture::Dim2Array;
 use luminance_front::Backend;
 
-use crate::camera::VIEW_DISTANCE;
+use crate::camera::ProjectionHelper;
 use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::VertexSemantics;
@@ -75,13 +75,13 @@ impl BlockUniformInterface {
     pub fn initialize(
         &self,
         program_iface: &mut ProgramInterface,
-        projection_matrix: Matrix4<FreeCoordinate>,
+        ph: &ProjectionHelper,
         space: &SpaceRendererBound<'_>,
     ) {
-        self.set_projection_matrix(program_iface, projection_matrix);
+        self.set_projection_matrix(program_iface, ph.projection());
         self.set_view_matrix(program_iface, space.view_matrix);
         self.set_block_texture(program_iface, &space.bound_block_texture);
-        program_iface.set(&self.fog_distance, VIEW_DISTANCE as f32);
+        program_iface.set(&self.fog_distance, ph.view_distance() as f32);
         program_iface.set(&self.fog_color, space.sky_color.into());
     }
 

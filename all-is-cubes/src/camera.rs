@@ -272,8 +272,9 @@ type M = Matrix4<FreeCoordinate>;
 pub struct ProjectionHelper {
     // Caller-provided data
     viewport: Viewport,
-    view: M,
     fov_y: Deg<FreeCoordinate>,
+    view_distance: FreeCoordinate,
+    view: M,
 
     // Derived data
     projection: M,
@@ -291,6 +292,7 @@ impl ProjectionHelper {
         let mut new_self = Self {
             viewport,
             fov_y: Deg(90.0),
+            view_distance: VIEW_DISTANCE,
             projection: M::identity(), // overwritten immediately
             view: M::identity(),
             inverse_projection_view: M::identity(), // overwritten immediately
@@ -328,6 +330,12 @@ impl ProjectionHelper {
         }
         self.fov_y = Deg(fov_y.0.min(179.).max(1.));
         self.compute_matrices();
+    }
+
+    /// Returns the view distance; the far plane of the projection matrix, or the distance
+    /// at which rendering may be truncated.
+    pub fn view_distance(&self) -> FreeCoordinate {
+        self.view_distance
     }
 
     /// Set the current cursor position. In the same pixel units as `set_viewport`.
@@ -384,7 +392,7 @@ impl ProjectionHelper {
             self.fov_y(),
             self.viewport.nominal_aspect_ratio(),
             /* near: */ 1. / 32., // half a voxel at resolution=16
-            /* far: */ VIEW_DISTANCE,
+            /* far: */ self.view_distance,
         );
         self.inverse_projection_view = (self.projection * self.view)
             .inverse_transform()
