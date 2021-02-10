@@ -464,9 +464,13 @@ fn copy_voxels_to_texture<A: TextureAllocator>(
     texture_allocator: &mut A,
     voxels: &GridArray<Evoxel>,
 ) -> Option<A::Tile> {
-    let tile_resolution = texture_allocator.resolution();
     texture_allocator.allocate().map(|mut texture| {
+        let tile_resolution = texture_allocator.resolution();
         let mut tile_texels: Vec<Texel> = Vec::with_capacity((tile_resolution as usize).pow(3));
+        // Note that this is row-major order whereas `Grid` uses column-major order, so
+        // expressing this with `Grid::interior_iter` would require shuffling the texture
+        // coordinates — or changing `Grid`'s choice of ordering, which might be worth
+        // doing but isn't for this one use case.
         for z in 0..tile_resolution {
             for y in 0..tile_resolution {
                 for x in 0..tile_resolution {
