@@ -446,7 +446,7 @@ impl GridRotation {
 
     // TODO: public? do we want this to be our API? should this also be a From impl?
     #[inline]
-    fn to_basis(self) -> Vector3<Face> {
+    pub(crate) fn to_basis(self) -> Vector3<Face> {
         use {Face::*, GridRotation::*};
         Vector3::from(match self {
             RXYZ => [PX, PY, PZ],
