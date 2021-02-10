@@ -287,16 +287,29 @@ impl<'a> SpaceRendererBound<'a> {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
 
-        for &pass in &[SpaceRendererPass::Opaque, SpaceRendererPass::Transparent] {
+        // These two blocks are *almost* identical but the iteration order is reversed,
+        // and we only count the chunks once.
+        {
+            let pass = SpaceRendererPass::Opaque;
             render_gate.render(&pass.render_state(), |mut tess_gate| {
                 for p in self.chunk_chart.chunks(self.view_chunk) {
                     if let Some(chunk) = self.chunks.get(&p) {
-                        chunks_drawn += 1; // TODO: double counts per pass
+                        chunks_drawn += 1;
                         squares_drawn += chunk.render(&mut tess_gate, pass)?;
                     }
                     // TODO: If the chunk is missing, draw a blocking shape, possibly?
                 }
-
+                Ok(())
+            })?;
+        }
+        {
+            let pass = SpaceRendererPass::Transparent;
+            render_gate.render(&pass.render_state(), |mut tess_gate| {
+                for p in self.chunk_chart.chunks(self.view_chunk).rev() {
+                    if let Some(chunk) = self.chunks.get(&p) {
+                        squares_drawn += chunk.render(&mut tess_gate, pass)?;
+                    }
+                }
                 Ok(())
             })?;
         }
