@@ -7,6 +7,7 @@ use cgmath::Point2;
 use luminance_front::context::GraphicsContext;
 use luminance_front::framebuffer::Framebuffer;
 use luminance_front::pipeline::PipelineState;
+use luminance_front::render_state::RenderState;
 use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
@@ -14,7 +15,7 @@ use luminance_front::Backend;
 use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper, Viewport};
 use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
-use crate::lum::space::{SpaceRenderInfo, SpaceRenderer, SpaceRendererPass};
+use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::Vertex;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
@@ -213,25 +214,18 @@ where
                     shading_gate.shade(
                         block_program,
                         |ref mut program_iface, u, mut render_gate| {
-                            // Render space (and cursor).
                             u.initialize(program_iface, &world_proj, &world_output_bound);
-                            // TODO: refactor to fold the passes and render_gate.render into SpaceRenderer
-                            for &pass in
-                                &[SpaceRendererPass::Opaque, SpaceRendererPass::Transparent]
-                            {
-                                render_gate.render(&pass.render_state(), |mut tess_gate| {
-                                    // TODO: should be `info.space += ...`
-                                    info.space = world_output_bound.render(&mut tess_gate, pass)?;
+                            // Space
+                            info.space = world_output_bound.render(&mut render_gate)?;
 
-                                    tess_gate.render(&cursor_tess)?;
-
-                                    if let Some(tess) = &debug_lines_tess {
-                                        tess_gate.render(tess)?;
-                                    }
-
-                                    Ok(())
-                                })?;
-                            }
+                            // Cursor and debug info
+                            render_gate.render(&RenderState::default(), |mut tess_gate| {
+                                tess_gate.render(&cursor_tess)?;
+                                if let Some(tess) = &debug_lines_tess {
+                                    tess_gate.render(tess)?;
+                                }
+                                Ok(())
+                            })?;
                             Ok(())
                         },
                     )
@@ -255,15 +249,7 @@ where
                             block_program,
                             |ref mut program_iface, u, mut render_gate| {
                                 u.initialize(program_iface, &ui_proj, &ui_bound);
-                                for &pass in
-                                    &[SpaceRendererPass::Opaque, SpaceRendererPass::Transparent]
-                                {
-                                    render_gate.render(&pass.render_state(), |mut tess_gate| {
-                                        let _ = ui_bound.render(&mut tess_gate, pass)?;
-                                        Ok(())
-                                    })?;
-                                }
-
+                                ui_bound.render(&mut render_gate)?;
                                 Ok(())
                             },
                         )?;

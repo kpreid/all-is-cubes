@@ -10,6 +10,7 @@ use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::pipeline::{Pipeline, PipelineError};
+use luminance_front::render_gate::RenderGate;
 use luminance_front::render_state::RenderState;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::tess_gate::TessGate;
@@ -281,21 +282,25 @@ impl<'a> SpaceRendererOutput<'a> {
     }
 }
 impl<'a> SpaceRendererBound<'a> {
-    /// Use a [`TessGate`] to actually draw the space.
-    pub fn render<E>(
-        &self,
-        tess_gate: &mut TessGate,
-        pass: SpaceRendererPass,
-    ) -> Result<SpaceRenderInfo, E> {
+    /// Use a [`RenderGate`] to actually draw the space.
+    pub fn render<E>(&self, render_gate: &mut RenderGate) -> Result<SpaceRenderInfo, E> {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
-        for p in self.chunk_chart.chunks(self.view_chunk) {
-            if let Some(chunk) = self.chunks.get(&p) {
-                chunks_drawn += 1;
-                squares_drawn += chunk.render(tess_gate, pass)?;
-            }
-            // TODO: If the chunk is missing, draw a blocking shape, possibly?
+
+        for &pass in &[SpaceRendererPass::Opaque, SpaceRendererPass::Transparent] {
+            render_gate.render(&pass.render_state(), |mut tess_gate| {
+                for p in self.chunk_chart.chunks(self.view_chunk) {
+                    if let Some(chunk) = self.chunks.get(&p) {
+                        chunks_drawn += 1; // TODO: double counts per pass
+                        squares_drawn += chunk.render(&mut tess_gate, pass)?;
+                    }
+                    // TODO: If the chunk is missing, draw a blocking shape, possibly?
+                }
+
+                Ok(())
+            })?;
         }
+
         Ok(SpaceRenderInfo {
             chunks_drawn,
             squares_drawn,
@@ -321,7 +326,7 @@ pub struct SpaceRenderInfo {
 
 // Which drawing pass we're doing.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum SpaceRendererPass {
+enum SpaceRendererPass {
     Opaque,
     Transparent,
 }
