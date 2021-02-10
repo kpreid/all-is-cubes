@@ -14,6 +14,7 @@
 
 use cgmath::{
     ElementWise as _, EuclideanSpace as _, Point2, Point3, Transform as _, Vector2, Vector3,
+    Zero as _,
 };
 use std::convert::TryFrom;
 
@@ -207,9 +208,39 @@ fn push_quad<V: From<BlockVertex>>(
     coloring: QuadColoring<impl TextureTile>,
     resolution: GridCoordinate,
 ) {
-    // TODO: Refactor so we don't have to do this anew for each individual quad
+    // TODO: Refactor so we don't have to do 100% of this anew for each individual quad
+    // This is tricky, though, since the coloring can vary per quad (though the scale _can_ be constant).
     let transform_f = face.matrix(1).to_free();
     let transform_t = transform_f.cast::<TextureCoordinate>().unwrap();
+    let half_texel = 0.5 / (resolution as TextureCoordinate);
+    let depth_fudge = Vector3::new(0., 0., half_texel);
+
+    let (clamp_min, clamp_max) = match coloring {
+        QuadColoring::Solid(_) => (Vector3::zero(), Vector3::zero()),
+        QuadColoring::Texture(tile, scale) => (
+            tile.texcoord(
+                transform_t
+                    .transform_point(Point3 {
+                        x: low_corner.x as TextureCoordinate + half_texel,
+                        y: low_corner.y as TextureCoordinate + half_texel,
+                        z: depth as TextureCoordinate + half_texel,
+                    })
+                    .to_vec()
+                    * scale,
+            ),
+            tile.texcoord(
+                transform_t
+                    .transform_point(Point3 {
+                        x: high_corner.x as TextureCoordinate - half_texel,
+                        y: high_corner.y as TextureCoordinate - half_texel,
+                        z: depth as TextureCoordinate + half_texel,
+                    })
+                    .to_vec()
+                    * scale,
+            ),
+        ),
+    };
+
     for &p in QUAD_VERTICES {
         // Apply bounding rectangle
         let p = low_corner.to_vec() + p.mul_element_wise(high_corner - low_corner);
@@ -223,38 +254,16 @@ fn push_quad<V: From<BlockVertex>>(
                 // Note: if we're ever looking for microöptimizations, we could try
                 // converting this to a trait for static dispatch.
                 QuadColoring::Solid(color) => Coloring::Solid(color),
-                QuadColoring::Texture(tile, scale) => {
-                    let half_texel = 0.5 / (resolution as TextureCoordinate);
-                    let depth_fudge = Vector3::new(0., 0., half_texel);
-                    Coloring::Texture {
-                        pos: tile.texcoord(
-                            transform_t
-                                .transform_point(p.map(|s| s as TextureCoordinate) + depth_fudge)
-                                .to_vec()
-                                * scale,
-                        ),
-                        clamp_min: tile.texcoord(
-                            transform_t
-                                .transform_point(Point3 {
-                                    x: low_corner.x as TextureCoordinate + half_texel,
-                                    y: low_corner.y as TextureCoordinate + half_texel,
-                                    z: depth as TextureCoordinate + half_texel,
-                                })
-                                .to_vec()
-                                * scale,
-                        ),
-                        clamp_max: tile.texcoord(
-                            transform_t
-                                .transform_point(Point3 {
-                                    x: high_corner.x as TextureCoordinate - half_texel,
-                                    y: high_corner.y as TextureCoordinate - half_texel,
-                                    z: depth as TextureCoordinate + half_texel,
-                                })
-                                .to_vec()
-                                * scale,
-                        ),
-                    }
-                }
+                QuadColoring::Texture(tile, scale) => Coloring::Texture {
+                    pos: tile.texcoord(
+                        transform_t
+                            .transform_point(p.map(|s| s as TextureCoordinate) + depth_fudge)
+                            .to_vec()
+                            * scale,
+                    ),
+                    clamp_min,
+                    clamp_max,
+                },
             },
         }));
     }
