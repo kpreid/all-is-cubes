@@ -8,6 +8,7 @@ use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as 
 use luminance::tess::View as _;
 use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
+use luminance_front::depth_test::DepthWrite;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::pipeline::{Pipeline, PipelineError};
 use luminance_front::render_gate::RenderGate;
@@ -289,6 +290,9 @@ impl<'a> SpaceRendererBound<'a> {
 
         // These two blocks are *almost* identical but the iteration order is reversed,
         // and we only count the chunks once.
+        // TODO: For performance, also use a shader that doesn't support opacity for the
+        // opaque pass. Once block geometry no longer uses alpha discard, we can skip that
+        // too.
         {
             let pass = SpaceRendererPass::Opaque;
             render_gate.render(&pass.render_state(), |mut tess_gate| {
@@ -346,18 +350,23 @@ enum SpaceRendererPass {
 impl SpaceRendererPass {
     /// Returns the [`RenderState`] to use for this pass.
     pub fn render_state(self) -> RenderState {
-        RenderState::default()
-            .set_face_culling(FaceCulling {
-                order: FaceCullingOrder::CCW,
-                mode: FaceCullingMode::Back,
-            })
-            .set_blending(Some(Blending {
-                // Note that this blending configuration is for premultiplied alpha.
-                // The fragment shaders are responsible for producing premultiplied alpha outputs.
-                equation: Equation::Additive,
-                src: Factor::One,
-                dst: Factor::SrcAlphaComplement,
-            }))
+        let base = RenderState::default().set_face_culling(FaceCulling {
+            order: FaceCullingOrder::CCW,
+            mode: FaceCullingMode::Back,
+        });
+        match self {
+            SpaceRendererPass::Opaque => base,
+            SpaceRendererPass::Transparent => {
+                base.set_depth_write(DepthWrite::Off) // Unnecessary
+                    .set_blending(Some(Blending {
+                        // Note that this blending configuration is for premultiplied alpha.
+                        // The fragment shaders are responsible for producing premultiplied alpha outputs.
+                        equation: Equation::Additive,
+                        src: Factor::One,
+                        dst: Factor::SrcAlphaComplement,
+                    }))
+            }
+        }
     }
 }
 
