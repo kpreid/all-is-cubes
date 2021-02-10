@@ -22,7 +22,7 @@ use std::ops::Range;
 
 use crate::block::{evaluated_block_resolution, EvaluatedBlock, Evoxel, Resolution};
 use crate::content::palette;
-use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, Rgba};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
 use crate::space::{BlockIndex, Grid, GridArray, PackedLight, Space};
 use crate::util::ConciseDebug as _;
 
@@ -393,9 +393,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     let mut visible_low_corner = Point2::new(block_resolution, block_resolution);
                     let mut visible_high_corner = Point2::new(0, 0);
 
-                    // By "transparent somewhere" we mean "visible and also transparent", i.e.
-                    // a surface with alpha between 0 and 1 that is not obscured.
-                    let mut layer_is_transparent_somewhere = false;
+                    // Contains a color with alpha > 0 for every voxel that _should be drawn_.
+                    // That is, it excludes all obscured interior volume.
+                    // First, we traverse the block and fill this with non-obscured voxels,
+                    // then we erase it as we convert contiguous rectangles of it to quads.
+                    let mut visible_image: Vec<Rgba> =
+                        Vec::with_capacity(block_resolution.pow(2) as usize);
 
                     for t in 0..block_resolution {
                         for s in 0..block_resolution {
@@ -425,81 +428,151 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                     .unwrap_or(false)
                             } {
                                 layer_is_visible_somewhere = true;
-                                if !color.fully_opaque() {
-                                    layer_is_transparent_somewhere = true;
-                                }
                                 for axis in 0..2 {
                                     visible_low_corner[axis] =
                                         visible_low_corner[axis].min(layer_coord[axis]);
                                     visible_high_corner[axis] =
                                         visible_high_corner[axis].max(layer_coord[axis] + 1);
                                 }
+                                visible_image.push(color);
+                            } else {
+                                // All obscured voxels are treated as transparent ones, in that we don't
+                                // generate geometry for them.
+                                visible_image.push(Rgba::TRANSPARENT);
                             }
                         }
                     }
 
-                    if layer_is_visible_somewhere {
-                        // Only the surface faces go anywhere but WITHIN.
-                        let FaceTriangulation {
-                            vertices,
-                            indices_opaque,
-                            indices_transparent,
-                            ..
-                        } = &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }];
-                        let depth =
-                            FreeCoordinate::from(layer) / FreeCoordinate::from(block_resolution);
+                    if !layer_is_visible_somewhere {
+                        // No need to analyze further.
+                        continue;
+                    }
 
-                        let coloring = if let Some(uniform_color) = layer_rectangle_is_uniform_color(
-                            &voxels,
-                            transform,
-                            layer,
-                            visible_low_corner,
-                            visible_high_corner,
-                        ) {
-                            // The quad we're going to draw has identical texels, so we might as
-                            // well use a solid color and skip needing a texture.
-                            QuadColoring::<A::Tile>::Solid(uniform_color)
-                        } else {
-                            if texture_if_needed.is_none() {
-                                // Try to compute texture
-                                texture_if_needed =
-                                    copy_voxels_to_texture(texture_allocator, voxels);
-                            }
-                            if let Some(ref texture) = texture_if_needed {
-                                QuadColoring::Texture(
-                                    texture,
-                                    block_resolution as TextureCoordinate
-                                        / tile_resolution as TextureCoordinate,
-                                )
-                            } else {
-                                // Texture allocation failure.
-                                // TODO: Mark this triangulation as defective in the return value, so
-                                // that when more space is available, it can be retried, rather than
-                                // having lingering failures.
-                                // TODO: Add other fallback strategies such as using multiple quads instead
-                                // of textures.
-                                QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
-                            }
-                        };
+                    // Pick where we're going to store the quads.
+                    // Only the cube-surface faces go anywhere but WITHIN.
+                    // (We could generalize this to blocks with concavities that still form a
+                    // light-tight seal against the cube face.)
+                    let FaceTriangulation {
+                        vertices,
+                        indices_opaque,
+                        indices_transparent,
+                        ..
+                    } = &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }];
+                    let depth =
+                        FreeCoordinate::from(layer) / FreeCoordinate::from(block_resolution);
 
-                        push_quad(
-                            vertices,
-                            if layer_is_transparent_somewhere {
-                                indices_transparent
+                    // Traverse `visible_image` using the "greedy meshing" algorithm:
+                    // <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
+                    let index = |s: GridCoordinate, t: GridCoordinate| {
+                        let s = usize::try_from(s).unwrap();
+                        let t = usize::try_from(t).unwrap();
+                        let res = usize::try_from(block_resolution).unwrap();
+                        t * res + s
+                    };
+                    for tl in 0..block_resolution {
+                        for sl in 0..block_resolution {
+                            let single_color = visible_image[index(sl, tl)];
+                            if single_color == Rgba::TRANSPARENT {
+                                continue; // Not the low corner of a quad...
+                            }
+                            let mut rect_has_alpha = !single_color.fully_opaque();
+                            let mut single_color = Some(single_color);
+                            // Find the largest width that works.
+                            let mut sh = sl;
+                            loop {
+                                sh += 1;
+                                if sh >= block_resolution {
+                                    break; // Found the far edge
+                                }
+                                let color = visible_image[index(sh, tl)];
+                                if color == Rgba::TRANSPARENT {
+                                    break; // Should not be generated
+                                }
+                                if Some(color) != single_color {
+                                    single_color = None; // Not a uniform color
+                                }
+                                if !color.fully_opaque() {
+                                    rect_has_alpha = true;
+                                }
+                            }
+                            // Find the largest height that works
+                            let mut th = tl;
+                            'expand_t: loop {
+                                th += 1;
+                                if th >= block_resolution {
+                                    break; // Found the far edge
+                                }
+                                // Check if all the voxels are wanted
+                                for s in sl..sh {
+                                    // TODO: Duplicated code with the S loop ... a sign that we should have an algorithm data structure to write methods on
+                                    let color = visible_image[index(s, th)];
+                                    if color == Rgba::TRANSPARENT {
+                                        break 'expand_t; // Should not be generated
+                                    }
+                                    if Some(color) != single_color {
+                                        single_color = None; // Not a uniform color
+                                    }
+                                    if !color.fully_opaque() {
+                                        rect_has_alpha = true;
+                                    }
+                                }
+                            }
+
+                            // Erase all the voxels that we just built a rectangle on, to remember not
+                            // to do it again. (We don't need to do this last, because the actual data
+                            // is either in the texture or in `single_color`.
+                            for t in tl..th {
+                                for s in sl..sh {
+                                    visible_image[index(s, t)] = Rgba::TRANSPARENT;
+                                }
+                            }
+
+                            // Generate quad.
+                            let coloring = if let Some(single_color) = single_color {
+                                // The quad we're going to draw has identical texels, so we might as
+                                // well use a solid color and skip needing a texture.
+                                QuadColoring::<A::Tile>::Solid(single_color)
                             } else {
-                                indices_opaque
-                            },
-                            face,
-                            depth,
-                            visible_low_corner.map(|c| {
+                                if texture_if_needed.is_none() {
+                                    // Try to compute texture
+                                    texture_if_needed =
+                                        copy_voxels_to_texture(texture_allocator, voxels);
+                                }
+                                if let Some(ref texture) = texture_if_needed {
+                                    QuadColoring::Texture(
+                                        texture,
+                                        block_resolution as TextureCoordinate
+                                            / tile_resolution as TextureCoordinate,
+                                    )
+                                } else {
+                                    // Texture allocation failure.
+                                    // TODO: Mark this triangulation as defective in the return value, so
+                                    // that when more space is available, it can be retried, rather than
+                                    // having lingering failures.
+                                    // TODO: Add other fallback strategies such as using multiple quads instead
+                                    // of textures.
+                                    QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
+                                }
+                            };
+
+                            let map_coord = |c| {
                                 FreeCoordinate::from(c) / FreeCoordinate::from(block_resolution)
-                            }),
-                            visible_high_corner.map(|c| {
-                                FreeCoordinate::from(c) / FreeCoordinate::from(block_resolution)
-                            }),
-                            coloring,
-                            tile_resolution,
-                        );
+                            };
+                            push_quad(
+                                vertices,
+                                if rect_has_alpha {
+                                    indices_transparent
+                                } else {
+                                    indices_opaque
+                                },
+                                face,
+                                depth,
+                                Point2::new(map_coord(sl), map_coord(tl)),
+                                Point2::new(map_coord(sh), map_coord(th)),
+                                coloring,
+                                tile_resolution,
+                            );
+                        }
                     }
                 }
             }
@@ -539,27 +612,6 @@ fn copy_voxels_to_texture<A: TextureAllocator>(
         texture.write(&tile_texels);
         texture
     })
-}
-
-fn layer_rectangle_is_uniform_color(
-    voxels: &GridArray<Evoxel>,
-    transform: GridMatrix,
-    layer: GridCoordinate,
-    low_corner: Point2<GridCoordinate>,
-    high_corner: Point2<GridCoordinate>,
-) -> Option<Rgba> {
-    let mut first = None;
-    for t in low_corner.y..high_corner.y {
-        for s in low_corner.x..high_corner.x {
-            let color = voxels
-                .get(transform.transform_point(GridPoint::new(s, t, layer)))?
-                .color;
-            if color != *first.get_or_insert(color) {
-                return None;
-            }
-        }
-    }
-    first
 }
 
 /// Precomputes vertices for blocks present in a space.
