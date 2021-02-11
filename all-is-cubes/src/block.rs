@@ -84,15 +84,16 @@ impl Block {
     ///
     /// Compared to direct use of the [`Block::Rotated`] variant, this will:
     /// * Avoid constructing chains of `Block::Rotated(Block::Rotated(...))`.
-    /// * TODO: Not rotate blocks that should never appear rotated
-    ///   (atom blocks and explicitly declared ones).
+    /// * Not rotate blocks that should never appear rotated (including atom blocks).
     ///
     /// ```
-    /// use all_is_cubes::block::Block;
-    /// use all_is_cubes::content::make_some_blocks;
+    /// use all_is_cubes::block::{AIR, Block};
+    /// use all_is_cubes::content::make_some_voxel_blocks;
     /// use all_is_cubes::math::{Face::*, GridRotation};
+    /// use all_is_cubes::universe::Universe;
     ///
-    /// let [block] = make_some_blocks();
+    /// let mut universe = Universe::new();
+    /// let [block] = make_some_voxel_blocks(&mut universe);
     /// let clockwise = GridRotation::CLOCKWISE;
     ///
     /// // Basic rotation
@@ -102,10 +103,16 @@ impl Block {
     /// // Multiple rotations are combined
     /// let double = rotated.clone().rotate(clockwise);
     /// assert_eq!(double, Block::Rotated(clockwise * clockwise, Box::new(block.clone())));
+    /// // AIR is never rotated
+    /// assert_eq!(AIR, AIR.rotate(clockwise));
     /// ```
     pub fn rotate(self, rotation: GridRotation) -> Self {
         match self {
-            // TODO: Block::Atom(..) => self,
+            // TODO: Just checking for Block::Atom doesn't help when the atom
+            // is hidden behind Block::Indirect. In general, we need to evaluate()
+            // (which suggests that this perhaps should be at least available
+            // as a function that takes Block + EvaluatedBlock).
+            Block::Atom(..) => self,
             Block::Rotated(existing_rotation, boxed_block) => {
                 // TODO: If the combined rotation is the identity, simplify
                 Block::Rotated(rotation * existing_rotation, boxed_block)
@@ -121,10 +128,12 @@ impl Block {
     ///
     /// ```
     /// use all_is_cubes::block::Block;
-    /// use all_is_cubes::content::make_some_blocks;
+    /// use all_is_cubes::content::make_some_voxel_blocks;
     /// use all_is_cubes::math::{Face::*, GridRotation};
+    /// use all_is_cubes::universe::Universe;
     ///
-    /// let [block] = make_some_blocks();
+    /// let mut universe = Universe::new();
+    /// let [block] = make_some_voxel_blocks(&mut universe);
     /// let clockwise = GridRotation::from_basis([PZ, PY, NX]);
     /// let rotated = block.clone().rotate(clockwise);
     /// assert_ne!(&block, &rotated);
