@@ -387,11 +387,6 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     // Becomes true if there is any voxel that is both non-fully-transparent and
                     // not obscured by another voxel on top.
                     let mut layer_is_visible_somewhere = false;
-                    // Track the bounding box of the layer that's actually occupied.
-                    // Uses inclusive-exclusive coordinates.
-                    // Invariant: If layer_is_visible_somewhere, then visible_low_corner < visible_high_corner.
-                    let mut visible_low_corner = Point2::new(block_resolution, block_resolution);
-                    let mut visible_high_corner = Point2::new(0, 0);
 
                     // Contains a color with alpha > 0 for every voxel that _should be drawn_.
                     // That is, it excludes all obscured interior volume.
@@ -402,7 +397,6 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
                     for t in 0..block_resolution {
                         for s in 0..block_resolution {
-                            let layer_coord = Point2::new(s, t);
                             let cube: Point3<GridCoordinate> =
                                 transform.transform_point(Point3::new(s, t, layer));
 
@@ -428,12 +422,6 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                     .unwrap_or(false)
                             } {
                                 layer_is_visible_somewhere = true;
-                                for axis in 0..2 {
-                                    visible_low_corner[axis] =
-                                        visible_low_corner[axis].min(layer_coord[axis]);
-                                    visible_high_corner[axis] =
-                                        visible_high_corner[axis].max(layer_coord[axis] + 1);
-                                }
                                 visible_image.push(color);
                             } else {
                                 // All obscured voxels are treated as transparent ones, in that we don't
