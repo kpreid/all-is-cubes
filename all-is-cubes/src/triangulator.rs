@@ -449,74 +449,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     let depth =
                         FreeCoordinate::from(layer) / FreeCoordinate::from(block_resolution);
 
-                    // Traverse `visible_image` using the "greedy meshing" algorithm:
-                    // <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
-                    let index = |s: GridCoordinate, t: GridCoordinate| {
-                        let s = usize::try_from(s).unwrap();
-                        let t = usize::try_from(t).unwrap();
-                        let res = usize::try_from(block_resolution).unwrap();
-                        t * res + s
-                    };
-                    for tl in 0..block_resolution {
-                        for sl in 0..block_resolution {
-                            let single_color = visible_image[index(sl, tl)];
-                            if single_color == Rgba::TRANSPARENT {
-                                continue; // Not the low corner of a quad...
-                            }
-                            let mut rect_has_alpha = !single_color.fully_opaque();
-                            let mut single_color = Some(single_color);
-                            // Find the largest width that works.
-                            let mut sh = sl;
-                            loop {
-                                sh += 1;
-                                if sh >= block_resolution {
-                                    break; // Found the far edge
-                                }
-                                let color = visible_image[index(sh, tl)];
-                                if color == Rgba::TRANSPARENT {
-                                    break; // Should not be generated
-                                }
-                                if Some(color) != single_color {
-                                    single_color = None; // Not a uniform color
-                                }
-                                if !color.fully_opaque() {
-                                    rect_has_alpha = true;
-                                }
-                            }
-                            // Find the largest height that works
-                            let mut th = tl;
-                            'expand_t: loop {
-                                th += 1;
-                                if th >= block_resolution {
-                                    break; // Found the far edge
-                                }
-                                // Check if all the voxels are wanted
-                                for s in sl..sh {
-                                    // TODO: Duplicated code with the S loop ... a sign that we should have an algorithm data structure to write methods on
-                                    let color = visible_image[index(s, th)];
-                                    if color == Rgba::TRANSPARENT {
-                                        break 'expand_t; // Should not be generated
-                                    }
-                                    if Some(color) != single_color {
-                                        single_color = None; // Not a uniform color
-                                    }
-                                    if !color.fully_opaque() {
-                                        rect_has_alpha = true;
-                                    }
-                                }
-                            }
-
-                            // Erase all the voxels that we just built a rectangle on, to remember not
-                            // to do it again. (We don't need to do this last, because the actual data
-                            // is either in the texture or in `single_color`.
-                            for t in tl..th {
-                                for s in sl..sh {
-                                    visible_image[index(s, t)] = Rgba::TRANSPARENT;
-                                }
-                            }
-
+                    // Traverse `visible_image` using the "greedy meshing" algorithm for
+                    // breaking an irregular shape into quads.
+                    GreedyMesher::new(visible_image, block_resolution).run(
+                        |mesher, low_corner, high_corner| {
                             // Generate quad.
-                            let coloring = if let Some(single_color) = single_color {
+                            let coloring = if let Some(single_color) = mesher.single_color {
                                 // The quad we're going to draw has identical texels, so we might as
                                 // well use a solid color and skip needing a texture.
                                 QuadColoring::<A::Tile>::Solid(single_color)
@@ -543,25 +481,22 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 }
                             };
 
-                            let map_coord = |c| {
-                                FreeCoordinate::from(c) / FreeCoordinate::from(block_resolution)
-                            };
                             push_quad(
                                 vertices,
-                                if rect_has_alpha {
+                                if mesher.rect_has_alpha {
                                     indices_transparent
                                 } else {
                                     indices_opaque
                                 },
                                 face,
                                 depth,
-                                Point2::new(map_coord(sl), map_coord(tl)),
-                                Point2::new(map_coord(sh), map_coord(th)),
+                                low_corner,
+                                high_corner,
                                 coloring,
                                 tile_resolution,
                             );
-                        }
-                    }
+                        },
+                    );
                 }
             }
 
@@ -600,6 +535,134 @@ fn copy_voxels_to_texture<A: TextureAllocator>(
         texture.write(&tile_texels);
         texture
     })
+}
+
+/// Data structure for the state and components of the "greedy meshing" algorithm.
+/// <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
+struct GreedyMesher {
+    visible_image: Vec<Rgba>,
+    resolution_g: GridCoordinate,
+    resolution_s: usize,
+    /// Contains a color if all voxels examined so far have that color.
+    single_color: Option<Rgba>,
+    rect_has_alpha: bool,
+}
+impl GreedyMesher {
+    /// Create the initial state.
+    fn new(visible_image: Vec<Rgba>, resolution: GridCoordinate) -> Self {
+        Self {
+            visible_image,
+            resolution_g: resolution,
+            resolution_s: resolution.try_into().unwrap(),
+            single_color: None,
+            rect_has_alpha: false,
+        }
+    }
+
+    /// Actually run the algorithm.
+    fn run(
+        mut self,
+        mut quad_callback: impl FnMut(&Self, Point2<FreeCoordinate>, Point2<FreeCoordinate>),
+    ) {
+        for tl in 0..self.resolution_g {
+            for sl in 0..self.resolution_g {
+                if !self.add_seed(sl, tl) {
+                    continue;
+                }
+                // Find the largest width that works.
+                let mut sh = sl;
+                loop {
+                    sh += 1;
+                    if sh >= self.resolution_g {
+                        break; // Found the far edge
+                    }
+                    if !self.add_candidate(sh, tl) {
+                        break;
+                    }
+                }
+                // Find the largest height that works
+                let mut th = tl;
+                'expand_t: loop {
+                    th += 1;
+                    if th >= self.resolution_g {
+                        break; // Found the far edge
+                    }
+                    // Check if all the voxels are wanted
+                    for s in sl..sh {
+                        if !self.add_candidate(s, th) {
+                            break 'expand_t;
+                        }
+                    }
+                }
+
+                // Erase all the voxels that we just built a rectangle on, to remember not
+                // to do it again. (We don't need to do this last, because the actual data
+                // is either in the texture or in `single_color`.
+                for t in tl..th {
+                    for s in sl..sh {
+                        self.erase(s, t);
+                    }
+                }
+                let map_coord =
+                    |c| FreeCoordinate::from(c) / FreeCoordinate::from(self.resolution_g);
+                quad_callback(
+                    &self,
+                    Point2::new(map_coord(sl), map_coord(tl)),
+                    Point2::new(map_coord(sh), map_coord(th)),
+                );
+            }
+        }
+    }
+
+    #[inline]
+    fn index(&self, s: GridCoordinate, t: GridCoordinate) -> usize {
+        // Can't fail because a usize ≈ u16 platform is too small anyway.
+        let s = usize::try_from(s).unwrap();
+        let t = usize::try_from(t).unwrap();
+        t * self.resolution_s as usize + s
+    }
+
+    /// Checks if a voxel is visible and thus can be the seed of a rectangle,
+    /// returns false if not, and updates `single_color`.
+    #[inline]
+    fn add_seed(&mut self, s: GridCoordinate, t: GridCoordinate) -> bool {
+        if s >= self.resolution_g || t >= self.resolution_g {
+            panic!("seed loop ran out of bounds");
+        }
+        let color = self.visible_image[self.index(s, t)];
+        if color.fully_transparent() {
+            return false;
+        }
+        self.rect_has_alpha = !color.fully_opaque();
+        self.single_color = Some(color);
+        true
+    }
+
+    /// Checks if a voxel is suitable for adding to the current rectangle, and either
+    /// returns false if not, and updates `single_color`.
+    #[inline]
+    fn add_candidate(&mut self, s: GridCoordinate, t: GridCoordinate) -> bool {
+        if s >= self.resolution_g || t >= self.resolution_g {
+            return false;
+        }
+        let color = self.visible_image[self.index(s, t)];
+        if color.fully_transparent() {
+            return false;
+        }
+        if Some(color) != self.single_color {
+            self.single_color = None; // Not a uniform color
+        }
+        if !color.fully_opaque() {
+            self.rect_has_alpha = true;
+        }
+        true
+    }
+
+    #[inline]
+    fn erase(&mut self, s: GridCoordinate, t: GridCoordinate) {
+        let index = self.index(s, t);
+        self.visible_image[index] = Rgba::TRANSPARENT;
+    }
 }
 
 /// Precomputes vertices for blocks present in a space.
