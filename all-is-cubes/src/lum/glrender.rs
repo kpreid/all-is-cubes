@@ -144,10 +144,10 @@ where
             self.world_renderer = Some(SpaceRenderer::new(camera.space.clone()));
         }
         let world_renderer = self.world_renderer.as_mut().unwrap();
-        let world_output = world_renderer.prepare_frame(surface, camera.view());
+        let world_output = world_renderer.prepare_frame(surface, &self.world_proj);
 
         let ui_output = if let Some(ui_renderer) = &mut self.ui_renderer {
-            Some(ui_renderer.prepare_frame(surface, self.ui_proj.view()))
+            Some(ui_renderer.prepare_frame(surface, &self.ui_proj))
         } else {
             None
         };

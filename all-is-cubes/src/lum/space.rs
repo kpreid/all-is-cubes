@@ -21,7 +21,7 @@ use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
-use crate::camera::VIEW_DISTANCE;
+use crate::camera::ProjectionHelper;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
@@ -76,7 +76,7 @@ impl SpaceRenderer {
             block_version_counter: 0,
             block_texture: None,
             chunks: HashMap::new(),
-            chunk_chart: ChunkChart::new(VIEW_DISTANCE),
+            chunk_chart: ChunkChart::new(0.0),
             chunks_were_missing: true,
         }
     }
@@ -92,7 +92,7 @@ impl SpaceRenderer {
     pub fn prepare_frame<'a, C>(
         &'a mut self,
         context: &mut C,
-        view_matrix: Matrix4<FreeCoordinate>,
+        projection: &ProjectionHelper,
     ) -> SpaceRendererOutput<'a>
     where
         C: GraphicsContext<Backend = Backend>,
@@ -167,9 +167,18 @@ impl SpaceRenderer {
 
         // TODO: tested function for this matrix op mess
         // TODO: replace unwrap()s with falling back to drawing nothing or drawing the origin
-        let view_point =
-            Point3::from_vec(view_matrix.invert().unwrap().transpose().row(3).truncate());
+        let view_point = Point3::from_vec(
+            projection
+                .view()
+                .invert()
+                .unwrap()
+                .transpose()
+                .row(3)
+                .truncate(),
+        );
         let view_chunk = point_to_chunk(view_point);
+        self.chunk_chart
+            .resize_if_needed(projection.view_distance());
 
         // Update some chunk geometry.
         let chunk_grid = space.grid().divide(CHUNK_SIZE);
@@ -223,7 +232,7 @@ impl SpaceRenderer {
         SpaceRendererOutput {
             sky_color: space.sky_color(),
             block_texture: &mut block_texture_allocator.texture,
-            view_matrix,
+            view_matrix: projection.view(),
             chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
             chunk_chart: &self.chunk_chart,
             view_chunk,
