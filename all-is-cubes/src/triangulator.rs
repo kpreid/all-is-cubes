@@ -360,15 +360,14 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // If the texture tile resolution is greater, we will just not use the extra
             // space. If it is lesser, we should use multiple texture tiles but don't for now.
             let tile_resolution: GridCoordinate = texture_allocator.resolution();
-            let mut block_resolution = match evaluated_block_resolution(voxels.grid()) {
+            let block_resolution = match evaluated_block_resolution(voxels.grid()) {
                 Some(r) => GridCoordinate::from(r),
                 // TODO: return an invalid block marker.
                 None => return BlockTriangulation::default(),
             };
-            // TODO: Temporarily implementing only the lower-resolution case
-            if block_resolution > tile_resolution {
-                block_resolution = tile_resolution;
-            }
+            // How should we scale texels versus the standard size to get correct display?
+            let voxel_scale_modifier =
+                block_resolution as TextureCoordinate / tile_resolution as TextureCoordinate;
 
             let mut texture_if_needed: Option<A::Tile> = None;
 
@@ -465,11 +464,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                         copy_voxels_to_texture(texture_allocator, voxels);
                                 }
                                 if let Some(ref texture) = texture_if_needed {
-                                    QuadColoring::Texture(
-                                        texture,
-                                        block_resolution as TextureCoordinate
-                                            / tile_resolution as TextureCoordinate,
-                                    )
+                                    QuadColoring::Texture(texture, voxel_scale_modifier)
                                 } else {
                                     // Texture allocation failure.
                                     // TODO: Mark this triangulation as defective in the return value, so
