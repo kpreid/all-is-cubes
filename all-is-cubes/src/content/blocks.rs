@@ -4,7 +4,7 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-use cgmath::ElementWise as _;
+use cgmath::{ElementWise as _, EuclideanSpace as _};
 use noise::Seedable as _;
 
 use crate::block::{Block, BlockCollision, AIR};
@@ -35,7 +35,15 @@ impl BlockModule for DemoBlocks {
 pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
     let resolution = 16;
     let resolution_g = GridCoordinate::from(resolution);
-    let center_point = GridPoint::new(1, 1, 1) * (resolution_g / 2);
+
+    // In order to have consistent radii from the center point, we need to work with
+    // doubled coordinates to allow for center vs. edge of block distinctions, and
+    // note when we mean to refer to a cube center.
+    // TODO: The whole premise of how to procedurally generate blocks like this ought
+    // to be made more convenient, though.
+    let one_diagonal = GridVector::new(1, 1, 1);
+    let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
+
     install_landscape_blocks(universe, resolution)?;
 
     use DemoBlocks::*;
@@ -71,8 +79,8 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
             .display_name("Lamp")
             .light_emission(Rgb::new(20.0, 20.0, 20.0))
             .voxels_fn(universe, resolution, |p| {
-                if int_magnitude_squared(p - center_point) <= (resolution_g / 2).pow(2) + 3
-                /* fudge */
+                if int_magnitude_squared(p * 2 + one_diagonal - center_point_doubled)
+                    <= resolution_g.pow(2)
                 {
                     Rgba::WHITE.into()
                 } else {
@@ -87,10 +95,11 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
             .light_emission(Rgb::new(3.0, 3.0, 3.0))
             .voxels_fn(universe, resolution, |p| {
                 if int_magnitude_squared(
-                    (p - center_point).mul_element_wise(GridVector::new(1, 0, 1)),
-                ) < 2i32.pow(2)
+                    (p * 2 + one_diagonal - center_point_doubled)
+                        .mul_element_wise(GridVector::new(1, 0, 1)),
+                ) <= 4i32.pow(2)
                 {
-                    Rgba::BLACK.into()
+                    rgb_const!(0.1, 0.1, 0.1).into()
                 } else {
                     AIR.clone()
                 }
