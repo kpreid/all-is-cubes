@@ -4,8 +4,8 @@
 //! Miscellaneous display and player-character stuff.
 
 use cgmath::{
-    Deg, ElementWise as _, EuclideanSpace as _, InnerSpace as _, Matrix3, Matrix4, Point2, Point3,
-    SquareMatrix, Transform, Vector2, Vector3, Vector4,
+    Deg, ElementWise as _, EuclideanSpace as _, InnerSpace as _, Matrix as _, Matrix3, Matrix4,
+    Point2, Point3, SquareMatrix, Transform, Vector2, Vector3, Vector4,
 };
 use num_traits::identities::Zero;
 use std::collections::HashSet;
@@ -363,6 +363,13 @@ impl ProjectionHelper {
     /// Returns a view matrix suitable for OpenGL use.
     pub fn view(&self) -> M {
         self.view
+    }
+
+    /// Computes the camera position in world coordinates.
+    pub fn compute_view_position(&self) -> Point3<FreeCoordinate> {
+        // TODO: This using an inversion is leftover from refactoring sloppy code.
+        // Do it in compute_matrices instead, or use inverse_projection_view.
+        Point3::from_vec(self.view.invert().unwrap().transpose().row(3).truncate())
     }
 
     /// Converts a screen position in normalized device coordinates (as produced by

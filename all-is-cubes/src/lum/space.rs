@@ -4,7 +4,7 @@
 //! Get from [`Space`] to [`Tess`].
 
 use bitvec::prelude::BitVec;
-use cgmath::{EuclideanSpace as _, Matrix as _, Matrix4, Point3, SquareMatrix as _};
+use cgmath::Matrix4;
 use luminance::tess::View as _;
 use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
@@ -165,17 +165,7 @@ impl SpaceRenderer {
             .flush()
             .expect("texture write failure"); // TODO: recover from this error
 
-        // TODO: tested function for this matrix op mess
-        // TODO: replace unwrap()s with falling back to drawing nothing or drawing the origin
-        let view_point = Point3::from_vec(
-            projection
-                .view()
-                .invert()
-                .unwrap()
-                .transpose()
-                .row(3)
-                .truncate(),
-        );
+        let view_point = projection.compute_view_position();
         let view_chunk = point_to_chunk(view_point);
         self.chunk_chart
             .resize_if_needed(projection.view_distance());
