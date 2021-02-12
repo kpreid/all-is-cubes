@@ -1115,11 +1115,12 @@ mod tests {
     #[test]
     fn space_tri_equals_block_tri() {
         // Construct recursive block.
+        let resolution = 4;
         let mut u = Universe::new();
         let mut blocks = make_some_blocks(2);
         blocks.push(AIR);
         let recursive_block = Block::builder()
-            .voxels_fn(&mut u, 4, |p| {
+            .voxels_fn(&mut u, resolution, |p| {
                 &blocks[(p.x as usize).rem_euclid(blocks.len())]
             })
             .unwrap()
@@ -1128,7 +1129,7 @@ mod tests {
         outer_space.set((0, 0, 0), &recursive_block).unwrap();
 
         let (tex, block_triangulations, space_rendered) =
-            triangulate_blocks_and_space(&outer_space, 1);
+            triangulate_blocks_and_space(&outer_space, resolution);
 
         eprintln!("{:#?}", block_triangulations);
         eprintln!("{:#?}", space_rendered);
@@ -1142,7 +1143,7 @@ mod tests {
                 .flat_map(|face_render| face_render.vertices.clone().into_iter())
                 .collect::<Vec<_>>()
         );
-        assert_eq!(tex.count_allocated(), 0);
+        assert_eq!(tex.count_allocated(), 1); // for striped faces
     }
 
     #[test]
