@@ -542,6 +542,14 @@ mod tests {
     };
 
     #[test]
+    fn projection_helper_bad_viewport_doesnt_panic() {
+        ProjectionHelper::new(Viewport {
+            nominal_size: Vector2::new(0.0, 0.0),
+            framebuffer_size: Vector2::new(0, 0),
+        });
+    }
+
+    #[test]
     fn projection_helper_view_position() {
         let mut ph = ProjectionHelper::new(DUMMY_VIEWPORT);
         let pos = Point3::new(1.0, 2.0, 3.0);
