@@ -325,7 +325,7 @@ impl<V> FaceMap<V> {
     /// own the data until we implement a custom iterator.
     #[rustfmt::skip]
     pub const fn values(&self) -> [&V; 7] {
-        [&self.nx, &self.ny, &self.nz, &self.px, &self.py, &self.pz, &self.within]
+        [&self.within, &self.nx, &self.ny, &self.nz, &self.px, &self.py, &self.pz]
     }
 
     /// Transform values.
@@ -425,7 +425,17 @@ mod tests {
 
     // TODO: More tests of face.matrix()
 
-    // TODO: Tests of FaceMap
+    #[test]
+    fn face_map_values_in_enum_order() {
+        // TODO: Maybe generalize this to _all_ the Face/FaceMap methods that have an ordering?
+        let map = FaceMap::generate(|f| f);
+        assert_eq!(
+            Face::ALL_SEVEN.to_vec(),
+            map.values().iter().copied().copied().collect::<Vec<_>>(),
+        )
+    }
+
+    // TODO: More Tests of FaceMap
 
     #[test]
     fn cubeface_format() {
