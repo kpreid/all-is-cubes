@@ -4,7 +4,7 @@
 //! Block texture atlas management: provides [`LumAtlasAllocator`], the
 //! [`TextureAllocator`] implementation for use with [`luminance_front`].
 
-use cgmath::{InnerSpace, Vector3};
+use cgmath::Vector3;
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::BoundTexture;
 use luminance_front::pixel::NormRGBA8UI;
@@ -14,7 +14,6 @@ use luminance_front::texture::{
 };
 use luminance_front::Backend;
 use std::cell::RefCell;
-use std::convert::TryFrom;
 use std::rc::{Rc, Weak};
 
 use crate::content::palette;
@@ -59,6 +58,9 @@ struct TileBacking {
     /// Scale factor for tile coordinates (0..1) to texture coordinates (some fraction of that).
     scale: f32,
     data: Option<Box<[Texel]>>,
+    /// Whether the data has changed so that we need to send it to the GPU on next
+    /// [`LumAtlasAllocator::flush`].
+    dirty: bool,
     /// Reference to the allocator so we can coordinate.
     /// Weak because if the allocator is dropped, nobody cares.
     allocator: Weak<RefCell<AllocatorBacking>>,
@@ -81,20 +83,29 @@ impl LumAtlasAllocator {
             row_length: 16,
         };
 
+        let mut texture = Texture::new(
+            context,
+            layout.dimensions(),
+            0, // mipmaps
+            Sampler {
+                wrap_s: Wrap::ClampToEdge,
+                wrap_t: Wrap::ClampToEdge,
+                wrap_r: Wrap::ClampToEdge,
+                mag_filter: MagFilter::Nearest,
+                min_filter: MinFilter::Nearest,
+                ..Sampler::default()
+            },
+        )?;
+        // TODO: distinguish between "logic error" errors and "out of texture memory" errors...though it doesn't matter much until we have atlas resizing reallocations.
+
+        // Mark unused area for easier debugging (error color instead of transparency)
+        texture.clear(
+            GenMipmaps::No,
+            palette::UNPAINTED_TEXTURE_FALLBACK.to_linear_32bit(),
+        )?;
+
         Ok(Self {
-            texture: Texture::new(
-                context,
-                layout.dimensions(),
-                0, // mipmaps
-                Sampler {
-                    wrap_s: Wrap::ClampToEdge,
-                    wrap_t: Wrap::ClampToEdge,
-                    wrap_r: Wrap::ClampToEdge,
-                    mag_filter: MagFilter::Nearest,
-                    min_filter: MinFilter::Nearest,
-                    ..Sampler::default()
-                },
-            )?,
+            texture,
             layout,
             backing: Rc::new(RefCell::new(AllocatorBacking {
                 dirty: false,
@@ -104,7 +115,10 @@ impl LumAtlasAllocator {
         })
     }
 
-    // TODO: Should this be part of the TextureAllocator trait?
+    /// Copy the texels of all modified and still-referenced tiles to the GPU's texture.
+    ///
+    /// If any errors prevent complete flushing, it will be attempted again on the next
+    /// call.
     pub fn flush(&mut self) -> Result<AtlasFlushInfo, TextureError> {
         let dirty = &mut self.backing.borrow_mut().dirty;
         if !*dirty {
@@ -116,27 +130,45 @@ impl LumAtlasAllocator {
         }
 
         let layout = self.layout;
-        // Allocate contiguous storage for uploading.
-        // TODO: Should we keep this allocated? Probably
-        let mut texels =
-            vec![palette::UNPAINTED_TEXTURE_FALLBACK.to_linear_32bit(); layout.texel_count()];
+        let rg = u32::from(layout.resolution);
         let mut count_written = 0;
 
-        // TODO: Add dirty rectangle tracking so we can do a partial upload...but not until
-        // a benchmark shows it's useful.
+        // retain() doesn't let us exit early on error, so we track any upload errors
+        // separately.
+        let mut error: Option<TextureError> = None;
+
+        let texture = &mut self.texture;
         self.in_use.retain(|weak_backing| {
             // Process the non-dropped weak references
             weak_backing.upgrade().map_or(false, |strong_backing| {
-                let backing: &TileBacking = &strong_backing.borrow();
-                if let Some(data) = backing.data.as_ref() {
-                    layout.copy_to_atlas(backing.index, &mut texels, data);
-                    count_written += 1;
+                let backing: &mut TileBacking = &mut strong_backing.borrow_mut();
+                if backing.dirty && error.is_none() {
+                    if let Some(data) = backing.data.as_ref() {
+                        match texture.upload_part(
+                            GenMipmaps::No,
+                            layout
+                                .index_to_location(backing.index)
+                                .map(|s| u32::from(s) * rg)
+                                .into(),
+                            [rg, rg, rg],
+                            data,
+                        ) {
+                            Ok(()) => {
+                                // Only clear dirty flag if upload was successful.
+                                backing.dirty = false;
+                            }
+                            Err(e) => error = Some(e),
+                        }
+                        count_written += 1;
+                    }
                 }
                 true // retain in self.in_use
             })
         });
 
-        self.texture.upload(GenMipmaps::No, &texels)?;
+        if let Some(error) = error {
+            return Err(error);
+        }
 
         *dirty = false;
         Ok(AtlasFlushInfo {
@@ -193,6 +225,7 @@ impl TextureAllocator for LumAtlasAllocator {
                 origin: self.layout.index_to_origin(index),
                 scale: self.layout.texcoord_scale(),
                 data: None,
+                dirty: false,
                 allocator: Rc::downgrade(&self.backing),
             })),
         };
@@ -208,6 +241,7 @@ impl TextureTile for LumAtlasTile {
     fn write(&mut self, data: &[Texel]) {
         let mut backing = self.backing.borrow_mut();
         backing.data = Some(data.into());
+        backing.dirty = true;
         if let Some(allocator_backing_ref) = backing.allocator.upgrade() {
             allocator_backing_ref.borrow_mut().dirty = true;
         }
@@ -265,11 +299,6 @@ impl AtlasLayout {
         u32::from(self.row_length) * u32::from(self.resolution)
     }
 
-    #[inline]
-    fn texel_count(&self) -> usize {
-        Dim3::count(self.dimensions())
-    }
-
     /// Compute location in the atlas of a tile. Units are tiles, not texels.
     ///
     /// Panics if `index >= self.tile_count()`.
@@ -307,32 +336,6 @@ impl AtlasLayout {
     fn texcoord_scale(&self) -> TextureCoordinate {
         TextureCoordinate::from(self.resolution) / (self.texel_edge_length() as TextureCoordinate)
     }
-
-    /// Copy texels for one tile into an array arranged according to this layout
-    /// (which requires non-contiguous copies).
-    #[inline]
-    fn copy_to_atlas<T: Copy>(&self, index: AtlasIndex, target: &mut [T], source: &[T]) {
-        let tile_size = usize::from(self.resolution);
-        let texel_edge_length = usize::try_from(self.texel_edge_length()).unwrap();
-
-        // Convert tile position to units of texels.
-        let origin: Vector3<usize> = self.index_to_location(index).map(usize::from) * tile_size;
-
-        // Copy in the most straightforward possible fashion. Cleverness can be later.
-        // ...okay, maybe a little clever.
-        // TODO: ...shouldn't we just be using `Grid` and/or `GridArray` here?
-        let source_step: Vector3<usize> = Vector3::new(1, tile_size, tile_size.pow(2));
-        let target_step: Vector3<usize> =
-            Vector3::new(1, texel_edge_length, texel_edge_length.pow(2));
-        for z in 0..tile_size {
-            for y in 0..tile_size {
-                for x in 0..tile_size {
-                    let p = Vector3::new(x, y, z);
-                    target[target_step.dot(origin + p)] = source[source_step.dot(p)];
-                }
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -361,29 +364,6 @@ mod tests {
                 u16::try_from(large_index_large / layer_length_large).unwrap(),
             ),
             layout.index_to_location(large_index)
-        );
-    }
-
-    #[test]
-    fn atlas_layout_copy() {
-        let layout = AtlasLayout {
-            resolution: 2,
-            row_length: 3,
-        };
-        let mut output: Vec<char> = vec!['.'; layout.texel_count()];
-        let input: Vec<char> = "abcdefgh".chars().collect();
-        layout.copy_to_atlas(10, &mut output, &input);
-        layout.copy_to_atlas(8, &mut output, &input);
-        assert_eq!(
-            output.into_iter().collect::<String>(),
-            "\
-                ............................ab....cd\
-                ............................ef....gh\
-                ..ab....cd..........................\
-                ..ef....gh..........................\
-                ....................................\
-                ....................................\
-            ",
         );
     }
 }
