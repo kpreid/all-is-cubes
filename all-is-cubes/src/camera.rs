@@ -274,10 +274,11 @@ pub struct ProjectionHelper {
     viewport: Viewport,
     fov_y: Deg<FreeCoordinate>,
     view_distance: FreeCoordinate,
-    view: M,
+    view_matrix: M,
 
     // Derived data
     projection: M,
+    view_position: Point3<FreeCoordinate>,
     inverse_projection_view: M,
 
     /// Position of mouse pointer or other input device in normalized device coordinates
@@ -293,10 +294,13 @@ impl ProjectionHelper {
             viewport,
             fov_y: Deg(90.0),
             view_distance: VIEW_DISTANCE,
-            projection: M::identity(), // overwritten immediately
-            view: M::identity(),
-            inverse_projection_view: M::identity(), // overwritten immediately
+            view_matrix: M::identity(),
             cursor_ndc_position: Vector2::zero(),
+
+            // Overwritten immediately by compute_matrices
+            projection: M::identity(),
+            view_position: Point3::origin(),
+            inverse_projection_view: M::identity(),
         };
         new_self.compute_matrices();
         new_self
@@ -345,12 +349,13 @@ impl ProjectionHelper {
 
     /// Sets the view matrix.
     ///
-    /// This matrix is used by [`project_ndc_into_world`](Self::project_ndc_into_world)
-    /// and [`project_cursor_into_world`](Self::project_cursor_into_world)
+    /// This matrix is used to determine world coordinates for purposes of [`view_position`],
+    /// [`project_ndc_into_world`](Self::project_ndc_into_world),
+    /// and [`project_cursor_into_world`](Self::project_cursor_into_world).
     /// to determine what world coordinates are.
-    pub fn set_view_matrix(&mut self, view: M) {
-        if view != self.view {
-            self.view = view;
+    pub fn set_view_matrix(&mut self, view_matrix: M) {
+        if view_matrix != self.view_matrix {
+            self.view_matrix = view_matrix;
             self.compute_matrices();
         }
     }
@@ -361,15 +366,13 @@ impl ProjectionHelper {
     }
 
     /// Returns a view matrix suitable for OpenGL use.
-    pub fn view(&self) -> M {
-        self.view
+    pub fn view_matrix(&self) -> M {
+        self.view_matrix
     }
 
-    /// Computes the camera position in world coordinates.
-    pub fn compute_view_position(&self) -> Point3<FreeCoordinate> {
-        // TODO: This using an inversion is leftover from refactoring sloppy code.
-        // Do it in compute_matrices instead, or use inverse_projection_view.
-        Point3::from_vec(self.view.invert().unwrap().transpose().row(3).truncate())
+    /// Returns the eye position in world coordinates, as set by [`Self::set_view_matrix()`].
+    pub fn view_position(&self) -> Point3<FreeCoordinate> {
+        self.view_position
     }
 
     /// Converts a screen position in normalized device coordinates (as produced by
@@ -401,7 +404,15 @@ impl ProjectionHelper {
             /* near: */ 1. / 32., // half a voxel at resolution=16
             /* far: */ self.view_distance,
         );
-        self.inverse_projection_view = (self.projection * self.view)
+        self.view_position = Point3::from_vec(
+            self.view_matrix
+                .inverse_transform()
+                .expect("view matrix was not invertible")
+                .transpose()
+                .row(3)
+                .truncate(),
+        );
+        self.inverse_projection_view = (self.projection * self.view_matrix)
             .inverse_transform()
             .expect("projection and view matrix was not invertible");
     }
@@ -531,12 +542,12 @@ mod tests {
     };
 
     #[test]
-    fn view_position() {
+    fn projection_helper_view_position() {
         let mut ph = ProjectionHelper::new(DUMMY_VIEWPORT);
         let pos = Point3::new(1.0, 2.0, 3.0);
         ph.set_view_matrix(
             Matrix4::from_angle_x(Deg(45.0)) * Matrix4::from_translation(-pos.to_vec()),
         );
-        assert_eq!(ph.compute_view_position(), pos);
+        assert_eq!(ph.view_position(), pos);
     }
 }

@@ -165,7 +165,7 @@ impl SpaceRenderer {
             .flush()
             .expect("texture write failure"); // TODO: recover from this error
 
-        let view_point = projection.compute_view_position();
+        let view_point = projection.view_position();
         let view_chunk = point_to_chunk(view_point);
         self.chunk_chart
             .resize_if_needed(projection.view_distance());
@@ -222,7 +222,7 @@ impl SpaceRenderer {
         SpaceRendererOutput {
             sky_color: space.sky_color(),
             block_texture: &mut block_texture_allocator.texture,
-            view_matrix: projection.view(),
+            view_matrix: projection.view_matrix(),
             chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
             chunk_chart: &self.chunk_chart,
             view_chunk,
