@@ -8,22 +8,22 @@ use all_is_cubes::content::make_some_blocks;
 
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::triangulator::{
-    triangulate_blocks, BlockTriangulations, BlockVertex, SpaceTriangulation, TestTextureAllocator,
-    TestTextureTile,
+    triangulate_blocks, triangulate_space, BlockTriangulations, BlockVertex, SpaceTriangulation,
+    TestTextureAllocator, TestTextureTile,
 };
 
 pub fn triangulator_bench(c: &mut Criterion) {
-    c.bench_function("SpaceTriangulation: checkerboard, new buffer", |b| {
+    c.bench_function("triangulate_space: checkerboard, new buffer", |b| {
         b.iter_batched(
             checkerboard_setup,
             |(space, block_triangulations)| {
-                SpaceTriangulation::triangulate(&space, space.grid(), &*block_triangulations)
+                triangulate_space(&space, space.grid(), &*block_triangulations)
             },
             BatchSize::SmallInput,
         );
     });
 
-    c.bench_function("SpaceTriangulation: checkerboard, reused buffer", |b| {
+    c.bench_function("triangulate_space: checkerboard, reused buffer", |b| {
         b.iter_batched(
             || {
                 let (space, block_triangulations) = checkerboard_setup();

@@ -679,6 +679,26 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
         .collect()
 }
 
+/// Computes a triangle-based representation of a [`Space`] for rasterization.
+///
+/// Shorthand for
+/// <code>[SpaceTriangulation::new()].[compute](SpaceTriangulation::compute)(space, bounds, block_triangulations)</code>.
+#[inline]
+pub fn triangulate_space<'p, BV, GV, T, P>(
+    space: &Space,
+    bounds: Grid,
+    block_triangulations: P,
+) -> SpaceTriangulation<GV>
+where
+    BV: ToGfxVertex<GV> + 'p,
+    P: BlockTriangulationProvider<'p, BV, T>,
+    T: 'p,
+{
+    let mut this = SpaceTriangulation::new();
+    this.compute(space, bounds, block_triangulations);
+    this
+}
+
 /// Container for a triangle-based representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
 ///
@@ -703,19 +723,6 @@ impl<GV> SpaceTriangulation<GV> {
             indices: Vec::new(),
             transparent_range: 0..0,
         }
-    }
-
-    /// Shorthand for <code>[Self::new()].[compute](Self::compute)(...)</code>.
-    #[inline]
-    pub fn triangulate<'p, BV, T, P>(space: &Space, bounds: Grid, block_triangulations: P) -> Self
-    where
-        BV: ToGfxVertex<GV> + 'p,
-        P: BlockTriangulationProvider<'p, BV, T>,
-        T: 'p,
-    {
-        let mut this = Self::new();
-        this.compute(space, bounds, block_triangulations);
-        this
     }
 
     /// Computes triangles for the contents of `space` within `bounds` and stores them
@@ -1011,7 +1018,7 @@ mod tests {
         )
     }
 
-    /// Test helper to call `triangulate_blocks` followed directly by `triangulate_space`.
+    /// Test helper to call `triangulate_blocks` followed directly by [`triangulate_space`].
     fn triangulate_blocks_and_space(
         space: &Space,
         texture_resolution: Resolution,
@@ -1022,11 +1029,8 @@ mod tests {
     ) {
         let mut tex = TestTextureAllocator::new(texture_resolution);
         let block_triangulations = triangulate_blocks(space, &mut tex);
-        let space_triangulation = SpaceTriangulation::<BlockVertex>::triangulate::<
-            BlockVertex,
-            TestTextureTile,
-            _,
-        >(space, space.grid(), &*block_triangulations);
+        let space_triangulation: SpaceTriangulation<BlockVertex> =
+            triangulate_space(space, space.grid(), &*block_triangulations);
         (tex, block_triangulations, space_triangulation)
     }
 
@@ -1076,7 +1080,7 @@ mod tests {
 
         // This should not panic; visual glitches are preferable to failure.
         space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
-        SpaceTriangulation::triangulate(&space, space.grid(), &*block_triangulations);
+        triangulate_space(&space, space.grid(), &*block_triangulations);
     }
 
     /// Construct a 1x1 recursive block and test that this is equivalent in geometry
