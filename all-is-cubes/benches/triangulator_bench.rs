@@ -30,7 +30,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
                 let mut buffer = SpaceTriangulation::new();
                 buffer.compute(&space, space.grid(), &*block_triangulations);
                 // Sanity check that we're actually rendering as much as we expect.
-                assert_eq!(buffer.vertices().len(), 6 * 6 * (16 * 16 * 16) / 2);
+                assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
                 (space, block_triangulations, buffer)
             },
             |(space, block_triangulations, mut buffer)| {
