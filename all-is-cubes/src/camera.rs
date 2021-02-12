@@ -520,3 +520,23 @@ impl std::fmt::Display for Cursor {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DUMMY_VIEWPORT: Viewport = Viewport {
+        nominal_size: Vector2::new(2.0, 2.0),
+        framebuffer_size: Vector2::new(2, 2),
+    };
+
+    #[test]
+    fn view_position() {
+        let mut ph = ProjectionHelper::new(DUMMY_VIEWPORT);
+        let pos = Point3::new(1.0, 2.0, 3.0);
+        ph.set_view_matrix(
+            Matrix4::from_angle_x(Deg(45.0)) * Matrix4::from_translation(-pos.to_vec()),
+        );
+        assert_eq!(ph.compute_view_position(), pos);
+    }
+}
