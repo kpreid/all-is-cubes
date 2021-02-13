@@ -346,7 +346,8 @@ impl ProjectionHelper {
 
     /// Sets the view matrix.
     ///
-    /// This matrix is used to determine world coordinates for purposes of [`view_position`],
+    /// This matrix is used to determine world coordinates for purposes of
+    /// [`view_position`](Self::view_position),
     /// [`project_ndc_into_world`](Self::project_ndc_into_world),
     /// and [`project_cursor_into_world`](Self::project_cursor_into_world).
     /// to determine what world coordinates are.
