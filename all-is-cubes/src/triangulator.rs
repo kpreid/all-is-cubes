@@ -772,22 +772,26 @@ impl<V> SpaceTriangulation<V> {
 
                 // Copy vertices, offset to the block position and with lighting
                 let face_triangulation = &precomputed.faces[face];
-                let index_offset: u32 = self
-                    .vertices
-                    .len()
+                let index_offset_usize = self.vertices.len();
+                let index_offset: u32 = index_offset_usize
                     .try_into()
                     .expect("vertex index overflow");
-                for mut vertex in face_triangulation.vertices.iter().cloned() {
-                    // TODO: copy in bulk before instantiating (if that's faster)
+                self.vertices.extend(face_triangulation.vertices.iter());
+                for vertex in &mut self.vertices[index_offset_usize..] {
                     vertex.instantiate(low_corner.to_vec(), lighting);
-                    self.vertices.push(vertex);
                 }
-                for index in face_triangulation.indices_opaque.iter() {
-                    self.indices.push(index + index_offset);
-                }
-                for index in face_triangulation.indices_transparent.iter() {
-                    transparent_indices.push(index + index_offset);
-                }
+                self.indices.extend(
+                    face_triangulation
+                        .indices_opaque
+                        .iter()
+                        .map(|i| i + index_offset),
+                );
+                transparent_indices.extend(
+                    face_triangulation
+                        .indices_transparent
+                        .iter()
+                        .map(|i| i + index_offset),
+                );
             }
         }
 
