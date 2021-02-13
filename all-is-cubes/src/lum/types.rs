@@ -27,11 +27,13 @@ pub enum VertexSemantics {
     Normal,
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a solid RGBA color.
-    /// * If `[3]` is -1.0, then the first three components are array texture coordinates.
+    /// * If `[3]` is -1.0, then the first three components are 3D texture coordinates.
     #[sem(name = "a_color_or_texture", repr = "[f32; 4]", wrapper = "VertexColorOrTexture")]
     ColorOrTexture,
+    /// Interpolated texture coordinates are clamped to be ≥ this value, to avoid bleeding.
     #[sem(name = "a_clamp_min", repr = "[f32; 3]", wrapper = "VertexClampLow")]
     ClampLow,
+    /// Interpolated texture coordinates are clamped to be ≤ this value, to avoid bleeding.
     #[sem(name = "a_clamp_max", repr = "[f32; 3]", wrapper = "VertexClampHigh")]
     ClampHigh,
     /// Diffuse lighting intensity; typically the color or texture should be multiplied by this.
