@@ -328,6 +328,23 @@ pub enum GridRotation {
 }
 
 impl GridRotation {
+    /// All 48 possible rotations.
+    /// 
+    /// Warning: TODO: The ordering of these rotations is not yet stable.
+    /// The current ordering is based on the six axis permutations followed by rotations.
+    #[rustfmt::skip]
+    pub const ALL: [Self; 48] = {
+        use GridRotation::*;
+        [
+            RXYZ, RXYz, RXyZ, RXyz, RxYZ, RxYz, RxyZ, Rxyz,
+            RXZY, RXZy, RXzY, RXzy, RxZY, RxZy, RxzY, Rxzy,
+            RYXZ, RYXz, RYxZ, RYxz, RyXZ, RyXz, RyxZ, Ryxz,
+            RYZX, RYZx, RYzX, RYzx, RyZX, RyZx, RyzX, Ryzx,
+            RZXY, RZXy, RZxY, RZxy, RzXY, RzXy, RzxY, Rzxy,
+            RZYX, RZYx, RZyX, RZyx, RzYX, RzYx, RzyX, Rzyx,    
+        ]
+    };
+
     pub const IDENTITY: Self = Self::RXYZ;
 
     /// The rotation that is clockwise in our Y-up right-handed coordinate system.
@@ -648,6 +665,8 @@ impl Mul<Self> for GridRotation {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
     use rand::{Rng, SeedableRng as _};
     use rand_xoshiro::Xoshiro256Plus;
@@ -758,5 +777,17 @@ mod tests {
             GridRotation::IDENTITY,
             GridRotation::COUNTERCLOCKWISE * GridRotation::CLOCKWISE
         );
+    }
+
+    /// Test that `GridRotation::ALL` is complete.
+    /// TODO: Also test numbering/ordering properties when that is stable.
+    #[test]
+    fn rotation_enumeration() {
+        let mut set = HashSet::new();
+        for &rot in &GridRotation::ALL {
+            set.insert(rot);
+        }
+        assert_eq!(set.len(), GridRotation::ALL.len());
+        assert_eq!(48, GridRotation::ALL.len());
     }
 }
