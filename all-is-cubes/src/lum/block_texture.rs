@@ -19,7 +19,7 @@ use std::rc::{Rc, Weak};
 
 use crate::content::palette;
 use crate::intalloc::IntAllocator;
-use crate::lum::types::Vertex;
+use crate::lum::types::LumBlockVertex;
 use crate::math::GridCoordinate;
 use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
@@ -147,14 +147,14 @@ impl LumAtlasAllocator {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn debug_atlas_tess<C>(&self, context: &mut C) -> Tess<Vertex>
+    pub(crate) fn debug_atlas_tess<C>(&self, context: &mut C) -> Tess<LumBlockVertex>
     where
         C: GraphicsContext<Backend = Backend>,
     {
         let mut vertices = Vec::new();
         //for layer in 0..self.layer_count {
         let layer = 0;
-        vertices.extend(&*Vertex::rectangle(
+        vertices.extend(&*LumBlockVertex::rectangle(
             // position
             Vector3::new(0.0, 0.0, 0.0),
             Vector3::new(1.0, 1.0, 0.0),

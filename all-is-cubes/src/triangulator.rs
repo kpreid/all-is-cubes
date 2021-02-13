@@ -102,25 +102,26 @@ impl std::fmt::Debug for Coloring {
     }
 }
 
-/// Implement this trait along with <code>[`From`]&lt;[`BlockVertex`]&gt;</code> to
-/// provide a representation of [`BlockVertex`] suitable for the target graphics system.
-pub trait ToGfxVertex<GV>: From<BlockVertex> + Sized {
+/// A custom representation of [`BlockVertex`] suitable for the target graphics system.
+///
+/// The life cycle of a `GfxVertex`: first, it is constructed by the triangulator for a
+/// block. Then, whenever the block appears in a [`Space`], the block vertices are copied
+/// to become the space verties, and `instantiate` is called on each one to position it
+/// at the particular location.
+pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
     /// Number type for the vertex position coordinates.
     type Coordinate: cgmath::BaseNum;
 
-    /// Transforms a vertex of a general model of an [`EvaluatedBlock`] to its
+    /// Transforms a vertex belonging to a general model of an [`EvaluatedBlock`] to its
     /// instantiation in a specific location in space and lighting conditions.
-    fn instantiate(&self, offset: Vector3<Self::Coordinate>, lighting: PackedLight) -> GV;
+    fn instantiate(&mut self, offset: Vector3<Self::Coordinate>, lighting: PackedLight);
 }
 
-/// Trivial implementation of [`ToGfxVertex`] for testing purposes. Discards lighting.
-impl ToGfxVertex<BlockVertex> for BlockVertex {
+/// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
+impl GfxVertex for BlockVertex {
     type Coordinate = FreeCoordinate;
-    fn instantiate(&self, offset: Vector3<FreeCoordinate>, _lighting: PackedLight) -> Self {
-        Self {
-            position: self.position + offset,
-            ..*self
-        }
+    fn instantiate(&mut self, offset: Vector3<FreeCoordinate>, _lighting: PackedLight) {
+        self.position += offset;
     }
 }
 
@@ -679,14 +680,14 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
 /// Shorthand for
 /// <code>[SpaceTriangulation::new()].[compute](SpaceTriangulation::compute)(space, bounds, block_triangulations)</code>.
 #[inline]
-pub fn triangulate_space<'p, BV, GV, T, P>(
+pub fn triangulate_space<'p, V, T, P>(
     space: &Space,
     bounds: Grid,
     block_triangulations: P,
-) -> SpaceTriangulation<GV>
+) -> SpaceTriangulation<V>
 where
-    BV: ToGfxVertex<GV> + 'p,
-    P: BlockTriangulationProvider<'p, BV, T>,
+    V: GfxVertex + 'p,
+    P: BlockTriangulationProvider<'p, V, T>,
     T: 'p,
 {
     let mut this = SpaceTriangulation::new();
@@ -700,16 +701,16 @@ where
 /// A `SpaceTriangulation` may be used multiple times as a [`Space`] is modified.
 /// Currently, the only benefit of this is avoiding reallocating memory.
 ///
-/// Type parameter `GV` is the type of triangle vertices.
+/// Type parameter `V` is the type of triangle vertices.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpaceTriangulation<GV> {
-    vertices: Vec<GV>,
+pub struct SpaceTriangulation<V> {
+    vertices: Vec<V>,
     indices: Vec<u32>,
     /// Where in `indices` the transparent vertices are bunched.
     transparent_range: Range<usize>,
 }
 
-impl<GV> SpaceTriangulation<GV> {
+impl<V> SpaceTriangulation<V> {
     /// Construct an empty `SpaceTriangulation` which draws nothing.
     #[inline]
     pub const fn new() -> Self {
@@ -731,19 +732,15 @@ impl<GV> SpaceTriangulation<GV> {
     /// at all. Thus, it always has a consistent interpretation based on
     /// `block_triangulations` (as opposed to, for example, using face opacity data not the
     /// same as the meshes and thus producing a rendering with gaps in it).
-    pub fn compute<'p, BV, T, P>(
-        &mut self,
-        space: &Space,
-        bounds: Grid,
-        mut block_triangulations: P,
-    ) where
-        BV: ToGfxVertex<GV> + 'p,
-        P: BlockTriangulationProvider<'p, BV, T>,
+    pub fn compute<'p, T, P>(&mut self, space: &Space, bounds: Grid, mut block_triangulations: P)
+    where
+        V: GfxVertex + 'p,
+        P: BlockTriangulationProvider<'p, V, T>,
         T: 'p,
     {
         // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
         // If we do this, we'd make it the provider's responsibility
-        let empty_render = BlockTriangulation::<BV, T>::default();
+        let empty_render = BlockTriangulation::<V, T>::default();
 
         // use the buffer but not the existing data
         self.vertices.clear();
@@ -758,7 +755,7 @@ impl<GV> SpaceTriangulation<GV> {
                 .get_block_index(cube)
                 .and_then(|index| block_triangulations.get(index))
                 .unwrap_or(&empty_render);
-            let low_corner = cube.cast::<BV::Coordinate>().unwrap();
+            let low_corner = cube.cast::<V::Coordinate>().unwrap();
             for &face in Face::ALL_SEVEN {
                 let adjacent_cube = cube + face.normal_vector();
                 if space
@@ -780,9 +777,10 @@ impl<GV> SpaceTriangulation<GV> {
                     .len()
                     .try_into()
                     .expect("vertex index overflow");
-                for vertex in face_triangulation.vertices.iter() {
-                    self.vertices
-                        .push(vertex.instantiate(low_corner.to_vec(), lighting));
+                for mut vertex in face_triangulation.vertices.iter().cloned() {
+                    // TODO: copy in bulk before instantiating (if that's faster)
+                    vertex.instantiate(low_corner.to_vec(), lighting);
+                    self.vertices.push(vertex);
                 }
                 for index in face_triangulation.indices_opaque.iter() {
                     self.indices.push(index + index_offset);
@@ -802,7 +800,7 @@ impl<GV> SpaceTriangulation<GV> {
     }
 
     #[inline]
-    pub fn vertices(&self) -> &[GV] {
+    pub fn vertices(&self) -> &[V] {
         &self.vertices
     }
 

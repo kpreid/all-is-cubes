@@ -16,7 +16,7 @@ use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper, Viewport};
 use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
-use crate::lum::types::Vertex;
+use crate::lum::types::LumBlockVertex;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
 use crate::space::Space;
@@ -153,7 +153,7 @@ where
         };
 
         let debug_lines_tess = {
-            let mut v: Vec<Vertex> = Vec::new();
+            let mut v: Vec<LumBlockVertex> = Vec::new();
 
             if DRAW_COLLISION_BOXES {
                 // Camera collision box

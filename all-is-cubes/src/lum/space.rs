@@ -24,7 +24,7 @@ use crate::camera::ProjectionHelper;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
-use crate::lum::types::{GLBlockVertex, Vertex};
+use crate::lum::types::LumBlockVertex;
 use crate::math::{GridPoint, Rgb};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
@@ -39,7 +39,7 @@ use super::block_texture::AtlasFlushInfo;
 pub struct SpaceRenderer {
     space: URef<Space>,
     todo: Rc<RefCell<SpaceRendererTodo>>,
-    block_triangulations: Vec<BlockTriangulation<GLBlockVertex, LumAtlasTile>>,
+    block_triangulations: Vec<BlockTriangulation<LumBlockVertex, LumAtlasTile>>,
     /// Version IDs used to track whether chunks have stale block triangulations.
     /// Indices are block indices and values are version numbers.
     block_versioning: Vec<u32>,
@@ -371,8 +371,8 @@ impl SpaceRendererPass {
 /// Storage for rendering of part of a [`Space`].
 pub struct Chunk {
     bounds: Grid,
-    triangulation: SpaceTriangulation<Vertex>,
-    tess: Option<Tess<Vertex, u32>>,
+    triangulation: SpaceTriangulation<LumBlockVertex>,
+    tess: Option<Tess<LumBlockVertex, u32>>,
     /// Texture tiles that our vertices' texture coordinates refer to.
     tile_dependencies: Vec<LumAtlasTile>,
     block_dependencies: Vec<(BlockIndex, u32)>,
@@ -401,7 +401,7 @@ impl Chunk {
         context: &mut C,
         chunk_todo: &mut ChunkTodo,
         space: &Space,
-        block_triangulations: &[BlockTriangulation<GLBlockVertex, LumAtlasTile>],
+        block_triangulations: &[BlockTriangulation<LumBlockVertex, LumAtlasTile>],
         block_versioning: &[u32],
     ) {
         let mut block_provider = TrackingBlockProvider::new(block_triangulations);
@@ -497,11 +497,11 @@ impl Chunk {
 
 /// Helper for [`Chunk`]'s dependency tracking.
 struct TrackingBlockProvider<'a> {
-    block_triangulations: &'a [BlockTriangulation<GLBlockVertex, LumAtlasTile>],
+    block_triangulations: &'a [BlockTriangulation<LumBlockVertex, LumAtlasTile>],
     seen: BitVec,
 }
 impl<'a> TrackingBlockProvider<'a> {
-    fn new(block_triangulations: &'a [BlockTriangulation<GLBlockVertex, LumAtlasTile>]) -> Self {
+    fn new(block_triangulations: &'a [BlockTriangulation<LumBlockVertex, LumAtlasTile>]) -> Self {
         Self {
             block_triangulations,
             seen: BitVec::with_capacity(256), // TODO: cleverer choice
@@ -516,13 +516,13 @@ impl<'a> TrackingBlockProvider<'a> {
         self.seen.iter_ones()
     }
 }
-impl<'a> BlockTriangulationProvider<'a, GLBlockVertex, LumAtlasTile>
+impl<'a> BlockTriangulationProvider<'a, LumBlockVertex, LumAtlasTile>
     for &mut TrackingBlockProvider<'a>
 {
     fn get(
         &mut self,
         index: BlockIndex,
-    ) -> Option<&'a BlockTriangulation<GLBlockVertex, LumAtlasTile>> {
+    ) -> Option<&'a BlockTriangulation<LumBlockVertex, LumAtlasTile>> {
         let index = usize::from(index);
         if index >= self.seen.len() {
             self.seen.resize(index + 1, false);

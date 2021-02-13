@@ -15,7 +15,7 @@ use luminance_front::Backend;
 
 use crate::camera::Cursor;
 use crate::content::palette;
-use crate::lum::types::{empty_tess, Vertex};
+use crate::lum::types::{empty_tess, LumBlockVertex};
 use crate::math::{Aab, Geometry, Rgba};
 use crate::util::MapExtend;
 
@@ -26,7 +26,7 @@ pub mod space;
 pub mod types;
 
 /// Creates a [`Tess`] to draw a [`Cursor`] as a wireframe cube.
-pub fn make_cursor_tess<C>(context: &mut C, cursor_result: &Option<Cursor>) -> Tess<Vertex>
+pub fn make_cursor_tess<C>(context: &mut C, cursor_result: &Option<Cursor>) -> Tess<LumBlockVertex>
 where
     C: GraphicsContext<Backend = Backend>,
 {
@@ -53,10 +53,10 @@ where
 /// mode) with the given `color`.
 pub fn wireframe_vertices<E, G>(vertices: &mut E, color: Rgba, geometry: G)
 where
-    E: Extend<Vertex>,
+    E: Extend<LumBlockVertex>,
     G: Geometry,
 {
     geometry.wireframe_points(&mut MapExtend::new(vertices, |p| {
-        Vertex::new_colored(p, Vector3::zero(), color)
+        LumBlockVertex::new_colored(p, Vector3::zero(), color)
     }))
 }
