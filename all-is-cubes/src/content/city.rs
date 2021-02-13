@@ -147,12 +147,16 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
 
     // Exhibits
     for exhibit in DEMO_CITY_EXHIBITS.iter() {
-        let enclosure_footprint = exhibit.footprint.expand(FaceMap::generate(|_| 1));
+        let exhibit_space = (exhibit.factory)(exhibit, universe)
+            .expect("exhibit generation failure. TODO: place an error marker and continue instead");
+        let exhibit_footprint = exhibit_space.grid();
+
+        let enclosure_footprint = exhibit_footprint.expand(FaceMap::generate(|_| 1));
 
         let plot_transform = planner
             .find_plot(enclosure_footprint)
             .expect("Out of city space!");
-        let plot = exhibit.footprint.transform(plot_transform).unwrap();
+        let plot = exhibit_footprint.transform(plot_transform).unwrap();
 
         // Mark the exhibit bounds
         // TODO: Design a unique block for this
@@ -168,9 +172,9 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
 
         // Draw exhibit name
         let name_transform = GridMatrix::from_translation([
-            exhibit.footprint.lower_bounds().x - 1,
+            exhibit_footprint.lower_bounds().x - 1,
             0,
-            exhibit.footprint.upper_bounds().z + 2,
+            exhibit_footprint.upper_bounds().z + 2,
         ]) * GridRotation::from_basis([Face::PX, Face::NZ, Face::PY])
             .to_rotation_matrix();
         let name_blocks = draw_to_blocks(
@@ -199,11 +203,9 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
         .expect("name drawing failure");
 
         // Place exhibit content
-        let exhibit_space = (exhibit.factory)(exhibit, universe)
-            .expect("exhibit generation failure. TODO: place an error marker and continue instead");
         space_to_space_copy(
             &exhibit_space,
-            exhibit.footprint,
+            exhibit_footprint,
             &mut space,
             plot_transform,
         )
@@ -242,7 +244,6 @@ fn space_to_space_copy(
 #[allow(clippy::type_complexity)]
 pub(crate) struct Exhibit {
     pub name: &'static str,
-    pub footprint: Grid,
     pub factory: fn(&Exhibit, &mut Universe) -> Result<Space, Box<dyn Error>>,
 }
 

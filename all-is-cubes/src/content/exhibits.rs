@@ -22,9 +22,8 @@ use crate::space::{Grid, Space};
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     Exhibit {
         name: "Transparency WIP",
-        footprint: Grid::new_c([-3, 0, -3], [7, 5, 7]),
-        factory: |this, _universe| {
-            let mut space = Space::empty(this.footprint);
+        factory: |_this, _universe| {
+            let mut space = Space::empty(Grid::new([-3, 0, -3], [7, 5, 7]));
 
             let colors = [
                 Rgb::new(1.0, 0.5, 0.5),
@@ -53,15 +52,15 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     },
     Exhibit {
         name: "Knot",
-        footprint: Grid::new_c([-2, -2, -1], [5, 5, 3]),
         factory: |this, universe| {
+            let footprint = Grid::new([-2, -2, -1], [5, 5, 3]);
             let resolution = 16;
             let toroidal_radius = 24.;
             let knot_split_radius = 9.;
             let strand_radius = 6.;
             let twists = 2.5;
 
-            let mut drawing_space = Space::empty(this.footprint.multiply(resolution));
+            let mut drawing_space = Space::empty(footprint.multiply(resolution));
             let paint = Block::from(Rgba::new(0.9, 0.9, 0.9, 1.0));
             drawing_space.fill(drawing_space.grid(), |p| {
                 // Measure from midpoint of odd dimension space
@@ -99,7 +98,6 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     },
     Exhibit {
         name: "Text",
-        footprint: Grid::new_c([0, 0, 0], [9, 1, 1]),
         factory: |_, universe| {
             let space = draw_to_blocks(
                 universe,
@@ -117,9 +115,9 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     },
     Exhibit {
         name: "Resolutions",
-        footprint: Grid::new_c([0, 0, 0], [5, 2, 3]),
-        factory: |this, universe| {
-            let mut space = Space::empty(this.footprint);
+        factory: |_this, universe| {
+            let footprint = Grid::new([0, 0, 0], [5, 2, 3]);
+            let mut space = Space::empty(footprint);
 
             for (i, &resolution) in [1, 2, 3, 8, 16, 32].iter().enumerate() {
                 let i = i as GridCoordinate;
@@ -168,16 +166,13 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
         },
     },
     {
-        const RADIUS: i16 = 5;
-        const O: i16 = -RADIUS - 1;
-        const S: u16 = (RADIUS as u16 + 1) * 2 + 1;
         Exhibit {
             name: "Visible chunk chart",
-            footprint: Grid::new_c([O, O, O], [S, S, S]),
             factory: |_this, _universe| {
                 use crate::chunking::{ChunkChart, CHUNK_SIZE_FREE};
+
                 // TODO: Show more than one size.
-                let chart = ChunkChart::new(CHUNK_SIZE_FREE * (RADIUS as FreeCoordinate) - 0.1);
+                let chart = ChunkChart::new(CHUNK_SIZE_FREE * 4.99);
                 Ok(chart.visualization())
             },
         }
