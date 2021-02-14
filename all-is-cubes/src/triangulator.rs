@@ -876,6 +876,85 @@ impl<'a, V, T> BlockTriangulationProvider<'a, V, T> for &'a [BlockTriangulation<
     }
 }
 
+/// Identifies a back-to-front order in which to draw triangles (resulting from
+/// [`triangulate_space`]), based on the direction from which they are being viewed.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum DepthOrdering {
+    /// Any ordering is acceptable.
+    Any,
+    /// The viewpoint is within the volume; therefore dynamic rather than precomputed
+    /// sorting must be used.
+    Within,
+    /// The viewpoint is outside the volume in a particular direction.
+    ///
+    /// The [`GridRotation`] is a rotation which will rotate the vector pointing from
+    /// the viewpoint to the triangles such that it lies in the crooked-pyramid-shaped
+    /// 48th of space where <var>x</var> &ge; <var>y</var> &ge; <var>z</var> &ge; 0.
+    ///
+    /// For more information on this classification scheme and the sort that uses it,
+    /// see [volumetric sort (2006)].
+    ///
+    /// [volumetric sort (2006)]: https://iquilezles.org/www/articles/volumesort/volumesort.htm
+    Direction(GridRotation),
+}
+
+impl DepthOrdering {
+    /// Calculates the `DepthOrdering` value for a particular viewing direction, expressed
+    /// as a vector from the camera to the geometry.
+    ///
+    /// If the vector is zero, [`DepthOrdering::Within`] will be returned. Thus, passing
+    /// coordinates in units of chunks will result in returning `Within` exactly when the
+    /// viewpoint is within the chunk (implying the need for finer-grained sorting).
+    pub fn from_view_direction(direction: Vector3<GridCoordinate>) -> DepthOrdering {
+        if direction == Vector3::zero() {
+            return DepthOrdering::Within;
+        }
+
+        // Find the axis permutation that sorts the coordinates descending.
+        // Or, actually, its inverse, because that's easier to think about and write down.
+        let abs = direction.map(GridCoordinate::abs);
+        let permutation = if abs.z > abs.x {
+            if abs.y > abs.x {
+                if abs.z > abs.y {
+                    GridRotation::RZYX
+                } else {
+                    GridRotation::RYZX
+                }
+            } else if abs.z > abs.y {
+                GridRotation::RZXY
+            } else {
+                GridRotation::RYZX
+            }
+        } else if abs.y > abs.x {
+            GridRotation::RYXZ
+        } else {
+            if abs.z > abs.y {
+                GridRotation::RXZY
+            } else {
+                GridRotation::RXYZ
+            }
+        };
+
+        // Find which axes need to be negated to get a nonnegative result.
+        let flips = if direction.x < 0 {
+            GridRotation::RxYZ
+        } else {
+            GridRotation::IDENTITY
+        } * if direction.y < 0 {
+            GridRotation::RXyZ
+        } else {
+            GridRotation::IDENTITY
+        } * if direction.z < 0 {
+            GridRotation::RXYz
+        } else {
+            GridRotation::IDENTITY
+        };
+
+        // Compose the transformations.
+        DepthOrdering::Direction(permutation.inverse() * flips)
+    }
+}
+
 /// RGBA color data accepted by [`TextureAllocator`].
 pub type Texel = (u8, u8, u8, u8);
 
@@ -1439,6 +1518,44 @@ mod tests {
         assert!(!t.is_empty());
         assert_eq!(t.vertices(), &[]);
         assert_eq!(t.indices(), &[0]);
+    }
+
+    #[test]
+    fn depth_ordering_from_view_direction() {
+        let mut problems = Vec::new();
+        // A coordinate range of ±3 will exercise every combination of axis orderings.
+        let range = -3..3;
+        for x in range.clone() {
+            for y in range.clone() {
+                for z in range.clone() {
+                    let direction = Vector3::new(x, y, z);
+                    let ordering = DepthOrdering::from_view_direction(direction);
+                    let rotated_direction = match ordering {
+                        DepthOrdering::Any => {
+                            panic!("from_view_direction should not return Any")
+                        }
+                        DepthOrdering::Within => direction,
+                        DepthOrdering::Direction(rotation) => {
+                            rotation.to_rotation_matrix().transform_vector(direction)
+                        }
+                    };
+                    let good = rotated_direction.x >= rotated_direction.y
+                        && rotated_direction.y >= rotated_direction.z;
+                    println!(
+                        "{:?} → {:?} → {:?}{}",
+                        direction,
+                        ordering,
+                        rotated_direction,
+                        if good { "" } else { " (wrong)" }
+                    );
+                    if !good {
+                        // Defer assertions to end so we can report all cases before panicking.
+                        problems.push(direction);
+                    }
+                }
+            }
+        }
+        assert_eq!(problems, vec![]);
     }
 
     /// Test the [`TestTextureAllocator`].
