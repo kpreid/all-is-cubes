@@ -112,6 +112,11 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
     /// Number type for the vertex position coordinates.
     type Coordinate: cgmath::BaseNum;
 
+    /// Returns the position of this vertex.
+    ///
+    /// Note: This is used to perform depth sorting for transparent vertices.
+    fn position(&self) -> Point3<Self::Coordinate>;
+
     /// Transforms a vertex belonging to a general model of an [`EvaluatedBlock`] to its
     /// instantiation in a specific location in space and lighting conditions.
     fn instantiate(&mut self, offset: Vector3<Self::Coordinate>, lighting: PackedLight);
@@ -120,6 +125,11 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
 /// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
 impl GfxVertex for BlockVertex {
     type Coordinate = FreeCoordinate;
+
+    fn position(&self) -> Point3<FreeCoordinate> {
+        self.position
+    }
+
     fn instantiate(&mut self, offset: Vector3<FreeCoordinate>, _lighting: PackedLight) {
         self.position += offset;
     }

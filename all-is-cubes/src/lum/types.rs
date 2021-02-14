@@ -157,6 +157,11 @@ impl GfxVertex for LumBlockVertex {
     type Coordinate = f32;
 
     #[inline]
+    fn position(&self) -> Point3<Self::Coordinate> {
+        Point3::from(self.position.repr)
+    }
+
+    #[inline]
     fn instantiate(&mut self, offset: Vector3<Self::Coordinate>, lighting: PackedLight) {
         self.position.repr[0] += offset.x;
         self.position.repr[1] += offset.y;
