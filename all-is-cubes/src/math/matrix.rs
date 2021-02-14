@@ -574,6 +574,20 @@ impl GridRotation {
         }
     }
 
+    /// Returns the inverse of this rotation; the one which undoes this.
+    /// 
+    /// ```
+    /// use all_is_cubes::math::GridRotation;
+    ///
+    /// for &rotation in &GridRotation::ALL {
+    ///     assert_eq!(rotation * rotation.inverse(), GridRotation::IDENTITY);
+    /// }
+    /// ```
+    pub fn inverse(self) -> Self {
+        // TODO: Make this more efficient. Can we do it without writing out another 48-element match?
+        self.iterate().last().unwrap()
+    }
+
     /// Generates the sequence of rotations that may be obtained by concatenating/multiplying
     /// this rotation with itself repeatedly.
     ///
