@@ -47,10 +47,12 @@ pub fn glfw_main_loop(
         }
     });
 
-    let surface = GlfwSurface::new_gl33(window_title, WindowOpt::default().set_dim(dim))?;
-    let viewport = map_glfw_viewport(&surface.window);
+    let GlfwSurface {
+        context, events_rx, ..
+    } = GlfwSurface::new_gl33(window_title, WindowOpt::default().set_dim(dim))?;
+    let viewport = map_glfw_viewport(&context.window);
     // TODO: this is duplicated code with the wasm version; use a logging system to remove it
-    let mut renderer = GLRenderer::new(surface, viewport)
+    let mut renderer = GLRenderer::new(context, viewport)
         .handle_warnings(|warning| {
             eprintln!("GLSL warning:\n{}", warning);
         })
@@ -62,22 +64,7 @@ pub fn glfw_main_loop(
     renderer.set_camera(Some(app.camera().clone()));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
-    // Flags to do things after renderer is no longer borrowed.
-    // TODO: this suggests a flaw in our structure or luminance-glfw's
-    let mut resize = false;
-    let mut update_cursor = false;
-
     'app: loop {
-        if resize {
-            resize = false;
-            renderer.set_viewport(map_glfw_viewport(&renderer.surface.window));
-        }
-        if update_cursor {
-            renderer.set_cursor_position(
-                Point2::from(renderer.surface.window.get_cursor_pos()).map(|x| x as usize),
-            );
-        }
-
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
         if app.frame_clock.should_draw() {
@@ -91,7 +78,7 @@ pub fn glfw_main_loop(
         // Poll for events after drawing, so that on the first loop iteration we draw
         // before the window is visible (at least on macOS).
         glfw.poll_events();
-        for (_, event) in renderer.surface.events_rx.try_iter() {
+        for (_, event) in events_rx.try_iter() {
             match event {
                 WindowEvent::Close => break 'app,
 
@@ -115,7 +102,9 @@ pub fn glfw_main_loop(
 
                 // Mouse input
                 WindowEvent::CursorPos(..) => {
-                    update_cursor = true;
+                    renderer.set_cursor_position(
+                        Point2::from(renderer.surface.window.get_cursor_pos()).map(|x| x as usize),
+                    );
                 }
                 WindowEvent::MouseButton(button, Action::Press, _) => {
                     if let Some(cursor) = &renderer.cursor_result {
@@ -137,7 +126,7 @@ pub fn glfw_main_loop(
 
                 // Window state
                 WindowEvent::FramebufferSize(..) | WindowEvent::ContentScale(..) => {
-                    resize = true;
+                    renderer.set_viewport(map_glfw_viewport(&renderer.surface.window));
                 }
                 WindowEvent::Focus(has_focus) => {
                     app.input_processor.key_focus(has_focus);

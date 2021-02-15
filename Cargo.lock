@@ -1088,9 +1088,9 @@ dependencies = [
 
 [[package]]
 name = "luminance-glfw"
-version = "0.14.4"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4927a57b785e6746a1ce2eee125f3420255caf013ed04abc187752ec984d8291"
+checksum = "d6ce411aab45ac1303eaf9df9e760a4d57e3efa95e03678524c7a2e3be8d15ef"
 dependencies = [
  "gl",
  "glfw",
