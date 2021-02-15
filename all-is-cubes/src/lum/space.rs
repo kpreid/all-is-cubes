@@ -4,6 +4,7 @@
 //! Get from [`Space`] to [`Tess`].
 
 use bitvec::prelude::BitVec;
+use cgmath::Point3;
 use luminance::tess::View as _;
 use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
@@ -25,11 +26,11 @@ use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::types::LumBlockVertex;
-use crate::math::{GridPoint, Rgb};
+use crate::math::{FreeCoordinate, GridPoint, Rgb};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
     triangulate_block, triangulate_blocks, BlockTriangulation, BlockTriangulationProvider,
-    SpaceTriangulation,
+    DepthOrdering, SpaceTriangulation,
 };
 use crate::universe::URef;
 
@@ -216,6 +217,10 @@ impl SpaceRenderer {
         }
         self.chunks_were_missing = chunks_are_missing;
 
+        if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
+            chunk.depth_sort_for_view(view_point);
+        }
+
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
         SpaceRendererOutput {
@@ -297,7 +302,7 @@ impl<'a> SpaceRendererBound<'a> {
                 for p in self.chunk_chart.chunks(self.view_chunk) {
                     if let Some(chunk) = self.chunks.get(&p) {
                         chunks_drawn += 1;
-                        squares_drawn += chunk.render(&mut tess_gate, pass)?;
+                        squares_drawn += chunk.render(&mut tess_gate, pass, DepthOrdering::Any)?;
                     }
                     // TODO: If the chunk is missing, draw a blocking shape, possibly?
                 }
@@ -309,7 +314,12 @@ impl<'a> SpaceRendererBound<'a> {
             render_gate.render(&pass.render_state(), |mut tess_gate| {
                 for p in self.chunk_chart.chunks(self.view_chunk).rev() {
                     if let Some(chunk) = self.chunks.get(&p) {
-                        squares_drawn += chunk.render(&mut tess_gate, pass)?;
+                        squares_drawn += chunk.render(
+                            &mut tess_gate,
+                            pass,
+                            // TODO: avoid adding and then subtracting view_chunk
+                            DepthOrdering::from_view_direction(p.0 - self.view_chunk.0),
+                        )?;
                     }
                 }
                 Ok(())
@@ -475,12 +485,28 @@ impl Chunk {
         chunk_todo.update_triangulation = false;
     }
 
-    fn render<E>(&self, tess_gate: &mut TessGate, pass: SpaceRendererPass) -> Result<usize, E> {
+    fn depth_sort_for_view(&mut self, view_position: Point3<FreeCoordinate>) {
+        if let Some(tess) = &mut self.tess {
+            self.triangulation
+                .depth_sort_for_view(view_position.map(|s| s as f32));
+            let range = self.triangulation.transparent_range(DepthOrdering::Within);
+            tess.indices_mut()
+                .expect("failed to map indices for depth sorting")[range.clone()]
+            .copy_from_slice(&self.triangulation.indices()[range]);
+        }
+    }
+
+    fn render<E>(
+        &self,
+        tess_gate: &mut TessGate,
+        pass: SpaceRendererPass,
+        ordering: DepthOrdering,
+    ) -> Result<usize, E> {
         let mut count = 0;
         if let Some(tess) = &self.tess {
             let range = match pass {
                 SpaceRendererPass::Opaque => self.triangulation.opaque_range(),
-                SpaceRendererPass::Transparent => self.triangulation.transparent_range(),
+                SpaceRendererPass::Transparent => self.triangulation.transparent_range(ordering),
             };
             if range.is_empty() {
                 return Ok(0);

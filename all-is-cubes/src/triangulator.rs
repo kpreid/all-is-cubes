@@ -22,7 +22,7 @@ use std::ops::Range;
 
 use crate::block::{evaluated_block_resolution, EvaluatedBlock, Evoxel, Resolution};
 use crate::content::palette;
-use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridRotation, Rgba};
 use crate::space::{BlockIndex, Grid, GridArray, PackedLight, Space};
 use crate::util::ConciseDebug as _;
 
@@ -716,7 +716,9 @@ where
 pub struct SpaceTriangulation<V> {
     vertices: Vec<V>,
     indices: Vec<u32>,
-    /// Where in `indices` the transparent vertices are bunched.
+    /// Where in `indices` the triangles with no partial transparency are arranged.
+    opaque_range: Range<usize>,
+    /// Where in `indices` the transparent vertices are arranged.
     transparent_range: Range<usize>,
 }
 
@@ -727,10 +729,61 @@ impl<V> SpaceTriangulation<V> {
         Self {
             vertices: Vec::new(),
             indices: Vec::new(),
+            opaque_range: 0..0,
             transparent_range: 0..0,
         }
     }
 
+    #[inline]
+    pub fn vertices(&self) -> &[V] {
+        &self.vertices
+    }
+
+    #[inline]
+    pub fn indices(&self) -> &[u32] {
+        &self.indices
+    }
+
+    /// True if there is nothing to draw.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.indices.is_empty()
+    }
+
+    /// The range of [`Self::indices`] which contains the triangles with only alpha values
+    /// of 0 or 1 and therefore may be drawn using a depth buffer rather than sorting.
+    #[inline]
+    pub fn opaque_range(&self) -> Range<usize> {
+        self.opaque_range.clone()
+    }
+
+    /// A range of [`Self::indices`] which contains the triangles with alpha values other
+    /// than 0 and 1 which therefore must be drawn with consideration for ordering.
+    /// There are multiple such ranges providing different depth-sort orderings.
+    #[inline]
+    pub fn transparent_range(&self, _ordering: DepthOrdering) -> Range<usize> {
+        // TODO: Actually implement sorted ranges.
+        self.transparent_range.clone()
+    }
+
+    fn consistency_check(&self) {
+        assert_eq!(self.opaque_range().start, 0);
+        let len_transparent = self.transparent_range(DepthOrdering::Any).len();
+        for &rot in &GridRotation::ALL {
+            assert_eq!(
+                self.transparent_range(DepthOrdering::Direction(rot)).len(),
+                len_transparent
+            );
+        }
+        assert_eq!(self.opaque_range().end % 3, 0);
+        assert_eq!(self.indices.len() % 3, 0);
+        for index in self.indices.iter().copied() {
+            assert!(index < self.vertices.len() as u32);
+        }
+    }
+}
+
+impl<V: GfxVertex> SpaceTriangulation<V> {
     /// Computes triangles for the contents of `space` within `bounds` and stores them
     /// in `self`.
     ///
@@ -744,8 +797,8 @@ impl<V> SpaceTriangulation<V> {
     /// same as the meshes and thus producing a rendering with gaps in it).
     pub fn compute<'p, T, P>(&mut self, space: &Space, bounds: Grid, mut block_triangulations: P)
     where
-        V: GfxVertex + 'p,
         P: BlockTriangulationProvider<'p, V, T>,
+        V: 'p,
         T: 'p,
     {
         // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
@@ -805,53 +858,31 @@ impl<V> SpaceTriangulation<V> {
             }
         }
 
-        let ts = self.indices.len();
-        self.indices.extend(transparent_indices);
-        self.transparent_range = ts..self.indices.len();
+        self.sort_and_store_transparent_indices(transparent_indices);
 
         // #[cfg(debug_assertions)]
         self.consistency_check();
     }
 
-    #[inline]
-    pub fn vertices(&self) -> &[V] {
-        &self.vertices
+    /// Given the indices of vertices of transparent triangles, copy them in various
+    /// depth-sorted permutations into `self.indices` and record the array-index ranges
+    /// which contain each of the orderings.
+    fn sort_and_store_transparent_indices(&mut self, transparent_indices: Vec<u32>) {
+        self.opaque_range = 0..self.indices.len();
+
+        let start = self.indices.len();
+        self.indices.extend(transparent_indices.iter());
+        self.transparent_range = start..self.indices.len();
+
+        // TODO: Make multiple copies and sort
     }
 
-    #[inline]
-    pub fn indices(&self) -> &[u32] {
-        &self.indices
-    }
-
-    /// True if there is nothing to draw.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.indices.is_empty()
-    }
-
-    /// The range of [`Self::indices`] which contains no alpha values other than 0 or 1
-    /// and therefore may be drawn using a depth buffer rather than sorting.
-    #[inline]
-    pub fn opaque_range(&self) -> Range<usize> {
-        0..(self.transparent_range.start)
-    }
-
-    /// The range of [`Self::indices`] which contains alpha values other than 0 and 1
-    /// and therefore must be drawn with consideration for ordering.
-    #[inline]
-    pub fn transparent_range(&self) -> Range<usize> {
-        self.transparent_range.clone()
-    }
-
-    fn consistency_check(&self) {
-        assert_eq!(self.opaque_range().start, 0);
-        assert_eq!(self.opaque_range().end, self.transparent_range().start);
-        assert_eq!(self.transparent_range().end, self.indices.len());
-        assert_eq!(self.opaque_range().end % 3, 0);
-        assert_eq!(self.indices.len() % 3, 0);
-        for index in self.indices.iter().copied() {
-            assert!(index < self.vertices.len() as u32);
-        }
+    /// Sort the existing indices of `self.transparent_range(DepthOrdering::Within)` for
+    /// the given view position.
+    ///
+    /// This is intended to be cheap enough to do every frame.
+    pub fn depth_sort_for_view(&mut self, _view_position: Point3<V::Coordinate>) {
+        // TODO: Sort.
     }
 }
 
@@ -1470,9 +1501,18 @@ mod tests {
         let (_, _, space_rendered) = triangulate_blocks_and_space(&space, 8);
         // 2 cubes...
         assert_eq!(space_rendered.vertices().len(), 6 * 4 * 2);
-        assert_eq!(space_rendered.indices().len(), 6 * 6 * 2);
-        // ...one of which is transparent
-        assert_eq!(space_rendered.transparent_range.len(), (6 * 6));
+        // ...one of which is opaque...
+        assert_eq!(space_rendered.opaque_range().len(), 6 * 6);
+        // ...and one of which is transparent
+        for &r in &GridRotation::ALL {
+            // TODO: probably DepthOrdering should have an iteration tool directly
+            assert_eq!(
+                space_rendered
+                    .transparent_range(DepthOrdering::Direction(r))
+                    .len(),
+                6 * 6
+            );
+        }
     }
 
     #[test]
