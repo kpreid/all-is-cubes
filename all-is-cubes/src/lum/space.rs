@@ -486,13 +486,15 @@ impl Chunk {
     }
 
     fn depth_sort_for_view(&mut self, view_position: Point3<FreeCoordinate>) {
-        if let Some(tess) = &mut self.tess {
-            self.triangulation
-                .depth_sort_for_view(view_position.map(|s| s as f32));
-            let range = self.triangulation.transparent_range(DepthOrdering::Within);
-            tess.indices_mut()
-                .expect("failed to map indices for depth sorting")[range.clone()]
-            .copy_from_slice(&self.triangulation.indices()[range]);
+        let range = self.triangulation.transparent_range(DepthOrdering::Within);
+        if !range.is_empty() {
+            if let Some(tess) = &mut self.tess {
+                self.triangulation
+                    .depth_sort_for_view(view_position.map(|s| s as f32));
+                tess.indices_mut()
+                    .expect("failed to map indices for depth sorting")[range.clone()]
+                .copy_from_slice(&self.triangulation.indices()[range]);
+            }
         }
     }
 
