@@ -371,7 +371,6 @@ impl Iterator for Raycaster {
 
             if self.is_out_of_bounds(-1) {
                 // We have not yet intersected the grid volume.
-                // TODO: We could avoid iterating over many preliminary cubes (and avoid having a loop here at all) by calculating the intersection instead of brute forcing. This is easy though.
                 continue;
             }
 
