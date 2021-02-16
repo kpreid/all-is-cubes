@@ -179,9 +179,9 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
 name = "bitvec"
-version = "0.20.1"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5011ffc90248764d7005b0e10c7294f5aa1bd87d9dd7248f4ad475b347c294d"
+checksum = "35a2e31dce162f8f238c3c35a6600f1df4cb30f8929a6c464b0a8118d17c2502"
 dependencies = [
  "funty",
  "radium",
