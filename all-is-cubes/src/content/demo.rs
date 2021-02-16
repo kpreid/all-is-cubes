@@ -8,6 +8,7 @@ use cgmath::Vector3;
 use crate::block::{Block, BlockDef};
 use crate::camera::Camera;
 use crate::content::{demo_city, install_demo_blocks};
+use crate::linking::{GenError, InGenError};
 use crate::math::{GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
@@ -37,7 +38,7 @@ pub enum UniverseTemplate {
 }
 
 impl UniverseTemplate {
-    pub fn build(self) -> Universe {
+    pub fn build(self) -> Result<Universe, GenError> {
         use UniverseTemplate::*;
         match self {
             DemoCity => new_universe_with_space_setup(demo_city),
@@ -48,7 +49,7 @@ impl UniverseTemplate {
 }
 
 #[rustfmt::skip]
-fn cornell_box(_universe: &mut Universe) -> Space {
+fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
     // Coordinates are set up based on this dimension because, being blocks, we're not
     // going to *exactly* replicate the original data, but we might want to adjust the
     // scale to something else entirely.
@@ -72,39 +73,41 @@ fn cornell_box(_universe: &mut Universe) -> Space {
         .build();
 
     // Floor.
-    space.fill_uniform(Grid::new((0, -1, 0), (box_size, 1, box_size)), &white).unwrap();
+    space.fill_uniform(Grid::new((0, -1, 0), (box_size, 1, box_size)), &white)?;
     // Ceiling.
-    space.fill_uniform(Grid::new((0, box_size, 0), (box_size, 1, box_size)), &white).unwrap();
+    space.fill_uniform(Grid::new((0, box_size, 0), (box_size, 1, box_size)), &white)?;
     // Light in ceiling.
-    space.fill_uniform(Grid::from_lower_upper((21, box_size, 23), (34, box_size + 1, 33)), &light).unwrap();
+    space.fill_uniform(Grid::from_lower_upper((21, box_size, 23), (34, box_size + 1, 33)), &light)?;
     // Back wall.
-    space.fill_uniform(Grid::new((0, 0, -1), (box_size, box_size, 1)), &white).unwrap();
+    space.fill_uniform(Grid::new((0, 0, -1), (box_size, box_size, 1)), &white)?;
     // Right wall (green).
-    space.fill_uniform(Grid::new((box_size, 0, 0), (1, box_size, box_size)), &green).unwrap();
+    space.fill_uniform(Grid::new((box_size, 0, 0), (1, box_size, box_size)), &green)?;
     // Left wall (red).
-    space.fill_uniform(Grid::new((-1, 0, 0), (1, box_size, box_size)), &red).unwrap();
+    space.fill_uniform(Grid::new((-1, 0, 0), (1, box_size, box_size)), &red)?;
 
     // Block #1
-    space.fill_uniform(Grid::new((29, 0, 36), (16, 16, 15)), &white).unwrap();
+    space.fill_uniform(Grid::new((29, 0, 36), (16, 16, 15)), &white)?;
     // Block #2
-    space.fill_uniform(Grid::new((10, 0, 13), (18, 33, 15)), &white).unwrap();
+    space.fill_uniform(Grid::new((10, 0, 13), (18, 33, 15)), &white)?;
 
     // TODO: Explicitly define camera.
 
-    space
+    Ok(space)
 }
 
-fn new_universe_with_space_setup<F>(space_fn: F) -> Universe
+fn new_universe_with_space_setup<F>(space_fn: F) -> Result<Universe, GenError>
 where
-    F: FnOnce(&mut Universe) -> Space,
+    F: FnOnce(&mut Universe) -> Result<Space, InGenError>,
 {
     let mut universe = Universe::new();
-    install_demo_blocks(&mut universe).unwrap();
+    install_demo_blocks(&mut universe)?;
 
-    let space: Space = space_fn(&mut universe);
+    let space_name1: Name = "space".into();
+    let space_name2 = space_name1.clone();
+    let space: Space = space_fn(&mut universe).map_err(|e| GenError::failure(e, space_name1))?;
     // TODO: this position should be configurable; it makes some sense to have a "spawn point" per Space
     let position = space.grid().center() + Vector3::new(0.5, 2.91, 8.5);
-    let space_ref = universe.insert("space".into(), space).unwrap();
+    let space_ref = universe.insert(space_name2, space)?;
 
     //let camera = Camera::looking_at_space(space_ref, Vector3::new(0.5, 0.5, 1.0));
     let mut camera = Camera::new(space_ref, position);
@@ -123,9 +126,9 @@ where
             }
         }
     }
-    universe.insert("camera".into(), camera).unwrap();
+    universe.insert("camera".into(), camera)?;
 
-    universe
+    Ok(universe)
 }
 
 /// Generate a space which is both completely enclosed and has a convenient flat surface
@@ -136,7 +139,7 @@ where
 /// a good idea.
 /// TODO: Add some lights.
 /// TODO: Define exactly what the radii mean so users can build things on surfaces.
-fn physics_lab(shell_radius: u16, planet_radius: u16) -> Space {
+fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenError> {
     assert!(shell_radius > planet_radius);
     let space_radius = shell_radius + 1; // TODO check off-by-one consistency
     let mut space = Space::empty(Grid::new(
@@ -163,39 +166,37 @@ fn physics_lab(shell_radius: u16, planet_radius: u16) -> Space {
     // TODO: Build some utilities for symmetric systematic constructions so we don't have to handcode this.
     let mut place_outer_wall = |p| {
         // TODO: add some random stars
-        space.set(p, &outer_wall_block).unwrap();
+        space.set(p, &outer_wall_block)
     };
     for x in -shell_radius..=shell_radius {
         for y in -shell_radius..=shell_radius {
             if x.abs() == shell_radius || y.abs() == shell_radius {
                 for z in -shell_radius..=shell_radius {
-                    place_outer_wall((x, y, z));
+                    place_outer_wall((x, y, z))?;
                 }
             } else {
-                place_outer_wall((x, y, shell_radius));
-                place_outer_wall((x, y, -shell_radius));
+                place_outer_wall((x, y, shell_radius))?;
+                place_outer_wall((x, y, -shell_radius))?;
             }
         }
     }
 
     // Inner surface.
-    space
-        .fill(
-            Grid::from_lower_upper(
-                GridPoint::new(-1, -1, -1) * planet_radius,
-                GridPoint::new(1, 1, 1) * planet_radius,
-            ),
-            |GridPoint { x, y, z }| {
-                Some(if (x + y + z).rem_euclid(2) == 0 {
-                    &floor_1
-                } else {
-                    &floor_2
-                })
-            },
-        )
-        .unwrap();
+    space.fill(
+        Grid::from_lower_upper(
+            GridPoint::new(-1, -1, -1) * planet_radius,
+            GridPoint::new(1, 1, 1) * planet_radius,
+        ),
+        |GridPoint { x, y, z }| {
+            Some(if (x + y + z).rem_euclid(2) == 0 {
+                &floor_1
+            } else {
+                &floor_2
+            })
+        },
+    )?;
 
-    space
+    Ok(space)
 }
 
 #[cfg(test)]
@@ -207,7 +208,7 @@ mod tests {
     #[test]
     pub fn template_smoke_test() {
         for template in UniverseTemplate::iter() {
-            let mut u = template.build();
+            let mut u = template.build().unwrap();
             let _ = u.get_default_camera().borrow();
             let _ = u.get_default_space().borrow();
             u.step(Duration::from_millis(10));

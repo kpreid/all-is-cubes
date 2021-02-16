@@ -254,9 +254,13 @@ mod tests {
         }
     }
 
+    fn dummy_icons() -> BlockProvider<Icons> {
+        BlockProvider::new(|_| Ok(make_some_blocks(1).swap_remove(0))).unwrap()
+    }
+
     #[test]
     fn icon_none() {
-        let dummy_icons = BlockProvider::new(|_| make_some_blocks(1).swap_remove(0));
+        let dummy_icons = dummy_icons();
         assert_eq!(Tool::None.icon(&dummy_icons), dummy_icons[Icons::EmptySlot]);
     }
 
@@ -276,7 +280,7 @@ mod tests {
 
     #[test]
     fn icon_delete_block() {
-        let dummy_icons = BlockProvider::new(|_| make_some_blocks(1).swap_remove(0));
+        let dummy_icons = dummy_icons();
         assert_eq!(
             Tool::DeleteBlock.icon(&dummy_icons),
             dummy_icons[Icons::Delete]
@@ -296,7 +300,7 @@ mod tests {
 
     #[test]
     fn icon_place_block() {
-        let dummy_icons = BlockProvider::new(|_| make_some_blocks(1).swap_remove(0));
+        let dummy_icons = dummy_icons();
         let [block]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
         assert_eq!(*Tool::PlaceBlock(block.clone()).icon(&dummy_icons), block);
     }

@@ -9,12 +9,12 @@ use noise::Seedable as _;
 
 use crate::block::{Block, BlockCollision, AIR};
 use crate::content::landscape::install_landscape_blocks;
-use crate::linking::{BlockModule, BlockProvider};
+use crate::linking::{BlockModule, BlockProvider, GenError};
 use crate::math::{
     int_magnitude_squared, GridCoordinate, GridPoint, GridRotation, GridVector, NoiseFnExt as _,
     NotNan, Rgb, Rgba,
 };
-use crate::universe::{InsertError, Universe};
+use crate::universe::Universe;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "kebab-case")]
@@ -32,7 +32,7 @@ impl BlockModule for DemoBlocks {
 }
 
 /// Add to `universe` demo-content blocks, that might be used by demo worldgen or offered to the player.
-pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
+pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
     let resolution = 16;
     let resolution_g = GridCoordinate::from(resolution);
 
@@ -66,74 +66,71 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), InsertError> {
         }
     };
 
-    BlockProvider::<DemoBlocks>::new(|key| match key {
-        Road => Block::builder()
-            .display_name("Road")
-            .voxels_fn(universe, resolution, |cube| {
-                scale_color(road_color.clone(), road_noise.at_grid(cube), 0.02)
-            })
-            .unwrap()
-            .build(),
+    BlockProvider::<DemoBlocks>::new(|key| {
+        Ok(match key {
+            Road => Block::builder()
+                .display_name("Road")
+                .voxels_fn(universe, resolution, |cube| {
+                    scale_color(road_color.clone(), road_noise.at_grid(cube), 0.02)
+                })?
+                .build(),
 
-        Lamp => Block::builder()
-            .display_name("Lamp")
-            .light_emission(Rgb::new(20.0, 20.0, 20.0))
-            .voxels_fn(universe, resolution, |p| {
-                if int_magnitude_squared(p * 2 + one_diagonal - center_point_doubled)
-                    <= resolution_g.pow(2)
-                {
-                    Rgba::WHITE.into()
-                } else {
-                    AIR.clone()
-                }
-            })
-            .unwrap()
-            .build(),
-
-        Lamppost => Block::builder()
-            .display_name("Lamppost")
-            .light_emission(Rgb::new(3.0, 3.0, 3.0))
-            .voxels_fn(universe, resolution, |p| {
-                if int_magnitude_squared(
-                    (p * 2 + one_diagonal - center_point_doubled)
-                        .mul_element_wise(GridVector::new(1, 0, 1)),
-                ) <= 4i32.pow(2)
-                {
-                    rgb_const!(0.1, 0.1, 0.1).into()
-                } else {
-                    AIR.clone()
-                }
-            })
-            .unwrap()
-            .build(),
-
-        Curb => Block::builder()
-            .display_name("Curb")
-            .collision(BlockCollision::None) // TODO: make solid when we have voxel-level collision
-            .voxels_fn(universe, resolution, curb_fn)
-            .unwrap()
-            .build(),
-
-        CurbCorner => Block::builder()
-            .display_name("Curb Corner")
-            .collision(BlockCollision::None) // TODO: make solid when we have voxel-level collision
-            .voxels_fn(universe, resolution, |cube| {
-                // TODO: rework so this isn't redoing the rotation calculations for every single voxel
-                // We should have tools for composing blocks instead...
-                for rot in GridRotation::CLOCKWISE.iterate() {
-                    let block = curb_fn(
-                        rot.to_positive_octant_matrix(resolution.into())
-                            .transform_cube(cube),
-                    );
-                    if block != AIR {
-                        return block;
+            Lamp => Block::builder()
+                .display_name("Lamp")
+                .light_emission(Rgb::new(20.0, 20.0, 20.0))
+                .voxels_fn(universe, resolution, |p| {
+                    if int_magnitude_squared(p * 2 + one_diagonal - center_point_doubled)
+                        <= resolution_g.pow(2)
+                    {
+                        Rgba::WHITE.into()
+                    } else {
+                        AIR.clone()
                     }
-                }
-                AIR
-            })
-            .unwrap()
-            .build(),
-    })
+                })?
+                .build(),
+
+            Lamppost => Block::builder()
+                .display_name("Lamppost")
+                .light_emission(Rgb::new(3.0, 3.0, 3.0))
+                .voxels_fn(universe, resolution, |p| {
+                    if int_magnitude_squared(
+                        (p * 2 + one_diagonal - center_point_doubled)
+                            .mul_element_wise(GridVector::new(1, 0, 1)),
+                    ) <= 4i32.pow(2)
+                    {
+                        rgb_const!(0.1, 0.1, 0.1).into()
+                    } else {
+                        AIR.clone()
+                    }
+                })?
+                .build(),
+
+            Curb => Block::builder()
+                .display_name("Curb")
+                .collision(BlockCollision::None) // TODO: make solid when we have voxel-level collision
+                .voxels_fn(universe, resolution, curb_fn)?
+                .build(),
+
+            CurbCorner => Block::builder()
+                .display_name("Curb Corner")
+                .collision(BlockCollision::None) // TODO: make solid when we have voxel-level collision
+                .voxels_fn(universe, resolution, |cube| {
+                    // TODO: rework so this isn't redoing the rotation calculations for every single voxel
+                    // We should have tools for composing blocks instead...
+                    for rot in GridRotation::CLOCKWISE.iterate() {
+                        let block = curb_fn(
+                            rot.to_positive_octant_matrix(resolution.into())
+                                .transform_cube(cube),
+                        );
+                        if block != AIR {
+                            return block;
+                        }
+                    }
+                    AIR
+                })?
+                .build(),
+        })
+    })?
     .install(universe)?;
 
     Ok(())

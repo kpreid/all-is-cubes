@@ -4,8 +4,6 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
-use std::error::Error;
-
 use cgmath::{EuclideanSpace as _, One as _, Transform as _};
 use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
@@ -17,7 +15,7 @@ use crate::content::{
     axes, logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
 };
 use crate::drawing::{draw_to_blocks, VoxelBrush};
-use crate::linking::BlockProvider;
+use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
     Rgb,
@@ -26,9 +24,9 @@ use crate::raycast::Raycaster;
 use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
 
-pub(crate) fn demo_city(universe: &mut Universe) -> Space {
-    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe).unwrap();
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe).unwrap();
+pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     use DemoBlocks::*;
 
     // Layout parameters
@@ -60,21 +58,17 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
     space.set_sky_color(Rgb::new(0.9, 0.9, 1.4));
 
     // Fill in flat ground
-    space
-        .fill_uniform(
-            Grid::from_lower_upper(
-                (-radius_xz, -ground_depth, -radius_xz),
-                (radius_xz, 0, radius_xz),
-            ),
-            &*landscape_blocks[LandscapeBlocks::Stone],
-        )
-        .unwrap();
-    space
-        .fill_uniform(
-            Grid::from_lower_upper((-radius_xz, 0, -radius_xz), (radius_xz, 1, radius_xz)),
-            &*landscape_blocks[LandscapeBlocks::Grass],
-        )
-        .unwrap();
+    space.fill_uniform(
+        Grid::from_lower_upper(
+            (-radius_xz, -ground_depth, -radius_xz),
+            (radius_xz, 0, radius_xz),
+        ),
+        &*landscape_blocks[LandscapeBlocks::Stone],
+    )?;
+    space.fill_uniform(
+        Grid::from_lower_upper((-radius_xz, 0, -radius_xz), (radius_xz, 1, radius_xz)),
+        &*landscape_blocks[LandscapeBlocks::Grass],
+    )?;
 
     // Roads and lamps
     for &face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
@@ -86,9 +80,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
         for (i, step) in raycaster.enumerate() {
             let i = i as GridCoordinate;
             for p in -road_radius..=road_radius {
-                space
-                    .set(step.cube_ahead() + perpendicular * p, &*demo_blocks[Road])
-                    .unwrap();
+                space.set(step.cube_ahead() + perpendicular * p, &*demo_blocks[Road])?;
             }
             if i > road_radius {
                 // Curbs
@@ -105,44 +97,38 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
                         curb =
                             curb.rotate(GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]));
                     }
-                    space
-                        .set(step.cube_ahead() + perpendicular * p + curb_y, curb)
-                        .unwrap();
+                    space.set(step.cube_ahead() + perpendicular * p + curb_y, curb)?;
                 }
             }
 
             if (i - lamp_position_radius) % lamp_spacing == 0 {
                 for p in &[-lamp_position_radius, lamp_position_radius] {
-                    lamp_brush
-                        .paint(
-                            &mut space,
-                            step.cube_ahead() + GridVector::new(0, 1, 0) + perpendicular * *p,
-                        )
-                        .unwrap();
+                    lamp_brush.paint(
+                        &mut space,
+                        step.cube_ahead() + GridVector::new(0, 1, 0) + perpendicular * *p,
+                    )?;
                 }
             }
         }
 
         // Patch up curb corners
         for &p in &[-(road_radius + 1), road_radius + 1] {
-            space
-                .set(
-                    GridPoint::origin() + curb_y + forward * (road_radius + 1) + perpendicular * p,
-                    &*demo_blocks[CurbCorner],
-                )
-                .unwrap();
+            space.set(
+                GridPoint::origin() + curb_y + forward * (road_radius + 1) + perpendicular * p,
+                &*demo_blocks[CurbCorner],
+            )?;
         }
     }
 
-    axes(&mut space);
+    axes(&mut space)?;
 
     // Landscape filling one quadrant
     let landscape_region = Grid::from_lower_upper(
         [-radius_xz, -ground_depth * 8 / 10, -radius_xz],
         [-exhibit_front_radius, sky_height, -exhibit_front_radius],
     );
-    space.fill_uniform(landscape_region, AIR).unwrap();
-    wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0);
+    space.fill_uniform(landscape_region, AIR)?;
+    wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
     planner.occupied_plots.push(landscape_region);
 
     // Exhibits
@@ -164,9 +150,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
             plot.lower_bounds().map(|x| x - 1),
             [plot.upper_bounds().x + 1, 1, plot.upper_bounds().z + 1],
         );
-        space
-            .fill_uniform(enclosure, &*landscape_blocks[LandscapeBlocks::Stone])
-            .unwrap();
+        space.fill_uniform(enclosure, &*landscape_blocks[LandscapeBlocks::Stone])?;
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
 
@@ -199,8 +183,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
             name_blocks.grid(),
             &mut space,
             plot_transform * name_transform,
-        )
-        .expect("name drawing failure");
+        )?; // TODO: on failure, place an error marker and continue
 
         // Place exhibit content
         space_to_space_copy(
@@ -208,16 +191,15 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Space {
             exhibit_footprint,
             &mut space,
             plot_transform,
-        )
-        .expect("copy failure. TODO: place an error marker and continue instead");
+        )?; // TODO: on failure, place an error marker and continue
     }
 
     logo_text(
         GridMatrix::from_translation([0, 12, -radius_xz]),
         &mut space,
-    );
+    )?;
 
-    space
+    Ok(space)
 }
 
 // TODO: move this since it is a generally useful utility
@@ -244,7 +226,7 @@ fn space_to_space_copy(
 #[allow(clippy::type_complexity)]
 pub(crate) struct Exhibit {
     pub name: &'static str,
-    pub factory: fn(&Exhibit, &mut Universe) -> Result<Space, Box<dyn Error>>,
+    pub factory: fn(&Exhibit, &mut Universe) -> Result<Space, InGenError>,
 }
 
 /// Tracks available land while the city is being generated.

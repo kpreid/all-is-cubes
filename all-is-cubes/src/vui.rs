@@ -500,7 +500,7 @@ impl Icons {
     fn new(universe: &mut Universe) -> BlockProvider<Icons> {
         let resolution = 16;
         BlockProvider::new(|key| {
-            match key {
+            Ok(match key {
                 Icons::EmptySlot => Block::builder()
                     .attributes(AIR_EVALUATED.attributes)
                     .display_name("")
@@ -539,22 +539,19 @@ impl Icons {
                                 .fill_color(&background_brush)
                                 .build(),
                         )
-                        .draw(display)
-                        .unwrap();
+                        .draw(display)?;
                     Line::new(
                         Point::new(-x_radius, -x_radius),
                         Point::new(x_radius, x_radius),
                     )
                     .into_styled(line_style)
-                    .draw(display)
-                    .unwrap();
+                    .draw(display)?;
                     Line::new(
                         Point::new(x_radius, -x_radius),
                         Point::new(-x_radius, x_radius),
                     )
                     .into_styled(line_style)
-                    .draw(display)
-                    .unwrap();
+                    .draw(display)?;
 
                     Block::builder()
                         .display_name("Delete Block")
@@ -566,8 +563,9 @@ impl Icons {
                     // TODO: design actual icon
                     .color(Rgba::new(0., 1., 0., 1.))
                     .build(),
-            }
+            })
         })
+        .unwrap()
     }
 }
 

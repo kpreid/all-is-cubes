@@ -14,7 +14,7 @@ use crate::block::Block;
 use crate::drawing::VoxelBrush;
 use crate::math::{FreeCoordinate, GridCoordinate, GridMatrix, Rgb, Rgba};
 use crate::raycast::{Face, Raycaster};
-use crate::space::Space;
+use crate::space::{SetCubeError, Space};
 
 mod blocks;
 pub use blocks::*;
@@ -29,7 +29,7 @@ pub use landscape::*;
 pub mod palette;
 
 /// Draw the All Is Cubes logo text.
-pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) {
+pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) -> Result<(), SetCubeError> {
     let foreground_text_block: Block = palette::LOGO_FILL.into();
     let background_text_block: Block = palette::LOGO_STROKE.into();
     let brush = VoxelBrush::new(vec![
@@ -44,9 +44,8 @@ pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) {
     let mut styled_text = Text::new("All is Cubes", Point::new(0, 0))
         .into_styled(TextStyleBuilder::new(Font8x16).text_color(&brush).build());
     styled_text = styled_text.translate(Point::zero() - styled_text.size() / 2);
-    styled_text
-        .draw(&mut space.draw_target(midpoint_transform * GridMatrix::FLIP_Y))
-        .unwrap();
+    styled_text.draw(&mut space.draw_target(midpoint_transform * GridMatrix::FLIP_Y))?;
+    Ok(())
 }
 
 /// Generate a set of distinct atom blocks for use in tests. They will have distinct
@@ -98,7 +97,7 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
 /// assert_ne!(space[(0, -10, 0)], AIR);
 /// assert_ne!(space[(0, 0, -10)], AIR);
 /// ```
-pub fn axes(space: &mut Space) {
+pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
     for &face in Face::ALL_SIX {
         let axis = face.axis_number();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
@@ -120,18 +119,17 @@ pub fn axes(space: &mut Space) {
                 };
             }
             light[axis] = 3.0;
-            space
-                .set(
-                    step.cube_ahead(),
-                    Block::builder()
-                        .display_name(display_name)
-                        .light_emission(Rgb::try_from(light).unwrap())
-                        .color(Rgba::try_from(color).expect("axes() color generation failed"))
-                        .build(),
-                )
-                .unwrap();
+            space.set(
+                step.cube_ahead(),
+                Block::builder()
+                    .display_name(display_name)
+                    .light_emission(Rgb::try_from(light).unwrap())
+                    .color(Rgba::try_from(color).expect("axes() color generation failed"))
+                    .build(),
+            )?;
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]

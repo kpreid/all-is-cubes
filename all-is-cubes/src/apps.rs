@@ -40,7 +40,10 @@ impl AllIsCubesAppState {
     /// Construct a new `AllIsCubesAppState` with a new [`Universe`] from the given
     /// template.
     pub fn new(template: UniverseTemplate) -> Self {
-        let game_universe = template.build();
+        let game_universe = template
+            .build()
+            // TODO: better error handling
+            .expect("Failure while constructing template");
 
         let mut new_self = Self {
             frame_clock: FrameClock::new(),

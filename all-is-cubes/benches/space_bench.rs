@@ -124,8 +124,8 @@ fn universe_for_lighting_test() -> Universe {
     let diameter = radius * 2 + 1;
     let grid = Grid::new((-radius, -radius, -radius), (diameter, diameter, diameter));
     let mut space = Space::empty(grid);
-    wavy_landscape(grid, &mut space, &blocks, 1.0);
-    axes(&mut space);
+    wavy_landscape(grid, &mut space, &blocks, 1.0).unwrap();
+    axes(&mut space).unwrap();
 
     universe.insert("space".into(), space).unwrap();
     universe

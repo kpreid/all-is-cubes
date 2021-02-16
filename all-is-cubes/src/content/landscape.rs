@@ -7,10 +7,10 @@ use std::borrow::Cow;
 use crate::block::{Block, Resolution};
 use crate::content::blocks::scale_color;
 use crate::content::palette;
-use crate::linking::{BlockModule, BlockProvider, DefaultProvision};
+use crate::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use crate::math::{FreeCoordinate, GridCoordinate, NoiseFnExt as _, Rgb};
-use crate::space::{Grid, Space};
-use crate::universe::{InsertError, Universe};
+use crate::space::{Grid, SetCubeError, Space};
+use crate::universe::Universe;
 
 /// Names for blocks assigned specific roles in generating outdoor landscapes.
 ///
@@ -60,7 +60,7 @@ impl DefaultProvision for LandscapeBlocks {
 pub fn install_landscape_blocks(
     universe: &mut Universe,
     resolution: Resolution,
-) -> Result<(), InsertError> {
+) -> Result<(), GenError> {
     use LandscapeBlocks::*;
     let colors = BlockProvider::<LandscapeBlocks>::default();
 
@@ -77,39 +77,53 @@ pub fn install_landscape_blocks(
         .set_bias(f64::from(resolution) * 0.75)
         .set_scale(2.5);
 
-    BlockProvider::<LandscapeBlocks>::new(|key| match key {
-        Stone => Block::builder()
-            .attributes(colors[Stone].evaluate().unwrap().attributes)
-            .voxels_fn(universe, resolution, |cube| {
-                scale_color((*colors[Stone]).clone(), stone_noise.at_grid(cube), 0.02)
-            })
-            .unwrap()
-            .build(),
+    BlockProvider::<LandscapeBlocks>::new(|key| {
+        Ok(match key {
+            Stone => Block::builder()
+                .attributes(
+                    colors[Stone]
+                        .evaluate()
+                        .map_err(InGenError::other)?
+                        .attributes,
+                )
+                .voxels_fn(universe, resolution, |cube| {
+                    scale_color((*colors[Stone]).clone(), stone_noise.at_grid(cube), 0.02)
+                })?
+                .build(),
 
-        Grass => Block::builder()
-            .attributes(colors[Grass].evaluate().unwrap().attributes)
-            .voxels_fn(universe, resolution, |cube| {
-                if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
-                    scale_color((*colors[Grass]).clone(), dirt_noise.at_grid(cube), 0.02)
-                } else {
+            Grass => Block::builder()
+                .attributes(
+                    colors[Grass]
+                        .evaluate()
+                        .map_err(InGenError::other)?
+                        .attributes,
+                )
+                .voxels_fn(universe, resolution, |cube| {
+                    if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
+                        scale_color((*colors[Grass]).clone(), dirt_noise.at_grid(cube), 0.02)
+                    } else {
+                        scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
+                    }
+                })?
+                .build(),
+
+            Dirt => Block::builder()
+                .attributes(
+                    colors[Dirt]
+                        .evaluate()
+                        .map_err(InGenError::other)?
+                        .attributes,
+                )
+                .voxels_fn(universe, resolution, |cube| {
                     scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
-                }
-            })
-            .unwrap()
-            .build(),
+                })?
+                .build(),
 
-        Dirt => Block::builder()
-            .attributes(colors[Dirt].evaluate().unwrap().attributes)
-            .voxels_fn(universe, resolution, |cube| {
-                scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
-            })
-            .unwrap()
-            .build(),
+            Trunk => (*colors[Trunk]).clone(),
 
-        Trunk => (*colors[Trunk]).clone(),
-
-        Leaves => (*colors[Leaves]).clone(),
-    })
+            Leaves => (*colors[Leaves]).clone(),
+        })
+    })?
     .install(universe)?;
     Ok(())
 }
@@ -127,7 +141,8 @@ pub fn install_landscape_blocks(
 ///     space.grid(),
 ///     &mut space,
 ///     &BlockProvider::<LandscapeBlocks>::default(),
-///     1.0);
+///     1.0,
+/// ).unwrap();
 /// # // TODO: It didn't panic, but how about some assertions?
 /// ```
 pub fn wavy_landscape(
@@ -135,7 +150,7 @@ pub fn wavy_landscape(
     space: &mut Space,
     blocks: &BlockProvider<LandscapeBlocks>,
     max_slope: FreeCoordinate,
-) {
+) -> Result<(), SetCubeError> {
     // TODO: justify this constant (came from cubes v1 code).
     let slope_scaled = max_slope / 0.904087;
     let middle_y = (region.lower_bounds().y + region.upper_bounds().y) / 2;
@@ -161,9 +176,10 @@ pub fn wavy_landscape(
                 } else {
                     &blocks[Stone]
                 };
-                space.set((x, y, z), block).unwrap();
+                space.set((x, y, z), block)?;
                 // TODO: Add various decorations on the ground. And trees.
             }
         }
     }
+    Ok(())
 }

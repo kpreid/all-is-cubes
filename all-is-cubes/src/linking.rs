@@ -13,12 +13,14 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Index;
 use strum::IntoEnumIterator;
 
 use crate::block::{Block, BlockDef};
+use crate::space::SetCubeError;
 use crate::universe::{InsertError, Name, URef, Universe, UniverseIndex};
 
 fn name_in_module<E: BlockModule>(key: &E) -> Name {
@@ -60,29 +62,24 @@ where
 
 impl<E> BlockProvider<E>
 where
-    E: IntoEnumIterator + Eq + Hash + Clone,
-{
-    /// Constructs a `BlockProvider` with block definitions computed by the given function.
-    pub fn new<F, B>(mut definer: F) -> Self
-    where
-        F: FnMut(E) -> B,
-        B: Into<Cow<'static, Block>>,
-    {
-        Self {
-            map: E::iter()
-                .map(|key| {
-                    let block: Cow<'static, Block> = definer(key.clone()).into();
-                    (key, block)
-                })
-                .collect(),
-        }
-    }
-}
-
-impl<E> BlockProvider<E>
-where
     E: BlockModule,
 {
+    /// Constructs a `BlockProvider` with block definitions computed by the given function.
+    pub fn new<F, B>(mut definer: F) -> Result<Self, GenError>
+    where
+        F: FnMut(E) -> Result<B, InGenError>,
+        B: Into<Cow<'static, Block>>,
+    {
+        let mut map = HashMap::new();
+        for key in E::iter() {
+            let block: Cow<'static, Block> = definer(key.clone())
+                .map_err(|e| GenError::failure(e, name_in_module(&key)))?
+                .into();
+            map.insert(key, block);
+        }
+        Ok(Self { map })
+    }
+
     pub fn install(&self, universe: &mut Universe) -> Result<BlockProvider<E>, InsertError> {
         for key in E::iter() {
             // TODO: the &* mess should not be required
@@ -136,4 +133,139 @@ impl<E: Eq + Hash> Index<E> for BlockProvider<E> {
 #[error("missing block definitions: {missing:?}")] // TODO: use Name's Display within the list
 pub struct ProviderError {
     missing: Box<[Name]>,
+}
+
+/// An error resulting from “world generation”: failure to calculate/create/place objects
+/// (due to bad parameters or unforeseen edge cases), failure to successfully store them
+/// in or retrieve them from a [`Universe`], et cetera.
+#[derive(Debug, thiserror::Error)]
+pub struct GenError {
+    // TODO: Replace box with enum for common cases
+    #[source]
+    detail: InGenError,
+    for_object: Option<Name>,
+}
+
+impl GenError {
+    pub fn failure(error: impl Into<InGenError>, object: Name) -> Self {
+        Self {
+            detail: error.into(),
+            for_object: Some(object),
+        }
+    }
+}
+
+impl std::fmt::Display for GenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.detail)?;
+        if let Some(name) = &self.for_object {
+            write!(f, "\nwhile setting up {}", name)?;
+        }
+        Ok(())
+    }
+}
+
+impl From<InsertError> for GenError {
+    // TODO: Maybe InsertError should just be a variant of GenError?
+    fn from(error: InsertError) -> Self {
+        GenError {
+            for_object: match &error {
+                InsertError::AlreadyExists(name) => Some(name.clone()),
+            },
+            detail: error.into(),
+        }
+    }
+}
+
+/// Aggregation of types of errors that might occur in “world generation”.
+///
+/// This is distinct from [`GenError`] in that this type is returned from functions
+/// _responsible for generation,_ and that type is returned from functions that
+/// _manage_ generation — that invoke the first kind and (usually) store its result
+/// in the [`Universe`]. This separation is intended to encourage more precise
+/// attribution of the source of the error despite implicit conversions, because a
+/// “nested” [`GenError`] will be obligated to be wrapped in `InGenError` rather than
+/// mistakenly taken as the same level.
+///
+/// TODO: Work this into a coherent set of error cases rather than purely
+/// "I saw one of these once, so add it".
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum InGenError {
+    /// Generic error container for unusual situations.
+    #[error(transparent)]
+    Other(Box<dyn Error>),
+
+    /// Something else needed to be generated and that failed.
+    #[error(transparent)]
+    Gen(Box<GenError>),
+
+    /// Failed to insert the generated items in the [`Universe`].
+    #[error(transparent)]
+    Insert(#[from] InsertError),
+
+    /// Failed to find a needed dependency.
+    // TODO: Any special handling? Phrase this as "missing dependency"?
+    #[error(transparent)]
+    Provider(#[from] ProviderError),
+
+    /// Failed during [`Space`] manipulation.
+    // TODO: Break apart `SetCubeError::BlockDataAccess` to its contents?
+    #[error(transparent)]
+    SetCube(#[from] SetCubeError),
+}
+
+impl InGenError {
+    /// Convert an arbitrary error to `InGenError`.
+    pub fn other<E: Error + 'static>(error: E) -> Self {
+        Self::Other(Box::new(error))
+    }
+}
+
+impl From<GenError> for InGenError {
+    fn from(error: GenError) -> Self {
+        // We need to box this to avoid an unboxed recursive type.
+        InGenError::Gen(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::space::Grid;
+
+    #[test]
+    fn gen_error_message() {
+        let e = GenError::failure(SetCubeError::OutOfBounds(Grid::for_block(1)), "x".into());
+        assert_eq!(
+            e.to_string(),
+            "Grid(0..1, 0..1, 0..1) is out of bounds\nwhile setting up 'x'"
+        );
+    }
+
+    #[test]
+    #[allow(clippy::try_err)]
+    fn gen_error_composition() {
+        // TODO: this isn't the greatest example situation
+        fn a() -> Result<(), GenError> {
+            b().map_err(|e| GenError::failure(e, "x".into()))?;
+            Ok(())
+        }
+        fn b() -> Result<(), InGenError> {
+            Err(SetCubeError::OutOfBounds(Grid::for_block(1)))?;
+            Ok(())
+        }
+        let r = a();
+        assert!(
+            matches!(
+                r,
+                Err(GenError {
+                    detail: InGenError::SetCube(_),
+                    for_object: Some(Name::Specific(_)),
+                })
+            ),
+            "got error: {:?}",
+            r
+        );
+    }
 }
