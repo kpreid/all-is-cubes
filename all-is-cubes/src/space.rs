@@ -39,6 +39,9 @@ pub struct Space {
     ///
     /// * Coordinates are transformed to indices by `Grid::index`.
     /// * Each element is an index into `self.block_data`.
+    // TODO: Consider making this use different integer types depending on how
+    // many blocks there are, so we can save memory in simple spaces but not have
+    // a cap on complex ones.
     contents: Box<[BlockIndex]>,
 
     /// Parallel array to `contents` for lighting data.
@@ -102,10 +105,8 @@ impl std::fmt::Debug for SpaceBlockData {
     }
 }
 
-/// Number used to compactly store blocks.
-///
-/// TODO: This should be replaced with a dynamically variable size for efficient storage.
-pub(crate) type BlockIndex = u16;
+/// Number used to identify distinct blocks within a [`Space`].
+pub type BlockIndex = u16;
 
 impl Space {
     /// Constructs a [`Space`] that is entirely filled with [`AIR`].
