@@ -13,6 +13,7 @@ use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::DrawTarget;
 use std::borrow::{Borrow, Cow};
 use std::convert::TryInto;
+use std::marker::PhantomData;
 
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
@@ -37,7 +38,7 @@ where
     for<'a> &'a D: Drawable<C>,
     D: Dimensions,
     C: PixelColor,
-    for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = SetCubeError>,
+    for<'a> DrawingPlane<'a, C>: DrawTarget<C, Error = SetCubeError>,
 {
     let top_left_2d = object.top_left();
     let bottom_right_2d = object.bottom_right();
@@ -74,17 +75,31 @@ where
 }
 
 /// Adapter to use a [`Space`] as a [`DrawTarget`].
-pub struct VoxelDisplayAdapter<'a> {
-    pub(crate) space: &'a mut Space,
+///
+/// Use [`Space::draw_target`] to construct this.
+///
+/// `'s` is the lifetime of the [`Space`].
+/// `C` is the color type to use, which to be usable must implement
+/// [`embedded_graphics::PixelColor`], [`Copy`], and <code>[Into]&lt;[Block]&gt;</code>
+/// or be [`&VoxelBrush`].
+pub struct DrawingPlane<'s, C> {
+    space: &'s mut Space,
     /// Defines the coordinate transformation from 2D graphics to the [`Space`].
-    pub(crate) transform: GridMatrix,
+    transform: GridMatrix,
+    _color: PhantomData<fn(C)>,
 }
 
-impl<'a> VoxelDisplayAdapter<'a> {
+impl<'s, C> DrawingPlane<'s, C> {
+    pub(crate) fn new(space: &'s mut Space, transform: GridMatrix) -> Self {
+        Self {
+            space,
+            transform,
+            _color: PhantomData,
+        }
+    }
+
     // TODO: We should probably have ways to stack more transforms
-}
 
-impl VoxelDisplayAdapter<'_> {
     /// Converts 2D point to 3D point. Helper for multiple `impl DrawTarget`s.
     fn convert_point(&self, point: Point) -> GridPoint {
         self.transform
@@ -102,7 +117,7 @@ impl VoxelDisplayAdapter<'_> {
     }
 }
 
-impl DrawTarget<&Block> for VoxelDisplayAdapter<'_> {
+impl DrawTarget<&Block> for DrawingPlane<'_, &Block> {
     type Error = SetCubeError;
 
     fn draw_pixel(&mut self, pixel: Pixel<&Block>) -> Result<(), Self::Error> {
@@ -115,9 +130,9 @@ impl DrawTarget<&Block> for VoxelDisplayAdapter<'_> {
     }
 }
 
-/// A [`VoxelDisplayAdapter`] accepts any color type provided that there is a conversion
+/// A [`DrawingPlane`] accepts any color type provided that there is a conversion
 /// from those colors to [`Block`]s.
-impl<C> DrawTarget<C> for VoxelDisplayAdapter<'_>
+impl<C> DrawTarget<C> for DrawingPlane<'_, C>
 where
     C: Into<Block> + PixelColor,
 {
@@ -125,6 +140,8 @@ where
 
     fn draw_pixel(&mut self, pixel: Pixel<C>) -> Result<(), Self::Error> {
         let Pixel(point, color) = pixel;
+        // TODO: Add a cache so we're not reconstructing the block for every single pixel.
+        // (This is possible because `PixelColor: PartialEq`.)
         ignore_out_of_bounds(self.space.set(self.convert_point(point), &color.into()))
     }
 
@@ -135,7 +152,7 @@ where
 
 /// A [`VoxelBrush`] may be used to draw multiple layers of blocks from a single 2D
 /// graphic, producing shadow or outline effects, or simply changing the depth/layer.
-impl DrawTarget<&'_ VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
+impl<'c> DrawTarget<&'c VoxelBrush<'c>> for DrawingPlane<'c, &'c VoxelBrush<'c>> {
     type Error = SetCubeError;
 
     fn draw_pixel(&mut self, pixel: Pixel<&VoxelBrush>) -> Result<(), Self::Error> {
@@ -153,6 +170,7 @@ impl DrawTarget<&'_ VoxelBrush<'_>> for VoxelDisplayAdapter<'_> {
 // TODO: Also adapt the other types, so that if someone wants to use them they can.
 impl From<Rgb888> for Rgb {
     fn from(color: Rgb888) -> Rgb {
+        // TODO: This is (debatably) wrong; it should default to presuming sRGB and converting out.
         Rgb::new(
             f32::from(color.r()) / 255.0,
             f32::from(color.g()) / 255.0,
@@ -183,7 +201,7 @@ impl PixelColor for Rgba {
 }
 
 /// A shape of multiple blocks to “paint” with. This may be used to make copies of a
-/// simple shape, or to make multi-layered "2.5D" drawings using [`VoxelDisplayAdapter`].
+/// simple shape, or to make multi-layered "2.5D" drawings using [`DrawingPlane`].
 ///
 /// Note that only `&VoxelBrush` implements [`PixelColor`]; this is because `PixelColor`
 /// requires a value implementing [`Copy`].
@@ -273,11 +291,11 @@ mod tests {
     use embedded_graphics::primitives::{Primitive, Rectangle};
     use embedded_graphics::style::{PrimitiveStyle, PrimitiveStyleBuilder};
 
-    /// Test using a particular color type with [`VoxelDisplayAdapter`].
+    /// Test using a particular color type with [`DrawingPlane`].
     fn test_color_drawing<C, E>(color_value: C, expected_block: &Block)
     where
         C: PixelColor,
-        for<'a> VoxelDisplayAdapter<'a>: DrawTarget<C, Error = E>,
+        for<'a> DrawingPlane<'a, C>: DrawTarget<C, Error = E>,
         E: std::fmt::Debug,
     {
         let mut space = Space::empty_positive(100, 100, 100);

@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use crate::block::*;
 use crate::content::palette;
-use crate::drawing::VoxelDisplayAdapter;
+use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
 use crate::math::*;
 use crate::universe::RefError;
@@ -458,11 +458,8 @@ impl Space {
     }
 
     /// Provides an [`embedded_graphics::DrawTarget`] adapter for 2.5D drawing.
-    pub fn draw_target(&mut self, transform: GridMatrix) -> VoxelDisplayAdapter<'_> {
-        VoxelDisplayAdapter {
-            space: self,
-            transform,
-        }
+    pub fn draw_target<C>(&mut self, transform: GridMatrix) -> DrawingPlane<'_, C> {
+        DrawingPlane::new(self, transform)
     }
 
     /// Returns all distinct block types found in the space.
