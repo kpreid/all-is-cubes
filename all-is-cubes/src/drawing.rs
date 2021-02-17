@@ -1,10 +1,22 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Draw 2D graphics into spaces and blocks, including text, using an adapter for the
-//! [`embedded_graphics`] crate.
+//! Draw 2D graphics and text into [`Space`]s, using a general adapter for
+//! [`embedded_graphics`]'s drawing algorithms.
 //!
 //! The [`VoxelBrush`] type can also be useful in direct 3D drawing.
+//!
+//! ## Coordinate system differences
+//!
+//! [`embedded_graphics`] uses coordinates which are different from ours in
+//! two ways that should be kept in mind when trying to align 2D and 3D shapes:
+//!
+//! *   Text drawing presumes that +X is rightward and +Y is downward. Hence,
+//!     text will be upside-down unless the chosen transformation inverts Y (or
+//!     otherwise transforms to suit the orientation the text is being viewed from).
+//! *   Coordinates are considered to refer to pixel centers rather than low corners,
+//!     and rectangles have inclusive upper bounds (whereas our [`Grid`]s have
+//!     exclusive upper bounds).
 
 use cgmath::{EuclideanSpace as _, Transform as _};
 use embedded_graphics::drawable::{Drawable, Pixel};
@@ -24,9 +36,10 @@ use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
 
 /// Generate a set of blocks which together display the given [`Drawable`] which may be
-/// larger than one block.
+/// larger than one block. The Z plane is placed midway through the depth of the block.
 ///
-/// Returns an error if reading the `Drawable`'s blocks fails.
+/// Returns a `Space` containing all the blocks properly arranged, or an error if reading
+/// the `Drawable`'s color-blocks fails.
 pub fn draw_to_blocks<D, C>(
     universe: &mut Universe,
     resolution: Resolution,
@@ -75,12 +88,11 @@ where
 }
 
 /// Adapter to use a [`Space`] as a [`DrawTarget`].
-///
 /// Use [`Space::draw_target`] to construct this.
 ///
 /// `'s` is the lifetime of the [`Space`].
 /// `C` is the color type to use, which to be usable must implement
-/// [`embedded_graphics::PixelColor`], [`Copy`], and <code>[Into]&lt;[Block]&gt;</code>
+/// [`PixelColor`], [`Copy`], and <code>[Into]&lt;[Block]&gt;</code>
 /// or be [`&VoxelBrush`].
 pub struct DrawingPlane<'s, C> {
     space: &'s mut Space,
