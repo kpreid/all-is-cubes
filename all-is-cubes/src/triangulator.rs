@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Algorithms for converting blocks/voxels to triangle-based rendering
+//! Algorithms for converting blocks/voxels to triangle-mesh-based rendering
 //! (as opposed to raytracing, voxel display hardware, or whatever else).
 //!
 //! All of the algorithms here are independent of graphics API but may presume that

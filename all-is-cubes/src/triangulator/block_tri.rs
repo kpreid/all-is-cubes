@@ -48,8 +48,17 @@ impl<V> Default for FaceTriangulation<V> {
     }
 }
 
-/// Describes how to draw a block. Pass it to
-/// [`triangulate_space`](super::triangulate_space) to use it.
+/// A triangle mesh for a single block.
+///
+/// Get it from [`triangulate_block`] or [`triangulate_blocks`].
+/// Pass it to [`triangulate_space`](super::triangulate_space) to assemble blocks into an
+/// entire scene or chunk ([`SpaceTriangulation`](super::SpaceTriangulation)).
+///
+/// The type parameters allow adaptation to the target graphics API:
+/// * `V` is the type of vertices.
+/// * `T` is the type of textures, which come from a [`TextureAllocator`].
+///
+/// TODO: Add methods so this can be read out directly if you really want to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockTriangulation<V, T> {
     /// Vertices grouped by the face they belong to.
@@ -84,12 +93,9 @@ impl<V, T> Default for BlockTriangulation<V, T> {
     }
 }
 
-/// Array of [`BlockTriangulation`] indexed by a [`Space`]'s block indices; a convenience
-/// alias for the return type of [`triangulate_blocks`].
-/// Pass it to [`triangulate_space`](super::triangulate_space) to use it.
-pub type BlockTriangulations<V, A> = Box<[BlockTriangulation<V, A>]>;
-
-/// Generate [`BlockTriangulation`] for a block.
+/// Generate [`BlockTriangulation`] for a block's current appearance.
+///
+/// This may then be may be used as input to [`triangulate_space`](super::triangulate_space).
 pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // TODO: Arrange to pass in a buffer of old data such that we can reuse existing textures.
     // This will allow for efficient implementation of animated blocks.
@@ -300,9 +306,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     }
 }
 
-/// Precomputes vertices for blocks present in a space.
+/// Precomputes [`BlockTriangulation`]s for blocks present in a space.
+/// Pass the result to [`triangulate_space`](super::triangulate_space) to use it.
 ///
-/// The resulting array is indexed by the `Space`'s internal unstable IDs.
+/// The resulting array is indexed by the `Space`'s
+/// [`BlockIndex`](crate::space::BlockIndex) values.
 pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
@@ -313,3 +321,8 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
         .map(|block_data| triangulate_block(block_data.evaluated(), texture_allocator))
         .collect()
 }
+
+/// Array of [`BlockTriangulation`] indexed by a [`Space`]'s block indices; a convenience
+/// alias for the return type of [`triangulate_blocks`].
+/// Pass it to [`triangulate_space`](super::triangulate_space) to use it.
+pub type BlockTriangulations<V, A> = Box<[BlockTriangulation<V, A>]>;

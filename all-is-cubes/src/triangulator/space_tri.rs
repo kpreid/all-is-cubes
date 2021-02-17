@@ -11,7 +11,7 @@ use crate::math::{Face, GridCoordinate, GridRotation};
 use crate::space::{BlockIndex, Grid, Space};
 use crate::triangulator::{BlockTriangulation, GfxVertex};
 
-/// Computes a triangle-based representation of a [`Space`] for rasterization.
+/// Computes a triangle mesh of a [`Space`].
 ///
 /// Shorthand for
 /// <code>[SpaceTriangulation::new()].[compute](SpaceTriangulation::compute)(space, bounds, block_triangulations)</code>.
@@ -31,7 +31,7 @@ where
     this
 }
 
-/// Container for a triangle-based representation of a [`Space`] (or part of it) which may
+/// Container for a triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
 ///
 /// A `SpaceTriangulation` may be used multiple times as a [`Space`] is modified.
@@ -47,6 +47,7 @@ pub struct SpaceTriangulation<V> {
     /// Ranges of `indices` for all partially-transparent triangles, sorted by depth
     /// as documented in [`Self::transparent_range`].
     transparent_ranges: [Range<usize>; DepthOrdering::COUNT],
+    // TODO: Shouldn't this also be retaining the texture tiles? Right now the caller has to.
 }
 
 impl<V> SpaceTriangulation<V> {
@@ -63,11 +64,19 @@ impl<V> SpaceTriangulation<V> {
         }
     }
 
+    /// The vertices of the mesh, in an arbitrary order. Use [`indices()`](`Self::indices`)
+    /// and the range methods to determine how to use them.
     #[inline]
     pub fn vertices(&self) -> &[V] {
         &self.vertices
     }
 
+    /// The indices of the mesh. Each consecutive three numbers denote a triangle
+    /// whose vertices are in the specified positions in [`vertices()`](Self::vertices).
+    /// Note that all triangles containing any partial transparency are repeated
+    /// several times to enable selection of a desired draw ordering; in order to
+    /// draw only one desired set, use [`self.opaque_range()`](Self::opaque_range) and
+    /// [`self.transparent_range(…)`](Self::transparent_range) to choose subslices of this.
     #[inline]
     pub fn indices(&self) -> &[u32] {
         &self.indices
