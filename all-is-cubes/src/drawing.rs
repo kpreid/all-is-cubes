@@ -26,6 +26,7 @@ use embedded_graphics::DrawTarget;
 use std::borrow::{Borrow, Cow};
 use std::convert::TryInto;
 use std::marker::PhantomData;
+use std::ops::RangeInclusive;
 
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
@@ -39,9 +40,7 @@ use crate::universe::Universe;
 /// Use [`Space::draw_target`] to construct this.
 ///
 /// `'s` is the lifetime of the [`Space`].
-/// `C` is the color type to use, which to be usable must implement
-/// [`PixelColor`], [`Copy`], and <code>[Into]&lt;[Block]&gt;</code>
-/// or be [`&VoxelBrush`].
+/// `C` is the “color” type to use, which should implement [`VoxelColor`].
 pub struct DrawingPlane<'s, C> {
     space: &'s mut Space,
     /// Defines the coordinate transformation from 2D graphics to the [`Space`].
@@ -77,24 +76,10 @@ impl<'s, C> DrawingPlane<'s, C> {
     }
 }
 
-impl DrawTarget<&Block> for DrawingPlane<'_, &Block> {
-    type Error = SetCubeError;
-
-    fn draw_pixel(&mut self, pixel: Pixel<&Block>) -> Result<(), Self::Error> {
-        let Pixel(point, color) = pixel;
-        ignore_out_of_bounds(self.space.set(self.convert_point(point), color))
-    }
-
-    fn size(&self) -> Size {
-        self.size_for_eg()
-    }
-}
-
-/// A [`DrawingPlane`] accepts any color type provided that there is a conversion
-/// from those colors to [`Block`]s.
-impl<C> DrawTarget<C> for DrawingPlane<'_, C>
+/// A [`DrawingPlane`] accepts any color type that implements [`VoxelColor`].
+impl<'c, C> DrawTarget<C> for DrawingPlane<'_, C>
 where
-    C: Into<Block> + PixelColor,
+    C: VoxelColor<'c>,
 {
     type Error = SetCubeError;
 
@@ -102,23 +87,10 @@ where
         let Pixel(point, color) = pixel;
         // TODO: Add a cache so we're not reconstructing the block for every single pixel.
         // (This is possible because `PixelColor: PartialEq`.)
-        ignore_out_of_bounds(self.space.set(self.convert_point(point), &color.into()))
-    }
-
-    fn size(&self) -> Size {
-        self.size_for_eg()
-    }
-}
-
-/// A [`VoxelBrush`] may be used to draw multiple layers of blocks from a single 2D
-/// graphic, producing shadow or outline effects, or simply changing the depth/layer.
-impl<'c> DrawTarget<&'c VoxelBrush<'c>> for DrawingPlane<'c, &'c VoxelBrush<'c>> {
-    type Error = SetCubeError;
-
-    fn draw_pixel(&mut self, pixel: Pixel<&VoxelBrush>) -> Result<(), Self::Error> {
-        let Pixel(point, brush) = pixel;
-        // TODO: Need to support rotation
-        brush.paint(self.space, self.convert_point(point))
+        // TODO: Need to rotate the brush to match our transform
+        color
+            .into_blocks()
+            .paint(self.space, self.convert_point(point))
     }
 
     fn size(&self) -> Size {
@@ -139,25 +111,52 @@ impl From<Rgb888> for Rgb {
     }
 }
 
-/// Perform the conversion to [`Block`] used by our [`DrawTarget`], alone so that
-/// it can be matched if desired.
-impl From<Rgb888> for Block {
-    fn from(color: Rgb888) -> Block {
-        Block::from(Rgb::from(color))
+/// Builds on [`PixelColor`] by defining a conversion to [`Block`]s and tracking depth.
+/// Any `VoxelColor` may be used to draw on a [`DrawingPlane`].
+pub trait VoxelColor<'a>: PixelColor {
+    fn into_blocks(self) -> VoxelBrush<'a>;
+
+    /// Returns the range of Z coordinates that the blocks painted by this color value
+    /// occupy.
+    ///
+    /// The default implementation assumes there is no depth beyond the Z=0 plane.
+    fn depth_range(self) -> RangeInclusive<GridCoordinate> {
+        0..=0
     }
 }
 
-/// Allows `&Block` to be used directly as a color with no conversion.
 impl<'a> PixelColor for &'a Block {
     type Raw = ();
+}
+impl<'a> VoxelColor<'a> for &'a Block {
+    fn into_blocks(self) -> VoxelBrush<'a> {
+        VoxelBrush::new(vec![([0, 0, 0], self)])
+    }
 }
 
 impl PixelColor for Rgb {
     type Raw = ();
 }
+impl<'a> VoxelColor<'a> for Rgb {
+    fn into_blocks(self) -> VoxelBrush<'a> {
+        VoxelBrush::single(Block::from(self))
+    }
+}
 
 impl PixelColor for Rgba {
     type Raw = ();
+}
+impl<'a> VoxelColor<'a> for Rgba {
+    fn into_blocks(self) -> VoxelBrush<'a> {
+        VoxelBrush::single(Block::from(self))
+    }
+}
+
+/// Adapt embedded_graphics's most general color type to ours.
+impl<'a> VoxelColor<'a> for Rgb888 {
+    fn into_blocks(self) -> VoxelBrush<'a> {
+        VoxelBrush::single(Block::from(Rgb::from(self)))
+    }
 }
 
 /// A shape of multiple blocks to “paint” with. This may be used to make copies of a
@@ -205,6 +204,16 @@ impl<'a> VoxelBrush<'a> {
         Ok(())
     }
 
+    /// Converts a `&VoxelBrush` into a `VoxelBrush` that borrows it.
+    pub fn as_ref(&self) -> VoxelBrush<'_> {
+        VoxelBrush(
+            self.0
+                .iter()
+                .map(|(v, b)| (*v, Cow::Borrowed(b.as_ref())))
+                .collect(),
+        )
+    }
+
     /// Converts a `VoxelBrush` with borrowed blocks to one with owned blocks.
     pub fn into_owned(self) -> VoxelBrush<'static> {
         VoxelBrush(
@@ -226,8 +235,20 @@ impl<'a> VoxelBrush<'a> {
     }
 }
 
-impl<'a, 'b> PixelColor for &'a VoxelBrush<'b> {
+impl<'a> PixelColor for &'a VoxelBrush<'a> {
     type Raw = ();
+}
+impl<'a> VoxelColor<'a> for &'a VoxelBrush<'a> {
+    fn into_blocks(self) -> VoxelBrush<'a> {
+        self.as_ref()
+    }
+
+    fn depth_range(self) -> RangeInclusive<GridCoordinate> {
+        let zs = self.0.iter().map(|&(GridPoint { z, .. }, _)| z);
+        let min = zs.clone().fold(0, GridCoordinate::min);
+        let max = zs.fold(0, GridCoordinate::max);
+        min..=max
+    }
 }
 
 /// Converts the return value of [`Space::set`] to the return value of
@@ -246,7 +267,7 @@ fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCub
 ///
 /// Returns a `Space` containing all the blocks properly arranged, or an error if reading
 /// the `Drawable`'s color-blocks fails.
-pub fn draw_to_blocks<D, C>(
+pub fn draw_to_blocks<'c, D, C>(
     universe: &mut Universe,
     resolution: Resolution,
     z: GridCoordinate,
@@ -256,8 +277,7 @@ pub fn draw_to_blocks<D, C>(
 where
     for<'a> &'a D: Drawable<C>,
     D: Dimensions,
-    C: PixelColor,
-    for<'a> DrawingPlane<'a, C>: DrawTarget<C, Error = SetCubeError>,
+    C: VoxelColor<'c>,
 {
     let top_left_2d = object.top_left();
     let bottom_right_2d = object.bottom_right();
@@ -304,11 +324,9 @@ mod tests {
     use embedded_graphics::style::{PrimitiveStyle, PrimitiveStyleBuilder};
 
     /// Test using a particular color type with [`DrawingPlane`].
-    fn test_color_drawing<C, E>(color_value: C, expected_block: &Block)
+    fn test_color_drawing<'c, C>(color_value: C, expected_block: &Block)
     where
-        C: PixelColor,
-        for<'a> DrawingPlane<'a, C>: DrawTarget<C, Error = E>,
-        E: std::fmt::Debug,
+        C: VoxelColor<'c>,
     {
         let mut space = Space::empty_positive(100, 100, 100);
         let mut display = space.draw_target(GridMatrix::from_translation([1, 2, 4]));
