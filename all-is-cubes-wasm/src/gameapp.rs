@@ -4,7 +4,7 @@
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{BorrowMutError, RefCell};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
@@ -123,18 +123,16 @@ impl WebGameRoot {
             let mut self_mut = (*self_cell_ref).borrow_mut();
             self_mut.self_ref = Rc::downgrade(&self_cell_ref);
 
-            let self_cell_ref_for_closure = self_cell_ref.clone();
+            let weak_self_ref = self_mut.self_ref.clone();
             self_mut.raf_callback = Closure::wrap(Box::new(move |dom_timestamp: f64| {
-                (*self_cell_ref_for_closure)
-                    .borrow_mut()
-                    .raf_callback_impl(dom_timestamp);
+                Self::upgrade_in_callback(&weak_self_ref, move |this| {
+                    this.raf_callback_impl(dom_timestamp)
+                })
             }));
 
-            let self_cell_ref_for_closure = self_cell_ref.clone();
+            let weak_self_ref = self_mut.self_ref.clone();
             self_mut.step_callback = Closure::wrap(Box::new(move || {
-                (*self_cell_ref_for_closure)
-                    .borrow_mut()
-                    .step_callback_impl();
+                Self::upgrade_in_callback(&weak_self_ref, |this| this.step_callback_impl())
             }));
         }
         // Other initialization.
@@ -144,99 +142,80 @@ impl WebGameRoot {
     }
 
     /// This method is broken out of new() so we can just use `self`. Well, some of the time.
-    #[rustfmt::skip]
     fn init_dom(&self) {
-        // TODO: Replace this with the JS GuiHelpers handling the event processing,
-        // because this is messy.
-        let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"keydown", move |event: KeyboardEvent| {
-            // TODO: Put some abstraction over this mess of reference issues.
-            // (There are two parts of it: The `Weak` reference might have gone away,
-            // and we also need to runtime borrow the `RefCell`)
-            if let Some(refcell_ref) = self_ref.upgrade() {
-                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+        self.add_canvas_to_self_event_listener(
+            "keydown",
+            false,
+            move |this, event: KeyboardEvent| {
                 if let Some(key) = map_keyboard_event(&event) {
-                    self2.app.input_processor.key_down(key);
+                    this.app.input_processor.key_down(key);
 
                     // TODO: return for keys we don't bind
                     let event: &Event = event.as_ref();
-                    event.stop_propagation();  // only if we didn't return already
+                    event.stop_propagation(); // only if we didn't return already
                     event.prevent_default();
                 }
-            }
-        }, &AddEventListenerOptions::new());
+            },
+        );
 
-        let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"keyup", move |event: KeyboardEvent| {
-            if let Some(refcell_ref) = self_ref.upgrade() {
-                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+        self.add_canvas_to_self_event_listener(
+            "keyup",
+            false,
+            move |this, event: KeyboardEvent| {
                 if let Some(key) = map_keyboard_event(&event) {
-                    self2.app.input_processor.key_up(key);
+                    this.app.input_processor.key_up(key);
 
                     // TODO: return for keys we don't bind
                     let event: &Event = event.as_ref();
-                    event.stop_propagation();  // only if we didn't return already
+                    event.stop_propagation(); // only if we didn't return already
                     event.prevent_default();
                 }
-            }
-        }, &AddEventListenerOptions::new());
+            },
+        );
 
-        let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"focus", move |_: FocusEvent| {
-            if let Some(refcell_ref) = self_ref.upgrade() {
-                refcell_ref.borrow_mut().app.input_processor.key_focus(true);
-            }
-        }, &AddEventListenerOptions::new().passive(true));
+        self.add_canvas_to_self_event_listener("focus", true, move |this, _: FocusEvent| {
+            this.app.input_processor.key_focus(true);
+        });
 
-        let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"blur", move |_: FocusEvent| {
-            if let Some(refcell_ref) = self_ref.upgrade() {
-                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
-                
-                self2.app.input_processor.key_focus(false);
-                self2.renderer.set_cursor_position(None);
-            }
-        }, &AddEventListenerOptions::new().passive(true));
+        self.add_canvas_to_self_event_listener("blur", true, move |this, _: FocusEvent| {
+            this.app.input_processor.key_focus(false);
+            this.renderer.set_cursor_position(None);
+        });
 
-        let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mousemove", move |event: MouseEvent| {
-            if let Some(refcell_ref) = self_ref.upgrade() {
-                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
-
-                self2.renderer.set_cursor_position(Some(Point2::new(
+        self.add_canvas_to_self_event_listener(
+            "mousemove",
+            true,
+            move |this, event: MouseEvent| {
+                this.renderer.set_cursor_position(Some(Point2::new(
                     event.client_x() as usize,
-                    event.client_y() as usize)));
-            }
-        }, &AddEventListenerOptions::new().passive(true));
+                    event.client_y() as usize,
+                )));
+            },
+        );
 
-        let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mouseover", move |event: MouseEvent| {
-            if let Some(refcell_ref) = self_ref.upgrade() {
-                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
-
-                self2.renderer.set_cursor_position(Some(Point2::new(
+        self.add_canvas_to_self_event_listener(
+            "mouseover",
+            true,
+            move |this, event: MouseEvent| {
+                this.renderer.set_cursor_position(Some(Point2::new(
                     event.client_x() as usize,
-                    event.client_y() as usize)));
-            }
-        }, &AddEventListenerOptions::new().passive(true));
+                    event.client_y() as usize,
+                )));
+            },
+        );
 
-        let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mouseout", move |_event: MouseEvent| {
-            if let Some(refcell_ref) = self_ref.upgrade() {
-                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+        self.add_canvas_to_self_event_listener("mouseout", true, move |this, _: MouseEvent| {
+            this.renderer.set_cursor_position(None);
+        });
 
-                self2.renderer.set_cursor_position(None);
-            }
-        }, &AddEventListenerOptions::new().passive(true));
-
-        let self_ref = self.self_ref.clone();
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mousedown", move |event: MouseEvent| {
-            if let Some(refcell_ref) = self_ref.upgrade() {
-                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
-
-                self2.renderer.set_cursor_position(Some(Point2::new(
+        self.add_canvas_to_self_event_listener(
+            "mousedown",
+            true,
+            move |this, event: MouseEvent| {
+                this.renderer.set_cursor_position(Some(Point2::new(
                     event.client_x() as usize,
-                    event.client_y() as usize)));
+                    event.client_y() as usize,
+                )));
                 // MouseEvent button numbering is sequential for a three button mouse, instead of
                 // counting the middle/wheel button as the third button.
                 let mapped_button: usize = match event.button() {
@@ -245,20 +224,69 @@ impl WebGameRoot {
                     1 => 2,
                     x => x as usize,
                 };
-                if let Some(cursor) = &self2.renderer.cursor_result {
+                if let Some(cursor) = &this.renderer.cursor_result {
                     // TODO: This should maybe go through InputProcessor? For consistency?
-                    let result = self2.app.camera().borrow_mut().click(cursor, mapped_button);
-                    console::log_1(&JsValue::from_str(&format!("click {}: {:?}", mapped_button, result)));
+                    let result = this.app.camera().borrow_mut().click(cursor, mapped_button);
+                    console::log_1(&JsValue::from_str(&format!(
+                        "click {}: {:?}",
+                        mapped_button, result
+                    )));
                 } else {
-                    console::log_1(&JsValue::from_str(&format!("click {}: no cursor", mapped_button)));
+                    console::log_1(&JsValue::from_str(&format!(
+                        "click {}: no cursor",
+                        mapped_button
+                    )));
+                }
+            },
+        );
+
+        add_event_listener(
+            &self.gui_helpers.canvas_helper().canvas(),
+            "contextmenu",
+            move |event: MouseEvent| {
+                // Inhibits context menu so that we can use right-click as a game action.
+                event.prevent_default();
+            },
+            &AddEventListenerOptions::new(),
+        );
+    }
+
+    fn add_canvas_to_self_event_listener<E, F>(&self, event_name: &str, passive: bool, callback: F)
+    where
+        E: JsCast,
+        F: Fn(&mut Self, E) + 'static,
+    {
+        let weak_self_ref = self.self_ref.clone();
+        add_event_listener(
+            &self.gui_helpers.canvas_helper().canvas(),
+            event_name,
+            move |event: E| {
+                Self::upgrade_in_callback(&weak_self_ref, |this| callback(&mut *this, event))
+            },
+            &AddEventListenerOptions::new().passive(passive),
+        );
+    }
+
+    fn upgrade_in_callback<F>(weak_self_ref: &Weak<RefCell<WebGameRoot>>, body: F)
+    where
+        F: FnOnce(&mut Self),
+    {
+        if let Some(strong_self_ref) = weak_self_ref.upgrade() {
+            match strong_self_ref.try_borrow_mut() {
+                Ok(mut this) => body(&mut *this),
+                Err(BorrowMutError { .. }) => {
+                    // We probably left the cell borrowed in a previous panic.
+                    // Log, but don't panic again because it will only create log spam.
+                    console::warn_1(&JsValue::from_str(
+                        "WebGameRoot is borrowed at event handler (check previous errors)",
+                    ));
                 }
             }
-        }, &AddEventListenerOptions::new().passive(true));
-
-        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"contextmenu", move |event: MouseEvent| {
-            // Inhibits context menu so that we can use right-click as a game action.
-            event.prevent_default();
-        }, &AddEventListenerOptions::new());
+        } else {
+            // Weak reference is dead; nothing to do.
+            // TODO: We could unregister this callback.
+            // (But ideally that would be done _on_ drop, not lazily.)
+        }
     }
 
     pub fn start_loop(&self) {
