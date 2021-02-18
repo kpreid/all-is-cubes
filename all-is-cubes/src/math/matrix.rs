@@ -329,7 +329,7 @@ pub enum GridRotation {
 
 impl GridRotation {
     /// All 48 possible rotations.
-    /// 
+    ///
     /// Warning: TODO: The ordering of these rotations is not yet stable.
     /// The current ordering is based on the six axis permutations followed by rotations.
     #[rustfmt::skip]
@@ -341,7 +341,7 @@ impl GridRotation {
             RYXZ, RYXz, RYxZ, RYxz, RyXZ, RyXz, RyxZ, Ryxz,
             RYZX, RYZx, RYzX, RYzx, RyZX, RyZx, RyzX, Ryzx,
             RZXY, RZXy, RZxY, RZxy, RzXY, RzXy, RzxY, Rzxy,
-            RZYX, RZYx, RZyX, RZyx, RzYX, RzYx, RzyX, Rzyx,    
+            RZYX, RZYx, RZyX, RZyx, RzYX, RzYx, RzyX, Rzyx,
         ]
     };
 
@@ -575,7 +575,7 @@ impl GridRotation {
     }
 
     /// Returns the inverse of this rotation; the one which undoes this.
-    /// 
+    ///
     /// ```
     /// use all_is_cubes::math::GridRotation;
     ///
