@@ -134,10 +134,10 @@ where
         // related in that the cursor should match the pixels being drawn.
         // TODO: Figure out how to lay this out with more separation of concerns, though.
         self.world_proj.set_view_matrix(camera.view());
-        self.cursor_result = cursor_raycast(
-            self.world_proj.project_cursor_into_world().cast(),
-            &*camera.space.borrow(),
-        );
+        self.cursor_result = self
+            .world_proj
+            .project_cursor_into_world()
+            .and_then(|ray| cursor_raycast(ray.cast(), &*camera.space.borrow()));
 
         // Prepare Tess and Texture for space.
         if self.world_renderer.as_ref().map(|sr| sr.space()) != Some(&camera.space) {
@@ -265,7 +265,7 @@ where
 
     /// Set the current cursor position, in pixel coordinates. Affects mouseover/click results.
     // TODO: This is a workaround for self.world_proj being private; arguably doesn't even belong there or here. Find a better structure.
-    pub fn set_cursor_position(&mut self, position: Point2<usize>) {
+    pub fn set_cursor_position(&mut self, position: Option<Point2<usize>>) {
         self.world_proj.set_cursor_position(position);
     }
 }

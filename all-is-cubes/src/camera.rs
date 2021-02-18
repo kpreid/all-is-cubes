@@ -278,9 +278,9 @@ pub struct ProjectionHelper {
     inverse_projection_view: M,
 
     /// Position of mouse pointer or other input device in normalized device coordinates
-    /// (range -1 to 1 upward and rightward). If there is no such input device, zero will
-    /// be the center of the screen.
-    pub cursor_ndc_position: Vector2<FreeCoordinate>,
+    /// (range -1 to 1 upward and rightward). If there is no such input device, zero may
+    /// be used to designate the center of the screen.
+    pub cursor_ndc_position: Option<Vector2<FreeCoordinate>>,
 }
 
 #[allow(clippy::cast_lossless)]
@@ -292,7 +292,7 @@ impl ProjectionHelper {
             fov_y: Deg(90.0),
             view_distance: 200.0,
             view_matrix: M::identity(),
-            cursor_ndc_position: Vector2::zero(),
+            cursor_ndc_position: None,
 
             // Overwritten immediately by compute_matrices
             projection: M::identity(),
@@ -340,8 +340,8 @@ impl ProjectionHelper {
     }
 
     /// Set the current cursor position. In the same pixel units as `set_viewport`.
-    pub fn set_cursor_position(&mut self, position: Point2<usize>) {
-        self.cursor_ndc_position = self.viewport.normalize_nominal_point(position);
+    pub fn set_cursor_position(&mut self, position: Option<Point2<usize>>) {
+        self.cursor_ndc_position = position.map(|p| self.viewport.normalize_nominal_point(p));
     }
 
     /// Sets the view matrix.
@@ -391,8 +391,9 @@ impl ProjectionHelper {
 
     /// Converts the cursor position into a ray in world space.
     /// Uses the view transformation given by [`set_view_matrix`](Self::set_view_matrix).
-    pub fn project_cursor_into_world(&self) -> Ray {
-        self.project_ndc_into_world(self.cursor_ndc_position.x, self.cursor_ndc_position.y)
+    pub fn project_cursor_into_world(&self) -> Option<Ray> {
+        self.cursor_ndc_position
+            .map(|pos| self.project_ndc_into_world(pos.x, pos.y))
     }
 
     fn compute_matrices(&mut self) {

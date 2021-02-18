@@ -191,7 +191,10 @@ impl WebGameRoot {
         let self_ref = self.self_ref.clone();
         add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"blur", move |_: FocusEvent| {
             if let Some(refcell_ref) = self_ref.upgrade() {
-                refcell_ref.borrow_mut().app.input_processor.key_focus(false);
+                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+                
+                self2.app.input_processor.key_focus(false);
+                self2.renderer.set_cursor_position(None);
             }
         }, &AddEventListenerOptions::new().passive(true));
 
@@ -200,9 +203,29 @@ impl WebGameRoot {
             if let Some(refcell_ref) = self_ref.upgrade() {
                 let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
 
-                self2.renderer.set_cursor_position(Point2::new(
+                self2.renderer.set_cursor_position(Some(Point2::new(
                     event.client_x() as usize,
-                    event.client_y() as usize));
+                    event.client_y() as usize)));
+            }
+        }, &AddEventListenerOptions::new().passive(true));
+
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mouseover", move |event: MouseEvent| {
+            if let Some(refcell_ref) = self_ref.upgrade() {
+                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+
+                self2.renderer.set_cursor_position(Some(Point2::new(
+                    event.client_x() as usize,
+                    event.client_y() as usize)));
+            }
+        }, &AddEventListenerOptions::new().passive(true));
+
+        let self_ref = self.self_ref.clone();
+        add_event_listener(&self.gui_helpers.canvas_helper().canvas(), &"mouseout", move |_event: MouseEvent| {
+            if let Some(refcell_ref) = self_ref.upgrade() {
+                let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
+
+                self2.renderer.set_cursor_position(None);
             }
         }, &AddEventListenerOptions::new().passive(true));
 
@@ -211,9 +234,9 @@ impl WebGameRoot {
             if let Some(refcell_ref) = self_ref.upgrade() {
                 let mut self2: std::cell::RefMut<WebGameRoot> = refcell_ref.borrow_mut();
 
-                self2.renderer.set_cursor_position(Point2::new(
+                self2.renderer.set_cursor_position(Some(Point2::new(
                     event.client_x() as usize,
-                    event.client_y() as usize));
+                    event.client_y() as usize)));
                 // MouseEvent button numbering is sequential for a three button mouse, instead of
                 // counting the middle/wheel button as the third button.
                 let mapped_button: usize = match event.button() {

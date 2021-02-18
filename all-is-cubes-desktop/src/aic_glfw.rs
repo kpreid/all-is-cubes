@@ -64,6 +64,7 @@ pub fn glfw_main_loop(
     renderer.set_camera(Some(app.camera().clone()));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
+    let mut cursor_in_window = true;
     'app: loop {
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
@@ -102,9 +103,22 @@ pub fn glfw_main_loop(
 
                 // Mouse input
                 WindowEvent::CursorPos(..) => {
-                    renderer.set_cursor_position(
+                    if cursor_in_window {
+                        renderer.set_cursor_position(Some(
+                            Point2::from(renderer.surface.window.get_cursor_pos())
+                                .map(|x| x as usize),
+                        ));
+                    }
+                }
+                WindowEvent::CursorEnter(true) => {
+                    cursor_in_window = true;
+                    renderer.set_cursor_position(Some(
                         Point2::from(renderer.surface.window.get_cursor_pos()).map(|x| x as usize),
-                    );
+                    ));
+                }
+                WindowEvent::CursorEnter(false) => {
+                    cursor_in_window = false;
+                    renderer.set_cursor_position(None);
                 }
                 WindowEvent::MouseButton(button, Action::Press, _) => {
                     if let Some(cursor) = &renderer.cursor_result {
@@ -136,7 +150,6 @@ pub fn glfw_main_loop(
                 WindowEvent::Pos(..) => {}
                 WindowEvent::Size(..) => {}
                 WindowEvent::Refresh => {}
-                WindowEvent::CursorEnter(_) => {}
                 WindowEvent::Iconify(_) => {}
                 WindowEvent::FileDrop(_) => {}
                 WindowEvent::Maximize(_) => {}
