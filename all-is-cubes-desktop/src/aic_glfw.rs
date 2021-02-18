@@ -12,7 +12,7 @@ use std::time::Instant;
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::Viewport;
-use all_is_cubes::lum::glrender::GLRenderer;
+use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::util::Warnings;
 
 /// Run GLFW-based rendering and event loop.

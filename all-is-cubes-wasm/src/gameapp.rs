@@ -17,7 +17,7 @@ use web_sys::{
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::cgmath::Point2;
 use all_is_cubes::content::UniverseTemplate;
-use all_is_cubes::lum::glrender::GLRenderer;
+use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::Warnings;
 

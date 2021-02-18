@@ -27,8 +27,7 @@ pub type BlockTexture = Texture<Dim3, NormRGBA8UI>;
 /// Alias for the concrete type of the block texture when bound in a luminance pipeline.
 pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim3, NormRGBA8UI>;
 
-/// Manages a block face texture, which is an atlased array texture (to minimize
-/// the chance of hitting any size limits) and implements [`TextureAllocator`].
+/// Implementation of [`TextureAllocator`] for [`luminance`].
 ///
 /// After any allocations, you must call [`LumAtlasAllocator::flush`] to write the
 /// updates to the actual GPU texture for drawing.

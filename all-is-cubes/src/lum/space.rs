@@ -395,7 +395,7 @@ impl SpaceRendererPass {
 }
 
 /// Storage for rendering of part of a [`Space`].
-pub struct Chunk {
+struct Chunk {
     bounds: Grid,
     triangulation: SpaceTriangulation<LumBlockVertex>,
     tess: Option<Tess<LumBlockVertex, u32>>,

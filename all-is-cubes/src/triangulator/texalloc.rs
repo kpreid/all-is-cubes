@@ -2,10 +2,10 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 //! Traits for texture atlas/array allocator for block textures.
-//!
-//! TODO: Look at this module together with the concrete implementation
-//! module [`crate::lum::block_texture`] and figure out better names for
-//! both of them.
+
+// TODO: Look at this module together with the concrete implementation
+// module [`crate::lum::block_texture`] and figure out better names for
+// both of them.
 
 use cgmath::Vector3;
 use std::convert::TryFrom;

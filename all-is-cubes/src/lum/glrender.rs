@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! OpenGL-based graphics rendering.
+//! Top level of the `luminance`-based renderer.
 
 use cgmath::Point2;
 use luminance_front::context::GraphicsContext;
