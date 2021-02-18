@@ -335,16 +335,19 @@ impl Space {
                         } else {
                             // Block is partly transparent and light should pass through.
                             let light_cube = hit.cube_ahead();
-                            if light_cube == cube {
+
+                            let stored_light = if light_cube == cube {
                                 // Don't read the value we're trying to recalculate.
-                                continue 'raycast;
-                            }
+                                Rgb::ZERO
+                            } else {
+                                self.get_lighting(light_cube).into()
+                            };
                             // 'coverage' is what fraction of the light ray we assume to hit this block,
                             // as opposed to passing through it.
-                            // TODO: Compute coverage in EvaluatedBlock.
+                            // TODO: Compute coverage (and connectivity) in EvaluatedBlock.
                             let coverage = 0.25;
                             incoming_light += (ev_hit.attributes.light_emission * ray_alpha
-                                + self.get_lighting(light_cube).into())
+                                + stored_light)
                                 * coverage;
                             ray_alpha *= 1.0 - coverage;
                             dependencies.push(hit.cube_ahead());
