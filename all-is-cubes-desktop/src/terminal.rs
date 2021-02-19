@@ -5,7 +5,7 @@
 
 use crossterm::cursor::MoveTo;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use crossterm::style::{Color, Colors, SetColors};
+use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::QueueableCommand as _;
 use std::borrow::Cow;
@@ -49,13 +49,13 @@ pub fn terminal_main_loop(
     // Run the actual work in a function so we can make really sure
     // that we always disable_raw_mode. (TODO: How about a Drop hook...?)
     let result = real_main_loop(app, options);
-    let _ = crossterm::terminal::disable_raw_mode();
+    let _ = cleanup();
     result
 }
 
 fn real_main_loop(
     mut app: AllIsCubesAppState,
-    options: TerminalOptions,
+    mut options: TerminalOptions,
 ) -> Result<(), Box<dyn Error>> {
     let mut proj: ProjectionHelper =
         ProjectionHelper::new(viewport_from_terminal_size(crossterm::terminal::size()?));
@@ -102,6 +102,10 @@ fn real_main_loop(
                         }) => {
                             return Ok(());
                         }
+                        Event::Key(KeyEvent {
+                            code: KeyCode::Char('m'),
+                            modifiers: _,
+                        }) => options.colors = options.colors.cycle(),
                         Event::Key(_) => {}
                         Event::Resize(w, h) => {
                             proj.set_viewport(viewport_from_terminal_size((w, h)));
@@ -162,6 +166,15 @@ pub fn viewport_from_terminal_size((w, h): (u16, u16)) -> Viewport {
     }
 }
 
+/// Reset terminal state before exiting.
+fn cleanup() -> crossterm::Result<()> {
+    let mut out = io::stdout();
+    crossterm::terminal::disable_raw_mode()?;
+    out.queue(SetAttribute(Attribute::Reset))?;
+    out.queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
+    Ok(())
+}
+
 /// Draw the camera's space to a terminal using raytracing.
 pub fn draw_space<O: io::Write>(
     projection: &mut ProjectionHelper,
@@ -175,8 +188,11 @@ pub fn draw_space<O: io::Write>(
     let (image, info) =
         SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(projection);
 
-    out.queue(MoveTo(0, 0))?;
     let mut current_color = Colors::new(Color::Reset, Color::Reset);
+    out.queue(SetAttribute(Attribute::Reset))?;
+    out.queue(SetColors(current_color))?;
+    out.queue(MoveTo(0, 0))?;
+
     let fs = projection.viewport().framebuffer_size;
     for y in 0..fs.y as usize {
         for x in 0..fs.x as usize {
@@ -196,7 +212,13 @@ pub fn draw_space<O: io::Write>(
         out.queue(SetColors(current_color))?;
         write!(out, "\r\n")?;
     }
-    write!(out, "\r\n{:?}\r\n", info)?;
+
+    // TODO: Allocate footer space explicitly, don't wrap on small widths, clear, etc.
+    write!(
+        out,
+        "\r\nColors: {:?}    Frame: {:?}\r\n",
+        options.colors, info,
+    )?;
     out.flush()?;
 
     Ok(())
@@ -212,6 +234,15 @@ enum ColorMode {
 }
 
 impl ColorMode {
+    fn cycle(self) -> Self {
+        use ColorMode::*;
+        match self {
+            None => TwoFiftySix,
+            TwoFiftySix => Rgb,
+            Rgb => None,
+        }
+    }
+
     fn convert(self, rgb: Rgb) -> Colors {
         // TODO: Pick 8/256/truecolor based on what the terminal supports.
         fn scale(x: NotNan<f32>, scale: f32) -> u8 {
