@@ -36,7 +36,8 @@ pub fn terminal_main_loop(app: AllIsCubesAppState) -> Result<(), Box<dyn Error>>
 }
 
 fn real_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
-    let mut proj: ProjectionHelper = ProjectionHelper::new(viewport_from_terminal_size()?);
+    let mut proj: ProjectionHelper =
+        ProjectionHelper::new(viewport_from_terminal_size(crossterm::terminal::size()?));
     let mut out = io::stdout();
 
     // Park stdin blocking reads on another thread.
@@ -81,7 +82,10 @@ fn real_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
                             return Ok(());
                         }
                         Event::Key(_) => {}
-                        Event::Resize(_, _) => {}
+                        Event::Resize(w, h) => {
+                            proj.set_viewport(viewport_from_terminal_size((w, h)));
+                            out.queue(Clear(ClearType::All))?;
+                        }
                         Event::Mouse(_) => {}
                     }
                 }
@@ -126,16 +130,15 @@ pub fn map_crossterm_event(event: &Event) -> Option<Key> {
 
 /// Obtain the terminal size and adjust it such that it is suitable for a
 /// `ProjectionHelper::set_viewport` followed by `draw_space`.
-pub fn viewport_from_terminal_size() -> Result<Viewport, Box<dyn Error>> {
-    let (w, h) = crossterm::terminal::size()?;
+pub fn viewport_from_terminal_size((w, h): (u16, u16)) -> Viewport {
     // max(1) is to keep the projection math from blowing up.
     // Subtracting some height allows for info text.
     let w = w.max(1);
-    let h = (h - 5).max(1);
-    Ok(Viewport {
+    let h = h.saturating_sub(5).max(1);
+    Viewport {
         framebuffer_size: Vector2::new(w.into(), h.into()),
         nominal_size: Vector2::new(FreeCoordinate::from(w) * 0.5, h.into()),
-    })
+    }
 }
 
 /// Draw the camera's space to an ANSI terminal using raytracing.
@@ -177,6 +180,7 @@ pub fn draw_space<O: io::Write>(
     Ok(())
 }
 
+/// Which type of color control sequences to use.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ColorMode {
     None,
@@ -275,4 +279,19 @@ impl PixelBuf for ColorCharacterBuf {
         self.text.add(Rgba::TRANSPARENT, &Cow::Borrowed(" "));
         self.override_color = true;
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn viewport_no_panic() {
+        viewport_from_terminal_size((0, 0));
+        viewport_from_terminal_size((0, 1));
+        viewport_from_terminal_size((1, 0));
+        viewport_from_terminal_size((1, 1));
+    }
+
+    // TODO: add tests of color calculation
 }
