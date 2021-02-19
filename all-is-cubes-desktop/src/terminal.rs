@@ -3,36 +3,47 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use once_cell::sync::Lazy;
+use crossterm::cursor::MoveTo;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::{Color, Colors, SetColors};
+use crossterm::terminal::{Clear, ClearType};
+use crossterm::QueueableCommand;
 use std::borrow::Cow;
 use std::error::Error;
 use std::io;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
-use termion::color;
-use termion::event::{Event, Key as TermionKey};
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::camera::{Camera, ProjectionHelper, Viewport};
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::math::{FreeCoordinate, NotNan, Rgba};
+use all_is_cubes::math::{FreeCoordinate, NotNan, Rgb, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
-pub fn terminal_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
+pub fn terminal_main_loop(app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
+    // TODO: Leftovers from early input-less days.
     app.camera().borrow_mut().auto_rotate = true;
 
+    crossterm::terminal::enable_raw_mode()?;
+
+    // Run the actual work in a function so we can make really sure
+    // that we always disable_raw_mode. (TODO: How about a Drop hook...?)
+    let result = real_main_loop(app);
+    let _ = crossterm::terminal::disable_raw_mode();
+    result
+}
+
+fn real_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
     let mut proj: ProjectionHelper = ProjectionHelper::new(viewport_from_terminal_size()?);
-    let mut out = io::stdout().into_raw_mode()?;
+    let mut out = io::stdout();
 
     // Park stdin blocking reads on another thread.
     let (event_tx, event_rx) = mpsc::sync_channel(0);
     thread::spawn(move || {
-        for event_result in io::stdin().lock().events() {
-            match event_result {
+        loop {
+            match crossterm::event::read() {
                 Ok(event) => event_tx.send(event).unwrap(),
                 Err(err) => {
                     eprintln!("stdin read error: {}", err);
@@ -43,26 +54,35 @@ pub fn terminal_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Err
         eprintln!("read thread exiting");
     });
 
-    print!("{}", termion::clear::All);
+    out.queue(Clear(ClearType::All))?;
 
     loop {
         'input: loop {
             match event_rx.try_recv() {
                 Ok(event) => {
-                    if let Some(aic_event) = map_termion_event(&event) {
+                    if let Some(aic_event) = map_crossterm_event(&event) {
                         if app.input_processor.key_momentary(aic_event) {
                             // Handled by input_processor
                             continue 'input;
                         }
                     }
-                    if let Event::Key(key) = event {
-                        use termion::event::Key;
-                        match key {
-                            Key::Esc | Key::Ctrl('c') | Key::Ctrl('d') => {
-                                return Ok(());
-                            }
-                            _ => {}
+                    match event {
+                        Event::Key(KeyEvent {
+                            code: KeyCode::Esc, ..
+                        })
+                        | Event::Key(KeyEvent {
+                            code: KeyCode::Char('c'),
+                            modifiers: KeyModifiers::CONTROL,
+                        })
+                        | Event::Key(KeyEvent {
+                            code: KeyCode::Char('d'),
+                            modifiers: KeyModifiers::CONTROL,
+                        }) => {
+                            return Ok(());
                         }
+                        Event::Key(_) => {}
+                        Event::Resize(_, _) => {}
+                        Event::Mouse(_) => {}
                     }
                 }
                 Err(mpsc::TryRecvError::Disconnected) => {
@@ -87,17 +107,17 @@ pub fn terminal_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Err
     }
 }
 
-/// Converts `termion::Event` to `all_is_cubes::camera::Key`.
+/// Converts [`Event`] to [`all_is_cubes::camera::Key`].
 ///
 /// Returns `None` if there is no corresponding value.
-pub fn map_termion_event(event: &Event) -> Option<Key> {
+pub fn map_crossterm_event(event: &Event) -> Option<Key> {
     match event {
-        Event::Key(key) => match key {
-            TermionKey::Char(c) => Some(Key::Character(c.to_ascii_lowercase())),
-            TermionKey::Up => Some(Key::Up),
-            TermionKey::Down => Some(Key::Down),
-            TermionKey::Left => Some(Key::Left),
-            TermionKey::Right => Some(Key::Right),
+        Event::Key(key_event) => match (key_event.modifiers, key_event.code) {
+            (KeyModifiers::NONE, KeyCode::Char(c)) => Some(Key::Character(c.to_ascii_lowercase())),
+            (_, KeyCode::Up) => Some(Key::Up),
+            (_, KeyCode::Down) => Some(Key::Down),
+            (_, KeyCode::Left) => Some(Key::Left),
+            (_, KeyCode::Right) => Some(Key::Right),
             _ => None,
         },
         _ => None,
@@ -106,8 +126,8 @@ pub fn map_termion_event(event: &Event) -> Option<Key> {
 
 /// Obtain the terminal size and adjust it such that it is suitable for a
 /// `ProjectionHelper::set_viewport` followed by `draw_space`.
-pub fn viewport_from_terminal_size() -> io::Result<Viewport> {
-    let (w, h) = termion::terminal_size()?;
+pub fn viewport_from_terminal_size() -> Result<Viewport, Box<dyn Error>> {
+    let (w, h) = crossterm::terminal::size()?;
     // max(1) is to keep the projection math from blowing up.
     // Subtracting some height allows for info text.
     let w = w.max(1);
@@ -123,26 +143,81 @@ pub fn draw_space<O: io::Write>(
     projection: &mut ProjectionHelper,
     camera: &Camera,
     out: &mut O,
-) -> io::Result<()> {
+) -> crossterm::Result<()> {
     let space = &*camera.space.borrow_mut();
     projection.set_view_matrix(camera.view());
 
-    write!(out, "{}", termion::cursor::Goto(1, 1))?;
-    let info = SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_text(
-        projection,
-        &*END_OF_LINE,
-        |s| write!(out, "{}", s),
-    )?;
-    write!(
-        out,
-        "{}{}{:?}\r\n",
-        *END_OF_LINE,
-        termion::clear::AfterCursor,
-        info
-    )?;
+    let (image, info) =
+        SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(projection);
+
+    out.queue(MoveTo(0, 0))?;
+    let mut current_color = Colors::new(Color::Reset, Color::Reset);
+    let fs = projection.viewport().framebuffer_size;
+    for y in 0..fs.y as usize {
+        for x in 0..fs.x as usize {
+            let (ref pixel, color) = image[y * fs.x as usize + x];
+
+            let mapped_color = match color {
+                Some(color) => ColorMode::TwoFiftySix.convert(color),
+                None => Colors::new(Color::Reset, Color::Reset),
+            };
+            if mapped_color != current_color {
+                current_color = mapped_color;
+                out.queue(SetColors(current_color))?;
+            }
+            write!(out, "{}", pixel)?;
+        }
+        current_color = Colors::new(Color::Reset, Color::Reset);
+        out.queue(SetColors(current_color))?;
+        write!(out, "\r\n")?;
+    }
+    write!(out, "\r\n{:?}\r\n", info)?;
     out.flush()?;
 
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum ColorMode {
+    None,
+    // TODO: Sixteen,
+    TwoFiftySix,
+    Rgb,
+}
+
+impl ColorMode {
+    fn convert(self, rgb: Rgb) -> Colors {
+        // TODO: Pick 8/256/truecolor based on what the terminal supports.
+        fn scale(x: NotNan<f32>, scale: f32) -> u8 {
+            (x.into_inner() * scale).max(0.0).min(scale) as u8
+        }
+
+        match self {
+            ColorMode::None => Colors {
+                foreground: None,
+                background: None,
+            },
+            // ColorMode::Sixteen => {}
+            ColorMode::TwoFiftySix => {
+                // Crossterm doesn't have a convenient 216-color table. Use Termion's.
+                use termion::color::AnsiValue;
+                let AnsiValue(byte) = AnsiValue::rgb(
+                    scale(rgb.red(), 5.),
+                    scale(rgb.green(), 5.),
+                    scale(rgb.blue(), 5.),
+                );
+                Colors::new(Color::Black, Color::AnsiValue(byte))
+            }
+            ColorMode::Rgb => {
+                let c = Color::Rgb {
+                    r: scale(rgb.red(), 255.),
+                    g: scale(rgb.green(), 255.),
+                    b: scale(rgb.blue(), 255.),
+                };
+                Colors::new(Color::Black, c)
+            }
+        }
+    }
 }
 
 /// Implements `PixelBuf` for colored text output using `termion`.
@@ -156,7 +231,7 @@ struct ColorCharacterBuf {
 }
 
 impl PixelBuf for ColorCharacterBuf {
-    type Pixel = String;
+    type Pixel = (String, Option<Rgb>);
     type BlockData = <CharacterBuf as PixelBuf>::BlockData;
 
     fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
@@ -177,35 +252,12 @@ impl PixelBuf for ColorCharacterBuf {
     }
 
     #[inline]
-    fn result(self) -> String {
+    fn result(self) -> (String, Option<Rgb>) {
+        // TODO: override_color should be less clunky
         if self.override_color {
-            return self.text.result();
-        }
-
-        let final_rgb = self.color.result().to_rgb();
-        // TODO: Pick 8/256/truecolor based on what the terminal supports.
-        fn scale(x: NotNan<f32>) -> u8 {
-            let scale = 5.0;
-            (x.into_inner() * scale).max(0.0).min(scale) as u8
-        }
-        let converted_color = color::AnsiValue::rgb(
-            scale(final_rgb.red()),
-            scale(final_rgb.green()),
-            scale(final_rgb.blue()),
-        );
-        if self.text.opaque() {
-            format!(
-                "{}{}{}",
-                color::Bg(converted_color),
-                color::Fg(color::Black),
-                self.text.result()
-            )
+            (self.text.result(), None)
         } else {
-            format!(
-                "{}{}.",
-                color::Bg(converted_color),
-                color::Fg(color::AnsiValue::rgb(5, 5, 5))
-            )
+            (self.text.result(), Some(self.color.result().to_rgb()))
         }
     }
 
@@ -220,17 +272,7 @@ impl PixelBuf for ColorCharacterBuf {
     }
 
     fn hit_nothing(&mut self) {
-        self.text.add(
-            Rgba::TRANSPARENT,
-            &Cow::Owned(format!(
-                "{}{} ",
-                color::Bg(color::Reset),
-                color::Fg(color::Reset)
-            )),
-        );
+        self.text.add(Rgba::TRANSPARENT, &Cow::Borrowed(" "));
         self.override_color = true;
     }
 }
-
-static END_OF_LINE: Lazy<String> =
-    Lazy::new(|| format!("{}{}\r\n", color::Bg(color::Reset), color::Fg(color::Reset)));
