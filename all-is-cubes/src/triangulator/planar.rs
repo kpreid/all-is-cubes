@@ -152,6 +152,7 @@ pub(super) enum QuadColoring<'a, T> {
 ///
 /// `depth`, `low_corner`, and `high_corner` are in 0-1 coordinates.
 #[inline]
+#[allow(clippy::too_many_arguments)] // TODO: Figure out how to simplify
 pub(super) fn push_quad<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
     indices: &mut Vec<u32>,
