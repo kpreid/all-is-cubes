@@ -239,23 +239,22 @@ impl InputProcessor {
 
     /// Applies the current input to the given `Camera`.
     pub fn apply_input(&mut self, camera: &mut Camera, timestep: Duration) {
-        let movement = self.movement();
-        if movement != Vector3::zero() {
-            camera.auto_rotate = false;
-        }
-        camera.set_velocity_input(movement);
-
         let dt = timestep.as_secs_f64();
         let key_turning_step = 80.0 * dt;
-        camera.body.yaw = (camera.body.yaw
-            + key_turning_step * self.net_movement(Key::Left, Key::Right)
-            + self.mouselook_buffer.x)
-            .rem_euclid(360.0);
-        camera.body.pitch = (camera.body.pitch
-            + key_turning_step * self.net_movement(Key::Up, Key::Down)
-            + self.mouselook_buffer.y)
-            .min(90.0)
-            .max(-90.0);
+
+        let movement = self.movement();
+        camera.set_velocity_input(movement);
+
+        let turning = Vector2::new(
+            key_turning_step * self.net_movement(Key::Left, Key::Right) + self.mouselook_buffer.x,
+            key_turning_step * self.net_movement(Key::Up, Key::Down) + self.mouselook_buffer.y,
+        );
+        camera.body.yaw = (camera.body.yaw + turning.x).rem_euclid(360.0);
+        camera.body.pitch = (camera.body.pitch + turning.y).min(90.0).max(-90.0);
+
+        if movement != Vector3::zero() || turning != Vector2::zero() {
+            camera.auto_rotate = false;
+        }
 
         if self.keys_held.contains(&Key::Character(' ')) {
             camera.jump_if_able();
