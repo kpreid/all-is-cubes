@@ -23,7 +23,7 @@ use aic_glfw::glfw_main_loop;
 mod record;
 use record::record_main;
 mod terminal;
-use terminal::terminal_main_loop;
+use terminal::{terminal_main_loop, TerminalOptions};
 
 #[derive(Debug, PartialEq, strum::EnumString, strum::EnumIter, strum::IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     match value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit()) {
         GraphicsType::Window => glfw_main_loop(app, title, display_size),
-        GraphicsType::Terminal => terminal_main_loop(app),
+        GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
         GraphicsType::Record => record_main(
             app,
             RecordOptions {

@@ -7,7 +7,7 @@ use crossterm::cursor::MoveTo;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Color, Colors, SetColors};
 use crossterm::terminal::{Clear, ClearType};
-use crossterm::QueueableCommand;
+use crossterm::QueueableCommand as _;
 use std::borrow::Cow;
 use std::error::Error;
 use std::io;
@@ -22,7 +22,25 @@ use all_is_cubes::math::{FreeCoordinate, NotNan, Rgb, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
-pub fn terminal_main_loop(app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
+/// Options for the terminal UI.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct TerminalOptions {
+    /// Color escapes supported by the terminal.
+    colors: ColorMode,
+}
+
+impl Default for TerminalOptions {
+    fn default() -> Self {
+        Self {
+            colors: ColorMode::TwoFiftySix, // TODO: default to 16-color mode once we have it implemented
+        }
+    }
+}
+
+pub fn terminal_main_loop(
+    app: AllIsCubesAppState,
+    options: TerminalOptions,
+) -> Result<(), Box<dyn Error>> {
     // TODO: Leftovers from early input-less days.
     app.camera().borrow_mut().auto_rotate = true;
 
@@ -30,12 +48,15 @@ pub fn terminal_main_loop(app: AllIsCubesAppState) -> Result<(), Box<dyn Error>>
 
     // Run the actual work in a function so we can make really sure
     // that we always disable_raw_mode. (TODO: How about a Drop hook...?)
-    let result = real_main_loop(app);
+    let result = real_main_loop(app, options);
     let _ = crossterm::terminal::disable_raw_mode();
     result
 }
 
-fn real_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
+fn real_main_loop(
+    mut app: AllIsCubesAppState,
+    options: TerminalOptions,
+) -> Result<(), Box<dyn Error>> {
     let mut proj: ProjectionHelper =
         ProjectionHelper::new(viewport_from_terminal_size(crossterm::terminal::size()?));
     let mut out = io::stdout();
@@ -103,7 +124,7 @@ fn real_main_loop(mut app: AllIsCubesAppState) -> Result<(), Box<dyn Error>> {
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
         if app.frame_clock.should_draw() {
-            draw_space(&mut proj, &*app.camera().borrow(), &mut out)?;
+            draw_space(&mut proj, &*app.camera().borrow(), &mut out, &options)?;
             app.frame_clock.did_draw();
         } else {
             std::thread::yield_now();
@@ -141,11 +162,12 @@ pub fn viewport_from_terminal_size((w, h): (u16, u16)) -> Viewport {
     }
 }
 
-/// Draw the camera's space to an ANSI terminal using raytracing.
+/// Draw the camera's space to a terminal using raytracing.
 pub fn draw_space<O: io::Write>(
     projection: &mut ProjectionHelper,
     camera: &Camera,
     out: &mut O,
+    options: &TerminalOptions,
 ) -> crossterm::Result<()> {
     let space = &*camera.space.borrow_mut();
     projection.set_view_matrix(camera.view());
@@ -161,7 +183,7 @@ pub fn draw_space<O: io::Write>(
             let (ref pixel, color) = image[y * fs.x as usize + x];
 
             let mapped_color = match color {
-                Some(color) => ColorMode::TwoFiftySix.convert(color),
+                Some(color) => options.colors.convert(color),
                 None => Colors::new(Color::Reset, Color::Reset),
             };
             if mapped_color != current_color {
