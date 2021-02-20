@@ -27,6 +27,13 @@ Related crates
 
 “The game” is in quotes because all you can do for the moment is place and remove blocks.
 
+Stability and versioning
+------------------------
+
+All is Cubes is just getting started; many core features are not yet implemented, and implementing them will require incompatible changes. During development, library APIs change regularly, and the version numbering will mark these versions as incompatible (e.g. 0.3 to 0.4); there will be no 1.0 version until I am confident that future versions will at least have save data compatibility. However, I have made some attempt to mark API elements that are _more likely_ to change in future versions.
+
+MSRV: The minimum supported Rust version is the current _stable_ version. This policy may change after a future 1.0 release.
+
 License
 -------
 

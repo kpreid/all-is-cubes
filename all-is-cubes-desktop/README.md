@@ -10,6 +10,13 @@ This crate is the “desktop edition” that you can build and run to “play th
 [all-is-cubes]: https://crates.io/crates/all-is-cubes
 [all-is-cubes-server]: https://crates.io/crates/all-is-cubes-server
 
+Stability and versioning
+------------------------
+
+All is Cubes is just getting started; many core features are not yet implemented, and implementing them will require incompatible changes. The 0.x version number will be incremented as needed to indicate incompatible releases. There will be no 1.0 version until I am confident that future versions will at least have save data compatibility.
+
+MSRV: The minimum supported Rust version is the current _stable_ version. This policy may change after a future 1.0 release.
+
 License
 -------
 
