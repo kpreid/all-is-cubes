@@ -71,9 +71,13 @@ struct TerminalMain {
     app: AllIsCubesAppState,
     options: TerminalOptions,
     out: io::Stdout,
-    terminal_size: Vector2<u16>,
     projection: ProjectionHelper,
+    /// True if we should clean up on drop.
     terminal_state_dirty: bool,
+
+    // Tracking terminal state.
+    terminal_size: Vector2<u16>,
+    current_color: Option<Colors>,
 }
 
 impl TerminalMain {
@@ -89,6 +93,7 @@ impl TerminalMain {
             out: io::stdout(),
             terminal_size,
             terminal_state_dirty: true,
+            current_color: None,
         })
     }
 
@@ -184,51 +189,51 @@ impl TerminalMain {
     }
 
     pub fn draw(&mut self) -> crossterm::Result<()> {
-        let projection = &mut self.projection;
         let camera = &*self.app.camera().borrow();
-        let out = &mut self.out;
-        let options = &self.options;
+        self.projection.set_view_matrix(camera.view());
+
+        let color_mode = self.options.colors;
         let space = &*camera.space.borrow_mut();
 
-        projection.set_view_matrix(camera.view());
-
         let (image, info) =
-            SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(projection);
+            SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(&self.projection);
 
-        let mut current_color = Colors::new(Color::Reset, Color::Reset);
-        out.queue(cursor::Hide)?;
-        out.queue(SetAttribute(Attribute::Reset))?;
-        out.queue(SetColors(current_color))?;
-        out.queue(MoveTo(0, 0))?;
+        self.out.queue(cursor::Hide)?;
+        self.out.queue(SetAttribute(Attribute::Reset))?;
+        self.out.queue(MoveTo(0, 0))?;
+        self.current_color = None; // pessimistic about prior state
 
-        let fs = projection.viewport().framebuffer_size;
+        let fs = self.projection.viewport().framebuffer_size;
         for y in 0..fs.y as usize {
             for x in 0..fs.x as usize {
                 let (ref pixel, color) = image[y * fs.x as usize + x];
 
                 let mapped_color = match color {
-                    Some(color) => options.colors.convert(color),
+                    Some(color) => color_mode.convert(color),
                     None => Colors::new(Color::Reset, Color::Reset),
                 };
-                if mapped_color != current_color {
-                    current_color = mapped_color;
-                    out.queue(SetColors(current_color))?;
-                }
-                write!(out, "{}", pixel)?;
+                self.write_with_color(pixel, mapped_color)?;
             }
-            current_color = Colors::new(Color::Reset, Color::Reset);
-            out.queue(SetColors(current_color))?;
-            write!(out, "\r\n")?;
+            self.write_with_color("\r\n", Colors::new(Color::Reset, Color::Reset))?;
         }
 
         // TODO: Allocate footer space explicitly, don't wrap on small widths, clear, etc.
         write!(
-            out,
+            self.out,
             "\r\nColors: {:?}    Frame: {:?}\r\n",
-            options.colors, info,
+            color_mode, info,
         )?;
-        out.flush()?;
+        self.out.flush()?;
 
+        Ok(())
+    }
+
+    fn write_with_color(&mut self, text: &str, color: Colors) -> crossterm::Result<()> {
+        if self.current_color != Some(color) {
+            self.current_color = Some(color);
+            self.out.queue(SetColors(color))?;
+        }
+        write!(self.out, "{}", text)?;
         Ok(())
     }
 }
