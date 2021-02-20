@@ -3,7 +3,7 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use crossterm::cursor::MoveTo;
+use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::terminal::{Clear, ClearType};
@@ -98,6 +98,7 @@ impl TerminalMain {
         self.out.queue(SetAttribute(Attribute::Reset))?;
         self.out
             .queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
+        self.out.queue(cursor::Show)?;
         crossterm::terminal::disable_raw_mode()?;
         self.terminal_state_dirty = false;
         Ok(())
@@ -195,6 +196,7 @@ impl TerminalMain {
             SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(projection);
 
         let mut current_color = Colors::new(Color::Reset, Color::Reset);
+        out.queue(cursor::Hide)?;
         out.queue(SetAttribute(Attribute::Reset))?;
         out.queue(SetColors(current_color))?;
         out.queue(MoveTo(0, 0))?;
