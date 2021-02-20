@@ -11,12 +11,13 @@ use crossterm::QueueableCommand as _;
 use std::borrow::Cow;
 use std::error::Error;
 use std::io;
+use std::io::Write as _;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
-use all_is_cubes::camera::{Camera, ProjectionHelper, Viewport};
+use all_is_cubes::camera::{ProjectionHelper, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::math::{FreeCoordinate, NotNan, Rgb, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
@@ -27,6 +28,21 @@ use all_is_cubes::space::SpaceBlockData;
 pub struct TerminalOptions {
     /// Color escapes supported by the terminal.
     colors: ColorMode,
+}
+
+impl TerminalOptions {
+    /// Obtain the terminal size and adjust it such that it is suitable for a
+    /// `ProjectionHelper::set_viewport` followed by `draw_space`.
+    fn viewport_from_terminal_size(&self, size: Vector2<u16>) -> Viewport {
+        // max(1) is to keep the projection math from blowing up.
+        // Subtracting some height allows for info text.
+        let w = size.x.max(1);
+        let h = size.y.saturating_sub(5).max(1);
+        Viewport {
+            framebuffer_size: Vector2::new(w.into(), h.into()),
+            nominal_size: Vector2::new(FreeCoordinate::from(w) * 0.5, h.into()),
+        }
+    }
 }
 
 impl Default for TerminalOptions {
@@ -67,11 +83,11 @@ impl TerminalMain {
         let terminal_size = Vector2::from(crossterm::terminal::size()?);
 
         Ok(Self {
+            projection: ProjectionHelper::new(options.viewport_from_terminal_size(terminal_size)),
             app,
             options,
             out: io::stdout(),
             terminal_size,
-            projection: ProjectionHelper::new(viewport_from_terminal_size(terminal_size)),
             terminal_state_dirty: true,
         })
     }
@@ -136,8 +152,9 @@ impl TerminalMain {
                             Event::Key(_) => {}
                             Event::Resize(w, h) => {
                                 self.terminal_size = Vector2::new(w, h);
-                                self.projection
-                                    .set_viewport(viewport_from_terminal_size(self.terminal_size));
+                                self.projection.set_viewport(
+                                    self.options.viewport_from_terminal_size(self.terminal_size),
+                                );
                                 self.out.queue(Clear(ClearType::All))?;
                             }
                             Event::Mouse(_) => {}
@@ -157,17 +174,60 @@ impl TerminalMain {
             self.app.frame_clock.advance_to(Instant::now());
             self.app.maybe_step_universe();
             if self.app.frame_clock.should_draw() {
-                draw_space(
-                    &mut self.projection,
-                    &*self.app.camera().borrow(),
-                    &mut self.out,
-                    &self.options,
-                )?;
+                self.draw()?;
                 self.app.frame_clock.did_draw();
             } else {
                 std::thread::yield_now();
             }
         }
+    }
+
+    pub fn draw(&mut self) -> crossterm::Result<()> {
+        let projection = &mut self.projection;
+        let camera = &*self.app.camera().borrow();
+        let out = &mut self.out;
+        let options = &self.options;
+        let space = &*camera.space.borrow_mut();
+
+        projection.set_view_matrix(camera.view());
+
+        let (image, info) =
+            SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(projection);
+
+        let mut current_color = Colors::new(Color::Reset, Color::Reset);
+        out.queue(SetAttribute(Attribute::Reset))?;
+        out.queue(SetColors(current_color))?;
+        out.queue(MoveTo(0, 0))?;
+
+        let fs = projection.viewport().framebuffer_size;
+        for y in 0..fs.y as usize {
+            for x in 0..fs.x as usize {
+                let (ref pixel, color) = image[y * fs.x as usize + x];
+
+                let mapped_color = match color {
+                    Some(color) => options.colors.convert(color),
+                    None => Colors::new(Color::Reset, Color::Reset),
+                };
+                if mapped_color != current_color {
+                    current_color = mapped_color;
+                    out.queue(SetColors(current_color))?;
+                }
+                write!(out, "{}", pixel)?;
+            }
+            current_color = Colors::new(Color::Reset, Color::Reset);
+            out.queue(SetColors(current_color))?;
+            write!(out, "\r\n")?;
+        }
+
+        // TODO: Allocate footer space explicitly, don't wrap on small widths, clear, etc.
+        write!(
+            out,
+            "\r\nColors: {:?}    Frame: {:?}\r\n",
+            options.colors, info,
+        )?;
+        out.flush()?;
+
+        Ok(())
     }
 }
 
@@ -182,7 +242,7 @@ impl Drop for TerminalMain {
 /// Converts [`Event`] to [`all_is_cubes::camera::Key`].
 ///
 /// Returns `None` if there is no corresponding value.
-pub fn map_crossterm_event(event: &Event) -> Option<Key> {
+fn map_crossterm_event(event: &Event) -> Option<Key> {
     match event {
         Event::Key(key_event) => match (key_event.modifiers, key_event.code) {
             (KeyModifiers::NONE, KeyCode::Char(c)) => Some(Key::Character(c.to_ascii_lowercase())),
@@ -194,68 +254,6 @@ pub fn map_crossterm_event(event: &Event) -> Option<Key> {
         },
         _ => None,
     }
-}
-
-/// Obtain the terminal size and adjust it such that it is suitable for a
-/// `ProjectionHelper::set_viewport` followed by `draw_space`.
-pub fn viewport_from_terminal_size(size: Vector2<u16>) -> Viewport {
-    // max(1) is to keep the projection math from blowing up.
-    // Subtracting some height allows for info text.
-    let w = size.x.max(1);
-    let h = size.y.saturating_sub(5).max(1);
-    Viewport {
-        framebuffer_size: Vector2::new(w.into(), h.into()),
-        nominal_size: Vector2::new(FreeCoordinate::from(w) * 0.5, h.into()),
-    }
-}
-
-/// Draw the camera's space to a terminal using raytracing.
-pub fn draw_space<O: io::Write>(
-    projection: &mut ProjectionHelper,
-    camera: &Camera,
-    out: &mut O,
-    options: &TerminalOptions,
-) -> crossterm::Result<()> {
-    let space = &*camera.space.borrow_mut();
-    projection.set_view_matrix(camera.view());
-
-    let (image, info) =
-        SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(projection);
-
-    let mut current_color = Colors::new(Color::Reset, Color::Reset);
-    out.queue(SetAttribute(Attribute::Reset))?;
-    out.queue(SetColors(current_color))?;
-    out.queue(MoveTo(0, 0))?;
-
-    let fs = projection.viewport().framebuffer_size;
-    for y in 0..fs.y as usize {
-        for x in 0..fs.x as usize {
-            let (ref pixel, color) = image[y * fs.x as usize + x];
-
-            let mapped_color = match color {
-                Some(color) => options.colors.convert(color),
-                None => Colors::new(Color::Reset, Color::Reset),
-            };
-            if mapped_color != current_color {
-                current_color = mapped_color;
-                out.queue(SetColors(current_color))?;
-            }
-            write!(out, "{}", pixel)?;
-        }
-        current_color = Colors::new(Color::Reset, Color::Reset);
-        out.queue(SetColors(current_color))?;
-        write!(out, "\r\n")?;
-    }
-
-    // TODO: Allocate footer space explicitly, don't wrap on small widths, clear, etc.
-    write!(
-        out,
-        "\r\nColors: {:?}    Frame: {:?}\r\n",
-        options.colors, info,
-    )?;
-    out.flush()?;
-
-    Ok(())
 }
 
 /// Which type of color control sequences to use.
@@ -374,10 +372,11 @@ mod tests {
 
     #[test]
     fn viewport_no_panic() {
-        viewport_from_terminal_size((0, 0).into());
-        viewport_from_terminal_size((0, 1).into());
-        viewport_from_terminal_size((1, 0).into());
-        viewport_from_terminal_size((1, 1).into());
+        let o = TerminalOptions::default();
+        o.viewport_from_terminal_size((0, 0).into());
+        o.viewport_from_terminal_size((0, 1).into());
+        o.viewport_from_terminal_size((1, 0).into());
+        o.viewport_from_terminal_size((1, 1).into());
     }
 
     // TODO: add tests of color calculation
