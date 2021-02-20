@@ -3,6 +3,7 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
+use cgmath::ElementWise as _;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
@@ -28,19 +29,34 @@ use all_is_cubes::space::SpaceBlockData;
 pub struct TerminalOptions {
     /// Color escapes supported by the terminal.
     colors: ColorMode,
+
+    /// Whether to use block drawing characters (e.g. “▄”) for increased resolution.
+    ///
+    /// This may cause artifacts in some terminals, and increases the CPU requirement
+    /// since more rays are used per frame.
+    graphic_characters: bool,
 }
 
 impl TerminalOptions {
     /// Obtain the terminal size and adjust it such that it is suitable for a
-    /// `ProjectionHelper::set_viewport` followed by `draw_space`.
+    /// [`ProjectionHelper::set_viewport`] followed by [`TerminalMain::draw`].
     fn viewport_from_terminal_size(&self, size: Vector2<u16>) -> Viewport {
         // max(1) is to keep the projection math from blowing up.
         // Subtracting some height allows for info text.
         let w = size.x.max(1);
         let h = size.y.saturating_sub(5).max(1);
         Viewport {
-            framebuffer_size: Vector2::new(w.into(), h.into()),
+            framebuffer_size: Vector2::new(w.into(), h.into())
+                .mul_element_wise(self.rays_per_character().map(u32::from)),
             nominal_size: Vector2::new(FreeCoordinate::from(w) * 0.5, h.into()),
+        }
+    }
+
+    fn rays_per_character(&self) -> Vector2<u8> {
+        if self.graphic_characters {
+            Vector2::new(1, 2)
+        } else {
+            Vector2::new(1, 1)
         }
     }
 }
@@ -49,6 +65,7 @@ impl Default for TerminalOptions {
     fn default() -> Self {
         Self {
             colors: ColorMode::TwoFiftySix, // TODO: default to 16-color mode once we have it implemented
+            graphic_characters: false,      // TODO: default false
         }
     }
 }
@@ -152,15 +169,20 @@ impl TerminalMain {
                                 return Ok(());
                             }
                             Event::Key(KeyEvent {
-                                code: KeyCode::Char('m'),
+                                code: KeyCode::Char('n'),
                                 modifiers: _,
                             }) => self.options.colors = self.options.colors.cycle(),
+                            Event::Key(KeyEvent {
+                                code: KeyCode::Char('m'),
+                                modifiers: _,
+                            }) => {
+                                self.options.graphic_characters = !self.options.graphic_characters;
+                                self.sync_options();
+                            }
                             Event::Key(_) => {}
                             Event::Resize(w, h) => {
                                 self.terminal_size = Vector2::new(w, h);
-                                self.projection.set_viewport(
-                                    self.options.viewport_from_terminal_size(self.terminal_size),
-                                );
+                                self.sync_options();
                                 self.out.queue(Clear(ClearType::All))?;
                             }
                             Event::Mouse(_) => {}
@@ -188,7 +210,12 @@ impl TerminalMain {
         }
     }
 
-    pub fn draw(&mut self) -> crossterm::Result<()> {
+    fn sync_options(&mut self) {
+        self.projection
+            .set_viewport(self.options.viewport_from_terminal_size(self.terminal_size));
+    }
+
+    fn draw(&mut self) -> crossterm::Result<()> {
         let camera = &*self.app.camera().borrow();
         self.projection.set_view_matrix(camera.view());
 
@@ -203,16 +230,19 @@ impl TerminalMain {
         self.out.queue(MoveTo(0, 0))?;
         self.current_color = None; // pessimistic about prior state
 
-        let fs = self.projection.viewport().framebuffer_size;
-        for y in 0..fs.y as usize {
-            for x in 0..fs.x as usize {
-                let (ref pixel, color) = image[y * fs.x as usize + x];
+        // TODO: aim for less number casting
+        let character_size = self
+            .projection
+            .viewport()
+            .framebuffer_size
+            .map(|s| s as usize)
+            .div_element_wise(self.options.rays_per_character().map(usize::from));
+        for y in 0..character_size.y {
+            for x in 0..character_size.x {
+                let (text, color) =
+                    self.image_patch_to_character(&*image, Vector2::new(x, y), character_size);
 
-                let mapped_color = match color {
-                    Some(color) => color_mode.convert(color),
-                    None => Colors::new(Color::Reset, Color::Reset),
-                };
-                self.write_with_color(pixel, mapped_color)?;
+                self.write_with_color(text, color)?;
             }
             self.write_with_color("\r\n", Colors::new(Color::Reset, Color::Reset))?;
         }
@@ -226,6 +256,50 @@ impl TerminalMain {
         self.out.flush()?;
 
         Ok(())
+    }
+
+    fn image_patch_to_character<'i>(
+        &self,
+        image: &'i [(String, Option<Rgba>)],
+        char_pos: Vector2<usize>,
+        char_size: Vector2<usize>,
+    ) -> (&'i str, Colors) {
+        let row = char_size.x;
+        // This condition must match TerminalOptions::rays_per_character
+        // TODO: Refactor to read patches separately from picking graphic characters
+        if self.options.graphic_characters {
+            // TODO: This is a mess
+            let (_, color1) = image[(char_pos.y * 2) * row + char_pos.x];
+            let (_, color2) = image[(char_pos.y * 2 + 1) * row + char_pos.x];
+            let color1 = color1.and_then(|c| self.options.colors.convert(c));
+            let color2 = color2.and_then(|c| self.options.colors.convert(c));
+            if color1 == color2 {
+                (
+                    // TODO: Offer choice of showing character sometimes. Also use characters for dithering.
+                    " ", // text.as_str(),
+                    Colors {
+                        // Emit color at all only if we're not doing no-colors
+                        foreground: color1.map(|_| Color::Black),
+                        background: color1,
+                    },
+                )
+            } else {
+                (
+                    "▄",
+                    Colors {
+                        foreground: color2,
+                        background: color1,
+                    },
+                )
+            }
+        } else {
+            let (ref text, color) = image[char_pos.y * row + char_pos.x];
+            let mapped_color = match color.and_then(|c| self.options.colors.convert(c)) {
+                Some(color) => Colors::new(Color::Black, color),
+                None => Colors::new(Color::Reset, Color::Reset),
+            };
+            (text, mapped_color)
+        }
     }
 
     fn write_with_color(&mut self, text: &str, color: Colors) -> crossterm::Result<()> {
@@ -282,12 +356,9 @@ impl ColorMode {
         }
     }
 
-    fn convert(self, rgb: Rgba) -> Colors {
+    fn convert(self, rgb: Rgba) -> Option<Color> {
         match self {
-            ColorMode::None => Colors {
-                foreground: None,
-                background: None,
-            },
+            ColorMode::None => None,
             // ColorMode::Sixteen => {}
             ColorMode::TwoFiftySix => {
                 let [r, g, b, _] = rgb.to_srgb_32bit();
@@ -299,12 +370,12 @@ impl ColorMode {
                 }
                 let AnsiValue(byte) = AnsiValue::rgb(scale(r), scale(g), scale(b));
 
-                Colors::new(Color::Black, Color::AnsiValue(byte))
+                Some(Color::AnsiValue(byte))
             }
             ColorMode::Rgb => {
                 let [r, g, b, _] = rgb.to_srgb_32bit();
                 let c = Color::Rgb { r, g, b };
-                Colors::new(Color::Black, c)
+                Some(c)
             }
         }
     }
