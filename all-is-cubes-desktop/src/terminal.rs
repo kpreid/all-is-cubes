@@ -44,94 +44,137 @@ pub fn terminal_main_loop(
     // TODO: Leftovers from early input-less days.
     app.camera().borrow_mut().auto_rotate = true;
 
-    crossterm::terminal::enable_raw_mode()?;
-
-    // Run the actual work in a function so we can make really sure
-    // that we always disable_raw_mode. (TODO: How about a Drop hook...?)
-    let result = real_main_loop(app, options);
-    let _ = cleanup();
-    result
+    let mut main = TerminalMain::new(app, options)?;
+    main.run()?;
+    main.clean_up_terminal()?; // note this is _also_ run on drop
+    Ok(())
 }
 
-fn real_main_loop(
-    mut app: AllIsCubesAppState,
-    mut options: TerminalOptions,
-) -> Result<(), Box<dyn Error>> {
-    let mut proj: ProjectionHelper =
-        ProjectionHelper::new(viewport_from_terminal_size(crossterm::terminal::size()?));
-    let mut out = io::stdout();
+#[derive(Debug)]
+struct TerminalMain {
+    app: AllIsCubesAppState,
+    options: TerminalOptions,
+    out: io::Stdout,
+    terminal_size: Vector2<u16>,
+    projection: ProjectionHelper,
+    terminal_state_dirty: bool,
+}
 
-    // Park stdin blocking reads on another thread.
-    let (event_tx, event_rx) = mpsc::sync_channel(0);
-    thread::spawn(move || {
+impl TerminalMain {
+    fn new(app: AllIsCubesAppState, options: TerminalOptions) -> crossterm::Result<Self> {
+        crossterm::terminal::enable_raw_mode()?;
+
+        let terminal_size = Vector2::from(crossterm::terminal::size()?);
+
+        Ok(Self {
+            app,
+            options,
+            out: io::stdout(),
+            terminal_size,
+            projection: ProjectionHelper::new(viewport_from_terminal_size(terminal_size)),
+            terminal_state_dirty: true,
+        })
+    }
+
+    /// Reset terminal state, as before exiting.
+    /// This will be run on drop but errors will not be reported in that case.
+    fn clean_up_terminal(&mut self) -> crossterm::Result<()> {
+        self.out.queue(SetAttribute(Attribute::Reset))?;
+        self.out
+            .queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
+        crossterm::terminal::disable_raw_mode()?;
+        self.terminal_state_dirty = false;
+        Ok(())
+    }
+
+    fn run(&mut self) -> crossterm::Result<()> {
+        // Park stdin blocking reads on another thread.
+        let (event_tx, event_rx) = mpsc::sync_channel(0);
+        thread::spawn(move || {
+            loop {
+                match crossterm::event::read() {
+                    Ok(event) => event_tx.send(event).unwrap(),
+                    Err(err) => {
+                        eprintln!("stdin read error: {}", err);
+                        break;
+                    }
+                }
+            }
+            eprintln!("read thread exiting");
+        });
+
+        self.out.queue(Clear(ClearType::All))?;
+
         loop {
-            match crossterm::event::read() {
-                Ok(event) => event_tx.send(event).unwrap(),
-                Err(err) => {
-                    eprintln!("stdin read error: {}", err);
-                    break;
-                }
-            }
-        }
-        eprintln!("read thread exiting");
-    });
-
-    out.queue(Clear(ClearType::All))?;
-
-    loop {
-        'input: loop {
-            match event_rx.try_recv() {
-                Ok(event) => {
-                    if let Some(aic_event) = map_crossterm_event(&event) {
-                        if app.input_processor.key_momentary(aic_event) {
-                            // Handled by input_processor
-                            continue 'input;
+            'input: loop {
+                match event_rx.try_recv() {
+                    Ok(event) => {
+                        if let Some(aic_event) = map_crossterm_event(&event) {
+                            if self.app.input_processor.key_momentary(aic_event) {
+                                // Handled by input_processor
+                                continue 'input;
+                            }
+                        }
+                        match event {
+                            Event::Key(KeyEvent {
+                                code: KeyCode::Esc, ..
+                            })
+                            | Event::Key(KeyEvent {
+                                code: KeyCode::Char('c'),
+                                modifiers: KeyModifiers::CONTROL,
+                            })
+                            | Event::Key(KeyEvent {
+                                code: KeyCode::Char('d'),
+                                modifiers: KeyModifiers::CONTROL,
+                            }) => {
+                                return Ok(());
+                            }
+                            Event::Key(KeyEvent {
+                                code: KeyCode::Char('m'),
+                                modifiers: _,
+                            }) => self.options.colors = self.options.colors.cycle(),
+                            Event::Key(_) => {}
+                            Event::Resize(w, h) => {
+                                self.terminal_size = Vector2::new(w, h);
+                                self.projection
+                                    .set_viewport(viewport_from_terminal_size(self.terminal_size));
+                                self.out.queue(Clear(ClearType::All))?;
+                            }
+                            Event::Mouse(_) => {}
                         }
                     }
-                    match event {
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Esc, ..
-                        })
-                        | Event::Key(KeyEvent {
-                            code: KeyCode::Char('c'),
-                            modifiers: KeyModifiers::CONTROL,
-                        })
-                        | Event::Key(KeyEvent {
-                            code: KeyCode::Char('d'),
-                            modifiers: KeyModifiers::CONTROL,
-                        }) => {
-                            return Ok(());
-                        }
-                        Event::Key(KeyEvent {
-                            code: KeyCode::Char('m'),
-                            modifiers: _,
-                        }) => options.colors = options.colors.cycle(),
-                        Event::Key(_) => {}
-                        Event::Resize(w, h) => {
-                            proj.set_viewport(viewport_from_terminal_size((w, h)));
-                            out.queue(Clear(ClearType::All))?;
-                        }
-                        Event::Mouse(_) => {}
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        eprintln!("input disconnected");
+                        return Ok(());
+                    }
+                    Err(mpsc::TryRecvError::Empty) => {
+                        break 'input;
                     }
                 }
-                Err(mpsc::TryRecvError::Disconnected) => {
-                    eprintln!("input disconnected");
-                    return Ok(());
-                }
-                Err(mpsc::TryRecvError::Empty) => {
-                    break 'input;
-                }
+            }
+
+            // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.
+            self.app.frame_clock.advance_to(Instant::now());
+            self.app.maybe_step_universe();
+            if self.app.frame_clock.should_draw() {
+                draw_space(
+                    &mut self.projection,
+                    &*self.app.camera().borrow(),
+                    &mut self.out,
+                    &self.options,
+                )?;
+                self.app.frame_clock.did_draw();
+            } else {
+                std::thread::yield_now();
             }
         }
+    }
+}
 
-        // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.
-        app.frame_clock.advance_to(Instant::now());
-        app.maybe_step_universe();
-        if app.frame_clock.should_draw() {
-            draw_space(&mut proj, &*app.camera().borrow(), &mut out, &options)?;
-            app.frame_clock.did_draw();
-        } else {
-            std::thread::yield_now();
+impl Drop for TerminalMain {
+    fn drop(&mut self) {
+        if self.terminal_state_dirty {
+            let _ = self.clean_up_terminal();
         }
     }
 }
@@ -155,24 +198,15 @@ pub fn map_crossterm_event(event: &Event) -> Option<Key> {
 
 /// Obtain the terminal size and adjust it such that it is suitable for a
 /// `ProjectionHelper::set_viewport` followed by `draw_space`.
-pub fn viewport_from_terminal_size((w, h): (u16, u16)) -> Viewport {
+pub fn viewport_from_terminal_size(size: Vector2<u16>) -> Viewport {
     // max(1) is to keep the projection math from blowing up.
     // Subtracting some height allows for info text.
-    let w = w.max(1);
-    let h = h.saturating_sub(5).max(1);
+    let w = size.x.max(1);
+    let h = size.y.saturating_sub(5).max(1);
     Viewport {
         framebuffer_size: Vector2::new(w.into(), h.into()),
         nominal_size: Vector2::new(FreeCoordinate::from(w) * 0.5, h.into()),
     }
-}
-
-/// Reset terminal state before exiting.
-fn cleanup() -> crossterm::Result<()> {
-    let mut out = io::stdout();
-    crossterm::terminal::disable_raw_mode()?;
-    out.queue(SetAttribute(Attribute::Reset))?;
-    out.queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
-    Ok(())
 }
 
 /// Draw the camera's space to a terminal using raytracing.
@@ -340,10 +374,10 @@ mod tests {
 
     #[test]
     fn viewport_no_panic() {
-        viewport_from_terminal_size((0, 0));
-        viewport_from_terminal_size((0, 1));
-        viewport_from_terminal_size((1, 0));
-        viewport_from_terminal_size((1, 1));
+        viewport_from_terminal_size((0, 0).into());
+        viewport_from_terminal_size((0, 1).into());
+        viewport_from_terminal_size((1, 0).into());
+        viewport_from_terminal_size((1, 1).into());
     }
 
     // TODO: add tests of color calculation
