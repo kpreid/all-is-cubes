@@ -19,7 +19,7 @@ use std::time::Instant;
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::camera::{ProjectionHelper, Viewport};
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::math::{FreeCoordinate, NotNan, Rgb, Rgba};
+use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
@@ -282,12 +282,7 @@ impl ColorMode {
         }
     }
 
-    fn convert(self, rgb: Rgb) -> Colors {
-        // TODO: Pick 8/256/truecolor based on what the terminal supports.
-        fn scale(x: NotNan<f32>, scale: f32) -> u8 {
-            (x.into_inner() * scale).max(0.0).min(scale) as u8
-        }
-
+    fn convert(self, rgb: Rgba) -> Colors {
         match self {
             ColorMode::None => Colors {
                 foreground: None,
@@ -295,21 +290,20 @@ impl ColorMode {
             },
             // ColorMode::Sixteen => {}
             ColorMode::TwoFiftySix => {
+                let [r, g, b, _] = rgb.to_srgb_32bit();
+
                 // Crossterm doesn't have a convenient 216-color table. Use Termion's.
                 use termion::color::AnsiValue;
-                let AnsiValue(byte) = AnsiValue::rgb(
-                    scale(rgb.red(), 5.),
-                    scale(rgb.green(), 5.),
-                    scale(rgb.blue(), 5.),
-                );
+                fn scale(x: u8) -> u8 {
+                    ((u16::from(x) * 5) / 255) as u8
+                }
+                let AnsiValue(byte) = AnsiValue::rgb(scale(r), scale(g), scale(b));
+
                 Colors::new(Color::Black, Color::AnsiValue(byte))
             }
             ColorMode::Rgb => {
-                let c = Color::Rgb {
-                    r: scale(rgb.red(), 255.),
-                    g: scale(rgb.green(), 255.),
-                    b: scale(rgb.blue(), 255.),
-                };
+                let [r, g, b, _] = rgb.to_srgb_32bit();
+                let c = Color::Rgb { r, g, b };
                 Colors::new(Color::Black, c)
             }
         }
@@ -327,7 +321,7 @@ struct ColorCharacterBuf {
 }
 
 impl PixelBuf for ColorCharacterBuf {
-    type Pixel = (String, Option<Rgb>);
+    type Pixel = (String, Option<Rgba>);
     type BlockData = <CharacterBuf as PixelBuf>::BlockData;
 
     fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
@@ -348,12 +342,12 @@ impl PixelBuf for ColorCharacterBuf {
     }
 
     #[inline]
-    fn result(self) -> (String, Option<Rgb>) {
+    fn result(self) -> (String, Option<Rgba>) {
         // TODO: override_color should be less clunky
         if self.override_color {
             (self.text.result(), None)
         } else {
-            (self.text.result(), Some(self.color.result().to_rgb()))
+            (self.text.result(), Some(self.color.result()))
         }
     }
 
