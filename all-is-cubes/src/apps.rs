@@ -133,6 +133,9 @@ pub struct InputProcessor {
     momentary_timeout: HashMap<Key, Duration>,
     /// Net mouse movement since the last [`Self::apply_input`].
     mouselook_buffer: Vector2<FreeCoordinate>,
+    /// [`Key`]s with one-shot effects when pressed which need to be applied
+    /// once per press rather than while held.
+    command_buffer: Vec<Key>,
 }
 
 impl InputProcessor {
@@ -142,6 +145,7 @@ impl InputProcessor {
             keys_held: HashSet::new(),
             momentary_timeout: HashMap::new(),
             mouselook_buffer: Vector2::zero(),
+            command_buffer: Vec::new(),
         }
     }
 
@@ -166,11 +170,23 @@ impl InputProcessor {
         }
     }
 
+    /// Returns true if the key should go in `command_buffer`.
+    fn is_command(key: Key) -> bool {
+        #[allow(clippy::match_like_matches_macro)]
+        match key {
+            Key::Character(d) if d.is_ascii_digit() => true,
+            _ => false,
+        }
+    }
+
     /// Handles incoming key-down events. Returns whether the key was unbound.
     pub fn key_down(&mut self, key: Key) -> bool {
         let bound = Self::is_bound(key);
         if bound {
             self.keys_held.insert(key);
+            if Self::is_command(key) {
+                self.command_buffer.push(key);
+            }
         }
         bound
     }
@@ -265,16 +281,14 @@ impl InputProcessor {
             camera.jump_if_able();
         }
 
-        // TODO: would be nice to express this in a more straightforward fashion
-        // (though it's probably fast enough that the O(n) doesn't matter)
-        for slot in 0..=9 {
-            let digit = if slot == 9 {
-                '0'
-            } else {
-                std::char::from_digit(slot as u32 + 1, 10).unwrap()
-            };
-            if self.keys_held.contains(&Key::Character(digit)) {
-                camera.set_selected_slot(1, slot);
+        for key in self.command_buffer.drain(..) {
+            match key {
+                Key::Character(numeral) if numeral.is_digit(10) => {
+                    let digit = numeral.to_digit(10).unwrap() as usize;
+                    let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
+                    camera.set_selected_slot(1, slot);
+                }
+                _ => {}
             }
         }
     }
@@ -309,6 +323,8 @@ pub enum Key {
 
 #[cfg(test)]
 mod tests {
+    use cgmath::{EuclideanSpace as _, Point3};
+
     use super::*;
 
     #[test]
@@ -338,6 +354,26 @@ mod tests {
         input.key_down(Key::Character('d'));
         assert_eq!(input.movement(), Vector3::unit_x());
         // TODO: test (and handle) key events arriving while focus is lost, just in case.
+    }
+
+    #[test]
+    fn input_slot_selection() {
+        // TODO: Awful lot of setup boilerplate...
+        let mut u = Universe::new();
+        let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let camera = u.insert_anonymous(Camera::new(space.clone(), Point3::origin()));
+        let mut input = InputProcessor::new();
+
+        input.key_down(Key::Character('5'));
+        input.key_up(Key::Character('5'));
+        input.apply_input(&mut *camera.borrow_mut(), Duration::from_secs(1));
+        assert_eq!(camera.borrow_mut().selected_slots()[1], 4);
+
+        // Tenth slot
+        input.key_down(Key::Character('0'));
+        input.key_up(Key::Character('0'));
+        input.apply_input(&mut *camera.borrow_mut(), Duration::from_secs(1));
+        assert_eq!(camera.borrow_mut().selected_slots()[1], 9);
     }
 
     // TODO: test jump and flying logic
