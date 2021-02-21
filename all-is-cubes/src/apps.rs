@@ -125,8 +125,13 @@ impl AllIsCubesAppState {
 ///    on the input processor.
 #[derive(Clone, Debug)]
 pub struct InputProcessor {
+    /// All [`Key`]s currently pressed.
     keys_held: HashSet<Key>,
+    /// As a special feature for supporting input without key-up events, stores all
+    /// keypresses arriving through [`Self::key_momentary`] and virtually holds them
+    /// for a short time. The value is the remaining time.
     momentary_timeout: HashMap<Key, Duration>,
+    /// Net mouse movement since the last [`Self::apply_input`].
     mouselook_buffer: Vector2<FreeCoordinate>,
 }
 
