@@ -65,7 +65,7 @@ pub struct Camera {
 }
 
 impl std::fmt::Debug for Camera {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt.debug_struct("Camera")
             .field("body", &self.body)
             .field("auto_rotate", &self.auto_rotate)

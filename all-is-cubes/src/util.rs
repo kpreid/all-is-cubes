@@ -19,7 +19,7 @@ pub trait ConciseDebug: Sized {
     }
 
     /// Implement this to provide ConciseDebug formatting for this type.
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result;
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result;
 }
 
 /// You can use [`ConciseDebug::as_concise_debug`] to construct this.
@@ -27,20 +27,20 @@ pub trait ConciseDebug: Sized {
 pub struct ConciseDebugWrapper<'a, T: ConciseDebug>(&'a T);
 
 impl<'a, T: ConciseDebug> fmt::Debug for ConciseDebugWrapper<'a, T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         <T as ConciseDebug>::fmt(self.0, fmt)
     }
 }
 
 // TODO: Macro time?
 impl<S: fmt::Debug> ConciseDebug for Point3<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z)
     }
 }
 
 impl<S: fmt::Debug> ConciseDebug for Matrix4<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt,
             "\n[{:?},\n {:?},\n {:?},\n {:?}]",
@@ -53,17 +53,17 @@ impl<S: fmt::Debug> ConciseDebug for Matrix4<S> {
 }
 
 impl<S: fmt::Debug> ConciseDebug for Vector2<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "({:+.3?}, {:+.3?})", self.x, self.y)
     }
 }
 impl<S: fmt::Debug> ConciseDebug for Vector3<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z)
     }
 }
 impl<S: fmt::Debug> ConciseDebug for Vector4<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt,
             "({:+.3?}, {:+.3?}, {:+.3?}, {:+.3?})",
@@ -168,7 +168,7 @@ mod tests {
         #[derive(Debug)]
         struct Foo;
         impl ConciseDebug for Foo {
-            fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(fmt, "<Foo>")
             }
         }

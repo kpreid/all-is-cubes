@@ -71,7 +71,11 @@ pub struct BlockUniformInterface {
 
 impl BlockUniformInterface {
     /// Set all the uniforms, given necessary parameters.
-    pub fn initialize(&self, program_iface: &mut ProgramInterface, space: &SpaceRendererBound<'_>) {
+    pub fn initialize(
+        &self,
+        program_iface: &mut ProgramInterface<'_>,
+        space: &SpaceRendererBound<'_>,
+    ) {
         self.set_projection_matrix(program_iface, space.ph.projection());
         self.set_view_matrix(program_iface, space.ph.view_matrix());
         self.set_block_texture(program_iface, &space.bound_block_texture);
@@ -82,7 +86,7 @@ impl BlockUniformInterface {
     /// Type converting wrapper for [`Self::projection_matrix`].
     pub fn set_projection_matrix(
         &self,
-        program_iface: &mut ProgramInterface,
+        program_iface: &mut ProgramInterface<'_>,
         projection_matrix: Matrix4<FreeCoordinate>,
     ) {
         program_iface.set(
@@ -94,7 +98,7 @@ impl BlockUniformInterface {
     /// Type converting wrapper for [`Self::view_matrix`].
     pub fn set_view_matrix(
         &self,
-        program_iface: &mut ProgramInterface,
+        program_iface: &mut ProgramInterface<'_>,
         view_matrix: Matrix4<FreeCoordinate>,
     ) {
         program_iface.set(&self.view_matrix, view_matrix.cast::<f32>().unwrap().into());
@@ -103,8 +107,8 @@ impl BlockUniformInterface {
     /// Type converting wrapper for [`Self::block_texture`].
     pub fn set_block_texture(
         &self,
-        program_iface: &mut ProgramInterface,
-        texture: &BoundBlockTexture,
+        program_iface: &mut ProgramInterface<'_>,
+        texture: &BoundBlockTexture<'_>,
     ) {
         program_iface.set(&self.block_texture, texture.binding());
     }

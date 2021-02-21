@@ -3,6 +3,7 @@
 
 //! Binary for All is Cubes desktop app.
 
+#![deny(rust_2018_idioms)]
 #![warn(clippy::cast_lossless)]
 
 use cgmath::Vector2;

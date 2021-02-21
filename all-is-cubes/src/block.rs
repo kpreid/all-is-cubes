@@ -455,7 +455,7 @@ pub struct EvaluatedBlock {
 }
 
 impl ConciseDebug for EvaluatedBlock {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt.debug_struct("EvaluatedBlock")
             .field("attributes", &self.attributes)
             .field("color", &self.color)

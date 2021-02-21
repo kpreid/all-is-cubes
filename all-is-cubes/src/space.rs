@@ -84,7 +84,7 @@ pub struct SpaceBlockData {
 }
 
 impl std::fmt::Debug for Space {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Make the assumption that a Space is too big to print in its entirety.
         fmt.debug_struct("Space")
             .field("grid", &self.grid)
@@ -95,7 +95,7 @@ impl std::fmt::Debug for Space {
 }
 
 impl std::fmt::Debug for SpaceBlockData {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Omit the evaluated data because it is usually redundant.
         // We may regret this later...
         fmt.debug_struct("SpaceBlockData")

@@ -6,6 +6,7 @@
 //! If this documentation looks strangely blank, it's because non-wasm32 builds have
 //! most of the modules excluded from compilation.
 
+#![deny(rust_2018_idioms)]
 #![warn(clippy::cast_lossless)]
 
 #[cfg(target_arch = "wasm32")]

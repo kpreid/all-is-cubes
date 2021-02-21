@@ -65,7 +65,7 @@ pub enum Coloring {
 }
 
 impl std::fmt::Debug for BlockVertex {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Print compactly on single line even if the formatter is in prettyprint mode.
         write!(
             fmt,
@@ -78,7 +78,7 @@ impl std::fmt::Debug for BlockVertex {
 }
 impl std::fmt::Debug for Coloring {
     // TODO: test formatting of this
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Coloring::Solid(color) => write!(fmt, "Solid({:?})", color),
             Coloring::Texture { pos, .. } => write!(fmt, "Texture({:?})", pos.as_concise_debug()),

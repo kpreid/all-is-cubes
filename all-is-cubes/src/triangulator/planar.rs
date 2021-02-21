@@ -160,7 +160,7 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
     depth: FreeCoordinate,
     low_corner: Point2<FreeCoordinate>,
     high_corner: Point2<FreeCoordinate>,
-    coloring: QuadColoring<impl TextureTile>,
+    coloring: QuadColoring<'_, impl TextureTile>,
     resolution: GridCoordinate,
 ) {
     // TODO: Refactor so we don't have to do 100% of this anew for each individual quad

@@ -7,6 +7,7 @@
 //! This crate defines the world model, simulation rules, rendering, and in-game user
 //! interface. Glue for displaying on specific platforms is kept in other crates.
 
+#![deny(rust_2018_idioms)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::needless_update)]
 #![warn(clippy::cast_lossless)]

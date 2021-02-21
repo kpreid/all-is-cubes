@@ -173,7 +173,7 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
     ///         .collect::<Vec<_>>(),
     /// );
     /// ```
-    fn iter_by_type(&self) -> UniverseIter<T>;
+    fn iter_by_type(&self) -> UniverseIter<'_, T>;
 }
 impl UniverseIndex<BlockDef> for Universe {
     fn get(&self, name: &Name) -> Option<URef<BlockDef>> {
@@ -182,7 +182,7 @@ impl UniverseIndex<BlockDef> for Universe {
     fn insert(&mut self, name: Name, value: BlockDef) -> Result<URef<BlockDef>, InsertError> {
         index_insert(self, name, value)
     }
-    fn iter_by_type(&self) -> UniverseIter<BlockDef> {
+    fn iter_by_type(&self) -> UniverseIter<'_, BlockDef> {
         UniverseIter(self.table().iter())
     }
 }
@@ -193,7 +193,7 @@ impl UniverseIndex<Camera> for Universe {
     fn insert(&mut self, name: Name, value: Camera) -> Result<URef<Camera>, InsertError> {
         index_insert(self, name, value)
     }
-    fn iter_by_type(&self) -> UniverseIter<Camera> {
+    fn iter_by_type(&self) -> UniverseIter<'_, Camera> {
         UniverseIter(self.table().iter())
     }
 }
@@ -204,7 +204,7 @@ impl UniverseIndex<Space> for Universe {
     fn insert(&mut self, name: Name, value: Space) -> Result<URef<Space>, InsertError> {
         index_insert(self, name, value)
     }
-    fn iter_by_type(&self) -> UniverseIter<Space> {
+    fn iter_by_type(&self) -> UniverseIter<'_, Space> {
         UniverseIter(self.table().iter())
     }
 }
@@ -236,7 +236,7 @@ where
 }
 
 /// Iterator type for [`UniverseIndex::iter_by_type`].
-pub struct UniverseIter<'u, T: 'u>(std::collections::hash_map::Iter<'u, Name, URootRef<T>>);
+pub struct UniverseIter<'u, T>(std::collections::hash_map::Iter<'u, Name, URootRef<T>>);
 impl<'u, T> Iterator for UniverseIter<'u, T> {
     type Item = (Name, URef<T>);
     fn next(&mut self) -> Option<Self::Item> {
@@ -394,12 +394,12 @@ impl<T> DerefMut for UBorrowMut<T> {
 }
 
 impl<T: Debug> Debug for UBorrow<T> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "UBorrow({:?})", **self)
     }
 }
 impl<T: Debug> Debug for UBorrowMut<T> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "UBorrowMut({:?})", **self)
     }
 }

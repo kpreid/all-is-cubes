@@ -357,7 +357,7 @@ impl Mul<f32> for Rgb {
 }
 
 impl std::fmt::Debug for Rgb {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             fmt,
             "Rgb({:?}, {:?}, {:?})",
@@ -368,7 +368,7 @@ impl std::fmt::Debug for Rgb {
     }
 }
 impl std::fmt::Debug for Rgba {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             fmt,
             "Rgba({:?}, {:?}, {:?}, {:?})",

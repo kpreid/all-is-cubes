@@ -291,7 +291,7 @@ impl HudLayout {
                 .draw_target(GridMatrix::from_translation(position.to_vec()) * GridMatrix::FLIP_Y);
             for sel in 0..2 {
                 let slot = selections.get(sel).copied().unwrap_or(usize::MAX);
-                let brush: &VoxelBrush =
+                let brush: &VoxelBrush<'_> =
                     &hud_blocks.toolbar_pointer[sel][usize::from(slot == index)];
                 Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
             }

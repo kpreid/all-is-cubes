@@ -224,7 +224,7 @@ impl Aab {
 }
 
 impl std::fmt::Debug for Aab {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             fmt,
             "Aab({:?} to {:?})",

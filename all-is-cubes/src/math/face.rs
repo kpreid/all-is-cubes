@@ -401,7 +401,7 @@ impl CubeFace {
 }
 
 impl std::fmt::Debug for CubeFace {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             fmt,
             "CubeFace({:?}, {:?})",

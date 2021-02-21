@@ -303,7 +303,7 @@ impl<'a> SpaceRendererOutput<'a> {
 }
 impl<'a> SpaceRendererBound<'a> {
     /// Use a [`RenderGate`] to actually draw the space.
-    pub fn render<E>(&self, render_gate: &mut RenderGate) -> Result<SpaceRenderInfo, E> {
+    pub fn render<E>(&self, render_gate: &mut RenderGate<'_>) -> Result<SpaceRenderInfo, E> {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
 
@@ -524,7 +524,7 @@ impl Chunk {
 
     fn render<E>(
         &self,
-        tess_gate: &mut TessGate,
+        tess_gate: &mut TessGate<'_>,
         pass: SpaceRendererPass,
         ordering: DepthOrdering,
     ) -> Result<usize, E> {
