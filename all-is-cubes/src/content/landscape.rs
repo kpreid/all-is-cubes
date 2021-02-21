@@ -2,12 +2,13 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use noise::Seedable as _;
+use ordered_float::NotNan;
 
-use crate::block::{Block, Resolution};
+use crate::block::{Block, BlockCollision, Resolution, AIR};
 use crate::content::blocks::scale_color;
 use crate::content::palette;
 use crate::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
-use crate::math::{FreeCoordinate, GridCoordinate, NoiseFnExt as _, Rgb};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, Rgb};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
 
@@ -20,6 +21,8 @@ use crate::universe::Universe;
 #[non_exhaustive]
 pub enum LandscapeBlocks {
     Grass,
+    GrassBlades1,
+    GrassBlades2,
     Dirt,
     Stone,
     Trunk,
@@ -42,9 +45,19 @@ impl DefaultProvision for LandscapeBlocks {
                 .build()
         }
 
+        fn blades() -> Block {
+            Block::builder()
+                .display_name("Grass Blades")
+                .color(palette::GRASS.with_alpha(NotNan::new(0.1).unwrap()))
+                .collision(BlockCollision::None)
+                .build()
+        }
+
         use LandscapeBlocks::*;
         match self {
             Grass => color_and_name(palette::GRASS, "Grass"),
+            GrassBlades1 => blades(),
+            GrassBlades2 => blades(),
             Dirt => color_and_name(palette::DIRT, "Dirt"),
             Stone => color_and_name(palette::STONE, "Stone"),
             Trunk => color_and_name(palette::TREE_BARK, "Wood"),
@@ -75,8 +88,39 @@ pub fn install_landscape_blocks(
     let overhang_noise = noise::ScaleBias::new(&overhang_noise_v)
         .set_bias(f64::from(resolution) * 0.75)
         .set_scale(2.5);
+    let blade_noise_v = noise::OpenSimplex::new().set_seed(0x7af8c181);
+    let blade_noise_stretch = noise::ScalePoint::new(blade_noise_v).set_y_scale(0.1);
+    let blade_noise = noise::ScaleBias::new(&blade_noise_stretch)
+        .set_bias(f64::from(resolution) * -0.34)
+        .set_scale(f64::from(resolution) * 1.7);
 
     BlockProvider::<LandscapeBlocks>::new(|key| {
+        let grass_blades = |universe, index: GridCoordinate| -> Result<Block, InGenError> {
+            Ok(Block::builder()
+                .attributes(
+                    colors[GrassBlades1]
+                        .evaluate()
+                        .map_err(InGenError::other)?
+                        .attributes,
+                )
+                .voxels_fn(universe, resolution, |cube| {
+                    if f64::from(cube.y)
+                        < blade_noise.at_grid(
+                            cube + GridVector::new(
+                                GridCoordinate::from(resolution),
+                                GridCoordinate::from(resolution) * 3 / 4,
+                                0,
+                            ) * index,
+                        )
+                    {
+                        scale_color(colors[Grass].clone(), dirt_noise.at_grid(cube), 0.02)
+                    } else {
+                        AIR
+                    }
+                })?
+                .build())
+        };
+
         Ok(match key {
             Stone => Block::builder()
                 .attributes(
@@ -105,6 +149,9 @@ pub fn install_landscape_blocks(
                     }
                 })?
                 .build(),
+
+            GrassBlades1 => grass_blades(universe, 0)?,
+            GrassBlades2 => grass_blades(universe, 1)?,
 
             Dirt => Block::builder()
                 .attributes(
@@ -154,6 +201,11 @@ pub fn wavy_landscape(
     let slope_scaled = max_slope / 0.904087;
     let middle_y = (region.lower_bounds().y + region.upper_bounds().y) / 2;
 
+    let placement_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
+    let placement_noise = noise::ScaleBias::new(&placement_noise_v)
+        .set_bias(0.0)
+        .set_scale(4.0);
+    let grass_threshold = 1.0;
     for x in region.x_range() {
         for z in region.z_range() {
             let fx = FreeCoordinate::from(x);
@@ -166,8 +218,17 @@ pub fn wavy_landscape(
             for y in region.y_range() {
                 let altitude = y - surface_y;
                 use LandscapeBlocks::*;
-                let block: &Block = if altitude > 0 {
+                let cube = GridPoint::new(x, y, z);
+                let block: &Block = if altitude > 1 {
                     continue;
+                } else if altitude == 1 {
+                    if placement_noise.at_cube(cube) > grass_threshold * 2. {
+                        &blocks[GrassBlades2]
+                    } else if placement_noise.at_cube(cube) > grass_threshold {
+                        &blocks[GrassBlades1]
+                    } else {
+                        &AIR
+                    }
                 } else if altitude == 0 {
                     &blocks[Grass]
                 } else if altitude == -1 {
@@ -175,7 +236,7 @@ pub fn wavy_landscape(
                 } else {
                     &blocks[Stone]
                 };
-                space.set((x, y, z), block)?;
+                space.set(cube, block)?;
                 // TODO: Add various decorations on the ground. And trees.
             }
         }

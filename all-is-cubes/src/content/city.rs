@@ -9,6 +9,7 @@ use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
+use noise::Seedable as _;
 use ordered_float::NotNan;
 use strum::IntoEnumIterator;
 
@@ -18,7 +19,7 @@ use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
-    Rgb,
+    NoiseFnExt as _, Rgb,
 };
 use crate::raycast::Raycaster;
 use crate::space::{Grid, SetCubeError, Space};
@@ -82,6 +83,28 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     space.fill_uniform(
         Grid::from_lower_upper((-radius_xz, 0, -radius_xz), (radius_xz, 1, radius_xz)),
         &landscape_blocks[LandscapeBlocks::Grass],
+    )?;
+
+    // Stray grass
+    let grass_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
+    let grass_noise = noise::ScaleBias::new(&grass_noise_v)
+        .set_bias(0.0)
+        .set_scale(4.0);
+    let grass_threshold = 1.2;
+    space.fill(
+        Grid::from_lower_upper((-radius_xz, 1, -radius_xz), (radius_xz, 2, radius_xz)),
+        |cube| {
+            if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
+                return None;
+            }
+            if grass_noise.at_cube(cube) > grass_threshold * 2. {
+                Some(&landscape_blocks[LandscapeBlocks::GrassBlades2])
+            } else if grass_noise.at_cube(cube) > grass_threshold {
+                Some(&landscape_blocks[LandscapeBlocks::GrassBlades1])
+            } else {
+                None
+            }
+        },
     )?;
 
     // Roads and lamps
