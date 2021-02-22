@@ -8,8 +8,9 @@ use luminance::{Semantics, Vertex};
 use luminance_front::context::GraphicsContext;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
+use std::convert::TryFrom as _;
 
-use crate::math::{FreeCoordinate, Rgba};
+use crate::math::{Face, FreeCoordinate, GridCoordinate, GridVector, Rgba};
 use crate::space::PackedLight;
 use crate::triangulator::{BlockVertex, Coloring, GfxVertex};
 
@@ -157,16 +158,22 @@ impl GfxVertex for LumBlockVertex {
     type Coordinate = f32;
 
     #[inline]
-    fn position(&self) -> Point3<Self::Coordinate> {
-        Point3::from(self.position.repr)
-    }
-
-    #[inline]
     fn instantiate(&mut self, offset: Vector3<Self::Coordinate>, lighting: PackedLight) {
         self.position.repr[0] += offset.x;
         self.position.repr[1] += offset.y;
         self.position.repr[2] += offset.z;
         self.lighting = VertexLighting::new(lighting.into());
+    }
+
+    #[inline]
+    fn position(&self) -> Point3<Self::Coordinate> {
+        Point3::from(self.position.repr)
+    }
+
+    #[inline]
+    fn face(&self) -> Face {
+        let normal: GridVector = Vector3::from(self.normal.repr).map(|c| c as GridCoordinate);
+        Face::try_from(normal).unwrap_or(Face::WITHIN)
     }
 }
 

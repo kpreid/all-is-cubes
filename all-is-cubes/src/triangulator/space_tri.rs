@@ -7,7 +7,7 @@ use std::convert::TryInto;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::math::{Face, GridCoordinate, GridRotation};
+use crate::math::{Face, FaceMap, GridCoordinate, GridRotation};
 use crate::space::{BlockIndex, Grid, Space};
 use crate::triangulator::{BlockTriangulation, GfxVertex};
 
@@ -160,6 +160,10 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 .and_then(|index| block_triangulations.get(index))
                 .unwrap_or(&empty_render);
             let low_corner = cube.cast::<V::Coordinate>().unwrap();
+
+            let light_neighborhood =
+                FaceMap::generate(|f| space.get_lighting(cube + f.normal_vector()));
+
             for &face in Face::ALL_SEVEN {
                 let adjacent_cube = cube + face.normal_vector();
                 if space
@@ -172,8 +176,6 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                     continue;
                 }
 
-                let lighting = space.get_lighting(adjacent_cube);
-
                 // Copy vertices, offset to the block position and with lighting
                 let face_triangulation = &precomputed.faces[face];
                 let index_offset_usize = self.vertices.len();
@@ -182,7 +184,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                     .expect("vertex index overflow");
                 self.vertices.extend(face_triangulation.vertices.iter());
                 for vertex in &mut self.vertices[index_offset_usize..] {
-                    vertex.instantiate(low_corner.to_vec(), lighting);
+                    vertex.instantiate(low_corner.to_vec(), light_neighborhood[vertex.face()]);
                 }
                 self.indices.extend(
                     face_triangulation
