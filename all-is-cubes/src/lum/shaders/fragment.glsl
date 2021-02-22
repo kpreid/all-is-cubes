@@ -34,8 +34,22 @@ void main(void) {
   mediump vec4 diffuse_color;
   if (v_color_or_texture[3] < -0.5) {
     // Texture coordinates.
-    mediump vec3 texcoord = clamp(v_color_or_texture.stp, v_clamp_min, v_clamp_max);
+    mediump vec3 unclamped = v_color_or_texture.stp;
+    mediump vec3 texcoord = clamp(unclamped, v_clamp_min, v_clamp_max);
     diffuse_color = texture(block_texture, texcoord);
+
+    #ifdef DEBUG_TEXTURE_EDGE
+      // Visualize the texture coordinate clamp boundaries, which happens to
+      // double as visualizing the edges of textured quads.
+      if (texcoord != v_color_or_texture.stp) {
+        bool dither = mod(dot(floor(gl_FragCoord.xy / 2.0), vec2(1.0, 1.0)), 2.0) > 0.75;
+        diffuse_color = dither
+          ? vec4(0.7, 0.2, 0.2, 1.0)
+          : vec4(vec3(
+              any(lessThan(unclamped, texcoord)) ? 0.0 : 1.0
+            ), 1.0);
+      }
+    #endif
   } else {
     // Solid color.
     diffuse_color = v_color_or_texture;
