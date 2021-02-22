@@ -139,9 +139,9 @@ impl ChunkChart {
         self.octant_chunks
             .iter()
             .copied()
-            .flat_map(|v| TwoIter::distinct(GridVector::new(-v.x, v.y, v.z), v))
-            .flat_map(|v| TwoIter::distinct(GridVector::new(v.x, -v.y, v.z), v))
-            .flat_map(|v| TwoIter::distinct(GridVector::new(v.x, v.y, -v.z), v))
+            .flat_map(AxisMirrorIter::for_axis(0))
+            .flat_map(AxisMirrorIter::for_axis(1))
+            .flat_map(AxisMirrorIter::for_axis(2))
             .map(move |v| ChunkPos(origin.0 + v))
     }
 
@@ -187,42 +187,65 @@ impl ChunkChart {
     }
 }
 
-/// An iterator that owns its items and has at most two of them.
-struct TwoIter<T> {
-    a: Option<T>,
-    b: Option<T>,
+/// An iterator that returns a vector and its opposite in the specified axis.
+/// Part of the implementation of [`ChunkChart`].
+struct AxisMirrorIter {
+    v: GridVector,
+    axis: u8,
+    has_mirrored: bool,
+    has_original: bool,
 }
-impl<T> TwoIter<T> {
-    /// Yields `a`, then `b` only if it is unequal.
-    fn distinct(a: T, b: T) -> Self
-    where
-        T: Eq,
-    {
-        let unequal = a != b;
-        Self {
-            a: Some(a),
-            b: Some(b).filter(|_| unequal),
+impl AxisMirrorIter {
+    #[inline]
+    fn for_axis(axis: u8) -> impl Fn(GridVector) -> Self {
+        move |v| Self {
+            v,
+            axis,
+            has_mirrored: v[usize::from(axis)] != 0,
+            has_original: true,
+        }
+    }
+    #[inline]
+    fn take_mirrored(&mut self) -> Option<GridVector> {
+        if self.has_mirrored {
+            self.has_mirrored = false;
+            let mut v = self.v;
+            v[usize::from(self.axis)] *= -1;
+            Some(v)
+        } else {
+            None
+        }
+    }
+    #[inline]
+    fn take_original(&mut self) -> Option<GridVector> {
+        if self.has_original {
+            self.has_original = false;
+            Some(self.v)
+        } else {
+            None
         }
     }
 }
-impl<T> Iterator for TwoIter<T> {
-    type Item = T;
+impl Iterator for AxisMirrorIter {
+    type Item = GridVector;
     #[inline]
-    fn next(&mut self) -> Option<T> {
-        self.a.take().or_else(|| self.b.take())
+    fn next(&mut self) -> Option<GridVector> {
+        self.take_mirrored().or_else(|| self.take_original())
     }
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let bound = self.a.is_some() as usize + self.b.is_some() as usize;
-        (bound, Some(bound))
+        let count = self.has_mirrored as usize + self.has_original as usize;
+        (count, Some(count))
     }
 }
-impl<T> DoubleEndedIterator for TwoIter<T> {
+impl DoubleEndedIterator for AxisMirrorIter {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.b.take().or_else(|| self.a.take())
+        self.take_original().or_else(|| self.take_mirrored())
     }
 }
-impl<T> std::iter::ExactSizeIterator for TwoIter<T> {}
-impl<T> std::iter::FusedIterator for TwoIter<T> {}
+impl std::iter::ExactSizeIterator for AxisMirrorIter {}
+impl std::iter::FusedIterator for AxisMirrorIter {}
 
 #[cfg(test)]
 mod tests {
