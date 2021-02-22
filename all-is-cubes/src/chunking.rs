@@ -8,6 +8,7 @@
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
 use std::convert::TryFrom;
+use std::iter::FusedIterator;
 
 use crate::math::{int_magnitude_squared, FreeCoordinate, GridCoordinate, GridPoint, GridVector};
 use crate::space::Grid;
@@ -135,7 +136,7 @@ impl ChunkChart {
     pub fn chunks(
         &self,
         origin: ChunkPos,
-    ) -> impl Iterator<Item = ChunkPos> + DoubleEndedIterator + '_ {
+    ) -> impl Iterator<Item = ChunkPos> + DoubleEndedIterator + FusedIterator + '_ {
         self.octant_chunks
             .iter()
             .copied()
@@ -244,8 +245,8 @@ impl DoubleEndedIterator for AxisMirrorIter {
         self.take_original().or_else(|| self.take_mirrored())
     }
 }
-impl std::iter::ExactSizeIterator for AxisMirrorIter {}
-impl std::iter::FusedIterator for AxisMirrorIter {}
+impl ExactSizeIterator for AxisMirrorIter {}
+impl FusedIterator for AxisMirrorIter {}
 
 #[cfg(test)]
 mod tests {
