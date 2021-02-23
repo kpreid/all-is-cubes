@@ -27,6 +27,7 @@ impl ChunkPos {
         Self(GridPoint::new(x, y, z))
     }
 
+    /// Returns the bounds of this chunk as a [`Grid`].
     pub fn grid(self) -> Grid {
         Grid::new(self.0 * CHUNK_SIZE, (CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE))
     }
