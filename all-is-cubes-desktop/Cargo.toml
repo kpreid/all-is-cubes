@@ -27,7 +27,7 @@ luminance = "0.43.1"
 luminance-front = "0.3.1"
 luminance-glfw = "0.15.0"
 luminance-windowing = "0.9"
-once_cell = "1.4.1"
+once_cell = "1.6.0"
 png = "0.16.8"
 strum = { version = "0.20.0", features = ["derive"] }
 termion = "1.5.5"  # TODO: Only used for ANSI color table. Remove?
