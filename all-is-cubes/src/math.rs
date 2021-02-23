@@ -3,6 +3,8 @@
 
 //! Mathematical utilities and decisions.
 
+use std::iter::FusedIterator;
+
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 use noise::NoiseFn;
 use num_traits::identities::Zero;
@@ -158,6 +160,25 @@ impl Aab {
     /// `self.upper_bounds() - self.lower_bounds()`.
     pub fn size(&self) -> Vector3<FreeCoordinate> {
         self.sizes
+    }
+
+    /// Iterates over the eight corner points of the box.
+    /// The ordering is deterministic but not currently declared stable.
+    pub(crate) fn corner_points(
+        self,
+    ) -> impl Iterator<Item = Point3<FreeCoordinate>>
+           + DoubleEndedIterator
+           + ExactSizeIterator
+           + FusedIterator {
+        let l = self.lower_bounds;
+        let u = self.upper_bounds;
+        (0..8).map(move |i| {
+            Point3::new(
+                if i & 1 == 0 { l.x } else { u.x },
+                if i & 2 == 0 { l.y } else { u.y },
+                if i & 4 == 0 { l.z } else { u.z },
+            )
+        })
     }
 
     /// Enlarges the AAB by moving each face outward by the specified distance.
@@ -372,5 +393,29 @@ mod tests {
 
             assert_eq!(expected_size, trailing_box.size());
         }
+    }
+
+    /// This would be a doc test except corner_points is not public for now
+    /// (since it's oddball and not fully nailed down).
+    #[test]
+    fn aab_corner_points() {
+        // use all_is_cubes::cgmath::Point3;
+        // use all_is_cubes::math::{Aab, GridPoint};
+
+        assert_eq!(
+            Aab::from_cube(GridPoint::new(10, 20, 30))
+                .corner_points()
+                .collect::<Vec<_>>(),
+            vec![
+                Point3::new(10., 20., 30.),
+                Point3::new(11., 20., 30.),
+                Point3::new(10., 21., 30.),
+                Point3::new(11., 21., 30.),
+                Point3::new(10., 20., 31.),
+                Point3::new(11., 20., 31.),
+                Point3::new(10., 21., 31.),
+                Point3::new(11., 21., 31.),
+            ],
+        );
     }
 }
