@@ -12,7 +12,7 @@ use std::ops::Range;
 
 use crate::block::Resolution;
 use crate::math::{
-    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
+    Aab, Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
 };
 
 /// Specifies the coordinate extent of a [`Space`](super::Space), as an axis-aligned box
@@ -462,6 +462,15 @@ impl std::fmt::Debug for Grid {
             .field(&self.y_range())
             .field(&self.z_range())
             .finish()
+    }
+}
+
+impl From<Grid> for Aab {
+    fn from(grid: Grid) -> Self {
+        Aab::from_lower_upper(
+            grid.lower_bounds().map(FreeCoordinate::from),
+            grid.upper_bounds().map(FreeCoordinate::from),
+        )
     }
 }
 
