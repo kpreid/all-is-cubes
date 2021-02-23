@@ -8,9 +8,10 @@ use cgmath::{
     Deg, EuclideanSpace as _, InnerSpace as _, Matrix as _, Matrix4, Point2, Point3, SquareMatrix,
     Transform, Vector2, Vector3, Vector4,
 };
+use itertools::Itertools as _;
 use ordered_float::NotNan;
 
-use crate::math::FreeCoordinate;
+use crate::math::{Aab, FreeCoordinate};
 use crate::raycast::Ray;
 use crate::space::Grid;
 
@@ -40,6 +41,7 @@ pub struct Camera {
     /// Inverse of `projection * view_matrix`.
     /// Calculated by [`Self::compute_matrices`].
     inverse_projection_view: M,
+    view_frustum_corners: [Point3<FreeCoordinate>; 8],
 
     /// Position of mouse pointer or other input device in normalized device coordinates
     /// (range -1 to 1 upward and rightward). If there is no such input device, zero may
@@ -62,6 +64,7 @@ impl Camera {
             projection: M::identity(),
             view_position: Point3::origin(),
             inverse_projection_view: M::identity(),
+            view_frustum_corners: [Point3::origin(); 8],
         };
         new_self.compute_matrices();
         new_self
@@ -153,11 +156,83 @@ impl Camera {
         }
     }
 
+    fn project_point_into_world(&self, p: Point3<FreeCoordinate>) -> Point3<FreeCoordinate> {
+        Point3::from_homogeneous(self.inverse_projection_view * p.to_homogeneous())
+    }
+
     /// Converts the cursor position into a ray in world space.
     /// Uses the view transformation given by [`set_view_matrix`](Self::set_view_matrix).
     pub fn project_cursor_into_world(&self) -> Option<Ray> {
         self.cursor_ndc_position
             .map(|pos| self.project_ndc_into_world(pos.x, pos.y))
+    }
+
+    /// Determine whether the given `Aab` is visible in this projection+view.
+    pub(crate) fn aab_in_view(&self, aab: Aab) -> bool {
+        // Check for the AAB being outside the viewport, using the separating axis theorem.
+        // First, check if the view frustum's corner points lie outside the AAB. This is
+        // the simpler case since it is axis-aligned.
+        for &axis in &[Vector3::unit_x(), Vector3::unit_y(), Vector3::unit_z()] {
+            if Self::separated_along(
+                self.view_frustum_corners.iter().copied(),
+                aab.corner_points(),
+                axis,
+            ) {
+                return false;
+            }
+        }
+
+        // Now use the viewport's projected planes to try more separation axes.
+        // TODO: The correctness of this depends on Aab::corner_points's point ordering,
+        // which is not yet nailed down.
+        let [lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn] = self.view_frustum_corners;
+        for &(p1, p2, p3) in &[
+            (lbn, lbf, ltf), // left
+            (rtn, rtf, rbf), // right
+            (ltn, ltf, rtf), // top
+            (rbn, rbf, lbf), // bottom
+            // Testing against the near plane (lbn, ltn, rtn) is not worthwhile since the
+            // frustum is nearly a pyramid — the volume removed is less than a single cube.
+            (lbf, rbf, ltf), // far
+        ] {
+            let normal = (p2 - p1).cross(p3 - p1);
+            if Self::separated_along(
+                self.view_frustum_corners.iter().copied(),
+                aab.corner_points(),
+                normal,
+            ) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Helper for aab_in_view; finds if two sets of points' projections onto a line intersect.
+    #[inline]
+    fn separated_along(
+        points1: impl IntoIterator<Item = Point3<FreeCoordinate>>,
+        points2: impl IntoIterator<Item = Point3<FreeCoordinate>>,
+        axis: Vector3<FreeCoordinate>,
+    ) -> bool {
+        let (min1, max1) = Self::projected_range(points1, axis);
+        let (min2, max2) = Self::projected_range(points2, axis);
+        let intersection_min = min1.max(min2);
+        let intersection_max = max1.min(max2);
+        intersection_max < intersection_min
+    }
+
+    /// Helper for aab_in_view; projects a set of points onto a line.
+    #[inline]
+    fn projected_range(
+        points: impl IntoIterator<Item = Point3<FreeCoordinate>>,
+        axis: Vector3<FreeCoordinate>,
+    ) -> (FreeCoordinate, FreeCoordinate) {
+        points
+            .into_iter()
+            .map(|p| p.to_vec().dot(axis))
+            .minmax()
+            .into_option()
+            .unwrap()
     }
 
     fn compute_matrices(&mut self) {
@@ -178,6 +253,17 @@ impl Camera {
         self.inverse_projection_view = (self.projection * self.view_matrix)
             .inverse_transform()
             .expect("projection and view matrix was not invertible");
+
+        // Compute the view frustum's corner points.
+        let mut view_frustum_corners: [Point3<FreeCoordinate>; 8] = [Point3::origin(); 8];
+        for (i, point) in Aab::new(-1., 1., -1., 1., -1., 1.)
+            .corner_points()
+            .map(|p| self.project_point_into_world(p))
+            .enumerate()
+        {
+            view_frustum_corners[i] = point;
+        }
+        self.view_frustum_corners = view_frustum_corners;
     }
 }
 
