@@ -76,10 +76,10 @@ impl BlockUniformInterface {
         program_iface: &mut ProgramInterface<'_>,
         space: &SpaceRendererBound<'_>,
     ) {
-        self.set_projection_matrix(program_iface, space.ph.projection());
-        self.set_view_matrix(program_iface, space.ph.view_matrix());
+        self.set_projection_matrix(program_iface, space.camera.projection());
+        self.set_view_matrix(program_iface, space.camera.view_matrix());
         self.set_block_texture(program_iface, &space.bound_block_texture);
-        program_iface.set(&self.fog_distance, space.ph.view_distance() as f32);
+        program_iface.set(&self.fog_distance, space.camera.view_distance() as f32);
         program_iface.set(&self.fog_color, space.sky_color.into());
     }
 

@@ -21,7 +21,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 
 use crate::block::{evaluated_block_resolution, Evoxel};
-use crate::camera::{eye_for_look_at, ProjectionHelper, Viewport};
+use crate::camera::{eye_for_look_at, Camera, Viewport};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
@@ -113,29 +113,22 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         })
     }
 
-    /// Compute a full image, using the dimensions, projection, and viewpoint defined by
-    /// `projection`.
+    /// Compute a full image.
     ///
     /// The returned `[P::Pixel]` is in the usual left-right then top-bottom raster order;
-    /// its dimensions are `projection.framebuffer_size`.
+    /// its dimensions are `camera.framebuffer_size`.
     ///
     /// TODO: Add a mechanism for incrementally rendering into a mutable buffer instead of
     /// all-at-once into a newly allocated one, for interactive use.
-    pub fn trace_scene_to_image(
-        &self,
-        projection: &ProjectionHelper,
-    ) -> (Box<[P::Pixel]>, RaytraceInfo) {
+    pub fn trace_scene_to_image(&self, camera: &Camera) -> (Box<[P::Pixel]>, RaytraceInfo) {
         // This wrapper function ensures that the two implementations have consistent
         // signatures.
-        self.trace_scene_to_image_impl(projection)
+        self.trace_scene_to_image_impl(camera)
     }
 
     #[cfg(feature = "rayon")]
-    fn trace_scene_to_image_impl(
-        &self,
-        projection: &ProjectionHelper,
-    ) -> (Box<[P::Pixel]>, RaytraceInfo) {
-        let viewport = projection.viewport();
+    fn trace_scene_to_image_impl(&self, camera: &Camera) -> (Box<[P::Pixel]>, RaytraceInfo) {
+        let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
 
         let output_iterator = (0..viewport_size.y)
@@ -144,7 +137,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                 let y = viewport.normalize_fb_y(ych);
                 (0..viewport_size.x).into_par_iter().map(move |xch| {
                     let x = viewport.normalize_fb_x(xch);
-                    self.trace_ray(projection.project_ndc_into_world(x, y))
+                    self.trace_ray(camera.project_ndc_into_world(x, y))
                 })
             })
             .flatten();
@@ -156,11 +149,8 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 
     #[cfg(not(feature = "rayon"))]
-    fn trace_scene_to_image_impl(
-        &self,
-        projection: &ProjectionHelper,
-    ) -> (Box<[P::Pixel]>, RaytraceInfo) {
-        let viewport = projection.viewport();
+    fn trace_scene_to_image_impl(&self, camera: &Camera) -> (Box<[P::Pixel]>, RaytraceInfo) {
+        let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
         let mut image = Vec::with_capacity(viewport_size.x.checked_add(viewport_size.y).unwrap());
 
@@ -169,7 +159,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
-                let (pixel, info) = self.trace_ray(projection.project_ndc_into_world(x, y));
+                let (pixel, info) = self.trace_ray(camera.project_ndc_into_world(x, y));
                 total_info += info;
                 image.push(pixel);
             }
@@ -200,7 +190,7 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
     /// After each line (row) of the image, `write(line_ending)` will be called.
     pub fn trace_scene_to_text<F, E>(
         &self,
-        projection: &ProjectionHelper,
+        camera: &Camera,
         line_ending: &str,
         write: F,
     ) -> Result<RaytraceInfo, E>
@@ -209,20 +199,20 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
     {
         // This wrapper function ensures that the two implementations have consistent
         // signatures.
-        self.trace_scene_to_text_impl(projection, line_ending, write)
+        self.trace_scene_to_text_impl(camera, line_ending, write)
     }
 
     #[cfg(feature = "rayon")]
     fn trace_scene_to_text_impl<F, E>(
         &self,
-        projection: &ProjectionHelper,
+        camera: &Camera,
         line_ending: &str,
         mut write: F,
     ) -> Result<RaytraceInfo, E>
     where
         F: FnMut(&str) -> Result<(), E>,
     {
-        let viewport = projection.viewport();
+        let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
         let output_iterator = (0..viewport_size.y)
             .into_par_iter()
@@ -232,7 +222,7 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
                     .into_par_iter()
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);
-                        self.trace_ray(projection.project_ndc_into_world(x, y))
+                        self.trace_ray(camera.project_ndc_into_world(x, y))
                     })
                     .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
             })
@@ -248,7 +238,7 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
     #[cfg(not(feature = "rayon"))]
     fn trace_scene_to_text_impl<F, E>(
         &self,
-        projection: &ProjectionHelper,
+        camera: &Camera,
         line_ending: &str,
         mut write: F,
     ) -> Result<RaytraceInfo, E>
@@ -257,13 +247,13 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
     {
         let mut total_info = RaytraceInfo::default();
 
-        let viewport = projection.viewport();
+        let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
         for ych in 0..viewport_size.y {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
-                let (text, info) = self.trace_ray(projection.project_ndc_into_world(x, y));
+                let (text, info) = self.trace_ray(camera.project_ndc_into_world(x, y));
                 total_info += info;
                 write(text.as_ref())?;
             }
@@ -322,18 +312,18 @@ fn print_space_impl<F: FnMut(&str)>(
     mut write: F,
 ) -> RaytraceInfo {
     // TODO: optimize height (and thus aspect ratio) for the shape of the space
-    let mut projection = ProjectionHelper::new(Viewport {
+    let mut camera = Camera::new(Viewport {
         nominal_size: Vector2::new(40., 40.),
         framebuffer_size: Vector2::new(80, 40),
     });
-    projection.set_view_matrix(Matrix4::look_at_rh(
+    camera.set_view_matrix(Matrix4::look_at_rh(
         eye_for_look_at(space.grid(), direction.into()),
         space.grid().center(),
         Vector3::new(0., 1., 0.),
     ));
 
     SpaceRaytracer::<CharacterBuf>::new(space)
-        .trace_scene_to_text(&projection, &"\n", move |s| {
+        .trace_scene_to_text(&camera, &"\n", move |s| {
             write(s);
             let r: Result<(), ()> = Ok(());
             r

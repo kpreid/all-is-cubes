@@ -15,13 +15,10 @@ use crate::space::Grid;
 
 type M = Matrix4<FreeCoordinate>;
 
-/// Tool for setting up and using a projection matrix. Stores viewport dimensions
-/// and aspect ratio, and derives a projection matrix.
-///
-/// Also stores an externally-provided view matrix (world space to camera space).
-/// If not needed, can be ignored.
+/// Defines a viewpoint in/of the world: a viewport (aspect ratio), projection matrix,
+/// and view matrix.
 #[derive(Clone, Debug)]
-pub struct ProjectionHelper {
+pub struct Camera {
     // Caller-provided data
     viewport: Viewport,
     fov_y: Deg<FreeCoordinate>,
@@ -36,11 +33,13 @@ pub struct ProjectionHelper {
     /// Position of mouse pointer or other input device in normalized device coordinates
     /// (range -1 to 1 upward and rightward). If there is no such input device, zero may
     /// be used to designate the center of the screen.
+    ///
+    /// TODO: This doesn't really belong here. Look for better data flow routes.
     pub cursor_ndc_position: Option<Vector2<FreeCoordinate>>,
 }
 
 #[allow(clippy::cast_lossless)]
-impl ProjectionHelper {
+impl Camera {
     pub fn new(viewport: Viewport) -> Self {
         let mut new_self = Self {
             viewport,
@@ -249,20 +248,20 @@ mod tests {
     };
 
     #[test]
-    fn projection_helper_bad_viewport_doesnt_panic() {
-        ProjectionHelper::new(Viewport {
+    fn camera_bad_viewport_doesnt_panic() {
+        Camera::new(Viewport {
             nominal_size: Vector2::new(0.0, 0.0),
             framebuffer_size: Vector2::new(0, 0),
         });
     }
 
     #[test]
-    fn projection_helper_view_position() {
-        let mut ph = ProjectionHelper::new(DUMMY_VIEWPORT);
+    fn camera_view_position() {
+        let mut camera = Camera::new(DUMMY_VIEWPORT);
         let pos = Point3::new(1.0, 2.0, 3.0);
-        ph.set_view_matrix(
+        camera.set_view_matrix(
             Matrix4::from_angle_x(Deg(45.0)) * Matrix4::from_translation(-pos.to_vec()),
         );
-        assert_eq!(ph.view_position(), pos);
+        assert_eq!(camera.view_position(), pos);
     }
 }

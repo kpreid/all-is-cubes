@@ -21,7 +21,7 @@ use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
-use crate::camera::ProjectionHelper;
+use crate::camera::Camera;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
@@ -92,7 +92,7 @@ impl SpaceRenderer {
     pub fn prepare_frame<'a, C>(
         &'a mut self,
         context: &mut C,
-        projection: &ProjectionHelper,
+        camera: &Camera,
     ) -> SpaceRendererOutput<'a>
     where
         C: GraphicsContext<Backend = Backend>,
@@ -181,10 +181,9 @@ impl SpaceRenderer {
             .flush()
             .expect("texture write failure"); // TODO: recover from this error
 
-        let view_point = projection.view_position();
+        let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
-        self.chunk_chart
-            .resize_if_needed(projection.view_distance());
+        self.chunk_chart.resize_if_needed(camera.view_distance());
 
         // Update some chunk geometry.
         let chunk_grid = space.grid().divide(CHUNK_SIZE);
@@ -242,7 +241,7 @@ impl SpaceRenderer {
         SpaceRendererOutput {
             sky_color: space.sky_color(),
             block_texture: &mut block_texture_allocator.texture,
-            ph: projection.clone(),
+            camera: camera.clone(),
             chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
             chunk_chart: &self.chunk_chart,
             view_chunk,
@@ -264,7 +263,7 @@ pub struct SpaceRendererOutput<'a> {
     pub sky_color: Rgb,
 
     block_texture: &'a mut BlockTexture,
-    ph: ProjectionHelper, // TODO: more info than we actually need (view matrix + view distance)
+    camera: Camera,
     /// Chunks are handy wrappers around some Tesses
     chunks: &'a HashMap<ChunkPos, Chunk>,
     chunk_chart: &'a ChunkChart,
@@ -278,8 +277,7 @@ pub struct SpaceRendererBound<'a> {
 
     /// Block texture to pass to the shader.
     pub bound_block_texture: BoundBlockTexture<'a>,
-    /// View information to pass to the shader.
-    pub ph: ProjectionHelper,
+    pub camera: Camera,
     chunks: &'a HashMap<ChunkPos, Chunk>,
     chunk_chart: &'a ChunkChart,
     view_chunk: ChunkPos,
@@ -293,7 +291,7 @@ impl<'a> SpaceRendererOutput<'a> {
         Ok(SpaceRendererBound {
             sky_color: self.sky_color,
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
-            ph: self.ph,
+            camera: self.camera,
             chunks: self.chunks,
             chunk_chart: self.chunk_chart,
             view_chunk: self.view_chunk,

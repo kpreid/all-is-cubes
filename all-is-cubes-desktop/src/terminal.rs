@@ -18,7 +18,7 @@ use std::thread;
 use std::time::Instant;
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
-use all_is_cubes::camera::{ProjectionHelper, Viewport};
+use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
@@ -39,7 +39,7 @@ pub struct TerminalOptions {
 
 impl TerminalOptions {
     /// Obtain the terminal size and adjust it such that it is suitable for a
-    /// [`ProjectionHelper::set_viewport`] followed by [`TerminalMain::draw`].
+    /// [`Camera::set_viewport`] followed by [`TerminalMain::draw`].
     fn viewport_from_terminal_size(&self, size: Vector2<u16>) -> Viewport {
         // max(1) is to keep the projection math from blowing up.
         // Subtracting some height allows for info text.
@@ -88,7 +88,7 @@ struct TerminalMain {
     app: AllIsCubesAppState,
     options: TerminalOptions,
     out: io::Stdout,
-    projection: ProjectionHelper,
+    camera: Camera,
     /// True if we should clean up on drop.
     terminal_state_dirty: bool,
 
@@ -104,7 +104,7 @@ impl TerminalMain {
         let terminal_size = Vector2::from(crossterm::terminal::size()?);
 
         Ok(Self {
-            projection: ProjectionHelper::new(options.viewport_from_terminal_size(terminal_size)),
+            camera: Camera::new(options.viewport_from_terminal_size(terminal_size)),
             app,
             options,
             out: io::stdout(),
@@ -211,19 +211,19 @@ impl TerminalMain {
     }
 
     fn sync_options(&mut self) {
-        self.projection
+        self.camera
             .set_viewport(self.options.viewport_from_terminal_size(self.terminal_size));
     }
 
     fn draw(&mut self) -> crossterm::Result<()> {
         let character = &*self.app.character().borrow();
-        self.projection.set_view_matrix(character.view());
+        self.camera.set_view_matrix(character.view());
 
         let color_mode = self.options.colors;
         let space = &*character.space.borrow_mut();
 
         let (image, info) =
-            SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(&self.projection);
+            SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(&self.camera);
 
         self.out.queue(cursor::Hide)?;
         self.out.queue(SetAttribute(Attribute::Reset))?;
@@ -232,7 +232,7 @@ impl TerminalMain {
 
         // TODO: aim for less number casting
         let character_size = self
-            .projection
+            .camera
             .viewport()
             .framebuffer_size
             .map(|s| s as usize)

@@ -12,7 +12,7 @@ use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
-use crate::camera::{ProjectionHelper, Viewport};
+use crate::camera::{Camera, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
@@ -44,8 +44,8 @@ where
     character: Option<URef<Character>>,
     world_renderer: Option<SpaceRenderer>,
     ui_renderer: Option<SpaceRenderer>,
-    world_proj: ProjectionHelper,
-    ui_proj: ProjectionHelper,
+    world_proj: Camera,
+    ui_proj: Camera,
 
     // Miscellaneous
     pub cursor_result: Option<Cursor>, // TODO: give this an accessor
@@ -67,7 +67,7 @@ where
         )
         .unwrap(); // TODO error handling
 
-        let mut ui_proj = ProjectionHelper::new(viewport);
+        let mut ui_proj = Camera::new(viewport);
         ui_proj.set_fov_y(Vui::SUGGESTED_FOV_Y);
 
         Ok((
@@ -78,7 +78,7 @@ where
                 character: None,
                 world_renderer: None,
                 ui_renderer: None,
-                world_proj: ProjectionHelper::new(viewport),
+                world_proj: Camera::new(viewport),
                 ui_proj,
                 cursor_result: None,
             },

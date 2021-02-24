@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use all_is_cubes::apps::AllIsCubesAppState;
-use all_is_cubes::camera::{ProjectionHelper, Viewport};
+use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::raytracer::{ColorBuf, SpaceRaytracer};
 
@@ -86,7 +86,7 @@ pub(crate) fn record_main(
     let _ = stderr.flush();
 
     let viewport = options.viewport();
-    let mut projection = ProjectionHelper::new(viewport);
+    let mut camera = Camera::new(viewport);
 
     // Set up app state
     let space_ref = app.character().borrow().space.clone();
@@ -100,9 +100,9 @@ pub(crate) fn record_main(
         let _ = write!(stderr, "f{}...", frame);
         let _ = stderr.flush();
 
-        projection.set_view_matrix(app.character().borrow().view());
+        camera.set_view_matrix(app.character().borrow().view());
         let (image_data, _info) =
-            SpaceRaytracer::<ColorBuf>::new(&*space_ref.borrow()).trace_scene_to_image(&projection);
+            SpaceRaytracer::<ColorBuf>::new(&*space_ref.borrow()).trace_scene_to_image(&camera);
         // TODO: Offer supersampling (multiple rays per output pixel).
 
         // Advance time for next frame.
