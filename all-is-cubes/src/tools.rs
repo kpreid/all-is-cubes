@@ -6,7 +6,7 @@
 use std::borrow::Cow;
 
 use crate::block::{Block, AIR};
-use crate::camera::Cursor;
+use crate::character::Cursor;
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
 use crate::space::{SetCubeError, Space};
@@ -204,7 +204,7 @@ impl Inventory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::camera::cursor_raycast;
+    use crate::character::cursor_raycast;
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
     use crate::raycast::Raycaster;

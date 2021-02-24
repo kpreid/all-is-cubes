@@ -13,7 +13,7 @@ use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
 use crate::block::BlockDef;
-use crate::camera::Camera;
+use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
 
 /// Name/key of an object in a [`Universe`].
@@ -45,7 +45,7 @@ impl Display for Name {
 #[derive(Debug)] // TODO: impl Debug with a less verbose result
 pub struct Universe {
     blocks: HashMap<Name, URootRef<BlockDef>>,
-    cameras: HashMap<Name, URootRef<Camera>>,
+    characters: HashMap<Name, URootRef<Character>>,
     spaces: HashMap<Name, URootRef<Space>>,
     next_anonym: usize,
 }
@@ -57,7 +57,7 @@ impl Universe {
             blocks: HashMap::new(),
             spaces: HashMap::new(),
             // TODO: bodies so body-in-world stepping
-            cameras: HashMap::new(),
+            characters: HashMap::new(),
             next_anonym: 0,
         }
     }
@@ -66,8 +66,8 @@ impl Universe {
     pub fn get_default_space(&self) -> URef<Space> {
         self.get(&"space".into()).unwrap()
     }
-    pub fn get_default_camera(&self) -> URef<Camera> {
-        self.get(&"camera".into()).unwrap()
+    pub fn get_default_character(&self) -> URef<Character> {
+        self.get(&"character".into()).unwrap()
     }
 
     /// Advance time for all members.
@@ -79,10 +79,10 @@ impl Universe {
                 .expect("space borrowed during universe.step()")
                 .step(timestep);
         }
-        for camera in self.cameras.values() {
-            let _camera_info = camera
+        for character in self.characters.values() {
+            let _info = character
                 .try_borrow_mut()
-                .expect("camera borrowed during universe.step()")
+                .expect("character borrowed during universe.step()")
                 .step(timestep);
         }
         info
@@ -118,12 +118,12 @@ impl UniverseTable<BlockDef> for Universe {
         &mut self.blocks
     }
 }
-impl UniverseTable<Camera> for Universe {
-    fn table(&self) -> &HashMap<Name, URootRef<Camera>> {
-        &self.cameras
+impl UniverseTable<Character> for Universe {
+    fn table(&self) -> &HashMap<Name, URootRef<Character>> {
+        &self.characters
     }
-    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Camera>> {
-        &mut self.cameras
+    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Character>> {
+        &mut self.characters
     }
 }
 impl UniverseTable<Space> for Universe {
@@ -186,14 +186,14 @@ impl UniverseIndex<BlockDef> for Universe {
         UniverseIter(self.table().iter())
     }
 }
-impl UniverseIndex<Camera> for Universe {
-    fn get(&self, name: &Name) -> Option<URef<Camera>> {
+impl UniverseIndex<Character> for Universe {
+    fn get(&self, name: &Name) -> Option<URef<Character>> {
         index_get(self, name)
     }
-    fn insert(&mut self, name: Name, value: Camera) -> Result<URef<Camera>, InsertError> {
+    fn insert(&mut self, name: Name, value: Character) -> Result<URef<Character>, InsertError> {
         index_insert(self, name, value)
     }
-    fn iter_by_type(&self) -> UniverseIter<'_, Camera> {
+    fn iter_by_type(&self) -> UniverseIter<'_, Character> {
         UniverseIter(self.table().iter())
     }
 }

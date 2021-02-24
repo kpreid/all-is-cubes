@@ -75,7 +75,7 @@ pub fn terminal_main_loop(
     options: TerminalOptions,
 ) -> Result<(), Box<dyn Error>> {
     // TODO: Leftovers from early input-less days.
-    app.camera().borrow_mut().auto_rotate = true;
+    app.character().borrow_mut().auto_rotate = true;
 
     let mut main = TerminalMain::new(app, options)?;
     main.run()?;
@@ -216,11 +216,11 @@ impl TerminalMain {
     }
 
     fn draw(&mut self) -> crossterm::Result<()> {
-        let camera = &*self.app.camera().borrow();
-        self.projection.set_view_matrix(camera.view());
+        let character = &*self.app.character().borrow();
+        self.projection.set_view_matrix(character.view());
 
         let color_mode = self.options.colors;
-        let space = &*camera.space.borrow_mut();
+        let space = &*character.space.borrow_mut();
 
         let (image, info) =
             SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(&self.projection);
@@ -320,7 +320,7 @@ impl Drop for TerminalMain {
     }
 }
 
-/// Converts [`Event`] to [`all_is_cubes::camera::Key`].
+/// Converts [`Event`] to [`Key`].
 ///
 /// Returns `None` if there is no corresponding value.
 fn map_crossterm_event(event: &Event) -> Option<Key> {

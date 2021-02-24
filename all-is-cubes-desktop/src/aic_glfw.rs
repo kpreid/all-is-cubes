@@ -61,7 +61,7 @@ pub fn glfw_main_loop(
             error
         })?;
 
-    renderer.set_camera(Some(app.camera().clone()));
+    renderer.set_character(Some(app.character().clone()));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
     let mut cursor_in_window = true;
@@ -124,7 +124,7 @@ pub fn glfw_main_loop(
                     if let Some(cursor) = &renderer.cursor_result {
                         // TODO: This should go through InputProcessor for consistency and duplicated code
                         let click = app
-                            .camera()
+                            .character()
                             .borrow_mut()
                             .click(cursor, map_glfw_button(button));
                         // TODO: this dumping should be replaced with in-game UI feedback

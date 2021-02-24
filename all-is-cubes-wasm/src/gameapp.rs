@@ -61,7 +61,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
             console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error)));
             JsValue::from_str(&*error)
         })?;
-    renderer.set_camera(Some(app.camera().clone()));
+    renderer.set_character(Some(app.character().clone()));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
     static_dom.scene_info_text_node.append_data("\nGL ready.")?;
@@ -226,7 +226,11 @@ impl WebGameRoot {
                 };
                 if let Some(cursor) = &this.renderer.cursor_result {
                     // TODO: This should maybe go through InputProcessor? For consistency?
-                    let result = this.app.camera().borrow_mut().click(cursor, mapped_button);
+                    let result = this
+                        .app
+                        .character()
+                        .borrow_mut()
+                        .click(cursor, mapped_button);
                     console::log_1(&JsValue::from_str(&format!(
                         "click {}: {:?}",
                         mapped_button, result
@@ -318,7 +322,7 @@ impl WebGameRoot {
             };
             self.static_dom.scene_info_text_node.set_data(&format!(
                 "{:#?}\n{:#?}\n{:#?}\n\n{}",
-                &*self.app.camera().borrow(),
+                &*self.app.character().borrow(),
                 self.last_step_info,
                 render_info,
                 cursor_result_text

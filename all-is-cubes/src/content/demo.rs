@@ -6,7 +6,7 @@
 use cgmath::Vector3;
 
 use crate::block::{Block, BlockDef};
-use crate::camera::Camera;
+use crate::character::Character;
 use crate::content::{demo_city, install_demo_blocks};
 use crate::linking::{GenError, InGenError};
 use crate::math::{GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
@@ -90,7 +90,7 @@ fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
     // Block #2
     space.fill_uniform(Grid::new((10, 0, 13), (18, 33, 15)), &white)?;
 
-    // TODO: Explicitly define camera.
+    // TODO: Explicitly define camera position (needs a means to do so).
 
     Ok(space)
 }
@@ -109,8 +109,8 @@ where
     let position = space.grid().center() + Vector3::new(0.5, 2.91, 8.5);
     let space_ref = universe.insert(space_name2, space)?;
 
-    //let camera = Camera::looking_at_space(space_ref, Vector3::new(0.5, 0.5, 1.0));
-    let mut camera = Camera::new(space_ref, position);
+    //let character = Character::looking_at_space(space_ref, Vector3::new(0.5, 0.5, 1.0));
+    let mut character = Character::new(space_ref, position);
     // Copy all named block defs into inventory.
     let mut items: Vec<(Name, URef<BlockDef>)> = universe
         .iter_by_type()
@@ -118,7 +118,7 @@ where
         .collect();
     items.sort_by(|(a, _), (b, _)| a.cmp(&b));
     for (_, block_def_ref) in items {
-        match camera.try_add_item(Tool::PlaceBlock(Block::Indirect(block_def_ref))) {
+        match character.try_add_item(Tool::PlaceBlock(Block::Indirect(block_def_ref))) {
             Ok(()) => {}
             Err(_) => {
                 // Out of space
@@ -126,7 +126,7 @@ where
             }
         }
     }
-    universe.insert("camera".into(), camera)?;
+    universe.insert("character".into(), character)?;
 
     Ok(universe)
 }
@@ -209,7 +209,7 @@ mod tests {
     pub fn template_smoke_test() {
         for template in UniverseTemplate::iter() {
             let mut u = template.build().unwrap();
-            let _ = u.get_default_camera().borrow();
+            let _ = u.get_default_character().borrow();
             let _ = u.get_default_space().borrow();
             u.step(Duration::from_millis(10));
         }

@@ -13,7 +13,7 @@ use luminance_front::context::GraphicsContext;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
 
-use crate::camera::Cursor;
+use crate::character::Cursor;
 use crate::content::palette;
 use crate::lum::types::{empty_tess, LumBlockVertex};
 use crate::math::{Aab, Geometry, Rgba};

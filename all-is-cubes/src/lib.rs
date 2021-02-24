@@ -26,6 +26,7 @@ pub mod math;
 pub mod apps;
 pub mod block;
 pub mod camera;
+pub mod character;
 mod chunking;
 pub mod content;
 pub mod drawing;

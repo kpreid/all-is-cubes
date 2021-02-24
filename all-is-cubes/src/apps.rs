@@ -7,7 +7,7 @@ use cgmath::{Vector2, Vector3, Zero as _};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use crate::camera::{Camera, CameraChange};
+use crate::character::{Character, CharacterChange};
 use crate::content::UniverseTemplate;
 use crate::listen::{DirtyFlag, ListenerHelper as _};
 use crate::math::FreeCoordinate;
@@ -30,7 +30,7 @@ pub struct AllIsCubesAppState {
     pub input_processor: InputProcessor,
 
     game_universe: Universe,
-    game_camera: URef<Camera>,
+    game_character: URef<Character>,
 
     ui: Vui,
     ui_dirty: DirtyFlag,
@@ -48,27 +48,27 @@ impl AllIsCubesAppState {
         let mut new_self = Self {
             frame_clock: FrameClock::new(),
             input_processor: InputProcessor::new(),
-            game_camera: game_universe.get_default_camera(),
+            game_character: game_universe.get_default_character(),
             game_universe,
             ui: Vui::new(),
             ui_dirty: DirtyFlag::new(true),
         };
 
-        // TODO: once it's possible to switch cameras we will need to clear and reinstall this
+        // TODO: once it's possible to switch characters we will need to clear and reinstall this
         new_self
-            .game_camera
+            .game_character
             .borrow()
             .listen(new_self.ui_dirty.listener().filter(|msg| match msg {
-                CameraChange::Inventory | CameraChange::Selections => Some(()),
+                CharacterChange::Inventory | CharacterChange::Selections => Some(()),
             }));
         new_self.maybe_sync_ui();
 
         new_self
     }
 
-    /// Returns a reference to the [`Camera`] that should be shown to the user.
-    pub fn camera(&self) -> &URef<Camera> {
-        &self.game_camera
+    /// Returns a reference to the [`Character`] that should be shown to the user.
+    pub fn character(&self) -> &URef<Character> {
+        &self.game_character
     }
 
     /// Returns a mutable reference to the [`Universe`].
@@ -87,7 +87,7 @@ impl AllIsCubesAppState {
             self.frame_clock.did_step();
 
             self.input_processor
-                .apply_input(&mut *self.camera().borrow_mut(), step_length);
+                .apply_input(&mut *self.character().borrow_mut(), step_length);
             self.input_processor.step(step_length);
 
             let mut info = self.game_universe.step(step_length);
@@ -102,16 +102,16 @@ impl AllIsCubesAppState {
 
     fn maybe_sync_ui(&mut self) {
         if self.ui_dirty.get_and_clear() {
-            // TODO: Exact interaction between Camera and Vui probably shouldn't be AllIsCubesAppState's responsibility.
-            let camera = self.game_camera.borrow();
+            // TODO: Exact interaction between Character and Vui probably shouldn't be AllIsCubesAppState's responsibility.
+            let character = self.game_character.borrow();
             self.ui
-                .set_toolbar(&camera.inventory().slots, &camera.selected_slots())
+                .set_toolbar(&character.inventory().slots, &character.selected_slots())
                 .unwrap();
         }
     }
 }
 
-/// Parse input events, particularly key-down/up pairs, into camera control and such.
+/// Parse input events, particularly key-down/up pairs, into character control and such.
 ///
 /// This is designed to be a leaf of the dependency graph: it does not own or send
 /// messages to any other elements of the application. Instead, the following steps
@@ -120,7 +120,7 @@ impl AllIsCubesAppState {
 /// 1. The platform-specific code should call [`InputProcessor::key_down`] and such to
 ///    to provide input information.
 /// 2. The game loop should call [`InputProcessor::apply_input`] to apply the effects
-///    of input on the relevant [`Camera`].
+///    of input on the relevant [`Character`].
 /// 3. The game loop should call [`InputProcessor::step`] to apply the effects of time
 ///    on the input processor.
 #[derive(Clone, Debug)]
@@ -258,27 +258,27 @@ impl InputProcessor {
         self.mouselook_buffer = Vector2::zero();
     }
 
-    /// Applies the current input to the given `Camera`.
-    pub fn apply_input(&mut self, camera: &mut Camera, timestep: Duration) {
+    /// Applies the current input to the given [`Character`].
+    pub fn apply_input(&mut self, character: &mut Character, timestep: Duration) {
         let dt = timestep.as_secs_f64();
         let key_turning_step = 80.0 * dt;
 
         let movement = self.movement();
-        camera.set_velocity_input(movement);
+        character.set_velocity_input(movement);
 
         let turning = Vector2::new(
             key_turning_step * self.net_movement(Key::Left, Key::Right) + self.mouselook_buffer.x,
             key_turning_step * self.net_movement(Key::Up, Key::Down) + self.mouselook_buffer.y,
         );
-        camera.body.yaw = (camera.body.yaw + turning.x).rem_euclid(360.0);
-        camera.body.pitch = (camera.body.pitch + turning.y).min(90.0).max(-90.0);
+        character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
+        character.body.pitch = (character.body.pitch + turning.y).min(90.0).max(-90.0);
 
         if movement != Vector3::zero() || turning != Vector2::zero() {
-            camera.auto_rotate = false;
+            character.auto_rotate = false;
         }
 
         if self.keys_held.contains(&Key::Character(' ')) {
-            camera.jump_if_able();
+            character.jump_if_able();
         }
 
         for key in self.command_buffer.drain(..) {
@@ -286,7 +286,7 @@ impl InputProcessor {
                 Key::Character(numeral) if numeral.is_digit(10) => {
                     let digit = numeral.to_digit(10).unwrap() as usize;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
-                    camera.set_selected_slot(1, slot);
+                    character.set_selected_slot(1, slot);
                 }
                 _ => {}
             }
@@ -361,19 +361,19 @@ mod tests {
         // TODO: Awful lot of setup boilerplate...
         let mut u = Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let camera = u.insert_anonymous(Camera::new(space.clone(), Point3::origin()));
+        let character = u.insert_anonymous(Character::new(space.clone(), Point3::origin()));
         let mut input = InputProcessor::new();
 
         input.key_down(Key::Character('5'));
         input.key_up(Key::Character('5'));
-        input.apply_input(&mut *camera.borrow_mut(), Duration::from_secs(1));
-        assert_eq!(camera.borrow_mut().selected_slots()[1], 4);
+        input.apply_input(&mut *character.borrow_mut(), Duration::from_secs(1));
+        assert_eq!(character.borrow_mut().selected_slots()[1], 4);
 
         // Tenth slot
         input.key_down(Key::Character('0'));
         input.key_up(Key::Character('0'));
-        input.apply_input(&mut *camera.borrow_mut(), Duration::from_secs(1));
-        assert_eq!(camera.borrow_mut().selected_slots()[1], 9);
+        input.apply_input(&mut *character.borrow_mut(), Duration::from_secs(1));
+        assert_eq!(character.borrow_mut().selected_slots()[1], 9);
     }
 
     // TODO: test jump and flying logic

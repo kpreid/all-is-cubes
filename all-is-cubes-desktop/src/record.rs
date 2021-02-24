@@ -89,18 +89,18 @@ pub(crate) fn record_main(
     let mut projection = ProjectionHelper::new(viewport);
 
     // Set up app state
-    let space_ref = app.camera().borrow().space.clone();
+    let space_ref = app.character().borrow().space.clone();
     space_ref.borrow_mut().evaluate_light();
     if options.animated() {
         // TODO: replace this with a general scripting mechanism
-        app.camera().borrow_mut().auto_rotate = true;
+        app.character().borrow_mut().auto_rotate = true;
     }
 
     for frame in options.frame_range() {
         let _ = write!(stderr, "f{}...", frame);
         let _ = stderr.flush();
 
-        projection.set_view_matrix(app.camera().borrow().view());
+        projection.set_view_matrix(app.character().borrow().view());
         let (image_data, _info) =
             SpaceRaytracer::<ColorBuf>::new(&*space_ref.borrow()).trace_scene_to_image(&projection);
         // TODO: Offer supersampling (multiple rays per output pixel).

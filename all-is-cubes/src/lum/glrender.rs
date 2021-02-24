@@ -12,7 +12,8 @@ use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
-use crate::camera::{cursor_raycast, Camera, Cursor, ProjectionHelper, Viewport};
+use crate::camera::{ProjectionHelper, Viewport};
+use crate::character::{cursor_raycast, Character, Cursor};
 use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
@@ -40,7 +41,7 @@ where
     block_program: BlockProgram,
 
     // Rendering state
-    camera: Option<URef<Camera>>,
+    character: Option<URef<Character>>,
     world_renderer: Option<SpaceRenderer>,
     ui_renderer: Option<SpaceRenderer>,
     world_proj: ProjectionHelper,
@@ -74,7 +75,7 @@ where
                 surface,
                 back_buffer,
                 block_program,
-                camera: None,
+                character: None,
                 world_renderer: None,
                 ui_renderer: None,
                 world_proj: ProjectionHelper::new(viewport),
@@ -106,9 +107,9 @@ where
         .unwrap(); // TODO error handling
     }
 
-    /// Sets the [`Camera`] whose view we render.
-    pub fn set_camera(&mut self, camera: Option<URef<Camera>>) {
-        self.camera = camera;
+    /// Sets the [`Character`] whose view we render.
+    pub fn set_character(&mut self, character: Option<URef<Character>>) {
+        self.character = character;
     }
 
     pub fn set_ui_space(&mut self, space: Option<URef<Space>>) {
@@ -122,8 +123,8 @@ where
     /// Draw a frame.
     pub fn render_frame(&mut self) -> RenderInfo {
         let mut info = RenderInfo::default();
-        let camera: &Camera = &*(if let Some(camera_ref) = &self.camera {
-            camera_ref.borrow()
+        let character: &Character = &*(if let Some(character_ref) = &self.character {
+            character_ref.borrow()
         } else {
             return info;
         });
@@ -133,15 +134,15 @@ where
         // Update cursor state. This is, strictly speaking, not rendering, but it is closely
         // related in that the cursor should match the pixels being drawn.
         // TODO: Figure out how to lay this out with more separation of concerns, though.
-        self.world_proj.set_view_matrix(camera.view());
+        self.world_proj.set_view_matrix(character.view());
         self.cursor_result = self
             .world_proj
             .project_cursor_into_world()
-            .and_then(|ray| cursor_raycast(ray.cast(), &*camera.space.borrow()));
+            .and_then(|ray| cursor_raycast(ray.cast(), &*character.space.borrow()));
 
         // Prepare Tess and Texture for space.
-        if self.world_renderer.as_ref().map(|sr| sr.space()) != Some(&camera.space) {
-            self.world_renderer = Some(SpaceRenderer::new(camera.space.clone()));
+        if self.world_renderer.as_ref().map(|sr| sr.space()) != Some(&character.space) {
+            self.world_renderer = Some(SpaceRenderer::new(character.space.clone()));
         }
         let world_renderer = self.world_renderer.as_mut().unwrap();
         let world_output = world_renderer.prepare_frame(surface, &self.world_proj);
@@ -156,14 +157,14 @@ where
             let mut v: Vec<LumBlockVertex> = Vec::new();
 
             if DRAW_COLLISION_BOXES {
-                // Camera collision box
+                // Character collision box
                 wireframe_vertices(
                     &mut v,
                     palette::DEBUG_COLLISION_BOX,
-                    camera.body.collision_box_abs(),
+                    character.body.collision_box_abs(),
                 );
                 // What it collided with
-                for contact in &camera.colliding_cubes {
+                for contact in &character.colliding_cubes {
                     wireframe_vertices(
                         &mut v,
                         palette::DEBUG_COLLISION_CUBES,
@@ -175,7 +176,7 @@ where
             // Lighting trace at cursor
             if DRAW_LIGHTING_DEBUG {
                 if let Some(cursor) = &self.cursor_result {
-                    let space = camera.space.borrow();
+                    let space = character.space.borrow();
                     let (_, _, _, lighting_info) = space.compute_lighting(cursor.place.adjacent());
                     wireframe_vertices(&mut v, Rgba::new(0.8, 0.8, 1.0, 1.0), lighting_info);
                 }
