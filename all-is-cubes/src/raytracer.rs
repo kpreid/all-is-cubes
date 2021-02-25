@@ -21,7 +21,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 
 use crate::block::{evaluated_block_resolution, Evoxel};
-use crate::camera::{eye_for_look_at, Camera, Viewport};
+use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
@@ -312,10 +312,13 @@ fn print_space_impl<F: FnMut(&str)>(
     mut write: F,
 ) -> RaytraceInfo {
     // TODO: optimize height (and thus aspect ratio) for the shape of the space
-    let mut camera = Camera::new(Viewport {
-        nominal_size: Vector2::new(40., 40.),
-        framebuffer_size: Vector2::new(80, 40),
-    });
+    let mut camera = Camera::new(
+        GraphicsOptions::default(),
+        Viewport {
+            nominal_size: Vector2::new(40., 40.),
+            framebuffer_size: Vector2::new(80, 40),
+        },
+    );
     camera.set_view_matrix(Matrix4::look_at_rh(
         eye_for_look_at(space.grid(), direction.into()),
         space.grid().center(),

@@ -53,14 +53,18 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
-    let mut renderer = GLRenderer::new(surface, gui_helpers.canvas_helper().viewport())
-        .handle_warnings(|warning| {
-            console::warn_1(&JsValue::from_str(&format!("GLSL warning:\n{}", warning)));
-        })
-        .map_err(|error| {
-            console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error)));
-            JsValue::from_str(&*error)
-        })?;
+    let mut renderer = GLRenderer::new(
+        surface,
+        app.graphics_options(),
+        gui_helpers.canvas_helper().viewport(),
+    )
+    .handle_warnings(|warning| {
+        console::warn_1(&JsValue::from_str(&format!("GLSL warning:\n{}", warning)));
+    })
+    .map_err(|error| {
+        console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error)));
+        JsValue::from_str(&*error)
+    })?;
     renderer.set_character(Some(app.character().clone()));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 

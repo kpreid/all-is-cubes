@@ -8,6 +8,7 @@ use cgmath::{
     Deg, EuclideanSpace as _, InnerSpace as _, Matrix as _, Matrix4, Point2, Point3, SquareMatrix,
     Transform, Vector2, Vector3, Vector4,
 };
+use ordered_float::NotNan;
 
 use crate::math::FreeCoordinate;
 use crate::raycast::Ray;
@@ -19,15 +20,25 @@ type M = Matrix4<FreeCoordinate>;
 /// and view matrix.
 #[derive(Clone, Debug)]
 pub struct Camera {
-    // Caller-provided data
+    /// Caller-provided options. Always validated by [`GraphicsOptions::repair`].
+    options: GraphicsOptions,
+
+    /// Caller-provided viewport.
     viewport: Viewport,
-    fov_y: Deg<FreeCoordinate>,
-    view_distance: FreeCoordinate,
+
+    /// Caller-provided view matrix.
     view_matrix: M,
 
-    // Derived data
+    /// Projection matrix derived from viewport and options.
+    /// Calculated by [`Self::compute_matrices`].
     projection: M,
+
+    /// View point derived from view matrix.
+    /// Calculated by [`Self::compute_matrices`].
     view_position: Point3<FreeCoordinate>,
+
+    /// Inverse of `projection * view_matrix`.
+    /// Calculated by [`Self::compute_matrices`].
     inverse_projection_view: M,
 
     /// Position of mouse pointer or other input device in normalized device coordinates
@@ -40,12 +51,10 @@ pub struct Camera {
 
 #[allow(clippy::cast_lossless)]
 impl Camera {
-    pub fn new(viewport: Viewport) -> Self {
+    pub fn new(options: GraphicsOptions, viewport: Viewport) -> Self {
         let mut new_self = Self {
+            options: options.repair(),
             viewport,
-            // TODO: user preferences for FOV and distance
-            fov_y: Deg(90.0),
-            view_distance: 200.0,
             view_matrix: M::identity(),
             cursor_ndc_position: None,
 
@@ -63,6 +72,10 @@ impl Camera {
         self.viewport
     }
 
+    pub fn set_options(&mut self, options: GraphicsOptions) {
+        self.options = options.repair();
+    }
+
     /// Sets the contained viewport value, and recalculates matrices to be suitable for
     /// the new viewport's aspect ratio.
     pub fn set_viewport(&mut self, viewport: Viewport) {
@@ -74,24 +87,15 @@ impl Camera {
 
     /// Returns the field of view, expressed in degrees on the vertical axis (that is, the
     /// horizontal field of view depends on the viewport's aspect ratio).
+    /// This differs from the value in [`GraphicsOptions`] by being clamped to valid values.
     pub fn fov_y(&self) -> Deg<FreeCoordinate> {
-        self.fov_y
-    }
-
-    /// Sets the field of view, in degrees on the vertical axis, and recalculates matrices
-    /// to be suitable for the new projection.
-    pub fn set_fov_y(&mut self, fov_y: Deg<FreeCoordinate>) {
-        if fov_y.0.is_nan() {
-            return; // TODO: panic? reset to default?
-        }
-        self.fov_y = Deg(fov_y.0.min(179.).max(1.));
-        self.compute_matrices();
+        Deg(self.options.fov_y.into_inner())
     }
 
     /// Returns the view distance; the far plane of the projection matrix, or the distance
     /// at which rendering may be truncated.
     pub fn view_distance(&self) -> FreeCoordinate {
-        self.view_distance
+        self.options.view_distance.into_inner()
     }
 
     /// Set the current cursor position. In the same pixel units as `set_viewport`.
@@ -156,7 +160,7 @@ impl Camera {
             self.fov_y(),
             self.viewport.nominal_aspect_ratio(),
             /* near: */ 1. / 32., // half a voxel at resolution=16
-            /* far: */ self.view_distance,
+            /* far: */ self.view_distance(),
         );
         self.view_position = Point3::from_vec(
             self.view_matrix
@@ -224,6 +228,43 @@ impl Viewport {
     // invertible transform.
 }
 
+/// User/debug options for rendering (i.e. not affecting gameplay except informationally).
+/// Not all of these options are applicable to all renderers.
+///
+/// TODO: This may not be the best module location. Possibly it should get its own module.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GraphicsOptions {
+    /// Field of view, in degrees from top to bottom edge of the viewport.
+    pub fov_y: NotNan<FreeCoordinate>,
+
+    /// Distance, in unit cubes, from the camera to the farthest visible point.
+    pub view_distance: NotNan<FreeCoordinate>,
+}
+
+impl GraphicsOptions {
+    /// Constrain fields to valid/practical values.
+    pub fn repair(mut self) -> Self {
+        self.fov_y = self
+            .fov_y
+            .max(NotNan::new(1.0).unwrap())
+            .min(NotNan::new(189.0).unwrap());
+        self.view_distance = self
+            .view_distance
+            .max(NotNan::new(1.0).unwrap())
+            .min(NotNan::new(10000.0).unwrap());
+        self
+    }
+}
+
+impl Default for GraphicsOptions {
+    fn default() -> Self {
+        Self {
+            fov_y: NotNan::new(90.).unwrap(),
+            view_distance: NotNan::new(200.).unwrap(),
+        }
+    }
+}
+
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.
 ///
 /// `direction` points in the direction the camera should be relative to the space.
@@ -249,15 +290,18 @@ mod tests {
 
     #[test]
     fn camera_bad_viewport_doesnt_panic() {
-        Camera::new(Viewport {
-            nominal_size: Vector2::new(0.0, 0.0),
-            framebuffer_size: Vector2::new(0, 0),
-        });
+        Camera::new(
+            GraphicsOptions::default(),
+            Viewport {
+                nominal_size: Vector2::new(0.0, 0.0),
+                framebuffer_size: Vector2::new(0, 0),
+            },
+        );
     }
 
     #[test]
     fn camera_view_position() {
-        let mut camera = Camera::new(DUMMY_VIEWPORT);
+        let mut camera = Camera::new(GraphicsOptions::default(), DUMMY_VIEWPORT);
         let pos = Point3::new(1.0, 2.0, 3.0);
         camera.set_view_matrix(
             Matrix4::from_angle_x(Deg(45.0)) * Matrix4::from_translation(-pos.to_vec()),

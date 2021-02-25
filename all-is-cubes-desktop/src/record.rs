@@ -86,7 +86,7 @@ pub(crate) fn record_main(
     let _ = stderr.flush();
 
     let viewport = options.viewport();
-    let mut camera = Camera::new(viewport);
+    let mut camera = Camera::new(app.graphics_options(), viewport);
 
     // Set up app state
     let space_ref = app.character().borrow().space.clone();

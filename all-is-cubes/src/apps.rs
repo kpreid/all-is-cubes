@@ -7,6 +7,7 @@ use cgmath::{Vector2, Vector3, Zero as _};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
+use crate::camera::GraphicsOptions;
 use crate::character::{Character, CharacterChange};
 use crate::content::UniverseTemplate;
 use crate::listen::{DirtyFlag, ListenerHelper as _};
@@ -78,6 +79,12 @@ impl AllIsCubesAppState {
 
     pub fn ui_space(&self) -> &URef<Space> {
         &self.ui.current_space()
+    }
+
+    pub fn graphics_options(&self) -> GraphicsOptions {
+        // TODO: this should be a constructor parameter (and mutable, once we have
+        // a change propagation strategy).
+        GraphicsOptions::default()
     }
 
     /// Steps the universe if the `FrameClock` says it's time to do so.

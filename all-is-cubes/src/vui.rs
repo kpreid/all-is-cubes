@@ -12,10 +12,12 @@ use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Font, Pixel, Primitive, Transform as _};
 use embedded_graphics::primitives::{Circle, Line, Rectangle, Triangle};
 use embedded_graphics::style::{PrimitiveStyleBuilder, TextStyleBuilder};
+use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::time::Duration;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR, AIR_EVALUATED};
+use crate::camera::GraphicsOptions;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
@@ -83,7 +85,11 @@ impl Vui {
         )
     }
 
-    pub const SUGGESTED_FOV_Y: Deg<FreeCoordinate> = Deg(30.);
+    /// Compute graphics options to render the VUI space given the user's regular options.
+    pub fn graphics_options(mut options: GraphicsOptions) -> GraphicsOptions {
+        options.fov_y = NotNan::new(30.).unwrap();
+        options
+    }
 
     pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
         if let Some(ref mut age) = self.tooltip_age {

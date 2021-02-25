@@ -52,7 +52,7 @@ pub fn glfw_main_loop(
     } = GlfwSurface::new_gl33(window_title, WindowOpt::default().set_dim(dim))?;
     let viewport = map_glfw_viewport(&context.window);
     // TODO: this is duplicated code with the wasm version; use a logging system to remove it
-    let mut renderer = GLRenderer::new(context, viewport)
+    let mut renderer = GLRenderer::new(context, app.graphics_options(), viewport)
         .handle_warnings(|warning| {
             eprintln!("GLSL warning:\n{}", warning);
         })

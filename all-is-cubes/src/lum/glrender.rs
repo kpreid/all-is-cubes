@@ -12,7 +12,7 @@ use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
 
-use crate::camera::{Camera, Viewport};
+use crate::camera::{Camera, GraphicsOptions, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
@@ -58,7 +58,11 @@ where
     /// Constructs `GLRenderer` for the given graphics context and initial viewport dimensions.
     ///
     /// Returns any shader compilation errors or warnings.
-    pub fn new(mut surface: C, viewport: Viewport) -> WarningsResult<Self, String, String> {
+    pub fn new(
+        mut surface: C,
+        options: GraphicsOptions,
+        viewport: Viewport,
+    ) -> WarningsResult<Self, String, String> {
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
         let (block_program, warnings) = prepare_block_program(&mut surface)?;
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
@@ -66,9 +70,6 @@ where
             viewport.framebuffer_size.into(),
         )
         .unwrap(); // TODO error handling
-
-        let mut ui_proj = Camera::new(viewport);
-        ui_proj.set_fov_y(Vui::SUGGESTED_FOV_Y);
 
         Ok((
             Self {
@@ -78,8 +79,8 @@ where
                 character: None,
                 world_renderer: None,
                 ui_renderer: None,
-                world_proj: Camera::new(viewport),
-                ui_proj,
+                ui_proj: Camera::new(Vui::graphics_options(options.clone()), viewport),
+                world_proj: Camera::new(options, viewport),
                 cursor_result: None,
             },
             warnings,

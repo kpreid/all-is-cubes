@@ -104,7 +104,10 @@ impl TerminalMain {
         let terminal_size = Vector2::from(crossterm::terminal::size()?);
 
         Ok(Self {
-            camera: Camera::new(options.viewport_from_terminal_size(terminal_size)),
+            camera: Camera::new(
+                app.graphics_options(),
+                options.viewport_from_terminal_size(terminal_size),
+            ),
             app,
             options,
             out: io::stdout(),
