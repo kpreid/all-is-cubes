@@ -19,7 +19,7 @@ lowp float fog_exp_fudged(highp float d) {
 lowp float fog_combo(highp float d) {
   // Combination of realistic exponential (constant density) fog,
   // and slower-starting fog so nearby stuff is clearer.
-  return mix(fog_exp_fudged(d), pow(d, 4.0), 0.5);
+  return mix(fog_exp_fudged(d), pow(d, 4.0), fog_mode_blend);
 }
 
 void basic_vertex(highp vec3 vertex_position) {

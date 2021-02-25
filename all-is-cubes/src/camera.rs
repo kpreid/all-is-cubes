@@ -326,10 +326,17 @@ impl Viewport {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct GraphicsOptions {
+    /// Whether and how to draw fog obscuring the view distance limit.
+    ///
+    /// TODO: Implement fog in raytracer.
+    pub fog: FogOption,
+
     /// Field of view, in degrees from top to bottom edge of the viewport.
     pub fov_y: NotNan<FreeCoordinate>,
 
     /// Distance, in unit cubes, from the camera to the farthest visible point.
+    ///
+    /// TODO: Implement view distance limit (and fog) in raytracer.
     pub view_distance: NotNan<FreeCoordinate>,
 
     /// Whether to use frustum culling for drawing only in-view chunks and objects.
@@ -340,7 +347,6 @@ pub struct GraphicsOptions {
 
     /// Draw the light rays that contribute to the selected block.
     pub debug_light_rays_at_cursor: bool,
-    // TODO: Add fog options.
 }
 
 impl GraphicsOptions {
@@ -361,6 +367,7 @@ impl GraphicsOptions {
 impl Default for GraphicsOptions {
     fn default() -> Self {
         Self {
+            fog: FogOption::Compromise,
             fov_y: NotNan::new(90.).unwrap(),
             view_distance: NotNan::new(200.).unwrap(),
             use_frustum_culling: true,
@@ -368,6 +375,18 @@ impl Default for GraphicsOptions {
             debug_light_rays_at_cursor: false,
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FogOption {
+    /// No fog: objects will maintain their color and disappear raggedly.
+    None,
+    /// Fog starts just before the view distance ends.
+    Abrupt,
+    /// Compromise between `Abrupt` and `Physical` options.
+    Compromise,
+    /// Almost physically realistic fog of constant density.
+    Physical,
 }
 
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.

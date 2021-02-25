@@ -12,6 +12,7 @@ use luminance_front::shader::{BuiltProgram, Program, ProgramError, ProgramInterf
 use luminance_front::texture::Dim3;
 use luminance_front::Backend;
 
+use crate::camera::GraphicsOptions;
 use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::VertexSemantics;
@@ -63,6 +64,9 @@ pub struct BlockUniformInterface {
     view_matrix: Uniform<[[f32; 4]; 4]>,
     block_texture: Uniform<TextureBinding<Dim3, NormUnsigned>>,
 
+    /// Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
+    /// TODO: Replace this uniform with a compiled-in flag since it doesn't need to be continuously changing.
+    fog_mode_blend: Uniform<f32>,
     /// How far out should be fully fogged?
     fog_distance: Uniform<f32>,
     /// Color for the fog.
@@ -76,10 +80,19 @@ impl BlockUniformInterface {
         program_iface: &mut ProgramInterface<'_>,
         space: &SpaceRendererBound<'_>,
     ) {
+        let options: &GraphicsOptions = space.camera.options();
         self.set_projection_matrix(program_iface, space.camera.projection());
         self.set_view_matrix(program_iface, space.camera.view_matrix());
         self.set_block_texture(program_iface, &space.bound_block_texture);
-        program_iface.set(&self.fog_distance, space.camera.view_distance() as f32);
+        let view_distance = space.camera.view_distance() as f32;
+        let (fog_mode_blend, fog_distance) = match options.fog {
+            crate::camera::FogOption::None => (0.0, f32::INFINITY),
+            crate::camera::FogOption::Abrupt => (1.0, view_distance),
+            crate::camera::FogOption::Compromise => (0.5, view_distance),
+            crate::camera::FogOption::Physical => (0.0, view_distance),
+        };
+        program_iface.set(&self.fog_mode_blend, fog_mode_blend);
+        program_iface.set(&self.fog_distance, fog_distance);
         program_iface.set(&self.fog_color, space.sky_color.into());
     }
 
