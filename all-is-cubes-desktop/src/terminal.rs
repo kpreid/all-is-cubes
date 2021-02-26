@@ -114,7 +114,7 @@ impl TerminalMain {
 
         Ok(Self {
             camera: Camera::new(
-                app.graphics_options(),
+                app.graphics_options().snapshot(),
                 options.viewport_from_terminal_size(terminal_size),
             ),
             app,
@@ -212,7 +212,7 @@ impl TerminalMain {
         let space = &*character.space.borrow_mut();
 
         let (image, info) =
-            SpaceRaytracer::<ColorCharacterBuf>::new(space, self.app.graphics_options())
+            SpaceRaytracer::<ColorCharacterBuf>::new(space, self.app.graphics_options().snapshot())
                 .trace_scene_to_image(&self.camera);
 
         self.out.queue(cursor::Hide)?;

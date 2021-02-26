@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::camera::{Camera, GraphicsOptions, Viewport};
 use crate::character::{cursor_raycast, Character, CharacterChange, Cursor};
 use crate::content::UniverseTemplate;
-use crate::listen::{DirtyFlag, ListenerHelper as _};
+use crate::listen::{DirtyFlag, ListenableCell, ListenableSource, ListenerHelper as _};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::universe::{FrameClock, URef, Universe, UniverseStepInfo};
@@ -29,6 +29,8 @@ pub struct AllIsCubesAppState {
     /// Handles (some) user input. The caller must provide input events/state;
     /// `AllIsCubesAppState` will handle calling [`InputProcessor::apply_input`].
     pub input_processor: InputProcessor,
+
+    graphics_options: ListenableCell<GraphicsOptions>,
 
     game_universe: Universe,
     game_character: URef<Character>,
@@ -54,6 +56,7 @@ impl AllIsCubesAppState {
         let mut new_self = Self {
             frame_clock: FrameClock::new(),
             input_processor: InputProcessor::new(),
+            graphics_options: ListenableCell::new(GraphicsOptions::default()),
             game_character: game_universe.get_default_character(),
             game_universe,
             ui: Vui::new(),
@@ -87,10 +90,8 @@ impl AllIsCubesAppState {
         &self.ui.current_space()
     }
 
-    pub fn graphics_options(&self) -> GraphicsOptions {
-        // TODO: this should be a constructor parameter (and mutable, once we have
-        // a change propagation strategy).
-        GraphicsOptions::default()
+    pub fn graphics_options(&self) -> ListenableSource<GraphicsOptions> {
+        self.graphics_options.as_source()
     }
 
     /// Steps the universe if the `FrameClock` says it's time to do so.

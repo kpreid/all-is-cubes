@@ -17,6 +17,7 @@ use std::time::Duration;
 use crate::camera::{Camera, GraphicsOptions, Viewport};
 use crate::character::{Character, Cursor};
 use crate::content::palette;
+use crate::listen::{DirtyFlag, ListenableSource};
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::LumBlockVertex;
@@ -33,6 +34,9 @@ pub struct GLRenderer<C>
 where
     C: GraphicsContext<Backend = Backend>,
 {
+    graphics_options: ListenableSource<GraphicsOptions>,
+    graphics_options_dirty: DirtyFlag,
+
     // Graphics objects
     pub surface: C,
     back_buffer: Framebuffer<Dim2, (), ()>,
@@ -55,7 +59,7 @@ where
     /// Returns any shader compilation errors or warnings.
     pub fn new(
         mut surface: C,
-        options: GraphicsOptions,
+        graphics_options: ListenableSource<GraphicsOptions>,
         viewport: Viewport,
     ) -> WarningsResult<Self, String, String> {
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
@@ -66,16 +70,22 @@ where
         )
         .unwrap(); // TODO error handling
 
+        let graphics_options_dirty = DirtyFlag::new(false);
+        graphics_options.listen(graphics_options_dirty.listener());
+        let initial_options = &*graphics_options.get();
+
         Ok((
             Self {
+                graphics_options,
+                graphics_options_dirty,
                 surface,
                 back_buffer,
                 block_program,
                 character: None,
                 world_renderer: None,
                 ui_renderer: None,
-                ui_camera: Camera::new(Vui::graphics_options(options.clone()), viewport),
-                world_camera: Camera::new(options, viewport),
+                ui_camera: Camera::new(Vui::graphics_options(initial_options.clone()), viewport),
+                world_camera: Camera::new(initial_options.clone(), viewport),
             },
             warnings,
         ))
@@ -138,6 +148,15 @@ where
     pub fn render_frame(&mut self, cursor_result: &Option<Cursor>) -> RenderInfo {
         let mut info = RenderInfo::default();
         let start_frame_time = Instant::now();
+
+        if self.graphics_options_dirty.get_and_clear() {
+            self.world_camera
+                .set_options(self.graphics_options.snapshot());
+            self.ui_camera
+                .set_options(Vui::graphics_options(self.graphics_options.snapshot()));
+
+            // TODO: going to need invalidation of chunks etc. here
+        }
 
         let character: &Character = &*(if let Some(character_ref) = &self.character {
             character_ref.borrow()
