@@ -374,6 +374,104 @@ impl<M: Clone> Listener<M> for NotifierForwarder<M> {
     }
 }
 
+/// A interior-mutable container for a value which can notify that the value changed,
+/// and which has reference-counted read-only handles to read it.
+#[derive(Debug)]
+pub struct ListenableCell<T> {
+    // TODO: Migrate to thread-safe storage once we have a use case.
+    storage: Rc<ListenableCellStorage<T>>,
+}
+/// Access to a value that might change (provided by a [`ListenableCell`]) or be [a
+/// constant](ListenableSource::constant), and which can be listened to.
+#[derive(Clone, Debug)]
+pub struct ListenableSource<T> {
+    storage: Rc<ListenableCellStorage<T>>,
+}
+#[derive(Debug)]
+struct ListenableCellStorage<T> {
+    /// RefCell because it's mutable; Rc because we want to be able to clone out of it to
+    /// avoid holding the cell borrowed.
+    /// TODO: Look into strategies to make this cheaper?
+    cell: RefCell<Rc<T>>,
+
+    /// Notifier to track listeners.
+    /// `None` if this is a constant cell.
+    ///
+    /// TODO: Add ability to diff the value and distribute that.
+    /// TODO: If the ListenableCell is dropped, drop this.
+    notifier: Option<Notifier<()>>,
+}
+
+// Note: The `T: Sync` bound is not mandatory; it's intended to preserve the future
+// possibility of making the whole thing thread-safe. Might be a bad idea.
+impl<T: Clone + Sync> ListenableCell<T> {
+    /// Creates a new [`ListenableCell`] containing the given value.
+    pub fn new(value: T) -> Self {
+        Self {
+            storage: Rc::new(ListenableCellStorage {
+                cell: RefCell::new(Rc::new(value)),
+                notifier: Some(Notifier::new()),
+            }),
+        }
+    }
+
+    /// Returns a reference to the current value of the cell.
+    pub fn get(&self) -> Rc<T> {
+        self.storage.cell.borrow().clone()
+    }
+
+    /// Sets the contained value and sends out a change notification.
+    ///
+    /// Caution: While listeners are *expected* not to have immediate side effects on
+    /// notification, this cannot be enforced.
+    pub fn set(&self, value: T) {
+        let mut borrow = self.storage.cell.borrow_mut();
+        *borrow = Rc::new(value);
+        self.storage
+            .notifier
+            .as_ref()
+            .expect("can't happen: set() on a constant cell")
+            .notify(());
+        // Notifying while still holding the `RefMut` enforces that listeners don't try to
+        // read the cell immedately.
+        drop(borrow);
+    }
+
+    /// Returns a [`ListenableSource`] which provides read-only access to the value
+    /// managed by this cell.
+    pub fn as_source(&self) -> ListenableSource<T> {
+        ListenableSource {
+            storage: self.storage.clone(),
+        }
+    }
+}
+
+impl<T: Clone + Sync> ListenableSource<T> {
+    /// Creates a new [`ListenableSource`] containing the given value, which will
+    /// never change.
+    pub fn constant(value: T) -> Self {
+        Self {
+            storage: Rc::new(ListenableCellStorage {
+                cell: RefCell::new(Rc::new(value)),
+                notifier: None,
+            }),
+        }
+    }
+
+    /// Returns a reference to the current value of the cell.
+    // TODO: Consider storing a 'local' copy of the Rc so we can borrow it rather than cloning it every time?
+    pub fn get(&self) -> Rc<T> {
+        self.storage.cell.borrow().clone()
+    }
+
+    /// Subscribes to change notifications.
+    pub fn listen(&self, listener: impl Listener<()> + 'static) {
+        if let Some(notifier) = &self.storage.notifier {
+            notifier.listen(listener);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -403,5 +501,35 @@ mod tests {
         let dirtied = DirtyFlag::new(false);
         dirtied.listener().receive(());
         assert_eq!(format!("{:?}", dirtied), "DirtyFlag(true)");
+    }
+
+    #[test]
+    fn listenable_cell() {
+        let cell = ListenableCell::new(0);
+
+        let s = cell.as_source();
+        let mut sink = Sink::new();
+        s.listen(sink.listener());
+
+        assert_eq!(None, sink.next());
+        cell.set(1);
+        assert_eq!(1, *s.get());
+        assert_eq!(Some(()), sink.next());
+    }
+
+    #[test]
+    fn listenable_source_constant() {
+        let s = ListenableSource::constant(123);
+        assert_eq!(*s.get(), 123);
+        s.listen(Sink::new().listener()); // no panic
+    }
+
+    #[test]
+    fn listenable_source_clone() {
+        let cell = ListenableCell::new(0);
+        let s = cell.as_source();
+        let s = s.clone();
+        cell.set(1);
+        assert_eq!(*s.get(), 1);
     }
 }
