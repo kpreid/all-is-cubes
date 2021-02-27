@@ -23,6 +23,8 @@ lint:
 
 test:
 	cargo test  # ignores wasm-only code
+	# try to build the wasm-only code -- currently npm based testing isn't doing anything
+	(cd all-is-cubes-wasm && cargo build --target=wasm32-unknown-unknown)
 	(cd all-is-cubes-wasm && npm test)
 	cargo build --all-targets # Confirm benchmarks etc. compile, even if we don't run them
 
