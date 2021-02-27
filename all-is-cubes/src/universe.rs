@@ -74,6 +74,8 @@ impl Universe {
     /// Advance time for all members.
     pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
+        let start_time = Instant::now();
+
         for space in self.spaces.values() {
             info.space_step += space
                 .try_borrow_mut()
@@ -86,6 +88,8 @@ impl Universe {
                 .expect("character borrowed during universe.step()")
                 .step(timestep);
         }
+
+        info.computation_time = Instant::now().duration_since(start_time);
         info
     }
 
@@ -458,6 +462,7 @@ impl<T> URootRef<T> {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct UniverseStepInfo {
+    computation_time: Duration,
     space_step: SpaceStepInfo,
 }
 impl std::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
