@@ -25,10 +25,6 @@ use crate::universe::URef;
 use crate::util::WarningsResult;
 use crate::vui::Vui;
 
-// TODO: Make these a runtime toggle
-const DRAW_LIGHTING_DEBUG: bool = false;
-const DRAW_COLLISION_BOXES: bool = false;
-
 /// Game world/UI renderer targeting `luminance`.
 // TODO: give this and its module a better name
 pub struct GLRenderer<C>
@@ -44,8 +40,8 @@ where
     character: Option<URef<Character>>,
     world_renderer: Option<SpaceRenderer>,
     ui_renderer: Option<SpaceRenderer>,
-    world_proj: Camera,
-    ui_proj: Camera,
+    world_camera: Camera,
+    ui_camera: Camera,
 
     // Miscellaneous
     pub cursor_result: Option<Cursor>, // TODO: give this an accessor
@@ -79,8 +75,8 @@ where
                 character: None,
                 world_renderer: None,
                 ui_renderer: None,
-                ui_proj: Camera::new(Vui::graphics_options(options.clone()), viewport),
-                world_proj: Camera::new(options, viewport),
+                ui_camera: Camera::new(Vui::graphics_options(options.clone()), viewport),
+                world_camera: Camera::new(options, viewport),
                 cursor_result: None,
             },
             warnings,
@@ -89,15 +85,15 @@ where
 
     /// Sets the expected viewport dimensions. Use in case of window resizing.
     pub fn set_viewport(&mut self, viewport: Viewport) {
-        self.world_proj.set_viewport(viewport);
+        self.world_camera.set_viewport(viewport);
 
-        self.ui_proj.set_viewport(viewport);
+        self.ui_camera.set_viewport(viewport);
         if let Some(ui_renderer) = &self.ui_renderer {
             // Note: Since this is conditional, we also have to set it up in
             // set_ui_space when ui_renderer becomes Some.
-            self.ui_proj.set_view_matrix(Vui::view_matrix(
+            self.ui_camera.set_view_matrix(Vui::view_matrix(
                 &*ui_renderer.space().borrow(),
-                self.ui_proj.fov_y(),
+                self.ui_camera.fov_y(),
             ));
         }
 
@@ -115,8 +111,8 @@ where
 
     pub fn set_ui_space(&mut self, space: Option<URef<Space>>) {
         self.ui_renderer = space.map(|space| {
-            self.ui_proj
-                .set_view_matrix(Vui::view_matrix(&*space.borrow(), self.ui_proj.fov_y()));
+            self.ui_camera
+                .set_view_matrix(Vui::view_matrix(&*space.borrow(), self.ui_camera.fov_y()));
             SpaceRenderer::new(space)
         });
     }
@@ -135,9 +131,9 @@ where
         // Update cursor state. This is, strictly speaking, not rendering, but it is closely
         // related in that the cursor should match the pixels being drawn.
         // TODO: Figure out how to lay this out with more separation of concerns, though.
-        self.world_proj.set_view_matrix(character.view());
+        self.world_camera.set_view_matrix(character.view());
         self.cursor_result = self
-            .world_proj
+            .world_camera
             .project_cursor_into_world()
             .and_then(|ray| cursor_raycast(ray.cast(), &*character.space.borrow()));
 
@@ -146,10 +142,10 @@ where
             self.world_renderer = Some(SpaceRenderer::new(character.space.clone()));
         }
         let world_renderer = self.world_renderer.as_mut().unwrap();
-        let world_output = world_renderer.prepare_frame(surface, &self.world_proj);
+        let world_output = world_renderer.prepare_frame(surface, &self.world_camera);
 
         let ui_output = if let Some(ui_renderer) = &mut self.ui_renderer {
-            Some(ui_renderer.prepare_frame(surface, &self.ui_proj))
+            Some(ui_renderer.prepare_frame(surface, &self.ui_camera))
         } else {
             None
         };
@@ -157,7 +153,7 @@ where
         let debug_lines_tess = {
             let mut v: Vec<LumBlockVertex> = Vec::new();
 
-            if DRAW_COLLISION_BOXES {
+            if self.world_camera.options().debug_collision_boxes {
                 // Character collision box
                 wireframe_vertices(
                     &mut v,
@@ -175,7 +171,7 @@ where
             }
 
             // Lighting trace at cursor
-            if DRAW_LIGHTING_DEBUG {
+            if self.world_camera.options().debug_light_rays_at_cursor {
                 if let Some(cursor) = &self.cursor_result {
                     let space = character.space.borrow();
                     let (_, _, _, lighting_info) = space.compute_lighting(cursor.place.adjacent());
@@ -268,7 +264,7 @@ where
     /// Set the current cursor position, in pixel coordinates. Affects mouseover/click results.
     // TODO: This is a workaround for self.world_proj being private; arguably doesn't even belong there or here. Find a better structure.
     pub fn set_cursor_position(&mut self, position: Option<Point2<usize>>) {
-        self.world_proj.set_cursor_position(position);
+        self.world_camera.set_cursor_position(position);
     }
 }
 

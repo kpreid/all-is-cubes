@@ -72,6 +72,11 @@ impl Camera {
         self.viewport
     }
 
+    /// Returns the [`GraphicsOptions`] value last provided (possibly with adjusted values).
+    pub fn options(&self) -> &GraphicsOptions {
+        &self.options
+    }
+
     pub fn set_options(&mut self, options: GraphicsOptions) {
         self.options = options.repair();
     }
@@ -233,12 +238,20 @@ impl Viewport {
 ///
 /// TODO: This may not be the best module location. Possibly it should get its own module.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct GraphicsOptions {
     /// Field of view, in degrees from top to bottom edge of the viewport.
     pub fov_y: NotNan<FreeCoordinate>,
 
     /// Distance, in unit cubes, from the camera to the farthest visible point.
     pub view_distance: NotNan<FreeCoordinate>,
+
+    /// Draw collision boxes for some objects.
+    pub debug_collision_boxes: bool,
+
+    /// Draw the light rays that contribute to the selected block.
+    pub debug_light_rays_at_cursor: bool,
+    // TODO: Add fog options.
 }
 
 impl GraphicsOptions {
@@ -261,6 +274,8 @@ impl Default for GraphicsOptions {
         Self {
             fov_y: NotNan::new(90.).unwrap(),
             view_distance: NotNan::new(200.).unwrap(),
+            debug_collision_boxes: false,
+            debug_light_rays_at_cursor: false,
         }
     }
 }
