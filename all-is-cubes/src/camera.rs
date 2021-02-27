@@ -332,6 +332,9 @@ pub struct GraphicsOptions {
     /// Distance, in unit cubes, from the camera to the farthest visible point.
     pub view_distance: NotNan<FreeCoordinate>,
 
+    /// Whether to use frustum culling for drawing only in-view chunks and objects.
+    pub use_frustum_culling: bool,
+
     /// Draw collision boxes for some objects.
     pub debug_collision_boxes: bool,
 
@@ -360,6 +363,7 @@ impl Default for GraphicsOptions {
         Self {
             fov_y: NotNan::new(90.).unwrap(),
             view_distance: NotNan::new(200.).unwrap(),
+            use_frustum_culling: true,
             debug_collision_boxes: false,
             debug_light_rays_at_cursor: false,
         }

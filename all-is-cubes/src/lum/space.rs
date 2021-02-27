@@ -315,6 +315,9 @@ impl<'a> SpaceRendererBound<'a> {
             render_gate.render(&pass.render_state(), |mut tess_gate| {
                 for p in self.chunk_chart.chunks(self.view_chunk) {
                     if let Some(chunk) = self.chunks.get(&p) {
+                        if self.cull(p) {
+                            continue;
+                        }
                         chunks_drawn += 1;
                         squares_drawn += chunk.render(&mut tess_gate, pass, DepthOrdering::Any)?;
                     }
@@ -328,6 +331,9 @@ impl<'a> SpaceRendererBound<'a> {
             render_gate.render(&pass.render_state(), |mut tess_gate| {
                 for p in self.chunk_chart.chunks(self.view_chunk).rev() {
                     if let Some(chunk) = self.chunks.get(&p) {
+                        if self.cull(p) {
+                            continue;
+                        }
                         squares_drawn += chunk.render(
                             &mut tess_gate,
                             pass,
@@ -345,6 +351,10 @@ impl<'a> SpaceRendererBound<'a> {
             squares_drawn,
             ..self.info.clone()
         })
+    }
+
+    fn cull(&self, chunk: ChunkPos) -> bool {
+        self.camera.options().use_frustum_culling && !self.camera.aab_in_view(chunk.grid().into())
     }
 }
 
