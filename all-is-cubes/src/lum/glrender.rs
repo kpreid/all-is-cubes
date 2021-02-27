@@ -4,6 +4,7 @@
 //! Top level of the `luminance`-based renderer.
 
 use cgmath::Point2;
+use instant::Instant; // wasm-compatible replacement for std::time::Instant
 use luminance_front::context::GraphicsContext;
 use luminance_front::framebuffer::Framebuffer;
 use luminance_front::pipeline::PipelineState;
@@ -11,6 +12,7 @@ use luminance_front::render_state::RenderState;
 use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
+use std::time::Duration;
 
 use crate::camera::{Camera, GraphicsOptions, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
@@ -120,6 +122,8 @@ where
     /// Draw a frame.
     pub fn render_frame(&mut self) -> RenderInfo {
         let mut info = RenderInfo::default();
+        let start_time = Instant::now();
+
         let character: &Character = &*(if let Some(character_ref) = &self.character {
             character_ref.borrow()
         } else {
@@ -257,7 +261,7 @@ where
             .into_result()
             .unwrap();
 
-        // There is no swap_buffers operation because WebGL implicitly does so.
+        info.frame_time = Instant::now().duration_since(start_time);
         info
     }
 
@@ -271,5 +275,6 @@ where
 /// Information about render performance.
 #[derive(Clone, Debug, Default)]
 pub struct RenderInfo {
+    frame_time: Duration,
     space: SpaceRenderInfo,
 }

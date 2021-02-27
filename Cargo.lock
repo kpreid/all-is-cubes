@@ -50,6 +50,7 @@ dependencies = [
  "criterion",
  "embedded-graphics",
  "indexmap",
+ "instant",
  "itertools 0.10.0",
  "luminance",
  "luminance-front",
@@ -100,6 +101,7 @@ version = "0.2.0"
 dependencies = [
  "all-is-cubes",
  "console_error_panic_hook",
+ "instant",
  "js-sys",
  "luminance",
  "luminance-front",
@@ -998,6 +1000,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
 dependencies = [
  "cfg-if 1.0.0",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

@@ -3,6 +3,7 @@
 
 //! Top-level game state container.
 
+use instant::Instant; // wasm-compatible replacement for std::time::Instant
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::HashMap;
@@ -10,7 +11,7 @@ use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::block::BlockDef;
 use crate::character::Character;
