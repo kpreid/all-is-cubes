@@ -9,7 +9,9 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::QueueableCommand as _;
+use cursor::position;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::error::Error;
 use std::io;
 use std::io::Write as _;
@@ -93,6 +95,11 @@ struct TerminalMain {
     // Tracking terminal state.
     terminal_size: Vector2<u16>,
     current_color: Option<Colors>,
+
+    /// The widths of "single characters" according to the terminal's interpretation
+    /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
+    /// position.
+    widths: HashMap<String, usize>,
 }
 
 impl TerminalMain {
@@ -112,6 +119,7 @@ impl TerminalMain {
             terminal_size,
             terminal_state_dirty: true,
             current_color: None,
+            widths: HashMap::new(),
         })
     }
 
@@ -214,11 +222,13 @@ impl TerminalMain {
             .map(|s| s as usize)
             .div_element_wise(self.options.rays_per_character().map(usize::from));
         for y in 0..character_size.y {
-            for x in 0..character_size.x {
+            let mut x = 0;
+            while x < character_size.x {
                 let (text, color) =
                     self.image_patch_to_character(&*image, Vector2::new(x, y), character_size);
 
-                self.write_with_color(text, color)?;
+                let width = self.write_with_color_and_measure(text, color, character_size.x - x)?;
+                x += width.max(1); // max(1) prevents infinite looping in edge case
             }
             self.write_with_color("\r\n", Colors::new(Color::Reset, Color::Reset))?;
         }
@@ -285,6 +295,30 @@ impl TerminalMain {
         }
         write!(self.out, "{}", text)?;
         Ok(())
+    }
+
+    fn write_with_color_and_measure(
+        &mut self,
+        text: &str,
+        color: Colors,
+        max_width: usize,
+    ) -> crossterm::Result<usize> {
+        if let Some(&w) = self.widths.get(text) {
+            if w <= max_width {
+                self.write_with_color(text, color)?;
+            }
+            Ok(w)
+        } else {
+            // Measure the de-facto width of the string by measuring how far the cursor advances.
+            let before = position()?;
+            self.write_with_color(text, color)?;
+            let after = position()?;
+            let w = usize::from(after.0.saturating_sub(before.0));
+            if after.1 == before.1 && w > 0 {
+                self.widths.insert(text.to_owned(), w);
+            }
+            Ok(w)
+        }
     }
 }
 
