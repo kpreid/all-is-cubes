@@ -4,18 +4,17 @@
 //! Headless image (and someday video) generation.
 
 use std::array::IntoIter;
-use std::borrow::Cow;
+use std::convert::TryInto;
 use std::error::Error;
-use std::ffi::OsString;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::ops::RangeInclusive;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use cgmath::Vector2;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
-use png::Encoder;
+use png::{chunk::ChunkType, Encoder};
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::behavior::AutoRotate;
@@ -57,30 +56,6 @@ impl RecordOptions {
             Some(animation) => 1..=animation.frame_count,
         }
     }
-
-    fn frame_path(&self, frame_number: usize) -> Cow<'_, Path> {
-        match &self.animation {
-            None => (&self.output_path).into(),
-            Some(_) => {
-                let mut path = self.output_path.clone();
-                let mut filename: OsString =
-                    path.file_stem().expect("missing file name").to_owned(); // TODO error handling
-                filename.push(format!("-{:04}.", frame_number));
-                filename.push(path.extension().unwrap());
-                path.set_file_name(filename);
-                path.into()
-            }
-        }
-    }
-
-    fn describe_output(&self) -> String {
-        let path = self.frame_path(*self.frame_range().start());
-        if self.animated() {
-            format!("{} + more frames", path.to_string_lossy())
-        } else {
-            format!("{}", path.to_string_lossy())
-        }
-    }
 }
 
 pub(crate) fn record_main(
@@ -112,38 +87,38 @@ pub(crate) fn record_main(
         });
     }
 
-    let drawing_progress_bar = ProgressBar::new(options.frame_range().size_hint().0 as u64)
-        .with_style(progress_style)
-        .with_prefix("Drawing");
-    drawing_progress_bar.enable_steady_tick(1000);
-    for frame in drawing_progress_bar.wrap_iter(options.frame_range()) {
-        camera.set_view_matrix(character_ref.borrow().view());
-        let (image_data, _info) = SpaceRaytracer::<ColorBuf>::new(
-            &*space_ref.borrow(),
-            app.graphics_options().snapshot(),
-        )
-        .trace_scene_to_image(&camera);
-        // TODO: Offer supersampling (multiple rays per output pixel).
+    // Set up image writer
+    let mut file_writer = BufWriter::new(File::create(&options.output_path)?);
+    {
+        let mut png_writer = new_png_writer(&mut file_writer, &options)?;
 
-        // Advance time for next frame.
-        let _ = app
-            .frame_clock
-            .request_frame(Duration::from_millis(1000 / 60));
-        app.maybe_step_universe();
+        let drawing_progress_bar = ProgressBar::new(options.frame_range().size_hint().0 as u64)
+            .with_style(progress_style)
+            .with_prefix("Drawing");
+        drawing_progress_bar.enable_steady_tick(1000);
+        for _frame in drawing_progress_bar.wrap_iter(options.frame_range()) {
+            camera.set_view_matrix(character_ref.borrow().view());
+            let (image_data, _info) = SpaceRaytracer::<ColorBuf>::new(
+                &*space_ref.borrow(),
+                app.graphics_options().snapshot(),
+            )
+            .trace_scene_to_image(&camera);
+            // TODO: Offer supersampling (multiple rays per output pixel).
 
-        let frame_path = options.frame_path(frame);
+            // Advance time for next frame.
+            let _ = app
+                .frame_clock
+                .request_frame(Duration::from_millis(1000 / 60));
+            app.maybe_step_universe();
 
-        // Write image data to file
-        let mut file_writer = BufWriter::new(File::create(&frame_path)?);
-        write_frame(
-            &mut new_png_writer(&mut file_writer, viewport)?,
-            &image_data,
-        )?;
-        file_writer.into_inner()?.sync_all()?;
+            // Write image data to file
+            write_frame(&mut png_writer, &image_data)?;
+        }
     }
 
     // Flush file and report completion
-    let _ = writeln!(stderr, "\nWrote {}", options.describe_output());
+    file_writer.into_inner()?.sync_all()?;
+    let _ = writeln!(stderr, "\nWrote {}", options.output_path.to_string_lossy());
 
     Ok(())
 }
@@ -160,18 +135,20 @@ fn write_frame(
     Ok(())
 }
 
-fn new_png_writer(
-    file_writer: &mut BufWriter<File>,
-    viewport: Viewport,
-) -> Result<png::Writer<&mut BufWriter<File>>, std::io::Error> {
+fn new_png_writer<'a>(
+    file_writer: &'a mut BufWriter<File>,
+    options: &RecordOptions,
+) -> Result<png::Writer<&'a mut BufWriter<File>>, std::io::Error> {
     // Scope of file_writer being borrowed
-    let mut png_encoder = Encoder::new(
-        file_writer,
-        viewport.framebuffer_size.x,
-        viewport.framebuffer_size.y,
-    );
-    png_encoder.set_color(png::ColorType::RGBA);
+    let mut png_encoder = Encoder::new(file_writer, options.image_size.x, options.image_size.y);
+    png_encoder.set_color(png::ColorType::Rgba);
     png_encoder.set_depth(png::BitDepth::Eight);
+    png_encoder.set_compression(png::Compression::Best);
+    if let Some(anim) = &options.animation {
+        png_encoder.set_animated(anim.frame_count.try_into().expect("too many frames"), 0)?;
+        // TODO: store more precisely; for that matter we should perhaps stop using Duration and have an explicit divisor of our own
+        png_encoder.set_frame_delay(anim.frame_period.as_millis().try_into().unwrap(), 1000)?;
+    }
     let mut png_writer = png_encoder.write_header()?;
     write_color_metadata(&mut png_writer)?;
     Ok(png_writer)
@@ -187,12 +164,12 @@ fn write_color_metadata<W: std::io::Write>(
     // https://github.com/image-rs/image-png/pull/244
 
     // Write sRGB chunk to declare that the image is sRGB.
-    png_writer.write_chunk(*b"sRGB", &[0])?;
+    png_writer.write_chunk(ChunkType(*b"sRGB"), &[0])?;
     // Write compatibility gamma information
-    png_writer.write_chunk(*b"gAMA", &45455_u32.to_be_bytes())?;
+    png_writer.write_chunk(ChunkType(*b"gAMA"), &45455_u32.to_be_bytes())?;
     // Write compatibility chromaticity information
     png_writer.write_chunk(
-        *b"cHRM",
+        ChunkType(*b"cHRM"),
         &IntoIter::new([
             31270, // White Point x
             32900, // White Point y
