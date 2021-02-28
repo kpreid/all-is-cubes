@@ -4,11 +4,12 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
-use cgmath::{EuclideanSpace as _, One as _, Transform as _};
+use cgmath::{EuclideanSpace as _, One as _, Transform as _, Vector3};
 use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
+use ordered_float::NotNan;
 
 use crate::block::{BlockAttributes, BlockCollision, AIR};
 use crate::content::{logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS};
@@ -54,6 +55,9 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     // Construct space.
     let mut space = Space::empty(grid);
     space.set_sky_color(Rgb::new(0.9, 0.9, 1.4));
+    space.spawn_mut().position =
+        (grid.center() + Vector3::new(0.5, 2.91, 8.5)).map(|s| NotNan::new(s).unwrap());
+    space.spawn_mut().flying = false;
 
     // Fill in flat ground
     space.fill_uniform(

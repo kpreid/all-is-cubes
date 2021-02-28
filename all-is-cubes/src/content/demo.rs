@@ -3,13 +3,14 @@
 
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
 
-use cgmath::Vector3;
+use cgmath::Point3;
+use ordered_float::NotNan;
 
 use crate::block::{Block, BlockDef};
 use crate::character::Character;
 use crate::content::{demo_city, install_demo_blocks};
 use crate::linking::{GenError, InGenError};
-use crate::math::{GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, Space};
 use crate::tools::Tool;
 use crate::universe::{Name, URef, Universe, UniverseIndex};
@@ -62,6 +63,7 @@ fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
     let mut space = Space::empty(grid);
     // There shall be no light but that which we make for ourselves!
     space.set_sky_color(Rgb::new(0., 0., 0.));
+    space.spawn_mut().position = (Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into()).map(|s| NotNan::new(s).unwrap());
 
     let white: Block = Rgba::new(1.0, 1.0, 1.0, 1.0).into();
     let red: Block = Rgba::new(0.57, 0.025, 0.025, 1.0).into();
@@ -105,12 +107,9 @@ where
     let space_name1: Name = "space".into();
     let space_name2 = space_name1.clone();
     let space: Space = space_fn(&mut universe).map_err(|e| GenError::failure(e, space_name1))?;
-    // TODO: this position should be configurable; it makes some sense to have a "spawn point" per Space
-    let position = space.grid().center() + Vector3::new(0.5, 2.91, 8.5);
     let space_ref = universe.insert(space_name2, space)?;
 
-    //let character = Character::looking_at_space(space_ref, Vector3::new(0.5, 0.5, 1.0));
-    let mut character = Character::new(space_ref, position);
+    let mut character = Character::spawn_default(space_ref);
     // Copy all named block defs into inventory.
     let mut items: Vec<(Name, URef<BlockDef>)> = universe
         .iter_by_type()
@@ -195,6 +194,11 @@ fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenErro
             })
         },
     )?;
+
+    let spawn = space.spawn_mut();
+    spawn.position = Point3::new(0., FreeCoordinate::from(planet_radius) + 2., 0.)
+        .map(|s| NotNan::new(s).unwrap());
+    spawn.flying = false;
 
     Ok(space)
 }

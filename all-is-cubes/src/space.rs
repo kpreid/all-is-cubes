@@ -12,6 +12,7 @@ use std::rc::{Rc, Weak};
 use std::time::Duration;
 
 use crate::block::*;
+use crate::character::Spawn;
 use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
@@ -63,6 +64,8 @@ pub struct Space {
     // should be "abstract" and not have either lighting or a sky color.)
     sky_color: Rgb,
     packed_sky_color: PackedLight,
+
+    spawn: Spawn,
 
     notifier: Notifier<SpaceChange>,
 
@@ -134,6 +137,7 @@ impl Space {
             lighting_update_set: HashSet::new(),
             sky_color,
             packed_sky_color: sky_color.into(),
+            spawn: Spawn::default_for_new_space(grid),
             notifier: Notifier::new(),
             todo: Default::default(),
         }
@@ -544,6 +548,14 @@ impl Space {
         self.sky_color = color;
         self.packed_sky_color = self.sky_color.into();
         // TODO: Also send out a SpaceChange.
+    }
+
+    pub fn spawn(&self) -> &Spawn {
+        &self.spawn
+    }
+
+    pub fn spawn_mut(&mut self) -> &mut Spawn {
+        &mut self.spawn
     }
 
     /// Finds or assigns an index to denote the block.

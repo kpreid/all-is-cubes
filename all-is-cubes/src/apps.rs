@@ -467,8 +467,6 @@ pub enum Key {
 
 #[cfg(test)]
 mod tests {
-    use cgmath::{EuclideanSpace as _, Point3};
-
     use super::*;
 
     #[test]
@@ -505,7 +503,7 @@ mod tests {
         // TODO: Awful lot of setup boilerplate...
         let mut u = Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let character = u.insert_anonymous(Character::new(space.clone(), Point3::origin()));
+        let character = u.insert_anonymous(Character::spawn_default(space.clone()));
         let mut input = InputProcessor::new();
 
         input.key_down(Key::Character('5'));

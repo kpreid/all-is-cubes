@@ -5,6 +5,7 @@
 
 use cgmath::{Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Matrix4, Point3, Vector3};
 use num_traits::identities::Zero;
+use ordered_float::NotNan;
 use std::collections::HashSet;
 use std::fmt;
 use std::time::Duration;
@@ -83,13 +84,14 @@ impl CustomFormat<StatusText> for Character {
 }
 
 impl Character {
-    /// Constructs a [`Character`] with specified position.
-    pub fn new(space: URef<Space>, position: impl Into<Point3<FreeCoordinate>>) -> Self {
+    /// Constructs a [`Character`] within/looking at the given `space`
+    /// with the initial state specified by `spawn`.
+    pub fn spawn(spawn: &Spawn, space: URef<Space>) -> Self {
         Self {
             body: Body {
-                // flying: true,
+                flying: spawn.flying,
                 ..Body::new_minimal(
-                    position.into(),
+                    spawn.position.map(|s| s.into_inner()),
                     Aab::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
                 )
             },
@@ -118,21 +120,10 @@ impl Character {
         }
     }
 
-    /// Constructs a [`Character`] located outside the [`Space`] and with its bounds in
-    /// frame.
-    ///
-    /// `direction` gives the direction in which the character will lie relative to the
-    /// center of the space.
-    pub fn looking_at_space(
-        space: URef<Space>,
-        direction: impl Into<Vector3<FreeCoordinate>>,
-    ) -> Self {
-        let grid: Grid = space.borrow().grid();
-
-        let mut character = Self::new(space, eye_for_look_at(grid, direction.into()));
-        character.body.look_at(grid.center());
-
-        character
+    /// Constructs a [`Character`] within/looking at the given `space`
+    /// with the initial state specified by [`Space::spawn`].
+    pub fn spawn_default(space: URef<Space>) -> Self {
+        Self::spawn(space.borrow().spawn(), space)
     }
 
     /// Registers a listener for mutations of this character.
@@ -342,6 +333,45 @@ impl std::fmt::Display for Cursor {
             self.lighting_ahead,
             self.lighting_behind,
         )
+    }
+}
+
+/// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Spawn {
+    /// Position, in cube coordinates.
+    ///
+    /// TODO: Replace this with something that can do noncolliding or random placement.
+    /// TODO: We do want to ensure that the data is comparable, but NotNan is inconvenient to create;
+    /// provide convenience.
+    pub position: Point3<NotNan<FreeCoordinate>>,
+
+    pub flying: bool,
+}
+
+impl Spawn {
+    pub(crate) fn default_for_new_space(_grid: Grid) -> Self {
+        Spawn {
+            position: Point3::origin(), // TODO: pick something better? For what criteria?
+            flying: true,
+        }
+    }
+
+    /// Constructs a [`Spawn`] point located outside the [`Space`] and with its bounds in
+    /// frame.
+    ///
+    /// `direction` gives the direction in which the character will lie relative to the
+    /// center of the space.
+    #[allow(dead_code)] // TODO: Saving this in case it turns out useful e.g. for looking at blocks.
+    pub(crate) fn looking_at_space(
+        space: URef<Space>,
+        direction: impl Into<Vector3<FreeCoordinate>>,
+    ) -> Self {
+        let grid = space.borrow().grid();
+        let mut spawn = Self::default_for_new_space(grid);
+        spawn.position = eye_for_look_at(grid, direction.into()).map(|s| NotNan::new(s).unwrap());
+        //spawn.look_at(grid.center());  // TODO
+        spawn
     }
 }
 
