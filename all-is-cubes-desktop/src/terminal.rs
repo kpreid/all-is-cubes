@@ -13,9 +13,7 @@ use std::borrow::Cow;
 use std::error::Error;
 use std::io;
 use std::io::Write as _;
-use std::sync::mpsc;
-use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::camera::{Camera, Viewport};
@@ -130,74 +128,49 @@ impl TerminalMain {
     }
 
     fn run(&mut self) -> crossterm::Result<()> {
-        // Park stdin blocking reads on another thread.
-        let (event_tx, event_rx) = mpsc::sync_channel(0);
-        thread::spawn(move || {
-            loop {
-                match crossterm::event::read() {
-                    Ok(event) => event_tx.send(event).unwrap(),
-                    Err(err) => {
-                        eprintln!("stdin read error: {}", err);
-                        break;
-                    }
-                }
-            }
-            eprintln!("read thread exiting");
-        });
-
         self.out.queue(Clear(ClearType::All))?;
 
         loop {
-            'input: loop {
-                match event_rx.try_recv() {
-                    Ok(event) => {
-                        if let Some(aic_event) = map_crossterm_event(&event) {
-                            if self.app.input_processor.key_momentary(aic_event) {
-                                // Handled by input_processor
-                                continue 'input;
-                            }
-                        }
-                        match event {
-                            Event::Key(KeyEvent {
-                                code: KeyCode::Esc, ..
-                            })
-                            | Event::Key(KeyEvent {
-                                code: KeyCode::Char('c'),
-                                modifiers: KeyModifiers::CONTROL,
-                            })
-                            | Event::Key(KeyEvent {
-                                code: KeyCode::Char('d'),
-                                modifiers: KeyModifiers::CONTROL,
-                            }) => {
-                                return Ok(());
-                            }
-                            Event::Key(KeyEvent {
-                                code: KeyCode::Char('n'),
-                                modifiers: _,
-                            }) => self.options.colors = self.options.colors.cycle(),
-                            Event::Key(KeyEvent {
-                                code: KeyCode::Char('m'),
-                                modifiers: _,
-                            }) => {
-                                self.options.graphic_characters = !self.options.graphic_characters;
-                                self.sync_options();
-                            }
-                            Event::Key(_) => {}
-                            Event::Resize(w, h) => {
-                                self.terminal_size = Vector2::new(w, h);
-                                self.sync_options();
-                                self.out.queue(Clear(ClearType::All))?;
-                            }
-                            Event::Mouse(_) => {}
-                        }
+            'input: while crossterm::event::poll(Duration::from_secs(0))? {
+                let event = crossterm::event::read()?;
+                if let Some(aic_event) = map_crossterm_event(&event) {
+                    if self.app.input_processor.key_momentary(aic_event) {
+                        // Handled by input_processor
+                        continue 'input;
                     }
-                    Err(mpsc::TryRecvError::Disconnected) => {
-                        eprintln!("input disconnected");
+                }
+                match event {
+                    Event::Key(KeyEvent {
+                        code: KeyCode::Esc, ..
+                    })
+                    | Event::Key(KeyEvent {
+                        code: KeyCode::Char('c'),
+                        modifiers: KeyModifiers::CONTROL,
+                    })
+                    | Event::Key(KeyEvent {
+                        code: KeyCode::Char('d'),
+                        modifiers: KeyModifiers::CONTROL,
+                    }) => {
                         return Ok(());
                     }
-                    Err(mpsc::TryRecvError::Empty) => {
-                        break 'input;
+                    Event::Key(KeyEvent {
+                        code: KeyCode::Char('n'),
+                        modifiers: _,
+                    }) => self.options.colors = self.options.colors.cycle(),
+                    Event::Key(KeyEvent {
+                        code: KeyCode::Char('m'),
+                        modifiers: _,
+                    }) => {
+                        self.options.graphic_characters = !self.options.graphic_characters;
+                        self.sync_options();
                     }
+                    Event::Key(_) => {}
+                    Event::Resize(w, h) => {
+                        self.terminal_size = Vector2::new(w, h);
+                        self.sync_options();
+                        self.out.queue(Clear(ClearType::All))?;
+                    }
+                    Event::Mouse(_) => {}
                 }
             }
 
