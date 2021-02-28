@@ -122,7 +122,7 @@ where
     /// Draw a frame.
     pub fn render_frame(&mut self) -> RenderInfo {
         let mut info = RenderInfo::default();
-        let start_time = Instant::now();
+        let start_frame_time = Instant::now();
 
         let character: &Character = &*(if let Some(character_ref) = &self.character {
             character_ref.borrow()
@@ -142,6 +142,7 @@ where
             .and_then(|ray| cursor_raycast(ray.cast(), &*character.space.borrow()));
 
         // Prepare Tess and Texture for space.
+        let start_prepare_time = Instant::now();
         if self.world_renderer.as_ref().map(|sr| sr.space()) != Some(&character.space) {
             self.world_renderer = Some(SpaceRenderer::new(character.space.clone()));
         }
@@ -153,6 +154,8 @@ where
         } else {
             None
         };
+
+        info.prepare_time = Instant::now().duration_since(start_prepare_time);
 
         let debug_lines_tess = {
             let mut v: Vec<LumBlockVertex> = Vec::new();
@@ -201,6 +204,7 @@ where
         // TODO: cache
         let cursor_tess = make_cursor_tess(surface, &self.cursor_result);
 
+        let start_draw_time = Instant::now();
         surface
             .new_pipeline_gate()
             .pipeline(
@@ -261,7 +265,8 @@ where
             .into_result()
             .unwrap();
 
-        info.frame_time = Instant::now().duration_since(start_time);
+        info.draw_time = Instant::now().duration_since(start_draw_time);
+        info.frame_time = Instant::now().duration_since(start_frame_time);
         info
     }
 
@@ -276,5 +281,7 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct RenderInfo {
     frame_time: Duration,
+    prepare_time: Duration,
+    draw_time: Duration,
     space: SpaceRenderInfo,
 }
