@@ -14,7 +14,7 @@ use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
 use crate::math::{GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
 use crate::universe::{Name, RefError, URef, Universe, UniverseIndex as _};
-use crate::util::ConciseDebug;
+use crate::util::{ConciseDebug, CustomFormat};
 
 /// Type for the edge length of recursive blocks in terms of their component voxels.
 /// This resolution cubed is the number of voxels making up a block.
@@ -454,8 +454,8 @@ pub struct EvaluatedBlock {
     pub visible: bool,
 }
 
-impl ConciseDebug for EvaluatedBlock {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl CustomFormat<ConciseDebug> for EvaluatedBlock {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>, _: ConciseDebug) -> std::fmt::Result {
         fmt.debug_struct("EvaluatedBlock")
             .field("attributes", &self.attributes)
             .field("color", &self.color)

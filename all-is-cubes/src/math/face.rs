@@ -405,7 +405,7 @@ impl std::fmt::Debug for CubeFace {
         write!(
             fmt,
             "CubeFace({:?}, {:?})",
-            self.cube.as_concise_debug(),
+            self.cube.custom_format(ConciseDebug),
             self.face,
         )
     }

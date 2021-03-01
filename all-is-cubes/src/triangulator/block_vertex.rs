@@ -7,7 +7,7 @@ use cgmath::{Point3, Vector3};
 
 use crate::math::{Face, FreeCoordinate, Rgba};
 use crate::space::PackedLight;
-use crate::util::ConciseDebug as _;
+use crate::util::{ConciseDebug, CustomFormat as _};
 
 /// Numeric type used to store texture coordinates in vertices.
 pub type TextureCoordinate = f32;
@@ -70,7 +70,7 @@ impl std::fmt::Debug for BlockVertex {
         write!(
             fmt,
             "{{ p: {:?} n: {:?} c: {:?} }}",
-            self.position.as_concise_debug(),
+            self.position.custom_format(ConciseDebug),
             self.face,
             self.coloring
         )
@@ -81,7 +81,9 @@ impl std::fmt::Debug for Coloring {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Coloring::Solid(color) => write!(fmt, "Solid({:?})", color),
-            Coloring::Texture { pos, .. } => write!(fmt, "Texture({:?})", pos.as_concise_debug()),
+            Coloring::Texture { pos, .. } => {
+                write!(fmt, "Texture({:?})", pos.custom_format(ConciseDebug))
+            }
         }
     }
 }

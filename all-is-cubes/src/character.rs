@@ -17,7 +17,7 @@ use crate::raycast::{CubeFace, Raycaster};
 use crate::space::{Grid, Space};
 use crate::tools::{Inventory, Tool, ToolError};
 use crate::universe::URef;
-use crate::util::ConciseDebug as _;
+use crate::util::{ConciseDebug, CustomFormat as _};
 
 // Control characteristics.
 const WALKING_SPEED: FreeCoordinate = 4.0;
@@ -65,7 +65,10 @@ impl std::fmt::Debug for Character {
         fmt.debug_struct("Character")
             .field("body", &self.body)
             .field("auto_rotate", &self.auto_rotate)
-            .field("velocity_input", &self.velocity_input.as_concise_debug())
+            .field(
+                "velocity_input",
+                &self.velocity_input.custom_format(ConciseDebug),
+            )
             .field("colliding_cubes", &self.colliding_cubes)
             .finish()
     }
@@ -295,7 +298,7 @@ impl std::fmt::Display for Cursor {
             f,
             "Block at {:?}\n{:#?}",
             self.place,
-            self.evaluated.as_concise_debug(),
+            self.evaluated.custom_format(ConciseDebug),
         )
     }
 }

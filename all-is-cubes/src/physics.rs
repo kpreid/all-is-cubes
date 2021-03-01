@@ -12,7 +12,7 @@ use crate::block::BlockCollision;
 use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::Space;
-use crate::util::ConciseDebug as _;
+use crate::util::{ConciseDebug, CustomFormat as _};
 
 /// Close-but-not-intersecting objects are set to this separation.
 const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
@@ -67,8 +67,8 @@ pub struct Body {
 impl std::fmt::Debug for Body {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt.debug_struct("Body")
-            .field("position", &self.position.as_concise_debug())
-            .field("velocity", &self.velocity.as_concise_debug())
+            .field("position", &self.position.custom_format(ConciseDebug))
+            .field("velocity", &self.velocity.custom_format(ConciseDebug))
             .field("collision_box", &self.collision_box)
             .field("flying", &self.flying)
             .field("noclip", &self.noclip)

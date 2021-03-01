@@ -11,7 +11,7 @@ use num_traits::identities::Zero;
 pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::space::Grid;
-use crate::util::ConciseDebug;
+use crate::util::{ConciseDebug, CustomFormat};
 
 #[macro_use]
 mod color;
@@ -249,8 +249,8 @@ impl std::fmt::Debug for Aab {
         write!(
             fmt,
             "Aab({:?} to {:?})",
-            self.lower_bounds.as_concise_debug(),
-            self.upper_bounds.as_concise_debug(),
+            self.lower_bounds.custom_format(ConciseDebug),
+            self.upper_bounds.custom_format(ConciseDebug),
         )
     }
 }

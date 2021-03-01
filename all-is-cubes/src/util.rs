@@ -4,66 +4,76 @@
 //! Tools that we could imagine being in the Rust standard library, but aren't.
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
-use std::fmt;
+use std::fmt::{self, Debug, Display};
 use std::marker::PhantomData;
 
-/// Objects for which alternate [`Debug`] representations can be generated.
-pub trait ConciseDebug: Sized {
-    // TODO: Can we not require Sized?
-
-    /// Wrap this value to provide an alternate concise format. This format
-    /// may be on one line despite the pretty-printing option, and may lose
-    /// precision or Rust syntax in favor of a short at-a-glance representation.
-    fn as_concise_debug(&self) -> ConciseDebugWrapper<'_, Self> {
-        ConciseDebugWrapper(self)
+/// Objects for which alternate textual representations can be generated.
+/// These are analogous to [`Display`] and [`Debug`], but have additional options.
+pub trait CustomFormat<F: Copy> {
+    /// Wrap this value so that when formatted with [`Debug`] or [`Display`] it uses
+    /// the given custom format instead.
+    fn custom_format(&self, format_type: F) -> CustomFormatWrapper<'_, F, Self> {
+        CustomFormatWrapper(format_type, self)
     }
 
     /// Implement this to provide ConciseDebug formatting for this type.
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result;
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: F) -> fmt::Result;
 }
 
-/// You can use [`ConciseDebug::as_concise_debug`] to construct this.
+/// You can use [`CustomFormat::custom_format`] to construct this.
 /// See its documentation.
-pub struct ConciseDebugWrapper<'a, T: ConciseDebug>(&'a T);
-
-impl<'a, T: ConciseDebug> fmt::Debug for ConciseDebugWrapper<'a, T> {
+pub struct CustomFormatWrapper<'a, F: Copy, T: CustomFormat<F> + ?Sized>(F, &'a T);
+impl<'a, F: Copy, T: CustomFormat<F>> Debug for CustomFormatWrapper<'a, F, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <T as ConciseDebug>::fmt(self.0, fmt)
+        <T as CustomFormat<F>>::fmt(self.1, fmt, self.0)
+    }
+}
+impl<'a, F: Copy, T: CustomFormat<F>> Display for CustomFormatWrapper<'a, F, T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <T as CustomFormat<F>>::fmt(self.1, fmt, self.0)
     }
 }
 
+/// Format type for [`CustomFormat`] which is similar to [`Debug`], but uses an
+/// alternate concise format.
+///
+/// This format may be on one line despite the pretty-printing option, and may lose
+/// precision or Rust syntax in favor of a short at-a-glance representation.
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub struct ConciseDebug;
+
 // TODO: Macro time?
-impl<S: fmt::Debug> ConciseDebug for Point3<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<S: Debug> CustomFormat<ConciseDebug> for Point3<S> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z)
     }
 }
 
-impl<S: fmt::Debug> ConciseDebug for Matrix4<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<S: Debug> CustomFormat<ConciseDebug> for Matrix4<S> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         write!(
             fmt,
             "\n[{:?},\n {:?},\n {:?},\n {:?}]",
-            self.x.as_concise_debug(),
-            self.y.as_concise_debug(),
-            self.z.as_concise_debug(),
-            self.w.as_concise_debug()
+            self.x.custom_format(ConciseDebug),
+            self.y.custom_format(ConciseDebug),
+            self.z.custom_format(ConciseDebug),
+            self.w.custom_format(ConciseDebug)
         )
     }
 }
 
-impl<S: fmt::Debug> ConciseDebug for Vector2<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<S: Debug> CustomFormat<ConciseDebug> for Vector2<S> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         write!(fmt, "({:+.3?}, {:+.3?})", self.x, self.y)
     }
 }
-impl<S: fmt::Debug> ConciseDebug for Vector3<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<S: Debug> CustomFormat<ConciseDebug> for Vector3<S> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z)
     }
 }
-impl<S: fmt::Debug> ConciseDebug for Vector4<S> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<S: Debug> CustomFormat<ConciseDebug> for Vector4<S> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         write!(
             fmt,
             "({:+.3?}, {:+.3?}, {:+.3?}, {:+.3?})",
@@ -167,12 +177,12 @@ mod tests {
     fn basic_concise_debug() {
         #[derive(Debug)]
         struct Foo;
-        impl ConciseDebug for Foo {
-            fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        impl CustomFormat<ConciseDebug> for Foo {
+            fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
                 write!(fmt, "<Foo>")
             }
         }
         assert_eq!("Foo", format!("{:?}", Foo));
-        assert_eq!("<Foo>", format!("{:?}", Foo.as_concise_debug()));
+        assert_eq!("<Foo>", format!("{:?}", Foo.custom_format(ConciseDebug)));
     }
 }
