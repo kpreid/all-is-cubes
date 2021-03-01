@@ -6,6 +6,7 @@
 use cgmath::{Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Matrix4, Point3, Vector3};
 use num_traits::identities::Zero;
 use std::collections::HashSet;
+use std::fmt;
 use std::time::Duration;
 
 use crate::block::{Block, EvaluatedBlock};
@@ -17,7 +18,7 @@ use crate::raycast::{CubeFace, Raycaster};
 use crate::space::{Grid, Space};
 use crate::tools::{Inventory, Tool, ToolError};
 use crate::universe::URef;
-use crate::util::{ConciseDebug, CustomFormat as _};
+use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 // Control characteristics.
 const WALKING_SPEED: FreeCoordinate = 4.0;
@@ -71,6 +72,13 @@ impl std::fmt::Debug for Character {
             )
             .field("colliding_cubes", &self.colliding_cubes)
             .finish()
+    }
+}
+
+impl CustomFormat<StatusText> for Character {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        writeln!(fmt, "{}", self.body.custom_format(StatusText))?;
+        write!(fmt, "Colliding: {:?}", self.colliding_cubes.len())
     }
 }
 
@@ -245,6 +253,7 @@ impl Character {
             .any(|contact| contact.face == Face::PY)
     }
 }
+
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CharacterChange {

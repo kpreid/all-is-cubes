@@ -7,7 +7,7 @@ use instant::Instant; // wasm-compatible replacement for std::time::Instant
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::HashMap;
-use std::fmt::{Debug, Display};
+use std::fmt::{self, Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
@@ -16,6 +16,7 @@ use std::time::Duration;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
+use crate::util::{CustomFormat, StatusText};
 
 /// Name/key of an object in a [`Universe`].
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
@@ -468,6 +469,17 @@ pub struct UniverseStepInfo {
 impl std::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
     fn add_assign(&mut self, other: Self) {
         self.space_step += other.space_step;
+    }
+}
+impl CustomFormat<StatusText> for UniverseStepInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        writeln!(
+            fmt,
+            "Step computation: {}",
+            self.computation_time.custom_format(StatusText),
+        )?;
+        write!(fmt, "{}", self.space_step.custom_format(StatusText))?;
+        Ok(())
     }
 }
 

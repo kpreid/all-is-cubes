@@ -6,6 +6,7 @@
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::fmt::{self, Debug, Display};
 use std::marker::PhantomData;
+use std::time::Duration;
 
 /// Objects for which alternate textual representations can be generated.
 /// These are analogous to [`Display`] and [`Debug`], but have additional options.
@@ -79,6 +80,21 @@ impl<S: Debug> CustomFormat<ConciseDebug> for Vector4<S> {
             "({:+.3?}, {:+.3?}, {:+.3?}, {:+.3?})",
             self.x, self.y, self.z, self.w
         )
+    }
+}
+
+/// Format type for [`CustomFormat`] which provides an highly condensed, ideally
+/// constant-size, user-facing format for live-updating textual status messages.
+/// This format does not follow Rust [`Debug`](fmt::Debug) syntax, and when implemented
+/// for standard Rust types may have quirks. Values may have multiple lines.
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub struct StatusText;
+
+/// Makes the assumption that [`Duration`]s are per-frame timings and hence the
+/// interesting precision is in the millisecond-to-microsecond range.
+impl CustomFormat<StatusText> for Duration {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        write!(fmt, "{:5.2?} ms", (self.as_micros() as f32) / 1000.0)
     }
 }
 

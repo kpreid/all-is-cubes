@@ -12,6 +12,7 @@ use luminance_front::render_state::RenderState;
 use luminance_front::tess::Mode;
 use luminance_front::texture::Dim2;
 use luminance_front::Backend;
+use std::fmt;
 use std::time::Duration;
 
 use crate::camera::{Camera, GraphicsOptions, Viewport};
@@ -24,7 +25,7 @@ use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
 use crate::space::Space;
 use crate::universe::URef;
-use crate::util::WarningsResult;
+use crate::util::{CustomFormat, StatusText, WarningsResult};
 use crate::vui::Vui;
 
 /// Game world/UI renderer targeting `luminance`.
@@ -284,4 +285,18 @@ pub struct RenderInfo {
     prepare_time: Duration,
     draw_time: Duration,
     space: SpaceRenderInfo,
+}
+
+impl CustomFormat<StatusText> for RenderInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        writeln!(
+            fmt,
+            "Frame time: {} (prep {}, draw {})",
+            self.frame_time.custom_format(StatusText),
+            self.prepare_time.custom_format(StatusText),
+            self.draw_time.custom_format(StatusText),
+        )?;
+        write!(fmt, "{}", self.space.custom_format(StatusText))?;
+        Ok(())
+    }
 }

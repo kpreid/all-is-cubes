@@ -14,6 +14,7 @@ use luminance_front::texture::{
 };
 use luminance_front::Backend;
 use std::cell::RefCell;
+use std::fmt;
 use std::rc::{Rc, Weak};
 
 use crate::content::palette;
@@ -21,6 +22,7 @@ use crate::intalloc::IntAllocator;
 use crate::lum::types::LumBlockVertex;
 use crate::math::GridCoordinate;
 use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
+use crate::util::{CustomFormat, StatusText};
 
 /// Alias for the concrete type of the block texture.
 pub type BlockTexture = Texture<Dim3, NormRGBA8UI>;
@@ -270,6 +272,19 @@ pub struct AtlasFlushInfo {
     flushed: usize,
     in_use: usize,
     capacity: usize,
+}
+
+impl CustomFormat<StatusText> for AtlasFlushInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        write!(
+            fmt,
+            "Textures: {}/{} ({}%) used, {:2} flushed",
+            self.in_use,
+            self.capacity,
+            (self.in_use as f32 / self.capacity as f32).ceil() as usize,
+            self.flushed,
+        )
+    }
 }
 
 /// Does the coordinate math for a texture atlas of uniform 3D tiles.

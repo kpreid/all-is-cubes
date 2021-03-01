@@ -19,6 +19,7 @@ use luminance_front::Backend;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
+use std::fmt;
 use std::rc::{Rc, Weak};
 
 use crate::camera::Camera;
@@ -33,6 +34,7 @@ use crate::triangulator::{
     DepthOrdering, SpaceTriangulation,
 };
 use crate::universe::URef;
+use crate::util::{CustomFormat, StatusText};
 
 use super::block_texture::AtlasFlushInfo;
 
@@ -371,6 +373,23 @@ pub struct SpaceRenderInfo {
     pub squares_drawn: usize,
     /// Status of the texture atlas.
     pub texture_info: AtlasFlushInfo,
+}
+
+impl CustomFormat<StatusText> for SpaceRenderInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        writeln!(
+            fmt,
+            "Chunk updates: {:3} Block updates: {:3}",
+            self.chunk_update_count, self.block_update_count,
+        )?;
+        writeln!(
+            fmt,
+            "Chunks drawn: {:3} Quads drawn: {:3}",
+            self.chunks_drawn, self.squares_drawn,
+        )?;
+        write!(fmt, "{:#?}", self.texture_info.custom_format(StatusText))?;
+        Ok(())
+    }
 }
 
 // Which drawing pass we're doing.

@@ -5,14 +5,16 @@
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
+use std::borrow::BorrowMut;
 use std::collections::HashSet;
+use std::fmt;
 use std::time::Duration;
 
 use crate::block::BlockCollision;
 use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::Space;
-use crate::util::{ConciseDebug, CustomFormat as _};
+use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 /// Close-but-not-intersecting objects are set to this separation.
 const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
@@ -75,6 +77,27 @@ impl std::fmt::Debug for Body {
             .field("yaw", &self.yaw)
             .field("pitch", &self.pitch)
             .finish()
+    }
+}
+
+/// Omits collision box on the grounds that it is presumably constant
+impl CustomFormat<StatusText> for Body {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        write!(
+            fmt,
+            "Position: {}  Yaw: {:5.1}°  Pitch: {:5.1}°\nVelocity: {}",
+            self.position.custom_format(ConciseDebug),
+            self.yaw,
+            self.pitch,
+            self.velocity.custom_format(ConciseDebug),
+        )?;
+        if self.flying {
+            write!(fmt, "  Flying");
+        }
+        if self.noclip {
+            write!(fmt, "  Noclip");
+        }
+        Ok(())
     }
 }
 

@@ -19,7 +19,7 @@ use all_is_cubes::cgmath::Point2;
 use all_is_cubes::content::UniverseTemplate;
 use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
-use all_is_cubes::util::Warnings;
+use all_is_cubes::util::{CustomFormat as _, StatusText, Warnings};
 
 use crate::js_bindings::GuiHelpers;
 use crate::web_glue::{add_event_listener, get_mandatory_element};
@@ -325,10 +325,10 @@ impl WebGameRoot {
                 None => Cow::Borrowed("No block"),
             };
             self.static_dom.scene_info_text_node.set_data(&format!(
-                "{:#?}\n{:#?}\n{:#?}\n\n{}",
-                &*self.app.character().borrow(),
-                self.last_step_info,
-                render_info,
+                "{:#?}\n\n{:#?}\n\n{:#?}\n\n{}",
+                self.app.character().borrow().custom_format(StatusText),
+                self.last_step_info.custom_format(StatusText),
+                render_info.custom_format(StatusText),
                 cursor_result_text
             ));
         }

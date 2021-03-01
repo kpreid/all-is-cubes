@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 
@@ -16,6 +17,7 @@ use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
 use crate::math::*;
 use crate::universe::RefError;
+use crate::util::{CustomFormat, StatusText};
 
 mod grid;
 pub use grid::*;
@@ -796,6 +798,15 @@ impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
         self.max_light_update_difference = self
             .max_light_update_difference
             .max(other.max_light_update_difference);
+    }
+}
+impl CustomFormat<StatusText> for SpaceStepInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        write!(
+            fmt,
+            "Relighting: {:4} of {:4} (max diff {:3})",
+            self.light_update_count, self.light_queue_count, self.max_light_update_difference
+        )
     }
 }
 
