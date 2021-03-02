@@ -523,6 +523,7 @@ mod tests {
         assert_eq!(
             info,
             SpaceStepInfo {
+                spaces: 1,
                 light_update_count: 1,
                 light_queue_count: 0,
                 max_light_update_difference: new_sky_light.difference_magnitude(former_sky_light),
