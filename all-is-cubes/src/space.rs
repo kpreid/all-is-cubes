@@ -784,6 +784,8 @@ pub enum SpaceChange {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct SpaceStepInfo {
+    /// Number of spaces whose updates were aggregated into this value.
+    pub spaces: usize,
     /// Number of blocks whose light data was updated this step.
     pub light_update_count: usize,
     /// Number of entries in the light update queue.
@@ -793,6 +795,11 @@ pub struct SpaceStepInfo {
 }
 impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     fn add_assign(&mut self, other: Self) {
+        if other == Self::default() {
+            // Specifically don't count those that did nothing.
+            return;
+        }
+        self.spaces += other.spaces;
         self.light_update_count += other.light_update_count;
         self.light_queue_count += other.light_queue_count;
         self.max_light_update_difference = self
@@ -802,11 +809,15 @@ impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
 }
 impl CustomFormat<StatusText> for SpaceStepInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
-        write!(
-            fmt,
-            "Relighting: {:4} of {:4} (max diff {:3})",
-            self.light_update_count, self.light_queue_count, self.max_light_update_difference
-        )
+        write!(fmt, "{} spaces: ", self.spaces)?;
+        if self.spaces > 0 {
+            write!(
+                fmt,
+                "Relighting: {:4} of {:4} (max diff {:3})",
+                self.light_update_count, self.light_queue_count, self.max_light_update_difference
+            )?;
+        }
+        Ok(())
     }
 }
 

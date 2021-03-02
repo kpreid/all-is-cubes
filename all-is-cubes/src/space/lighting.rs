@@ -207,6 +207,7 @@ impl Space {
             }
         }
         SpaceStepInfo {
+            spaces: 1,
             light_update_count,
             light_queue_count: self.lighting_update_queue.len(),
             max_light_update_difference: max_difference,
