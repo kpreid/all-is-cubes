@@ -11,9 +11,7 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
 
 use crate::block::{BlockAttributes, BlockCollision, AIR};
-use crate::content::{
-    axes, logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
-};
+use crate::content::{logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS};
 use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
@@ -120,7 +118,12 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         }
     }
 
-    axes(&mut space)?;
+    // Draw space axes.
+    // This is disabled because it doesn't fit aesthetically. We could perhaps turn it
+    // back on with customizations of the blocks to be less saturated and to omit the
+    // +Y axis making an obtrusive pillar in the middle.
+    //
+    // axes(&mut space)?;
 
     // Landscape filling one quadrant
     let landscape_region = Grid::from_lower_upper(
