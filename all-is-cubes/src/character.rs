@@ -15,7 +15,7 @@ use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Raycaster};
-use crate::space::{Grid, Space};
+use crate::space::{Grid, PackedLight, Space};
 use crate::tools::{Inventory, Tool, ToolError};
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
@@ -274,12 +274,16 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
     for step in ray {
         let cube = step.cube_ahead();
         let evaluated = space.get_evaluated(cube);
+        let lighting_ahead = space.get_lighting(cube);
+        let lighting_behind = space.get_lighting(step.cube_behind());
         if evaluated.attributes.selectable {
             return Some(Cursor {
                 // TODO: Cursor info text would like to have lighting information too.
                 place: step.cube_face(),
                 block: space[cube].clone(),
                 evaluated: evaluated.clone(),
+                lighting_ahead,
+                lighting_behind,
             });
         }
     }
@@ -297,6 +301,8 @@ pub struct Cursor {
     pub block: Block,
     /// The EvaluatedBlock data for the block.
     pub evaluated: EvaluatedBlock,
+    pub lighting_ahead: PackedLight,
+    pub lighting_behind: PackedLight,
 }
 
 // TODO: this probably shouldn't be Display any more, but Debug or ConciseDebug
@@ -305,9 +311,11 @@ impl std::fmt::Display for Cursor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Block at {:?}\n{:#?}",
+            "Block at {:?}\n{:#?}\nLighting within {:?}, behind {:?}",
             self.place,
             self.evaluated.custom_format(ConciseDebug),
+            self.lighting_ahead,
+            self.lighting_behind,
         )
     }
 }
