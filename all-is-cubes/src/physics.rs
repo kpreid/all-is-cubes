@@ -5,7 +5,6 @@
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
-use std::borrow::BorrowMut;
 use std::collections::HashSet;
 use std::fmt;
 use std::time::Duration;
@@ -92,10 +91,10 @@ impl CustomFormat<StatusText> for Body {
             self.velocity.custom_format(ConciseDebug),
         )?;
         if self.flying {
-            write!(fmt, "  Flying");
+            write!(fmt, "  Flying")?;
         }
         if self.noclip {
-            write!(fmt, "  Noclip");
+            write!(fmt, "  Noclip")?;
         }
         Ok(())
     }
