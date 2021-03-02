@@ -285,6 +285,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
     }
 
     /// Compute quad midpoint from triangle vertices, for depth sorting.
+    #[inline]
     fn midpoint(vertices: &[V], indices: [u32; 3]) -> Point3<V::Coordinate> {
         let one_half = <V::Coordinate as num_traits::NumCast>::from(0.5f32).unwrap();
         let v0 = vertices[indices[0] as usize].position();
