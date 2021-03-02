@@ -339,6 +339,11 @@ pub struct GraphicsOptions {
     /// TODO: Implement view distance limit (and fog) in raytracer.
     pub view_distance: NotNan<FreeCoordinate>,
 
+    /// Number of space chunks (16³ groups of blocks) to redraw if needed, per frame.
+    ///
+    /// Does not apply to raytracing.
+    pub chunks_per_frame: u16,
+
     /// Whether to use frustum culling for drawing only in-view chunks and objects.
     pub use_frustum_culling: bool,
 
@@ -370,6 +375,7 @@ impl Default for GraphicsOptions {
             fog: FogOption::Compromise,
             fov_y: NotNan::new(90.).unwrap(),
             view_distance: NotNan::new(200.).unwrap(),
+            chunks_per_frame: 4,
             use_frustum_culling: true,
             debug_collision_boxes: false,
             debug_light_rays_at_cursor: false,

@@ -198,7 +198,7 @@ impl SpaceRenderer {
             }
 
             // TODO: tune max update count dynamically?
-            if chunk_update_count >= 4 {
+            if chunk_update_count >= camera.options().chunks_per_frame.into() {
                 break;
             }
 
