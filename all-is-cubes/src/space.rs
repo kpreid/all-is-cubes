@@ -55,6 +55,9 @@ pub struct Space {
     pub(crate) lighting: Box<[PackedLight]>,
     /// Queue of cubes whose light values should be updated.
     light_update_queue: LightUpdateQueue,
+    /// Debug log of the updated cubes from last frame.
+    /// Empty unless this debug function is enabled.
+    pub(crate) last_light_updates: Vec<GridPoint>,
 
     /// Global characteristics such as the behavior of light and gravity.
     physics: SpacePhysics,
@@ -134,6 +137,7 @@ impl Space {
             contents: vec![0; volume].into_boxed_slice(),
             lighting: physics.light.initialize_lighting(grid, packed_sky_color),
             light_update_queue: LightUpdateQueue::new(),
+            last_light_updates: Vec::new(),
             physics,
             packed_sky_color,
             spawn: Spawn::default_for_new_space(grid),
@@ -904,7 +908,7 @@ pub enum SpaceChange {
 /// Performance data returned by [`Space::step`]. The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct SpaceStepInfo {
     /// Number of spaces whose updates were aggregated into this value.

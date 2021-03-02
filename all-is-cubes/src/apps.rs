@@ -142,7 +142,7 @@ impl AllIsCubesAppState {
                 self.maybe_sync_ui();
                 info += self.ui.step(tick);
 
-                self.last_step_info = info;
+                self.last_step_info = info.clone();
                 result = Some(info)
             }
         }

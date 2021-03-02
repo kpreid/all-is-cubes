@@ -338,11 +338,16 @@ impl Space {
     /// Do some lighting updates.
     pub(crate) fn update_lighting_from_queue(&mut self) -> LightUpdatesInfo {
         let mut light_update_count: usize = 0;
+        self.last_light_updates.clear();
         let mut max_difference: PackedLightScalar = 0;
         let mut cost = 0;
 
         if self.physics.light != LightPhysics::None {
             while let Some(LightUpdateRequest { cube, .. }) = self.light_update_queue.pop() {
+                if false {
+                    // Log cubes that were updated for debug visualization.
+                    self.last_light_updates.push(cube);
+                }
                 light_update_count += 1;
                 // Note: For performance, it is key that this call site ignores the info value
                 // and the functions are inlined. Thus, the info calculation can be

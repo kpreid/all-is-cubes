@@ -234,6 +234,17 @@ where
                 }
             }
 
+            // Show light update debug info.
+            // This is enabled/disabled inside the lighting algorithm, not as a graphics
+            // option.
+            for cube in character.space.borrow().last_light_updates.iter().copied() {
+                wireframe_vertices(
+                    &mut v,
+                    Rgba::new(1.0, 1.0, 0.0, 1.0),
+                    Aab::from_cube(cube).enlarge(0.005),
+                );
+            }
+
             // Lighting trace at cursor
             if graphics_options.debug_light_rays_at_cursor {
                 if let Some(cursor) = cursor_result {

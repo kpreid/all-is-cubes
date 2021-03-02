@@ -537,7 +537,7 @@ impl<T> URootRef<T> {
 /// Performance data returned by [`Universe::step`]. The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct UniverseStepInfo {
     computation_time: Duration,
