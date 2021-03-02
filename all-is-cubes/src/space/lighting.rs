@@ -7,6 +7,7 @@
 use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3, Zero as _};
 use once_cell::sync::Lazy;
 use std::convert::TryInto as _;
+use std::fmt;
 
 use crate::math::*;
 use crate::raycast::Ray;
@@ -23,7 +24,7 @@ const SURFACE_ABSORPTION: f32 = 0.75;
 pub(crate) type PackedLightScalar = u8;
 
 /// Lighting within a [`Space`]; an [`Rgb`] value stored with reduced precision and range.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PackedLight(Vector3<PackedLightScalar>);
 // TODO: Once we've built out the rest of the game, do some performance testing and
 // decide whether having colored lighting is worth the compute and storage cost.
@@ -58,6 +59,12 @@ impl PackedLight {
         } else {
             ((f32::from(value) - Self::LOG_OFFSET) / Self::LOG_SCALE).exp2()
         }
+    }
+}
+
+impl fmt::Debug for PackedLight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PackedLight({}, {}, {})", self.0.x, self.0.y, self.0.z)
     }
 }
 
