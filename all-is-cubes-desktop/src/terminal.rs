@@ -186,6 +186,7 @@ impl TerminalMain {
             self.app.frame_clock.advance_to(Instant::now());
             self.app.maybe_step_universe();
             if self.app.frame_clock.should_draw() {
+                self.app.update_cursor(&self.camera);
                 self.draw()?;
                 self.app.frame_clock.did_draw();
             } else {
@@ -236,9 +237,20 @@ impl TerminalMain {
         // TODO: Allocate footer space explicitly, don't wrap on small widths, clear, etc.
         write!(
             self.out,
-            "\r\nColors: {:?}    Frame: {:?}\r\n",
+            "\r\nColors: {:?}    Frame: {:?}",
             color_mode, info,
         )?;
+        self.out.queue(Clear(ClearType::UntilNewLine))?;
+        write!(self.out, "\r\n")?;
+        if let Some(cursor) = self.app.cursor_result() {
+            // TODO: design good formatting for cursor data
+            write!(
+                self.out,
+                "{:?} : {}",
+                cursor.place, cursor.evaluated.attributes.display_name
+            )?;
+        }
+        self.out.queue(Clear(ClearType::UntilNewLine))?;
         self.out.flush()?;
 
         Ok(())
