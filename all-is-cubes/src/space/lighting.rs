@@ -554,6 +554,52 @@ mod tests {
         // Ideally we'd confirm identical results from repeated step() and single evaluate_light().
     }
 
+    #[test]
+    fn lighting_queue_ordering() {
+        let mut space = Space::empty_positive(99, 99, 99);
+        space.light_needs_update(GridPoint::new(0, 0, 0), 0);
+        space.light_needs_update(GridPoint::new(2, 0, 0), 0);
+        space.light_needs_update(GridPoint::new(1, 0, 0), 0);
+        space.light_needs_update(GridPoint::new(0, 0, 2), 200);
+        space.light_needs_update(GridPoint::new(0, 0, 1), 100);
+        assert_eq!(
+            space.lighting_update_queue.pop(),
+            Some(LightUpdateRequest {
+                cube: GridPoint::new(0, 0, 2),
+                priority: 200
+            })
+        );
+        assert_eq!(
+            space.lighting_update_queue.pop(),
+            Some(LightUpdateRequest {
+                cube: GridPoint::new(0, 0, 1),
+                priority: 100
+            })
+        );
+        assert_eq!(
+            space.lighting_update_queue.pop(),
+            Some(LightUpdateRequest {
+                cube: GridPoint::new(0, 0, 0),
+                priority: 0
+            })
+        );
+        assert_eq!(
+            space.lighting_update_queue.pop(),
+            Some(LightUpdateRequest {
+                cube: GridPoint::new(1, 0, 0),
+                priority: 0
+            })
+        );
+        assert_eq!(
+            space.lighting_update_queue.pop(),
+            Some(LightUpdateRequest {
+                cube: GridPoint::new(2, 0, 0),
+                priority: 0
+            })
+        );
+        assert_eq!(space.lighting_update_queue.pop(), None);
+    }
+
     // TODO: test sky lighting propagation onto blocks after quiescing
 
     // TODO: test a single semi-transparent block will receive and diffuse light
