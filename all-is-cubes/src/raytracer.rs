@@ -13,7 +13,9 @@
 //! In the future (or currently, if I forgot to update this comment), it will be used
 //! as a means to display the state of `Space`s used for testing inline in test output.
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Matrix4, Point3, Vector2, Vector3, Zero as _};
+use cgmath::{
+    EuclideanSpace as _, InnerSpace as _, Matrix4, Point2, Point3, Vector2, Vector3, Zero as _,
+};
 use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
@@ -137,7 +139,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                 let y = viewport.normalize_fb_y(ych);
                 (0..viewport_size.x).into_par_iter().map(move |xch| {
                     let x = viewport.normalize_fb_x(xch);
-                    self.trace_ray(camera.project_ndc_into_world(x, y))
+                    self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)))
                 })
             })
             .flatten();
@@ -159,7 +161,8 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
-                let (pixel, info) = self.trace_ray(camera.project_ndc_into_world(x, y));
+                let (pixel, info) =
+                    self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
                 total_info += info;
                 image.push(pixel);
             }
@@ -222,7 +225,7 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
                     .into_par_iter()
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);
-                        self.trace_ray(camera.project_ndc_into_world(x, y))
+                        self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)))
                     })
                     .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
             })
@@ -253,7 +256,7 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
-                let (text, info) = self.trace_ray(camera.project_ndc_into_world(x, y));
+                let (text, info) = self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
                 total_info += info;
                 write(text.as_ref())?;
             }

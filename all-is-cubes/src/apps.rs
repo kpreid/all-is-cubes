@@ -3,12 +3,12 @@
 
 //! Components for "apps", or game clients: user interface and top-level state.
 
-use cgmath::{Vector2, Vector3, Zero as _};
+use cgmath::{EuclideanSpace as _, Point2, Vector2, Vector3, Zero as _};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use crate::camera::GraphicsOptions;
-use crate::character::{Character, CharacterChange};
+use crate::camera::{Camera, GraphicsOptions, Viewport};
+use crate::character::{cursor_raycast, Character, CharacterChange, Cursor};
 use crate::content::UniverseTemplate;
 use crate::listen::{DirtyFlag, ListenerHelper as _};
 use crate::math::FreeCoordinate;
@@ -35,6 +35,11 @@ pub struct AllIsCubesAppState {
 
     ui: Vui,
     ui_dirty: DirtyFlag,
+
+    /// Last cursor raycast result.
+    /// TODO: This needs to handle clicking on the HUD and thus explicitly point into
+    /// one of two different spaces.
+    cursor_result: Option<Cursor>,
 }
 
 impl AllIsCubesAppState {
@@ -53,6 +58,7 @@ impl AllIsCubesAppState {
             game_universe,
             ui: Vui::new(),
             ui_dirty: DirtyFlag::new(true),
+            cursor_result: None,
         };
 
         // TODO: once it's possible to switch characters we will need to clear and reinstall this
@@ -116,6 +122,22 @@ impl AllIsCubesAppState {
                 .unwrap();
         }
     }
+
+    /// Call this once per frame to update the cursor raycast.
+    ///
+    /// TODO: bad API; revisit general cursor handling logic.
+    pub fn update_cursor(&mut self, camera: &Camera) {
+        let character = self.game_character.borrow_mut();
+        self.cursor_result = self
+            .input_processor
+            .mouse_ndc_position // TODO accessor
+            .map(|p| camera.project_ndc_into_world(p))
+            .and_then(|ray| cursor_raycast(ray.cast(), &*character.space.borrow()));
+    }
+
+    pub fn cursor_result(&self) -> &Option<Cursor> {
+        &self.cursor_result
+    }
 }
 
 /// Parse input events, particularly key-down/up pairs, into character control and such.
@@ -138,11 +160,14 @@ pub struct InputProcessor {
     /// keypresses arriving through [`Self::key_momentary`] and virtually holds them
     /// for a short time. The value is the remaining time.
     momentary_timeout: HashMap<Key, Duration>,
-    /// Net mouse movement since the last [`Self::apply_input`].
-    mouselook_buffer: Vector2<FreeCoordinate>,
     /// [`Key`]s with one-shot effects when pressed which need to be applied
     /// once per press rather than while held.
     command_buffer: Vec<Key>,
+
+    /// Net mouse movement since the last [`Self::apply_input`].
+    mouselook_buffer: Vector2<FreeCoordinate>,
+
+    mouse_ndc_position: Option<Point2<FreeCoordinate>>,
 }
 
 impl InputProcessor {
@@ -151,8 +176,9 @@ impl InputProcessor {
         Self {
             keys_held: HashSet::new(),
             momentary_timeout: HashMap::new(),
-            mouselook_buffer: Vector2::zero(),
             command_buffer: Vec::new(),
+            mouselook_buffer: Vector2::zero(),
+            mouse_ndc_position: Some(Point2::origin()),
         }
     }
 
@@ -230,9 +256,43 @@ impl InputProcessor {
     ///
     /// This value is an accumulated displacement, not an angular velocity, so it is not
     /// suitable for joystick-type input.
+    ///
+    /// Note that absolute cursor positions must be provided separately.
     pub fn mouselook_delta(&mut self, delta: Vector2<FreeCoordinate>) {
         // TODO: sensitivity option
         self.mouselook_buffer += delta * 0.2;
+    }
+
+    /// Provide position of mouse pointer or other input device in normalized device
+    /// coordinates (range -1 to 1 upward and rightward).
+    /// [`None`] denotes the cursor being outside the viewport, and out-of-range
+    /// coordinates will be treated the same.
+    ///
+    /// Pixel coordinates may be converted to NDC using [`Viewport::normalize_nominal_point`]
+    /// or by using [`InputProcessor::mouse_pixel_position`].
+    ///
+    /// If this is never called, the default value is (0, 0) which corresponds to the
+    /// center of the screen.
+    pub fn mouse_ndc_position(&mut self, position: Option<Point2<FreeCoordinate>>) {
+        self.mouse_ndc_position = position.filter(|p| p.x.abs() <= 1. && p.y.abs() <= 1.);
+    }
+
+    /// Provide position of mouse pointer or other input device in pixel coordinates
+    /// framed by the given [`Viewport`].
+    /// [`None`] denotes the cursor being outside the viewport, and out-of-range
+    /// coordinates will be treated the same.
+    ///
+    /// This is equivalent to converting the coordinates and calling
+    /// [`InputProcessor::mouse_ndc_position`].
+    ///
+    /// If this is never called, the default value is (0, 0) which corresponds to the
+    /// center of the screen.
+    ///
+    /// TODO: this should take float input, probably
+    pub fn mouse_pixel_position(&mut self, viewport: Viewport, position: Option<Point2<usize>>) {
+        self.mouse_ndc_position(
+            position.map(|p| Point2::from_vec(viewport.normalize_nominal_point(p))),
+        );
     }
 
     /// Returns the character movement velocity that input is currently requesting.

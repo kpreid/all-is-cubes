@@ -6,7 +6,7 @@
 
 use cgmath::{
     Deg, EuclideanSpace as _, InnerSpace as _, Matrix as _, Matrix4, Point2, Point3, SquareMatrix,
-    Transform, Vector2, Vector3, Vector4,
+    Transform, Vector2, Vector3,
 };
 use itertools::Itertools as _;
 use ordered_float::NotNan;
@@ -42,13 +42,6 @@ pub struct Camera {
     /// Calculated by [`Self::compute_matrices`].
     inverse_projection_view: M,
     view_frustum_corners: [Point3<FreeCoordinate>; 8],
-
-    /// Position of mouse pointer or other input device in normalized device coordinates
-    /// (range -1 to 1 upward and rightward). If there is no such input device, zero may
-    /// be used to designate the center of the screen.
-    ///
-    /// TODO: This doesn't really belong here. Look for better data flow routes.
-    pub cursor_ndc_position: Option<Vector2<FreeCoordinate>>,
 }
 
 #[allow(clippy::cast_lossless)]
@@ -58,7 +51,6 @@ impl Camera {
             options: options.repair(),
             viewport,
             view_matrix: M::identity(),
-            cursor_ndc_position: None,
 
             // Overwritten immediately by compute_matrices
             projection: M::identity(),
@@ -106,11 +98,6 @@ impl Camera {
         self.options.view_distance.into_inner()
     }
 
-    /// Set the current cursor position. In the same pixel units as `set_viewport`.
-    pub fn set_cursor_position(&mut self, position: Option<Point2<usize>>) {
-        self.cursor_ndc_position = position.map(|p| self.viewport.normalize_nominal_point(p));
-    }
-
     /// Sets the view matrix.
     ///
     /// This matrix is used to determine world coordinates for purposes of
@@ -143,9 +130,9 @@ impl Camera {
     /// Converts a screen position in normalized device coordinates (as produced by
     /// [`Viewport::normalize_nominal_point`]) into a ray in world space.
     /// Uses the view transformation given by [`set_view_matrix`](Self::set_view_matrix).
-    pub fn project_ndc_into_world(&self, ndc_x: FreeCoordinate, ndc_y: FreeCoordinate) -> Ray {
-        let ndc_near = Vector4::new(ndc_x, ndc_y, -1.0, 1.0);
-        let ndc_far = Vector4::new(ndc_x, ndc_y, 1.0, 1.0);
+    pub fn project_ndc_into_world(&self, ndc: Point2<FreeCoordinate>) -> Ray {
+        let ndc_near = ndc.to_vec().extend(-1.0).extend(1.0);
+        let ndc_far = ndc.to_vec().extend(1.0).extend(1.0);
         // World-space endpoints of the ray.
         let world_near = Point3::from_homogeneous(self.inverse_projection_view * ndc_near);
         let world_far = Point3::from_homogeneous(self.inverse_projection_view * ndc_far);
@@ -158,13 +145,6 @@ impl Camera {
 
     fn project_point_into_world(&self, p: Point3<FreeCoordinate>) -> Point3<FreeCoordinate> {
         Point3::from_homogeneous(self.inverse_projection_view * p.to_homogeneous())
-    }
-
-    /// Converts the cursor position into a ray in world space.
-    /// Uses the view transformation given by [`set_view_matrix`](Self::set_view_matrix).
-    pub fn project_cursor_into_world(&self) -> Option<Ray> {
-        self.cursor_ndc_position
-            .map(|pos| self.project_ndc_into_world(pos.x, pos.y))
     }
 
     /// Determine whether the given `Aab` is visible in this projection+view.

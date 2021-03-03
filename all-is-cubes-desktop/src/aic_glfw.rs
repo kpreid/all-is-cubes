@@ -69,7 +69,8 @@ pub fn glfw_main_loop(
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
         if app.frame_clock.should_draw() {
-            let _render_info = renderer.render_frame();
+            app.update_cursor(renderer.world_camera());
+            let _render_info = renderer.render_frame(app.cursor_result());
             renderer.surface.window.swap_buffers();
             app.frame_clock.did_draw();
         } else {
@@ -103,25 +104,34 @@ pub fn glfw_main_loop(
 
                 // Mouse input
                 WindowEvent::CursorPos(..) => {
+                    // TODO: Now that InputProcessor does its own framing checks, can we skip having the cursor_in_window flag?
                     if cursor_in_window {
-                        renderer.set_cursor_position(Some(
-                            Point2::from(renderer.surface.window.get_cursor_pos())
-                                .map(|x| x as usize),
-                        ));
+                        app.input_processor.mouse_pixel_position(
+                            renderer.viewport(),
+                            Some(
+                                Point2::from(renderer.surface.window.get_cursor_pos())
+                                    .map(|x| x as usize),
+                            ),
+                        );
                     }
                 }
                 WindowEvent::CursorEnter(true) => {
                     cursor_in_window = true;
-                    renderer.set_cursor_position(Some(
-                        Point2::from(renderer.surface.window.get_cursor_pos()).map(|x| x as usize),
-                    ));
+                    app.input_processor.mouse_pixel_position(
+                        renderer.viewport(),
+                        Some(
+                            Point2::from(renderer.surface.window.get_cursor_pos())
+                                .map(|x| x as usize),
+                        ),
+                    );
                 }
                 WindowEvent::CursorEnter(false) => {
                     cursor_in_window = false;
-                    renderer.set_cursor_position(None);
+                    app.input_processor
+                        .mouse_pixel_position(renderer.viewport(), None);
                 }
                 WindowEvent::MouseButton(button, Action::Press, _) => {
-                    if let Some(cursor) = &renderer.cursor_result {
+                    if let Some(cursor) = &app.cursor_result() {
                         // TODO: This should go through InputProcessor for consistency and duplicated code
                         let click = app
                             .character()

@@ -183,17 +183,14 @@ impl WebGameRoot {
 
         self.add_canvas_to_self_event_listener("blur", true, move |this, _: FocusEvent| {
             this.app.input_processor.key_focus(false);
-            this.renderer.set_cursor_position(None);
+            this.app.input_processor.mouse_ndc_position(None);
         });
 
         self.add_canvas_to_self_event_listener(
             "mousemove",
             true,
             move |this, event: MouseEvent| {
-                this.renderer.set_cursor_position(Some(Point2::new(
-                    event.client_x() as usize,
-                    event.client_y() as usize,
-                )));
+                this.update_mouse_position(&event);
             },
         );
 
@@ -201,25 +198,19 @@ impl WebGameRoot {
             "mouseover",
             true,
             move |this, event: MouseEvent| {
-                this.renderer.set_cursor_position(Some(Point2::new(
-                    event.client_x() as usize,
-                    event.client_y() as usize,
-                )));
+                this.update_mouse_position(&event);
             },
         );
 
         self.add_canvas_to_self_event_listener("mouseout", true, move |this, _: MouseEvent| {
-            this.renderer.set_cursor_position(None);
+            this.app.input_processor.mouse_ndc_position(None);
         });
 
         self.add_canvas_to_self_event_listener(
             "mousedown",
             true,
             move |this, event: MouseEvent| {
-                this.renderer.set_cursor_position(Some(Point2::new(
-                    event.client_x() as usize,
-                    event.client_y() as usize,
-                )));
+                this.update_mouse_position(&event);
                 // MouseEvent button numbering is sequential for a three button mouse, instead of
                 // counting the middle/wheel button as the third button.
                 let mapped_button: usize = match event.button() {
@@ -228,7 +219,7 @@ impl WebGameRoot {
                     1 => 2,
                     x => x as usize,
                 };
-                if let Some(cursor) = &this.renderer.cursor_result {
+                if let Some(cursor) = &this.app.cursor_result() {
                     // TODO: This should maybe go through InputProcessor? For consistency?
                     let result = this
                         .app
@@ -314,13 +305,14 @@ impl WebGameRoot {
             // TODO do projection updates only when needed
             self.renderer
                 .set_viewport(self.gui_helpers.canvas_helper().viewport());
+            self.app.update_cursor(self.renderer.world_camera());
 
             // Do graphics
-            let render_info = self.renderer.render_frame();
+            let render_info = self.renderer.render_frame(self.app.cursor_result());
 
             // Compute info text.
             // TODO: tidy up cursor result formatting, make it reusable
-            let cursor_result_text = match &self.renderer.cursor_result {
+            let cursor_result_text = match self.app.cursor_result() {
                 Some(cursor) => Cow::Owned(format!("{}", cursor)),
                 None => Cow::Borrowed("No block"),
             };
@@ -356,6 +348,16 @@ impl WebGameRoot {
                 self.last_step_info = universe_step_info;
             }
         }
+    }
+
+    fn update_mouse_position(&mut self, event: &MouseEvent) {
+        self.app.input_processor.mouse_pixel_position(
+            self.renderer.viewport(),
+            Some(Point2::new(
+                event.client_x() as usize,
+                event.client_y() as usize,
+            )),
+        );
     }
 }
 

@@ -3,7 +3,6 @@
 
 //! Top level of the `luminance`-based renderer.
 
-use cgmath::Point2;
 use instant::Instant; // wasm-compatible replacement for std::time::Instant
 use luminance_front::context::GraphicsContext;
 use luminance_front::framebuffer::Framebuffer;
@@ -16,7 +15,7 @@ use std::fmt;
 use std::time::Duration;
 
 use crate::camera::{Camera, GraphicsOptions, Viewport};
-use crate::character::{cursor_raycast, Character, Cursor};
+use crate::character::{Character, Cursor};
 use crate::content::palette;
 use crate::lum::shading::{prepare_block_program, BlockProgram};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
@@ -45,9 +44,6 @@ where
     ui_renderer: Option<SpaceRenderer>,
     world_camera: Camera,
     ui_camera: Camera,
-
-    // Miscellaneous
-    pub cursor_result: Option<Cursor>, // TODO: give this an accessor
 }
 
 impl<C> GLRenderer<C>
@@ -80,10 +76,14 @@ where
                 ui_renderer: None,
                 ui_camera: Camera::new(Vui::graphics_options(options.clone()), viewport),
                 world_camera: Camera::new(options, viewport),
-                cursor_result: None,
             },
             warnings,
         ))
+    }
+
+    /// Returns the last [`Viewport`] provided.
+    pub fn viewport(&self) -> Viewport {
+        self.world_camera.viewport()
     }
 
     /// Sets the expected viewport dimensions. Use in case of window resizing.
@@ -120,8 +120,15 @@ where
         });
     }
 
+    /// Return the camera used to render the space.
+    /// TODO: This interface exists to support cursor usage and should be improved to handle
+    /// UI clicking, perhaps by putting the raycast in here.
+    pub fn world_camera(&self) -> &Camera {
+        &self.world_camera
+    }
+
     /// Draw a frame.
-    pub fn render_frame(&mut self) -> RenderInfo {
+    pub fn render_frame(&mut self, cursor_result: &Option<Cursor>) -> RenderInfo {
         let mut info = RenderInfo::default();
         let start_frame_time = Instant::now();
 
@@ -133,14 +140,7 @@ where
         let surface = &mut self.surface;
         let block_program = &mut self.block_program;
 
-        // Update cursor state. This is, strictly speaking, not rendering, but it is closely
-        // related in that the cursor should match the pixels being drawn.
-        // TODO: Figure out how to lay this out with more separation of concerns, though.
         self.world_camera.set_view_matrix(character.view());
-        self.cursor_result = self
-            .world_camera
-            .project_cursor_into_world()
-            .and_then(|ray| cursor_raycast(ray.cast(), &*character.space.borrow()));
 
         // Prepare Tess and Texture for space.
         let start_prepare_time = Instant::now();
@@ -180,7 +180,7 @@ where
 
             // Lighting trace at cursor
             if self.world_camera.options().debug_light_rays_at_cursor {
-                if let Some(cursor) = &self.cursor_result {
+                if let Some(cursor) = cursor_result {
                     let space = character.space.borrow();
                     let (_, _, _, lighting_info) = space.compute_lighting(cursor.place.adjacent());
                     wireframe_vertices(&mut v, Rgba::new(0.8, 0.8, 1.0, 1.0), lighting_info);
@@ -203,7 +203,7 @@ where
         };
 
         // TODO: cache
-        let cursor_tess = make_cursor_tess(surface, &self.cursor_result);
+        let cursor_tess = make_cursor_tess(surface, &cursor_result);
 
         let start_draw_time = Instant::now();
         surface
@@ -269,12 +269,6 @@ where
         info.draw_time = Instant::now().duration_since(start_draw_time);
         info.frame_time = Instant::now().duration_since(start_frame_time);
         info
-    }
-
-    /// Set the current cursor position, in pixel coordinates. Affects mouseover/click results.
-    // TODO: This is a workaround for self.world_proj being private; arguably doesn't even belong there or here. Find a better structure.
-    pub fn set_cursor_position(&mut self, position: Option<Point2<usize>>) {
-        self.world_camera.set_cursor_position(position);
     }
 }
 
