@@ -40,18 +40,21 @@ struct SpaceRaytracerImpl<P: PixelBuf> {
     #[borrows(blocks)]
     #[covariant]
     cubes: GridArray<TracingCubeData<'this, P::BlockData>>,
+
+    options: GraphicsOptions,
     sky_color: Rgb,
 }
 
 impl<P: PixelBuf> SpaceRaytracer<P> {
     /// Snapshots the given [`Space`] to prepare for raytracing it.
-    pub fn new(space: &Space) -> Self {
+    pub fn new(space: &Space, options: GraphicsOptions) -> Self {
         SpaceRaytracer(
             SpaceRaytracerImplBuilder {
                 blocks: prepare_blocks::<P>(space),
                 cubes_builder: |blocks: &[TracingBlock<P::BlockData>]| {
                     prepare_cubes::<P>(blocks, space)
                 },
+                options,
                 sky_color: space.sky_color(),
             }
             .build(),
@@ -329,7 +332,7 @@ fn print_space_impl<F: FnMut(&str)>(
         Vector3::new(0., 1., 0.),
     ));
 
-    SpaceRaytracer::<CharacterBuf>::new(space)
+    SpaceRaytracer::<CharacterBuf>::new(space, GraphicsOptions::default())
         .trace_scene_to_text(&camera, &"\n", move |s| {
             write(s);
             let r: Result<(), ()> = Ok(());

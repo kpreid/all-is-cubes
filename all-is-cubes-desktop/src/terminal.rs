@@ -25,6 +25,10 @@ use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
 /// Options for the terminal UI.
+///
+/// TODO: Migrate all of this into `GraphicsOptions`? Add an extension mechanism?
+/// In any case, we shouldn't have two separately-designed mechanisms, but at most two
+/// parallel ones.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TerminalOptions {
     /// Color escapes supported by the terminal.
@@ -208,7 +212,8 @@ impl TerminalMain {
         let space = &*character.space.borrow_mut();
 
         let (image, info) =
-            SpaceRaytracer::<ColorCharacterBuf>::new(space).trace_scene_to_image(&self.camera);
+            SpaceRaytracer::<ColorCharacterBuf>::new(space, self.app.graphics_options())
+                .trace_scene_to_image(&self.camera);
 
         self.out.queue(cursor::Hide)?;
         self.out.queue(SetAttribute(Attribute::Reset))?;

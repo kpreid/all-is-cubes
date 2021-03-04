@@ -102,7 +102,8 @@ pub(crate) fn record_main(
 
         camera.set_view_matrix(app.character().borrow().view());
         let (image_data, _info) =
-            SpaceRaytracer::<ColorBuf>::new(&*space_ref.borrow()).trace_scene_to_image(&camera);
+            SpaceRaytracer::<ColorBuf>::new(&*space_ref.borrow(), app.graphics_options())
+                .trace_scene_to_image(&camera);
         // TODO: Offer supersampling (multiple rays per output pixel).
 
         // Advance time for next frame.
