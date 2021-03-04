@@ -319,6 +319,12 @@ pub struct GraphicsOptions {
     /// TODO: Implement view distance limit (and fog) in raytracer.
     pub view_distance: NotNan<FreeCoordinate>,
 
+    /// Style in which to draw the lighting of [`Space`]s. This does not affect the
+    /// *computation* of lighting.
+    ///
+    /// TODO: This option is not yet implemented.
+    pub lighting_display: LightingOption,
+
     /// Number of space chunks (16³ groups of blocks) to redraw if needed, per frame.
     ///
     /// Does not apply to raytracing.
@@ -355,6 +361,7 @@ impl Default for GraphicsOptions {
             fog: FogOption::Compromise,
             fov_y: NotNan::new(90.).unwrap(),
             view_distance: NotNan::new(200.).unwrap(),
+            lighting_display: LightingOption::Flat,
             chunks_per_frame: 4,
             use_frustum_culling: true,
             debug_collision_boxes: false,
@@ -373,6 +380,18 @@ pub enum FogOption {
     Compromise,
     /// Almost physically realistic fog of constant density.
     Physical,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LightingOption {
+    /// No lighting: objects will be displayed with their original surface color.
+    None,
+    /// Light is taken from the volume immediately above a cube face.
+    /// Edges between cubes are visible.
+    Flat,
+    // TODO: Implement smooth lighting.
+    // /// Light varies across surfaces.
+    // Smooth,
 }
 
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.
