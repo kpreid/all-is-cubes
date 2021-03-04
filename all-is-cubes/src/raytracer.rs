@@ -24,7 +24,7 @@ use std::convert::TryFrom;
 
 use crate::block::{evaluated_block_resolution, Evoxel};
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
-use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
 
@@ -94,8 +94,9 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                             ),
                             ..ray
                         };
-                        // TODO: not the right lighting for non-opaque blocks
-                        let lighting = self.get_lighting(hit.cube_behind());
+                        let light_neighborhood = FaceMap::generate(|f| {
+                            self.get_lighting(hit.cube_ahead() + f.normal_vector())
+                        });
                         for subcube_hit in adjusted_ray.cast().within_grid(array.grid()) {
                             if s.count_step_should_stop() {
                                 break;
@@ -104,7 +105,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                             s.trace_through_surface(
                                 pixel_block_data,
                                 color,
-                                lighting,
+                                light_neighborhood[subcube_hit.face()],
                                 subcube_hit.face(),
                             );
                         }
