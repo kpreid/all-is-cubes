@@ -288,7 +288,7 @@ impl TryFrom<GridVector> for Face {
 }
 
 /// Container for values keyed by [`Face`]s.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
 pub struct FaceMap<V> {
     /// The value whose key is `Face::WITHIN`.
     pub within: V,
