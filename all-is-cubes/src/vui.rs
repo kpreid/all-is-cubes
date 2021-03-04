@@ -17,7 +17,7 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR, AIR_EVALUATED};
-use crate::camera::GraphicsOptions;
+use crate::camera::{FogOption, GraphicsOptions};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
@@ -87,7 +87,16 @@ impl Vui {
 
     /// Compute graphics options to render the VUI space given the user's regular options.
     pub fn graphics_options(mut options: GraphicsOptions) -> GraphicsOptions {
+        // Set FOV to give a predictable, not-too-wide-angle perspective.
         options.fov_y = NotNan::new(30.).unwrap();
+
+        // Disable fog for maximum clarity and because we shouldn't have any far clipping to hide.
+        options.fog = FogOption::None;
+
+        // Fixed view distance for our layout.
+        // TODO: Derive this from HudLayout and also FOV (since FOV determines eye-to-space distance).
+        options.view_distance = NotNan::new(100.0).unwrap();
+
         options
     }
 
