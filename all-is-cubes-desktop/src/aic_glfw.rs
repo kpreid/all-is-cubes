@@ -64,9 +64,6 @@ pub fn glfw_main_loop(
     renderer.set_character(Some(app.character().clone()));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
-    // TODO: InputProcessor should help with this ... though the need for delta is a GLFW quirk
-    let mut cursor_in_window = true;
-
     'app: loop {
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
@@ -116,17 +113,13 @@ pub fn glfw_main_loop(
 
                 // Mouse input
                 WindowEvent::CursorPos(..) => {
-                    // TODO: Now that InputProcessor does its own framing checks, can we skip having the cursor_in_window flag?
-                    if cursor_in_window {
-                        app.input_processor.mouse_pixel_position(
-                            renderer.viewport(),
-                            Some(Point2::from(renderer.surface.window.get_cursor_pos())),
-                            true,
-                        );
-                    }
+                    app.input_processor.mouse_pixel_position(
+                        renderer.viewport(),
+                        Some(Point2::from(renderer.surface.window.get_cursor_pos())),
+                        true,
+                    );
                 }
                 WindowEvent::CursorEnter(true) => {
-                    cursor_in_window = true;
                     app.input_processor.mouse_pixel_position(
                         renderer.viewport(),
                         Some(Point2::from(renderer.surface.window.get_cursor_pos())),
@@ -134,7 +127,6 @@ pub fn glfw_main_loop(
                     );
                 }
                 WindowEvent::CursorEnter(false) => {
-                    cursor_in_window = false;
                     app.input_processor
                         .mouse_pixel_position(renderer.viewport(), None, false);
                 }
