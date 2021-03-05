@@ -66,7 +66,6 @@ pub fn glfw_main_loop(
 
     // TODO: InputProcessor should help with this ... though the need for delta is a GLFW quirk
     let mut cursor_in_window = true;
-    let mut prev_cursor = None;
 
     'app: loop {
         app.frame_clock.advance_to(Instant::now());
@@ -87,7 +86,6 @@ pub fn glfw_main_loop(
             .set_cursor_mode(if app.input_processor.wants_pointer_lock() {
                 glfw::CursorMode::Disabled
             } else {
-                prev_cursor = None;
                 glfw::CursorMode::Normal
             });
 
@@ -117,23 +115,16 @@ pub fn glfw_main_loop(
                 WindowEvent::CharModifiers(..) => {}
 
                 // Mouse input
-                WindowEvent::CursorPos(x, y) => {
+                WindowEvent::CursorPos(..) => {
                     // TODO: Now that InputProcessor does its own framing checks, can we skip having the cursor_in_window flag?
-                    if app.input_processor.wants_pointer_lock() {
-                        let new_cursor = Vector2::new(x, y);
-                        if let Some(prev_cursor) = prev_cursor {
-                            let delta = new_cursor - prev_cursor;
-                            // TODO: Make input_processor responsible for tracking deltas.
-                            app.input_processor.mouselook_delta(delta);
-                        }
-                        prev_cursor = Some(new_cursor);
-                    } else if cursor_in_window {
+                    if cursor_in_window {
                         app.input_processor.mouse_pixel_position(
                             renderer.viewport(),
                             Some(
                                 Point2::from(renderer.surface.window.get_cursor_pos())
-                                    .map(|x| x as usize),
+                                    .map(|x| x as i32),
                             ),
+                            true,
                         );
                     }
                 }
@@ -143,14 +134,15 @@ pub fn glfw_main_loop(
                         renderer.viewport(),
                         Some(
                             Point2::from(renderer.surface.window.get_cursor_pos())
-                                .map(|x| x as usize),
+                                .map(|x| x as i32),
                         ),
+                        false,
                     );
                 }
                 WindowEvent::CursorEnter(false) => {
                     cursor_in_window = false;
                     app.input_processor
-                        .mouse_pixel_position(renderer.viewport(), None);
+                        .mouse_pixel_position(renderer.viewport(), None, false);
                 }
                 WindowEvent::MouseButton(button, Action::Press, _) => {
                     if let Some(cursor) = &app.cursor_result() {

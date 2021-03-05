@@ -288,7 +288,7 @@ impl Viewport {
     ///
     /// TODO: this should take float input, probably
     #[inline]
-    pub fn normalize_nominal_point(&self, nominal_point: Point2<usize>) -> Vector2<FreeCoordinate> {
+    pub fn normalize_nominal_point(&self, nominal_point: Point2<i32>) -> Vector2<FreeCoordinate> {
         Vector2::new(
             (nominal_point.x as FreeCoordinate + 0.5) / self.nominal_size.x * 2.0 - 1.0,
             -((nominal_point.y as FreeCoordinate + 0.5) / self.nominal_size.y * 2.0 - 1.0),

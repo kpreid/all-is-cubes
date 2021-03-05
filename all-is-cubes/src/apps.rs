@@ -170,6 +170,10 @@ pub struct InputProcessor {
 
     /// Mouse position in NDC. None if out of bounds/lost focus.
     mouse_ndc_position: Option<Point2<FreeCoordinate>>,
+
+    /// Mouse position used for generating mouselook deltas.
+    /// [`None`] if games.
+    mouse_previous_pixel_position: Option<Point2<i32>>,
 }
 
 impl InputProcessor {
@@ -182,6 +186,7 @@ impl InputProcessor {
             mouselook_mode: false, // TODO: might want a parameter
             mouselook_buffer: Vector2::zero(),
             mouse_ndc_position: Some(Point2::origin()),
+            mouse_previous_pixel_position: None,
         }
     }
 
@@ -254,6 +259,8 @@ impl InputProcessor {
         } else {
             self.keys_held.clear();
             self.momentary_timeout.clear();
+
+            self.mouselook_mode = false;
         }
     }
 
@@ -272,7 +279,9 @@ impl InputProcessor {
     /// Note that absolute cursor positions must be provided separately.
     pub fn mouselook_delta(&mut self, delta: Vector2<FreeCoordinate>) {
         // TODO: sensitivity option
-        self.mouselook_buffer += delta * 0.2;
+        if self.mouselook_mode {
+            self.mouselook_buffer += delta * 0.2;
+        }
     }
 
     /// Provide position of mouse pointer or other input device in normalized device
@@ -301,10 +310,24 @@ impl InputProcessor {
     /// center of the screen.
     ///
     /// TODO: this should take float input, probably
-    pub fn mouse_pixel_position(&mut self, viewport: Viewport, position: Option<Point2<usize>>) {
+    pub fn mouse_pixel_position(
+        &mut self,
+        viewport: Viewport,
+        position: Option<Point2<i32>>,
+        derive_movement: bool,
+    ) {
         self.mouse_ndc_position(
             position.map(|p| Point2::from_vec(viewport.normalize_nominal_point(p))),
         );
+
+        if derive_movement {
+            if let (Some(p1), Some(p2)) = (self.mouse_previous_pixel_position, position) {
+                self.mouselook_delta((p2 - p1).map(FreeCoordinate::from));
+            }
+            self.mouse_previous_pixel_position = position;
+        } else {
+            self.mouse_previous_pixel_position = None;
+        }
     }
 
     /// Returns the character movement velocity that input is currently requesting.
@@ -364,7 +387,10 @@ impl InputProcessor {
             match key {
                 Key::Character('l') => {
                     self.mouselook_mode = !self.mouselook_mode;
-                    dbg!(self.mouselook_mode);
+                    if self.mouselook_mode {
+                        // Clear delta tracking just in case
+                        self.mouse_previous_pixel_position = None;
+                    }
                 }
                 Key::Character(numeral) if numeral.is_digit(10) => {
                     let digit = numeral.to_digit(10).unwrap() as usize;

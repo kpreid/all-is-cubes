@@ -354,8 +354,8 @@ impl WebGameRoot {
         self.app.input_processor.mouse_pixel_position(
             self.renderer.viewport(),
             Some(Point2::new(
-                event.client_x() as usize,
-                event.client_y() as usize,
+                event.client_x() as i32,
+                event.client_y() as i32,
             )),
         );
     }
