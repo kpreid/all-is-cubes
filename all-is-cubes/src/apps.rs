@@ -164,7 +164,11 @@ pub struct InputProcessor {
     /// once per press rather than while held.
     command_buffer: Vec<Key>,
 
+    /// Do we *want* pointer lock for mouselook? Controlled by UI.
     mouselook_mode: bool,
+    /// Do we *have* pointer lock for mouselook? Reported by calling input implementation.
+    has_pointer_lock: bool,
+
     /// Net mouse movement since the last [`Self::apply_input`].
     mouselook_buffer: Vector2<FreeCoordinate>,
 
@@ -184,6 +188,7 @@ impl InputProcessor {
             momentary_timeout: HashMap::new(),
             command_buffer: Vec::new(),
             mouselook_mode: false, // TODO: might want a parameter
+            has_pointer_lock: false,
             mouselook_buffer: Vector2::zero(),
             mouse_ndc_position: Some(Point2::origin()),
             mouse_previous_pixel_position: None,
@@ -266,9 +271,17 @@ impl InputProcessor {
 
     /// True when the UI is in a state which _should_ have mouse pointer
     /// lock/capture/disable. This is not the same as actually having it since the window
-    /// may lack focus, the application may lack permission, etc.
+    /// may lack focus, the application may lack permission, etc.; use
+    /// [`InputProcessor::has_pointer_lock`] to report that state.
     pub fn wants_pointer_lock(&self) -> bool {
         self.mouselook_mode
+    }
+
+    /// Use this method to report whether mouse mouse pointer lock/capture/disable is
+    /// known to be successfully enabled, after [`InputProcessor::wants_pointer_lock`]
+    /// requests it or it is disabled for any reason.
+    pub fn has_pointer_lock(&mut self, value: bool) {
+        self.has_pointer_lock = value;
     }
 
     /// Provide relative movement information for mouselook.
@@ -279,7 +292,7 @@ impl InputProcessor {
     /// Note that absolute cursor positions must be provided separately.
     pub fn mouselook_delta(&mut self, delta: Vector2<FreeCoordinate>) {
         // TODO: sensitivity option
-        if self.mouselook_mode {
+        if self.has_pointer_lock {
             self.mouselook_buffer += delta * 0.2;
         }
     }

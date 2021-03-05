@@ -4,7 +4,7 @@
 //! Glue between [`all_is_cubes`] and [`glfw`] & [`luminance_glfw`].
 
 use cgmath::{Point2, Vector2};
-use glfw::{Action, Context as _, Window, WindowEvent};
+use glfw::{Action, Context as _, CursorMode, Window, WindowEvent};
 use luminance_glfw::GlfwSurface;
 use luminance_windowing::{WindowDim, WindowOpt};
 use std::error::Error;
@@ -81,10 +81,12 @@ pub fn glfw_main_loop(
             .surface
             .window
             .set_cursor_mode(if app.input_processor.wants_pointer_lock() {
-                glfw::CursorMode::Disabled
+                CursorMode::Disabled
             } else {
-                glfw::CursorMode::Normal
+                CursorMode::Normal
             });
+        app.input_processor
+            .has_pointer_lock(renderer.surface.window.get_cursor_mode() == CursorMode::Disabled);
 
         // Poll for events after drawing, so that on the first loop iteration we draw
         // before the window is visible (at least on macOS).
