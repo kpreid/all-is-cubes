@@ -10,12 +10,12 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
-    console, AddEventListenerOptions, Document, Event, FocusEvent, HtmlElement, KeyboardEvent,
-    MouseEvent, Text,
+    console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,
+    KeyboardEvent, MouseEvent, Text,
 };
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
-use all_is_cubes::cgmath::Point2;
+use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::content::UniverseTemplate;
 use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
@@ -336,6 +336,20 @@ impl WebGameRoot {
                 .unwrap();
         }
 
+        // Sync pointer lock state
+        let wants = self.app.input_processor.wants_pointer_lock();
+        let has = self.check_pointer_lock();
+        if wants != has {
+            let canvas = self.gui_helpers.canvas_helper().canvas();
+            if wants {
+                canvas.request_pointer_lock();
+            } else {
+                if let Some(document) = canvas.owner_document() {
+                    document.exit_pointer_lock();
+                }
+            }
+        }
+
         // Schedule next requestAnimationFrame
         self.start_loop();
     }
@@ -351,7 +365,15 @@ impl WebGameRoot {
     }
 
     fn update_mouse_position(&mut self, event: &MouseEvent) {
-        self.app.input_processor.mouse_pixel_position(
+        let lock = self.check_pointer_lock();
+
+        let i = &mut self.app.input_processor;
+        i.mouselook_delta(Vector2::new(
+            event.movement_x().into(),
+            event.movement_y().into(),
+        ));
+        i.has_pointer_lock(lock);
+        i.mouse_pixel_position(
             self.renderer.viewport(),
             Some(Point2::new(
                 event.client_x().into(),
@@ -359,6 +381,14 @@ impl WebGameRoot {
             )),
             false,
         );
+    }
+
+    fn check_pointer_lock(&self) -> bool {
+        let canvas = self.gui_helpers.canvas_helper().canvas(); // TODO: less indirection?
+        canvas
+            .owner_document()
+            .and_then(|d| d.pointer_lock_element())
+            == canvas.dyn_into::<Element>().ok()
     }
 }
 
