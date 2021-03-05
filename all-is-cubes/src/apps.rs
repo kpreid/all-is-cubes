@@ -121,6 +121,9 @@ impl AllIsCubesAppState {
                 .set_toolbar(&character.inventory().slots, &character.selected_slots())
                 .unwrap();
         }
+        self.ui
+            .set_crosshair_visible(self.input_processor.mouselook_mode)
+            .unwrap(); // TODO: ui should have internal error handling
     }
 
     /// Call this once per frame to update the cursor raycast.

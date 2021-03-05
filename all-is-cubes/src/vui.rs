@@ -152,6 +152,21 @@ impl Vui {
             text,
         )
     }
+
+    // TODO: handle errors in a local/transient way instead of propagating
+    // TODO: this should surely be a listener rather than an explicit setter??
+    pub(crate) fn set_crosshair_visible(&mut self, visible: bool) -> Result<(), SetCubeError> {
+        self.hud_space.borrow_mut().set(
+            HudLayout::default().crosshair_position(),
+            if visible {
+                // TODO: This is horrible; we need a better way to pass along borrowed blocks
+                Cow::Borrowed(&*self.hud_blocks.icons[Icons::Crosshair])
+            } else {
+                Cow::Borrowed(&AIR)
+            },
+        )?;
+        Ok(())
+    }
 }
 
 /// Knows where and how to place graphics within the HUD space, but does not store
@@ -169,8 +184,8 @@ struct HudLayout {
 impl Default for HudLayout {
     fn default() -> Self {
         Self {
-            // Odd width benefits the toolbar.
-            size: Vector2::new(25, 18),
+            // Odd width benefits the toolbar and crosshair.
+            size: Vector2::new(25, 17),
             toolbar_positions: 10,
         }
     }
@@ -269,6 +284,10 @@ impl HudLayout {
         universe.insert_anonymous(space)
     }
 
+    fn crosshair_position(&self) -> GridPoint {
+        GridPoint::new(self.size.x / 2, self.size.y / 2, 0)
+    }
+
     fn tool_icon_position(&self, index: usize) -> GridPoint {
         let x_start =
             (self.size.x - (self.toolbar_positions as GridCoordinate) * TOOLBAR_STEP + 1) / 2;
@@ -285,7 +304,7 @@ impl HudLayout {
     /// Returns an error if using the tools' icons produced an error — or possibly if
     /// there was a drawing layout problem.
     // TODO: Error return should probably be something other than SetCubeError
-    pub fn set_toolbar(
+    fn set_toolbar(
         &self,
         space: &mut Space,
         hud_blocks: &HudBlocks,
@@ -502,8 +521,15 @@ pub(crate) fn draw_background(space: &mut Space) {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Icons {
+    /// HUD crosshair indicating cursor position.
+    ///
+    /// TODO: This should be kept elsewhere than the icons enum.
+    Crosshair,
+    /// Icon for an empty toolbar slot.
     EmptySlot,
+    /// Icon for `Tool::DeleteBlock`.
     Delete,
+    /// Icon for `Tool::CopyFromSpace`.
     CopyFromSpace,
 }
 impl BlockModule for Icons {
@@ -514,6 +540,7 @@ impl BlockModule for Icons {
 impl Icons {
     fn new(universe: &mut Universe) -> BlockProvider<Icons> {
         let resolution = 16;
+        let crosshair_resolution = 29; // Odd resolution allows centering
         BlockProvider::new(|key| {
             Ok(match key {
                 Icons::EmptySlot => Block::builder()
@@ -521,6 +548,27 @@ impl Icons {
                     .display_name("")
                     .color(Rgba::TRANSPARENT)
                     .build(),
+                Icons::Crosshair => {
+                    let mut space = Space::empty_positive(crosshair_resolution.into(), crosshair_resolution.into(), 1);
+                    let center_x2 =
+                        GridPoint::new(1, 1, 0) * (GridCoordinate::from(crosshair_resolution) - 1);
+
+                    let line_block_1 = Block::from(rgba_const!(0.2, 0.2, 0.2, 0.5));
+                    let line_block_2 = line_block_1.clone(); // TODO: experiment with patterning
+                    for i in 5..8 {
+                        for &direction in &[Face::PX, Face::PY, Face::NX, Face::NY] {
+                            let position_x2 = center_x2 + i * direction.normal_vector() * 2;
+                            space.set(
+                                position_x2 / 2,
+                                [&line_block_1, &line_block_2][i as usize % 2],
+                            )?;
+                        }
+                    }
+                    Block::builder()
+                        .display_name("Crosshair")
+                        .voxels_ref(crosshair_resolution, universe.insert_anonymous(space))
+                        .build()
+                }
                 Icons::Delete => {
                     let x_radius = i32::from(resolution) * 3 / 16;
                     let background_block_1: Block = Rgba::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
