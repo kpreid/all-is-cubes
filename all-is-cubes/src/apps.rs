@@ -173,7 +173,7 @@ pub struct InputProcessor {
 
     /// Mouse position used for generating mouselook deltas.
     /// [`None`] if games.
-    mouse_previous_pixel_position: Option<Point2<i32>>,
+    mouse_previous_pixel_position: Option<Point2<f64>>,
 }
 
 impl InputProcessor {
@@ -313,7 +313,7 @@ impl InputProcessor {
     pub fn mouse_pixel_position(
         &mut self,
         viewport: Viewport,
-        position: Option<Point2<i32>>,
+        position: Option<Point2<f64>>,
         derive_movement: bool,
     ) {
         self.mouse_ndc_position(

@@ -120,10 +120,7 @@ pub fn glfw_main_loop(
                     if cursor_in_window {
                         app.input_processor.mouse_pixel_position(
                             renderer.viewport(),
-                            Some(
-                                Point2::from(renderer.surface.window.get_cursor_pos())
-                                    .map(|x| x as i32),
-                            ),
+                            Some(Point2::from(renderer.surface.window.get_cursor_pos())),
                             true,
                         );
                     }
@@ -132,10 +129,7 @@ pub fn glfw_main_loop(
                     cursor_in_window = true;
                     app.input_processor.mouse_pixel_position(
                         renderer.viewport(),
-                        Some(
-                            Point2::from(renderer.surface.window.get_cursor_pos())
-                                .map(|x| x as i32),
-                        ),
+                        Some(Point2::from(renderer.surface.window.get_cursor_pos())),
                         false,
                     );
                 }

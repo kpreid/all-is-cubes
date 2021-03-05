@@ -286,12 +286,12 @@ impl Viewport {
     /// Convert a point in the `self.nominal_size` coordinate system to
     /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel centers) with Y flipped.
     ///
-    /// TODO: this should take float input, probably
+    /// TODO: Some windowing APIs providing float input might have different ideas of pixel centers.
     #[inline]
-    pub fn normalize_nominal_point(&self, nominal_point: Point2<i32>) -> Vector2<FreeCoordinate> {
+    pub fn normalize_nominal_point(&self, nominal_point: Point2<f64>) -> Vector2<FreeCoordinate> {
         Vector2::new(
-            (nominal_point.x as FreeCoordinate + 0.5) / self.nominal_size.x * 2.0 - 1.0,
-            -((nominal_point.y as FreeCoordinate + 0.5) / self.nominal_size.y * 2.0 - 1.0),
+            (nominal_point.x + 0.5) / self.nominal_size.x * 2.0 - 1.0,
+            -((nominal_point.y + 0.5) / self.nominal_size.y * 2.0 - 1.0),
         )
     }
 
