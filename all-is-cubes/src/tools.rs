@@ -20,9 +20,13 @@ use crate::vui::Icons;
 /// Currently, `Tool`s also play the role of “inventory items”. This may change in the
 /// future.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Tool {
     /// Empty slot; does nothing.
     None,
+    /// “Click”, or “push button”, or generally “activate the function of this”
+    /// as opposed to editing it. Used for [`vui`](crate::vui) interaction.
+    Activate,
     /// Destroy any targeted block.
     DeleteBlock,
     /// Place a copy of the given block in empty space.
@@ -35,6 +39,10 @@ impl Tool {
     pub fn use_tool(&mut self, input: &mut ToolInput) -> Result<(), ToolError> {
         match self {
             Self::None => Err(ToolError::NotUsable),
+            Self::Activate => {
+                // TODO: We have nothing to activate yet.
+                Err(ToolError::NotUsable)
+            }
             Self::DeleteBlock => {
                 input.set_cube(input.cursor().place.cube, &input.cursor().block, &AIR)
             }
@@ -58,6 +66,7 @@ impl Tool {
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
             Self::None => Cow::Borrowed(&predefined[Icons::EmptySlot]),
+            Self::Activate => Cow::Borrowed(&predefined[Icons::Activate]),
             Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             Self::PlaceBlock(block) => Cow::Borrowed(&block),
@@ -276,6 +285,32 @@ mod tests {
         );
         print_space(&tester.space(), (-1., 1., 1.));
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
+    }
+
+    #[test]
+    fn icon_activate() {
+        let dummy_icons = dummy_icons();
+        assert_eq!(
+            Tool::Activate.icon(&dummy_icons),
+            dummy_icons[Icons::Activate]
+        );
+    }
+
+    #[test]
+    fn use_activate_noop() {
+        let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
+        let tester = ToolTester::new(|space| {
+            space.set((1, 0, 0), &existing).unwrap();
+        });
+        assert_eq!(
+            Tool::Activate.use_tool(&mut tester.input()),
+            Err(ToolError::NotUsable)
+        );
+    }
+
+    #[test]
+    fn use_activate_effect() {
+        // TODO: When Tool::Activate actually gains some effects, test them here.
     }
 
     #[test]

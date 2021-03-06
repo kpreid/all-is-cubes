@@ -527,6 +527,8 @@ pub enum Icons {
     Crosshair,
     /// Icon for an empty toolbar slot.
     EmptySlot,
+    /// Icon for `Tool::Activate`,
+    Activate,
     /// Icon for `Tool::DeleteBlock`.
     Delete,
     /// Icon for `Tool::CopyFromSpace`.
@@ -543,13 +545,12 @@ impl Icons {
         let crosshair_resolution = 29; // Odd resolution allows centering
         BlockProvider::new(|key| {
             Ok(match key {
-                Icons::EmptySlot => Block::builder()
-                    .attributes(AIR_EVALUATED.attributes)
-                    .display_name("")
-                    .color(Rgba::TRANSPARENT)
-                    .build(),
                 Icons::Crosshair => {
-                    let mut space = Space::empty_positive(crosshair_resolution.into(), crosshair_resolution.into(), 1);
+                    let mut space = Space::empty_positive(
+                        crosshair_resolution.into(),
+                        crosshair_resolution.into(),
+                        1,
+                    );
                     let center_x2 =
                         GridPoint::new(1, 1, 0) * (GridCoordinate::from(crosshair_resolution) - 1);
 
@@ -568,6 +569,16 @@ impl Icons {
                         .display_name("Crosshair")
                         .voxels_ref(crosshair_resolution, universe.insert_anonymous(space))
                         .build()
+                }
+                Icons::EmptySlot => Block::builder()
+                    .attributes(AIR_EVALUATED.attributes)
+                    .display_name("")
+                    .color(Rgba::TRANSPARENT)
+                    .build(),
+                Icons::Activate => {
+                    // TODO: This doesn't appear in the UI yet. When it does, give it an
+                    // actual icon; perhaps the traditional "white gloved 👆 pointing finger" cursor.
+                    Block::from(rgb_const!(0.0, 1.0, 0.0))
                 }
                 Icons::Delete => {
                     let x_radius = i32::from(resolution) * 3 / 16;
