@@ -135,7 +135,7 @@ impl AllIsCubesAppState {
             .input_processor
             .cursor_ndc_position() // TODO accessor
             .map(|p| camera.project_ndc_into_world(p))
-            .and_then(|ray| cursor_raycast(ray.cast(), &*character.space.borrow()));
+            .and_then(|ray| cursor_raycast(ray, &*character.space.borrow()));
     }
 
     pub fn cursor_result(&self) -> &Option<Cursor> {

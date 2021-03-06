@@ -9,12 +9,12 @@ use std::collections::HashSet;
 use std::fmt;
 use std::time::Duration;
 
-use crate::block::{Block, EvaluatedBlock};
+use crate::block::{evaluated_block_resolution, recursive_raycast, Block, EvaluatedBlock};
 use crate::camera::eye_for_look_at;
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, Contact};
-use crate::raycast::{CubeFace, Raycaster};
+use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
 use crate::tools::{Inventory, Tool, ToolError};
 use crate::universe::URef;
@@ -267,18 +267,27 @@ pub enum CharacterChange {
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck.
-pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
-    let ray = ray.within_grid(space.grid());
+pub fn cursor_raycast(ray: Ray, space: &Space) -> Option<Cursor> {
     // TODO: implement 'reach' radius limit
-    // Note: it may become the case in the future that we want to pass something more specialized than a RaycastStep, but for now RaycastStep is exactly the right structure.
-    for step in ray {
+    for step in ray.cast().within_grid(space.grid()) {
         let cube = step.cube_ahead();
         let evaluated = space.get_evaluated(cube);
         let lighting_ahead = space.get_lighting(cube);
         let lighting_behind = space.get_lighting(step.cube_behind());
+
+        // Check intersection with recursive block
+        if let Some(voxels) = &evaluated.voxels {
+            if let Some(resolution) = evaluated_block_resolution(voxels.grid()) {
+                if !recursive_raycast(ray, step.cube_ahead(), resolution)
+                    .any(|voxel_step| voxels[voxel_step.cube_ahead()].selectable)
+                {
+                    continue;
+                }
+            }
+        }
+
         if evaluated.attributes.selectable {
             return Some(Cursor {
-                // TODO: Cursor info text would like to have lighting information too.
                 place: step.cube_face(),
                 block: space[cube].clone(),
                 evaluated: evaluated.clone(),
@@ -292,7 +301,7 @@ pub fn cursor_raycast(ray: Raycaster, space: &Space) -> Option<Cursor> {
 /// Data collected by [`cursor_raycast`] about the blocks struck by the ray; intended to be
 /// sufficient for various player interactions with blocks.
 ///
-/// TODO: Should carry information about lighting, and both the struck and preceding cubes.
+/// TODO: Should carry information about both the struck and preceding cubes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
     /// The cube the cursor is at and which face was hit.

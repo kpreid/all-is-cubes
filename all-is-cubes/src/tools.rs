@@ -207,7 +207,7 @@ mod tests {
     use crate::character::cursor_raycast;
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
-    use crate::raycast::Raycaster;
+    use crate::raycast::Ray;
     use crate::raytracer::print_space;
     use crate::universe::{UBorrow, UBorrowMut, Universe};
     use std::convert::TryInto;
@@ -234,7 +234,7 @@ mod tests {
 
         fn input(&self) -> ToolInput {
             let cursor = cursor_raycast(
-                Raycaster::new((0., 0.5, 0.5), (1., 0., 0.)),
+                Ray::new([0., 0.5, 0.5], [1., 0., 0.]),
                 &*self.space_ref.borrow(),
             )
             .unwrap();
