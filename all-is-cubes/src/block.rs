@@ -4,14 +4,15 @@
 //! Definition of blocks, which are game objects which live in the grid of a
 //! [`Space`]. See [`Block`] for details.
 
-use cgmath::EuclideanSpace as _;
+use cgmath::{EuclideanSpace as _, Point3};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
-use crate::math::{GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
+use crate::raycast::{Ray, Raycaster};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
 use crate::universe::{Name, RefError, URef, Universe, UniverseIndex as _};
 use crate::util::{ConciseDebug, CustomFormat};
@@ -512,6 +513,36 @@ pub(crate) fn evaluated_block_resolution(grid: Grid) -> Option<Resolution> {
         return None;
     }
     Some(Resolution::try_from(min_upper).unwrap_or(Resolution::MAX))
+}
+
+/// Given the `resolution` of some recursive block occupying `cube`, transform `ray`
+/// into an equivalent ray intersecting the recursive grid.
+///
+/// See also [`recursive_raycast`] for a raycast built on this.
+// TODO: Decide whether this is good public API
+#[inline]
+pub(crate) fn recursive_ray(ray: Ray, cube: GridPoint, resolution: Resolution) -> Ray {
+    Ray {
+        origin: Point3::from_vec(
+            (ray.origin - cube.map(FreeCoordinate::from)) * FreeCoordinate::from(resolution),
+        ),
+        direction: ray.direction,
+    }
+}
+
+/// Given the `resolution` of some recursive block occupying `cube`, transform `ray`
+/// into an equivalent ray intersecting the recursive grid, and start the raycast
+/// through that block. This is equivalent to
+///
+/// ```skip
+/// recursive_ray(ray, cube, resolution).cast().within_grid(Grid::for_block(resolution))
+/// ```
+// TODO: Decide whether this is good public API
+#[inline]
+pub(crate) fn recursive_raycast(ray: Ray, cube: GridPoint, resolution: Resolution) -> Raycaster {
+    recursive_ray(ray, cube, resolution)
+        .cast()
+        .within_grid(Grid::for_block(resolution))
 }
 
 /// Notification when an [`EvaluatedBlock`] result changes.

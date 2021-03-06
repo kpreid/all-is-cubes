@@ -13,16 +13,14 @@
 //! In the future (or currently, if I forgot to update this comment), it will be used
 //! as a means to display the state of `Space`s used for testing inline in test output.
 
-use cgmath::{
-    EuclideanSpace as _, InnerSpace as _, Matrix4, Point2, Point3, Vector2, Vector3, Zero as _,
-};
+use cgmath::{InnerSpace as _, Matrix4, Point2, Vector2, Vector3, Zero as _};
 use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
-use crate::block::{evaluated_block_resolution, Evoxel};
+use crate::block::{evaluated_block_resolution, recursive_raycast, Evoxel};
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
@@ -84,23 +82,15 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         );
                     }
                     TracingBlock::Recur(pixel_block_data, array) => {
-                        // Find where the origin in the space's coordinate system is.
-                        // TODO: Raycaster does not efficiently implement advancing from outside a
-                        // grid. Fix that to get way more performance.
-                        let adjusted_ray = Ray {
-                            origin: Point3::from_vec(
-                                (ray.origin - hit.cube_ahead().cast::<FreeCoordinate>().unwrap())
-                                    * FreeCoordinate::from(
-                                        evaluated_block_resolution(array.grid())
-                                            .expect("bad block array"),
-                                    ),
-                            ),
-                            ..ray
-                        };
                         let light_neighborhood = FaceMap::generate(|f| {
                             self.get_lighting(hit.cube_ahead() + f.normal_vector())
                         });
-                        for subcube_hit in adjusted_ray.cast().within_grid(array.grid()) {
+                        for subcube_hit in recursive_raycast(
+                            ray,
+                            hit.cube_ahead(),
+                            evaluated_block_resolution(array.grid())
+                                .expect("bad block array dimensions"),
+                        ) {
                             if s.count_step_should_stop() {
                                 break;
                             }
