@@ -190,7 +190,7 @@ impl TerminalMain {
             self.app.frame_clock.advance_to(Instant::now());
             self.app.maybe_step_universe();
             if self.app.frame_clock.should_draw() {
-                self.app.update_cursor(&self.camera);
+                self.app.update_cursor(&self.camera, &self.camera); // TODO: wrong UI camera ...
                 self.draw()?;
                 self.app.frame_clock.did_draw();
             } else {

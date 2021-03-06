@@ -129,13 +129,19 @@ impl AllIsCubesAppState {
     /// Call this once per frame to update the cursor raycast.
     ///
     /// TODO: bad API; revisit general cursor handling logic.
-    pub fn update_cursor(&mut self, camera: &Camera) {
-        let character = self.game_character.borrow_mut();
-        self.cursor_result = self
-            .input_processor
-            .cursor_ndc_position() // TODO accessor
-            .map(|p| camera.project_ndc_into_world(p))
-            .and_then(|ray| cursor_raycast(ray, &character.space));
+    pub fn update_cursor(&mut self, ui_camera: &Camera, game_camera: &Camera) {
+        let ndc_pos = self.input_processor.cursor_ndc_position();
+
+        self.cursor_result = ndc_pos
+            .map(|p| ui_camera.project_ndc_into_world(p))
+            .and_then(|ray| cursor_raycast(ray, &self.ui.current_space()));
+
+        if self.cursor_result.is_none() {
+            let character = self.game_character.borrow_mut();
+            self.cursor_result = ndc_pos
+                .map(|p| game_camera.project_ndc_into_world(p))
+                .and_then(|ray| cursor_raycast(ray, &character.space));
+        }
     }
 
     pub fn cursor_result(&self) -> &Option<Cursor> {

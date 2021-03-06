@@ -232,8 +232,18 @@ impl Character {
             .get(button)
             .copied()
             .unwrap_or(self.selected_slots[0]);
-        self.inventory.use_tool(cursor, slot_index)?;
-        self.notifier.notify(CharacterChange::Inventory);
+        self.inventory.use_tool(
+            cursor,
+            if cursor.space == self.space {
+                // Use inventory tools on world
+                Some(slot_index)
+            } else {
+                // Assuming this is the UI space, just click on it
+                // TODO: Bad design; we should perhaps not route these clicks through Character::click at all.
+                None
+            },
+        )?;
+        self.notifier.notify(CharacterChange::Inventory); // TODO: this change report should come from the inventory
         Ok(())
     }
 

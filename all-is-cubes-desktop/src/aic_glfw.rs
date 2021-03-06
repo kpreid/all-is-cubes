@@ -68,7 +68,7 @@ pub fn glfw_main_loop(
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
         if app.frame_clock.should_draw() {
-            app.update_cursor(renderer.world_camera());
+            app.update_cursor(renderer.ui_camera(), renderer.world_camera());
             let _render_info = renderer.render_frame(app.cursor_result());
             renderer.surface.window.swap_buffers();
             app.frame_clock.did_draw();

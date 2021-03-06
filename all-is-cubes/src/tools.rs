@@ -166,30 +166,44 @@ impl Inventory {
         Inventory { slots: items }
     }
 
-    /// Apply a tool to the space.
-    pub fn use_tool(&mut self, cursor: &Cursor, slot_index: usize) -> Result<(), ToolError> {
-        if let Some(tool) = self.slots.get_mut(slot_index) {
-            let mut input = ToolInput {
-                cursor: cursor.clone(),
-                output_items: Vec::new(),
-            };
-            tool.use_tool(&mut input)?;
+    /// Apply a tool to the cursor location.
+    ///
+    /// If `slot_index` is [`None`], uses a [`Tool::Activate`] that does not exist in the inventory.
+    /// TODO: Bad API, have a more coherent overall design.
+    pub fn use_tool(
+        &mut self,
+        cursor: &Cursor,
+        slot_index: Option<usize>,
+    ) -> Result<(), ToolError> {
+        let mut activate = Tool::Activate;
+        let tool = if let Some(slot_index) = slot_index {
+            if let Some(tool) = self.slots.get_mut(slot_index) {
+                tool
+            } else {
+                return Err(ToolError::NotUsable);
+            }
+        } else {
+            &mut activate
+        };
 
-            // Stuff any outputs into our inventory
-            // TODO: Write tests for this
-            for output in input.output_items {
-                match self.try_add_item(output) {
-                    Ok(()) => {}
-                    Err(_output) => {
-                        // TODO: drop these items on the ground or something once that option exists.
-                        // Or in some cases we might want transactional tools (no effect if can't succeed).
-                    }
+        let mut input = ToolInput {
+            cursor: cursor.clone(),
+            output_items: Vec::new(),
+        };
+        tool.use_tool(&mut input)?;
+
+        // Stuff any outputs into our inventory
+        // TODO: Write tests for this
+        for output in input.output_items {
+            match self.try_add_item(output) {
+                Ok(()) => {}
+                Err(_output) => {
+                    // TODO: drop these items on the ground or something once that option exists.
+                    // Or in some cases we might want transactional tools (no effect if can't succeed).
                 }
             }
-            Ok(())
-        } else {
-            Err(ToolError::NotUsable)
         }
+        Ok(())
     }
 
     /// Add an item to an empty slot in this inventory. Returns the item if there is

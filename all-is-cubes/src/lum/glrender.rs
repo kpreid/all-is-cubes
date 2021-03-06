@@ -121,10 +121,17 @@ where
     }
 
     /// Return the camera used to render the space.
-    /// TODO: This interface exists to support cursor usage and should be improved to handle
-    /// UI clicking, perhaps by putting the raycast in here.
+    /// TODO: This interface exists to support cursor usage and should perhaps be made more
+    /// high-level by doing the raycast in here.
+    #[doc(hidden)] // TODO: design better interface that doesn't need to call this
     pub fn world_camera(&self) -> &Camera {
         &self.world_camera
+    }
+
+    /// Return the camera used to render the VUI. See comments on [`Self::world_camera`].
+    #[doc(hidden)] // TODO: design better interface that doesn't need to call this
+    pub fn ui_camera(&self) -> &Camera {
+        &self.ui_camera
     }
 
     /// Draw a frame.
@@ -181,9 +188,13 @@ where
             // Lighting trace at cursor
             if self.world_camera.options().debug_light_rays_at_cursor {
                 if let Some(cursor) = cursor_result {
-                    let space = character.space.borrow();
-                    let (_, _, _, lighting_info) = space.compute_lighting(cursor.place.adjacent());
-                    wireframe_vertices(&mut v, Rgba::new(0.8, 0.8, 1.0, 1.0), lighting_info);
+                    // TODO: We should be able to draw wireframes in the UI space too, and when we do that will enable supporting this.
+                    if cursor.space == character.space {
+                        let space = character.space.borrow();
+                        let (_, _, _, lighting_info) =
+                            space.compute_lighting(cursor.place.adjacent());
+                        wireframe_vertices(&mut v, Rgba::new(0.8, 0.8, 1.0, 1.0), lighting_info);
+                    }
                 }
             }
 

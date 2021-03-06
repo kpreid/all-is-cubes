@@ -305,7 +305,8 @@ impl WebGameRoot {
             // TODO do projection updates only when needed
             self.renderer
                 .set_viewport(self.gui_helpers.canvas_helper().viewport());
-            self.app.update_cursor(self.renderer.world_camera());
+            self.app
+                .update_cursor(self.renderer.ui_camera(), self.renderer.world_camera());
 
             // Do graphics
             let render_info = self.renderer.render_frame(self.app.cursor_result());
