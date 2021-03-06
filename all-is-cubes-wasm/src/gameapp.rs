@@ -343,10 +343,8 @@ impl WebGameRoot {
             let canvas = self.gui_helpers.canvas_helper().canvas();
             if wants {
                 canvas.request_pointer_lock();
-            } else {
-                if let Some(document) = canvas.owner_document() {
-                    document.exit_pointer_lock();
-                }
+            } else if let Some(document) = canvas.owner_document() {
+                document.exit_pointer_lock();
             }
         }
 
