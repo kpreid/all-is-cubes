@@ -222,14 +222,17 @@ impl Character {
         self.velocity_input = velocity.into();
     }
 
-    /// Handle a click/tool-use on the view.
+    /// Use this character's selected tool on the given cursor.
+    ///
+    /// TODO: Dubious API: shouldn't this only work with the character's space?
+    /// We want to refactor click handling in general, so keep an eye on that.
     pub fn click(&mut self, cursor: &Cursor, button: usize) -> Result<(), ToolError> {
         let slot_index = self
             .selected_slots
             .get(button)
             .copied()
             .unwrap_or(self.selected_slots[0]);
-        self.inventory.use_tool(&self.space, cursor, slot_index)?;
+        self.inventory.use_tool(cursor, slot_index)?;
         self.notifier.notify(CharacterChange::Inventory);
         Ok(())
     }
@@ -267,8 +270,9 @@ pub enum CharacterChange {
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck.
-pub fn cursor_raycast(ray: Ray, space: &Space) -> Option<Cursor> {
+pub fn cursor_raycast(ray: Ray, space_ref: &URef<Space>) -> Option<Cursor> {
     // TODO: implement 'reach' radius limit
+    let space = space_ref.try_borrow().ok()?;
     for step in ray.cast().within_grid(space.grid()) {
         let cube = step.cube_ahead();
         let evaluated = space.get_evaluated(cube);
@@ -288,6 +292,7 @@ pub fn cursor_raycast(ray: Ray, space: &Space) -> Option<Cursor> {
 
         if evaluated.attributes.selectable {
             return Some(Cursor {
+                space: space_ref.clone(),
                 place: step.cube_face(),
                 block: space[cube].clone(),
                 evaluated: evaluated.clone(),
@@ -304,6 +309,7 @@ pub fn cursor_raycast(ray: Ray, space: &Space) -> Option<Cursor> {
 /// TODO: Should carry information about both the struck and preceding cubes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
+    pub space: URef<Space>,
     /// The cube the cursor is at and which face was hit.
     pub place: CubeFace,
     /// The block that was found in the given cube.

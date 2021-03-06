@@ -224,7 +224,11 @@ where
 
                             // Cursor and debug info
                             render_gate.render(&RenderState::default(), |mut tess_gate| {
-                                tess_gate.render(&cursor_tess)?;
+                                // Draw cursor only if it's in the same space.
+                                if matches!(cursor_result, Some(c) if c.space == character.space) {
+                                    tess_gate.render(&cursor_tess)?;
+                                }
+
                                 if let Some(tess) = &debug_lines_tess {
                                     tess_gate.render(tess)?;
                                 }

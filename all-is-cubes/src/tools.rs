@@ -9,8 +9,8 @@ use crate::block::{Block, AIR};
 use crate::character::Cursor;
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
-use crate::space::{SetCubeError, Space};
-use crate::universe::{RefError, URef};
+use crate::space::SetCubeError;
+use crate::universe::RefError;
 use crate::vui::Icons;
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
@@ -81,7 +81,6 @@ impl Tool {
 /// parameter list for `Tool::use_tool`.
 #[derive(Debug)]
 pub struct ToolInput {
-    space: URef<Space>,
     // TODO: It shouldn't be mandatory to have a valid cursor input; some tools
     // might not need targeting.
     cursor: Cursor,
@@ -96,7 +95,11 @@ impl ToolInput {
         old_block: &Block,
         new_block: &Block,
     ) -> Result<(), ToolError> {
-        let mut space = self.space.try_borrow_mut().map_err(ToolError::SpaceRef)?;
+        let mut space = self
+            .cursor
+            .space
+            .try_borrow_mut()
+            .map_err(ToolError::SpaceRef)?;
         if &space[cube] != old_block {
             return Err(ToolError::NotUsable);
         }
@@ -164,15 +167,9 @@ impl Inventory {
     }
 
     /// Apply a tool to the space.
-    pub fn use_tool(
-        &mut self,
-        space: &URef<Space>,
-        cursor: &Cursor,
-        slot_index: usize,
-    ) -> Result<(), ToolError> {
+    pub fn use_tool(&mut self, cursor: &Cursor, slot_index: usize) -> Result<(), ToolError> {
         if let Some(tool) = self.slots.get_mut(slot_index) {
             let mut input = ToolInput {
-                space: space.clone(),
                 cursor: cursor.clone(),
                 output_items: Vec::new(),
             };
@@ -218,7 +215,8 @@ mod tests {
     use crate::math::Rgba;
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
-    use crate::universe::{UBorrow, UBorrowMut, Universe};
+    use crate::space::Space;
+    use crate::universe::{UBorrow, UBorrowMut, URef, Universe};
     use std::convert::TryInto;
 
     #[derive(Debug)]
@@ -242,14 +240,10 @@ mod tests {
         }
 
         fn input(&self) -> ToolInput {
-            let cursor = cursor_raycast(
-                Ray::new([0., 0.5, 0.5], [1., 0., 0.]),
-                &*self.space_ref.borrow(),
-            )
-            .unwrap();
+            let cursor =
+                cursor_raycast(Ray::new([0., 0.5, 0.5], [1., 0., 0.]), &self.space_ref).unwrap();
             ToolInput {
                 // TODO: define ToolInput::new
-                space: self.space_ref.clone(),
                 cursor,
                 output_items: Vec::new(),
             }

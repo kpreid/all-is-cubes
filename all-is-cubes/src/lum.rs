@@ -31,6 +31,7 @@ mod space;
 mod types;
 
 /// Creates a [`Tess`] to draw a [`Cursor`] as a wireframe cube.
+/// Caller must set up the camera for the cursor's space.
 pub(crate) fn make_cursor_tess<C>(
     context: &mut C,
     cursor_result: &Option<Cursor>,
