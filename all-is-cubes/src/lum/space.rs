@@ -4,17 +4,19 @@
 //! Get from [`Space`] to [`Tess`].
 
 use bitvec::prelude::BitVec;
-use cgmath::Point3;
+use cgmath::{EuclideanSpace as _, Point3, Vector3};
 use luminance::tess::View as _;
 use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
 use luminance_front::depth_test::DepthWrite;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
-use luminance_front::pipeline::{Pipeline, PipelineError};
+use luminance_front::pipeline::{BoundTexture, Pipeline, PipelineError};
+use luminance_front::pixel::NormRGBA8UI;
 use luminance_front::render_gate::RenderGate;
 use luminance_front::render_state::RenderState;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::tess_gate::TessGate;
+use luminance_front::texture::{Dim3, GenMipmaps, Sampler, Texture, TextureError};
 use luminance_front::Backend;
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -27,7 +29,7 @@ use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::types::LumBlockVertex;
-use crate::math::{FreeCoordinate, GridPoint, Rgb};
+use crate::math::{FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
     triangulate_block, triangulate_blocks, BlockTriangulation, BlockTriangulationProvider,
@@ -700,6 +702,91 @@ impl Listener<SpaceChange> for TodoListener {
     fn alive(&self) -> bool {
         self.0.strong_count() > 0
     }
+}
+
+/// Keeps a 3D [`Texture`] up to date with the light data from a [`Space`].
+///
+/// The texels are in [`PackedLight`] form.
+/// The alpha component is unused.
+/// TODO: Use alpha component to communicate block opacity.
+struct SpaceLightTexture {
+    texture: Texture<Dim3, NormRGBA8UI>,
+    /// The region of cube coordinates for which there are valid texels.
+    texture_grid: Grid,
+}
+
+impl SpaceLightTexture {
+    /// Construct a new `SpaceLightTexture` for the specified size of [`Space`],
+    /// with no data.
+    pub fn new<C>(context: &mut C, grid: Grid) -> Result<Self, TextureError>
+    where
+        C: GraphicsContext<Backend = Backend>,
+    {
+        // Boundary of 1 extra cube automatically captures sky light.
+        let texture_grid = grid.expand(FaceMap {
+            px: 1,
+            py: 1,
+            pz: 1,
+            nx: 0,
+            ny: 0,
+            nz: 0,
+            within: 0,
+        });
+        let texture = Texture::new(
+            context,
+            texture_grid.unsigned_size().into(),
+            /* mipmaps= */ 0,
+            Sampler::default(), // sampler options don't matter because we're using texelFetch()
+        )?;
+        Ok(Self {
+            texture,
+            texture_grid,
+        })
+    }
+
+    /// Copy the specified region of light data.
+    pub fn update(&mut self, space: &Space, region: Grid) -> Result<(), TextureError> {
+        let mut data = Vec::with_capacity(region.volume());
+        // TODO: Enable circular operation and eliminate the need for the offset of the
+        // coordinates (texture_grid.lower_bounds() and light_offset in the shader)
+        // by doing a coordinate wrap-around -- the shader and the Space will agree
+        // on coordinates modulo the texture size, and this upload will need to be broken
+        // into up to 8 pieces.
+        for z in region.z_range() {
+            for y in region.y_range() {
+                for x in region.x_range() {
+                    data.push(space.get_lighting([x, y, z]).as_texel());
+                }
+            }
+        }
+        self.texture.upload_part(
+            GenMipmaps::No,
+            (region.lower_bounds() - self.texture_grid.lower_bounds())
+                .map(|s| s as u32)
+                .into(),
+            region.unsigned_size().into(),
+            &data,
+        )
+    }
+
+    pub fn update_all(&mut self, space: &Space) -> Result<(), TextureError> {
+        self.update(space, self.texture_grid)
+    }
+
+    fn bind<'a>(
+        &'a mut self,
+        pipeline: &'a Pipeline<'a>,
+    ) -> Result<SpaceLightTextureBound<'a>, PipelineError> {
+        Ok(SpaceLightTextureBound {
+            texture: pipeline.bind_texture(&mut self.texture)?,
+            offset: -self.texture_grid.lower_bounds().to_vec(),
+        })
+    }
+}
+
+pub(crate) struct SpaceLightTextureBound<'a> {
+    pub(crate) texture: BoundTexture<'a, Dim3, NormRGBA8UI>,
+    pub(crate) offset: Vector3<GridCoordinate>,
 }
 
 #[cfg(test)]

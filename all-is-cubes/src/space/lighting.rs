@@ -103,6 +103,15 @@ impl PackedLight {
     // TODO: Expose LightStatus once we are more confident in its API stability
 
     #[inline]
+    pub(crate) fn as_texel(self) -> (u8, u8, u8, u8) {
+        let Self {
+            value: Vector3 { x, y, z },
+            status,
+        } = self;
+        (x, y, z, status as u8)
+    }
+
+    #[inline]
     fn difference_magnitude(self, other: PackedLight) -> PackedLightScalar {
         if other.status != self.status {
             // A non-opaque block changing to an opaque one, or similar, changes the
