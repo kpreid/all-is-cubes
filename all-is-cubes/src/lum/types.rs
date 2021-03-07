@@ -37,10 +37,6 @@ pub enum VertexSemantics {
     /// Interpolated texture coordinates are clamped to be ≤ this value, to avoid bleeding.
     #[sem(name = "a_clamp_max", repr = "[f32; 3]", wrapper = "VertexClampHigh")]
     ClampHigh,
-    /// Diffuse lighting intensity; typically the color or texture should be multiplied by this.
-    // TODO: look into packed repr for lighting, or switching to a 3D texture
-    #[sem(name = "a_lighting", repr = "[f32; 3]", wrapper = "VertexLighting")]
-    Lighting,
 }
 
 /// Vertex type sent to shader for rendering blocks (and, for the moment, other geometry,
@@ -54,7 +50,6 @@ pub struct LumBlockVertex {
     color_or_texture: VertexColorOrTexture,
     clamp_min: VertexClampLow,
     clamp_max: VertexClampHigh,
-    lighting: VertexLighting,
 }
 
 impl LumBlockVertex {
@@ -65,7 +60,6 @@ impl LumBlockVertex {
         color_or_texture: VertexColorOrTexture::new([0., 0., 0., 0.]),
         clamp_min: VertexClampLow::new([0., 0., 0.]),
         clamp_max: VertexClampHigh::new([0., 0., 0.]),
-        lighting: VertexLighting::new([0., 0., 0.]),
     };
 
     /// Constructor taking our natural types instead of luminance specialized types.
@@ -81,7 +75,6 @@ impl LumBlockVertex {
             color_or_texture: VertexColorOrTexture::new(color.into()),
             clamp_min: VertexClampLow::new([0., 0., 0.]),
             clamp_max: VertexClampHigh::new([0., 0., 0.]),
-            lighting: VertexLighting::new([1.0, 1.0, 1.0]),
         }
     }
 
@@ -105,7 +98,6 @@ impl LumBlockVertex {
             color_or_texture: VertexColorOrTexture::new(t.extend(-1.0).into()),
             clamp_min: VertexClampLow::new([0., 0., 0.]),
             clamp_max: VertexClampHigh::new([0., 0., 0.]),
-            lighting: VertexLighting::new([1.0, 1.0, 1.0]),
         };
         Box::new([
             v(origin, tex_origin),
@@ -135,7 +127,6 @@ impl From<BlockVertex> for LumBlockVertex {
                     color_or_texture: color_attribute,
                     clamp_min: VertexClampLow::new([0., 0., 0.]),
                     clamp_max: VertexClampHigh::new([0., 0., 0.]),
-                    lighting: VertexLighting::new([0., 0., 0.]),
                 }
             }
             Coloring::Texture {
@@ -148,7 +139,6 @@ impl From<BlockVertex> for LumBlockVertex {
                 color_or_texture: VertexColorOrTexture::new([tc[0], tc[1], tc[2], -1.0]),
                 clamp_min: VertexClampLow::new(clamp_min.into()),
                 clamp_max: VertexClampHigh::new(clamp_max.into()),
-                lighting: VertexLighting::new([0., 0., 0.]),
             },
         }
     }
@@ -157,7 +147,7 @@ impl From<BlockVertex> for LumBlockVertex {
 impl GfxVertex for LumBlockVertex {
     type Coordinate = f32;
     type BlockInst = Vector3<f32>;
-    const WANTS_LIGHT: bool = true;
+    const WANTS_LIGHT: bool = false;
 
     #[inline]
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
@@ -165,11 +155,10 @@ impl GfxVertex for LumBlockVertex {
     }
 
     #[inline]
-    fn instantiate_vertex(&mut self, cube: Self::BlockInst, lighting: PackedLight) {
+    fn instantiate_vertex(&mut self, cube: Self::BlockInst, _lighting: PackedLight) {
         self.position.repr[0] += cube.x;
         self.position.repr[1] += cube.y;
         self.position.repr[2] += cube.z;
-        self.lighting = VertexLighting::new(lighting.value().into());
     }
 
     #[inline]
@@ -219,7 +208,6 @@ mod tests {
         assert_eq!(vertex.position.repr, [1.0, 2.0, 3.0]);
         assert_eq!(vertex.normal.repr, [4.0, 5.0, 6.0]);
         assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 0.5]);
-        assert_eq!(vertex.lighting.repr, [1.0, 1.0, 1.0]);
     }
 
     /// Full path used by normal rendering.
@@ -238,6 +226,5 @@ mod tests {
         assert_eq!(vertex.position.repr, [11., 22.1, 33.]);
         assert_eq!(vertex.normal.repr, [1.0, 0.0, 0.0]);
         assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 0.5]);
-        assert_eq!(vertex.lighting.repr, [1.0, 0.0, 2.0]);
     }
 }

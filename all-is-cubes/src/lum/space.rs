@@ -24,7 +24,7 @@ use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::fmt;
 use std::rc::{Rc, Weak};
 
-use crate::camera::{Camera, GraphicsOptions, LightingOption};
+use crate::camera::{Camera, GraphicsOptions};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
@@ -116,8 +116,6 @@ impl SpaceRenderer {
             LumAtlasAllocator::new(context).expect("texture setup failure")
         });
 
-        // TODO: Once graphics options can change.
-        todo.lighting_dirties_chunks = graphics_options.lighting_display != LightingOption::None;
         let light_texture = self.light_texture.get_or_insert_with(|| {
             todo.light = None; // signal to update everything
             SpaceLightTexture::new(context, space.grid()).expect("texture setup failure")
@@ -655,9 +653,6 @@ struct SpaceRendererTodo {
     /// outside of the view area are not tracked.
     chunks: HashMap<ChunkPos, ChunkTodo>,
 
-    /// Whether chunks depend on lighting data.
-    lighting_dirties_chunks: bool,
-
     /// Blocks whose light texels should be updated.
     /// None means do a full space reupload.
     ///
@@ -721,13 +716,6 @@ impl Listener<SpaceChange> for TodoListener {
                     // None means everything
                     if let Some(set) = &mut todo.light {
                         set.insert(p);
-                    }
-
-                    // TODO: When we're actually not using vertex lighting any more, remove this
-                    if todo.lighting_dirties_chunks {
-                        todo.modify_block_and_adjacent(p, |chunk_todo| {
-                            chunk_todo.update_triangulation = true;
-                        });
                     }
                 }
                 SpaceChange::Number(index) => {
