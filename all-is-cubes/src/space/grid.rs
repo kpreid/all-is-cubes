@@ -4,7 +4,7 @@
 //! Axis-aligned integer-coordinate box volumes ([`Grid`]), arrays bounded by them
 //! ([`GridArray`]), and related.
 
-use cgmath::{Point3, Transform};
+use cgmath::{Point3, Transform, Vector3};
 use itertools::Itertools as _;
 use std::cmp::Ordering;
 use std::convert::TryFrom;
@@ -170,6 +170,19 @@ impl Grid {
     /// `self.upper_bounds() - self.lower_bounds()`.
     pub fn size(&self) -> GridVector {
         self.sizes
+    }
+
+    /// Size of the grid in each axis; equivalent to
+    /// `self.upper_bounds() - self.lower_bounds()`, except that the result is an
+    /// unsigned integer.
+    ///
+    /// Compared to [`Grid::size`], this is a convenience so that callers needing
+    /// unsigned integers do not need to write a fallible-looking conversion.
+    pub fn unsigned_size(&self) -> Vector3<u32> {
+        // Convert the i32 we know to be positive to u32.
+        // Declaring the parameter type ensures that if we ever decide to change the numeric type
+        // of `GridCoordinate`, this will fail to compile.
+        self.sizes.map(|s: i32| s as u32)
     }
 
     /// The range of X coordinates for cubes within the grid.

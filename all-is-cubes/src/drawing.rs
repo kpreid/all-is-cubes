@@ -24,7 +24,6 @@ use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::DrawTarget;
 use std::borrow::{Borrow, Cow};
-use std::convert::TryInto;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 
@@ -67,11 +66,10 @@ impl<'s, C> DrawingPlane<'s, C> {
 
     /// Common implementation for the [`DrawTarget`] size methods.
     fn size_for_eg(&self) -> Size {
-        let size = self.space.grid().size();
+        let size = self.space.grid().unsigned_size();
         Size {
-            // TODO: Surely there's a better way to write a saturating cast?
-            width: size.x.try_into().unwrap_or(u32::MAX),
-            height: size.y.try_into().unwrap_or(u32::MAX),
+            width: size.x,
+            height: size.y,
         }
     }
 }
