@@ -172,7 +172,10 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
             let light_neighborhood = if V::WANTS_LIGHT {
                 match options.lighting_display {
                     LightingOption::None => FaceMap::generate(|_| PackedLight::ONE),
-                    LightingOption::Flat => {
+                    // Note: This is not sufficient neighborhood data for smooth lighting,
+                    // but vertex lighting in general can't do smooth lighting unless we pack
+                    // the neighborhood into each vertex, which isn't currently in any plans.
+                    LightingOption::Flat | LightingOption::Smooth => {
                         FaceMap::generate(|f| space.get_lighting(cube + f.normal_vector()))
                     }
                 }

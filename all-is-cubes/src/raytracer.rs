@@ -79,7 +79,10 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                             *color,
                             match impl_fields.options.lighting_display {
                                 LightingOption::None => Rgb::ONE,
-                                LightingOption::Flat => self.get_lighting(hit.cube_behind()),
+                                // TODO: Implement actual smooth lighting in raytracer
+                                LightingOption::Flat | LightingOption::Smooth => {
+                                    self.get_lighting(hit.cube_behind())
+                                }
                             },
                             hit.face(),
                         );
@@ -87,9 +90,12 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                     TracingBlock::Recur(pixel_block_data, array) => {
                         let light_neighborhood = match impl_fields.options.lighting_display {
                             LightingOption::None => FaceMap::generate(|_| Rgb::ONE),
-                            LightingOption::Flat => FaceMap::generate(|f| {
-                                self.get_lighting(hit.cube_ahead() + f.normal_vector())
-                            }),
+                            // TODO: Implement actual smooth lighting in raytracer
+                            LightingOption::Flat | LightingOption::Smooth => {
+                                FaceMap::generate(|f| {
+                                    self.get_lighting(hit.cube_ahead() + f.normal_vector())
+                                })
+                            }
                         };
                         for subcube_hit in recursive_raycast(
                             ray,

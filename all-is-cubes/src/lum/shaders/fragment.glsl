@@ -7,7 +7,13 @@ in mediump vec4 v_color_or_texture;
 in mediump vec3 v_normal;
 in mediump vec3 v_clamp_min;
 in mediump vec3 v_clamp_max;
-in lowp vec3 v_lighting;
+
+#ifdef SMOOTH_LIGHTING
+  // Two positive unit vectors perpendicular to the normal vector.
+  in lowp vec3 v_perpendicular_1, v_perpendicular_2;
+#else
+  in lowp vec3 v_lighting;
+#endif
 
 // What fraction of the fragment color should be fog?
 in lowp float fog_mix;
@@ -56,8 +62,79 @@ lowp float fixed_directional_lighting() {
   return (1.0 - 1.0 / 16.0) + 0.25 * (max(0.0, dot(light_1_direction, normal)) + max(0.0, dot(light_2_direction, normal)));
 }
 
+bool valid_light(vec4 light) {
+  return light.a > 0.125;
+}
+
+#ifdef SMOOTH_LIGHTING
+// Compute the interpolated ('smooth') light for the surface from light_texture.
+lowp vec3 interpolated_space_light() {
+  // About half the size of the smallest permissible voxel.
+  const highp float above_surface_epsilon = 0.5 / 256.0;
+
+  // The position we should start with for texture lookup and interpolation.
+  highp vec3 origin = v_position + v_normal * above_surface_epsilon;
+
+  // Find linear interpolation coefficients based on where we are relative to
+  // a half-cube-offset grid.
+  mediump float mix_1 = mod(dot(origin, v_perpendicular_1) - 0.5, 1.0);
+  mediump float mix_2 = mod(dot(origin, v_perpendicular_2) - 0.5, 1.0);
+
+  // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on
+  lowp vec3 dir_1 = v_perpendicular_1;
+  lowp vec3 dir_2 = v_perpendicular_2;
+  if (mix_1 > 0.5) {
+    dir_1 *= -1.0;
+    mix_1 = 1.0 - mix_1;
+  }
+  if (mix_2 > 0.5) {
+    dir_2 *= -1.0;
+    mix_2 = 1.0 - mix_2;
+  }
+
+  // Modify interpolation by smoothstep to change the visual impression towards
+  // "blurred blocks" and away from the diamond-shaped gradients of linear interpolation
+  // which, being so familiar, can give an unfortunate impression of "here is 
+  // a closeup of a really low-resolution texture".
+  mix_1 = smoothstep(0.0, 1.0, mix_1);
+  mix_2 = smoothstep(0.0, 1.0, mix_2);
+
+  // Retrieve texels, again using the half-cube-offset grid (this way we won't have edge artifacts).
+  const mediump float lin_lo = -0.5;
+  const mediump float lin_hi = +0.5;
+  lowp vec4 near12    = light_texture_fetch(origin + lin_lo * dir_1 + lin_lo * dir_2);
+  lowp vec4 near1far2 = light_texture_fetch(origin + lin_lo * dir_1 + lin_hi * dir_2);
+  lowp vec4 near2far1 = light_texture_fetch(origin + lin_hi * dir_1 + lin_lo * dir_2);
+  lowp vec4 far12     = light_texture_fetch(origin + lin_hi * dir_1 + lin_hi * dir_2);
+  
+  // Perform bilinear interpolation.
+  if (!valid_light(near1far2) && !valid_light(near2far1)) {
+    // The far corner is on the other side of a diagonal wall, so should be
+    // omitted; there is only one sample to use.
+    return near12.rgb;
+  } else {
+    lowp vec4 v = mix(
+      mix(near12,    near1far2, mix_2),
+      mix(near2far1, far12,     mix_2),
+      mix_1
+    );
+    // Scale result by sum of valid texels.
+    // Because v.a went through the mix, it scales with the proportion of valid texels
+    // that were used, so it is always a smooth blend without block edge effects.
+    // However, we don't want divide-by-a-small-number effects so we cap the divisor.
+    return v.rgb / max(0.1, v.a);
+  }
+}
+#endif
+
 lowp vec3 lighting() {
-  return fixed_directional_lighting() * v_lighting;
+  lowp vec3 local_light;
+  #ifdef SMOOTH_LIGHTING
+    local_light = interpolated_space_light();
+  #else
+    local_light = v_lighting;
+  #endif
+  return fixed_directional_lighting() * local_light;
 }
 
 void main(void) {

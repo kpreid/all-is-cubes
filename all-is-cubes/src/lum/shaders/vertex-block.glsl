@@ -14,7 +14,13 @@ out mediump vec4 v_color_or_texture;
 out mediump vec3 v_clamp_min;
 out mediump vec3 v_clamp_max;
 out lowp vec3 v_normal;
-out lowp vec3 v_lighting;
+
+#ifdef SMOOTH_LIGHTING
+  // Two positive unit vectors perpendicular to the normal vector.
+  out lowp vec3 v_perpendicular_1, v_perpendicular_2;
+#else
+  out lowp vec3 v_lighting;
+#endif
 
 lowp vec3 flat_space_light() {
   mediump vec3 origin = a_cube + a_normal + vec3(0.5);
@@ -30,6 +36,20 @@ void main(void) {
   v_clamp_max = a_clamp_max;
 
   v_position_in_cube = a_position - a_cube;
-  v_lighting = flat_space_light();
+
+  #ifdef SMOOTH_LIGHTING
+    // Choose two vectors that are perpendicular to each other and the normal,
+    // and in the positive direction on that axis.
+    // Assumes v_normal is an axis-aligned unit vector.
+    if (v_normal.x != 0.0) {
+      v_perpendicular_1 = vec3(0.0, 1.0, 0.0);
+      v_perpendicular_2 = vec3(0.0, 0.0, 1.0);
+    } else {
+      v_perpendicular_1 = vec3(1.0, 0.0, 0.0);
+      v_perpendicular_2 = abs(cross(v_perpendicular_1, v_normal));
+    }
+  #else
+    v_lighting = flat_space_light();
+  #endif
 }
 

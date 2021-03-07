@@ -12,7 +12,7 @@ use luminance_front::shader::{BuiltProgram, Program, ProgramError, ProgramInterf
 use luminance_front::texture::Dim3;
 use luminance_front::Backend;
 
-use crate::camera::GraphicsOptions;
+use crate::camera::{GraphicsOptions, LightingOption};
 use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::VertexSemantics;
@@ -29,17 +29,28 @@ pub(crate) struct BlockPrograms {
 }
 
 impl BlockPrograms {
-    pub(crate) fn compile<C>(context: &mut C) -> WarningsResult<BlockPrograms, String, String>
+    pub(crate) fn compile<C>(
+        context: &mut C,
+        options: &GraphicsOptions,
+    ) -> WarningsResult<BlockPrograms, String, String>
     where
         C: GraphicsContext<Backend = Backend>,
     {
+        let mut base_defines = Vec::new();
+        if options.lighting_display == LightingOption::Smooth {
+            base_defines.push(("SMOOTH_LIGHTING", "1"));
+        }
+
         let mut warnings = Vec::new();
         let this = BlockPrograms {
-            opaque: prepare_block_program(context, [].iter().copied())
+            opaque: prepare_block_program(context, base_defines.iter().copied())
                 .move_warnings(&mut warnings)?,
             transparent: prepare_block_program(
                 context,
-                [("ALLOW_TRANSPARENCY", "1")].iter().copied(),
+                base_defines
+                    .iter()
+                    .chain([("ALLOW_TRANSPARENCY", "1")].iter())
+                    .copied(),
             )
             .move_warnings(&mut warnings)?,
         };

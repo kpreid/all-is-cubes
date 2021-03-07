@@ -62,17 +62,17 @@ where
         graphics_options: ListenableSource<GraphicsOptions>,
         viewport: Viewport,
     ) -> WarningsResult<Self, String, String> {
+        let graphics_options_dirty = DirtyFlag::new(false);
+        graphics_options.listen(graphics_options_dirty.listener());
+        let initial_options = &*graphics_options.get();
+
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
-        let (block_programs, warnings) = BlockPrograms::compile(&mut surface)?;
+        let (block_programs, warnings) = BlockPrograms::compile(&mut surface, initial_options)?;
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut surface,
             viewport.framebuffer_size.into(),
         )
         .unwrap(); // TODO error handling
-
-        let graphics_options_dirty = DirtyFlag::new(false);
-        graphics_options.listen(graphics_options_dirty.listener());
-        let initial_options = &*graphics_options.get();
 
         Ok((
             Self {
@@ -150,6 +150,7 @@ where
         let start_frame_time = Instant::now();
 
         if self.graphics_options_dirty.get_and_clear() {
+            // TODO: (asynchronously?) recompile shaders with new options
             self.world_camera
                 .set_options(self.graphics_options.snapshot());
             self.ui_camera

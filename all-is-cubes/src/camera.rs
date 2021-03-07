@@ -321,8 +321,6 @@ pub struct GraphicsOptions {
 
     /// Style in which to draw the lighting of [`Space`](crate::space::Space)s.
     /// This does not affect the *computation* of lighting.
-    ///
-    /// TODO: This option is not yet implemented.
     pub lighting_display: LightingOption,
 
     /// Number of space chunks (16³ groups of blocks) to redraw if needed, per frame.
@@ -391,9 +389,8 @@ pub enum LightingOption {
     /// Light is taken from the volume immediately above a cube face.
     /// Edges between cubes are visible.
     Flat,
-    // TODO: Implement smooth lighting.
-    // /// Light varies across surfaces.
-    // Smooth,
+    /// Light varies across surfaces.
+    Smooth,
 }
 
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.
