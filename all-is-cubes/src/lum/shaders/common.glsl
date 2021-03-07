@@ -9,6 +9,9 @@ uniform highp mat4 view_matrix;
 
 uniform lowp sampler3D block_texture;
 
+uniform lowp sampler3D light_texture;
+uniform highp ivec3 light_offset;
+
 // Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
 // TODO: Replace this uniform with a compiled-in flag since it doesn't need to be continuously changing.
 uniform lowp float fog_mode_blend;

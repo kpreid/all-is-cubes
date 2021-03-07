@@ -64,6 +64,11 @@ pub struct BlockUniformInterface {
     view_matrix: Uniform<[[f32; 4]; 4]>,
     block_texture: Uniform<TextureBinding<Dim3, NormUnsigned>>,
 
+    /// Texture containing light map.
+    light_texture: Uniform<TextureBinding<Dim3, NormUnsigned>>,
+    /// Offset applied to vertex coordinates to get light map coordinates.
+    light_offset: Uniform<[i32; 3]>,
+
     /// Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
     /// TODO: Replace this uniform with a compiled-in flag since it doesn't need to be continuously changing.
     fog_mode_blend: Uniform<f32>,
@@ -84,6 +89,13 @@ impl BlockUniformInterface {
         self.set_projection_matrix(program_iface, space.camera.projection());
         self.set_view_matrix(program_iface, space.camera.view_matrix());
         self.set_block_texture(program_iface, &space.bound_block_texture);
+
+        program_iface.set(
+            &self.light_texture,
+            space.bound_light_texture.texture.binding(),
+        );
+        program_iface.set(&self.light_offset, space.bound_light_texture.offset.into());
+
         let view_distance = space.camera.view_distance() as f32;
         let (fog_mode_blend, fog_distance) = match options.fog {
             crate::camera::FogOption::None => (0.0, f32::INFINITY),
