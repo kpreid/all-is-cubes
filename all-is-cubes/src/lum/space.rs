@@ -50,6 +50,7 @@ pub struct SpaceRenderer {
     block_versioning: Vec<u32>,
     block_version_counter: u32,
     block_texture: Option<LumAtlasAllocator>,
+    light_texture: Option<SpaceLightTexture>,
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.borrow().chunks`.
     chunks: HashMap<ChunkPos, Chunk>,
@@ -79,6 +80,7 @@ impl SpaceRenderer {
             block_versioning: Vec::new(),
             block_version_counter: 0,
             block_texture: None,
+            light_texture: None,
             chunks: HashMap::new(),
             chunk_chart: ChunkChart::new(0.0),
             chunks_were_missing: true,
@@ -102,6 +104,8 @@ impl SpaceRenderer {
         C: GraphicsContext<Backend = Backend>,
     {
         let graphics_options = camera.options();
+        let mut todo = self.todo.borrow_mut();
+
         let space = &*self
             .space
             .try_borrow()
@@ -112,12 +116,15 @@ impl SpaceRenderer {
             LumAtlasAllocator::new(context).expect("texture setup failure")
         });
 
-        let mut todo = self.todo.borrow_mut();
         // TODO: Once graphics options can change.
         todo.lighting_dirties_chunks = graphics_options.lighting_display != LightingOption::None;
+        let light_texture = self.light_texture.get_or_insert_with(|| {
+            todo.light = None; // signal to update everything
+            SpaceLightTexture::new(context, space.grid()).expect("texture setup failure")
+        });
 
-        if todo.everything {
-            todo.everything = false;
+        if todo.all_blocks_and_chunks {
+            todo.all_blocks_and_chunks = false;
             self.block_triangulations.clear();
             self.block_version_counter = self.block_version_counter.wrapping_add(1);
             // We don't need to clear self.chunks because they will automatically be considered
@@ -130,7 +137,7 @@ impl SpaceRenderer {
             // * It's the first run and we haven't prepared the blocks at all.
             // * The space somehow has zero blocks, in which case this is trivial anyway.
             // * The space signaled SpaceChange::EveryBlock.
-            todo.everything = false;
+            todo.all_blocks_and_chunks = false;
             self.block_triangulations =
                 Vec::from(triangulate_blocks(space, block_texture_allocator));
             self.block_versioning =
@@ -186,7 +193,22 @@ impl SpaceRenderer {
 
         let texture_info = block_texture_allocator
             .flush()
-            .expect("texture write failure"); // TODO: recover from this error
+            .expect("block texture write failure"); // TODO: recover from this error
+
+        // Update light texture
+        if let Some(set) = &mut todo.light {
+            // TODO: work in larger, ahem, chunks
+            for cube in set.drain() {
+                light_texture
+                    .update(space, Grid::new(cube, [1, 1, 1]))
+                    .expect("light texture write failure");
+            }
+        } else {
+            light_texture
+                .update_all(space)
+                .expect("light texture write failure");
+            todo.light = Some(HashSet::new());
+        }
 
         let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
@@ -249,6 +271,7 @@ impl SpaceRenderer {
         SpaceRendererOutput {
             sky_color: space.sky_color(),
             block_texture: &mut block_texture_allocator.texture,
+            light_texture,
             camera: camera.clone(),
             chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
             chunk_chart: &self.chunk_chart,
@@ -271,6 +294,7 @@ pub struct SpaceRendererOutput<'a> {
     pub sky_color: Rgb,
 
     block_texture: &'a mut BlockTexture,
+    light_texture: &'a mut SpaceLightTexture,
     camera: Camera,
     /// Chunks are handy wrappers around some Tesses
     chunks: &'a HashMap<ChunkPos, Chunk>,
@@ -279,13 +303,16 @@ pub struct SpaceRendererOutput<'a> {
     info: SpaceRenderInfo,
 }
 /// As [`SpaceRendererOutput`], but past the texture-binding stage of the pipeline.
+/// Note: This must be public to satisfy luminance derive macros' public requirements.
 pub struct SpaceRendererBound<'a> {
     /// Space's sky color, to be used as background color (clear color / fog).
-    pub sky_color: Rgb,
+    pub(super) sky_color: Rgb,
 
     /// Block texture to pass to the shader.
-    pub bound_block_texture: BoundBlockTexture<'a>,
-    pub camera: Camera,
+    pub(super) bound_block_texture: BoundBlockTexture<'a>,
+    /// Block texture to pass to the shader.
+    pub(super) bound_light_texture: SpaceLightTextureBound<'a>,
+    pub(super) camera: Camera,
     chunks: &'a HashMap<ChunkPos, Chunk>,
     chunk_chart: &'a ChunkChart,
     view_chunk: ChunkPos,
@@ -299,6 +326,7 @@ impl<'a> SpaceRendererOutput<'a> {
         Ok(SpaceRendererBound {
             sky_color: self.sky_color,
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
+            bound_light_texture: self.light_texture.bind(pipeline)?,
             camera: self.camera,
             chunks: self.chunks,
             chunk_chart: self.chunk_chart,
@@ -621,7 +649,7 @@ impl<'a> BlockTriangulationProvider<'a, LumBlockVertex, LumAtlasTile>
 /// [`SpaceRenderer`]'s set of things that need recomputing.
 #[derive(Debug, Default)]
 struct SpaceRendererTodo {
-    everything: bool,
+    all_blocks_and_chunks: bool,
     blocks: HashSet<BlockIndex>,
     /// Membership in this table indicates that the chunk *exists;* todos for chunks
     /// outside of the view area are not tracked.
@@ -629,6 +657,12 @@ struct SpaceRendererTodo {
 
     /// Whether chunks depend on lighting data.
     lighting_dirties_chunks: bool,
+
+    /// Blocks whose light texels should be updated.
+    /// None means do a full space reupload.
+    ///
+    /// TODO: experiment with different granularities of light invalidation (chunks, dirty rects, etc.)
+    light: Option<HashSet<GridPoint>>,
 }
 
 impl SpaceRendererTodo {
@@ -673,9 +707,10 @@ impl Listener<SpaceChange> for TodoListener {
             let mut todo = cell.borrow_mut();
             match message {
                 SpaceChange::EveryBlock => {
-                    todo.everything = true;
+                    todo.all_blocks_and_chunks = true;
                     todo.blocks.clear();
                     todo.chunks.clear();
+                    todo.light = None;
                 }
                 SpaceChange::Block(p) => {
                     todo.modify_block_and_adjacent(p, |chunk_todo| {
@@ -683,6 +718,12 @@ impl Listener<SpaceChange> for TodoListener {
                     });
                 }
                 SpaceChange::Lighting(p) => {
+                    // None means everything
+                    if let Some(set) = &mut todo.light {
+                        set.insert(p);
+                    }
+
+                    // TODO: When we're actually not using vertex lighting any more, remove this
                     if todo.lighting_dirties_chunks {
                         todo.modify_block_and_adjacent(p, |chunk_todo| {
                             chunk_todo.update_triangulation = true;
@@ -690,10 +731,14 @@ impl Listener<SpaceChange> for TodoListener {
                     }
                 }
                 SpaceChange::Number(index) => {
-                    todo.blocks.insert(index);
+                    if !todo.all_blocks_and_chunks {
+                        todo.blocks.insert(index);
+                    }
                 }
                 SpaceChange::BlockValue(index) => {
-                    todo.blocks.insert(index);
+                    if !todo.all_blocks_and_chunks {
+                        todo.blocks.insert(index);
+                    }
                 }
             }
         }
