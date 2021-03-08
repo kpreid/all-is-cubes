@@ -343,7 +343,7 @@ impl Space {
             // (It would be mostly okay to skip doing this entirely, but doing it gives
             // more determinism, and the old value could be temporarily revealed when
             // the block is removed.)
-            self.lighting[contents_index] = PackedLight::ZERO;
+            self.lighting[contents_index] = PackedLight::OPAQUE;
         }
         for &face in Face::ALL_SIX {
             let neighbor = position + face.normal_vector();

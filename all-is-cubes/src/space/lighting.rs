@@ -24,32 +24,99 @@ const SURFACE_ABSORPTION: f32 = 0.75;
 pub(crate) type PackedLightScalar = u8;
 
 /// Lighting within a [`Space`]; an [`Rgb`] value stored with reduced precision and range.
+///
+/// TODO: This now stores additional information. Rename to 'SpaceLight' or some such.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct PackedLight(Vector3<PackedLightScalar>);
+pub struct PackedLight {
+    // LightStatus being other than Visible is mutually exclusive with value being nonzero,
+    // so we could in theory make this an enum, but that wouldn't actually compact the
+    // representation, and this representation maps to 8-bit-per-component RGBA which is
+    // what the shader expects.
+    value: Vector3<PackedLightScalar>,
+    status: LightStatus,
+}
 // TODO: Once we've built out the rest of the game, do some performance testing and
 // decide whether having colored lighting is worth the compute and storage cost.
 // If memory vs. bit depth is an issue, consider switching to something like YCbCr
 // representation, or possibly something that GPUs specifically do well with.
 
+/// Special reasons for a cube having zero light in it.
+/// These may be used to help compute smoothed lighting across blocks.
+///
+/// The numeric value of this enum is used to transmit it to shaders by packing
+/// it into an "RGBA" color value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum LightStatus {
+    #[allow(unused)]
+    Uninitialized = 0,
+    /// The cube contains an opaque block and therefore does not have any light entering.
+    Opaque = 1,
+    /// The cube has no surfaces to catch light and therefore the light value is not tracked.
+    NoRays = 2,
+    /// No special situation: if it's black then it's just dark.
+    Visible = 255,
+}
+
 impl PackedLight {
     const LOG_SCALE: f32 = 16.0;
     const LOG_OFFSET: f32 = 128.0;
 
-    pub(crate) const ZERO: PackedLight = PackedLight(Vector3 { x: 0, y: 0, z: 0 });
-    pub(crate) const ONE: PackedLight = PackedLight(Vector3 {
-        x: Self::LOG_OFFSET as PackedLightScalar,
-        y: Self::LOG_OFFSET as PackedLightScalar,
-        z: Self::LOG_OFFSET as PackedLightScalar,
-    });
+    pub(crate) const OPAQUE: Self = Self::none(LightStatus::Opaque);
+    pub(crate) const NO_RAYS: Self = Self::none(LightStatus::NoRays);
+    pub(crate) const ONE: PackedLight = PackedLight {
+        status: LightStatus::Visible,
+        value: Vector3 {
+            x: Self::LOG_OFFSET as PackedLightScalar,
+            y: Self::LOG_OFFSET as PackedLightScalar,
+            z: Self::LOG_OFFSET as PackedLightScalar,
+        },
+    };
+
+    pub(crate) fn some(value: Rgb) -> Self {
+        PackedLight {
+            value: Vector3::new(
+                Self::scalar_in(value.red()),
+                Self::scalar_in(value.green()),
+                Self::scalar_in(value.blue()),
+            ),
+            status: LightStatus::Visible,
+        }
+    }
+
+    pub(crate) const fn none(status: LightStatus) -> Self {
+        PackedLight {
+            value: Vector3 { x: 0, y: 0, z: 0 },
+            status,
+        }
+    }
+
+    #[inline]
+    pub fn value(&self) -> Rgb {
+        Rgb::new_nn(
+            Self::scalar_out_nn(self.value[0]),
+            Self::scalar_out_nn(self.value[1]),
+            Self::scalar_out_nn(self.value[2]),
+        )
+    }
+
+    // TODO: Expose LightStatus once we are more confident in its API stability
 
     #[inline]
     fn difference_magnitude(self, other: PackedLight) -> PackedLightScalar {
+        if other.status != self.status {
+            // A non-opaque block changing to an opaque one, or similar, changes the
+            // results of the rest of the algorithm so should be counted as a difference
+            // (and a high-priority one) even if it's still changing zero to zero.
+            return PackedLightScalar::MAX;
+        }
+
         fn dm(a: PackedLightScalar, b: PackedLightScalar) -> PackedLightScalar {
             a.max(b) - a.min(b)
         }
-        dm(self.0[0], other.0[0])
-            .max(dm(self.0[1], other.0[1]))
-            .max(dm(self.0[2], other.0[2]))
+        dm(self.value[0], other.value[0])
+            .max(dm(self.value[1], other.value[1]))
+            .max(dm(self.value[2], other.value[2]))
     }
 
     fn scalar_in(value: impl Into<f32>) -> PackedLightScalar {
@@ -57,6 +124,8 @@ impl PackedLight {
         (value.into().log2() * Self::LOG_SCALE + Self::LOG_OFFSET) as PackedLightScalar
     }
 
+    /// Convert a `PackedLightScalar` value to a linear color component value.
+    /// This function is guaranteed (and tested) to only return finite floats.
     fn scalar_out(value: PackedLightScalar) -> f32 {
         // Special representation to ensure we don't "round" zero up to a small nonzero value.
         if value == 0 {
@@ -65,42 +134,29 @@ impl PackedLight {
             ((f32::from(value) - Self::LOG_OFFSET) / Self::LOG_SCALE).exp2()
         }
     }
+
+    fn scalar_out_nn(value: PackedLightScalar) -> NotNan<f32> {
+        unsafe {
+            // Safety: a test verifies that `scalar_out` can never return NaN.
+            NotNan::unchecked_new(Self::scalar_out(value))
+        }
+    }
 }
 
 impl fmt::Debug for PackedLight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "PackedLight({}, {}, {})", self.0.x, self.0.y, self.0.z)
+        write!(
+            f,
+            "PackedLight({}, {}, {}, {:?})",
+            self.value.x, self.value.y, self.value.z, self.status
+        )
     }
 }
 
 impl From<Rgb> for PackedLight {
     #[inline]
     fn from(value: Rgb) -> Self {
-        PackedLight(Vector3::new(
-            Self::scalar_in(value.red()),
-            Self::scalar_in(value.green()),
-            Self::scalar_in(value.blue()),
-        ))
-    }
-}
-impl From<PackedLight> for [f32; 3] {
-    #[inline]
-    fn from(value: PackedLight) -> Self {
-        [
-            PackedLight::scalar_out(value.0[0]),
-            PackedLight::scalar_out(value.0[1]),
-            PackedLight::scalar_out(value.0[2]),
-        ]
-    }
-}
-impl From<PackedLight> for Rgb {
-    #[inline]
-    fn from(value: PackedLight) -> Self {
-        Rgb::new(
-            PackedLight::scalar_out(value.0[0]),
-            PackedLight::scalar_out(value.0[1]),
-            PackedLight::scalar_out(value.0[2]),
-        )
+        PackedLight::some(value)
     }
 }
 
@@ -325,7 +381,7 @@ impl Space {
                             let surface_color = ev_hit.color.to_rgb() * SURFACE_ABSORPTION
                                 + Rgb::ONE * (1. - SURFACE_ABSORPTION);
                             let light_from_struck_face = ev_hit.attributes.light_emission
-                                + Rgb::from(stored_light) * surface_color;
+                                + stored_light.value() * surface_color;
                             incoming_light += light_from_struck_face * ray_alpha;
                             dependencies.push(light_cube);
                             cost += 10;
@@ -353,7 +409,7 @@ impl Space {
                                 // Don't read the value we're trying to recalculate.
                                 Rgb::ZERO
                             } else {
-                                self.get_lighting(light_cube).into()
+                                self.get_lighting(light_cube).value()
                             };
                             // 'coverage' is what fraction of the light ray we assume to hit this block,
                             // as opposed to passing through it.
@@ -382,7 +438,14 @@ impl Space {
         // if total_rays is zero then incoming_light is zero so the result will be zero.
         // We just need to avoid dividing by zero.
         let scale = NotNan::new(1.0 / total_rays.max(1) as f32).unwrap();
-        let new_light_value: PackedLight = (incoming_light * scale).into();
+        let new_light_value: PackedLight = if total_rays > 0 {
+            PackedLight::some(incoming_light * scale)
+        } else if ev_origin.opaque {
+            PackedLight::OPAQUE
+        } else {
+            PackedLight::NO_RAYS
+        };
+
         (
             new_light_value,
             dependencies,
@@ -460,7 +523,35 @@ impl Geometry for LightingUpdateRayInfo {
 mod tests {
     use super::*;
     use crate::space::Space;
+    use std::iter::once;
     use std::time::Duration;
+
+    fn packed_light_test_values() -> impl Iterator<Item = PackedLight> {
+        (PackedLightScalar::MIN..PackedLightScalar::MAX)
+            .flat_map(|s| {
+                vec![
+                    PackedLight {
+                        value: Vector3::new(s, 0, 0),
+                        status: LightStatus::Visible,
+                    },
+                    PackedLight {
+                        value: Vector3::new(0, s, 0),
+                        status: LightStatus::Visible,
+                    },
+                    PackedLight {
+                        value: Vector3::new(0, 0, s),
+                        status: LightStatus::Visible,
+                    },
+                    PackedLight {
+                        value: Vector3::new(s, 127, 255),
+                        status: LightStatus::Visible,
+                    },
+                ]
+                .into_iter()
+            })
+            .chain(once(PackedLight::OPAQUE))
+            .chain(once(PackedLight::NO_RAYS))
+    }
 
     /// Test that unpacking and packing doesn't shift the value, which could lead
     /// to runaway light values.
@@ -468,6 +559,15 @@ mod tests {
     fn packed_light_roundtrip() {
         for i in PackedLightScalar::MIN..PackedLightScalar::MAX {
             assert_eq!(i, PackedLight::scalar_in(PackedLight::scalar_out(i)));
+        }
+    }
+
+    /// Safety test: we want to skip the NaN checks for constructing `Rgb`
+    /// from `PackedLight`, so it had better not be NaN for any possible input.
+    #[test]
+    fn packed_light_always_finite() {
+        for i in PackedLightScalar::MIN..PackedLightScalar::MAX {
+            assert!(PackedLight::scalar_out(i).is_finite(), "{}", i);
         }
     }
 
@@ -484,6 +584,12 @@ mod tests {
         );
     }
 
+    #[test]
+    fn packed_light_is_packed() {
+        // Technically this is not guaranteed by the compiler, but if it's false something probably went wrong.
+        assert_eq!(std::mem::size_of::<PackedLight>(), 4);
+    }
+
     /// Demonstrate what range and step sizes we get out of the encoding.
     #[test]
     fn packed_light_extreme_values_out() {
@@ -497,6 +603,21 @@ mod tests {
             ],
             [0.0, 0.0040791943, 0.004259796, 234.75304, 245.14644],
         );
+    }
+
+    #[test]
+    fn packed_light_difference_vs_eq() {
+        for v1 in packed_light_test_values() {
+            for v2 in packed_light_test_values() {
+                assert_eq!(
+                    v1 == v2,
+                    v1.difference_magnitude(v2) == 0,
+                    "v1={:?} v2={:?}",
+                    v1,
+                    v2
+                );
+            }
+        }
     }
 
     #[test]
@@ -526,7 +647,7 @@ mod tests {
 
         space.set((0, 0, 0), Rgb::ONE).unwrap();
         // Not changed yet... except for the now-opaque block
-        assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::ZERO);
+        assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::OPAQUE);
         assert_eq!(space.get_lighting((1, 0, 0)), former_sky_light);
         assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light);
 
@@ -543,7 +664,7 @@ mod tests {
             }
         );
 
-        assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::ZERO); // opaque
+        assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::OPAQUE); // opaque
         assert_eq!(space.get_lighting((1, 0, 0)), new_sky_light); // updated
         assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light); // not updated
     }

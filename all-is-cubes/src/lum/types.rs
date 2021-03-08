@@ -162,7 +162,7 @@ impl GfxVertex for LumBlockVertex {
         self.position.repr[0] += offset.x;
         self.position.repr[1] += offset.y;
         self.position.repr[2] += offset.z;
-        self.lighting = VertexLighting::new(lighting.into());
+        self.lighting = VertexLighting::new(lighting.value().into());
     }
 
     #[inline]

@@ -177,7 +177,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
             impl_fields
                 .cubes
                 .get(cube)
-                .map(|b| b.lighting.into())
+                .map(|b| b.lighting.value())
                 .unwrap_or(*impl_fields.sky_color)
         })
     }
