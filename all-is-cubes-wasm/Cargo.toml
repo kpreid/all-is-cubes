@@ -21,7 +21,7 @@ crate-type = ["cdylib"]
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.2.0" }
 console_error_panic_hook = "0.1.5"
-js-sys = "0.3.47"
+js-sys = "0.3.48"
 # Note: No direct usage of instant; this enables the required feature for all-is-cubes itself.
 instant = { version = "0.1.9", features = ["wasm-bindgen"] }
 luminance = "0.43.2"
