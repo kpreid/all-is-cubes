@@ -33,7 +33,7 @@ default = ["lum"]
 lum = ["luminance", "luminance-front"]
 
 [dependencies]
-bitvec = "0.20.1"
+bitvec = "0.21.1"
 bytemuck = "1.5.0"
 cgmath = "0.18.0"
 embedded-graphics = "0.6.2"
