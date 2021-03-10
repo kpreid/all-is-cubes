@@ -197,6 +197,16 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         )?; // TODO: on failure, place an error marker and continue
     }
 
+    if false {
+        // A visual test of logo_text_extent().
+        // TODO: Transplant this to an automated test.
+        space.fill_uniform(
+            crate::content::logo_text_extent()
+                .transform(GridMatrix::from_translation([0, 12, -radius_xz]))
+                .unwrap(),
+            crate::block::Block::from(Rgb::ONE),
+        )?;
+    }
     logo_text(
         GridMatrix::from_translation([0, 12, -radius_xz]),
         &mut space,
