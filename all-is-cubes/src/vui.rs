@@ -9,7 +9,7 @@
 use cgmath::{Angle as _, Deg, EuclideanSpace as _, Matrix4, Vector2, Vector3};
 use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
-use embedded_graphics::prelude::{Drawable, Font, Pixel, Primitive, Transform as _};
+use embedded_graphics::prelude::{Dimensions as _, Drawable, Pixel, Primitive, Transform as _};
 use embedded_graphics::primitives::{Circle, Line, Rectangle, Triangle};
 use embedded_graphics::style::{PrimitiveStyleBuilder, TextStyleBuilder};
 use ordered_float::NotNan;
@@ -349,16 +349,13 @@ impl HudLayout {
         let grid = toolbar_text_space.grid();
         toolbar_text_space.fill_uniform(grid, &AIR).unwrap();
 
-        let text_width =
-            text.len() as GridCoordinate * Font8x16::CHARACTER_SIZE.width as GridCoordinate;
-        let text_start_x = (grid.size().x - text_width) / 2;
-
-        Text::new(&text, Point::new(text_start_x, -16))
-            .into_styled(
-                TextStyleBuilder::new(Font8x16)
-                    .text_color(&hud_blocks.text)
-                    .build(),
-            )
+        let text_obj = Text::new(&text, Point::new(grid.size().x / 2, -16)).into_styled(
+            TextStyleBuilder::new(Font8x16)
+                .text_color(&hud_blocks.text)
+                .build(),
+        );
+        text_obj
+            .translate(Point::new(-((text_obj.size().width / 2) as i32), 0))
             .draw(&mut toolbar_text_space.draw_target(GridMatrix::FLIP_Y))?;
 
         Ok(())
