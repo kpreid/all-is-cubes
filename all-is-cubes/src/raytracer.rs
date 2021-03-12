@@ -21,7 +21,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 
 use crate::block::{evaluated_block_resolution, recursive_raycast, Evoxel};
-use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
+use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, LightingOption, Viewport};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
@@ -77,14 +77,20 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         s.trace_through_surface(
                             pixel_block_data,
                             *color,
-                            self.get_lighting(hit.cube_behind()),
+                            match impl_fields.options.lighting_display {
+                                LightingOption::None => Rgb::ONE,
+                                LightingOption::Flat => self.get_lighting(hit.cube_behind()),
+                            },
                             hit.face(),
                         );
                     }
                     TracingBlock::Recur(pixel_block_data, array) => {
-                        let light_neighborhood = FaceMap::generate(|f| {
-                            self.get_lighting(hit.cube_ahead() + f.normal_vector())
-                        });
+                        let light_neighborhood = match impl_fields.options.lighting_display {
+                            LightingOption::None => FaceMap::generate(|_| Rgb::ONE),
+                            LightingOption::Flat => FaceMap::generate(|f| {
+                                self.get_lighting(hit.cube_ahead() + f.normal_vector())
+                            }),
+                        };
                         for subcube_hit in recursive_raycast(
                             ray,
                             hit.cube_ahead(),
