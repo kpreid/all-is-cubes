@@ -7,8 +7,9 @@ use std::convert::TryInto;
 use std::fmt::Debug;
 use std::ops::Range;
 
+use crate::camera::{GraphicsOptions, LightingOption};
 use crate::math::{Face, FaceMap, GridCoordinate, GridRotation};
-use crate::space::{BlockIndex, Grid, Space};
+use crate::space::{BlockIndex, Grid, PackedLight, Space};
 use crate::triangulator::{BlockTriangulation, GfxVertex};
 
 /// Computes a triangle mesh of a [`Space`].
@@ -19,6 +20,7 @@ use crate::triangulator::{BlockTriangulation, GfxVertex};
 pub fn triangulate_space<'p, V, T, P>(
     space: &Space,
     bounds: Grid,
+    options: &GraphicsOptions,
     block_triangulations: P,
 ) -> SpaceTriangulation<V>
 where
@@ -27,7 +29,7 @@ where
     T: 'p,
 {
     let mut this = SpaceTriangulation::new();
-    this.compute(space, bounds, block_triangulations);
+    this.compute(space, bounds, options, block_triangulations);
     this
 }
 
@@ -136,8 +138,13 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
     /// same as the meshes and thus producing a rendering with gaps in it).
     ///
     /// [`triangulate_blocks`]: super::triangulate_blocks
-    pub fn compute<'p, T, P>(&mut self, space: &Space, bounds: Grid, mut block_triangulations: P)
-    where
+    pub fn compute<'p, T, P>(
+        &mut self,
+        space: &Space,
+        bounds: Grid,
+        options: &GraphicsOptions,
+        mut block_triangulations: P,
+    ) where
         P: BlockTriangulationProvider<'p, V, T>,
         V: 'p,
         T: 'p,
@@ -161,8 +168,12 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 .unwrap_or(&empty_render);
             let low_corner = cube.cast::<V::Coordinate>().unwrap();
 
-            let light_neighborhood =
-                FaceMap::generate(|f| space.get_lighting(cube + f.normal_vector()));
+            let light_neighborhood = match options.lighting_display {
+                LightingOption::None => FaceMap::generate(|_| PackedLight::ONE),
+                LightingOption::Flat => {
+                    FaceMap::generate(|f| space.get_lighting(cube + f.normal_vector()))
+                }
+            };
 
             for &face in Face::ALL_SEVEN {
                 let adjacent_cube = cube + face.normal_vector();

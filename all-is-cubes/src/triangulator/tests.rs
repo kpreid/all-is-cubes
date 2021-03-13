@@ -8,6 +8,7 @@ use cgmath::{MetricSpace as _, Point3, Vector3};
 
 use super::*;
 use crate::block::{Block, BlockAttributes, Resolution, AIR};
+use crate::camera::GraphicsOptions;
 use crate::content::make_some_blocks;
 use crate::math::{Face, GridRotation};
 use crate::math::{Face::*, FaceMap, FreeCoordinate, GridPoint, Rgba};
@@ -57,8 +58,12 @@ fn triangulate_blocks_and_space(
 ) {
     let mut tex = TestTextureAllocator::new(texture_resolution);
     let block_triangulations = triangulate_blocks(space, &mut tex);
-    let space_triangulation: SpaceTriangulation<BlockVertex> =
-        triangulate_space(space, space.grid(), &*block_triangulations);
+    let space_triangulation: SpaceTriangulation<BlockVertex> = triangulate_space(
+        space,
+        space.grid(),
+        &GraphicsOptions::default(),
+        &*block_triangulations,
+    );
     (tex, block_triangulations, space_triangulation)
 }
 
@@ -108,7 +113,12 @@ fn no_panic_on_missing_blocks() {
 
     // This should not panic; visual glitches are preferable to failure.
     space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
-    triangulate_space(&space, space.grid(), &*block_triangulations);
+    triangulate_space(
+        &space,
+        space.grid(),
+        &GraphicsOptions::default(),
+        &*block_triangulations,
+    );
 }
 
 /// Construct a 1x1 recursive block and test that this is equivalent in geometry

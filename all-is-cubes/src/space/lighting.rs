@@ -36,6 +36,11 @@ impl PackedLight {
     const LOG_OFFSET: f32 = 128.0;
 
     pub(crate) const ZERO: PackedLight = PackedLight(Vector3 { x: 0, y: 0, z: 0 });
+    pub(crate) const ONE: PackedLight = PackedLight(Vector3 {
+        x: Self::LOG_OFFSET as PackedLightScalar,
+        y: Self::LOG_OFFSET as PackedLightScalar,
+        z: Self::LOG_OFFSET as PackedLightScalar,
+    });
 
     #[inline]
     fn difference_magnitude(self, other: PackedLight) -> PackedLightScalar {

@@ -1,6 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use all_is_cubes::camera::GraphicsOptions;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::AIR;
@@ -13,11 +14,13 @@ use all_is_cubes::triangulator::{
 };
 
 pub fn triangulator_bench(c: &mut Criterion) {
+    let options = GraphicsOptions::default();
+
     c.bench_function("triangulate_space: checkerboard, new buffer", |b| {
         b.iter_batched(
             checkerboard_setup,
             |(space, block_triangulations)| {
-                triangulate_space(&space, space.grid(), &*block_triangulations)
+                triangulate_space(&space, space.grid(), &options, &*block_triangulations)
             },
             BatchSize::SmallInput,
         );
@@ -28,7 +31,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
             || {
                 let (space, block_triangulations) = checkerboard_setup();
                 let mut buffer = SpaceTriangulation::new();
-                buffer.compute(&space, space.grid(), &*block_triangulations);
+                buffer.compute(&space, space.grid(), &options, &*block_triangulations);
                 // Sanity check that we're actually rendering as much as we expect.
                 assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
                 (space, block_triangulations, buffer)
@@ -39,7 +42,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
                 // and so this will become a meaningful benchmark of how much CPU time we're
                 // spending or saving on that.
-                buffer.compute(&space, space.grid(), &*block_triangulations)
+                buffer.compute(&space, space.grid(), &options, &*block_triangulations)
             },
             BatchSize::SmallInput,
         );

@@ -22,7 +22,7 @@ use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::fmt;
 use std::rc::{Rc, Weak};
 
-use crate::camera::Camera;
+use crate::camera::{Camera, GraphicsOptions, LightingOption};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
@@ -99,6 +99,7 @@ impl SpaceRenderer {
     where
         C: GraphicsContext<Backend = Backend>,
     {
+        let graphics_options = camera.options();
         let space = &*self
             .space
             .try_borrow()
@@ -110,6 +111,8 @@ impl SpaceRenderer {
         });
 
         let mut todo = self.todo.borrow_mut();
+        // TODO: Once graphics options can change.
+        todo.lighting_dirties_chunks = graphics_options.lighting_display != LightingOption::None;
 
         if todo.everything {
             todo.everything = false;
@@ -198,7 +201,7 @@ impl SpaceRenderer {
             }
 
             // TODO: tune max update count dynamically?
-            if chunk_update_count >= camera.options().chunks_per_frame.into() {
+            if chunk_update_count >= graphics_options.chunks_per_frame.into() {
                 break;
             }
 
@@ -226,6 +229,7 @@ impl SpaceRenderer {
                         context,
                         todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
                         &space,
+                        graphics_options,
                         &self.block_triangulations,
                         &self.block_versioning,
                     );
@@ -454,6 +458,7 @@ impl Chunk {
         context: &mut C,
         chunk_todo: &mut ChunkTodo,
         space: &Space,
+        options: &GraphicsOptions,
         block_triangulations: &[BlockTriangulation<LumBlockVertex, LumAtlasTile>],
         block_versioning: &[u32],
     ) {
@@ -462,7 +467,7 @@ impl Chunk {
         let old_indices_len = self.triangulation.indices().len();
 
         self.triangulation
-            .compute(space, self.bounds, &mut block_provider);
+            .compute(space, self.bounds, options, &mut block_provider);
 
         // Stash all the texture tiles so they aren't deallocated out from under us.
         // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
@@ -619,6 +624,9 @@ struct SpaceRendererTodo {
     /// Membership in this table indicates that the chunk *exists;* todos for chunks
     /// outside of the view area are not tracked.
     chunks: HashMap<ChunkPos, ChunkTodo>,
+
+    /// Whether chunks depend on lighting data.
+    lighting_dirties_chunks: bool,
 }
 
 impl SpaceRendererTodo {
@@ -673,9 +681,11 @@ impl Listener<SpaceChange> for TodoListener {
                     });
                 }
                 SpaceChange::Lighting(p) => {
-                    todo.modify_block_and_adjacent(p, |chunk_todo| {
-                        chunk_todo.update_triangulation = true;
-                    });
+                    if todo.lighting_dirties_chunks {
+                        todo.modify_block_and_adjacent(p, |chunk_todo| {
+                            chunk_todo.update_triangulation = true;
+                        });
+                    }
                 }
                 SpaceChange::Number(index) => {
                     todo.blocks.insert(index);
