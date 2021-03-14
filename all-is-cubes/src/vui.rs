@@ -162,10 +162,9 @@ impl Vui {
         self.hud_space.borrow_mut().set(
             HudLayout::default().crosshair_position(),
             if visible {
-                // TODO: This is horrible; we need a better way to pass along borrowed blocks
-                Cow::Borrowed(&*self.hud_blocks.icons[Icons::Crosshair])
+                &self.hud_blocks.icons[Icons::Crosshair]
             } else {
-                Cow::Borrowed(&AIR)
+                &AIR
             },
         )?;
         Ok(())

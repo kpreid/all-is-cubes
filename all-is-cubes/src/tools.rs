@@ -278,7 +278,10 @@ mod tests {
     #[test]
     fn icon_none() {
         let dummy_icons = dummy_icons();
-        assert_eq!(Tool::None.icon(&dummy_icons), dummy_icons[Icons::EmptySlot]);
+        assert_eq!(
+            &*Tool::None.icon(&dummy_icons),
+            &dummy_icons[Icons::EmptySlot]
+        );
     }
 
     #[test]
@@ -299,8 +302,8 @@ mod tests {
     fn icon_activate() {
         let dummy_icons = dummy_icons();
         assert_eq!(
-            Tool::Activate.icon(&dummy_icons),
-            dummy_icons[Icons::Activate]
+            &*Tool::Activate.icon(&dummy_icons),
+            &dummy_icons[Icons::Activate]
         );
     }
 
@@ -325,8 +328,8 @@ mod tests {
     fn icon_delete_block() {
         let dummy_icons = dummy_icons();
         assert_eq!(
-            Tool::DeleteBlock.icon(&dummy_icons),
-            dummy_icons[Icons::Delete]
+            &*Tool::DeleteBlock.icon(&dummy_icons),
+            &dummy_icons[Icons::Delete]
         );
     }
 

@@ -2,7 +2,6 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use noise::Seedable as _;
-use std::borrow::Cow;
 
 use crate::block::{Block, Resolution};
 use crate::content::blocks::scale_color;
@@ -34,13 +33,12 @@ impl BlockModule for LandscapeBlocks {
 
 /// Provides a bland instance of [`LandscapeBlocks`] with single color blocks.
 impl DefaultProvision for LandscapeBlocks {
-    fn default(self) -> Cow<'static, Block> {
-        fn color_and_name(color: Rgb, name: &'static str) -> Cow<'static, Block> {
+    fn default(self) -> Block {
+        fn color_and_name(color: Rgb, name: &'static str) -> Block {
             Block::builder()
                 .display_name(name)
                 .color(color.with_alpha_one())
                 .build()
-                .into()
         }
 
         use LandscapeBlocks::*;
@@ -87,7 +85,7 @@ pub fn install_landscape_blocks(
                         .attributes,
                 )
                 .voxels_fn(universe, resolution, |cube| {
-                    scale_color((*colors[Stone]).clone(), stone_noise.at_grid(cube), 0.02)
+                    scale_color(colors[Stone].clone(), stone_noise.at_grid(cube), 0.02)
                 })?
                 .build(),
 
@@ -100,9 +98,9 @@ pub fn install_landscape_blocks(
                 )
                 .voxels_fn(universe, resolution, |cube| {
                     if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
-                        scale_color((*colors[Grass]).clone(), dirt_noise.at_grid(cube), 0.02)
+                        scale_color(colors[Grass].clone(), dirt_noise.at_grid(cube), 0.02)
                     } else {
-                        scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
+                        scale_color(colors[Dirt].clone(), dirt_noise.at_grid(cube), 0.02)
                     }
                 })?
                 .build(),
@@ -115,13 +113,13 @@ pub fn install_landscape_blocks(
                         .attributes,
                 )
                 .voxels_fn(universe, resolution, |cube| {
-                    scale_color((*colors[Dirt]).clone(), dirt_noise.at_grid(cube), 0.02)
+                    scale_color(colors[Dirt].clone(), dirt_noise.at_grid(cube), 0.02)
                 })?
                 .build(),
 
-            Trunk => (*colors[Trunk]).clone(),
+            Trunk => colors[Trunk].clone(),
 
-            Leaves => (*colors[Leaves]).clone(),
+            Leaves => colors[Leaves].clone(),
         })
     })?
     .install(universe)?;

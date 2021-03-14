@@ -48,10 +48,10 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
 
     // Prepare brushes.
     let lamp_brush = VoxelBrush::new(vec![
-        ((0, 0, 0), &*demo_blocks[Lamppost]),
-        ((0, 1, 0), &*demo_blocks[Lamppost]),
-        ((0, 2, 0), &*demo_blocks[Lamppost]),
-        ((0, 3, 0), &*demo_blocks[Lamp]),
+        ((0, 0, 0), &demo_blocks[Lamppost]),
+        ((0, 1, 0), &demo_blocks[Lamppost]),
+        ((0, 2, 0), &demo_blocks[Lamppost]),
+        ((0, 3, 0), &demo_blocks[Lamp]),
     ]);
 
     // Construct space.
@@ -64,12 +64,12 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         (grid.center() + Vector3::new(0.5, 2.91, 8.5)).map(|s| NotNan::new(s).unwrap());
     spawn.flying = false;
     // Initial inventory contents. TODO: Make a better list.
-    for block in LandscapeBlocks::iter().map(|key| (&*landscape_blocks[key]).clone()) {
+    for block in LandscapeBlocks::iter().map(|key| landscape_blocks[key].clone()) {
         spawn.inventory.push(Tool::PlaceBlock(block));
     }
     spawn
         .inventory
-        .push(Tool::PlaceBlock((&*demo_blocks[Lamp]).clone()));
+        .push(Tool::PlaceBlock(demo_blocks[Lamp].clone()));
 
     // Fill in flat ground
     space.fill_uniform(
@@ -77,11 +77,11 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             (-radius_xz, -ground_depth, -radius_xz),
             (radius_xz, 0, radius_xz),
         ),
-        &*landscape_blocks[LandscapeBlocks::Stone],
+        &landscape_blocks[LandscapeBlocks::Stone],
     )?;
     space.fill_uniform(
         Grid::from_lower_upper((-radius_xz, 0, -radius_xz), (radius_xz, 1, radius_xz)),
-        &*landscape_blocks[LandscapeBlocks::Grass],
+        &landscape_blocks[LandscapeBlocks::Grass],
     )?;
 
     // Roads and lamps
@@ -94,19 +94,17 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         for (i, step) in raycaster.enumerate() {
             let i = i as GridCoordinate;
             for p in -road_radius..=road_radius {
-                space.set(step.cube_ahead() + perpendicular * p, &*demo_blocks[Road])?;
+                space.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
             }
             if i > road_radius {
                 // Curbs
                 for (side, &p) in [-(road_radius + 1), road_radius + 1].iter().enumerate() {
                     // TODO: should be able to express this in look-at terms.
-                    let mut curb = (*demo_blocks[Curb])
-                        .clone()
-                        .rotate(GridRotation::from_basis([
-                            face.cross(Face::PY),
-                            Face::PY,
-                            face,
-                        ]));
+                    let mut curb = demo_blocks[Curb].clone().rotate(GridRotation::from_basis([
+                        face.cross(Face::PY),
+                        Face::PY,
+                        face,
+                    ]));
                     if side == 0 {
                         curb =
                             curb.rotate(GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]));
@@ -129,7 +127,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         for &p in &[-(road_radius + 1), road_radius + 1] {
             space.set(
                 GridPoint::origin() + curb_y + forward * (road_radius + 1) + perpendicular * p,
-                &*demo_blocks[CurbCorner],
+                &demo_blocks[CurbCorner],
             )?;
         }
     }
@@ -169,7 +167,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             plot.lower_bounds().map(|x| x - 1),
             [plot.upper_bounds().x + 1, 1, plot.upper_bounds().z + 1],
         );
-        space.fill_uniform(enclosure, &*landscape_blocks[LandscapeBlocks::Stone])?;
+        space.fill_uniform(enclosure, &landscape_blocks[LandscapeBlocks::Stone])?;
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
 

@@ -11,7 +11,6 @@
 //! by becoming aware of dependencies between “modules”. For now, it's just enough to
 //! solve bootstrapping needs.
 
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Display;
@@ -29,7 +28,7 @@ fn name_in_module<E: BlockModule>(key: &E) -> Name {
 
 // TODO: document
 pub trait DefaultProvision {
-    fn default(self) -> Cow<'static, Block>;
+    fn default(self) -> Block;
 }
 
 // TODO: consider replacing Display (presumed derived by strum) with a special trait
@@ -41,7 +40,7 @@ pub trait BlockModule: Display + IntoEnumIterator + Eq + Hash + Clone {
 pub struct BlockProvider<E> {
     /// Guaranteed to contain an entry for every variant of `E` if `E`'s
     /// `strum::IntoEnumIterator` implementation is accurate.
-    map: HashMap<E, Cow<'static, Block>>,
+    map: HashMap<E, Block>,
 }
 
 impl<E> Default for BlockProvider<E>
@@ -68,11 +67,11 @@ where
     pub fn new<F, B>(mut definer: F) -> Result<Self, GenError>
     where
         F: FnMut(E) -> Result<B, InGenError>,
-        B: Into<Cow<'static, Block>>,
+        B: Into<Block>,
     {
         let mut map = HashMap::new();
         for key in E::iter() {
-            let block: Cow<'static, Block> = definer(key.clone())
+            let block: Block = definer(key.clone())
                 .map_err(|e| GenError::failure(e, name_in_module(&key)))?
                 .into();
             map.insert(key, block);
@@ -83,10 +82,7 @@ where
     pub fn install(&self, universe: &mut Universe) -> Result<BlockProvider<E>, InsertError> {
         for key in E::iter() {
             // TODO: the &* mess should not be required
-            universe.insert(
-                name_in_module(&key),
-                BlockDef::new(self[key].clone().into_owned()),
-            )?;
+            universe.insert(name_in_module(&key), BlockDef::new(self[key].clone()))?;
         }
         Ok(Self::using(universe).expect("failed to retrieve names we just inserted??"))
     }
@@ -113,7 +109,7 @@ where
         Ok(BlockProvider {
             map: E::iter()
                 .map(|key| {
-                    let block = Cow::Owned(Block::Indirect(found.remove(&key).unwrap()));
+                    let block = Block::Indirect(found.remove(&key).unwrap());
                     (key, block)
                 })
                 .collect(),
@@ -122,7 +118,7 @@ where
 }
 
 impl<E: Eq + Hash> Index<E> for BlockProvider<E> {
-    type Output = Cow<'static, Block>;
+    type Output = Block;
 
     fn index(&self, index: E) -> &Self::Output {
         &self.map[&index]
