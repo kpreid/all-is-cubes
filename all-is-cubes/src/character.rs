@@ -157,13 +157,6 @@ impl Character {
         }
     }
 
-    /// Adds an item to the inventory. TODO: Quick kludge and we should find a better strategy for inventory mutations.
-    pub(crate) fn try_add_item(&mut self, item: Tool) -> Result<(), Tool> {
-        self.inventory.try_add_item(item)?;
-        self.notifier.notify(CharacterChange::Inventory);
-        Ok(())
-    }
-
     /// Advances time.
     ///
     /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).

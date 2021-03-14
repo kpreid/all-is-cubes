@@ -106,25 +106,24 @@ where
 
     let space_name1: Name = "space".into();
     let space_name2 = space_name1.clone();
-    let space: Space = space_fn(&mut universe).map_err(|e| GenError::failure(e, space_name1))?;
-    let space_ref = universe.insert(space_name2, space)?;
+    let mut space: Space =
+        space_fn(&mut universe).map_err(|e| GenError::failure(e, space_name1))?;
 
-    let mut character = Character::spawn_default(space_ref);
-    // Copy all named block defs into inventory.
+    // Copy all named block defs into initial inventory.
     let mut items: Vec<(Name, URef<BlockDef>)> = universe
         .iter_by_type()
         .filter(|(name, _)| !matches!(name, Name::Anonym(_)))
         .collect();
     items.sort_by(|(a, _), (b, _)| a.cmp(&b));
     for (_, block_def_ref) in items {
-        match character.try_add_item(Tool::PlaceBlock(Block::Indirect(block_def_ref))) {
-            Ok(()) => {}
-            Err(_) => {
-                // Out of space
-                break;
-            }
-        }
+        let item = Tool::PlaceBlock(Block::Indirect(block_def_ref));
+        space.spawn_mut().inventory.push(item);
     }
+    let space_ref = universe.insert(space_name2, space)?;
+
+    // TODO: "character" is a special default name used for finding the character the
+    // player actually uses, and we should replace that or handle it more formally.
+    let character = Character::spawn_default(space_ref);
     universe.insert("character".into(), character)?;
 
     Ok(universe)
