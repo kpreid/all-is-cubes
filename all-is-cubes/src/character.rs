@@ -87,6 +87,23 @@ impl Character {
     /// Constructs a [`Character`] within/looking at the given `space`
     /// with the initial state specified by `spawn`.
     pub fn spawn(spawn: &Spawn, space: URef<Space>) -> Self {
+        // TODO: special inventory slots should be set up some other way.
+        // The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
+        // And we shouldn't have special slots anyway.
+        let mut inventory = vec![Tool::None; 12];
+        inventory[10] = Tool::DeleteBlock;
+        inventory[11] = Tool::CopyFromSpace;
+        let mut free = 0;
+        'fill: for item in spawn.inventory.iter() {
+            while inventory[free] != Tool::None {
+                free += 1;
+                if free >= inventory.len() {
+                    break 'fill;
+                }
+            }
+            inventory[free] = item.clone();
+        }
+
         Self {
             body: Body {
                 flying: spawn.flying,
@@ -99,22 +116,7 @@ impl Character {
             auto_rotate: false,
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
-            inventory: Inventory::from_items(vec![
-                // TODO: special inventory slots should be set up some other way.
-                // The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
-                Tool::None,
-                Tool::None,
-                Tool::None,
-                Tool::None,
-                Tool::None,
-                Tool::None,
-                Tool::None,
-                Tool::None,
-                Tool::None,
-                Tool::None,
-                Tool::DeleteBlock,
-                Tool::CopyFromSpace,
-            ]),
+            inventory: Inventory::from_items(inventory),
             selected_slots: [10, 1, 11],
             notifier: Notifier::new(),
         }
@@ -347,6 +349,8 @@ pub struct Spawn {
     pub position: Point3<NotNan<FreeCoordinate>>,
 
     pub flying: bool,
+
+    pub inventory: Vec<Tool>,
 }
 
 impl Spawn {
@@ -354,6 +358,7 @@ impl Spawn {
         Spawn {
             position: Point3::origin(), // TODO: pick something better? For what criteria?
             flying: true,
+            inventory: vec![],
         }
     }
 
@@ -377,5 +382,26 @@ impl Spawn {
 
 #[cfg(test)]
 mod tests {
-    // TODO: tests
+    use super::*;
+    use crate::universe::Universe;
+
+    #[test]
+    fn spawn_inventory() {
+        let inventory_data = vec![Tool::PlaceBlock(Block::from(rgb_const!(0.1, 0.2, 0.3)))];
+
+        let mut universe = Universe::new();
+        let space = Space::empty_positive(1, 1, 1);
+        let spawn = Spawn {
+            inventory: inventory_data.clone(),
+            ..Spawn::default_for_new_space(space.grid())
+        };
+        let space = universe.insert_anonymous(space);
+        let character = Character::spawn(&spawn, space);
+
+        assert_eq!(character.inventory.slots[0], inventory_data[0]);
+        assert_eq!(character.inventory.slots[1], Tool::None);
+        // TODO: Either test the special slot contents or eliminate that mechanism
+    }
+
+    // TODO: more tests
 }
