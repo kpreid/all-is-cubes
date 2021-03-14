@@ -23,5 +23,5 @@ test = false # any testable code will be in lib
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.2.0", features = ["rayon"] }
 static_dir = "0.1.3"
-tokio = { version = "0.2.22", features = ["macros"] }
+tokio = { version = "1.3.0", features = ["macros"] }
 warp = "0.2.5"
