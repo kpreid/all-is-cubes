@@ -10,6 +10,7 @@ use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
 use ordered_float::NotNan;
+use strum::IntoEnumIterator;
 
 use crate::block::{BlockAttributes, BlockCollision, AIR};
 use crate::content::{logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS};
@@ -21,6 +22,7 @@ use crate::math::{
 };
 use crate::raycast::Raycaster;
 use crate::space::{Grid, SetCubeError, Space};
+use crate::tools::Tool;
 use crate::universe::Universe;
 
 pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
@@ -55,9 +57,19 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     // Construct space.
     let mut space = Space::empty(grid);
     space.set_sky_color(Rgb::new(0.9, 0.9, 1.4));
-    space.spawn_mut().position =
+
+    // Spawn
+    let spawn = space.spawn_mut();
+    spawn.position =
         (grid.center() + Vector3::new(0.5, 2.91, 8.5)).map(|s| NotNan::new(s).unwrap());
-    space.spawn_mut().flying = false;
+    spawn.flying = false;
+    // Initial inventory contents. TODO: Make a better list.
+    for block in LandscapeBlocks::iter().map(|key| (&*landscape_blocks[key]).clone()) {
+        spawn.inventory.push(Tool::PlaceBlock(block));
+    }
+    spawn
+        .inventory
+        .push(Tool::PlaceBlock((&*demo_blocks[Lamp]).clone()));
 
     // Fill in flat ground
     space.fill_uniform(

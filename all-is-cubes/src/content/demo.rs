@@ -6,14 +6,13 @@
 use cgmath::Point3;
 use ordered_float::NotNan;
 
-use crate::block::{Block, BlockDef};
+use crate::block::Block;
 use crate::character::Character;
 use crate::content::{demo_city, install_demo_blocks};
 use crate::linking::{GenError, InGenError};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, Space};
-use crate::tools::Tool;
-use crate::universe::{Name, URef, Universe, UniverseIndex};
+use crate::universe::{Name, Universe, UniverseIndex};
 
 /// Selection of initial content for constructing a new [`Universe`].
 //
@@ -106,25 +105,12 @@ where
 
     let space_name1: Name = "space".into();
     let space_name2 = space_name1.clone();
-    let mut space: Space =
-        space_fn(&mut universe).map_err(|e| GenError::failure(e, space_name1))?;
-
-    // Copy all named block defs into initial inventory.
-    let mut items: Vec<(Name, URef<BlockDef>)> = universe
-        .iter_by_type()
-        .filter(|(name, _)| !matches!(name, Name::Anonym(_)))
-        .collect();
-    items.sort_by(|(a, _), (b, _)| a.cmp(&b));
-    for (_, block_def_ref) in items {
-        let item = Tool::PlaceBlock(Block::Indirect(block_def_ref));
-        space.spawn_mut().inventory.push(item);
-    }
+    let space: Space = space_fn(&mut universe).map_err(|e| GenError::failure(e, space_name1))?;
     let space_ref = universe.insert(space_name2, space)?;
 
     // TODO: "character" is a special default name used for finding the character the
     // player actually uses, and we should replace that or handle it more formally.
-    let character = Character::spawn_default(space_ref);
-    universe.insert("character".into(), character)?;
+    universe.insert("character".into(), Character::spawn_default(space_ref))?;
 
     Ok(universe)
 }
