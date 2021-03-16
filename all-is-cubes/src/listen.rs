@@ -459,9 +459,14 @@ impl<T: Clone + Sync> ListenableSource<T> {
     }
 
     /// Returns a reference to the current value of the cell.
-    // TODO: Consider storing a 'local' copy of the Rc so we can borrow it rather than cloning it every time?
+    // TODO: Consider storing a 'local' copy of the Rc so we can borrow it rather than cloning the Rc every time?
     pub fn get(&self) -> Rc<T> {
         self.storage.cell.borrow().clone()
+    }
+
+    /// Returns a clone of the current value of the cell.
+    pub fn snapshot(&self) -> T {
+        (**self.storage.cell.borrow()).clone()
     }
 
     /// Subscribes to change notifications.
