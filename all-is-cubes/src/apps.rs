@@ -418,10 +418,6 @@ impl InputProcessor {
         character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
         character.body.pitch = (character.body.pitch + turning.y).min(90.0).max(-90.0);
 
-        if movement != Vector3::zero() || turning != Vector2::zero() {
-            character.auto_rotate = false;
-        }
-
         if self.keys_held.contains(&Key::Character(' ')) {
             character.jump_if_able();
         }

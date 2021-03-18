@@ -18,6 +18,7 @@ use std::time::Duration;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
+use crate::transactions::Transaction as _;
 use crate::util::{CustomFormat, StatusText, TypeName};
 
 /// Name/key of an object in a [`Universe`].
@@ -85,11 +86,23 @@ impl Universe {
                 .expect("space borrowed during universe.step()")
                 .step(timestep);
         }
+
+        let mut transactions = Vec::new();
         for character in self.characters.values() {
-            let _info = character
+            // TODO: Make URootRef::downgrade() non-allocating
+            let transaction = character
                 .try_borrow_mut()
                 .expect("character borrowed during universe.step()")
-                .step(timestep);
+                .step(Some(&character.downgrade()), timestep);
+            transactions.push(transaction)
+        }
+        // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
+        for t in transactions {
+            if let Err(e) = t.execute(self) {
+                // TODO: Need to report these failures back to the source
+                // ... and perhaps in the UniverseStepInfo
+                eprintln!("Transaction failure: {}", e);
+            }
         }
 
         info.computation_time = Instant::now().duration_since(start_time);

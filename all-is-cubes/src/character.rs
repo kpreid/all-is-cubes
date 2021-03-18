@@ -11,6 +11,7 @@ use std::error::Error;
 use std::fmt;
 use std::time::Duration;
 
+use crate::behavior::{Behavior, BehaviorSet};
 use crate::block::{evaluated_block_resolution, recursive_raycast, Block, EvaluatedBlock};
 use crate::camera::eye_for_look_at;
 use crate::listen::{Listener, Notifier};
@@ -43,10 +44,6 @@ pub struct Character {
     /// Refers to the [`Space`] to be viewed and collided with.
     pub space: URef<Space>,
 
-    /// Whether the look direction should rotate without user input for demo purposes.
-    /// TODO: Replace this with a general camera move scripting system.
-    pub auto_rotate: bool,
-
     /// Velocity specified by user input, which the actual velocity is smoothly adjusted
     /// towards.
     velocity_input: Vector3<FreeCoordinate>,
@@ -62,18 +59,21 @@ pub struct Character {
 
     /// Notifier for modifications.
     notifier: Notifier<CharacterChange>,
+
+    // TODO: not crate access: we need something like the listen() method for Notifier
+    pub(crate) behaviors: BehaviorSet<Character>,
 }
 
 impl std::fmt::Debug for Character {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt.debug_struct("Character")
             .field("body", &self.body)
-            .field("auto_rotate", &self.auto_rotate)
             .field(
                 "velocity_input",
                 &self.velocity_input.custom_format(ConciseDebug),
             )
             .field("colliding_cubes", &self.colliding_cubes)
+            .field("behaviors", &self.behaviors)
             .finish()
     }
 }
@@ -115,12 +115,12 @@ impl Character {
                 )
             },
             space,
-            auto_rotate: false,
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
             inventory: Inventory::from_items(inventory),
             selected_slots: [10, 1, 11],
             notifier: Notifier::new(),
+            behaviors: BehaviorSet::new(),
         }
     }
 
@@ -146,6 +146,13 @@ impl Character {
         &self.inventory
     }
 
+    pub fn add_behavior<B>(&mut self, behavior: B)
+    where
+        B: Behavior<Character> + 'static,
+    {
+        self.behaviors.insert(behavior);
+    }
+
     pub fn selected_slots(&self) -> [usize; 3] {
         self.selected_slots
     }
@@ -162,7 +169,11 @@ impl Character {
     /// Advances time.
     ///
     /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).
-    pub fn step(&mut self, duration: Duration) {
+    pub fn step(
+        &mut self,
+        self_ref: Option<&URef<Character>>,
+        duration: Duration,
+    ) -> UniverseTransaction {
         let dt = duration.as_secs_f64();
         let control_orientation: Matrix3<FreeCoordinate> =
             Matrix3::from_angle_y(-Deg(self.body.yaw));
@@ -200,8 +211,17 @@ impl Character {
             self.body.flying = false;
         }
 
-        if self.auto_rotate {
-            self.body.yaw += 45.0 * dt;
+        // TODO: Think about what order we want sequence of effects to be in. In particular,
+        // combining behavior calls with step() means behaviors on different characters
+        // see other characters as not having been stepped yet.
+        if let Some(self_ref) = self_ref {
+            self.behaviors.step(
+                &self,
+                &(|t: CharacterTransaction| t.bind(self_ref.clone())),
+                duration,
+            )
+        } else {
+            UniverseTransaction::default()
         }
     }
 
@@ -263,7 +283,7 @@ impl Transactional for Character {
     type Transaction = CharacterTransaction;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct CharacterTransaction {
     body: BodyTransaction,
     inventory: InventoryTransaction,

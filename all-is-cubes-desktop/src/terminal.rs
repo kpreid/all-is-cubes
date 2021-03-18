@@ -78,9 +78,6 @@ pub fn terminal_main_loop(
     app: AllIsCubesAppState,
     options: TerminalOptions,
 ) -> Result<(), Box<dyn Error>> {
-    // TODO: Leftovers from early input-less days.
-    app.character().borrow_mut().auto_rotate = true;
-
     let mut main = TerminalMain::new(app, options)?;
     main.run()?;
     main.clean_up_terminal()?; // note this is _also_ run on drop

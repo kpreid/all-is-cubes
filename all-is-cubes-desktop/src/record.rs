@@ -16,8 +16,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use all_is_cubes::apps::AllIsCubesAppState;
+use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{Camera, Viewport};
-use all_is_cubes::math::{FreeCoordinate, Rgba};
+use all_is_cubes::math::{FreeCoordinate, NotNan, Rgba};
 use all_is_cubes::raytracer::{ColorBuf, SpaceRaytracer};
 
 /// Options for recording and output in [`record_main`].
@@ -94,7 +95,9 @@ pub(crate) fn record_main(
     space_ref.borrow_mut().evaluate_light();
     if options.animated() {
         // TODO: replace this with a general scripting mechanism
-        app.character().borrow_mut().auto_rotate = true;
+        app.character().borrow_mut().add_behavior(AutoRotate {
+            rate: NotNan::new(45.0).unwrap(),
+        });
     }
 
     for frame in options.frame_range() {
