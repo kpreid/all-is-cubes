@@ -97,6 +97,16 @@ where
         &self.chunk_chart
     }
 
+    /// Iterate over the [`ChunkMesh`]es of all chunks, in arbitrary order.
+    ///
+    /// Empty chunks are included; in particular, this will iterate over every `D` value
+    /// owned by this [`ChunkedSpaceMesh`].
+    ///
+    /// TODO: Define the order
+    pub fn iter_chunks(&self) -> impl Iterator<Item = &ChunkMesh<D, Vert, Tex, CHUNK_SIZE>> {
+        self.chunks.values()
+    }
+
     /// Retrieves a [`ChunkMesh`] for the specified chunk position, if one exists.
     ///
     /// Call this while drawing, after [`Self::update_blocks_and_some_chunks`]

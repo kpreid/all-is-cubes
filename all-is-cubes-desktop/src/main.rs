@@ -50,8 +50,9 @@ use terminal::{terminal_main_loop, TerminalOptions};
 use crate::aic_glfw::create_glfw_desktop_session;
 use crate::aic_winit::{create_winit_rt_desktop_session, create_winit_wgpu_desktop_session};
 use crate::command_options::{
-    parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
+    determine_record_format, parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
 };
+use crate::record::RecordFormat;
 use crate::session::{ClockSource, DesktopSession};
 use crate::terminal::terminal_print_once;
 
@@ -73,7 +74,7 @@ fn main() -> Result<(), anyhow::Error> {
         template,
         precompute_light,
         input_file,
-        output_file: _,
+        output_file,
         duration,
         verbose,
         no_config_files,
@@ -156,7 +157,14 @@ fn main() -> Result<(), anyhow::Error> {
             .as_secs_f32()
     );
 
-    if precompute_light || graphics_type == GraphicsType::Record {
+    // TODO: kludgy condition; this should be a question we ask about the record_options()
+    if precompute_light
+        || (graphics_type == GraphicsType::Record
+            && output_file
+                .as_ref()
+                .and_then(|f| determine_record_format(f).ok())
+                != Some(RecordFormat::Gltf))
+    {
         session
             .character()
             .snapshot()

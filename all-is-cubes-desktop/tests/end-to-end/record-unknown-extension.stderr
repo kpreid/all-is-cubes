@@ -1,3 +1,3 @@
-error: Invalid value "should-not-be-written.nonsense" for '--output <FILE>': file name must have an extension specifying the type; one of 'png' or 'apng'
+error: Invalid value "should-not-be-written.nonsense" for '--output <FILE>': file name must have an extension specifying the type; one of 'png', 'apng', or 'gltf'
 
 For more information try --help

@@ -33,6 +33,7 @@ pub struct RecordAnimationOptions {
 pub enum RecordFormat {
     // PNG and Animated-PNG are (currently) the same implementation, just with multiple frames or not
     PngOrApng,
+    Gltf,
 }
 
 impl RecordOptions {

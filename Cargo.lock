@@ -99,6 +99,7 @@ dependencies = [
  "all-is-cubes-content",
  "all-is-cubes-gpu",
  "anyhow",
+ "base64",
  "bytemuck",
  "clap 3.2.8",
  "crossterm",
@@ -106,6 +107,7 @@ dependencies = [
  "dot_vox",
  "futures",
  "glfw",
+ "gltf-json",
  "image",
  "indicatif",
  "log",
@@ -118,6 +120,7 @@ dependencies = [
  "simplelog",
  "softbuffer",
  "strum",
+ "tempfile",
  "thiserror",
  "trycmd",
  "tui",
@@ -1355,6 +1358,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "gltf-derive"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdd53d6e284bb2bf02a6926e4cc4984978c1990914d6cd9deae4e31cf37cd113"
+dependencies = [
+ "inflections",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "gltf-json"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9949836a9ec5e7f83f76fb9bbcbc77f254a577ebbdb0820867bc11979ef97cad"
+dependencies = [
+ "gltf-derive",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "gpu-alloc"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1635,6 +1662,12 @@ name = "indoc"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05a0bd019339e5d968b37855180087b7b9d512c5046fbd244cf8c95687927d6e"
+
+[[package]]
+name = "inflections"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a257582fdcde896fd96463bf2d40eefea0580021c0712a0e2b028b60b47a837a"
 
 [[package]]
 name = "inplace_it"

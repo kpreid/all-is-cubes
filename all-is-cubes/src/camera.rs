@@ -160,6 +160,11 @@ impl Camera {
         self.compute_matrices();
     }
 
+    /// Gets the last eye-to-world transform set by [`Self::set_view_transform()`].
+    pub fn get_view_transform(&self) -> ViewTransform {
+        self.eye_to_world_transform
+    }
+
     /// Returns a projection matrix suitable for OpenGL use.
     pub fn projection(&self) -> M {
         self.projection

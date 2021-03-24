@@ -213,11 +213,12 @@ pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'sta
             // When updating this match, also update the docs for output_file!
             Some("png" | "PNG") => return Ok(RecordFormat::PngOrApng),
             Some("apng" | "APNG") => return Ok(RecordFormat::PngOrApng),
+            Some("gltf" | "GLTF") => return Ok(RecordFormat::Gltf),
             _ => {}
         }
     }
     // TODO: Have a separate option for choosing file type as a fallback
-    Err("file name must have an extension specifying the type; one of 'png' or 'apng'")
+    Err("file name must have an extension specifying the type; one of 'png', 'apng', or 'gltf'")
 }
 
 fn validate_output_file(path_str: &OsStr) -> Result<(), &'static str> {

@@ -23,6 +23,7 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["rayon
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 anyhow = "1.0"
+base64 = "0.13.0" # used for glTF
 bytemuck = { version = "1.7.2", default-features = false }
 clap = { version = "3.2.8", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }
 # Note: keep crossterm in sync with tui's crossterm dependency.
@@ -31,6 +32,7 @@ directories-next = "2.0.0"
 dot_vox = "4.1.0" # TODO: belongs in a separate import/export lib
 futures = { version = "0.3.17", default-features = false, features = ["std", "executor"] }
 glfw = "0.44.0"
+gltf-json = { version = "1.0.0", default-features = false, features = ["names"] } # TODO: belongs in a separate import/export lib
 image = { version = "0.24.2", default-features = false }
 indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
@@ -50,4 +52,5 @@ unicode-width = { version = "0.1.9", default-features = false }
 winit = { version = "0.26.1", default-features = false, features = ["x11"] }
 
 [dev-dependencies]
+tempfile = "3.3.0"
 trycmd = "0.13.1"
