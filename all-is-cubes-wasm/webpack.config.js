@@ -19,6 +19,9 @@ module.exports = {
   devServer: {
     contentBase: dist,
   },
+  experiments: {
+    syncWebAssembly: true,
+  },
   plugins: [
     new CopyPlugin({
       patterns: [
