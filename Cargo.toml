@@ -14,6 +14,8 @@ opt-level = 2
 # for ALL profiles. (Because not catching overflows in release mode is unwise when this is
 # precisely where the program is *likely to encounter bigger numbers than in testing*.)
 overflow-checks = true
+# Faster builds at the cost of pathname-sensitive debug info.
+split-debuginfo = "unpacked"
 
 [profile.release]
 # TODO: review recommended options for wasm releases
