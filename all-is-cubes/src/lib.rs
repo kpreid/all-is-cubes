@@ -9,6 +9,7 @@
 
 #![deny(rust_2018_idioms)]
 #![allow(clippy::collapsible_if)]
+#![allow(clippy::collapsible_else_if)]
 #![allow(clippy::needless_update)]
 #![warn(clippy::cast_lossless)]
 #![cfg_attr(test,
