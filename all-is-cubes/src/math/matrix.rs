@@ -314,8 +314,9 @@ impl Transform<GridPoint> for GridMatrix {
 /// * [`Face`] is less general, in that it specifies a single axis but not
 ///   rotation about that axis.
 /// * [`GridMatrix`] is more general, specifying an affine transformation.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[rustfmt::skip]
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(u8)]
 pub enum GridRotation {
     // TODO: shuffle or explicitly number these to choose a meaningful numbering

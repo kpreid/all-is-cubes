@@ -16,10 +16,12 @@ use crate::math::*;
 ///
 /// So far, nearly every usage of Face has a use for [`WITHIN`](Face::WITHIN), but we
 /// should keep an eye out for uses of the ‘true’ 6-face version.
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Face {
     /// The interior volume of a cube, or an undefined direction. Corresponds to the vector `(0, 0, 0)`.
+    // TODO: Rename to Face::Within.
     WITHIN = 0,
     /// Negative X; the face whose normal vector is `(-1, 0, 0)`.
     NX,
