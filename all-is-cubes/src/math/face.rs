@@ -290,6 +290,7 @@ impl TryFrom<GridVector> for Face {
 }
 
 /// Container for values keyed by [`Face`]s.
+#[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
 pub struct FaceMap<V> {
     /// The value whose key is `Face::Within`.
@@ -377,9 +378,10 @@ impl<V> IndexMut<Face> for FaceMap<V> {
     }
 }
 
-#[derive(Clone, Copy, Hash, Eq, PartialEq)]
 /// The combination of a `GridPoint` identifying a unit cube and a `Face` identifying
 /// one face of it. This pattern recurs in selection and collision detection.
+#[derive(Clone, Copy, Hash, Eq, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
 pub struct CubeFace {
     pub cube: GridPoint,
     pub face: Face,

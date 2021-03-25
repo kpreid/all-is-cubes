@@ -16,6 +16,7 @@ use crate::math::*;
 /// [`cgmath::Matrix4`] requires.
 ///
 /// TODO: The operators implemented for this are very incomplete.
+#[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct GridMatrix {
     /// First column

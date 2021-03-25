@@ -15,6 +15,7 @@ pub type TextureCoordinate = f32;
 /// Generic structure of output from triangulator. Implement
 /// <code>[`From`]&lt;[`BlockVertex`]&gt;</code>
 /// to provide a specialized version fit for the target graphics API.
+#[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct BlockVertex {
     /// Vertex position.

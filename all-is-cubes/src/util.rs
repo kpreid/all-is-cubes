@@ -50,6 +50,7 @@ impl<T> CustomFormat<TypeName> for PhantomData<T> {
 ///
 /// This format may be on one line despite the pretty-printing option, and may lose
 /// precision or Rust syntax in favor of a short at-a-glance representation.
+#[allow(clippy::exhaustive_structs)]
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct ConciseDebug;
 
@@ -97,6 +98,7 @@ impl<S: Debug> CustomFormat<ConciseDebug> for Vector4<S> {
 /// constant-size, user-facing format for live-updating textual status messages.
 /// This format does not follow Rust [`Debug`](fmt::Debug) syntax, and when implemented
 /// for standard Rust types may have quirks. Values may have multiple lines.
+#[allow(clippy::exhaustive_structs)]
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct StatusText;
 

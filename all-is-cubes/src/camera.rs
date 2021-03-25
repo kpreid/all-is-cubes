@@ -249,6 +249,7 @@ impl Camera {
 
 /// Viewport dimensions for rendering and UI layout with the correct resolution and
 /// aspect ratio.
+#[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Viewport {
     /// Viewport dimensions to use for determining aspect ratio and interpreting

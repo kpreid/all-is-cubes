@@ -305,6 +305,7 @@ pub fn cursor_raycast(ray: Ray, space_ref: &URef<Space>) -> Option<Cursor> {
 ///
 /// TODO: Should carry information about both the struck and preceding cubes.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Cursor {
     pub space: URef<Space>,
     /// The cube the cursor is at and which face was hit.
@@ -334,6 +335,7 @@ impl std::fmt::Display for Cursor {
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct Spawn {
     /// Position, in cube coordinates.
     ///

@@ -432,6 +432,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
 /// A “flattened” and snapshotted form of [`Block`] which contains all information needed
 /// for rendering and physics, and does not require dereferencing [`URef`]s.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct EvaluatedBlock {
     /// The block's attributes.
     pub attributes: BlockAttributes,
@@ -879,6 +880,7 @@ pub mod builder {
 
     /// Placeholder type for an incomplete [`BlockBuilder`]'s content. The builder
     /// cannot create an actual block until this is replaced.
+    #[allow(clippy::exhaustive_structs)]
     #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq)]
     pub struct NeedsColorOrVoxels;
     /// Content of a [`BlockBuilder`] that can build a block without a [`Universe`].

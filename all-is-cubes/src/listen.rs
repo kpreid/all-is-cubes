@@ -176,6 +176,7 @@ impl<M, L: Listener<M> + Sized> ListenerHelper<M> for L {}
 
 /// A [`Listener`] which discards all messages and is suitable for filling
 /// listener parameters when no listener is needed.
+#[allow(clippy::exhaustive_structs)]
 pub struct NullListener;
 
 impl<M> Listener<M> for NullListener {

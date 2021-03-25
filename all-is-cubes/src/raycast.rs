@@ -17,6 +17,7 @@ use crate::space::Grid;
 pub use crate::math::{CubeFace, Face};
 
 /// A ray; a half-infinite line segment.
+#[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ray {
     /// The sole endpoint of the ray.
