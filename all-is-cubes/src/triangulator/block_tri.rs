@@ -65,7 +65,7 @@ pub struct BlockTriangulation<V, T> {
     ///
     /// All triangles which are on the surface of the cube (such that they may be omitted
     /// when a `fully_opaque` block is adjacent) are grouped under the corresponding
-    /// face, and all other triangles are grouped under `Face::WITHIN`.
+    /// face, and all other triangles are grouped under `Face::Within`.
     pub(super) faces: FaceMap<FaceTriangulation<V>>,
 
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
@@ -105,7 +105,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     match &block.voxels {
         None => {
             let faces = FaceMap::generate(|face| {
-                if face == Face::WITHIN {
+                if face == Face::Within {
                     // No interior detail for atom blocks.
                     return FaceTriangulation::default();
                 }
@@ -147,17 +147,17 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
         }
         Some(voxels) => {
             // Construct empty output to mutate, because inside the loops we'll be
-            // updating WITHIN independently of other faces.
+            // updating `Within` independently of other faces.
             let mut output_by_face = FaceMap::generate(|face| FaceTriangulation {
                 vertices: Vec::new(),
                 indices_opaque: Vec::new(),
                 indices_transparent: Vec::new(),
                 // Start assuming opacity; if we find any transparent pixels we'll set
-                // this to false. WITHIN is always "transparent" because the algorithm
+                // this to false. `Within` is always "transparent" because the algorithm
                 // that consumes this structure will say "draw this face if its adjacent
-                // cube's opposing face is not opaque", and WITHIN means the adjacent
+                // cube's opposing face is not opaque", and `Within` means the adjacent
                 // cube is ourself.
-                fully_opaque: face != Face::WITHIN,
+                fully_opaque: face != Face::Within,
             });
 
             // If the texture tile resolution is greater, we will just not use the extra
@@ -239,7 +239,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     }
 
                     // Pick where we're going to store the quads.
-                    // Only the cube-surface faces go anywhere but WITHIN.
+                    // Only the cube-surface faces go anywhere but `Within`.
                     // (We could generalize this to blocks with concavities that still form a
                     // light-tight seal against the cube face.)
                     let FaceTriangulation {
@@ -247,7 +247,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         indices_opaque,
                         indices_transparent,
                         ..
-                    } = &mut output_by_face[if layer == 0 { face } else { Face::WITHIN }];
+                    } = &mut output_by_face[if layer == 0 { face } else { Face::Within }];
                     let depth =
                         FreeCoordinate::from(layer) / FreeCoordinate::from(block_resolution);
 

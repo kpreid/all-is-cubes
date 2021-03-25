@@ -343,10 +343,10 @@ fn shrunken_box_uniform_color() {
     );
 }
 
-/// Make a `FaceMap` with uniform values except for `WITHIN`.
+/// Make a [`FaceMap`] with uniform values except for [`Face::Within`].
 fn except_within<T: Clone>(without: T, within: T) -> FaceMap<T> {
     FaceMap::generate(|face| {
-        if face == Face::WITHIN {
+        if face == Face::Within {
             within.clone()
         } else {
             without.clone()

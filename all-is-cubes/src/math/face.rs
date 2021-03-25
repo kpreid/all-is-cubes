@@ -12,17 +12,16 @@ use std::ops::{Index, IndexMut};
 use crate::math::*;
 
 /// Identifies a face of a cube or an orthogonal unit vector, except for
-/// [`WITHIN`](Face::WITHIN) meaning “zero distance and undefined direction”.
+/// [`Within`](Face::Within) meaning “zero distance and undefined direction”.
 ///
-/// So far, nearly every usage of Face has a use for [`WITHIN`](Face::WITHIN), but we
+/// So far, nearly every usage of Face has a use for [`Within`](Face::Within), but we
 /// should keep an eye out for uses of the ‘true’ 6-face version.
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Face {
     /// The interior volume of a cube, or an undefined direction. Corresponds to the vector `(0, 0, 0)`.
-    // TODO: Rename to Face::Within.
-    WITHIN = 0,
+    Within = 0,
     /// Negative X; the face whose normal vector is `(-1, 0, 0)`.
     NX,
     /// Negative Y; the face whose normal vector is `(0, -1, 0)`; downward.
@@ -38,12 +37,12 @@ pub enum Face {
 }
 
 impl Face {
-    /// All the values of [`Face`] except for [`Face::WITHIN`].
+    /// All the values of [`Face`] except for [`Face::Within`].
     pub const ALL_SIX: &'static [Face; 6] =
         &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
-    /// All the values of [`Face`], with [`Face::WITHIN`] listed first.
+    /// All the values of [`Face`], with [`Face::Within`] listed first.
     pub const ALL_SEVEN: &'static [Face; 7] = &[
-        Face::WITHIN,
+        Face::Within,
         Face::NX,
         Face::NY,
         Face::NZ,
@@ -53,10 +52,10 @@ impl Face {
     ];
 
     /// Returns which axis this face's normal vector is parallel to, with the numbering
-    /// X = 0, Y = 1, Z = 2. Panics if given [`Face::WITHIN`].
+    /// X = 0, Y = 1, Z = 2. Panics if given [`Face::Within`].
     pub fn axis_number(self) -> usize {
         match self {
-            Face::WITHIN => panic!("WITHIN has no axis number"),
+            Face::Within => panic!("Face::Within has no axis number"),
             Face::NX | Face::PX => 0,
             Face::NY | Face::PY => 1,
             Face::NZ | Face::PZ => 2,
@@ -71,7 +70,7 @@ impl Face {
     ///
     /// assert_eq!(Face::PX.is_positive(), true);
     /// assert_eq!(Face::NX.is_positive(), false);
-    /// assert_eq!(Face::WITHIN.is_positive(), false);
+    /// assert_eq!(Face::Within.is_positive(), false);
     /// ```
     pub fn is_positive(self) -> bool {
         matches!(self, Face::PX | Face::PY | Face::PZ)
@@ -85,7 +84,7 @@ impl Face {
     ///
     /// assert_eq!(Face::PX.is_negative(), false);
     /// assert_eq!(Face::NX.is_negative(), true);
-    /// assert_eq!(Face::WITHIN.is_negative(), false);
+    /// assert_eq!(Face::Within.is_negative(), false);
     /// ```
     pub fn is_negative(self) -> bool {
         matches!(self, Face::NX | Face::NY | Face::NZ)
@@ -95,7 +94,7 @@ impl Face {
     #[inline]
     pub const fn opposite(self) -> Face {
         match self {
-            Face::WITHIN => Face::WITHIN,
+            Face::Within => Face::Within,
             Face::NX => Face::PX,
             Face::NY => Face::PY,
             Face::NZ => Face::PZ,
@@ -126,24 +125,24 @@ impl Face {
         use Face::*;
         match (self, other) {
             // Zero input
-            (WITHIN, _) => WITHIN,
-            (_, WITHIN) => WITHIN,
+            (Within, _) => Within,
+            (_, Within) => Within,
 
             // Equal vectors
-            (Face::NX, Face::NX) => WITHIN,
-            (Face::NY, Face::NY) => WITHIN,
-            (Face::NZ, Face::NZ) => WITHIN,
-            (Face::PX, Face::PX) => WITHIN,
-            (Face::PY, Face::PY) => WITHIN,
-            (Face::PZ, Face::PZ) => WITHIN,
+            (Face::NX, Face::NX) => Within,
+            (Face::NY, Face::NY) => Within,
+            (Face::NZ, Face::NZ) => Within,
+            (Face::PX, Face::PX) => Within,
+            (Face::PY, Face::PY) => Within,
+            (Face::PZ, Face::PZ) => Within,
 
             // Opposite vectors
-            (Face::NX, Face::PX) => WITHIN,
-            (Face::NY, Face::PY) => WITHIN,
-            (Face::NZ, Face::PZ) => WITHIN,
-            (Face::PX, Face::NX) => WITHIN,
-            (Face::PY, Face::NY) => WITHIN,
-            (Face::PZ, Face::NZ) => WITHIN,
+            (Face::NX, Face::PX) => Within,
+            (Face::NY, Face::PY) => Within,
+            (Face::NZ, Face::PZ) => Within,
+            (Face::PX, Face::NX) => Within,
+            (Face::PY, Face::NY) => Within,
+            (Face::PZ, Face::NZ) => Within,
 
             (Face::NX, Face::NY) => PZ,
             (Face::NX, Face::NZ) => NY,
@@ -177,7 +176,7 @@ impl Face {
         }
     }
 
-    /// Returns the vector normal to this face. [`WITHIN`](Self::WITHIN) is assigned the
+    /// Returns the vector normal to this face. [`Within`](Self::Within) is assigned the
     /// zero vector.
     #[inline]
     pub fn normal_vector<S>(self) -> Vector3<S>
@@ -185,7 +184,7 @@ impl Face {
         S: BaseNum + std::ops::Neg<Output = S>,
     {
         match self {
-            Face::WITHIN => Vector3::new(S::zero(), S::zero(), S::zero()),
+            Face::Within => Vector3::new(S::zero(), S::zero(), S::zero()),
             Face::NX => Vector3::new(-S::one(), S::zero(), S::zero()),
             Face::NY => Vector3::new(S::zero(), -S::one(), S::zero()),
             Face::NZ => Vector3::new(S::zero(), S::zero(), -S::one()),
@@ -207,7 +206,7 @@ impl Face {
     #[rustfmt::skip]
     pub const fn matrix(self, scale: GridCoordinate) -> GridMatrix {
         match self {
-            Face::WITHIN => GridMatrix::ZERO,
+            Face::Within => GridMatrix::ZERO,
             Face::NX => GridMatrix::new(
                 0, 1, 0,
                 0, 0, 1,
@@ -277,7 +276,7 @@ impl TryFrom<GridVector> for Face {
     fn try_from(value: GridVector) -> Result<Self, Self::Error> {
         use Face::*;
         match value {
-            GridVector { x: 0, y: 0, z: 0 } => Ok(WITHIN),
+            GridVector { x: 0, y: 0, z: 0 } => Ok(Within),
             GridVector { x: 1, y: 0, z: 0 } => Ok(PX),
             GridVector { x: 0, y: 1, z: 0 } => Ok(PY),
             GridVector { x: 0, y: 0, z: 1 } => Ok(PZ),
@@ -292,7 +291,7 @@ impl TryFrom<GridVector> for Face {
 /// Container for values keyed by [`Face`]s.
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
 pub struct FaceMap<V> {
-    /// The value whose key is `Face::WITHIN`.
+    /// The value whose key is `Face::Within`.
     pub within: V,
     /// The value whose key is `Face::NX`.
     pub nx: V,
@@ -312,7 +311,7 @@ impl<V> FaceMap<V> {
     /// Compute and store a value for each [`Face`] enum variant.
     pub fn generate(mut f: impl FnMut(Face) -> V) -> Self {
         Self {
-            within: f(Face::WITHIN),
+            within: f(Face::Within),
             nx: f(Face::NX),
             ny: f(Face::NY),
             nz: f(Face::NZ),
@@ -335,7 +334,7 @@ impl<V> FaceMap<V> {
     /// TODO: Should wr do this in terms of iterators?
     pub fn map<U>(self, mut f: impl FnMut(Face, V) -> U) -> FaceMap<U> {
         FaceMap {
-            within: f(Face::WITHIN, self.within),
+            within: f(Face::Within, self.within),
             nx: f(Face::NX, self.nx),
             ny: f(Face::NY, self.ny),
             nz: f(Face::NZ, self.nz),
@@ -352,7 +351,7 @@ impl<V> Index<Face> for FaceMap<V> {
     type Output = V;
     fn index(&self, face: Face) -> &V {
         match face {
-            Face::WITHIN => &self.within,
+            Face::Within => &self.within,
             Face::NX => &self.nx,
             Face::NY => &self.ny,
             Face::NZ => &self.nz,
@@ -366,7 +365,7 @@ impl<V> Index<Face> for FaceMap<V> {
 impl<V> IndexMut<Face> for FaceMap<V> {
     fn index_mut(&mut self, face: Face) -> &mut V {
         match face {
-            Face::WITHIN => &mut self.within,
+            Face::Within => &mut self.within,
             Face::NX => &mut self.nx,
             Face::NY => &mut self.ny,
             Face::NZ => &mut self.nz,
@@ -395,7 +394,7 @@ impl CubeFace {
     }
 
     /// Computes the cube that is adjacent in the direction of `self.face`.
-    /// Equal to `self.cube` if the face is [`Face::WITHIN`].
+    /// Equal to `self.cube` if the face is [`Face::Within`].
     #[inline]
     pub fn adjacent(self) -> GridPoint {
         self.cube + self.face.normal_vector()

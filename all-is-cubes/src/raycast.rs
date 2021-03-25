@@ -180,7 +180,7 @@ impl Raycaster {
             step: direction.map(improved_signum),
             t_max: origin.to_vec().zip(direction, scale_to_integer_step),
             t_delta: direction.map(|x| x.abs().recip()),
-            last_face: Face::WITHIN,
+            last_face: Face::Within,
             last_t_distance: 0.0,
             grid: None,
         }
@@ -248,9 +248,9 @@ impl Raycaster {
         // Update face crossing info
         static FACE_TABLE: [[Face; 3]; 3] = [
             // Middle column is never used.
-            [Face::PX, Face::WITHIN, Face::NX],
-            [Face::PY, Face::WITHIN, Face::NY],
-            [Face::PZ, Face::WITHIN, Face::NZ],
+            [Face::PX, Face::Within, Face::NX],
+            [Face::PY, Face::Within, Face::NY],
+            [Face::PZ, Face::Within, Face::NZ],
         ];
         self.last_face = FACE_TABLE[axis][(self.step[axis] + 1) as usize];
     }
@@ -400,7 +400,7 @@ pub struct RaycastStep {
     // The fields of this structure are private to allow for future revision of which
     // values are calculated versus stored.
     /// The specific face that was crossed. If the ray's origin was within a cube,
-    /// the face will be Face::WITHIN.
+    /// the face will be Face::Within.
     cube_face: CubeFace,
     /// The distance traversed, as measured in multiples of the supplied direction vector.
     t_distance: FreeCoordinate,
@@ -427,7 +427,7 @@ impl RaycastStep {
     /// vector points away from that cube and towards `self.cube_behind()`.
     ///
     /// If the ray starts within a cube, then the initial step will have a face of
-    /// `Face::WITHIN`.
+    /// `Face::Within`.
     ///
     /// ```
     /// use all_is_cubes::math::Face;
@@ -436,7 +436,7 @@ impl RaycastStep {
     /// let mut r = Raycaster::new((0.5, 0.5, 0.5), (1.0, 0.0, 0.0));
     /// let mut next = || r.next().unwrap();
     ///
-    /// assert_eq!(next().face(), Face::WITHIN);  // started at (0, 0, 0)
+    /// assert_eq!(next().face(), Face::Within);  // started at (0, 0, 0)
     /// assert_eq!(next().face(), Face::NX);      // moved to (1, 0, 0)
     /// assert_eq!(next().face(), Face::NX);      // moved to (2, 0, 0)
     /// ```
@@ -501,7 +501,7 @@ impl RaycastStep {
         // TODO: Make sure this always falls within the square?
 
         let CubeFace { cube, face } = self.cube_face;
-        if face != Face::WITHIN {
+        if face != Face::Within {
             // Make the value on the axis perpendicular to the plane exact, since we can.
             let axis = face.axis_number();
             intersection[axis] = FreeCoordinate::from(cube[axis])
@@ -608,7 +608,7 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.01, 0.0001, 0.0001)),
             vec![
-                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 30, Face::Within, 0.0),
                 step(11, 20, 30, Face::NX, 50.0),
                 step(12, 20, 30, Face::NX, 150.0),
             ]);
@@ -617,7 +617,7 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(-0.01, 0.0001, 0.0001)),
             vec![
-                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 30, Face::Within, 0.0),
                 step(9, 20, 30, Face::PX, 50.0),
                 step(8, 20, 30, Face::PX, 150.0),
             ]);
@@ -626,7 +626,7 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.0001, 0.01, 0.0001)),
             vec![
-                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 30, Face::Within, 0.0),
                 step(10, 21, 30, Face::NY, 50.0),
                 step(10, 22, 30, Face::NY, 150.0),
             ]);
@@ -635,7 +635,7 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.0001, -0.01, 0.0001)),
             vec![
-                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 30, Face::Within, 0.0),
                 step(10, 19, 30, Face::PY, 50.0),
                 step(10, 18, 30, Face::PY, 150.0),
             ]);
@@ -644,7 +644,7 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.0001, 0.0001, 0.01)),
             vec![
-                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 30, Face::Within, 0.0),
                 step(10, 20, 31, Face::NZ, 50.0),
                 step(10, 20, 32, Face::NZ, 150.0),
             ]);
@@ -653,7 +653,7 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.0001, 0.0001, -0.01)),
             vec![
-                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 30, Face::Within, 0.0),
                 step(10, 20, 29, Face::PZ, 50.0),
                 step(10, 20, 28, Face::PZ, 150.0),
             ]);
@@ -667,7 +667,7 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(0.01, 0.0, 0.0)),
             vec![
-                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 30, Face::Within, 0.0),
                 step(11, 20, 30, Face::NX, 50.0),
                 step(12, 20, 30, Face::NX, 150.0),
             ]);
@@ -676,7 +676,7 @@ mod tests {
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(-0.01, 0.0, 0.0)),
             vec![
-                step(10, 20, 30, Face::WITHIN, 0.0),
+                step(10, 20, 30, Face::Within, 0.0),
                 step(9, 20, 30, Face::PX, 50.0),
                 step(8, 20, 30, Face::PX, 150.0),
             ]);
@@ -688,7 +688,7 @@ mod tests {
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::zero()),
-            step(10, 20, 30, Face::WITHIN, 0.0));
+            step(10, 20, 30, Face::Within, 0.0));
     }
 
     #[test]
@@ -697,7 +697,7 @@ mod tests {
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::zero()),
-            step(10, 20, 30, Face::WITHIN, 0.0));
+            step(10, 20, 30, Face::Within, 0.0));
     }
 
     #[test]
@@ -706,7 +706,7 @@ mod tests {
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
                 Vector3::new(1.0, 2.0, FreeCoordinate::NAN)),
-            step(10, 20, 30, Face::WITHIN, 0.0));
+            step(10, 20, 30, Face::Within, 0.0));
     }
 
     #[test]
@@ -751,7 +751,7 @@ mod tests {
                 Point3::new(4.833333333333334, 4.666666666666666, -3.0),
                 Vector3::new(0.0, 0.0, 10.0)),
             vec![
-                step(4, 4, -3, Face::WITHIN, 0.0),
+                step(4, 4, -3, Face::Within, 0.0),
                 step(4, 4, -2, Face::NZ, 0.1),
                 step(4, 4, -1, Face::NZ, 0.2),
             ]);
@@ -818,7 +818,7 @@ mod tests {
                             interiors += 1;
                         }
                     }
-                    assert!(surfaces + interiors == 3 && (surfaces > 0 || step.face() == Face::WITHIN),
+                    assert!(surfaces + interiors == 3 && (surfaces > 0 || step.face() == Face::Within),
                         "ray {:?} produced invalid point {:?}", ray, point);
                 }
                 steps => {

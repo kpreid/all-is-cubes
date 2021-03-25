@@ -211,7 +211,7 @@ impl Body {
                 // Movement is unobstructed in this timestep.
                 break;
             }
-            if ray_step.face() == Face::WITHIN {
+            if ray_step.face() == Face::Within {
                 // If we are intersecting a block, we are allowed to leave it; pretend
                 // it doesn't exist.
                 // TODO: Implement pushing out of shallow collisions.
@@ -405,7 +405,7 @@ fn aab_raycast(
         // TODO: The POSITION_EPSILON is a quick kludge to get a result that
         // *includes* the cubes we are advancing towards. Replace it with something
         // more precisely what we need.
-        let nudge = if step.face() != Face::WITHIN {
+        let nudge = if step.face() != Face::Within {
             origin_ray.direction * POSITION_EPSILON
         } else {
             Vector3::zero()

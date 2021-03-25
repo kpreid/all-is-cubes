@@ -173,7 +173,7 @@ impl GfxVertex for LumBlockVertex {
     #[inline]
     fn face(&self) -> Face {
         let normal: GridVector = Vector3::from(self.normal.repr).map(|c| c as GridCoordinate);
-        Face::try_from(normal).unwrap_or(Face::WITHIN)
+        Face::try_from(normal).unwrap_or(Face::Within)
     }
 }
 

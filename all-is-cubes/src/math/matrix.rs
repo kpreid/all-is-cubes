@@ -563,7 +563,7 @@ impl GridRotation {
     pub fn transform(self, face: Face) -> Face {
         // TODO: there ought to be a much cleaner way to express this
         // ... and it should be a const fn, too
-        if face == Face::WITHIN {
+        if face == Face::Within {
             face
         } else {
             let p = self.to_basis()[face.axis_number()];
