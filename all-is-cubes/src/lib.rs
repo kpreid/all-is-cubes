@@ -12,6 +12,7 @@
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::needless_update)]
 #![warn(clippy::cast_lossless)]
+#![warn(clippy::exhaustive_enums)]
 #![cfg_attr(test,
     allow(clippy::float_cmp), // Tests work with predictable floats
     allow(clippy::redundant_clone), // Tests prefer regularity over efficiency

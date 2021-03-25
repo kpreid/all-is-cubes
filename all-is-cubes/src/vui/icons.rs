@@ -15,6 +15,7 @@ use crate::universe::Universe;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "kebab-case")]
+#[non_exhaustive]
 pub enum Icons {
     /// HUD crosshair indicating cursor position.
     ///

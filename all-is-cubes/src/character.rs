@@ -255,6 +255,7 @@ impl Character {
 
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum CharacterChange {
     // We'll probably want more but these are the ones needed for now.
     // (Also note that anything that's a public field can't be reliably notified about.)

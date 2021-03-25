@@ -17,6 +17,7 @@ use crate::universe::Universe;
 /// placeholder.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "kebab-case")]
+#[non_exhaustive]
 pub enum LandscapeBlocks {
     Grass,
     Dirt,

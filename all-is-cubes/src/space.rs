@@ -759,6 +759,7 @@ impl SpaceBlockData {
 ///
 /// Note that "already contained the given block" is considered a success.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum SetCubeError {
     /// The given cube or region is out of the bounds of this Space.
     #[error("{:?} is out of bounds", .0)]
@@ -773,6 +774,7 @@ pub enum SetCubeError {
 
 /// Description of a change to a [`Space`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum SpaceChange {
     // TODO: This set of names is not very clear and self-consistent.
     /// The block at the given location was replaced.

@@ -335,6 +335,7 @@ impl<'a, V, T> BlockTriangulationProvider<'a, V, T> for &'a [BlockTriangulation<
 
 /// Identifies a back-to-front order in which to draw triangles (resulting from
 /// [`triangulate_space`]), based on the direction from which they are being viewed.
+#[allow(clippy::exhaustive_enums)]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DepthOrdering {
     /// Any ordering is acceptable.

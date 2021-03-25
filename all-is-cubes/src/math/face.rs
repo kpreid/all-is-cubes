@@ -17,6 +17,7 @@ use crate::math::*;
 /// So far, nearly every usage of Face has a use for [`Within`](Face::Within), but we
 /// should keep an eye out for uses of the ‘true’ 6-face version.
 #[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Face {

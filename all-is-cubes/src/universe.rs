@@ -20,6 +20,7 @@ use crate::space::{Space, SpaceStepInfo};
 use crate::util::{CustomFormat, StatusText, TypeName};
 
 /// Name/key of an object in a [`Universe`].
+#[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Name {
     /// An explicitly set name.
@@ -282,6 +283,7 @@ impl Default for Universe {
 
 /// Errors resulting from attempting to insert an object in a `Universe`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum InsertError {
     #[error("an object already exists with name {0}")]
     AlreadyExists(Name),
@@ -385,6 +387,7 @@ impl<T> Clone for URef<T> {
 }
 
 /// Errors resulting from attempting to borrow/dereference a [`URef`].
+#[allow(clippy::exhaustive_enums)] // If this has to change it will be a major semantic change
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 pub enum RefError {
     /// Target was deleted, or its entire universe was dropped.

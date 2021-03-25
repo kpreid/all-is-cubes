@@ -46,6 +46,7 @@ impl BlockVertex {
 }
 
 /// Describes the two ways a [`BlockVertex`] may be colored; by a solid color or by a texture.
+#[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Coloring {
     /// Solid color.

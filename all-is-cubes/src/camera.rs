@@ -371,6 +371,7 @@ impl Default for GraphicsOptions {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum FogOption {
     /// No fog: objects will maintain their color and disappear raggedly.
     None,
@@ -383,6 +384,7 @@ pub enum FogOption {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum LightingOption {
     /// No lighting: objects will be displayed with their original surface color.
     None,

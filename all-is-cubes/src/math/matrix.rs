@@ -316,6 +316,7 @@ impl Transform<GridPoint> for GridMatrix {
 /// * [`GridMatrix`] is more general, specifying an affine transformation.
 #[rustfmt::skip]
 #[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(u8)]
 pub enum GridRotation {

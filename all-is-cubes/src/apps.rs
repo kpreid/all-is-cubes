@@ -453,6 +453,7 @@ impl InputProcessor {
 
 /// A platform-neutral representation of keyboard keys for [`InputProcessor`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum Key {
     /// Letters should be lowercase.
     Character(char),
