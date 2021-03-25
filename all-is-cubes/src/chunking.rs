@@ -13,15 +13,14 @@ use std::iter::FusedIterator;
 use crate::math::{int_magnitude_squared, FreeCoordinate, GridCoordinate, GridPoint, GridVector};
 use crate::space::Grid;
 
-/// Chunk size (side length), fixed at compile time.
-pub const CHUNK_SIZE: GridCoordinate = 16;
-pub const CHUNK_SIZE_FREE: FreeCoordinate = 16.;
-
 /// Type to distinguish chunk coordinates from grid coordinates.
+///
+/// Parameter `CHUNK_SIZE` is the number of cubes along the edge of a chunk.
+/// The consequences are unspecified if it is not positive.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ChunkPos(pub GridPoint);
+pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub GridPoint);
 
-impl ChunkPos {
+impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     /// Construct a ChunkPos from coordinates.
     pub const fn new(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Self {
         Self(GridPoint::new(x, y, z))
@@ -34,12 +33,14 @@ impl ChunkPos {
 }
 
 /// Scale a cube position to obtain the containing chunk.
-pub fn cube_to_chunk(cube: GridPoint) -> ChunkPos {
+pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(cube: GridPoint) -> ChunkPos<CHUNK_SIZE> {
     ChunkPos(cube.map(|c| c.div_euclid(CHUNK_SIZE)))
 }
 /// Scale an arbitrary point to obtain the containing chunk.
-pub fn point_to_chunk(cube: Point3<FreeCoordinate>) -> ChunkPos {
-    ChunkPos(cube.map(|c| c.div_euclid(CHUNK_SIZE_FREE).floor() as GridCoordinate))
+pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
+    cube: Point3<FreeCoordinate>,
+) -> ChunkPos<CHUNK_SIZE> {
+    ChunkPos(cube.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE)).floor() as GridCoordinate))
 }
 
 /// Precomputed information about the spherical pattern of chunks within view distance.
@@ -47,7 +48,7 @@ pub fn point_to_chunk(cube: Point3<FreeCoordinate>) -> ChunkPos {
 /// In order to use the same pattern for all posible view positions, the view position is
 /// rounded to enclosing chunk position.
 #[derive(Clone, Debug, Eq, PartialEq)] // TODO: customize Debug and PartialEq
-pub struct ChunkChart {
+pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
     /// The maximum view distance which this chart is designed for.
     view_distance: NotNan<FreeCoordinate>,
 
@@ -68,14 +69,14 @@ pub struct ChunkChart {
     octant_chunks: Vec<GridVector>,
 }
 
-impl ChunkChart {
+impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     pub fn new(view_distance: FreeCoordinate) -> Self {
         let view_distance = Self::sanitize_distance(view_distance);
 
         // We're going to compute in the zero-or-positive octant, which means that the chunk origin
         // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
         // each chunk.
-        let view_distance_in_chunks = view_distance.into_inner() / CHUNK_SIZE_FREE;
+        let view_distance_in_chunks = view_distance.into_inner() / FreeCoordinate::from(CHUNK_SIZE);
         // We can do the squared distance calculation in GridCoordinate integers but only after
         // the squaring.
         let distance_squared = view_distance_in_chunks.powf(2.).ceil() as GridCoordinate;
@@ -95,7 +96,7 @@ impl ChunkChart {
             })
             .collect();
         // Sort by distance, with coordinates for tiebreakers.
-        octant_chunks.sort_unstable_by_key(ChunkChart::sort_key);
+        octant_chunks.sort_unstable_by_key(ChunkChart::<CHUNK_SIZE>::sort_key);
         Self {
             view_distance,
             octant_chunks,
@@ -136,8 +137,8 @@ impl ChunkChart {
     /// farthest to nearest.
     pub fn chunks(
         &self,
-        origin: ChunkPos,
-    ) -> impl Iterator<Item = ChunkPos> + DoubleEndedIterator + FusedIterator + '_ {
+        origin: ChunkPos<CHUNK_SIZE>,
+    ) -> impl Iterator<Item = ChunkPos<CHUNK_SIZE>> + DoubleEndedIterator + FusedIterator + '_ {
         self.octant_chunks
             .iter()
             .copied()
@@ -260,7 +261,7 @@ mod tests {
     fn chunk_consistency() {
         // TODO: this is overkill; sampling the edge cases would be sufficient
         for cube in Grid::new((-1, -1, -1), (32, 32, 32)).interior_iter() {
-            assert!(cube_to_chunk(cube).grid().contains_cube(cube));
+            assert!(cube_to_chunk::<16>(cube).grid().contains_cube(cube));
         }
     }
 
@@ -270,7 +271,7 @@ mod tests {
     /// This also tests that the origin position is added in.
     #[test]
     fn chunk_chart_zero_size() {
-        let chart = ChunkChart::new(0.0);
+        let chart = ChunkChart::<16>::new(0.0);
         let chunk = ChunkPos::new(1, 2, 3);
         assert_eq!(chart.chunks(chunk).collect::<Vec<_>>(), vec![chunk]);
     }
@@ -278,7 +279,7 @@ mod tests {
     /// If we look a tiny bit outside the origin chunk, there are 9³ - 1 neighbors.
     #[test]
     fn chunk_chart_epsilon_size() {
-        let chart = ChunkChart::new(0.00001);
+        let chart = ChunkChart::<16>::new(0.00001);
         assert_eq!(
             chart.chunks(ChunkPos::new(0, 0, 0)).collect::<Vec<_>>(),
             vec![
@@ -319,7 +320,7 @@ mod tests {
     #[test]
     fn chunk_chart_radius_break_points() {
         fn assert_count(distance_in_chunks: FreeCoordinate, count: usize) {
-            let chart = ChunkChart::new(distance_in_chunks * CHUNK_SIZE_FREE);
+            let chart = ChunkChart::<16>::new(distance_in_chunks * 16.);
 
             println!("distance {}, expected count {}", distance_in_chunks, count);
             print_space(&chart.visualization(), (1., 1., 1.));
@@ -349,7 +350,7 @@ mod tests {
     /// [`ChunkChart`]'s iterator should be consistent when reversed.
     #[test]
     fn chunk_chart_reverse_iteration() {
-        let chart = ChunkChart::new(7. * CHUNK_SIZE_FREE);
+        let chart = ChunkChart::<16>::new(7. * 16.);
         let p = ChunkPos::new(10, 3, 100);
         let forward = chart.chunks(p).collect::<Vec<_>>();
         let mut reverse = chart.chunks(p).rev().collect::<Vec<_>>();
@@ -360,7 +361,7 @@ mod tests {
     #[test]
     fn chunk_chart_sorting() {
         // Caution: O(n^6) in the chart radius...
-        let chart = ChunkChart::new(4.0 * CHUNK_SIZE_FREE);
+        let chart = ChunkChart::<16>::new(4.0 * 16.);
         println!("{:?}", chart);
 
         let mut seen: HashSet<GridPoint> = HashSet::new();
@@ -384,7 +385,7 @@ mod tests {
 
     #[test]
     fn chunk_chart_resize() {
-        let chart1 = ChunkChart::new(200.0);
+        let chart1 = ChunkChart::<16>::new(200.0);
         let mut chart2 = ChunkChart::new(300.0);
         chart2.resize_if_needed(200.0);
         assert_eq!(

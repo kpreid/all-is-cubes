@@ -25,7 +25,7 @@ use std::fmt;
 use std::rc::{Rc, Weak};
 
 use crate::camera::{Camera, GraphicsOptions};
-use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
+use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::shading::BlockPrograms;
@@ -41,6 +41,8 @@ use crate::util::{CustomFormat, StatusText};
 
 use super::block_texture::AtlasFlushInfo;
 
+const CHUNK_SIZE: GridCoordinate = 16;
+
 /// Manages cached data and GPU resources for drawing a single [`Space`].
 pub struct SpaceRenderer {
     space: URef<Space>,
@@ -54,8 +56,8 @@ pub struct SpaceRenderer {
     light_texture: Option<SpaceLightTexture>,
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.borrow().chunks`.
-    chunks: HashMap<ChunkPos, Chunk>,
-    chunk_chart: ChunkChart,
+    chunks: HashMap<ChunkPos<CHUNK_SIZE>, Chunk>,
+    chunk_chart: ChunkChart<CHUNK_SIZE>,
     /// Whether, on the previous frame, some chunks were unavailable.
     /// If so, then we prioritize adding new chunks over updating existing ones.
     chunks_were_missing: bool,
@@ -296,9 +298,9 @@ pub struct SpaceRendererOutput<'a> {
     light_texture: &'a mut SpaceLightTexture,
     camera: Camera,
     /// Chunks are handy wrappers around some Tesses
-    chunks: &'a HashMap<ChunkPos, Chunk>,
-    chunk_chart: &'a ChunkChart,
-    view_chunk: ChunkPos,
+    chunks: &'a HashMap<ChunkPos<CHUNK_SIZE>, Chunk>,
+    chunk_chart: &'a ChunkChart<CHUNK_SIZE>,
+    view_chunk: ChunkPos<CHUNK_SIZE>,
     info: SpaceRenderInfo,
 }
 /// As [`SpaceRendererOutput`], but past the texture-binding stage of the pipeline.
@@ -312,9 +314,9 @@ pub struct SpaceRendererBound<'a> {
     /// Block texture to pass to the shader.
     pub(super) bound_light_texture: SpaceLightTextureBound<'a>,
     pub(super) camera: Camera,
-    chunks: &'a HashMap<ChunkPos, Chunk>,
-    chunk_chart: &'a ChunkChart,
-    view_chunk: ChunkPos,
+    chunks: &'a HashMap<ChunkPos<CHUNK_SIZE>, Chunk>,
+    chunk_chart: &'a ChunkChart<CHUNK_SIZE>,
+    view_chunk: ChunkPos<CHUNK_SIZE>,
     info: SpaceRenderInfo,
 }
 
@@ -399,7 +401,7 @@ impl<'a> SpaceRendererBound<'a> {
         })
     }
 
-    fn cull(&self, chunk: ChunkPos) -> bool {
+    fn cull(&self, chunk: ChunkPos<CHUNK_SIZE>) -> bool {
         self.camera.options().use_frustum_culling && !self.camera.aab_in_view(chunk.grid().into())
     }
 }
@@ -476,7 +478,7 @@ struct Chunk {
 }
 
 impl Chunk {
-    fn new(chunk_pos: ChunkPos) -> Self {
+    fn new(chunk_pos: ChunkPos<CHUNK_SIZE>) -> Self {
         Chunk {
             bounds: chunk_pos.grid(),
             triangulation: SpaceTriangulation::new(),
@@ -663,7 +665,7 @@ struct SpaceRendererTodo {
     blocks: HashSet<BlockIndex>,
     /// Membership in this table indicates that the chunk *exists;* todos for chunks
     /// outside of the view area are not tracked.
-    chunks: HashMap<ChunkPos, ChunkTodo>,
+    chunks: HashMap<ChunkPos<CHUNK_SIZE>, ChunkTodo>,
 
     /// Blocks whose light texels should be updated.
     /// None means do a full space reupload.
@@ -842,14 +844,18 @@ mod tests {
 
     // TODO: Arrange, somehow, to test the parts that need a GraphicsContext
 
-    fn read_todo_chunks(todo: &RefCell<SpaceRendererTodo>) -> Vec<(ChunkPos, ChunkTodo)> {
+    fn read_todo_chunks(
+        todo: &RefCell<SpaceRendererTodo>,
+    ) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
         let mut v = todo
             .borrow()
             .chunks
             .iter()
             .map(|(&p, &ct)| (p, ct))
             .collect::<Vec<_>>();
-        v.sort_by_key(|(p, _): &(ChunkPos, _)| <_ as Into<[GridCoordinate; 3]>>::into(p.0));
+        v.sort_by_key(|(p, _): &(ChunkPos<CHUNK_SIZE>, _)| {
+            <_ as Into<[GridCoordinate; 3]>>::into(p.0)
+        });
         v
     }
 

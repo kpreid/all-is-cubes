@@ -169,10 +169,10 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
         Exhibit {
             name: "Visible chunk chart",
             factory: |_this, _universe| {
-                use crate::chunking::{ChunkChart, CHUNK_SIZE_FREE};
+                use crate::chunking::ChunkChart;
 
                 // TODO: Show more than one size.
-                let chart = ChunkChart::new(CHUNK_SIZE_FREE * 4.99);
+                let chart = ChunkChart::<16>::new(16. * 4.99);
                 Ok(chart.visualization())
             },
         }
