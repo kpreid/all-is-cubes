@@ -12,7 +12,7 @@ use all_is_cubes::universe::{Universe, UniverseIndex as _};
 pub fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
 
-    for mutation_size in [1, 4, 16, 24, 32].iter().copied() {
+    for &mutation_size in &[1, 4, 16, 24, 32] {
         let grid = Grid::new([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
         let size_description = format!("{}×{}×{}", mutation_size, mutation_size, mutation_size);
         let mutation_volume = grid.volume();

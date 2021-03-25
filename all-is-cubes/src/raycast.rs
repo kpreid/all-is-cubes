@@ -83,7 +83,10 @@ impl Geometry for Ray {
         E: Extend<Point3<FreeCoordinate>>,
     {
         // TODO: add an arrowhead
-        output.extend([self.origin, self.origin + self.direction].iter().copied());
+        output.extend(std::array::IntoIter::new([
+            self.origin,
+            self.origin + self.direction,
+        ]));
     }
 }
 

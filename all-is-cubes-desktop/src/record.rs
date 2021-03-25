@@ -5,6 +5,7 @@
 
 use cgmath::Vector2;
 use png::Encoder;
+use std::array::IntoIter;
 use std::borrow::Cow;
 use std::error::Error;
 use std::ffi::OsString;
@@ -137,10 +138,7 @@ fn write_frame(
 ) -> Result<(), std::io::Error> {
     let byte_raster = image_data
         .iter()
-        .flat_map(|c| {
-            // TODO: In Rust 1.51, use std::array::IntoIter instead to avoid a heap allocation.
-            Vec::from(c.to_srgb_32bit())
-        })
+        .flat_map(|c| IntoIter::new(c.to_srgb_32bit()))
         .collect::<Vec<u8>>();
     png_writer.write_image_data(&byte_raster)?;
     Ok(())
@@ -179,7 +177,7 @@ fn write_color_metadata<W: std::io::Write>(
     // Write compatibility chromaticity information
     png_writer.write_chunk(
         *b"cHRM",
-        &[
+        &IntoIter::new([
             31270, // White Point x
             32900, // White Point y
             64000, // Red x
@@ -188,11 +186,8 @@ fn write_color_metadata<W: std::io::Write>(
             60000, // Green y
             15000, // Blue x
             6000,  // Blue y
-        ]
-        .iter()
-        .copied()
-        // TODO: In Rust 1.51, use std::array::IntoIter instead to avoid a heap allocation.
-        .flat_map(|v| Vec::from(u32::to_be_bytes(v)))
+        ])
+        .flat_map(|v| IntoIter::new(u32::to_be_bytes(v)))
         .collect::<Box<[u8]>>(),
     )?;
     Ok(())
