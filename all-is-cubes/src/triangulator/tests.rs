@@ -180,9 +180,8 @@ fn space_tri_equals_block_tri() {
         space_rendered.vertices().to_vec(),
         block_triangulations[0]
             .faces
-            .values()
             .iter()
-            .flat_map(|face_render| face_render.vertices.clone().into_iter())
+            .flat_map(|(_face, face_render)| face_render.vertices.clone().into_iter())
             .collect::<Vec<_>>()
     );
     assert_eq!(tex.count_allocated(), 1); // for striped faces

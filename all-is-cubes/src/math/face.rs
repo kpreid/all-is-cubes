@@ -323,12 +323,9 @@ impl<V> FaceMap<V> {
         }
     }
 
-    /// Access all of the values.
-    /// TODO: Return an iterator instead; right now the problem is the iterator won't
-    /// own the data until we implement a custom iterator.
-    #[rustfmt::skip]
-    pub const fn values(&self) -> [&V; 7] {
-        [&self.within, &self.nx, &self.ny, &self.nz, &self.px, &self.py, &self.pz]
+    /// Iterate over the map entries by reference.
+    pub fn iter<'s>(&'s self) -> impl Iterator<Item = (Face, &V)> + 's {
+        Face::ALL_SEVEN.iter().copied().map(move |f| (f, &self[f]))
     }
 
     /// Transform values.
@@ -430,12 +427,12 @@ mod tests {
     // TODO: More tests of face.matrix()
 
     #[test]
-    fn face_map_values_in_enum_order() {
+    fn face_map_iter_in_enum_order() {
         // TODO: Maybe generalize this to _all_ the Face/FaceMap methods that have an ordering?
         let map = FaceMap::generate(|f| f);
         assert_eq!(
             Face::ALL_SEVEN.to_vec(),
-            map.values().iter().copied().copied().collect::<Vec<_>>(),
+            map.iter().map(|(_, &v)| v).collect::<Vec<_>>(),
         )
     }
 
