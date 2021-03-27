@@ -166,13 +166,19 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 .get_block_index(cube)
                 .and_then(|index| block_triangulations.get(index))
                 .unwrap_or(&empty_render);
-            let low_corner = cube.cast::<V::Coordinate>().unwrap();
 
-            let light_neighborhood = match options.lighting_display {
-                LightingOption::None => FaceMap::generate(|_| PackedLight::ONE),
-                LightingOption::Flat => {
-                    FaceMap::generate(|f| space.get_lighting(cube + f.normal_vector()))
+            let inst = V::instantiate_block(cube);
+
+            let light_neighborhood = if V::WANTS_LIGHT {
+                match options.lighting_display {
+                    LightingOption::None => FaceMap::generate(|_| PackedLight::ONE),
+                    LightingOption::Flat => {
+                        FaceMap::generate(|f| space.get_lighting(cube + f.normal_vector()))
+                    }
                 }
+            } else {
+                // Not read; hopefully the optimizer throws it out.
+                FaceMap::generate(|_| PackedLight::ONE)
             };
 
             for &face in Face::ALL_SEVEN {
@@ -195,7 +201,14 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                     .expect("vertex index overflow");
                 self.vertices.extend(face_triangulation.vertices.iter());
                 for vertex in &mut self.vertices[index_offset_usize..] {
-                    vertex.instantiate(low_corner.to_vec(), light_neighborhood[vertex.face()]);
+                    vertex.instantiate_vertex(
+                        inst,
+                        if V::WANTS_LIGHT {
+                            light_neighborhood[vertex.face()]
+                        } else {
+                            PackedLight::ONE
+                        },
+                    );
                 }
                 self.indices.extend(
                     face_triangulation

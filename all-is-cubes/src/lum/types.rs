@@ -10,7 +10,7 @@ use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
 use std::convert::TryFrom as _;
 
-use crate::math::{Face, FreeCoordinate, GridCoordinate, GridVector, Rgba};
+use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
 use crate::space::PackedLight;
 use crate::triangulator::{BlockVertex, Coloring, GfxVertex};
 
@@ -156,12 +156,19 @@ impl From<BlockVertex> for LumBlockVertex {
 
 impl GfxVertex for LumBlockVertex {
     type Coordinate = f32;
+    type BlockInst = Vector3<f32>;
+    const WANTS_LIGHT: bool = true;
 
     #[inline]
-    fn instantiate(&mut self, offset: Vector3<Self::Coordinate>, lighting: PackedLight) {
-        self.position.repr[0] += offset.x;
-        self.position.repr[1] += offset.y;
-        self.position.repr[2] += offset.z;
+    fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
+        cube.to_vec().map(|s| s as f32)
+    }
+
+    #[inline]
+    fn instantiate_vertex(&mut self, cube: Self::BlockInst, lighting: PackedLight) {
+        self.position.repr[0] += cube.x;
+        self.position.repr[1] += cube.y;
+        self.position.repr[2] += cube.z;
         self.lighting = VertexLighting::new(lighting.value().into());
     }
 
@@ -219,13 +226,16 @@ mod tests {
     #[test]
     fn vertex_from_block_vertex() {
         let block_vertex = BlockVertex {
-            position: Point3::new(1.0, 2.0, 3.0),
+            position: Point3::new(1.0, 2.1, 3.0),
             face: Face::PX,
             coloring: Coloring::Solid(Rgba::new(7.0, 8.0, 9.0, 0.5)),
         };
         let mut vertex = LumBlockVertex::from(block_vertex);
-        vertex.instantiate(Vector3::new(0.1, 0.2, 0.3), Rgb::new(1.0, 0.0, 2.0).into());
-        assert_eq!(vertex.position.repr, [1.1, 2.2, 3.3]);
+        vertex.instantiate_vertex(
+            LumBlockVertex::instantiate_block(Point3::new(10, 20, 30)),
+            Rgb::new(1.0, 0.0, 2.0).into(),
+        );
+        assert_eq!(vertex.position.repr, [11., 22.1, 33.]);
         assert_eq!(vertex.normal.repr, [1.0, 0.0, 0.0]);
         assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 0.5]);
         assert_eq!(vertex.lighting.repr, [1.0, 0.0, 2.0]);

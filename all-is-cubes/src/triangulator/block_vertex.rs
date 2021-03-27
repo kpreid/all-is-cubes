@@ -3,9 +3,9 @@
 
 //! Vertices and related types for the triangulator.
 
-use cgmath::{Point3, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
-use crate::math::{Face, FreeCoordinate, Rgba};
+use crate::math::{Face, FreeCoordinate, GridPoint, Rgba};
 use crate::space::PackedLight;
 use crate::util::{ConciseDebug, CustomFormat as _};
 
@@ -100,9 +100,23 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
     /// Number type for the vertex position coordinates.
     type Coordinate: cgmath::BaseFloat;
 
+    /// Type of the data carried from [`Self::instantiate_block`] to
+    /// [`Self::instantiate_vertex`].
+    type BlockInst: Copy;
+
+    /// Whether the triangulator should compute light values for this vertex type.
+    /// If this is false, the `lighting` parameter to `instantiate_vertex` will be a
+    /// constant unrelated to actual light conditions.
+    const WANTS_LIGHT: bool;
+
+    /// Prepare the information needed to instantiate vertices of one block.
+    /// Currently, this constitutes the location of that block, and hence this function
+    /// is responsible for any necessary numeric conversion.
+    fn instantiate_block(cube: GridPoint) -> Self::BlockInst;
+
     /// Transforms a vertex belonging to a general model of a block to its instantiation
     /// in a specific location in space and lighting conditions.
-    fn instantiate(&mut self, offset: Vector3<Self::Coordinate>, lighting: PackedLight);
+    fn instantiate_vertex(&mut self, block: Self::BlockInst, lighting: PackedLight);
 
     /// Returns the position of this vertex.
     ///
@@ -116,12 +130,19 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
 /// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
 impl GfxVertex for BlockVertex {
     type Coordinate = FreeCoordinate;
+    type BlockInst = Vector3<FreeCoordinate>;
+    const WANTS_LIGHT: bool = false;
 
     fn position(&self) -> Point3<FreeCoordinate> {
         self.position
     }
 
-    fn instantiate(&mut self, offset: Vector3<FreeCoordinate>, _lighting: PackedLight) {
+    #[inline]
+    fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
+        cube.to_vec().map(FreeCoordinate::from)
+    }
+
+    fn instantiate_vertex(&mut self, offset: Self::BlockInst, _lighting: PackedLight) {
         self.position += offset;
     }
 
