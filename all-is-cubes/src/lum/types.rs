@@ -23,6 +23,13 @@ pub enum VertexSemantics {
     /// Vertex position.
     #[sem(name = "a_position", repr = "[f32; 3]", wrapper = "VertexPosition")]
     Position,
+    /// Position of the cube containing the triangle this vertex belongs to.
+    /// Note that this is not the same as floor() of `Position`.
+    ///
+    /// TODO: Once we implement storing chunks in relative coordinates for better
+    /// precision, we can reduce this representation size down to i8 or u8.
+    #[sem(name = "a_cube", repr = "[f32; 3]", wrapper = "VertexCube")]
+    Cube,
     /// Vertex normal (should be length 1).
     #[sem(name = "a_normal", repr = "[f32; 3]", wrapper = "VertexNormal")]
     Normal,
@@ -46,6 +53,7 @@ pub enum VertexSemantics {
 #[vertex(sem = "VertexSemantics")]
 pub struct LumBlockVertex {
     position: VertexPosition,
+    cube: VertexCube,
     normal: VertexNormal,
     color_or_texture: VertexColorOrTexture,
     clamp_min: VertexClampLow,
@@ -56,6 +64,7 @@ impl LumBlockVertex {
     /// A vertex which will not be rendered.
     pub const DUMMY: Self = Self {
         position: VertexPosition::new([f32::INFINITY, f32::INFINITY, f32::INFINITY]),
+        cube: VertexCube::new([0., 0., 0.]),
         normal: VertexNormal::new([0., 0., 0.]),
         color_or_texture: VertexColorOrTexture::new([0., 0., 0., 0.]),
         clamp_min: VertexClampLow::new([0., 0., 0.]),
@@ -71,6 +80,7 @@ impl LumBlockVertex {
     ) -> Self {
         Self {
             position: VertexPosition::new(position.cast::<f32>().unwrap().into()),
+            cube: VertexCube::new(position.map(|s| s.floor() as f32).into()),
             normal: VertexNormal::new(normal.cast::<f32>().unwrap().into()),
             color_or_texture: VertexColorOrTexture::new(color.into()),
             clamp_min: VertexClampLow::new([0., 0., 0.]),
@@ -94,6 +104,7 @@ impl LumBlockVertex {
         let tdy = Vector3::new(0.0, tex_size.y, 0.0);
         let v = |p: Vector3<f32>, t: Vector3<f32>| Self {
             position: VertexPosition::new(p.into()),
+            cube: VertexCube::new(p.map(|c| c.floor() as f32).into()),
             normal: VertexNormal::new(normal.into()),
             color_or_texture: VertexColorOrTexture::new(t.extend(-1.0).into()),
             clamp_min: VertexClampLow::new([0., 0., 0.]),
@@ -114,6 +125,7 @@ impl From<BlockVertex> for LumBlockVertex {
     #[inline]
     fn from(vertex: BlockVertex) -> Self {
         let position = vertex.position.cast::<f32>().unwrap().to_vec();
+        let cube = VertexCube::new([0., 0., 0.]);
         let normal = VertexNormal::new(vertex.face.normal_vector::<f32>().into());
         match vertex.coloring {
             Coloring::Solid(color) => {
@@ -123,6 +135,7 @@ impl From<BlockVertex> for LumBlockVertex {
                 color_attribute[3] = color_attribute[3].min(1.).max(0.);
                 Self {
                     position: VertexPosition::new(position.into()),
+                    cube,
                     normal,
                     color_or_texture: color_attribute,
                     clamp_min: VertexClampLow::new([0., 0., 0.]),
@@ -135,6 +148,7 @@ impl From<BlockVertex> for LumBlockVertex {
                 clamp_max,
             } => Self {
                 position: VertexPosition::new(position.into()),
+                cube,
                 normal,
                 color_or_texture: VertexColorOrTexture::new([tc[0], tc[1], tc[2], -1.0]),
                 clamp_min: VertexClampLow::new(clamp_min.into()),
@@ -159,6 +173,7 @@ impl GfxVertex for LumBlockVertex {
         self.position.repr[0] += cube.x;
         self.position.repr[1] += cube.y;
         self.position.repr[2] += cube.z;
+        self.cube.repr = cube.into();
     }
 
     #[inline]
@@ -224,6 +239,7 @@ mod tests {
             Rgb::new(1.0, 0.0, 2.0).into(),
         );
         assert_eq!(vertex.position.repr, [11., 22.1, 33.]);
+        assert_eq!(vertex.cube.repr, [10., 20., 30.]);
         assert_eq!(vertex.normal.repr, [1.0, 0.0, 0.0]);
         assert_eq!(vertex.color_or_texture.repr, [7.0, 8.0, 9.0, 0.5]);
     }

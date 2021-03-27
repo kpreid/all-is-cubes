@@ -6,6 +6,7 @@ in mediump vec4 v_color_or_texture;
 in mediump vec3 v_normal;
 in mediump vec3 v_clamp_min;
 in mediump vec3 v_clamp_max;
+in lowp vec3 v_lighting;
 
 // What fraction of the fragment color should be fog?
 in lowp float fog_mix;
@@ -21,47 +22,8 @@ lowp float fixed_directional_lighting() {
   return (1.0 - 1.0 / 16.0) + 0.25 * (max(0.0, dot(light_1_direction, normal)) + max(0.0, dot(light_2_direction, normal)));
 }
 
-// Given integer cube coordinates, fetch and unpack a light_texture RGB value.
-// The alpha component is either 0 or 1 indicating whether this is a "valid" 
-// light value; one which is neither inside an opaque block nor in empty unlit
-// air.
-lowp vec4 light_texture_fetch(mediump vec3 p) {
-  ivec3 lookup_position = ivec3(floor(p));
-  lookup_position += light_offset;
-  // Implement wrapping (not automatic since we're using texelFetch).
-  // Wrapping is used to handle sky light and in the future will be used for
-  // circular buffering of the local light in an unbounded world.
-  ivec3 size = textureSize(light_texture, 0);
-  lookup_position = (lookup_position % size + size) % size;
-
-  lowp vec4 texel = texelFetch(light_texture, lookup_position, 0);
-  lowp vec3 packed_light = texel.rgb;
-  lowp vec3 unpacked_light = pow(vec3(2.0), (packed_light - 128.0 / 255.0) * (255.0 / 16.0));
-
-  // See all_is_cubes::space::LightStatus for the value this is interpreting.
-  bool valid = texel.a >= 0.5;
-
-  return vec4(unpacked_light, float(valid));
-}
-
-lowp vec3 flat_space_light() {
-  // About half the size of the smallest permissible voxel.
-  const mediump float above_surface_epsilon = 0.5 / 256.0;
-
-  // The position we should start with for texture lookup and interpolation.
-  mediump vec3 origin = v_position + v_normal * above_surface_epsilon;
-
-  return light_texture_fetch(origin).rgb;
-}
-
 lowp vec3 lighting() {
-  lowp vec3 local_light;
-  if (true) {  // TODO: uniform or compile-time parameter
-    local_light = flat_space_light();
-  } else {
-    local_light = vec3(1.0);
-  }
-  return fixed_directional_lighting() * local_light;
+  return fixed_directional_lighting() * v_lighting;
 }
 
 void main(void) {

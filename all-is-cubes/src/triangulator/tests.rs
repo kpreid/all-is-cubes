@@ -3,8 +3,7 @@
 
 //! Tests for [`crate::triangulator`].
 
-use cgmath::Transform as _;
-use cgmath::{MetricSpace as _, Point3, Vector3};
+use cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 
 use super::*;
 use crate::block::{Block, BlockAttributes, Resolution, AIR};
