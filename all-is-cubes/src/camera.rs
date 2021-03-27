@@ -101,9 +101,8 @@ impl Camera {
     /// Sets the view matrix.
     ///
     /// This matrix is used to determine world coordinates for purposes of
-    /// [`view_position`](Self::view_position),
-    /// [`project_ndc_into_world`](Self::project_ndc_into_world),
-    /// and [`project_cursor_into_world`](Self::project_cursor_into_world).
+    /// [`view_position`](Self::view_position) and,
+    /// [`project_ndc_into_world`](Self::project_ndc_into_world).
     /// to determine what world coordinates are.
     pub fn set_view_matrix(&mut self, view_matrix: M) {
         if view_matrix != self.view_matrix {
@@ -320,8 +319,8 @@ pub struct GraphicsOptions {
     /// TODO: Implement view distance limit (and fog) in raytracer.
     pub view_distance: NotNan<FreeCoordinate>,
 
-    /// Style in which to draw the lighting of [`Space`]s. This does not affect the
-    /// *computation* of lighting.
+    /// Style in which to draw the lighting of [`Space`](crate::space::Space)s.
+    /// This does not affect the *computation* of lighting.
     ///
     /// TODO: This option is not yet implemented.
     pub lighting_display: LightingOption,
