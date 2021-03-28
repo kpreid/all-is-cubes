@@ -50,12 +50,6 @@ void main(void) {
     diffuse_color = v_color_or_texture;
   }
 
-  if (diffuse_color.a <= 0.0001) {
-    // Prevent (effectively) fully transparent areas from writing to the depth buffer.
-    // This allows using binary opacity in color or texture without depth sorting.
-    discard;
-  }
-
   // Lighting
   // TODO: What's a better name for this variable?
   mediump vec4 color = diffuse_color * vec4(lighting(), 1.0);
