@@ -4,6 +4,11 @@
 // What fraction of the fragment color should be fog?
 out lowp float fog_mix;
 
+// Direction vector in world coordinate axes (same as vertex_position)
+// from the camera position to this vertex (and thus, when interpolated,
+// to the fragment as well).
+out highp vec3 camera_ray_direction;
+
 // Physically realistic fog, but doesn't ever reach 1 (fully opaque).
 lowp float fog_exponential(highp float d) {
   const lowp float fog_density = 1.6;
@@ -25,7 +30,12 @@ lowp float fog_combo(highp float d) {
 void basic_vertex(highp vec3 vertex_position) {
   // Camera-relative position not transformed by projection.
   highp vec4 eye_vertex_position = view_matrix * vec4(vertex_position, 1.0);
-  highp float distance_from_eye = length(vec3(eye_vertex_position));
+  highp float distance_from_eye = length(eye_vertex_position.xyz);
+
+  // Send direction vector to fragment shader.
+  // Note that we do not normalize this vector: by keeping things linear, we
+  // allow linear interpolation between vertices to get the right answer.
+  camera_ray_direction = vertex_position - view_position;
 
   // Distance in range 0 (camera position) to 1 (opaque fog position/far clip position).
   highp float normalized_distance = distance_from_eye / fog_distance;

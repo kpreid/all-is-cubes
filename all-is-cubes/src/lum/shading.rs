@@ -100,6 +100,7 @@ const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 pub struct BlockUniformInterface {
     projection_matrix: Uniform<[[f32; 4]; 4]>,
     view_matrix: Uniform<[[f32; 4]; 4]>,
+    view_position: Uniform<[f32; 3]>,
     block_texture: Uniform<TextureBinding<Dim3, NormUnsigned>>,
 
     /// Texture containing light map.
@@ -126,6 +127,10 @@ impl BlockUniformInterface {
         let options: &GraphicsOptions = space.camera.options();
         self.set_projection_matrix(program_iface, space.camera.projection());
         self.set_view_matrix(program_iface, space.camera.view_matrix());
+        program_iface.set(
+            &self.view_position,
+            space.camera.view_position().map(|s| s as f32).into(),
+        );
         self.set_block_texture(program_iface, &space.bound_block_texture);
 
         program_iface.set(

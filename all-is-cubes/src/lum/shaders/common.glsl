@@ -6,6 +6,7 @@
 
 uniform highp mat4 projection_matrix;
 uniform highp mat4 view_matrix;
+uniform highp vec3 view_position;
 
 uniform lowp sampler3D block_texture;
 
