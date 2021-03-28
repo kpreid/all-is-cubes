@@ -355,11 +355,8 @@ impl WebGameRoot {
 
     fn step_callback_impl(&mut self) {
         self.step_callback_scheduled = false;
-        // Allow 2 steps of catch-up. TODO: This policy should probably live in FrameClock instead.
-        for _ in 0..2 {
-            if let Some(universe_step_info) = self.app.maybe_step_universe() {
-                self.last_step_info = universe_step_info;
-            }
+        if let Some(universe_step_info) = self.app.maybe_step_universe() {
+            self.last_step_info = universe_step_info;
         }
     }
 

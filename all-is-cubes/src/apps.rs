@@ -95,23 +95,29 @@ impl AllIsCubesAppState {
     }
 
     /// Steps the universe if the `FrameClock` says it's time to do so.
+    /// Always returns info for the last step even if multiple steps were taken.
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
-        if self.frame_clock.should_step() {
-            let step_length = self.frame_clock.step_length();
-            self.frame_clock.did_step();
+        // TODO: Catch-up policy should probably live in FrameClock.
+        const CATCH_UP_FRAMES: usize = 2;
+        let mut result = None;
+        for _ in 0..CATCH_UP_FRAMES {
+            if self.frame_clock.should_step() {
+                let step_length = self.frame_clock.step_length();
+                self.frame_clock.did_step();
 
-            self.input_processor
-                .apply_input(&mut *self.character().borrow_mut(), step_length);
-            self.input_processor.step(step_length);
+                self.input_processor
+                    .apply_input(&mut *self.character().borrow_mut(), step_length);
+                self.input_processor.step(step_length);
 
-            let mut info = self.game_universe.step(step_length);
+                let mut info = self.game_universe.step(step_length);
 
-            self.maybe_sync_ui();
-            info += self.ui.step(step_length);
-            Some(info)
-        } else {
-            None
+                self.maybe_sync_ui();
+                info += self.ui.step(step_length);
+
+                result = Some(info)
+            }
         }
+        result
     }
 
     fn maybe_sync_ui(&mut self) {
