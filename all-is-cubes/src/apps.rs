@@ -97,10 +97,9 @@ impl AllIsCubesAppState {
     /// Steps the universe if the `FrameClock` says it's time to do so.
     /// Always returns info for the last step even if multiple steps were taken.
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
-        // TODO: Catch-up policy should probably live in FrameClock.
-        const CATCH_UP_FRAMES: usize = 2;
         let mut result = None;
-        for _ in 0..CATCH_UP_FRAMES {
+        // TODO: Catch-up implementation should probably live in FrameClock.
+        for _ in 0..FrameClock::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
                 let step_length = self.frame_clock.step_length();
                 self.frame_clock.did_step();
