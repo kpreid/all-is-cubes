@@ -132,6 +132,11 @@ pub trait Warnings: Sized {
     /// values.
     fn split_warnings(self) -> (Vec<Self::W>, Result<Self::T, Self::E>);
 
+    /// Separate warnings from the successful value, placing the warnings into
+    /// `buf`. On error, instead removes all the warnings from `buf` and returns
+    /// them in `Err`. This thus works well with the `?` operator.
+    fn move_warnings(self, buf: &mut Vec<Self::W>) -> Result<Self::T, (Self::E, Vec<Self::W>)>;
+
     /// Call the `handler` with all warnings and return a [`Result`] stripped of the
     /// warnings.
     fn handle_warnings<H>(self, handler: H) -> Result<Self::T, Self::E>
@@ -154,6 +159,20 @@ impl<T, E, W> Warnings for WarningsResult<T, E, W> {
         match self {
             Ok((v, w)) => (w, Ok(v)),
             Err((v, w)) => (w, Err(v)),
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn move_warnings(self, buf: &mut Vec<Self::W>) -> Result<Self::T, (Self::E, Vec<Self::W>)> {
+        match self {
+            Ok((v, mut w)) => {
+                buf.extend(w.drain(..));
+                Ok(v)
+            }
+            Err((v, mut w)) => {
+                w.extend(buf.drain(..));
+                Err((v, w))
+            }
         }
     }
 }

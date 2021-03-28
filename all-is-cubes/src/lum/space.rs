@@ -12,8 +12,8 @@ use luminance_front::depth_test::DepthWrite;
 use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
 use luminance_front::pipeline::{BoundTexture, Pipeline, PipelineError};
 use luminance_front::pixel::NormRGBA8UI;
-use luminance_front::render_gate::RenderGate;
 use luminance_front::render_state::RenderState;
+use luminance_front::shading_gate::ShadingGate;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::texture::{Dim3, GenMipmaps, Sampler, Texture, TextureError};
@@ -28,6 +28,7 @@ use crate::camera::{Camera, GraphicsOptions};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, CHUNK_SIZE};
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
+use crate::lum::shading::BlockPrograms;
 use crate::lum::types::LumBlockVertex;
 use crate::math::{FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
@@ -334,51 +335,62 @@ impl<'a> SpaceRendererOutput<'a> {
     }
 }
 impl<'a> SpaceRendererBound<'a> {
-    /// Use a [`RenderGate`] to actually draw the space.
-    pub fn render<E>(&self, render_gate: &mut RenderGate<'_>) -> Result<SpaceRenderInfo, E> {
+    /// Use a [`ShadingGate`] to actually draw the space.
+    pub(crate) fn render<E>(
+        &self,
+        shading_gate: &mut ShadingGate<'_>,
+        block_programs: &mut BlockPrograms,
+    ) -> Result<SpaceRenderInfo, E> {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
 
         // These two blocks are *almost* identical but the iteration order is reversed,
-        // and we only count the chunks once.
-        // TODO: For performance, also use a shader that doesn't support opacity for the
-        // opaque pass. Once block geometry no longer uses alpha discard, we can skip that
-        // too.
-        {
-            let pass = SpaceRendererPass::Opaque;
-            render_gate.render(&pass.render_state(), |mut tess_gate| {
-                for p in self.chunk_chart.chunks(self.view_chunk) {
-                    if let Some(chunk) = self.chunks.get(&p) {
-                        if self.cull(p) {
-                            continue;
+        // the shader is different, and we only count the chunks once.
+        shading_gate.shade(
+            &mut block_programs.opaque,
+            |ref mut program_iface, u, mut render_gate| {
+                u.initialize(program_iface, self);
+                let pass = SpaceRendererPass::Opaque;
+                render_gate.render(&pass.render_state(), |mut tess_gate| {
+                    for p in self.chunk_chart.chunks(self.view_chunk) {
+                        if let Some(chunk) = self.chunks.get(&p) {
+                            if self.cull(p) {
+                                continue;
+                            }
+                            chunks_drawn += 1;
+                            squares_drawn +=
+                                chunk.render(&mut tess_gate, pass, DepthOrdering::Any)?;
                         }
-                        chunks_drawn += 1;
-                        squares_drawn += chunk.render(&mut tess_gate, pass, DepthOrdering::Any)?;
+                        // TODO: If the chunk is missing, draw a blocking shape, possibly?
                     }
-                    // TODO: If the chunk is missing, draw a blocking shape, possibly?
-                }
-                Ok(())
-            })?;
-        }
-        {
-            let pass = SpaceRendererPass::Transparent;
-            render_gate.render(&pass.render_state(), |mut tess_gate| {
-                for p in self.chunk_chart.chunks(self.view_chunk).rev() {
-                    if let Some(chunk) = self.chunks.get(&p) {
-                        if self.cull(p) {
-                            continue;
+                    Ok(())
+                })
+            },
+        )?;
+
+        shading_gate.shade(
+            &mut block_programs.transparent,
+            |ref mut program_iface, u, mut render_gate| {
+                u.initialize(program_iface, self);
+                let pass = SpaceRendererPass::Transparent;
+                render_gate.render(&pass.render_state(), |mut tess_gate| {
+                    for p in self.chunk_chart.chunks(self.view_chunk).rev() {
+                        if let Some(chunk) = self.chunks.get(&p) {
+                            if self.cull(p) {
+                                continue;
+                            }
+                            squares_drawn += chunk.render(
+                                &mut tess_gate,
+                                pass,
+                                // TODO: avoid adding and then subtracting view_chunk
+                                DepthOrdering::from_view_direction(p.0 - self.view_chunk.0),
+                            )?;
                         }
-                        squares_drawn += chunk.render(
-                            &mut tess_gate,
-                            pass,
-                            // TODO: avoid adding and then subtracting view_chunk
-                            DepthOrdering::from_view_direction(p.0 - self.view_chunk.0),
-                        )?;
                     }
-                }
-                Ok(())
-            })?;
-        }
+                    Ok(())
+                })
+            },
+        )?;
 
         Ok(SpaceRenderInfo {
             chunks_drawn,

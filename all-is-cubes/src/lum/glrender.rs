@@ -18,7 +18,7 @@ use crate::camera::{Camera, GraphicsOptions, Viewport};
 use crate::character::{Character, Cursor};
 use crate::content::palette;
 use crate::listen::{DirtyFlag, ListenableSource};
-use crate::lum::shading::{prepare_block_program, BlockProgram};
+use crate::lum::shading::BlockPrograms;
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::LumBlockVertex;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
@@ -40,7 +40,7 @@ where
     // Graphics objects
     pub surface: C,
     back_buffer: Framebuffer<Dim2, (), ()>,
-    block_program: BlockProgram,
+    block_programs: BlockPrograms,
 
     // Rendering state
     character: Option<URef<Character>>,
@@ -63,7 +63,7 @@ where
         viewport: Viewport,
     ) -> WarningsResult<Self, String, String> {
         // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
-        let (block_program, warnings) = prepare_block_program(&mut surface)?;
+        let (block_programs, warnings) = BlockPrograms::compile(&mut surface)?;
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut surface,
             viewport.framebuffer_size.into(),
@@ -80,7 +80,7 @@ where
                 graphics_options_dirty,
                 surface,
                 back_buffer,
-                block_program,
+                block_programs,
                 character: None,
                 world_renderer: None,
                 ui_renderer: None,
@@ -164,7 +164,7 @@ where
             return info;
         });
         let surface = &mut self.surface;
-        let block_program = &mut self.block_program;
+        let block_programs = &mut self.block_programs;
 
         self.world_camera.set_view_matrix(character.view());
 
@@ -245,14 +245,15 @@ where
                     .set_clear_color(world_output.sky_color.with_alpha_one().into()),
                 |pipeline, mut shading_gate| {
                     let world_output_bound = world_output.bind(&pipeline)?;
+                    // Space
+                    info.space = world_output_bound.render(&mut shading_gate, block_programs)?;
+
+                    // Cursor and debug info
+                    // Note: This will fall on top of transparent world content due to draw order.
                     shading_gate.shade(
-                        block_program,
+                        &mut block_programs.opaque,
                         |ref mut program_iface, u, mut render_gate| {
                             u.initialize(program_iface, &world_output_bound);
-                            // Space
-                            info.space = world_output_bound.render(&mut render_gate)?;
-
-                            // Cursor and debug info
                             render_gate.render(&RenderState::default(), |mut tess_gate| {
                                 // Draw cursor only if it's in the same space.
                                 if matches!(cursor_result, Some(c) if c.space == character.space) {
@@ -281,16 +282,10 @@ where
                 &PipelineState::default().enable_clear_color(false),
                 |pipeline, mut shading_gate| {
                     if let Some(ui_output) = ui_output {
-                        let ui_bound = ui_output.bind(&pipeline)?;
-
-                        shading_gate.shade(
-                            block_program,
-                            |ref mut program_iface, u, mut render_gate| {
-                                u.initialize(program_iface, &ui_bound);
-                                ui_bound.render(&mut render_gate)?;
-                                Ok(())
-                            },
-                        )?;
+                        // TODO: Ignoring info
+                        ui_output
+                            .bind(&pipeline)?
+                            .render(&mut shading_gate, block_programs)?;
                     }
 
                     Ok(())

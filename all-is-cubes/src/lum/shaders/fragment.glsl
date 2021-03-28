@@ -57,6 +57,13 @@ void main(void) {
   // Fog
   color.rgb = mix(color.rgb, fog_color, fog_mix);
 
+  // Ban alpha in our opaque mode, to make mistakes show up faster
+  // and to prevent transparent holes in the mesh if the opaque mesh's texture
+  // isn't up to date.
+  #ifndef ALLOW_TRANSPARENCY
+    color.a = 1.0;
+  #endif
+
   // Multiply alpha because our blend function choice is premultiplied alpha.
   fragment_color = vec4(color.rgb * color.a, color.a);
 }

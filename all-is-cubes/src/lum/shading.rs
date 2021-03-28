@@ -17,28 +17,66 @@ use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::VertexSemantics;
 use crate::math::FreeCoordinate;
-use crate::util::WarningsResult;
+use crate::util::{Warnings as _, WarningsResult};
 
 /// Type of the block shader program (output of [`prepare_block_program`]).
 pub type BlockProgram = Program<VertexSemantics, (), BlockUniformInterface>;
 
-// TODO: Make higher-level abstractions such that this doesn't need to be public
+/// Collection of shaders for rendering blocks, which all share the `BlockUniformInterface`.
+pub(crate) struct BlockPrograms {
+    pub(crate) opaque: BlockProgram,
+    pub(crate) transparent: BlockProgram,
+}
+
+impl BlockPrograms {
+    pub(crate) fn compile<C>(context: &mut C) -> WarningsResult<BlockPrograms, String, String>
+    where
+        C: GraphicsContext<Backend = Backend>,
+    {
+        let mut warnings = Vec::new();
+        let this = BlockPrograms {
+            opaque: prepare_block_program(context, [].iter().copied())
+                .move_warnings(&mut warnings)?,
+            transparent: prepare_block_program(
+                context,
+                [("ALLOW_TRANSPARENCY", "1")].iter().copied(),
+            )
+            .move_warnings(&mut warnings)?,
+        };
+        Ok((this, warnings))
+    }
+}
+
 /// Compile the block shader program for the given [`GraphicsContext`].
-pub fn prepare_block_program<C>(context: &mut C) -> WarningsResult<BlockProgram, String, String>
+fn prepare_block_program<'a, C>(
+    context: &mut C,
+    defines: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> WarningsResult<BlockProgram, String, String>
 where
     C: GraphicsContext<Backend = Backend>,
 {
+    let defines: String = defines
+        .into_iter()
+        .map(|(k, v)| format!("#define {} {}\n", k, v))
+        .collect();
+
+    let concatenated_vertex_shader: String = defines.clone()
+        + "\n#line 1 0\n"
+        + SHADER_COMMON
+        + "\n#line 1 1\n"
+        + SHADER_VERTEX_COMMON
+        + "\n#line 1 2\n"
+        + SHADER_VERTEX_BLOCK;
+    let concatenated_fragment_shader: String =
+        defines + "\n#line 1 0\n" + SHADER_COMMON + "#line 1 1\n" + SHADER_FRAGMENT;
+
     let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = context
         .new_shader_program::<VertexSemantics, (), BlockUniformInterface>()
         .from_strings(
-            &(SHADER_COMMON.to_owned()
-                + "\n#line 1 1\n"
-                + SHADER_VERTEX_COMMON
-                + "\n#line 1 2\n"
-                + SHADER_VERTEX_BLOCK),
+            &concatenated_vertex_shader,
             None,
             None,
-            &(SHADER_COMMON.to_owned() + "#line 1 1\n" + SHADER_FRAGMENT),
+            &concatenated_fragment_shader,
         );
     match program_attempt {
         Err(error) => Err((format!("{}", error), vec![])),
