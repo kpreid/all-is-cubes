@@ -219,23 +219,12 @@ impl WebGameRoot {
                     1 => 2,
                     x => x as usize,
                 };
-                if let Some(cursor) = &this.app.cursor_result() {
-                    // TODO: This should maybe go through InputProcessor? For consistency?
-                    let result = this
-                        .app
-                        .character()
-                        .borrow_mut()
-                        .click(cursor, mapped_button);
-                    console::log_1(&JsValue::from_str(&format!(
-                        "click {}: {:?}",
-                        mapped_button, result
-                    )));
-                } else {
-                    console::log_1(&JsValue::from_str(&format!(
-                        "click {}: no cursor",
-                        mapped_button
-                    )));
-                }
+                // TODO: outcome reporting should be directly in the UI, not our responsibility
+                let result = this.app.click(mapped_button);
+                console::log_1(&JsValue::from_str(&format!(
+                    "click {}: {:?}",
+                    mapped_button, result
+                )));
             },
         );
 

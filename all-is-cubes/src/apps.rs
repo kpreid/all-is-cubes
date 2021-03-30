@@ -13,6 +13,8 @@ use crate::content::UniverseTemplate;
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource, ListenerHelper as _};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
+use crate::tools::ToolError;
+use crate::transactions::Transaction;
 use crate::universe::{FrameClock, URef, Universe, UniverseStepInfo};
 use crate::vui::Vui;
 
@@ -152,6 +154,19 @@ impl AllIsCubesAppState {
 
     pub fn cursor_result(&self) -> &Option<Cursor> {
         &self.cursor_result
+    }
+
+    /// TODO: Should have click feedback in VUI, not via return value.
+    pub fn click(&mut self, button: usize) -> Result<(), ToolError> {
+        if let Some(cursor) = &self.cursor_result {
+            let transaction = Character::click(self.game_character.clone(), cursor, button)?;
+            transaction
+                .execute(self.universe_mut())
+                .map_err(|e| ToolError::Internal(e.to_string()))?;
+            Ok(())
+        } else {
+            Err(ToolError::NothingSelected) // TODO: slightly wrong
+        }
     }
 }
 

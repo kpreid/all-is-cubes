@@ -8,12 +8,12 @@ use std::collections::BTreeMap;
 use std::error::Error;
 
 use crate::block::{Block, AIR};
-use crate::character::Cursor;
+use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
-use crate::space::SetCubeError;
-use crate::transactions::Transaction;
-use crate::universe::RefError;
+use crate::space::{SetCubeError, SpaceTransaction};
+use crate::transactions::{Transaction, UniverseTransaction};
+use crate::universe::{RefError, URef};
 use crate::vui::Icons;
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
@@ -39,23 +39,34 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub fn use_tool(&mut self, input: &mut ToolInput) -> Result<(), ToolError> {
+    /// Computes the effect of using the tool.
+    ///
+    /// The effect consists of both mutations to `self` and a [`UniverseTransaction`].
+    /// If the transaction does not succeed, the original `Tool` value should be kept.
+    pub fn use_tool(self, input: &ToolInput) -> Result<(Self, UniverseTransaction), ToolError> {
         match self {
             Self::None => Err(ToolError::NotUsable),
             Self::Activate => {
                 // TODO: We have nothing to activate yet.
                 Err(ToolError::NotUsable)
             }
-            Self::DeleteBlock => {
-                input.set_cube(input.cursor().place.cube, &input.cursor().block, &AIR)
+            Self::DeleteBlock => Ok((
+                self,
+                input.set_cube(input.cursor().place.cube, input.cursor().block.clone(), AIR)?,
+            )),
+            Self::PlaceBlock(ref block) => {
+                let block = block.clone();
+                Ok((
+                    self,
+                    input.set_cube(input.cursor().place.adjacent(), AIR, block)?,
+                ))
             }
-            Self::PlaceBlock(block) => input.set_cube(input.cursor().place.adjacent(), &AIR, block),
-            Self::CopyFromSpace => {
+            Self::CopyFromSpace => Ok((
+                self,
                 input.produce_item(Tool::PlaceBlock(
                     input.cursor().block.clone().unspecialize(),
-                ));
-                Ok(())
-            }
+                ))?,
+            )),
         }
     }
 
@@ -87,33 +98,30 @@ pub struct ToolInput {
     // TODO: It shouldn't be mandatory to have a valid cursor input; some tools
     // might not need targeting.
     cursor: Cursor,
-    output_items: Vec<Tool>,
+    character: Option<URef<Character>>,
 }
 
 impl ToolInput {
-    // Generic handler for a tool that replaces one cube.
+    /// Generic handler for a tool that replaces one cube.
     fn set_cube(
         &self,
         cube: GridPoint,
-        old_block: &Block,
-        new_block: &Block,
-    ) -> Result<(), ToolError> {
-        let mut space = self
+        old_block: Block,
+        new_block: Block,
+    ) -> Result<UniverseTransaction, ToolError> {
+        let space = self
             .cursor
             .space
-            .try_borrow_mut()
+            .try_borrow()
             .map_err(ToolError::SpaceRef)?;
-        if &space[cube] != old_block {
+        if space[cube] != old_block {
             return Err(ToolError::NotUsable);
         }
-        space.set(cube, new_block).map_err(ToolError::SetCube)?;
 
-        // Gimmick: update lighting ASAP in order to make it less likely that non-updated
-        // light is rendered. This is particularly needful for tools because their effects
-        // (currently) happen outside of Space::step.
-        space.update_lighting_from_queue();
-
-        Ok(())
+        Ok(UniverseTransaction::of(
+            self.cursor.space.clone(),
+            SpaceTransaction::set_cube(cube, Some(old_block), Some(new_block)),
+        ))
     }
 
     pub fn cursor(&self) -> &Cursor {
@@ -121,10 +129,16 @@ impl ToolInput {
     }
 
     /// Add the provided item to the inventory from which the tool was used.
-    // TODO: Provide a way to check if inventory space is full? In general, should there
-    // be transaction support?
-    pub fn produce_item(&mut self, item: Tool) {
-        self.output_items.push(item);
+    pub fn produce_item(&self, item: Tool) -> Result<UniverseTransaction, ToolError> {
+        if let Some(ref character) = self.character {
+            Ok(UniverseTransaction::of(
+                character.clone(),
+                CharacterTransaction::inventory(InventoryTransaction::insert(item)),
+            ))
+        } else {
+            // TODO: Specific error
+            Err(ToolError::NotUsable)
+        }
     }
 }
 
@@ -132,7 +146,8 @@ impl ToolInput {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 pub enum ToolError {
     // TODO: Add tests for these error messages and make them make good sense in contexts
-    // they might appear ... or possibly we have a separate trait for them.
+    // they might appear ... or possibly we have a separate trait for them
+    // TODO: This enum needs a rework given the new transaction system.
     /// The tool cannot currently be used or does not apply to the target.
     #[error("does not apply")]
     NotUsable,
@@ -142,9 +157,13 @@ pub enum ToolError {
     /// The cube to be modified could not be modified; see the inner error for why.
     #[error("error placing block: {0}")]
     SetCube(#[from] SetCubeError),
-    /// The space to be modified could not be accessed.
-    #[error("error modifying space: {0}")]
+    /// The space to be operated on could not be accessed.
+    #[error("error accessing space: {0}")]
     SpaceRef(#[from] RefError),
+    /// An error occurred while executing the effects of the tool.
+    /// TODO: Improve this along with [`Transaction`] error types.
+    #[error("unexpected error: {0}")]
+    Internal(String),
 }
 
 /// A collection of [`Tool`]s. (Might contain other sorts of items in the future.)
@@ -173,40 +192,49 @@ impl Inventory {
     ///
     /// If `slot_index` is [`None`], uses a [`Tool::Activate`] that does not exist in the inventory.
     /// TODO: Bad API, have a more coherent overall design.
+    ///
+    /// `character` must be the character containing the inventory. TODO: Bad API
     pub fn use_tool(
-        &mut self,
+        &self,
         cursor: &Cursor,
+        character: URef<Character>,
         slot_index: Option<usize>,
-    ) -> Result<(), ToolError> {
-        let mut activate = Tool::Activate;
+    ) -> Result<UniverseTransaction, ToolError> {
+        let activate = Tool::Activate;
         let tool = if let Some(slot_index) = slot_index {
-            if let Some(tool) = self.slots.get_mut(slot_index) {
+            if let Some(tool) = self.slots.get(slot_index) {
                 tool
             } else {
                 return Err(ToolError::NotUsable);
             }
         } else {
-            &mut activate
+            &activate
         };
 
-        let mut input = ToolInput {
+        let input = ToolInput {
             cursor: cursor.clone(),
-            output_items: Vec::new(),
+            character: Some(character.clone()),
         };
-        tool.use_tool(&mut input)?;
+        let (new_tool, mut transaction) = tool.clone().use_tool(&input)?;
 
-        // Stuff any outputs into our inventory
-        // TODO: Write tests for this
-        for output in input.output_items {
-            match self.try_add_item(output) {
-                Ok(()) => {}
-                Err(_output) => {
-                    // TODO: drop these items on the ground or something once that option exists.
-                    // Or in some cases we might want transactional tools (no effect if can't succeed).
-                }
+        if &new_tool != tool {
+            if let Some(slot_index) = slot_index {
+                transaction = transaction
+                    .merge(UniverseTransaction::of(
+                        character,
+                        CharacterTransaction::inventory(InventoryTransaction::replace(
+                            slot_index,
+                            tool.clone(),
+                            new_tool,
+                        )),
+                    ))
+                    .expect("failed to merge tool self-update");
+            } else {
+                panic!("shouldn't happen: no slot but tool mutated");
             }
         }
-        Ok(())
+
+        Ok(transaction)
     }
 
     /// Add an item to an empty slot in this inventory. Returns the item if there is
@@ -327,6 +355,7 @@ mod tests {
     #[derive(Debug)]
     struct ToolTester {
         universe: Universe,
+        character_ref: URef<Character>,
         space_ref: URef<Space>,
     }
     impl ToolTester {
@@ -339,8 +368,10 @@ mod tests {
             let space_ref = universe.insert_anonymous(space);
 
             Self {
-                universe,
+                character_ref: universe
+                    .insert_anonymous(Character::spawn_default(space_ref.clone())),
                 space_ref,
+                universe,
             }
         }
 
@@ -350,8 +381,24 @@ mod tests {
             ToolInput {
                 // TODO: define ToolInput::new
                 cursor,
-                output_items: Vec::new(),
+                character: Some(self.character_ref.clone()),
             }
+        }
+
+        fn equip_and_use_tool(&self, tool: Tool) -> Result<UniverseTransaction, ToolError> {
+            // Put the tool in inventory.
+            let index = 0;
+            let mut c = self.character_ref.borrow_mut();
+            CharacterTransaction::inventory(InventoryTransaction::replace(0, Tool::None, tool))
+                .execute(&mut *c)
+                .unwrap();
+
+            // Invoke Inventory::use_tool, which knows how to assemble the answer into a single transaction
+            // (and the result format may change as I'm just getting started with adding transactions as of
+            // writing this code).
+            let input = self.input();
+            c.inventory()
+                .use_tool(&input.cursor, self.character_ref.clone(), Some(index))
         }
 
         fn space(&self) -> UBorrow<Space> {
@@ -384,7 +431,7 @@ mod tests {
             space.set((1, 0, 0), &existing).unwrap();
         });
         assert_eq!(
-            Tool::None.use_tool(&mut tester.input()),
+            tester.equip_and_use_tool(Tool::None),
             Err(ToolError::NotUsable)
         );
         print_space(&tester.space(), (-1., 1., 1.));
@@ -407,7 +454,7 @@ mod tests {
             space.set((1, 0, 0), &existing).unwrap();
         });
         assert_eq!(
-            Tool::Activate.use_tool(&mut tester.input()),
+            tester.equip_and_use_tool(Tool::Activate),
             Err(ToolError::NotUsable)
         );
     }
@@ -429,10 +476,22 @@ mod tests {
     #[test]
     fn use_delete_block() {
         let [existing] = make_some_blocks();
-        let tester = ToolTester::new(|space| {
+        let mut tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
-        assert_eq!(Tool::DeleteBlock.use_tool(&mut tester.input()), Ok(()));
+        let transaction = tester.equip_and_use_tool(Tool::DeleteBlock).unwrap();
+        assert_eq!(
+            transaction,
+            UniverseTransaction::of(
+                tester.space_ref.clone(),
+                SpaceTransaction::set_cube(
+                    GridPoint::new(1, 0, 0),
+                    Some(existing.clone()),
+                    Some(AIR)
+                )
+            )
+        );
+        transaction.execute(&mut tester.universe).unwrap();
         print_space(&*tester.space(), (-1., 1., 1.));
         assert_eq!(&tester.space()[(1, 0, 0)], &AIR);
     }
@@ -447,13 +506,24 @@ mod tests {
     #[test]
     fn use_place_block() {
         let [existing, tool_block] = make_some_blocks();
-        let tester = ToolTester::new(|space| {
+        let mut tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
+        let transaction = tester
+            .equip_and_use_tool(Tool::PlaceBlock(tool_block.clone()))
+            .unwrap();
         assert_eq!(
-            Tool::PlaceBlock(tool_block.clone()).use_tool(&mut tester.input()),
-            Ok(())
+            transaction,
+            UniverseTransaction::of(
+                tester.space_ref.clone(),
+                SpaceTransaction::set_cube(
+                    GridPoint::new(0, 0, 0),
+                    Some(AIR),
+                    Some(tool_block.clone())
+                )
+            )
         );
+        transaction.execute(&mut tester.universe).unwrap();
         print_space(&tester.space(), (-1., 1., 1.));
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
         assert_eq!(&tester.space()[(0, 0, 0)], &tool_block);
@@ -468,7 +538,7 @@ mod tests {
         // Place the obstacle after the raycast
         tester.space_mut().set((0, 0, 0), &obstacle).unwrap();
         assert_eq!(
-            Tool::PlaceBlock(tool_block).use_tool(&mut tester.input()),
+            tester.equip_and_use_tool(Tool::PlaceBlock(tool_block)),
             Err(ToolError::NotUsable)
         );
         print_space(&*tester.space(), (-1., 1., 1.));
@@ -479,12 +549,20 @@ mod tests {
     #[test]
     fn use_copy_from_space() {
         let [existing] = make_some_blocks();
-        let tester = ToolTester::new(|space| {
+        let mut tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
-        let mut input = tester.input();
-        assert_eq!(Tool::CopyFromSpace.use_tool(&mut input), Ok(()));
-        assert_eq!(input.output_items, vec![Tool::PlaceBlock(existing.clone())]);
+        let transaction = tester.equip_and_use_tool(Tool::CopyFromSpace).unwrap();
+        assert_eq!(
+            transaction,
+            UniverseTransaction::of(
+                tester.character_ref.clone(),
+                CharacterTransaction::inventory(InventoryTransaction::insert(Tool::PlaceBlock(
+                    existing.clone()
+                )))
+            )
+        );
+        transaction.execute(&mut tester.universe).unwrap();
         // Space is unmodified
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
     }

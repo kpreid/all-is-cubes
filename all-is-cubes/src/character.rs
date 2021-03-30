@@ -19,7 +19,7 @@ use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
 use crate::tools::{Inventory, InventoryTransaction, Tool, ToolError};
-use crate::transactions::Transaction;
+use crate::transactions::{Transaction, UniverseTransaction};
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
@@ -214,15 +214,21 @@ impl Character {
     ///
     /// TODO: Dubious API: shouldn't this only work with the character's space?
     /// We want to refactor click handling in general, so keep an eye on that.
-    pub fn click(&mut self, cursor: &Cursor, button: usize) -> Result<(), ToolError> {
-        let slot_index = self
+    pub fn click(
+        this: URef<Character>,
+        cursor: &Cursor,
+        button: usize,
+    ) -> Result<UniverseTransaction, ToolError> {
+        let tb = this.borrow();
+        let slot_index = tb
             .selected_slots
             .get(button)
             .copied()
-            .unwrap_or(self.selected_slots[0]);
-        self.inventory.use_tool(
+            .unwrap_or(tb.selected_slots[0]);
+        tb.inventory.use_tool(
             cursor,
-            if cursor.space == self.space {
+            this,
+            if cursor.space == tb.space {
                 // Use inventory tools on world
                 Some(slot_index)
             } else {
@@ -230,9 +236,7 @@ impl Character {
                 // TODO: Bad design; we should perhaps not route these clicks through Character::click at all.
                 None
             },
-        )?;
-        self.notifier.notify(CharacterChange::Inventory); // TODO: this change report should come from the inventory
-        Ok(())
+        )
     }
 
     // TODO: this code's location is driven by colliding_cubes being here, which is probably wrong

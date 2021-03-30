@@ -133,15 +133,8 @@ pub fn glfw_main_loop(
                         .mouse_pixel_position(renderer.viewport(), None, false);
                 }
                 WindowEvent::MouseButton(button, Action::Press, _) => {
-                    if let Some(cursor) = &app.cursor_result() {
-                        // TODO: This should go through InputProcessor for consistency and duplicated code
-                        let click = app
-                            .character()
-                            .borrow_mut()
-                            .click(cursor, map_glfw_button(button));
-                        // TODO: this dumping should be replaced with in-game UI feedback
-                        eprintln!("click: {:?}", click);
-                    }
+                    // TODO: this dumping should be replaced with in-game UI feedback
+                    eprintln!("click: {:?}", app.click(map_glfw_button(button)));
                 }
                 WindowEvent::MouseButton(_, Action::Release, _) => {}
                 WindowEvent::MouseButton(_, Action::Repeat, _) => {}
