@@ -5,6 +5,7 @@
 
 use instant::Instant; // wasm-compatible replacement for std::time::Instant
 use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
+use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::HashMap;
 use std::fmt::{self, Debug, Display};
@@ -431,6 +432,36 @@ impl<T> Deref for UBorrowMut<T> {
 impl<T> DerefMut for UBorrowMut<T> {
     fn deref_mut(&mut self) -> &mut T {
         self.0.deref_mut()
+    }
+}
+impl<T> AsRef<T> for UBorrow<T> {
+    fn as_ref(&self) -> &T {
+        self.deref()
+    }
+}
+impl<T> AsRef<T> for UBorrowMut<T> {
+    fn as_ref(&self) -> &T {
+        self.deref()
+    }
+}
+impl<T> AsMut<T> for UBorrowMut<T> {
+    fn as_mut(&mut self) -> &mut T {
+        self.deref_mut()
+    }
+}
+impl<T> Borrow<T> for UBorrow<T> {
+    fn borrow(&self) -> &T {
+        self.deref()
+    }
+}
+impl<T> Borrow<T> for UBorrowMut<T> {
+    fn borrow(&self) -> &T {
+        self.deref()
+    }
+}
+impl<T> BorrowMut<T> for UBorrowMut<T> {
+    fn borrow_mut(&mut self) -> &mut T {
+        self.deref_mut()
     }
 }
 
