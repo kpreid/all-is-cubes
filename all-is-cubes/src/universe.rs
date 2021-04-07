@@ -300,7 +300,6 @@ type StrongEntryRef<T> = Rc<RefCell<UEntry<T>>>;
 /// or panic depending on the method).
 /// To ensure an object does not vanish while operating on it, [`URef::borrow`] it.
 /// (TODO: Should there be an operation in the style of `Weak::upgrade`?)
-#[derive(Debug)]
 pub struct URef<T> {
     // TODO: We're going to want to either track reference counts or implement a garbage
     // collector for the graph of URefs. Reference counts would be an easy way to ensure
@@ -358,6 +357,13 @@ impl<T: 'static> URef<T> {
         self.weak_ref
             .upgrade()
             .ok_or_else(|| RefError::Gone(Rc::clone(&self.name)))
+    }
+}
+
+impl<T> Debug for URef<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO: Maybe print dead refs differently?
+        write!(f, "URef({})", self.name)
     }
 }
 
@@ -658,6 +664,16 @@ Universe {
 }\
             "
         );
+    }
+
+    #[test]
+    fn uref_debug() {
+        let mut u = Universe::new();
+        let r = u
+            .insert("foo".into(), Space::empty_positive(1, 2, 3))
+            .unwrap();
+        assert_eq!(format!("{:?}", r), "URef('foo')");
+        assert_eq!(format!("{:#?}", r), "URef('foo')");
     }
 
     #[test]
