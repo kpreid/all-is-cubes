@@ -8,7 +8,7 @@ use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::prelude::{Dimensions, Drawable, Point, Transform};
 use embedded_graphics::style::{Styled, TextStyle, TextStyleBuilder};
 use std::borrow::Cow;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use crate::block::Block;
 use crate::drawing::VoxelBrush;
@@ -77,18 +77,16 @@ where
 /// use all_is_cubes::block::Block;
 /// use all_is_cubes::content::make_some_blocks;
 ///
-/// let blocks: Vec<Block> = make_some_blocks(3);
-/// assert_eq!(blocks.len(), 3);
+/// let blocks: [Block; 3] = make_some_blocks();
 /// assert_ne!(blocks[0], blocks[1]);
 /// assert_ne!(blocks[0], blocks[2]);
 /// assert_ne!(blocks[1], blocks[2]);
 /// ```
-pub fn make_some_blocks(count: usize) -> Vec<Block> {
-    // TODO: should this return an iterator? would anyone care?
-    let mut vec: Vec<Block> = Vec::with_capacity(count);
-    for i in 0..count {
-        let luminance = if count > 1 {
-            i as f32 / (count - 1) as f32
+pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
+    let mut vec: Vec<Block> = Vec::with_capacity(COUNT);
+    for i in 0..COUNT {
+        let luminance = if COUNT > 1 {
+            i as f32 / (COUNT - 1) as f32
         } else {
             0.5
         };
@@ -99,7 +97,7 @@ pub fn make_some_blocks(count: usize) -> Vec<Block> {
                 .build(),
         );
     }
-    vec
+    vec.try_into().unwrap()
 }
 
 /// Draw the Space's axes as lines of blocks centered on (0, 0, 0).
@@ -161,15 +159,15 @@ mod tests {
 
     #[test]
     fn make_some_blocks_0() {
-        assert_eq!(make_some_blocks(0), vec![]);
+        assert_eq!(make_some_blocks::<0>(), []);
     }
 
     #[test]
     fn make_some_blocks_1() {
         // Should succeed even though the normal range would be division-by-zero.
         assert_eq!(
-            make_some_blocks(1),
-            vec![Block::Atom(
+            make_some_blocks::<1>(),
+            [Block::Atom(
                 BlockAttributes {
                     display_name: "0".into(),
                     ..BlockAttributes::default()
@@ -182,8 +180,8 @@ mod tests {
     #[test]
     fn make_some_blocks_2() {
         assert_eq!(
-            make_some_blocks(2),
-            vec![
+            make_some_blocks::<2>(),
+            [
                 Block::Atom(
                     BlockAttributes {
                         display_name: "0".into(),

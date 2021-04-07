@@ -104,7 +104,7 @@ fn excludes_hidden_faces_of_blocks() {
 /// Run [`triangulate_space`] with stale block data and confirm it does not panic.
 #[test]
 fn no_panic_on_missing_blocks() {
-    let block = make_some_blocks(1).swap_remove(0);
+    let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
     let block_triangulations: BlockTriangulations<BlockVertex, _> =
         triangulate_blocks(&space, &mut TestTextureAllocator::new(43));
@@ -159,7 +159,7 @@ fn space_tri_equals_block_tri() {
     // Construct recursive block.
     let resolution = 4;
     let mut u = Universe::new();
-    let mut blocks = make_some_blocks(2);
+    let mut blocks = Vec::from(make_some_blocks::<2>());
     blocks.push(AIR);
     let recursive_block = Block::builder()
         .voxels_fn(&mut u, resolution, |p| {

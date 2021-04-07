@@ -872,7 +872,6 @@ mod tests {
     use crate::math::GridPoint;
     use crate::universe::{Universe, UniverseIndex as _};
     use cgmath::EuclideanSpace as _;
-    use std::convert::TryInto;
     use std::rc::Rc;
 
     // TODO: test consistency between the index and get_* methods
@@ -881,7 +880,7 @@ mod tests {
     /// set() returns Ok when the cube was changed or already equal.
     #[test]
     fn set_success() {
-        let [first, second]: [_; 2] = make_some_blocks(2).try_into().unwrap();
+        let [first, second] = make_some_blocks();
         let mut space = Space::empty_positive(1, 1, 1);
         let pt = GridPoint::origin();
         assert_eq!(Ok(true), space.set(pt, &first));
@@ -896,7 +895,7 @@ mod tests {
 
     #[test]
     fn set_failure_out_of_bounds() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         let pt = GridPoint::new(1, 0, 0);
         let ptg = Grid::single_cube(pt);
         let mut space = Space::empty_positive(1, 1, 1);
@@ -932,10 +931,10 @@ mod tests {
 
     #[test]
     fn set_failure_too_many() {
-        let n = 300_u16;
-        let blocks = make_some_blocks(n.into());
-        let mut space = Space::empty_positive(n.into(), 1, 1);
-        for i in 0..n {
+        const N: u16 = 300_u16;
+        let blocks = make_some_blocks::<{ N as usize }>();
+        let mut space = Space::empty_positive(N.into(), 1, 1);
+        for i in 0..N {
             match space.set([i.into(), 0, 0], &blocks[usize::from(i)]) {
                 Ok(true) => {}
                 Err(SetCubeError::TooManyBlocks()) => break,
@@ -965,7 +964,7 @@ mod tests {
     /// EvaluatedBlock data is updated when a new block index is allocated.
     #[test]
     fn set_updates_evaluated_on_added_block() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         let mut space = Space::empty_positive(2, 1, 1);
         space.set((0, 0, 0), &block).unwrap();
         // Confirm the expected indices
@@ -979,7 +978,7 @@ mod tests {
     /// EvaluatedBlock data is updated when a block index is reused.
     #[test]
     fn set_updates_evaluated_on_replaced_block() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         let mut space = Space::empty_positive(1, 1, 1);
         space.set((0, 0, 0), &block).unwrap();
         // Confirm the expected indices
@@ -991,52 +990,52 @@ mod tests {
 
     #[test]
     fn removed_blocks_are_forgotten() {
-        let blocks = make_some_blocks(3);
+        let [block_0, block_1, block_2] = make_some_blocks();
         let mut space = Space::empty_positive(2, 1, 1);
         let pt1 = GridPoint::new(0, 0, 0);
         let pt2 = GridPoint::new(1, 0, 0);
         // TODO: This test depends on block allocation order. distinct_blocks() ought to be stable or explicitly return a HashSet or something.
         assert_eq!(space.distinct_blocks(), vec![AIR.clone()], "step 1");
-        space.set(pt1, &blocks[0]).unwrap();
+        space.set(pt1, &block_0).unwrap();
         space.consistency_check();
         assert_eq!(
             space.distinct_blocks(),
-            vec![AIR.clone(), blocks[0].clone()],
+            vec![AIR.clone(), block_0.clone()],
             "step 2"
         );
-        space.set(pt2, &blocks[1]).unwrap();
+        space.set(pt2, &block_1).unwrap();
         space.consistency_check();
         assert_eq!(
             space.distinct_blocks(),
-            vec![blocks[1].clone(), blocks[0].clone()],
+            vec![block_1.clone(), block_0.clone()],
             "step 3"
         );
-        space.set(pt1, &blocks[2]).unwrap();
+        space.set(pt1, &block_2).unwrap();
         space.consistency_check();
         assert_eq!(
             space.distinct_blocks(),
-            vec![blocks[1].clone(), blocks[2].clone()],
+            vec![block_1.clone(), block_2.clone()],
             "step 4"
         );
 
         // Make sure that reinserting an old block correctly allocates an index rather than using the old one.
-        space.set(pt2, &blocks[0]).unwrap();
+        space.set(pt2, &block_0).unwrap();
         space.consistency_check();
         assert_eq!(
             space.distinct_blocks(),
-            vec![blocks[0].clone(), blocks[2].clone()],
+            vec![block_0.clone(), block_2.clone()],
             "step 4"
         );
     }
 
     #[test]
     fn change_listener() {
-        let blocks = make_some_blocks(2);
+        let [block] = make_some_blocks();
         let mut space = Space::empty_positive(2, 1, 1);
         let mut sink = Sink::new();
         space.listen(sink.listener());
 
-        assert_eq!(Ok(true), space.set((0, 0, 0), &blocks[0]));
+        assert_eq!(Ok(true), space.set((0, 0, 0), &block));
         //panic!("{:?}", sink.collect::<Vec<_>>());
         // Note: Sink currently reports things in reverse of insertion order.
         assert_eq!(
@@ -1047,16 +1046,16 @@ mod tests {
         assert_eq!(None, sink.next());
 
         // No change, no notification
-        assert_eq!(Ok(false), space.set((0, 0, 0), &blocks[0]));
+        assert_eq!(Ok(false), space.set((0, 0, 0), &block));
         assert_eq!(None, sink.next());
     }
 
     #[test]
     fn extract_out_of_bounds() {
-        let blocks = make_some_blocks(2);
+        let [block_0, block_1] = make_some_blocks();
         let mut space = Space::empty_positive(2, 1, 1);
-        space.set((0, 0, 0), &blocks[0]).unwrap();
-        space.set((1, 0, 0), &blocks[1]).unwrap();
+        space.set((0, 0, 0), &block_0).unwrap();
+        space.set((1, 0, 0), &block_1).unwrap();
 
         let extract_grid = Grid::new((1, 0, 0), (1, 2, 1));
         let extracted = space.extract(extract_grid, |_index, block_data, _lighting| {
@@ -1067,7 +1066,7 @@ mod tests {
         });
 
         assert_eq!(extracted.grid(), extract_grid);
-        assert_eq!(&extracted[(1, 0, 0)], &blocks[1]);
+        assert_eq!(&extracted[(1, 0, 0)], &block_1);
         assert_eq!(&extracted[(1, 1, 0)], &AIR);
     }
 
@@ -1082,7 +1081,7 @@ mod tests {
     /// Test filling an entire space with one block using [`Space::fill`].
     #[test]
     fn fill_entire_space() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         let grid = Grid::new((0, 3, 0), (25 * 16, 16, 2));
         let mut space = Space::empty(grid);
         space.fill(grid, |_| Some(&block)).unwrap();
@@ -1095,7 +1094,7 @@ mod tests {
     /// Test filling an entire space with one block using [`Space::fill_uniform`].
     #[test]
     fn fill_uniform_entire_space() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         let grid = Grid::new((0, 3, 0), (25 * 16, 16, 2));
         let mut space = Space::empty(grid);
         let mut sink = Sink::new();
@@ -1116,7 +1115,7 @@ mod tests {
     /// case.
     #[test]
     fn replace_last_block_regression() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         let grid = Grid::new([0, 0, 0], [3, 1, 1]);
         let mut space = Space::empty(grid);
         for i in 0..3 {

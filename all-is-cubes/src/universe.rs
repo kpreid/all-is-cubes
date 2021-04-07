@@ -187,9 +187,9 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
     /// use all_is_cubes::universe::{Name, Universe, UniverseIndex, URef};
     ///
     /// let mut universe = Universe::new();
-    /// let blocks = make_some_blocks(2);
-    /// universe.insert(Name::from("b1"), BlockDef::new(blocks[0].clone()));
-    /// universe.insert(Name::from("b2"), BlockDef::new(blocks[1].clone()));
+    /// let [block_1, block_2] = make_some_blocks();
+    /// universe.insert(Name::from("b1"), BlockDef::new(block_1.clone()));
+    /// universe.insert(Name::from("b2"), BlockDef::new(block_2.clone()));
     ///
     /// let mut found_blocks = universe.iter_by_type()
     ///     .map(|(name, value): (Name, URef<BlockDef>)| (name, Block::clone(&value.borrow())))
@@ -198,7 +198,7 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
     /// assert_eq!(
     ///     found_blocks,
     ///     vec![Name::from("b1"), Name::from("b2")].into_iter()
-    ///         .zip(blocks.into_iter())
+    ///         .zip(vec![block_1, block_2])
     ///         .collect::<Vec<_>>(),
     /// );
     /// ```
@@ -650,7 +650,7 @@ mod tests {
         let mut u = Universe::new();
         u.insert("foo".into(), Space::empty_positive(1, 2, 3))
             .unwrap();
-        u.insert_anonymous(BlockDef::new(make_some_blocks(1).swap_remove(0)));
+        u.insert_anonymous(BlockDef::new(AIR));
         assert_eq!(
             format!("{:?}", u),
             "Universe { [anonymous #0]: all_is_cubes::block::BlockDef, 'foo': all_is_cubes::space::Space }"
@@ -731,12 +731,12 @@ Universe {
 
     #[test]
     fn insert_anonymous_makes_distinct_names() {
-        let blocks = make_some_blocks(2);
+        let [block_0, block_1] = make_some_blocks();
         let mut u = Universe::new();
         let ref_a = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let ref_b = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        ref_a.borrow_mut().set((0, 0, 0), &blocks[0]).unwrap();
-        ref_b.borrow_mut().set((0, 0, 0), &blocks[1]).unwrap();
+        ref_a.borrow_mut().set((0, 0, 0), &block_0).unwrap();
+        ref_b.borrow_mut().set((0, 0, 0), &block_1).unwrap();
         assert_ne!(ref_a, ref_b, "not equal");
         assert_ne!(
             ref_a.borrow()[(0, 0, 0)],

@@ -489,8 +489,9 @@ mod tests {
 
     #[test]
     fn falling_collision() {
+        let [block] = make_some_blocks();
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &make_some_blocks(1)[0]).unwrap();
+        space.set((0, 0, 0), &block).unwrap();
         let mut body = Body {
             velocity: Vector3::new(2.0, 0.0, 0.0),
             flying: false,
@@ -508,8 +509,9 @@ mod tests {
 
     #[test]
     fn push_out_simple() {
+        let [block] = make_some_blocks();
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &make_some_blocks(1)[0]).unwrap();
+        space.set((0, 0, 0), &block).unwrap();
         let mut body = Body {
             position: Point3::new(1.25, 0.5, 0.5), // intersection of 0.25
             velocity: Vector3::zero(),
@@ -531,7 +533,7 @@ mod tests {
     fn no_passing_through_blocks() {
         // Construct cubical box. TODO: worldgen utilities for this?
         let mut space = Space::empty(Grid::new((-1, -1, -1), (3, 3, 3)));
-        let wall_block = make_some_blocks(1).swap_remove(0);
+        let [wall_block] = make_some_blocks();
         space.fill_uniform(space.grid(), &wall_block).unwrap();
         space.set([0, 0, 0], &AIR).unwrap();
 

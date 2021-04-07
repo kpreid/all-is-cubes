@@ -4,7 +4,7 @@
 use all_is_cubes::camera::GraphicsOptions;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
-use all_is_cubes::block::AIR;
+use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::content::make_some_blocks;
 
 use all_is_cubes::space::{Grid, Space};
@@ -52,7 +52,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
 fn checkerboard_setup() -> (Space, BlockTriangulations<BlockVertex, TestTextureTile>) {
     let grid = Grid::new((0, 0, 0), (16, 16, 16));
     let mut space = Space::empty(grid);
-    let mut blocks = make_some_blocks(2);
+    let mut blocks: [Block; 2] = make_some_blocks();
     blocks[0] = AIR.clone();
 
     // Generate checkerboard

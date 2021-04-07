@@ -85,7 +85,7 @@ impl Block {
     /// use all_is_cubes::content::make_some_blocks;
     /// use all_is_cubes::math::{Face::*, GridRotation};
     ///
-    /// let block = make_some_blocks(1).swap_remove(0);
+    /// let [block] = make_some_blocks();
     /// let clockwise = GridRotation::CLOCKWISE;
     ///
     /// // Basic rotation
@@ -117,7 +117,7 @@ impl Block {
     /// use all_is_cubes::content::make_some_blocks;
     /// use all_is_cubes::math::{Face::*, GridRotation};
     ///
-    /// let block = make_some_blocks(1).swap_remove(0);
+    /// let [block] = make_some_blocks();
     /// let clockwise = GridRotation::from_basis([PZ, PY, NX]);
     /// let rotated = block.clone().rotate(clockwise);
     /// assert_ne!(&block, &rotated);
@@ -1208,7 +1208,7 @@ mod tests {
     #[test]
     fn listen_recur() {
         let mut universe = Universe::new();
-        let some_blocks = make_some_blocks(2);
+        let [block_0, block_1] = make_some_blocks();
         let space_ref = universe.insert_anonymous(Space::empty_positive(2, 1, 1));
         let block = Block::builder().voxels_ref(1, space_ref.clone()).build();
         let mut sink = Sink::new();
@@ -1216,19 +1216,13 @@ mod tests {
         assert_eq!(None, sink.next());
 
         // Now mutate the space and we should see a notification.
-        space_ref
-            .borrow_mut()
-            .set((0, 0, 0), &some_blocks[0])
-            .unwrap();
+        space_ref.borrow_mut().set((0, 0, 0), &block_0).unwrap();
         assert!(sink.next().is_some());
 
         // TODO: Also test that we don't propagate lighting changes
 
         // A mutation out of bounds should not trigger a notification
-        space_ref
-            .borrow_mut()
-            .set((1, 0, 0), &some_blocks[1])
-            .unwrap();
+        space_ref.borrow_mut().set((1, 0, 0), &block_1).unwrap();
         assert_eq!(sink.next(), None);
     }
 

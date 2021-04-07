@@ -714,10 +714,10 @@ mod tests {
     #[test]
     fn print_space_test() {
         let mut space = Space::empty_positive(3, 1, 1);
-        let blocks = make_some_blocks(3);
-        space.set((0, 0, 0), &blocks[0]).unwrap();
-        space.set((1, 0, 0), &blocks[1]).unwrap();
-        space.set((2, 0, 0), &blocks[2]).unwrap();
+        let [b0, b1, b2] = make_some_blocks();
+        space.set((0, 0, 0), &b0).unwrap();
+        space.set((1, 0, 0), &b1).unwrap();
+        space.set((2, 0, 0), &b2).unwrap();
 
         let mut output = String::new();
         print_space_impl(&space, (1., 1., 1.), |s| output += s);

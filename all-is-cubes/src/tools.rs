@@ -231,7 +231,6 @@ mod tests {
     use crate::raytracer::print_space;
     use crate::space::Space;
     use crate::universe::{UBorrow, UBorrowMut, URef, Universe};
-    use std::convert::TryInto;
 
     #[derive(Debug)]
     struct ToolTester {
@@ -272,7 +271,9 @@ mod tests {
     }
 
     fn dummy_icons() -> BlockProvider<Icons> {
-        BlockProvider::new(|_| Ok(make_some_blocks(1).swap_remove(0))).unwrap()
+        // TODO: Might be good to generate differently labeled blocks... maybe BlockProvider should have a way to do that for any enum.
+        let [block] = make_some_blocks();
+        BlockProvider::new(|_| Ok(block.clone())).unwrap()
     }
 
     #[test]
@@ -286,7 +287,7 @@ mod tests {
 
     #[test]
     fn use_none() {
-        let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
+        let [existing] = make_some_blocks();
         let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
@@ -309,7 +310,7 @@ mod tests {
 
     #[test]
     fn use_activate_noop() {
-        let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
+        let [existing] = make_some_blocks();
         let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
@@ -335,7 +336,7 @@ mod tests {
 
     #[test]
     fn use_delete_block() {
-        let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
+        let [existing] = make_some_blocks();
         let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
@@ -347,13 +348,13 @@ mod tests {
     #[test]
     fn icon_place_block() {
         let dummy_icons = dummy_icons();
-        let [block]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
+        let [block] = make_some_blocks();
         assert_eq!(*Tool::PlaceBlock(block.clone()).icon(&dummy_icons), block);
     }
 
     #[test]
     fn use_place_block() {
-        let [existing, tool_block]: [Block; 2] = make_some_blocks(2).try_into().unwrap();
+        let [existing, tool_block] = make_some_blocks();
         let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
@@ -368,7 +369,7 @@ mod tests {
 
     #[test]
     fn use_place_block_with_obstacle() {
-        let [existing, tool_block, obstacle]: [Block; 3] = make_some_blocks(3).try_into().unwrap();
+        let [existing, tool_block, obstacle] = make_some_blocks();
         let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
@@ -385,7 +386,7 @@ mod tests {
 
     #[test]
     fn use_copy_from_space() {
-        let [existing]: [Block; 1] = make_some_blocks(1).try_into().unwrap();
+        let [existing] = make_some_blocks();
         let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });

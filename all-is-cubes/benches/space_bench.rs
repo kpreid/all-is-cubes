@@ -21,7 +21,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
         group.bench_function(
             BenchmarkId::new("fill() entire space", &size_description),
             |b| {
-                let block = make_some_blocks(1).swap_remove(0);
+                let [block] = make_some_blocks();
                 b.iter_batched(
                     || Space::empty(grid),
                     |mut space| {
@@ -35,7 +35,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
         group.bench_function(
             BenchmarkId::new("fill() part of space", &size_description),
             |b| {
-                let block = make_some_blocks(1).swap_remove(0);
+                let [block] = make_some_blocks();
                 b.iter_batched(
                     || Space::empty(grid.multiply(2)),
                     |mut space| {
@@ -49,7 +49,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
         group.bench_function(
             BenchmarkId::new("fill_uniform() entire space", &size_description),
             |b| {
-                let block = make_some_blocks(1).swap_remove(0);
+                let [block] = make_some_blocks();
                 b.iter_batched(
                     || Space::empty(grid),
                     |mut space| {
@@ -63,7 +63,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
         group.bench_function(
             BenchmarkId::new("fill_uniform() part of space", &size_description),
             |b| {
-                let block = make_some_blocks(1).swap_remove(0);
+                let [block] = make_some_blocks();
                 b.iter_batched(
                     || Space::empty(grid.multiply(2)),
                     |mut space| {
@@ -77,7 +77,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
         group.bench_function(
             BenchmarkId::new("set() entire space", &size_description),
             |b| {
-                let block = make_some_blocks(1).swap_remove(0);
+                let [block] = make_some_blocks();
                 b.iter_batched(
                     || Space::empty(grid),
                     |mut space| {

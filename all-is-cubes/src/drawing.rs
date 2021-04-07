@@ -336,7 +336,7 @@ mod tests {
 
     #[test]
     fn draw_with_block_ref() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         test_color_drawing(&block, &block);
     }
 
@@ -362,15 +362,15 @@ mod tests {
 
     #[test]
     fn draw_with_brush() -> Result<(), SetCubeError> {
-        let blocks = make_some_blocks(2);
+        let [block_0, block_1] = make_some_blocks();
         let mut space = Space::empty_positive(100, 100, 100);
 
-        let brush = VoxelBrush::new(vec![((0, 0, 0), &blocks[0]), ((0, 1, 1), &blocks[1])]);
+        let brush = VoxelBrush::new(vec![((0, 0, 0), &block_0), ((0, 1, 1), &block_1)]);
         Pixel(Point::new(2, 3), &brush)
             .draw(&mut space.draw_target(GridMatrix::from_translation([0, 0, 4])))?;
 
-        assert_eq!(&space[(2, 3, 4)], &blocks[0]);
-        assert_eq!(&space[(2, 4, 5)], &blocks[1]);
+        assert_eq!(&space[(2, 3, 4)], &block_0);
+        assert_eq!(&space[(2, 4, 5)], &block_1);
         Ok(())
     }
 
@@ -469,7 +469,7 @@ mod tests {
 
     #[test]
     fn voxel_brush_single() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         assert_eq!(
             VoxelBrush::single(&block),
             VoxelBrush::new(vec![((0, 0, 0), &block)]),
@@ -478,7 +478,7 @@ mod tests {
 
     #[test]
     fn voxel_brush_translate() {
-        let block = make_some_blocks(1).swap_remove(0);
+        let [block] = make_some_blocks();
         assert_eq!(
             VoxelBrush::new(vec![((1, 2, 3), &block)]).translate((10, 20, 30)),
             VoxelBrush::new(vec![((11, 22, 33), &block)]),
