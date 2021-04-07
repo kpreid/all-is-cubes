@@ -220,7 +220,11 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         // TODO: give this an offset of a suitable rotation that won't collide...
         space_to_space_copy(
             &name_blocks,
-            name_blocks.grid(),
+            name_blocks
+                .grid()
+                // Truncate if necessary
+                .intersection(Grid::new([0, 0, 0], [exhibit_footprint.size().x + 3, 1, 1]))
+                .unwrap(),
             &mut space,
             plot_transform * name_transform,
         )?; // TODO: on failure, place an error marker and continue
