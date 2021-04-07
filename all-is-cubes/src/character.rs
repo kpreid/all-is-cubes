@@ -7,6 +7,7 @@ use cgmath::{Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Matrix4, Point
 use num_traits::identities::Zero;
 use ordered_float::NotNan;
 use std::collections::HashSet;
+use std::error::Error;
 use std::fmt;
 use std::time::Duration;
 
@@ -17,7 +18,8 @@ use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
-use crate::tools::{Inventory, Tool, ToolError};
+use crate::tools::{Inventory, InventoryTransaction, Tool, ToolError};
+use crate::transactions::Transaction;
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
@@ -253,6 +255,48 @@ impl Character {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct CharacterTransaction {
+    inventory: InventoryTransaction,
+}
+
+impl CharacterTransaction {
+    pub fn inventory(t: InventoryTransaction) -> Self {
+        CharacterTransaction { inventory: t }
+    }
+}
+
+impl Transaction<Character> for CharacterTransaction {
+    type Check = <InventoryTransaction as Transaction<Inventory>>::Check;
+
+    fn check(&self, target: &Character) -> Result<Self::Check, ()> {
+        self.inventory.check(&target.inventory)
+    }
+
+    fn commit(&self, target: &mut Character, check: Self::Check) -> Result<(), Box<dyn Error>> {
+        self.inventory.commit(&mut target.inventory, check)?;
+
+        // TODO: notify only if the transaction is not a noop
+        target.notifier.notify(CharacterChange::Inventory);
+        Ok(())
+    }
+
+    fn merge(mut self, mut other: Self) -> Result<Self, (Self, Self)> {
+        match self.inventory.merge(other.inventory) {
+            Ok(merged) => {
+                self.inventory = merged;
+                Ok(self)
+            }
+            Err((si, oi)) => {
+                // Undo the moves
+                self.inventory = si;
+                other.inventory = oi;
+                Err((self, other))
+            }
+        }
+    }
+}
+
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -379,6 +423,7 @@ impl Spawn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::AIR;
     use crate::universe::Universe;
 
     #[test]
@@ -397,6 +442,20 @@ mod tests {
         assert_eq!(character.inventory.slots[0], inventory_data[0]);
         assert_eq!(character.inventory.slots[1], Tool::None);
         // TODO: Either test the special slot contents or eliminate that mechanism
+    }
+
+    #[test]
+    fn inventory_transaction() {
+        let mut universe = Universe::new();
+        let space = Space::empty_positive(1, 1, 1);
+        let space_ref = universe.insert_anonymous(space);
+        let character_ref = universe.insert_anonymous(Character::spawn_default(space_ref.clone()));
+
+        let item = Tool::PlaceBlock(AIR);
+        CharacterTransaction::inventory(InventoryTransaction::insert(item.clone()))
+            .execute(&mut character_ref.borrow_mut())
+            .unwrap();
+        // TODO: Actually assert inventory contents -- no public interface for that
     }
 
     // TODO: more tests

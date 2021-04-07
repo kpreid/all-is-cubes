@@ -27,6 +27,9 @@ mod lighting;
 pub use lighting::PackedLight;
 use lighting::{initialize_lighting, PackedLightScalar};
 
+mod space_txn;
+pub use space_txn::*;
+
 /// Container for [`Block`]s arranged in three-dimensional space. The main “game world”
 /// data structure.
 pub struct Space {

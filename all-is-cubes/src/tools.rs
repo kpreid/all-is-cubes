@@ -4,12 +4,15 @@
 //! Means by which the player may alter or interact with the world.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::error::Error;
 
 use crate::block::{Block, AIR};
 use crate::character::Cursor;
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
 use crate::space::SetCubeError;
+use crate::transactions::Transaction;
 use crate::universe::RefError;
 use crate::vui::Icons;
 
@@ -221,6 +224,95 @@ impl Inventory {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct InventoryTransaction {
+    replace: BTreeMap<usize, (Tool, Tool)>,
+    insert: Vec<Tool>,
+}
+
+impl InventoryTransaction {
+    /// Transaction to insert an item into an inventory, which will fail if there is no space.
+    pub fn insert(item: Tool) -> Self {
+        // TODO: If the item is `Tool::None`, it should become a noop.
+        InventoryTransaction {
+            replace: BTreeMap::default(),
+            insert: vec![item],
+        }
+    }
+
+    /// Transaction to replace an existing item in an inventory, which will fail if the existing
+    /// item is not as expected.
+    pub fn replace(slot: usize, old: Tool, new: Tool) -> Self {
+        // TODO: Should inventories store `Rc<Tool>` so callers can avoid cloning for the sake of `old`s?
+        let mut replace = BTreeMap::new();
+        replace.insert(slot, (old, new));
+        InventoryTransaction {
+            replace,
+            insert: vec![],
+        }
+    }
+}
+
+impl Transaction<Inventory> for InventoryTransaction {
+    type Check = Vec<usize>;
+
+    fn check(&self, inventory: &Inventory) -> Result<Self::Check, ()> {
+        // Check replacements and notice if any slots are becoming empty
+        for (&slot, (old, _new)) in self.replace.iter() {
+            if inventory.slots[slot] != *old {
+                return Err(()); // TODO: detailed errors so we can signal where the conflict was
+            }
+        }
+
+        // Find locations for new slots
+        // TODO: We should also allow inserting into slots that are simultaneously freed up.
+        let empty_slots = inventory
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_index, item)| **item == Tool::None)
+            .map(|(index, _item)| index)
+            .take(self.insert.len())
+            .collect::<Vec<_>>();
+        if empty_slots.len() < self.insert.len() {
+            return Err(());
+        }
+
+        Ok(empty_slots)
+    }
+
+    fn commit(
+        &self,
+        inventory: &mut Inventory,
+        empty_slots: Self::Check,
+    ) -> Result<(), Box<dyn Error>> {
+        for (&slot, (_old, new)) in self.replace.iter() {
+            inventory.slots[slot] = new.clone();
+        }
+        for (slot, item) in empty_slots.into_iter().zip(self.insert.iter()) {
+            inventory.slots[slot] = item.clone();
+        }
+        Ok(())
+    }
+
+    fn merge(mut self, other: Self) -> Result<Self, (Self, Self)> {
+        // Checks:
+        // Don't allow any touching the same slot at all.
+        if self
+            .replace
+            .keys()
+            .any(|slot| other.replace.contains_key(slot))
+        {
+            return Err((self, other));
+        }
+
+        // Perform the merge infallibly.
+        self.replace.extend(other.replace);
+        self.insert.extend(other.insert);
+        Ok(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -423,6 +515,38 @@ mod tests {
 
         assert_eq!(inventory.slots, contents);
         assert_eq!(Err(new_item.clone()), inventory.try_add_item(new_item));
+        assert_eq!(inventory.slots, contents);
+    }
+
+    #[test]
+    fn inventory_txn_insert_success() {
+        let mut inventory = Inventory::from_items(vec![
+            Tool::DeleteBlock,
+            Tool::DeleteBlock,
+            Tool::None,
+            Tool::DeleteBlock,
+            Tool::None,
+        ]);
+        let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
+
+        assert_eq!(inventory.slots[2], Tool::None);
+        InventoryTransaction::insert(new_item.clone())
+            .execute(&mut inventory)
+            .unwrap();
+        assert_eq!(inventory.slots[2], new_item);
+    }
+
+    #[test]
+    fn inventory_txn_insert_no_space() {
+        let contents = vec![Tool::DeleteBlock, Tool::DeleteBlock];
+        let inventory = Inventory::from_items(contents.clone());
+        let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
+
+        assert_eq!(inventory.slots, contents);
+        assert_eq!(
+            InventoryTransaction::insert(new_item.clone()).check(&inventory),
+            Err(()), // TODO: transactions should have detailed errors
+        );
         assert_eq!(inventory.slots, contents);
     }
 }

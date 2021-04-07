@@ -8,6 +8,8 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::rc::Rc;
 
+use crate::character::{Character, CharacterTransaction};
+use crate::space::{Space, SpaceTransaction};
 use crate::universe::{Name, UBorrowMut, URef, Universe};
 
 /// A `Transaction` is a description of a mutation to an object or collection thereof that
@@ -161,15 +163,22 @@ impl<Tr: PartialEq, Ta> PartialEq for TransactionInUniverse<Tr, Ta> {
 /// This type is public out of necessity due to appearing in trait bounds; you should not
 /// need to use it.
 #[derive(Clone, PartialEq)]
+#[non_exhaustive]
 pub enum AnyTransaction {
-    // TODO: Actual variants
+    // TODO: BlockDefTransaction
+    Character(TransactionInUniverse<CharacterTransaction, Character>),
+    Space(TransactionInUniverse<SpaceTransaction, Space>),
 }
 
 impl Transaction<()> for AnyTransaction {
     type Check = Box<dyn Any>;
 
     fn check(&self, _target: &()) -> Result<Self::Check, ()> {
-        Ok(todo!())
+        use AnyTransaction::*;
+        Ok(match self {
+            Character(t) => Box::new(t.check(&())?),
+            Space(t) => Box::new(t.check(&())?),
+        })
     }
 
     fn commit(&self, _target: &mut (), check: Self::Check) -> Result<(), Box<dyn Error>> {
@@ -186,7 +195,11 @@ impl Transaction<()> for AnyTransaction {
             transaction.commit(&mut (), check)
         }
 
-        todo!()
+        use AnyTransaction::*;
+        match self {
+            Character(t) => commit_helper(t, check),
+            Space(t) => commit_helper(t, check),
+        }
     }
 
     fn merge(self, other: Self) -> Result<Self, (Self, Self)> {
@@ -204,7 +217,10 @@ impl Transaction<()> for AnyTransaction {
             }
         }
 
+        use AnyTransaction::*;
         match (self, other) {
+            (Character(t1), Character(t2)) => merge_helper(t1, t2, Character),
+            (Space(t1), Space(t2)) => merge_helper(t1, t2, Space),
             (t1, t2) => Err((t1, t2)),
         }
     }
@@ -213,13 +229,23 @@ impl Transaction<()> for AnyTransaction {
 /// Hide the wrapper type entirely since its type is determined entirely by its contents.
 impl Debug for AnyTransaction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        use AnyTransaction::*;
+        match self {
+            Character(t) => Debug::fmt(t, fmt),
+            Space(t) => Debug::fmt(t, fmt),
+        }
     }
 }
 
 #[rustfmt::skip]
 mod any_transaction {
-    // TODO: repetitive impls go here
+    use super::*;
+    impl From<TransactionInUniverse<CharacterTransaction, Character>> for AnyTransaction {
+        fn from(t: TransactionInUniverse<CharacterTransaction, Character>) -> Self { Self::Character(t) }
+    }
+    impl From<TransactionInUniverse<SpaceTransaction, Space>> for AnyTransaction {
+        fn from(t: TransactionInUniverse<SpaceTransaction, Space>) -> Self { Self::Space(t) }
+    }
 }
 
 /// Combination of [`Transaction`]s to be applied to one or more objects in a
@@ -357,5 +383,66 @@ mod tests {
                 members: HashMap::new(),
             }
         )
+    }
+
+    #[test]
+    fn universe_txn_merge_unrelated() {
+        let [block_1, block_2] = make_some_blocks();
+        let mut u = Universe::new();
+        let s1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let s2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let t1 = UniverseTransaction::of(
+            s1,
+            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1)),
+        );
+        let t2 = UniverseTransaction::of(
+            s2,
+            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)),
+        );
+        t1.merge(t2).unwrap();
+        // TODO: check the contents
+    }
+
+    #[test]
+    fn universe_txn_merge_conflict() {
+        let [block_1, block_2] = make_some_blocks();
+        let mut u = Universe::new();
+        let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let t1 = UniverseTransaction::of(
+            s.clone(),
+            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1)),
+        );
+        let t2 = UniverseTransaction::of(
+            s,
+            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)),
+        );
+        merge_is_rejected(t1, t2).unwrap();
+    }
+
+    #[test]
+    fn universe_txn_merges_members() {
+        let [old_block, new_block] = make_some_blocks();
+        let mut u = Universe::new();
+        let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let t1 = UniverseTransaction::of(
+            s.clone(),
+            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(new_block.clone())),
+        );
+        let t2 = UniverseTransaction::of(
+            s.clone(),
+            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(old_block.clone()), None),
+        );
+        let t3 = t1.merge(t2).unwrap();
+        assert_eq!(
+            t3,
+            UniverseTransaction::of(
+                s,
+                SpaceTransaction::set_cube(
+                    GridPoint::new(0, 0, 0),
+                    Some(old_block),
+                    Some(new_block)
+                ),
+            )
+        );
     }
 }
