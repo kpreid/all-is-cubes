@@ -312,6 +312,10 @@ pub struct URef<T> {
 }
 
 impl<T: 'static> URef<T> {
+    pub fn name(&self) -> &Rc<Name> {
+        &self.name
+    }
+
     /// Borrow the value, in the sense of [`RefCell::borrow`], and panic on failure.
     #[track_caller]
     pub fn borrow(&self) -> UBorrow<T> {

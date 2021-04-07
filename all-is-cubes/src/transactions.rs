@@ -1,0 +1,361 @@
+// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
+// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
+
+use std::any::Any;
+use std::collections::hash_map::Entry::*;
+use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::Debug;
+use std::rc::Rc;
+
+use crate::universe::{Name, UBorrowMut, URef, Universe};
+
+/// A `Transaction` is a description of a mutation to an object or collection thereof that
+/// should occur in a logically atomic fashion (all or nothing), with a set of
+/// preconditions for it to happen at all. Transactions are used:
+///
+/// * to enable game objects to describe effects on their containers in a way compatible
+///   with Rust's ownership rules (e.g. a [`Tool`](crate::tools::Tool) may affect its
+///   containing [`Character`]),
+/// * to avoid “item duplication” type bugs by checking all preconditions before making
+///   any changes, and
+/// * to avoid update-order-dependent game mechanics by applying effects in batches.
+///
+/// A [`Transaction`] is not consumed by committing it; it may be used repeatedly. Future
+/// work may include building on this to provide undo/redo functionality.
+#[must_use]
+pub trait Transaction<T> {
+    /// Type of a value passed from [`Transaction::check`] to [`Transaction::commit`].
+    /// This may be used to pass precalculated values to speed up the commit phase,
+    /// or even [`UBorrow`]s or similar, but also makes it difficult to accidentally
+    /// call `commit` without `check`.
+    type Check: 'static;
+
+    /// Checks whether the target's current state meets the preconditions and returns
+    /// [`Err`] if it does not. (TODO: Informative error return type.)
+    ///
+    /// If the preconditions are met, returns [`Ok`] containing data to be passed to
+    /// [`Transaction::commit`].
+    fn check(&self, target: &T) -> Result<Self::Check, ()>;
+
+    /// Perform the mutations specified by this transaction. The `check` value should have
+    /// been created by a prior call to [`Transaction::commit`].
+    ///
+    /// Returns [`Ok`] if the transaction completed normally, and [`Err`] if there was a
+    /// problem which was not detected as a precondition; in this case the transaction may
+    /// have been partially applied, since that problem was detected too late, by
+    /// definition.
+    ///
+    /// The target should not be mutated between the call to [`Transaction::check`] and
+    /// [`Transaction::commit`] (including via interior mutability, however that applies
+    /// to the particular `T`). The consequences of doing so may include mutating the
+    /// wrong components, signaling an error partway through the transaction, or merely
+    /// committing the transaction while its preconditions do not hold.
+    fn commit(&self, target: &mut T, check: Self::Check) -> Result<(), Box<dyn Error>>;
+
+    /// Convenience method to execute a transaction in one step. Implementations should not
+    /// need to override this. Approximately equivalent to:
+    ///
+    /// ```rust,ignore
+    /// # use all_is_cubes::universe::Universe;
+    /// # use all_is_cubes::transactions::UniverseTransaction;
+    /// # let transaction = UniverseTransaction::default();
+    /// # let target = &mut Universe::new();
+    /// let check = transaction.check(target)?;
+    /// transaction.commit(target, check)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    fn execute(&self, target: &mut T) -> Result<(), Box<dyn Error>> {
+        let check = self
+            .check(target)
+            .map_err(|()| "Transaction precondition not met")?;
+        self.commit(target, check)
+    }
+
+    /// Combines two transactions into one which has both effects simultaneously.
+    /// This operation must be commutative and have `Default::default` as the identity.
+    ///
+    /// Returns [`Err`] if the two transactions conflict, containing the unmodified
+    /// transactions.
+    ///
+    /// TODO: This is hard to implement correctly and efficiently. Review actual use cases
+    /// and see whether recovering from failure is desired and how much information is
+    /// needed from it.
+    fn merge(self, other: Self) -> Result<Self, (Self, Self)>
+    where
+        Self: Sized;
+}
+
+/// Pair of a transaction and a [`URef`] to its target.
+///
+/// [`AnyTransaction`] is a singly-typed wrapper around this.
+///
+/// This type is public out of necessity due to appearing in trait bounds; you should not
+/// need to use it.
+///
+/// TODO: Better name.
+#[derive(Debug, Eq)]
+pub struct TransactionInUniverse<Tr, Ta> {
+    target: URef<Ta>,
+    transaction: Tr,
+}
+
+impl<Tr, Ta> Transaction<()> for TransactionInUniverse<Tr, Ta>
+where
+    Tr: Transaction<Ta> + Debug,
+    Ta: 'static + Debug, // TODO: Debug bound not actually necessary
+{
+    type Check = (UBorrowMut<Ta>, Tr::Check);
+
+    fn check(&self, _dummy_target: &()) -> Result<Self::Check, ()> {
+        let borrow = self.target.borrow_mut();
+        let check = self.transaction.check(&borrow)?;
+        Ok((borrow, check))
+    }
+
+    fn commit(
+        &self,
+        _dummy_target: &mut (),
+        (mut borrow, check): Self::Check,
+    ) -> Result<(), Box<dyn Error>> {
+        self.transaction.commit(&mut borrow, check)
+    }
+
+    fn merge(mut self, mut other: Self) -> Result<Self, (Self, Self)> {
+        if self.target != other.target {
+            panic!("TransactionInUniverse cannot have multiple targets; use UniverseTransaction instead");
+        }
+        match self.transaction.merge(other.transaction) {
+            Ok(merged) => {
+                self.transaction = merged;
+                Ok(self)
+            }
+            Err((st, ot)) => {
+                // Undo the moves
+                self.transaction = st;
+                other.transaction = ot;
+                Err((self, other))
+            }
+        }
+    }
+}
+
+/// Manual implementation to avoid `Ta: Clone` bound.
+impl<Tr: Clone, Ta> Clone for TransactionInUniverse<Tr, Ta> {
+    fn clone(&self) -> Self {
+        Self {
+            target: self.target.clone(),
+            transaction: self.transaction.clone(),
+        }
+    }
+}
+/// Manual implementation to avoid `Ta: Clone` bound.
+impl<Tr: PartialEq, Ta> PartialEq for TransactionInUniverse<Tr, Ta> {
+    fn eq(&self, other: &Self) -> bool {
+        self.target == other.target && self.transaction == other.transaction
+    }
+}
+
+/// Polymorphic container for transactions in a [`UniverseTransaction`].
+///
+/// This type is public out of necessity due to appearing in trait bounds; you should not
+/// need to use it.
+#[derive(Clone, PartialEq)]
+pub enum AnyTransaction {
+    // TODO: Actual variants
+}
+
+impl Transaction<()> for AnyTransaction {
+    type Check = Box<dyn Any>;
+
+    fn check(&self, _target: &()) -> Result<Self::Check, ()> {
+        Ok(todo!())
+    }
+
+    fn commit(&self, _target: &mut (), check: Self::Check) -> Result<(), Box<dyn Error>> {
+        fn commit_helper<Ta: Debug, Tr: Transaction<Ta> + Debug>(
+            transaction: &TransactionInUniverse<Tr, Ta>,
+            check: Box<dyn Any>,
+        ) -> Result<(), Box<dyn Error>>
+        where
+            TransactionInUniverse<Tr, Ta>: Transaction<()>,
+        {
+            let check: <TransactionInUniverse<Tr, Ta> as Transaction<()>>::Check = *(check
+                .downcast()
+                .map_err(|_| "AnyTransaction: type mismatch in check data")?);
+            transaction.commit(&mut (), check)
+        }
+
+        todo!()
+    }
+
+    fn merge(self, other: Self) -> Result<Self, (Self, Self)> {
+        fn merge_helper<Ta, Tr: Transaction<Ta>>(
+            t1: TransactionInUniverse<Tr, Ta>,
+            t2: TransactionInUniverse<Tr, Ta>,
+            rewrapper: fn(TransactionInUniverse<Tr, Ta>) -> AnyTransaction,
+        ) -> Result<AnyTransaction, (AnyTransaction, AnyTransaction)>
+        where
+            TransactionInUniverse<Tr, Ta>: Transaction<()>,
+        {
+            match t1.merge(t2) {
+                Ok(t) => Ok(rewrapper(t)),
+                Err((t1, t2)) => Err((rewrapper(t1), rewrapper(t2))),
+            }
+        }
+
+        match (self, other) {
+            (t1, t2) => Err((t1, t2)),
+        }
+    }
+}
+
+/// Hide the wrapper type entirely since its type is determined entirely by its contents.
+impl Debug for AnyTransaction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+#[rustfmt::skip]
+mod any_transaction {
+    // TODO: repetitive impls go here
+}
+
+/// Combination of [`Transaction`]s to be applied to one or more objects in a
+/// [`Universe`] somultaneously.
+#[derive(Clone, Default, PartialEq)]
+pub struct UniverseTransaction {
+    members: HashMap<Rc<Name>, AnyTransaction>,
+}
+
+impl UniverseTransaction {
+    pub fn of<Ta, Tr>(target: URef<Ta>, transaction: Tr) -> Self
+    where
+        Tr: Transaction<Ta> + Debug + 'static,
+        Ta: Debug + 'static,
+        TransactionInUniverse<Tr, Ta>: Into<AnyTransaction>,
+    {
+        let mut members: HashMap<Rc<Name>, AnyTransaction> = HashMap::new();
+        members.insert(
+            target.name().clone(),
+            (TransactionInUniverse {
+                target,
+                transaction,
+            })
+            .into(),
+        );
+        UniverseTransaction { members }
+    }
+}
+
+impl Transaction<Universe> for UniverseTransaction {
+    type Check = HashMap<Rc<Name>, Box<dyn Any>>;
+
+    fn check(&self, _target: &Universe) -> Result<Self::Check, ()> {
+        // TODO: Enforce that `target` is the universe all the URefs belong to.
+
+        let mut checks = HashMap::new();
+        for (name, member) in self.members.iter() {
+            checks.insert(name.clone(), member.check(&())?);
+        }
+        Ok(checks)
+    }
+
+    fn commit(&self, _target: &mut Universe, checks: Self::Check) -> Result<(), Box<dyn Error>> {
+        for (name, check) in checks {
+            self.members[&name].commit(&mut (), check)?;
+        }
+        Ok(())
+    }
+
+    fn merge(mut self, other: Self) -> Result<Self, (Self, Self)>
+    where
+        Self: Sized,
+    {
+        // TODO: Enforce that rhs has the same universe.
+
+        if other
+            .members
+            .keys()
+            .all(|name| !self.members.contains_key(name))
+        {
+            // Fast path: no member merges needed; cannot fail.
+            self.members.extend(other.members);
+            Ok(self)
+
+            // TODO: Add no-cloning fast path when one side of the merge has exactly one
+            // transaction and therefore will either succeed or fail atomically.
+        } else {
+            // Fall back to cloning before merging.
+            let mut members = self.members.clone();
+            for (name, t2) in other.members.iter() {
+                let name = name.clone();
+                let t2 = t2.clone();
+                match members.entry(name) {
+                    Occupied(mut entry) => {
+                        let t1 = entry.get().clone();
+                        match t1.merge(t2) {
+                            Ok(merged) => {
+                                entry.insert(merged);
+                            }
+                            Err(_) => {
+                                return Err((self, other));
+                            }
+                        }
+                    }
+                    Vacant(entry) => {
+                        entry.insert(t2);
+                    }
+                }
+            }
+            Ok(UniverseTransaction { members })
+        }
+    }
+}
+
+/// This formatting is chosen to be similar to [`Universe`]'s.
+impl Debug for UniverseTransaction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = fmt.debug_struct("UniverseTransaction");
+        for (name, txn) in &self.members {
+            ds.field(&name.to_string(), txn);
+        }
+        ds.finish()
+    }
+}
+
+/// Tests that a transaction merge fails, and that it does not mutate the transactions before failing.
+/// Use with `.unwrap()` or `.expect()`.
+#[cfg(test)]
+pub(crate) fn merge_is_rejected<Tr, Ta>(t1: Tr, t2: Tr) -> Result<(), Tr>
+where
+    Tr: Transaction<Ta> + Clone + Debug + PartialEq,
+{
+    match t1.clone().merge(t2.clone()) {
+        Ok(t3) => Err(t3),
+        Err((t1r, t2r)) => {
+            assert_eq!(t1, t1r, "rejected transaction should not be modified");
+            assert_eq!(t2, t2r, "rejected transaction should not be modified");
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::content::make_some_blocks;
+    use crate::math::GridPoint;
+
+    #[test]
+    fn universe_txn_has_default() {
+        assert_eq!(
+            UniverseTransaction::default(),
+            UniverseTransaction {
+                // TODO: Replace this literal with some other means of specifying an empty transaction
+                members: HashMap::new(),
+            }
+        )
+    }
+}
