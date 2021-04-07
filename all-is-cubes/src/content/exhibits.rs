@@ -177,4 +177,27 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
             },
         }
     },
+    {
+        Exhibit {
+            name: "make_some_blocks",
+            factory: |_this, _universe| {
+                use crate::content::make_some_blocks;
+                const ROWS: GridCoordinate = 5;
+                let rows: [Vec<Block>; ROWS as usize] = [
+                    Vec::from(make_some_blocks::<5>()),
+                    Vec::from(make_some_blocks::<4>()),
+                    Vec::from(make_some_blocks::<3>()),
+                    Vec::from(make_some_blocks::<2>()),
+                    Vec::from(make_some_blocks::<1>()),
+                ];
+                let mut space = Space::empty_positive(1, ROWS, ROWS);
+                for (y, blocks) in std::array::IntoIter::new(rows).enumerate() {
+                    for (h, block) in blocks.into_iter().enumerate() {
+                        space.set([0, y as GridCoordinate, h as GridCoordinate], block)?;
+                    }
+                }
+                Ok(space)
+            },
+        }
+    },
 ];
