@@ -118,10 +118,10 @@ impl ToolInput {
             return Err(ToolError::NotUsable);
         }
 
-        Ok(UniverseTransaction::of(
-            self.cursor.space.clone(),
-            SpaceTransaction::set_cube(cube, Some(old_block), Some(new_block)),
-        ))
+        Ok(
+            SpaceTransaction::set_cube(cube, Some(old_block), Some(new_block))
+                .bind(self.cursor.space.clone()),
+        )
     }
 
     pub fn cursor(&self) -> &Cursor {
@@ -131,10 +131,10 @@ impl ToolInput {
     /// Add the provided item to the inventory from which the tool was used.
     pub fn produce_item(&self, item: Tool) -> Result<UniverseTransaction, ToolError> {
         if let Some(ref character) = self.character {
-            Ok(UniverseTransaction::of(
-                character.clone(),
-                CharacterTransaction::inventory(InventoryTransaction::insert(item)),
-            ))
+            Ok(
+                CharacterTransaction::inventory(InventoryTransaction::insert(item))
+                    .bind(character.clone()),
+            )
         } else {
             // TODO: Specific error
             Err(ToolError::NotUsable)
@@ -220,14 +220,14 @@ impl Inventory {
         if &new_tool != tool {
             if let Some(slot_index) = slot_index {
                 transaction = transaction
-                    .merge(UniverseTransaction::of(
-                        character,
+                    .merge(
                         CharacterTransaction::inventory(InventoryTransaction::replace(
                             slot_index,
                             tool.clone(),
                             new_tool,
-                        )),
-                    ))
+                        ))
+                        .bind(character),
+                    )
                     .expect("failed to merge tool self-update");
             } else {
                 panic!("shouldn't happen: no slot but tool mutated");
@@ -482,14 +482,8 @@ mod tests {
         let transaction = tester.equip_and_use_tool(Tool::DeleteBlock).unwrap();
         assert_eq!(
             transaction,
-            UniverseTransaction::of(
-                tester.space_ref.clone(),
-                SpaceTransaction::set_cube(
-                    GridPoint::new(1, 0, 0),
-                    Some(existing.clone()),
-                    Some(AIR)
-                )
-            )
+            SpaceTransaction::set_cube(GridPoint::new(1, 0, 0), Some(existing.clone()), Some(AIR))
+                .bind(tester.space_ref.clone())
         );
         transaction.execute(&mut tester.universe).unwrap();
         print_space(&*tester.space(), (-1., 1., 1.));
@@ -514,14 +508,12 @@ mod tests {
             .unwrap();
         assert_eq!(
             transaction,
-            UniverseTransaction::of(
-                tester.space_ref.clone(),
-                SpaceTransaction::set_cube(
-                    GridPoint::new(0, 0, 0),
-                    Some(AIR),
-                    Some(tool_block.clone())
-                )
+            SpaceTransaction::set_cube(
+                GridPoint::new(0, 0, 0),
+                Some(AIR),
+                Some(tool_block.clone())
             )
+            .bind(tester.space_ref.clone())
         );
         transaction.execute(&mut tester.universe).unwrap();
         print_space(&tester.space(), (-1., 1., 1.));
@@ -555,12 +547,10 @@ mod tests {
         let transaction = tester.equip_and_use_tool(Tool::CopyFromSpace).unwrap();
         assert_eq!(
             transaction,
-            UniverseTransaction::of(
-                tester.character_ref.clone(),
-                CharacterTransaction::inventory(InventoryTransaction::insert(Tool::PlaceBlock(
-                    existing.clone()
-                )))
-            )
+            CharacterTransaction::inventory(InventoryTransaction::insert(Tool::PlaceBlock(
+                existing.clone()
+            )))
+            .bind(tester.character_ref.clone())
         );
         transaction.execute(&mut tester.universe).unwrap();
         // Space is unmodified

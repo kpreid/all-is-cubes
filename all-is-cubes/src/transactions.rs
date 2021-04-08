@@ -86,6 +86,18 @@ pub trait Transaction<T: ?Sized> {
     fn merge(self, other: Self) -> Result<Self, (Self, Self)>
     where
         Self: Sized;
+
+    /// Specify the target of this transaction as a [`URef`], and erase its type,
+    /// so that it can be combined with other transactions in the same universe.
+    ///
+    /// This is a convenience wrapper around [`UTransactional::bind`].
+    fn bind(self, target: URef<T>) -> UniverseTransaction
+    where
+        Self: Sized,
+        T: UTransactional<Transaction = Self>,
+    {
+        UTransactional::bind(target, self)
+    }
 }
 
 /// Specifies a canonical transaction type for a target type.
@@ -94,6 +106,17 @@ pub trait Transaction<T: ?Sized> {
 /// `<T as Transactional>::Transaction`.
 pub trait Transactional {
     type Transaction: Transaction<Self>;
+}
+
+pub trait UTransactional: Transactional + 'static
+where
+    Self: Sized,
+{
+    /// Specify the target of the transaction as a [`URef`], and erase its type,
+    /// so that it can be combined with other transactions in the same universe.
+    ///
+    /// This is also available as [`Transaction::bind`]
+    fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction;
 }
 
 /// Pair of a transaction and a [`URef`] to its target.
@@ -105,7 +128,7 @@ pub trait Transactional {
 ///
 /// TODO: Better name.
 #[derive(Debug, Eq)]
-pub struct TransactionInUniverse<O: Transactional> {
+struct TransactionInUniverse<O: Transactional> {
     target: URef<O>,
     transaction: O::Transaction,
 }
@@ -173,15 +196,22 @@ where
 }
 
 /// Polymorphic container for transactions in a [`UniverseTransaction`].
-///
-/// This type is public out of necessity due to appearing in trait bounds; you should not
-/// need to use it.
 #[derive(Clone, PartialEq)]
 #[non_exhaustive]
-pub enum AnyTransaction {
+enum AnyTransaction {
     // TODO: BlockDefTransaction
     Character(TransactionInUniverse<Character>),
     Space(TransactionInUniverse<Space>),
+}
+
+impl AnyTransaction {
+    fn target_name(&self) -> &Rc<Name> {
+        use AnyTransaction::*;
+        match self {
+            Character(t) => t.target.name(),
+            Space(t) => t.target.name(),
+        }
+    }
 }
 
 impl Transaction<()> for AnyTransaction {
@@ -254,14 +284,24 @@ impl Debug for AnyTransaction {
     }
 }
 
-#[rustfmt::skip]
+/// Each implementation of [`UTransactional`] corresponds to a variant of [`AnyTransaction`].
 mod any_transaction {
     use super::*;
-    impl From<TransactionInUniverse<Character>> for AnyTransaction {
-        fn from(t: TransactionInUniverse<Character>) -> Self { Self::Character(t) }
+    impl UTransactional for Character {
+        fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction {
+            UniverseTransaction::from(AnyTransaction::Character(TransactionInUniverse {
+                target,
+                transaction,
+            }))
+        }
     }
-    impl From<TransactionInUniverse<Space>> for AnyTransaction {
-        fn from(t: TransactionInUniverse<Space>) -> Self { Self::Space(t) }
+    impl UTransactional for Space {
+        fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction {
+            UniverseTransaction::from(AnyTransaction::Space(TransactionInUniverse {
+                target,
+                transaction,
+            }))
+        }
     }
 }
 
@@ -272,22 +312,10 @@ pub struct UniverseTransaction {
     members: HashMap<Rc<Name>, AnyTransaction>,
 }
 
-impl UniverseTransaction {
-    pub fn of<O>(target: URef<O>, transaction: O::Transaction) -> Self
-    where
-        O: Transactional + 'static,
-        //Tr: Transaction<O> + Debug + 'static,
-        TransactionInUniverse<O>: Into<AnyTransaction>,
-    {
+impl From<AnyTransaction> for UniverseTransaction {
+    fn from(transaction: AnyTransaction) -> Self {
         let mut members: HashMap<Rc<Name>, AnyTransaction> = HashMap::new();
-        members.insert(
-            target.name().clone(),
-            (TransactionInUniverse {
-                target,
-                transaction,
-            })
-            .into(),
-        );
+        members.insert(transaction.target_name().clone(), transaction);
         UniverseTransaction { members }
     }
 }
@@ -409,14 +437,8 @@ mod tests {
         let mut u = Universe::new();
         let s1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let s2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let t1 = UniverseTransaction::of(
-            s1,
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1)),
-        );
-        let t2 = UniverseTransaction::of(
-            s2,
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)),
-        );
+        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1)).bind(s1);
+        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)).bind(s2);
         t1.merge(t2).unwrap();
         // TODO: check the contents
     }
@@ -426,14 +448,9 @@ mod tests {
         let [block_1, block_2] = make_some_blocks();
         let mut u = Universe::new();
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let t1 = UniverseTransaction::of(
-            s.clone(),
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1)),
-        );
-        let t2 = UniverseTransaction::of(
-            s,
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)),
-        );
+        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1))
+            .bind(s.clone());
+        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)).bind(s);
         merge_is_rejected(t1, t2).unwrap();
     }
 
@@ -442,25 +459,15 @@ mod tests {
         let [old_block, new_block] = make_some_blocks();
         let mut u = Universe::new();
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let t1 = UniverseTransaction::of(
-            s.clone(),
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(new_block.clone())),
-        );
-        let t2 = UniverseTransaction::of(
-            s.clone(),
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(old_block.clone()), None),
-        );
+        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(new_block.clone()))
+            .bind(s.clone());
+        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(old_block.clone()), None)
+            .bind(s.clone());
         let t3 = t1.merge(t2).unwrap();
         assert_eq!(
             t3,
-            UniverseTransaction::of(
-                s,
-                SpaceTransaction::set_cube(
-                    GridPoint::new(0, 0, 0),
-                    Some(old_block),
-                    Some(new_block)
-                ),
-            )
+            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(old_block), Some(new_block))
+                .bind(s)
         );
     }
 }
