@@ -308,6 +308,7 @@ mod any_transaction {
 /// Combination of [`Transaction`]s to be applied to one or more objects in a
 /// [`Universe`] somultaneously.
 #[derive(Clone, Default, PartialEq)]
+#[must_use]
 pub struct UniverseTransaction {
     members: HashMap<Rc<Name>, AnyTransaction>,
 }
@@ -439,7 +440,7 @@ mod tests {
         let s2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1)).bind(s1);
         let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)).bind(s2);
-        t1.merge(t2).unwrap();
+        let _ = t1.merge(t2).unwrap();
         // TODO: check the contents
     }
 
