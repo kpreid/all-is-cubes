@@ -52,7 +52,7 @@ impl Icons {
                     let center_x2 =
                         GridPoint::new(1, 1, 0) * (GridCoordinate::from(crosshair_resolution) - 1);
 
-                    let line_block_1 = Block::from(rgba_const!(0.2, 0.2, 0.2, 0.5));
+                    let line_block_1 = Block::from(rgba_const!(0.1, 0.1, 0.1, 1.0));
                     let line_block_2 = line_block_1.clone(); // TODO: experiment with patterning
                     for i in 5..8 {
                         for &direction in &[Face::PX, Face::PY, Face::NX, Face::NY] {
