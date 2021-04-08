@@ -15,7 +15,7 @@ use crate::block::{evaluated_block_resolution, recursive_raycast, Block, Evaluat
 use crate::camera::eye_for_look_at;
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
-use crate::physics::{Body, Contact};
+use crate::physics::{Body, BodyTransaction, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
 use crate::tools::{Inventory, InventoryTransaction, Tool, ToolError};
@@ -265,27 +265,53 @@ impl Transactional for Character {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CharacterTransaction {
+    body: BodyTransaction,
     inventory: InventoryTransaction,
 }
 
 impl CharacterTransaction {
+    pub fn body(t: BodyTransaction) -> Self {
+        CharacterTransaction {
+            body: t,
+            inventory: Default::default(),
+        }
+    }
+
     pub fn inventory(t: InventoryTransaction) -> Self {
-        CharacterTransaction { inventory: t }
+        CharacterTransaction {
+            body: Default::default(),
+            inventory: t,
+        }
     }
 }
 
 impl Transaction<Character> for CharacterTransaction {
-    type Check = <InventoryTransaction as Transaction<Inventory>>::Check;
+    type Check = (
+        <BodyTransaction as Transaction<Body>>::Check,
+        <InventoryTransaction as Transaction<Inventory>>::Check,
+    );
 
     fn check(&self, target: &Character) -> Result<Self::Check, ()> {
-        self.inventory.check(&target.inventory)
+        Ok((
+            self.body.check(&target.body)?,
+            self.inventory.check(&target.inventory)?,
+        ))
     }
 
-    fn commit(&self, target: &mut Character, check: Self::Check) -> Result<(), Box<dyn Error>> {
-        self.inventory.commit(&mut target.inventory, check)?;
+    fn commit(
+        &self,
+        target: &mut Character,
+        (body_check, inventory_check): Self::Check,
+    ) -> Result<(), Box<dyn Error>> {
+        self.body.commit(&mut target.body, body_check)?;
 
-        // TODO: notify only if the transaction is not a noop
-        target.notifier.notify(CharacterChange::Inventory);
+        // TODO: Perhaps Transaction should have an explicit cheap ".is_empty()"?
+        if self.inventory != Default::default() {
+            self.inventory
+                .commit(&mut target.inventory, inventory_check)?;
+            target.notifier.notify(CharacterChange::Inventory);
+        }
+
         Ok(())
     }
 

@@ -13,6 +13,7 @@ use crate::block::BlockCollision;
 use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::Space;
+use crate::transactions::{Transaction, Transactional};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 /// Close-but-not-intersecting objects are set to this separation.
@@ -384,6 +385,39 @@ pub struct BodyStepInfo {
     /// Details on movement and collision. A single frame's movement may have up to three
     /// segments as differently oriented faces are collided with.
     pub move_segments: [MoveSegment; 3],
+}
+
+/// The [`Transaction`] type for [`Body`].
+///
+/// TODO: Very incomplete.
+#[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
+pub struct BodyTransaction {
+    // TODO: Better strategy than just having public fields
+    pub delta_yaw: FreeCoordinate,
+}
+
+impl Transactional for Body {
+    type Transaction = BodyTransaction;
+}
+
+impl Transaction<Body> for BodyTransaction {
+    type Check = ();
+
+    fn check(&self, _body: &Body) -> Result<Self::Check, ()> {
+        // No conflicts currently possible.
+        Ok(())
+    }
+
+    fn commit(&self, body: &mut Body, _: Self::Check) -> Result<(), Box<dyn std::error::Error>> {
+        body.yaw += self.delta_yaw;
+        Ok(())
+    }
+
+    fn merge(mut self, other: Self) -> Result<Self, (Self, Self)> {
+        self.delta_yaw += other.delta_yaw;
+        Ok(self)
+    }
 }
 
 /// Given a ray describing movement of the origin of an AAB, perform a raycast to find
