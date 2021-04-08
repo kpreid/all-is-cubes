@@ -10,7 +10,11 @@ use std::error::Error;
 use super::Space;
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
-use crate::transactions::Transaction;
+use crate::transactions::{Transaction, Transactional};
+
+impl Transactional for Space {
+    type Transaction = SpaceTransaction;
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpaceTransaction {

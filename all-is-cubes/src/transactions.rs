@@ -8,8 +8,8 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use crate::character::{Character, CharacterTransaction};
-use crate::space::{Space, SpaceTransaction};
+use crate::character::Character;
+use crate::space::Space;
 use crate::universe::{Name, UBorrowMut, URef, Universe};
 
 /// A `Transaction` is a description of a mutation to an object or collection thereof that
@@ -26,10 +26,10 @@ use crate::universe::{Name, UBorrowMut, URef, Universe};
 /// A [`Transaction`] is not consumed by committing it; it may be used repeatedly. Future
 /// work may include building on this to provide undo/redo functionality.
 #[must_use]
-pub trait Transaction<T> {
+pub trait Transaction<T: ?Sized> {
     /// Type of a value passed from [`Transaction::check`] to [`Transaction::commit`].
     /// This may be used to pass precalculated values to speed up the commit phase,
-    /// or even [`UBorrow`]s or similar, but also makes it difficult to accidentally
+    /// or even [`UBorrowMut`]s or similar, but also makes it difficult to accidentally
     /// call `commit` without `check`.
     type Check: 'static;
 
@@ -88,6 +88,14 @@ pub trait Transaction<T> {
         Self: Sized;
 }
 
+/// Specifies a canonical transaction type for a target type.
+///
+/// `Transaction<T>` may be implemented by multiple types but there can be at most one
+/// `<T as Transactional>::Transaction`.
+pub trait Transactional {
+    type Transaction: Transaction<Self>;
+}
+
 /// Pair of a transaction and a [`URef`] to its target.
 ///
 /// [`AnyTransaction`] is a singly-typed wrapper around this.
@@ -97,17 +105,16 @@ pub trait Transaction<T> {
 ///
 /// TODO: Better name.
 #[derive(Debug, Eq)]
-pub struct TransactionInUniverse<Tr, Ta> {
-    target: URef<Ta>,
-    transaction: Tr,
+pub struct TransactionInUniverse<O: Transactional> {
+    target: URef<O>,
+    transaction: O::Transaction,
 }
 
-impl<Tr, Ta> Transaction<()> for TransactionInUniverse<Tr, Ta>
+impl<O> Transaction<()> for TransactionInUniverse<O>
 where
-    Tr: Transaction<Ta> + Debug,
-    Ta: 'static + Debug, // TODO: Debug bound not actually necessary
+    O: Transactional + 'static,
 {
-    type Check = (UBorrowMut<Ta>, Tr::Check);
+    type Check = (UBorrowMut<O>, <O::Transaction as Transaction<O>>::Check);
 
     fn check(&self, _dummy_target: &()) -> Result<Self::Check, ()> {
         let borrow = self.target.borrow_mut();
@@ -142,8 +149,12 @@ where
     }
 }
 
-/// Manual implementation to avoid `Ta: Clone` bound.
-impl<Tr: Clone, Ta> Clone for TransactionInUniverse<Tr, Ta> {
+/// Manual implementation to avoid `O: Clone` bound.
+impl<O> Clone for TransactionInUniverse<O>
+where
+    O: Transactional,
+    O::Transaction: Clone,
+{
     fn clone(&self) -> Self {
         Self {
             target: self.target.clone(),
@@ -151,8 +162,11 @@ impl<Tr: Clone, Ta> Clone for TransactionInUniverse<Tr, Ta> {
         }
     }
 }
-/// Manual implementation to avoid `Ta: Clone` bound.
-impl<Tr: PartialEq, Ta> PartialEq for TransactionInUniverse<Tr, Ta> {
+/// Manual implementation to avoid `O: PartialEq` bound.
+impl<O: Transactional> PartialEq for TransactionInUniverse<O>
+where
+    O::Transaction: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target && self.transaction == other.transaction
     }
@@ -166,8 +180,8 @@ impl<Tr: PartialEq, Ta> PartialEq for TransactionInUniverse<Tr, Ta> {
 #[non_exhaustive]
 pub enum AnyTransaction {
     // TODO: BlockDefTransaction
-    Character(TransactionInUniverse<CharacterTransaction, Character>),
-    Space(TransactionInUniverse<SpaceTransaction, Space>),
+    Character(TransactionInUniverse<Character>),
+    Space(TransactionInUniverse<Space>),
 }
 
 impl Transaction<()> for AnyTransaction {
@@ -182,16 +196,18 @@ impl Transaction<()> for AnyTransaction {
     }
 
     fn commit(&self, _target: &mut (), check: Self::Check) -> Result<(), Box<dyn Error>> {
-        fn commit_helper<Ta: Debug, Tr: Transaction<Ta> + Debug>(
-            transaction: &TransactionInUniverse<Tr, Ta>,
+        fn commit_helper<O>(
+            transaction: &TransactionInUniverse<O>,
             check: Box<dyn Any>,
         ) -> Result<(), Box<dyn Error>>
         where
-            TransactionInUniverse<Tr, Ta>: Transaction<()>,
+            O: Transactional,
+            TransactionInUniverse<O>: Transaction<()>,
         {
-            let check: <TransactionInUniverse<Tr, Ta> as Transaction<()>>::Check = *(check
-                .downcast()
-                .map_err(|_| "AnyTransaction: type mismatch in check data")?);
+            let check: <TransactionInUniverse<O> as Transaction<()>>::Check =
+                *(check
+                    .downcast()
+                    .map_err(|_| "AnyTransaction: type mismatch in check data")?);
             transaction.commit(&mut (), check)
         }
 
@@ -203,13 +219,14 @@ impl Transaction<()> for AnyTransaction {
     }
 
     fn merge(self, other: Self) -> Result<Self, (Self, Self)> {
-        fn merge_helper<Ta, Tr: Transaction<Ta>>(
-            t1: TransactionInUniverse<Tr, Ta>,
-            t2: TransactionInUniverse<Tr, Ta>,
-            rewrapper: fn(TransactionInUniverse<Tr, Ta>) -> AnyTransaction,
+        fn merge_helper<O>(
+            t1: TransactionInUniverse<O>,
+            t2: TransactionInUniverse<O>,
+            rewrapper: fn(TransactionInUniverse<O>) -> AnyTransaction,
         ) -> Result<AnyTransaction, (AnyTransaction, AnyTransaction)>
         where
-            TransactionInUniverse<Tr, Ta>: Transaction<()>,
+            O: Transactional,
+            TransactionInUniverse<O>: Transaction<()>,
         {
             match t1.merge(t2) {
                 Ok(t) => Ok(rewrapper(t)),
@@ -240,11 +257,11 @@ impl Debug for AnyTransaction {
 #[rustfmt::skip]
 mod any_transaction {
     use super::*;
-    impl From<TransactionInUniverse<CharacterTransaction, Character>> for AnyTransaction {
-        fn from(t: TransactionInUniverse<CharacterTransaction, Character>) -> Self { Self::Character(t) }
+    impl From<TransactionInUniverse<Character>> for AnyTransaction {
+        fn from(t: TransactionInUniverse<Character>) -> Self { Self::Character(t) }
     }
-    impl From<TransactionInUniverse<SpaceTransaction, Space>> for AnyTransaction {
-        fn from(t: TransactionInUniverse<SpaceTransaction, Space>) -> Self { Self::Space(t) }
+    impl From<TransactionInUniverse<Space>> for AnyTransaction {
+        fn from(t: TransactionInUniverse<Space>) -> Self { Self::Space(t) }
     }
 }
 
@@ -256,11 +273,11 @@ pub struct UniverseTransaction {
 }
 
 impl UniverseTransaction {
-    pub fn of<Ta, Tr>(target: URef<Ta>, transaction: Tr) -> Self
+    pub fn of<O>(target: URef<O>, transaction: O::Transaction) -> Self
     where
-        Tr: Transaction<Ta> + Debug + 'static,
-        Ta: Debug + 'static,
-        TransactionInUniverse<Tr, Ta>: Into<AnyTransaction>,
+        O: Transactional + 'static,
+        //Tr: Transaction<O> + Debug + 'static,
+        TransactionInUniverse<O>: Into<AnyTransaction>,
     {
         let mut members: HashMap<Rc<Name>, AnyTransaction> = HashMap::new();
         members.insert(
@@ -373,6 +390,7 @@ mod tests {
     use super::*;
     use crate::content::make_some_blocks;
     use crate::math::GridPoint;
+    use crate::space::SpaceTransaction;
 
     #[test]
     fn universe_txn_has_default() {

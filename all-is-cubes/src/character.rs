@@ -19,7 +19,7 @@ use crate::physics::{Body, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
 use crate::tools::{Inventory, InventoryTransaction, Tool, ToolError};
-use crate::transactions::{Transaction, UniverseTransaction};
+use crate::transactions::{Transaction, Transactional, UniverseTransaction};
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
@@ -257,6 +257,10 @@ impl Character {
             .iter()
             .any(|contact| contact.face == Face::PY)
     }
+}
+
+impl Transactional for Character {
+    type Transaction = CharacterTransaction;
 }
 
 #[derive(Clone, Debug, PartialEq)]
