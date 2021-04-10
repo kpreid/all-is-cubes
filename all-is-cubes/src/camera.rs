@@ -359,7 +359,7 @@ impl Default for GraphicsOptions {
             fog: FogOption::Compromise,
             fov_y: NotNan::new(90.).unwrap(),
             view_distance: NotNan::new(200.).unwrap(),
-            lighting_display: LightingOption::Flat,
+            lighting_display: LightingOption::Smooth,
             chunks_per_frame: 4,
             use_frustum_culling: true,
             debug_collision_boxes: false,
