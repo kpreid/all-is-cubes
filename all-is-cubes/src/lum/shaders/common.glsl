@@ -25,9 +25,17 @@ uniform mediump vec3 fog_color;
 
 
 // Given integer cube coordinates, fetch and unpack a light_texture RGB value.
-// The alpha component is either 0 or 1 indicating whether this is a "valid" 
-// light value; one which is neither inside an opaque block nor in empty unlit
-// air.
+// The alpha component corresponds to the `LightStatus` enum on the Rust side,
+// but indirectly in a way that is useful for blending:
+//
+// LightStatus::Uninitialized = -1
+// LightStatus::Opaque = 0
+// LightStatus::NoRays = -1
+// LightStatus::Visible = 1
+// 
+// This encoding allows use of the 0-1 range for smooth lighting's blending
+// excluding opaque blocks, while the -1 value indicates values that should be
+// truly ignored.
 lowp vec4 light_texture_fetch(mediump vec3 p) {
   ivec3 lookup_position = ivec3(floor(p));
   lookup_position += light_offset;
@@ -42,7 +50,9 @@ lowp vec4 light_texture_fetch(mediump vec3 p) {
   lowp vec3 unpacked_light = pow(vec3(2.0), (packed_light - 128.0 / 255.0) * (255.0 / 16.0));
 
   // See all_is_cubes::space::LightStatus for the value this is interpreting.
-  bool valid = texel.a >= 0.5;
+  // The enum values are grouped into approximately {0, 128, 255}, so multiplying by 2 and rounding
+  // produces -1, 0, and 1 without any conditionals.
+  lowp float status = round(texel.a * 2.0 - 1.0);
 
-  return vec4(unpacked_light, float(valid));
+  return vec4(unpacked_light, status);
 }

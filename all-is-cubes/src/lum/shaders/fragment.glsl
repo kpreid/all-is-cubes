@@ -63,7 +63,21 @@ lowp float fixed_directional_lighting() {
 }
 
 bool valid_light(vec4 light) {
-  return light.a > 0.125;
+  return light.a > 0.5;
+}
+
+// Tweak a light value for ambient occlusion -- and convert the light status 
+// value returned from light_texture_fetch to an interpolation coefficient.
+lowp vec4 ao_fudge(lowp vec4 light_value) {
+  // TODO: Make this a (uniform) graphics option
+  const lowp float fudge = 0.25;
+  lowp float status = light_value.a;
+  // Fudge applies only to opaque cubes, not to no-rays cubes.
+  // This multiplication provides a branchless calculation:
+  // If status is -1 (no-rays or uninitialized), return 0.
+  // If status is 0 (opaque), return fudge value.
+  // If status is 1 (normal light value), return that.
+  return vec4(light_value.rgb, float(status > -0.5) * max(status, fudge));
 }
 
 #ifdef SMOOTH_LIGHTING
@@ -108,23 +122,29 @@ lowp vec3 interpolated_space_light() {
   lowp vec4 near2far1 = light_texture_fetch(origin + lin_hi * dir_1 + lin_lo * dir_2);
   lowp vec4 far12     = light_texture_fetch(origin + lin_hi * dir_1 + lin_hi * dir_2);
   
-  // Perform bilinear interpolation.
   if (!valid_light(near1far2) && !valid_light(near2far1)) {
     // The far corner is on the other side of a diagonal wall, so should be
-    // omitted; there is only one sample to use.
-    return near12.rgb;
-  } else {
-    lowp vec4 v = mix(
-      mix(near12,    near1far2, mix_2),
-      mix(near2far1, far12,     mix_2),
-      mix_1
-    );
-    // Scale result by sum of valid texels.
-    // Because v.a went through the mix, it scales with the proportion of valid texels
-    // that were used, so it is always a smooth blend without block edge effects.
-    // However, we don't want divide-by-a-small-number effects so we cap the divisor.
-    return v.rgb / max(0.1, v.a);
+    // ignored to prevent light leaks.
+    far12 = near12;
   }
+
+  // Apply ambient occlusion.
+  near12    = ao_fudge(near12);
+  near1far2 = ao_fudge(near1far2);
+  near2far1 = ao_fudge(near2far1);
+  far12     = ao_fudge(far12);
+
+  // Perform bilinear interpolation.
+  lowp vec4 v = mix(
+    mix(near12,    near1far2, mix_2),
+    mix(near2far1, far12,     mix_2),
+    mix_1
+  );
+  // Scale result by sum of valid texels.
+  // Because v.a went through the mix, it scales with the proportion of valid texels
+  // that were used, so it is always a smooth blend without block edge effects.
+  // However, we don't want divide-by-a-small-number effects so we cap the divisor.
+  return v.rgb / max(0.1, v.a);
 }
 #endif
 

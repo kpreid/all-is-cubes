@@ -256,23 +256,32 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         let near12 = get_light(lin_lo * dir_1 + lin_lo * dir_2);
         let near1far2 = get_light(lin_lo * dir_1 + lin_hi * dir_2);
         let near2far1 = get_light(lin_hi * dir_1 + lin_lo * dir_2);
-        let far12 = get_light(lin_hi * dir_1 + lin_hi * dir_2);
+        let mut far12 = get_light(lin_hi * dir_1 + lin_hi * dir_2);
+
+        if !near1far2.valid() && !near2far1.valid() {
+            // The far corner is on the other side of a diagonal wall, so should be
+            // ignored to prevent light leaks.
+            far12 = near12;
+        }
+
+        // Apply ambient occlusion.
+        let near12 = near12.value_with_ambient_occlusion();
+        let near1far2 = near1far2.value_with_ambient_occlusion();
+        let near2far1 = near2far1.value_with_ambient_occlusion();
+        let far12 = far12.value_with_ambient_occlusion();
 
         // Perform bilinear interpolation.
-        if !near1far2.valid() && !near2far1.valid() {
-            near12.value()
-        } else {
-            fn mix(x: Vector4<f32>, y: Vector4<f32>, a: FreeCoordinate) -> Vector4<f32> {
-                let a = a as f32;
-                x * (1. - a) + y * a
-            }
-            let v = mix(
-                mix(near12.value_and_valid(), near1far2.value_and_valid(), mix_2),
-                mix(near2far1.value_and_valid(), far12.value_and_valid(), mix_2),
-                mix_1,
-            );
-            Rgb::try_from(v.truncate() / v.w.max(0.1)).unwrap()
+        fn mix(x: Vector4<f32>, y: Vector4<f32>, a: FreeCoordinate) -> Vector4<f32> {
+            // This should be replaced with https://doc.rust-lang.org/nightly/std/primitive.f32.html#method.lerp when that's stable
+            let a = a as f32;
+            x * (1. - a) + y * a
         }
+        let v = mix(
+            mix(near12, near1far2, mix_2),
+            mix(near2far1, far12, mix_2),
+            mix_1,
+        );
+        Rgb::try_from(v.truncate() / v.w.max(0.1)).unwrap()
     }
 }
 
