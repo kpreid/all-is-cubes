@@ -21,8 +21,9 @@ use crate::space::{Grid, Space};
 
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     Exhibit {
-        name: "Transparency WIP",
+        name: "Transparency",
         factory: |_this, _universe| {
+            // TODO: Add some partial-block transparency once we're any good at implementing it
             let mut space = Space::empty(Grid::new([-3, 0, -3], [7, 5, 7]));
 
             let colors = [
@@ -196,6 +197,26 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                         space.set([0, y as GridCoordinate, h as GridCoordinate], block)?;
                     }
                 }
+                Ok(space)
+            },
+        }
+    },
+    {
+        Exhibit {
+            name: "Swimming Pool",
+            factory: |_this, _universe| {
+                let width = 6;
+                let depth = 6;
+                let water_area = Grid::new([0, -depth, 0], [width, depth, width]);
+                let mut space = Space::empty(water_area);
+                space.fill_uniform(
+                    water_area,
+                    Block::builder()
+                        .display_name("Not entirely unlike water")
+                        .color(Rgba::new(0.96, 0.96, 1.0, 0.1))
+                        .collision(BlockCollision::None)
+                        .build(),
+                )?;
                 Ok(space)
             },
         }
