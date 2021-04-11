@@ -50,13 +50,16 @@ impl AllIsCubesAppState {
             // TODO: better error handling
             .expect("Failure while constructing template");
 
+        let input_processor = InputProcessor::new();
+
         let mut new_self = Self {
+            ui: Vui::new(&input_processor),
+
             frame_clock: FrameClock::new(),
-            input_processor: InputProcessor::new(),
+            input_processor,
             graphics_options: ListenableCell::new(GraphicsOptions::default()),
             game_character: game_universe.get_default_character(),
             game_universe,
-            ui: Vui::new(),
             ui_dirty: DirtyFlag::new(true),
             cursor_result: None,
         };
@@ -124,9 +127,6 @@ impl AllIsCubesAppState {
                 .set_toolbar(&character.inventory().slots, &character.selected_slots())
                 .unwrap();
         }
-        self.ui
-            .set_crosshair_visible(self.input_processor.mouselook_mode)
-            .unwrap(); // TODO: ui should have internal error handling
     }
 
     /// Call this once per frame to update the cursor raycast.

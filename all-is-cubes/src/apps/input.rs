@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use crate::camera::Viewport;
 use crate::character::Character;
+use crate::listen::{ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
 
 /// Parse input events, particularly key-down/up pairs, into character control and such.
@@ -21,7 +22,7 @@ use crate::math::FreeCoordinate;
 ///    of input on the relevant [`Character`].
 /// 3. The game loop should call [`InputProcessor::step`] to apply the effects of time
 ///    on the input processor.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct InputProcessor {
     /// All [`Key`]s currently pressed.
     keys_held: HashSet<Key>,
@@ -33,9 +34,10 @@ pub struct InputProcessor {
     /// once per press rather than while held.
     command_buffer: Vec<Key>,
 
-    /// Do we *want* pointer lock for mouselook? Controlled by UI.
-    // TODO: Stop making this public directly
-    pub(super) mouselook_mode: bool,
+    /// Do we *want* pointer lock for mouselook?
+    ///
+    /// This is listenable so that the UI can react to this state.
+    mouselook_mode: ListenableCell<bool>,
     /// Do we *have* pointer lock for mouselook? Reported by calling input implementation.
     has_pointer_lock: bool,
 
@@ -57,7 +59,7 @@ impl InputProcessor {
             keys_held: HashSet::new(),
             momentary_timeout: HashMap::new(),
             command_buffer: Vec::new(),
-            mouselook_mode: false, // TODO: might want a parameter
+            mouselook_mode: ListenableCell::new(false), // TODO: might want a parameter
             has_pointer_lock: false,
             mouselook_buffer: Vector2::zero(),
             mouse_ndc_position: Some(Point2::origin()),
@@ -135,7 +137,7 @@ impl InputProcessor {
             self.keys_held.clear();
             self.momentary_timeout.clear();
 
-            self.mouselook_mode = false;
+            self.mouselook_mode.set(false);
         }
     }
 
@@ -144,7 +146,7 @@ impl InputProcessor {
     /// may lack focus, the application may lack permission, etc.; use
     /// [`InputProcessor::has_pointer_lock`] to report that state.
     pub fn wants_pointer_lock(&self) -> bool {
-        self.mouselook_mode
+        *self.mouselook_mode.get()
     }
 
     /// Use this method to report whether mouse mouse pointer lock/capture/disable is
@@ -265,8 +267,9 @@ impl InputProcessor {
         for key in self.command_buffer.drain(..) {
             match key {
                 Key::Character('l') => {
-                    self.mouselook_mode = !self.mouselook_mode;
-                    if self.mouselook_mode {
+                    let new_state = !*self.mouselook_mode.get();
+                    self.mouselook_mode.set(new_state);
+                    if new_state {
                         // Clear delta tracking just in case
                         self.mouse_previous_pixel_position = None;
                     }
@@ -281,13 +284,17 @@ impl InputProcessor {
         }
     }
 
+    pub fn mouselook_mode(&self) -> ListenableSource<bool> {
+        self.mouselook_mode.as_source()
+    }
+
     /// Returns the position which should be used for click/cursor raycasting.
     /// This is not necessarily equal to the tracked mouse position.
     ///
     /// Returns [`None`] if the mouse position is out of bounds, the window has lost
     /// focus, or similar conditions under which no cursor should be shown.
     pub fn cursor_ndc_position(&self) -> Option<Point2<FreeCoordinate>> {
-        if self.mouselook_mode {
+        if *self.mouselook_mode.get() {
             Some(Point2::origin())
         } else {
             self.mouse_ndc_position

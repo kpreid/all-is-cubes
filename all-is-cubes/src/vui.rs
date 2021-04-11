@@ -15,10 +15,12 @@ use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::time::Duration;
 
+use crate::apps::InputProcessor;
 use crate::block::{Block, AIR};
 use crate::camera::{FogOption, GraphicsOptions};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
+use crate::listen::ListenableSource;
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::{SetCubeError, Space};
 use crate::tools::Tool;
@@ -41,10 +43,15 @@ pub(crate) struct Vui {
 
     /// None if the tooltip is blanked
     tooltip_age: Option<Duration>,
+
+    mouselook_mode: ListenableSource<bool>,
 }
 
 impl Vui {
-    pub fn new() -> Self {
+    /// `input_processor` is the `InputProcessor` whose state may be reflected on the HUD.
+    /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
+    /// elements.
+    pub fn new(input_processor: &InputProcessor) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = HudBlocks::new(&mut universe, 16);
         let hud_space = HudLayout::default().new_space(&mut universe, &hud_blocks);
@@ -57,6 +64,8 @@ impl Vui {
             aspect_ratio: 4. / 3., // arbitrary placeholder assumption
 
             tooltip_age: None,
+
+            mouselook_mode: input_processor.mouselook_mode(),
         }
     }
 
@@ -104,6 +113,20 @@ impl Vui {
     }
 
     pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
+        // Update crosshair block
+        // TODO: Do this with a dirty check
+        self.hud_space
+            .borrow_mut()
+            .set(
+                HudLayout::default().crosshair_position(),
+                if *self.mouselook_mode.get() {
+                    &self.hud_blocks.icons[Icons::Crosshair]
+                } else {
+                    &AIR
+                },
+            )
+            .unwrap(); // TODO: Handle internal errors better than panicking
+
         if let Some(ref mut age) = self.tooltip_age {
             *age += timestep;
             if *age > Duration::from_secs(1) {
@@ -155,20 +178,6 @@ impl Vui {
             text,
         )
     }
-
-    // TODO: handle errors in a local/transient way instead of propagating
-    // TODO: this should surely be a listener rather than an explicit setter??
-    pub(crate) fn set_crosshair_visible(&mut self, visible: bool) -> Result<(), SetCubeError> {
-        self.hud_space.borrow_mut().set(
-            HudLayout::default().crosshair_position(),
-            if visible {
-                &self.hud_blocks.icons[Icons::Crosshair]
-            } else {
-                &AIR
-            },
-        )?;
-        Ok(())
-    }
 }
 
 #[allow(unused)] // TODO: not yet used for real
@@ -201,9 +210,13 @@ pub(crate) fn draw_background(space: &mut Space) {
 mod tests {
     use super::*;
 
+    fn new_vui_for_test() -> Vui {
+        Vui::new(&InputProcessor::new())
+    }
+
     #[test]
     fn vui_smoke_test() {
-        let _ = Vui::new();
+        let _ = new_vui_for_test();
     }
 
     #[test]
@@ -214,7 +227,7 @@ mod tests {
 
     #[test]
     fn tooltip_timeout() {
-        let mut vui = Vui::new();
+        let mut vui = new_vui_for_test();
         assert_eq!(vui.tooltip_age, None);
         vui.set_tooltip_text("Hello world").unwrap();
         assert_eq!(vui.tooltip_age, Some(Duration::from_secs(0)));
