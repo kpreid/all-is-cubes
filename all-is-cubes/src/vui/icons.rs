@@ -49,6 +49,8 @@ pub enum Icons {
     Delete,
     /// Icon for [`Tool::CopyFromSpace`].
     CopyFromSpace,
+    /// Icon for [`Tool::EditBlock`].
+    EditBlock,
     /// Icon for [`Tool::Jetpack`].
     Jetpack {
         active: bool,
@@ -77,6 +79,7 @@ impl fmt::Display for Icons {
             Icons::Activate => write!(f, "activate"),
             Icons::Delete => write!(f, "delete"),
             Icons::CopyFromSpace => write!(f, "copy-from-space"),
+            Icons::EditBlock => write!(f, "edit-block"),
             Icons::Jetpack { active } => write!(f, "jetpack/{}", active),
             Icons::PauseButton(state) => write!(f, "pause-button/{}", state),
             Icons::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
@@ -223,6 +226,12 @@ impl Icons {
 
                 Icons::CopyFromSpace => Block::builder()
                     .display_name("Copy Block from Cursor")
+                    // TODO: design actual icon
+                    .color(Rgba::new(0., 1., 0., 1.))
+                    .build(),
+
+                Icons::EditBlock => Block::builder()
+                    .display_name("Edit Block")
                     // TODO: design actual icon
                     .color(Rgba::new(0., 1., 0., 1.))
                     .build(),

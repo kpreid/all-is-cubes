@@ -7,13 +7,12 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use crate::block::{Block, Modifier, RotationPlacementRule, AIR};
+use crate::block::{Block, Modifier, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
-use crate::math::{GridPoint, GridRotation};
-use crate::raycast::Face;
-use crate::space::SpaceTransaction;
+use crate::math::{Face, GridPoint, GridRotation};
+use crate::space::{Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction, UniverseTransaction};
 use crate::universe::{RefError, RefVisitor, URef, VisitRefs};
 use crate::vui::Icons;
@@ -43,6 +42,11 @@ pub enum Tool {
 
     /// Copy block from space to inventory.
     CopyFromSpace,
+
+    /// Teleport into a block's space for editing.
+    ///
+    /// TODO: This is not yet actually implemented.
+    EditBlock,
 
     /// Allows flight.
     ///
@@ -129,6 +133,25 @@ impl Tool {
                         .produce_item(Tool::InfiniteBlocks(cursor.block.clone().unspecialize()))?,
                 ))
             }
+            Self::EditBlock => {
+                // TODO: this should probably be a utility on Block itself
+                fn find_space(block: &Block) -> Result<Option<URef<Space>>, RefError> {
+                    match block.primitive() {
+                        Primitive::Indirect(r) => find_space(&**r.try_borrow()?),
+                        Primitive::Atom(_, _) => Ok(None),
+                        Primitive::Recur { space, .. } => Ok(Some(space.clone())),
+                    }
+                }
+                match find_space(&input.cursor()?.block) {
+                    // TODO: Actually implement the tool.
+                    Ok(Some(_space_ref)) => {
+                        Err(ToolError::Internal("EditBlock not implemented".to_string()))
+                    }
+                    Ok(None) => Err(ToolError::NotUsable),
+                    // TODO: slightly wrong meaning of error variant
+                    Err(ref_err) => Err(ToolError::SpaceRef(ref_err)),
+                }
+            }
             Self::Jetpack { active } => Ok((
                 Some(Self::Jetpack { active: !active }),
                 UniverseTransaction::default(),
@@ -177,6 +200,7 @@ impl Tool {
                 Cow::Owned(Modifier::Quote { ambient: false }.attach(block.clone()))
             }
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
+            Self::EditBlock => Cow::Borrowed(&predefined[Icons::EditBlock]),
             Self::Jetpack { active } => {
                 Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
             }
@@ -194,6 +218,7 @@ impl Tool {
             Tool::Block(_) => Standard,
             Tool::InfiniteBlocks(_) => One,
             Tool::CopyFromSpace => One,
+            Tool::EditBlock => One,
             Tool::Jetpack { .. } => One,
             Tool::ExternalAction { .. } => One,
         }
@@ -208,6 +233,7 @@ impl VisitRefs for Tool {
             Tool::Block(block) => block.visit_refs(visitor),
             Tool::InfiniteBlocks(block) => block.visit_refs(visitor),
             Tool::CopyFromSpace => {}
+            Tool::EditBlock => {}
             Tool::Jetpack { active: _ } => {}
             Tool::ExternalAction { function: _, icon } => {
                 icon.visit_refs(visitor);
