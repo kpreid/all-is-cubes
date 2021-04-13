@@ -181,6 +181,10 @@ impl Aab {
         })
     }
 
+    pub fn scale(self, scalar: FreeCoordinate) -> Self {
+        Self::from_lower_upper(self.lower_bounds * scalar, self.upper_bounds * scalar)
+    }
+
     /// Enlarges the AAB by moving each face outward by the specified distance.
     ///
     /// Panics if the distance is negative or NaN.
