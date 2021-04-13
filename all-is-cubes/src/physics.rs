@@ -17,15 +17,12 @@ pub(crate) const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 mod tests {
     use super::*;
     use crate::apps::Tick;
-    use crate::block::AIR;
+    use crate::block::{Block, BlockCollision, AIR};
     use crate::content::make_some_blocks;
-    use crate::math::Aab;
-    use crate::raycast::CubeFace;
-    use crate::raycast::Face;
-    use crate::space::SpacePhysics;
-    use crate::space::{Grid, Space};
-    use cgmath::Vector3;
-    use cgmath::{InnerSpace as _, Point3, Zero as _};
+    use crate::math::{Aab, CubeFace, Face};
+    use crate::space::{Grid, Space, SpacePhysics};
+    use crate::universe::Universe;
+    use cgmath::{InnerSpace as _, Point3, Vector3, Zero as _};
     use rand::prelude::SliceRandom as _;
     use rand::{Rng as _, SeedableRng as _};
     use std::collections::VecDeque;
@@ -99,6 +96,34 @@ mod tests {
         assert_eq!(body.position.x, 2.0);
         assert_eq!(body.position.z, 0.0);
         assert!((body.position.y - 1.5).abs() < 1e-6, "{:?}", body.position);
+        assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);
+    }
+
+    #[test]
+    #[ignore] // TODO: Voxel-level collision is not yet implemented; this test will not pass
+    fn falling_collision_partial_block() {
+        let u = &mut Universe::new();
+        let [voxel] = make_some_blocks();
+        let block = Block::builder()
+            .collision(BlockCollision::Hard)
+            .voxels_fn(u, 2, |p| if p.y > 0 { &AIR } else { &voxel })
+            .unwrap()
+            .build();
+
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set((0, 0, 0), &block).unwrap();
+        let mut body = Body {
+            velocity: Vector3::new(2.0, 0.0, 0.0),
+            flying: false,
+            ..test_body()
+        };
+
+        let mut contacts = Vec::new();
+        body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
+
+        assert_eq!(body.position.x, 2.0);
+        assert_eq!(body.position.z, 0.0);
+        assert!((body.position.y - 1.0).abs() < 1e-6, "{:?}", body.position);
         assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);
     }
 
