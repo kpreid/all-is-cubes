@@ -214,8 +214,8 @@ impl Body {
             }
             if ray_step.face() == Face::Within {
                 // If we are intersecting a block, we are allowed to leave it; pretend
-                // it doesn't exist.
-                // TODO: Implement pushing out of shallow collisions.
+                // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
+                // maybe there's no clear direction.)
                 for box_cube in step_aab.round_up_to_grid().interior_iter() {
                     already_colliding.insert(Contact {
                         cube: box_cube,
