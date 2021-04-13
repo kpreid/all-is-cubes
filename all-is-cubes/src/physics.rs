@@ -10,7 +10,7 @@ use std::fmt;
 
 use crate::apps::Tick;
 use crate::block::BlockCollision;
-use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _};
+use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _, GridPoint};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::Space;
 use crate::transactions::{Transaction, Transactional};
@@ -216,7 +216,7 @@ impl Body {
                 // If we are intersecting a block, we are allowed to leave it; pretend
                 // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
                 // maybe there's no clear direction.)
-                for box_cube in step_aab.round_up_to_grid().interior_iter() {
+                for box_cube in Self::collision_test(&space, step_aab) {
                     already_colliding.insert(Contact {
                         cube: box_cube,
                         face: ray_step.face(),
@@ -228,15 +228,12 @@ impl Body {
             // Loop over all the cubes that our AAB is just now intersecting and check if
             // any of them are solid.
             let mut hit_something = false;
-            for box_cube in step_aab.round_up_to_grid().interior_iter() {
+            for box_cube in Self::collision_test(&space, step_aab) {
                 let contact = Contact {
                     cube: box_cube,
                     face: ray_step.face(),
                 };
-                // TODO: change this from `==` to `match` to allow for expansion of the enum
-                if space.get_evaluated(box_cube).attributes.collision == BlockCollision::Hard
-                    && !already_colliding.contains(&contact)
-                {
+                if !already_colliding.contains(&contact) {
                     hit_something = true;
                     collision_callback(contact);
                 }
@@ -281,16 +278,19 @@ impl Body {
         )
     }
 
+    /// TODO: Refactor and tidy this...
+    fn collision_test(space: &Space, aab: Aab) -> impl Iterator<Item = GridPoint> + '_ {
+        aab.round_up_to_grid().interior_iter().filter(move |&cube| {
+            // TODO: change this from `==` to `match` to allow for expansion of the enum
+            space.get_evaluated(cube).attributes.collision == BlockCollision::Hard
+        })
+    }
+
     /// Check if we're intersecting any blocks and fix that if so.
     fn push_out(&mut self, space: &Space) -> Option<Vector3<FreeCoordinate>> {
-        let colliding = self
-            .collision_box_abs()
-            .round_up_to_grid()
-            .interior_iter()
-            .any(|cube| {
-                // TODO: Have collision test logic in common with the movement routine
-                space.get_evaluated(cube).attributes.collision == BlockCollision::Hard
-            });
+        let colliding = Self::collision_test(space, self.collision_box_abs())
+            .next()
+            .is_some();
         if colliding {
             let exit_backwards = -self.velocity;
             let shortest_push_out = (-1..=1)
