@@ -86,27 +86,32 @@ where
         defines + "\n#line 1 0\n" + SHADER_COMMON + "#line 1 1\n" + SHADER_FRAGMENT;
 
     let start_compile_time = Instant::now();
-    let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = context
-        .new_shader_program::<VertexSemantics, (), BlockUniformInterface>()
-        .from_strings(
-            &concatenated_vertex_shader,
-            None,
-            None,
-            &concatenated_fragment_shader,
-        );
+    let result = map_shader_result(
+        context
+            .new_shader_program::<VertexSemantics, (), BlockUniformInterface>()
+            .from_strings(
+                &concatenated_vertex_shader,
+                None,
+                None,
+                &concatenated_fragment_shader,
+            ),
+    );
     log::trace!(
         "Shader compilation took {:.3} s",
         Instant::now()
             .duration_since(start_compile_time)
             .as_secs_f32()
     );
+    result
+}
+
+pub(crate) fn map_shader_result<Sem, Out, Uni>(
+    program_attempt: Result<BuiltProgram<Sem, Out, Uni>, ProgramError>,
+) -> WarningsResult<Program<Sem, Out, Uni>, String, String> {
     match program_attempt {
         Err(error) => Err((format!("{}", error), vec![])),
-        Ok(BuiltProgram {
-            program: block_program,
-            warnings,
-        }) => Ok((
-            block_program,
+        Ok(BuiltProgram { program, warnings }) => Ok((
+            program,
             warnings.into_iter().map(|w| format!("{}", w)).collect(),
         )),
     }
