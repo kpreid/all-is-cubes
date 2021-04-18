@@ -29,6 +29,7 @@ use crate::util::MapExtend;
 // (that we can stably support). Revisit.
 
 mod block_texture;
+mod frame_texture;
 mod glrender;
 pub use glrender::*;
 mod shading;
