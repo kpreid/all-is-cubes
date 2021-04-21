@@ -167,6 +167,9 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // How should we scale texels versus the standard size to get correct display?
             let voxel_scale_modifier =
                 block_resolution as TextureCoordinate / tile_resolution as TextureCoordinate;
+            // Map quad vertices in voxel grid coordinates to containing block coordinates.
+            let vertex_scale = FreeCoordinate::from(block.resolution).recip();
+            let scale_vertex = |s| FreeCoordinate::from(s) * vertex_scale;
 
             let mut texture_if_needed: Option<A::Tile> = None;
 
@@ -175,9 +178,17 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             for &face in Face::ALL_SIX {
                 let transform = face.matrix(block_resolution - 1);
 
+                // Rotate the voxel array's extent into our local coordinate system, so we can find
+                // out what range to iterate over.
+                // TODO: Avoid using a matrix inversion
+                let rotated_voxel_range = voxels
+                    .grid()
+                    .transform(face.matrix(block_resolution).inverse_transform().unwrap())
+                    .unwrap();
+
                 // Layer 0 is the outside surface of the cube and successive layers are
                 // deeper below that surface.
-                for layer in 0..block_resolution {
+                for layer in rotated_voxel_range.z_range() {
                     // TODO: Have EvaluatedBlock tell us when a block is fully cubical and opaque,
                     // and then only scan the first and last layers. EvaluatedBlock.fully_opaque
                     // is not quite that because it is defined to allow concavities.
@@ -190,20 +201,16 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     // That is, it excludes all obscured interior volume.
                     // First, we traverse the block and fill this with non-obscured voxels,
                     // then we erase it as we convert contiguous rectangles of it to quads.
-                    let mut visible_image: Vec<Rgba> =
-                        Vec::with_capacity(block_resolution.pow(2) as usize);
+                    let mut visible_image: Vec<Rgba> = Vec::with_capacity(
+                        rotated_voxel_range.x_range().len() * rotated_voxel_range.y_range().len(),
+                    );
 
-                    for t in 0..block_resolution {
-                        for s in 0..block_resolution {
+                    for t in rotated_voxel_range.y_range() {
+                        for s in rotated_voxel_range.x_range() {
                             let cube: Point3<GridCoordinate> =
                                 transform.transform_point(Point3::new(s, t, layer));
 
-                            // Diagnose out-of-space accesses. TODO: Tidy this up and document it, or remove it:
-                            // it will happen whenever the space is the wrong size for the textures.
-                            let color = voxels
-                                .get(cube)
-                                .unwrap_or(&Evoxel::new(palette::MISSING_VOXEL_FALLBACK))
-                                .color;
+                            let color = voxels.get(cube).unwrap_or(&Evoxel::AIR).color;
 
                             if layer == 0 && !color.fully_opaque() {
                                 // If the first layer is transparent in any cube at all, then the face is
@@ -249,48 +256,53 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
                     // Traverse `visible_image` using the "greedy meshing" algorithm for
                     // breaking an irregular shape into quads.
-                    GreedyMesher::new(visible_image, block_resolution).run(
-                        |mesher, low_corner, high_corner| {
-                            // Generate quad.
-                            let coloring = if let Some(single_color) = mesher.single_color {
-                                // The quad we're going to draw has identical texels, so we might as
-                                // well use a solid color and skip needing a texture.
-                                QuadColoring::<A::Tile>::Solid(single_color)
+                    GreedyMesher::new(
+                        visible_image,
+                        rotated_voxel_range.x_range(),
+                        rotated_voxel_range.y_range(),
+                    )
+                    .run(|mesher, low_corner, high_corner| {
+                        let low_corner = low_corner.map(scale_vertex);
+                        let high_corner = high_corner.map(scale_vertex);
+                        // Generate quad.
+                        let coloring = if let Some(single_color) = mesher.single_color {
+                            // The quad we're going to draw has identical texels, so we might as
+                            // well use a solid color and skip needing a texture.
+                            QuadColoring::<A::Tile>::Solid(single_color)
+                        } else {
+                            if texture_if_needed.is_none() {
+                                // Try to compute texture
+                                texture_if_needed =
+                                    copy_voxels_to_texture(texture_allocator, voxels);
+                            }
+                            if let Some(ref texture) = texture_if_needed {
+                                QuadColoring::Texture(texture, voxel_scale_modifier)
                             } else {
-                                if texture_if_needed.is_none() {
-                                    // Try to compute texture
-                                    texture_if_needed =
-                                        copy_voxels_to_texture(texture_allocator, voxels);
-                                }
-                                if let Some(ref texture) = texture_if_needed {
-                                    QuadColoring::Texture(texture, voxel_scale_modifier)
-                                } else {
-                                    // Texture allocation failure.
-                                    // TODO: Mark this triangulation as defective in the return value, so
-                                    // that when more space is available, it can be retried, rather than
-                                    // having lingering failures.
-                                    // TODO: Add other fallback strategies such as using multiple quads instead
-                                    // of textures.
-                                    QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
-                                }
-                            };
+                                // Texture allocation failure.
+                                // TODO: Mark this triangulation as defective in the return value, so
+                                // that when more space is available, it can be retried, rather than
+                                // having lingering failures.
+                                // TODO: Add other fallback strategies such as using multiple quads instead
+                                // of textures.
+                                QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
+                            }
+                        };
 
-                            push_quad(
-                                vertices,
-                                if mesher.rect_has_alpha {
-                                    indices_transparent
-                                } else {
-                                    indices_opaque
-                                },
-                                face,
-                                depth,
-                                low_corner,
-                                high_corner,
-                                coloring,
-                                tile_resolution,
-                            );
-                        },
-                    );
+                        push_quad(
+                            vertices,
+                            if mesher.rect_has_alpha {
+                                indices_transparent
+                            } else {
+                                indices_opaque
+                            },
+                            face,
+                            depth,
+                            low_corner,
+                            high_corner,
+                            coloring,
+                            tile_resolution,
+                        );
+                    });
                 }
             }
 

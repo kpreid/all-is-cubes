@@ -8,6 +8,7 @@ use cgmath::{
     Zero as _,
 };
 use std::convert::{TryFrom, TryInto};
+use std::ops::Range;
 
 use crate::math::{Face, FreeCoordinate, GridCoordinate, Rgba};
 use crate::triangulator::{BlockVertex, Coloring, TextureCoordinate, TextureTile};
@@ -16,19 +17,24 @@ use crate::triangulator::{BlockVertex, Coloring, TextureCoordinate, TextureTile}
 /// <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
 pub(crate) struct GreedyMesher {
     visible_image: Vec<Rgba>,
-    resolution_g: GridCoordinate,
-    resolution_s: usize,
+    // Logical bounding rectangle of the data in `visible_image`.
+    image_s_range: Range<GridCoordinate>,
+    image_t_range: Range<GridCoordinate>,
     /// Contains a color if all voxels examined so far have that color.
     pub(crate) single_color: Option<Rgba>,
     pub(crate) rect_has_alpha: bool,
 }
 impl GreedyMesher {
     /// Create the initial state.
-    pub(crate) fn new(visible_image: Vec<Rgba>, resolution: GridCoordinate) -> Self {
+    pub(crate) fn new(
+        visible_image: Vec<Rgba>,
+        image_s_range: Range<GridCoordinate>,
+        image_t_range: Range<GridCoordinate>,
+    ) -> Self {
         Self {
             visible_image,
-            resolution_g: resolution,
-            resolution_s: resolution.try_into().unwrap(),
+            image_s_range,
+            image_t_range,
             single_color: None,
             rect_has_alpha: false,
         }
@@ -37,10 +43,10 @@ impl GreedyMesher {
     /// Actually run the algorithm.
     pub(crate) fn run(
         mut self,
-        mut quad_callback: impl FnMut(&Self, Point2<FreeCoordinate>, Point2<FreeCoordinate>),
+        mut quad_callback: impl FnMut(&Self, Point2<GridCoordinate>, Point2<GridCoordinate>),
     ) {
-        for tl in 0..self.resolution_g {
-            for sl in 0..self.resolution_g {
+        for tl in self.image_t_range.clone() {
+            for sl in self.image_s_range.clone() {
                 if !self.add_seed(sl, tl) {
                     continue;
                 }
@@ -48,7 +54,7 @@ impl GreedyMesher {
                 let mut sh = sl;
                 loop {
                     sh += 1;
-                    if sh >= self.resolution_g {
+                    if sh >= self.image_s_range.end {
                         break; // Found the far edge
                     }
                     if !self.add_candidate(sh, tl) {
@@ -59,7 +65,7 @@ impl GreedyMesher {
                 let mut th = tl;
                 'expand_t: loop {
                     th += 1;
-                    if th >= self.resolution_g {
+                    if th >= self.image_t_range.end {
                         break; // Found the far edge
                     }
                     // Check if all the voxels are wanted
@@ -78,13 +84,7 @@ impl GreedyMesher {
                         self.erase(s, t);
                     }
                 }
-                let map_coord =
-                    |c| FreeCoordinate::from(c) / FreeCoordinate::from(self.resolution_g);
-                quad_callback(
-                    &self,
-                    Point2::new(map_coord(sl), map_coord(tl)),
-                    Point2::new(map_coord(sh), map_coord(th)),
-                );
+                quad_callback(&self, Point2::new(sl, tl), Point2::new(sh, th));
             }
         }
     }
@@ -92,16 +92,16 @@ impl GreedyMesher {
     #[inline]
     fn index(&self, s: GridCoordinate, t: GridCoordinate) -> usize {
         // Can't fail because a usize ≈ u16 platform is too small anyway.
-        let s = usize::try_from(s).unwrap();
-        let t = usize::try_from(t).unwrap();
-        t * self.resolution_s as usize + s
+        let s = usize::try_from(s - self.image_s_range.start).unwrap();
+        let t = usize::try_from(t - self.image_t_range.start).unwrap();
+        t * self.image_s_range.len() + s
     }
 
     /// Checks if a voxel is visible and thus can be the seed of a rectangle,
     /// returns false if not, and updates `single_color`.
     #[inline]
     fn add_seed(&mut self, s: GridCoordinate, t: GridCoordinate) -> bool {
-        if s >= self.resolution_g || t >= self.resolution_g {
+        if !self.image_s_range.contains(&s) || !self.image_t_range.contains(&t) {
             panic!("seed loop ran out of bounds");
         }
         let color = self.visible_image[self.index(s, t)];
@@ -117,7 +117,7 @@ impl GreedyMesher {
     /// returns false if not, and updates `single_color`.
     #[inline]
     fn add_candidate(&mut self, s: GridCoordinate, t: GridCoordinate) -> bool {
-        if s >= self.resolution_g || t >= self.resolution_g {
+        if !self.image_s_range.contains(&s) || !self.image_t_range.contains(&t) {
             return false;
         }
         let color = self.visible_image[self.index(s, t)];

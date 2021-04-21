@@ -173,9 +173,9 @@ impl Block {
                 let resolution_g: GridCoordinate = resolution.max(1).into();
 
                 let block_space = space_ref.try_borrow()?;
-                // TODO: Compute and store a potentially smaller grid, to save time and memory
-                // with thin high-resolution blocks (i.e. text).
-                let grid = Grid::new(offset, [resolution_g, resolution_g, resolution_g]);
+                let grid = Grid::new(offset, [resolution_g, resolution_g, resolution_g])
+                    .intersection(block_space.grid())
+                    .unwrap_or_else(|| Grid::new(offset, [1, 1, 1])); // TODO: would be nice not to need this arbitrary value
                 let voxels = block_space
                     .extract(
                         grid,
@@ -211,14 +211,17 @@ impl Block {
             // TODO: this has no unit tests
             Block::Rotated(rotation, block) => {
                 let base = block.evaluate()?;
+                let resolution = base.resolution;
                 Ok(EvaluatedBlock {
                     voxels: base.voxels.map(|voxels| {
-                        let resolution = voxels.grid().size().x;
-                        let matrix = rotation.to_positive_octant_matrix(resolution);
-                        // TODO: Use a rotated grid on the output, which will prevent the function from panicking if the grid size is incorrect
-                        GridArray::generate(voxels.grid(), |cube| {
-                            voxels[matrix.transform_cube(cube)]
-                        })
+                        let matrix = rotation.to_positive_octant_matrix(resolution.into());
+                        let inverse_matrix = rotation
+                            .inverse()
+                            .to_positive_octant_matrix(resolution.into());
+                        GridArray::generate(
+                            voxels.grid().transform(inverse_matrix).unwrap(),
+                            |cube| voxels[matrix.transform_cube(cube)],
+                        )
                     }),
                     ..base
                 })
@@ -545,6 +548,15 @@ pub struct Evoxel {
 }
 
 impl Evoxel {
+    /// The `Evoxel` value that would have resulted from using [`AIR`] in a recursive block.
+    ///
+    /// TODO: Write a test for that.
+    pub const AIR: Self = Self {
+        color: Rgba::TRANSPARENT,
+        selectable: false,
+        collision: BlockCollision::None,
+    };
+
     /// Construct the [`Evoxel`] that would have resulted from evaluating a voxel block
     /// with the given color and default attributes.
     pub const fn new(color: Rgba) -> Self {
