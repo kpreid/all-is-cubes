@@ -186,11 +186,9 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                     let color_point = p / 2;
                     let part_of_grid: [GridCoordinate; 3] =
                         p.to_vec().map(|s| s.rem_euclid(2)).into();
-                    let color = Rgb::from(
-                        color_point
-                            .to_vec()
-                            .map(|s| NotNan::new(s as f32 / (gradient_resolution - 1) as f32).unwrap()),
-                    );
+                    let color = Rgb::from(color_point.to_vec().map(|s| {
+                        NotNan::new(s as f32 / (gradient_resolution - 1) as f32).unwrap()
+                    }));
                     let color_srgb = color.with_alpha_one().to_srgb_32bit();
                     let description = format!(
                         "{:0.2}\n{:0.2}\n{:0.2}\n#{:02x}{:02x}{:02x} srgb",
@@ -208,7 +206,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                                 .color(color.with_alpha_one())
                                 .build(),
                         ),
-                        [0, 1, 0] if false /* TODO: disabled because high-res blocks are too slow for now */ => Some(
+                        [0, 1, 0] => Some(
                             draw_to_blocks(
                                 universe,
                                 64,
