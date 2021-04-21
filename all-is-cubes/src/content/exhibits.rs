@@ -168,6 +168,78 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     },
     {
         Exhibit {
+            name: "Colors",
+            factory: |_this, universe| {
+                let gradient_resolution = 5;
+                let mut space = Space::empty(Grid::new(
+                    [0, 0, 0],
+                    [
+                        gradient_resolution * 2 - 1,
+                        gradient_resolution * 2,
+                        gradient_resolution * 2 - 1,
+                    ],
+                ));
+
+                space.fill(space.grid(), |p| {
+                    let color_point = p / 2;
+                    let part_of_grid: [GridCoordinate; 3] =
+                        p.to_vec().map(|s| s.rem_euclid(2)).into();
+                    let color = Rgb::from(
+                        color_point
+                            .to_vec()
+                            .map(|s| NotNan::new(s as f32 / (gradient_resolution - 1) as f32).unwrap()),
+                    );
+                    let color_srgb = color.with_alpha_one().to_srgb_32bit();
+                    let description = format!(
+                        "{:0.2}\n{:0.2}\n{:0.2}\n#{:02x}{:02x}{:02x} srgb",
+                        color.red(),
+                        color.green(),
+                        color.blue(),
+                        color_srgb[0],
+                        color_srgb[1],
+                        color_srgb[2]
+                    );
+                    match part_of_grid {
+                        [0, 0, 0] => Some(
+                            Block::builder()
+                                .display_name(description)
+                                .color(color.with_alpha_one())
+                                .build(),
+                        ),
+                        [0, 1, 0] if false /* TODO: disabled because high-res blocks are too slow for now */ => Some(
+                            draw_to_blocks(
+                                universe,
+                                64,
+                                0,
+                                BlockAttributes {
+                                    display_name: description.clone().into(),
+                                    collision: BlockCollision::None,
+                                    ..BlockAttributes::default()
+                                },
+                                Text::new(
+                                    &description,
+                                    Point::new(0, -16 * (description.lines().count() as i32)),
+                                )
+                                .into_styled(
+                                    TextStyleBuilder::new(Font8x16)
+                                        .text_color(Rgb888::new(10, 10, 10))
+                                        .build(),
+                                ),
+                            )
+                            .unwrap()[GridPoint::origin()] // TODO: Give Space an into_single_element() ?
+                            .clone()
+                            .rotate(GridRotation::RXzY),
+                        ),
+                        _ => None,
+                    }
+                })?;
+
+                Ok(space)
+            },
+        }
+    },
+    {
+        Exhibit {
             name: "Visible chunk chart",
             factory: |_this, _universe| {
                 use crate::chunking::ChunkChart;
