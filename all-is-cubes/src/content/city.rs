@@ -9,6 +9,7 @@ use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::style::TextStyleBuilder;
+use instant::Instant;
 use noise::Seedable as _;
 use ordered_float::NotNan;
 use strum::IntoEnumIterator;
@@ -27,6 +28,8 @@ use crate::tools::Tool;
 use crate::universe::Universe;
 
 pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
+    let start_city_time = Instant::now();
+
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     use DemoBlocks::*;
@@ -155,12 +158,13 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         }
     }
 
-    // Draw space axes.
-    // This is disabled because it doesn't fit aesthetically. We could perhaps turn it
-    // back on with customizations of the blocks to be less saturated and to omit the
-    // +Y axis making an obtrusive pillar in the middle.
-    //
-    // axes(&mut space)?;
+    let blank_city_time = Instant::now();
+    log::trace!(
+        "Blank city took {:.3} s",
+        blank_city_time
+            .duration_since(start_city_time)
+            .as_secs_f32()
+    );
 
     // Landscape filling one quadrant
     let landscape_region = Grid::from_lower_upper(
@@ -171,8 +175,15 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
     planner.occupied_plots.push(landscape_region);
 
+    let landscape_time = Instant::now();
+    log::trace!(
+        "Landscape took {:.3} s",
+        landscape_time.duration_since(blank_city_time).as_secs_f32()
+    );
+
     // Exhibits
     for exhibit in DEMO_CITY_EXHIBITS.iter() {
+        let start_exhibit_time = Instant::now();
         let exhibit_space = (exhibit.factory)(exhibit, universe)
             .expect("exhibit generation failure. TODO: place an error marker and continue instead");
         let exhibit_footprint = exhibit_space.grid();
@@ -236,6 +247,14 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             &mut space,
             plot_transform,
         )?; // TODO: on failure, place an error marker and continue
+
+        // Log build time
+        let exhibit_time = Instant::now().duration_since(start_exhibit_time);
+        log::trace!(
+            "{:?} took {:.3} s",
+            exhibit.name,
+            exhibit_time.as_secs_f32()
+        );
     }
 
     if false {
