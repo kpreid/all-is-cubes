@@ -128,13 +128,17 @@ lowp vec3 interpolated_space_light() {
 #endif
 
 lowp vec3 lighting() {
-  lowp vec3 local_light;
-  #ifdef SMOOTH_LIGHTING
-    local_light = interpolated_space_light();
+  #ifdef LIGHTING
+    lowp vec3 local_light;
+    #ifdef SMOOTH_LIGHTING
+      local_light = interpolated_space_light();
+    #else
+      local_light = v_lighting;
+    #endif
+    return fixed_directional_lighting() * local_light;
   #else
-    local_light = v_lighting;
+    return vec3(1.0);
   #endif
-  return fixed_directional_lighting() * local_light;
 }
 
 void main(void) {

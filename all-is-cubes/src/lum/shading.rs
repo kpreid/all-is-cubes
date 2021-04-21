@@ -37,6 +37,9 @@ impl BlockPrograms {
         C: GraphicsContext<Backend = Backend>,
     {
         let mut base_defines = Vec::new();
+        if options.lighting_display != LightingOption::None {
+            base_defines.push(("LIGHTING", "1"));
+        }
         if options.lighting_display == LightingOption::Smooth {
             base_defines.push(("SMOOTH_LIGHTING", "1"));
         }
@@ -115,8 +118,10 @@ pub struct BlockUniformInterface {
     block_texture: Uniform<TextureBinding<Dim3, NormUnsigned>>,
 
     /// Texture containing light map.
+    #[uniform(unbound)] // unbound if LightingOption::None
     light_texture: Uniform<TextureBinding<Dim3, NormUnsigned>>,
     /// Offset applied to vertex coordinates to get light map coordinates.
+    #[uniform(unbound)] // unbound if LightingOption::None
     light_offset: Uniform<[i32; 3]>,
 
     /// Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
