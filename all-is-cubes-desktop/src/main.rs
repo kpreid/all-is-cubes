@@ -90,9 +90,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .get_matches();
 
-    // Parse option values that we will consult multiple times.
+    // Convert options we will consult multiple times.
     let display_size = parse_dimensions(options.value_of("display_size").unwrap()).unwrap();
     let graphics_type = value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit());
+    let universe_template =
+        value_t!(options, "template", UniverseTemplate).unwrap_or_else(|e| e.exit());
 
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal {
@@ -104,9 +106,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
     }
 
-    let mut app = AllIsCubesAppState::new(
-        value_t!(options, "template", UniverseTemplate).unwrap_or_else(|e| e.exit()),
+    let start_time = Instant::now();
+    let mut app = AllIsCubesAppState::new(universe_template.clone());
+    let app_done_time = Instant::now();
+    log::debug!(
+        "Initialized game state with {:?} ({:.3} s)",
+        universe_template,
+        app_done_time.duration_since(start_time).as_secs_f32()
     );
+
     match graphics_type {
         GraphicsType::Window => glfw_main_loop(app, title, display_size),
         GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
