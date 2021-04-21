@@ -89,12 +89,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .help("Output file name for 'record' mode."),
         )
         .get_matches();
+
+    // Parse option values that we will consult multiple times.
     let display_size = parse_dimensions(options.value_of("display_size").unwrap()).unwrap();
+    let graphics_type = value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit());
+
+    // Initialize logging -- but only if it won't interfere.
+    if graphics_type != GraphicsType::Terminal {
+        simplelog::TermLogger::init(
+            simplelog::LevelFilter::Debug,
+            simplelog::Config::default(),
+            simplelog::TerminalMode::Stderr,
+            simplelog::ColorChoice::Auto,
+        )?;
+    }
 
     let mut app = AllIsCubesAppState::new(
         value_t!(options, "template", UniverseTemplate).unwrap_or_else(|e| e.exit()),
     );
-    match value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit()) {
+    match graphics_type {
         GraphicsType::Window => glfw_main_loop(app, title, display_size),
         GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
         GraphicsType::Record => record_main(

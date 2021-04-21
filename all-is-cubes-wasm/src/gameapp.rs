@@ -32,6 +32,9 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     // I moved it here since this is our sole entry point in practice.
     console_error_panic_hook::set_once();
 
+    // Initialize logging via the `log` crate's interface.
+    console_log::init_with_level(log::Level::Trace).unwrap();
+
     let document = web_sys::window()
         .expect("missing `window`")
         .document()

@@ -23,10 +23,12 @@ cgmath = "0.18.0"
 clap = "2.33.3"
 crossterm = "0.19.0"
 glfw = "0.41"
+log = "0.4.14"
 luminance = "0.43.1"
 luminance-front = "0.3.1"
 luminance-glfw = "0.15.0"
 luminance-windowing = "0.9"
 png = "0.16.8"
+simplelog = "0.10.0"
 strum = { version = "0.20.0", features = ["derive"] }
 termion = "1.5.5"  # TODO: Only used for ANSI color table. Remove?
