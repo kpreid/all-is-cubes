@@ -129,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         GraphicsType::Headless => {
             // TODO: Right now this is useless. Eventually, we may have other paths for side
             // effects from the universe, or interesting logging.
-            eprintln!("Simulating a universe nobody's looking at...");
+            log::info!("Simulating a universe nobody's looking at...");
 
             loop {
                 // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.

@@ -101,7 +101,7 @@ impl Universe {
             if let Err(e) = t.execute(self) {
                 // TODO: Need to report these failures back to the source
                 // ... and perhaps in the UniverseStepInfo
-                eprintln!("Transaction failure: {}", e);
+                log::info!("Transaction failure: {}", e);
             }
         }
 

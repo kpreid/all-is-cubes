@@ -134,7 +134,7 @@ pub fn glfw_main_loop(
                 }
                 WindowEvent::MouseButton(button, Action::Press, _) => {
                     // TODO: this dumping should be replaced with in-game UI feedback
-                    eprintln!("click: {:?}", app.click(map_glfw_button(button)));
+                    log::info!("click: {:?}", app.click(map_glfw_button(button)));
                 }
                 WindowEvent::MouseButton(_, Action::Release, _) => {}
                 WindowEvent::MouseButton(_, Action::Repeat, _) => {}
