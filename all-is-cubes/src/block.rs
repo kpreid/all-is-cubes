@@ -6,7 +6,6 @@
 
 use cgmath::{EuclideanSpace as _, Point3};
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
@@ -138,28 +137,30 @@ impl Block {
         match self {
             Block::Indirect(def_ref) => def_ref.try_borrow()?.block.evaluate(),
 
-            Block::Atom(attributes, color) => Ok(EvaluatedBlock {
+            &Block::Atom(ref attributes, color) => Ok(EvaluatedBlock {
                 attributes: attributes.clone(),
-                color: *color,
+                color,
                 voxels: None,
+                resolution: 1,
                 opaque: color.fully_opaque(),
                 visible: !color.fully_transparent(),
             }),
 
-            Block::Recur {
-                attributes,
+            &Block::Recur {
+                ref attributes,
                 offset,
                 resolution,
-                space: space_ref,
+                space: ref space_ref,
             } => {
                 // Ensure resolution is at least 1 to not panic on bad data.
                 // (We could eliminate this if Grid allowed a size of zero, but that
                 // might lead to division-by-zero trouble elsewhere...)
-                let resolution: GridCoordinate = (*resolution).max(1).into();
-                let offset = *offset;
+                let resolution_g: GridCoordinate = resolution.max(1).into();
 
                 let block_space = space_ref.try_borrow()?;
-                let grid = Grid::new(offset, (resolution, resolution, resolution));
+                // TODO: Compute and store a potentially smaller grid, to save time and memory
+                // with thin high-resolution blocks (i.e. text).
+                let grid = Grid::new(offset, [resolution_g, resolution_g, resolution_g]);
                 let voxels = block_space
                     .extract(grid, |_index, sub_block_data, _lighting| {
                         let sub_evaluated = sub_block_data.evaluated();
@@ -174,6 +175,7 @@ impl Block {
                     attributes: attributes.clone(),
                     color: Rgba::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels
                     // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
+                    resolution,
                     opaque: voxels
                         .grid()
                         .interior_iter()
@@ -418,6 +420,7 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     attributes: AIR_ATTRIBUTES,
     color: Rgba::TRANSPARENT,
     voxels: None,
+    resolution: 1,
     opaque: false,
     visible: false,
 };
@@ -445,6 +448,11 @@ pub struct EvaluatedBlock {
     /// TODO: Specify how it should be handled if the grid has unsuitable dimensions
     /// (not cubical, not having an origin of 0, etc.).
     pub voxels: Option<GridArray<Evoxel>>,
+    /// If `self.voxels` is present, then this is the voxel resolution (number of voxels along
+    /// an edge) of the block. The bounds of `voxels` should be ignored
+    ///
+    /// If `self.voxels` is [`None`], then this value should be 1.
+    pub resolution: Resolution,
     /// Whether the block is known to be completely opaque to light on all six faces.
     ///
     /// Currently, this is defined to be that each of the surfaces of the block are
@@ -496,24 +504,6 @@ impl Evoxel {
             collision: DA.collision,
         }
     }
-}
-
-/// Computes the [`Resolution`] implied by a [`Grid`] of block voxels.
-///
-/// If the grid is of a proper “n × n × n” shape, this returns n. In case it isn't, the
-/// returned value is the minimum of the [`Grid::upper_bounds`], or [`None`] if that value
-/// would be less than 1 or if the lower bounds do not include the cube `[0, 0, 0]`.
-/// This definition is intended to prevent out-of-bounds accesses.
-pub(crate) fn evaluated_block_resolution(grid: Grid) -> Option<Resolution> {
-    if !grid.contains_cube(GridPoint::origin()) {
-        return None;
-    }
-    let u = grid.upper_bounds();
-    let min_upper = u.x.min(u.y).min(u.z);
-    if min_upper < 1 {
-        return None;
-    }
-    Some(Resolution::try_from(min_upper).unwrap_or(Resolution::MAX))
 }
 
 /// Given the `resolution` of some recursive block occupying `cube`, transform `ray`
@@ -947,6 +937,7 @@ mod tests {
         assert_eq!(e.attributes, attributes);
         assert_eq!(e.color, block.color());
         assert!(e.voxels.is_none());
+        assert_eq!(e.resolution, 1);
         assert_eq!(e.opaque, true);
         assert_eq!(e.visible, true);
     }
@@ -1003,6 +994,7 @@ mod tests {
                 }
             }))
         );
+        assert_eq!(e.resolution, resolution);
         assert_eq!(e.opaque, true);
         assert_eq!(e.visible, true);
     }
@@ -1052,6 +1044,7 @@ mod tests {
             .build();
 
         let e = block.evaluate().unwrap();
+        assert_eq!(e.resolution, 4);
         assert_eq!(e.opaque, false);
         assert_eq!(e.visible, true);
     }
@@ -1118,41 +1111,6 @@ mod tests {
         let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
         let eval_def = block_def_ref.borrow().block.evaluate();
         assert_eq!(eval_bare, eval_def);
-    }
-
-    #[test]
-    fn evaluated_block_resolution_test() {
-        assert_eq!(
-            Some(1),
-            evaluated_block_resolution(Grid::new([0, 0, 0], [1, 1, 1]))
-        );
-        assert_eq!(
-            Some(16),
-            evaluated_block_resolution(Grid::new([0, 0, 0], [16, 16, 16]))
-        );
-        assert_eq!(
-            Some(7),
-            evaluated_block_resolution(Grid::new([0, 0, 0], [7, 8, 9]))
-        );
-        // Overflow
-        assert_eq!(
-            Some(Resolution::MAX),
-            evaluated_block_resolution(Grid::new([0, 0, 0], [65536, 65536, 10000000]))
-        );
-        assert_eq!(
-            Some(4),
-            evaluated_block_resolution(Grid::new([0, -12, 0], [16, 16, 16]))
-        );
-        // Does not contain even one block in the positive octant
-        assert_eq!(
-            None,
-            evaluated_block_resolution(Grid::new([0, -16, 0], [16, 16, 16]))
-        );
-        // Lower bounds too high
-        assert_eq!(
-            None,
-            evaluated_block_resolution(Grid::new([8, 8, 8], [8, 8, 8]))
-        );
     }
 
     #[test]

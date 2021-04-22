@@ -12,7 +12,7 @@ use std::fmt;
 use std::time::Duration;
 
 use crate::behavior::{Behavior, BehaviorSet};
-use crate::block::{evaluated_block_resolution, recursive_raycast, Block, EvaluatedBlock};
+use crate::block::{recursive_raycast, Block, EvaluatedBlock};
 use crate::camera::eye_for_look_at;
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
@@ -376,12 +376,11 @@ pub fn cursor_raycast(ray: Ray, space_ref: &URef<Space>) -> Option<Cursor> {
 
         // Check intersection with recursive block
         if let Some(voxels) = &evaluated.voxels {
-            if let Some(resolution) = evaluated_block_resolution(voxels.grid()) {
-                if !recursive_raycast(ray, step.cube_ahead(), resolution)
-                    .any(|voxel_step| voxels[voxel_step.cube_ahead()].selectable)
-                {
-                    continue;
-                }
+            if !recursive_raycast(ray, step.cube_ahead(), evaluated.resolution)
+                .flat_map(|voxel_step| voxels.get(voxel_step.cube_ahead()))
+                .any(|v| v.selectable)
+            {
+                continue;
             }
         }
 

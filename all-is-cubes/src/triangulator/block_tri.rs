@@ -8,7 +8,7 @@
 use cgmath::{Point2, Point3, Transform as _};
 use std::fmt::Debug;
 
-use crate::block::{evaluated_block_resolution, EvaluatedBlock, Evoxel};
+use crate::block::{EvaluatedBlock, Evoxel};
 use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
 use crate::space::Space;
@@ -163,11 +163,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // If the texture tile resolution is greater, we will just not use the extra
             // space. If it is lesser, we should use multiple texture tiles but don't for now.
             let tile_resolution: GridCoordinate = texture_allocator.resolution();
-            let block_resolution = match evaluated_block_resolution(voxels.grid()) {
-                Some(r) => GridCoordinate::from(r),
-                // TODO: return an invalid block marker.
-                None => return BlockTriangulation::default(),
-            };
+            let block_resolution = GridCoordinate::from(block.resolution);
             // How should we scale texels versus the standard size to get correct display?
             let voxel_scale_modifier =
                 block_resolution as TextureCoordinate / tile_resolution as TextureCoordinate;

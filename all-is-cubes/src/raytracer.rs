@@ -20,7 +20,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
-use crate::block::{evaluated_block_resolution, recursive_raycast, Evoxel};
+use crate::block::{recursive_raycast, Evoxel, Resolution};
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, LightingOption, Viewport};
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
@@ -87,7 +87,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                             hit.face(),
                         );
                     }
-                    TracingBlock::Recur(pixel_block_data, array) => {
+                    TracingBlock::Recur(pixel_block_data, resolution, array) => {
                         let light_neighborhood = match impl_fields.options.lighting_display {
                             LightingOption::None => FaceMap::generate(|_| Rgb::ONE),
                             // TODO: Implement actual smooth lighting in raytracer
@@ -97,12 +97,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                                 })
                             }
                         };
-                        for subcube_hit in recursive_raycast(
-                            ray,
-                            hit.cube_ahead(),
-                            evaluated_block_resolution(array.grid())
-                                .expect("bad block array dimensions"),
-                        ) {
+                        for subcube_hit in recursive_raycast(ray, hit.cube_ahead(), *resolution) {
                             if s.count_step_should_stop() {
                                 break;
                             }
@@ -354,9 +349,9 @@ fn prepare_blocks<P: PixelBuf>(space: &Space) -> Box<[TracingBlock<P::BlockData>
             let evaluated = block_data.evaluated();
             let pixel_block_data = P::compute_block_data(block_data);
             if let Some(ref voxels) = evaluated.voxels {
-                TracingBlock::Recur(pixel_block_data, voxels.clone())
+                TracingBlock::Recur(pixel_block_data, evaluated.resolution, voxels.clone())
             } else {
-                TracingBlock::Atom(pixel_block_data, block_data.evaluated().color)
+                TracingBlock::Atom(pixel_block_data, evaluated.color)
             }
         })
         .collect()
@@ -385,7 +380,7 @@ struct TracingCubeData<'a, B: 'static> {
 #[derive(Clone, Debug)]
 enum TracingBlock<B: 'static> {
     Atom(B, Rgba),
-    Recur(B, GridArray<Evoxel>),
+    Recur(B, Resolution, GridArray<Evoxel>),
 }
 
 #[derive(Clone, Debug, Default)]
