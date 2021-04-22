@@ -25,6 +25,7 @@ jobs:
           components: rustfmt, clippy
     - name: Install native libraries
       run: |
+          sudo apt update
           sudo apt-get -y install libxrandr-dev xorg-dev libglfw3-dev 
     - name: Install wasm-pack
       run: cargo install wasm-pack
