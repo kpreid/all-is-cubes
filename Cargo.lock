@@ -1116,9 +1116,9 @@ dependencies = [
 
 [[package]]
 name = "luminance-web-sys"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "641868612e0ff329bdb697bfb8a86ac70eda2a1feb719ea458425df34ea0235a"
+checksum = "a656d971946c8ea3c169a5e6eea24d75e9e4b6f34cb700a7ebb7e4a7bce157ad"
 dependencies = [
  "luminance",
  "luminance-webgl",

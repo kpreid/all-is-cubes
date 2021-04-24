@@ -53,7 +53,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     // TODO: Get template choice from URL
     let app = AllIsCubesAppState::new(UniverseTemplate::DemoCity);
 
-    let surface = WebSysWebGL2Surface::new(gui_helpers.canvas_helper().id())
+    let surface = WebSysWebGL2Surface::from_canvas(gui_helpers.canvas_helper().canvas())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
 
     let mut renderer = GLRenderer::new(

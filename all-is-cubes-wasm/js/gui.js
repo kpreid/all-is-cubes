@@ -61,16 +61,6 @@ export class CanvasHelper {
 
   // property .viewportPx
 
-  // Get the ID of the canvas element, assigning one if needed.
-  id() {
-    let id = this.canvas.id;
-    if (typeof id !== 'string') {
-      console.warn('canvas has no id; assigning a random one');
-      this.canvas.id = id = 'canvas' + Math.random();
-    }
-    return id;
-  }
-
   // Given pixel X and Y as used in mouse events, return GL-style normalized
   // device coordinates.
   normalizePosition(x, y) {
