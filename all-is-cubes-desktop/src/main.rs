@@ -88,6 +88,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .value_name("FILE")
                 .help("Output file name for 'record' mode."),
         )
+        .arg(
+            Arg::with_name("verbose")
+                .long("verbose")
+                .short("v")
+                .help("Additional logging to stderr."),
+        )
         .get_matches();
 
     // Convert options we will consult multiple times.
@@ -97,9 +103,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         value_t!(options, "template", UniverseTemplate).unwrap_or_else(|e| e.exit());
 
     // Initialize logging -- but only if it won't interfere.
-    if graphics_type != GraphicsType::Terminal {
+    if graphics_type != GraphicsType::Terminal || options.is_present("verbose") {
         simplelog::TermLogger::init(
-            simplelog::LevelFilter::Debug,
+            match options.occurrences_of("verbose") {
+                // TODO: When we're closer to 1.0, change the default level to `Info`
+                0 => simplelog::LevelFilter::Debug,
+                _ => simplelog::LevelFilter::Trace,
+            },
             simplelog::Config::default(),
             simplelog::TerminalMode::Stderr,
             simplelog::ColorChoice::Auto,
