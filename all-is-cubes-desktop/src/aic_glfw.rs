@@ -23,6 +23,7 @@ pub fn glfw_main_loop(
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
 ) -> Result<(), Box<dyn Error>> {
+    let glfw_start_time = Instant::now();
     let mut glfw = glfw::init::<()>(None)?;
 
     // Pick a window size.
@@ -64,6 +65,13 @@ pub fn glfw_main_loop(
     renderer.set_character(Some(app.character().clone()));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
+    let ready_time = Instant::now();
+    log::debug!(
+        "Renderer and GLFW initialized in {:.3} s",
+        ready_time.duration_since(glfw_start_time).as_secs_f32()
+    );
+
+    let mut first_frame = true;
     'app: loop {
         app.frame_clock.advance_to(Instant::now());
         app.maybe_step_universe();
@@ -74,6 +82,14 @@ pub fn glfw_main_loop(
             app.frame_clock.did_draw();
         } else {
             std::thread::yield_now();
+        }
+
+        if first_frame {
+            first_frame = false;
+            log::debug!(
+                "First frame completed in {:.3} s",
+                Instant::now().duration_since(ready_time).as_secs_f32()
+            );
         }
 
         // Sync UI state back to glfw

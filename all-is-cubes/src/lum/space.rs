@@ -5,6 +5,7 @@
 
 use bitvec::prelude::BitVec;
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use instant::Instant;
 use luminance::tess::View as _;
 use luminance_front::blending::{Blending, Equation, Factor};
 use luminance_front::context::GraphicsContext;
@@ -138,12 +139,20 @@ impl SpaceRenderer {
             // * It's the first run and we haven't prepared the blocks at all.
             // * The space somehow has zero blocks, in which case this is trivial anyway.
             // * The space signaled SpaceChange::EveryBlock.
+            let start_triangulation_time = Instant::now();
             todo.all_blocks_and_chunks = false;
             self.block_triangulations =
                 Vec::from(triangulate_blocks(space, block_texture_allocator));
             self.block_versioning =
                 vec![self.block_version_counter; self.block_triangulations.len()];
             block_update_count = self.block_triangulations.len();
+            log::trace!(
+                "triangulate_blocks({}) took {:.3} s",
+                self.space.name(),
+                Instant::now()
+                    .duration_since(start_triangulation_time)
+                    .as_secs_f32()
+            );
         } else if !todo.blocks.is_empty() {
             // Partial update.
             self.block_version_counter = self.block_version_counter.wrapping_add(1);
