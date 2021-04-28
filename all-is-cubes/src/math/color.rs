@@ -216,17 +216,15 @@ impl Rgba {
         )
     }
 
+    // TODO: Stop using a tuple
     #[inline]
     pub fn from_linear_32bit((r, g, b, a): (u8, u8, u8, u8)) -> Self {
-        #[inline]
-        fn convert_component(x: u8) -> NotNan<f32> {
-            NotNan::new(f32::from(x) / 255.0).unwrap()
-        }
+        // TODO: make this const when Rust `const_fn_floating_point_arithmetic` is stable
         Self(Vector4::new(
-            convert_component(r),
-            convert_component(g),
-            convert_component(b),
-            convert_component(a),
+            component_from_linear_8bit(r),
+            component_from_linear_8bit(g),
+            component_from_linear_8bit(b),
+            component_from_linear_8bit(a),
         ))
     }
 
@@ -237,8 +235,19 @@ impl Rgba {
             component_to_srgb_8bit(self.0.x),
             component_to_srgb_8bit(self.0.y),
             component_to_srgb_8bit(self.0.z),
-            (self.0.w.into_inner() * 255.0) as u8,
+            (self.0.w.into_inner() * 255.0).round() as u8,
         ]
+    }
+
+    #[inline]
+    pub fn from_srgb_32bit(rgba: [u8; 4]) -> Self {
+        // TODO: make this const when Rust `const_fn_floating_point_arithmetic` is stable
+        Self(Vector4::new(
+            component_from_srgb_8bit(rgba[0]),
+            component_from_srgb_8bit(rgba[1]),
+            component_from_srgb_8bit(rgba[2]),
+            component_from_linear_8bit(rgba[3]),
+        ))
     }
 }
 
@@ -385,7 +394,7 @@ fn component_to_srgb_8bit(c: NotNan<f32>) -> u8 {
     // Strip NotNan
     let c = c.into_inner();
     // Apply sRGB gamma curve
-    let c = if c < 0.0031308 {
+    let c = if c <= 0.0031308 {
         c * (323. / 25.)
     } else {
         (211. * c.powf(5. / 12.) - 11.) / 200.
@@ -394,9 +403,31 @@ fn component_to_srgb_8bit(c: NotNan<f32>) -> u8 {
     (c * 255.) as u8
 }
 
+#[inline]
+fn component_from_linear_8bit(c: u8) -> NotNan<f32> {
+    // TODO: make this const when Rust `const_fn_floating_point_arithmetic` is stable
+    NotNan::new(f32::from(c) / 255.0).unwrap()
+}
+
+#[inline]
+fn component_from_srgb_8bit(c: u8) -> NotNan<f32> {
+    // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_reverse_transformation> (version as of Feb 3, 2020)
+    // Convert to float
+    let c = f32::from(c) / 255.0;
+    // Apply sRGB gamma curve
+    let c = if c <= 0.04045 {
+        c * (25. / 323.)
+    } else {
+        ((200. * c + 11.) / 211.).powf(12. / 5.)
+    };
+    NotNan::new(c).unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
+    use std::array::IntoIter;
 
     // TODO: Add tests of the color not-NaN mechanisms.
 
@@ -438,5 +469,35 @@ mod tests {
             format!("{:#?}", Rgba::new(0.1, 0.2, 0.3, 0.4)),
             "Rgba(0.1, 0.2, 0.3, 0.4)"
         );
+    }
+
+    /// Test that [`Rgba::from_srgb_32bit`] agrees with [`Rgba::to_srgb_32bit`].
+    #[test]
+    fn srgb_round_trip() {
+        let srgb_figures = [
+            0x00, 0x05, 0x10, 0x22, 0x33, 0x44, 0x55, 0x77, 0x7f, 0xDD, 0xFF,
+        ];
+        let results = srgb_figures
+            .iter()
+            .cartesian_product(srgb_figures.iter())
+            .map(|(&r, &a)| {
+                let srgb = [r, 0, 0, a];
+                let color = Rgba::from_srgb_32bit(srgb);
+                (srgb, color, color.to_srgb_32bit())
+            })
+            .collect::<Vec<_>>();
+        // Print all the results before asserting
+        eprintln!("{:#?}", results);
+        // Filter with a max difference of 1. TODO: Fix rounding errors, if that's what they are,
+        // so there's an exact round trip of all the 8-bit values.
+        let bad = results
+            .into_iter()
+            .filter(|&(o, _, r)| {
+                IntoIter::new(o)
+                    .zip(IntoIter::new(r))
+                    .any(|(a, b)| (i16::from(a) - i16::from(b)).abs() > 1)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(bad, vec![]);
     }
 }
