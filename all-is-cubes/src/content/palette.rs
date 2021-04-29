@@ -44,3 +44,5 @@ pub const MENU_FRAME: Rgba = rgba_const!(0.95, 0.95, 0.95, 1.0);
 // Debug UI elements (all wireframe)
 pub const DEBUG_COLLISION_BOX: Rgba = rgba_const!(0.0, 0.0, 1.0, 1.0);
 pub const DEBUG_COLLISION_CUBES: Rgba = rgba_const!(1.0, 0.0, 0.0, 1.0);
+pub const DEBUG_CHUNK_MAJOR: Rgba = rgba_const!(0.0, 0.0, 0.8, 1.0);
+pub const DEBUG_CHUNK_MINOR: Rgba = rgba_const!(0.0, 0.8, 0.8, 1.0);

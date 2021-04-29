@@ -329,7 +329,13 @@ pub struct GraphicsOptions {
     pub chunks_per_frame: u16,
 
     /// Whether to use frustum culling for drawing only in-view chunks and objects.
+    ///
+    /// This option is for debugging and performance testing and should not have any
+    /// visible effects.
     pub use_frustum_culling: bool,
+
+    /// Draw boxes around chunk borders and some debug info.
+    pub debug_chunk_boxes: bool,
 
     /// Draw collision boxes for some objects.
     pub debug_collision_boxes: bool,
@@ -362,6 +368,7 @@ impl Default for GraphicsOptions {
             lighting_display: LightingOption::Smooth,
             chunks_per_frame: 4,
             use_frustum_culling: true,
+            debug_chunk_boxes: false,
             debug_collision_boxes: false,
             debug_light_rays_at_cursor: false,
         }

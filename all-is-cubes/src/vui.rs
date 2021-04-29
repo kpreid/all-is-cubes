@@ -109,6 +109,9 @@ impl Vui {
         // TODO: Derive this from HudLayout and also FOV (since FOV determines eye-to-space distance).
         options.view_distance = NotNan::new(100.0).unwrap();
 
+        // clutter
+        options.debug_chunk_boxes = false;
+
         options
     }
 

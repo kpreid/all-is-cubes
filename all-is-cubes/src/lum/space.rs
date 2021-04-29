@@ -4,7 +4,7 @@
 //! Get from [`Space`] to [`Tess`].
 
 use bitvec::prelude::BitVec;
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3, Zero as _};
 use instant::Instant;
 use luminance::tess::View as _;
 use luminance_front::blending::{Blending, Equation, Factor};
@@ -27,11 +27,14 @@ use std::rc::{Rc, Weak};
 
 use crate::camera::{Camera, GraphicsOptions};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
+use crate::content::palette;
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::shading::BlockPrograms;
 use crate::lum::types::LumBlockVertex;
-use crate::math::{FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
+use crate::lum::wireframe_vertices;
+use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
+use crate::raycast::Face;
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
     triangulate_block, triangulate_blocks, BlockTriangulation, BlockTriangulationProvider,
@@ -59,6 +62,7 @@ pub struct SpaceRenderer {
     /// in `todo.borrow().chunks`.
     chunks: HashMap<ChunkPos<CHUNK_SIZE>, Chunk>,
     chunk_chart: ChunkChart<CHUNK_SIZE>,
+    debug_chunk_boxes_tess: Option<Tess<LumBlockVertex>>,
     /// Whether, on the previous frame, some chunks were unavailable.
     /// If so, then we prioritize adding new chunks over updating existing ones.
     chunks_were_missing: bool,
@@ -87,6 +91,7 @@ impl SpaceRenderer {
             light_texture: None,
             chunks: HashMap::new(),
             chunk_chart: ChunkChart::new(0.0),
+            debug_chunk_boxes_tess: None,
             chunks_were_missing: true,
         }
     }
@@ -278,11 +283,55 @@ impl SpaceRenderer {
 
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
+        if graphics_options.debug_chunk_boxes {
+            if self.debug_chunk_boxes_tess.is_none() {
+                let mut v = Vec::new();
+                for chunk in self.chunk_chart.chunks(view_chunk) {
+                    wireframe_vertices(&mut v, palette::DEBUG_CHUNK_MAJOR, Aab::from(chunk.grid()));
+                }
+
+                // Frame the nearest chunk in detail
+                for face in Face::ALL_SIX {
+                    let m = face.matrix(CHUNK_SIZE);
+                    for i in 1..CHUNK_SIZE {
+                        let mut push = |p| {
+                            v.push(LumBlockVertex::new_colored(
+                                m.transform_point(p).map(FreeCoordinate::from),
+                                Vector3::zero(),
+                                palette::DEBUG_CHUNK_MINOR,
+                            ));
+                        };
+                        push(Point3::new(i, 0, 0));
+                        push(Point3::new(i, CHUNK_SIZE, 0));
+                        push(Point3::new(0, i, 0));
+                        push(Point3::new(CHUNK_SIZE, i, 0));
+                    }
+                }
+
+                // TODO: Allocate some vertices for dynamic debug info
+                // (or maybe use separate Tesses per chunk)
+                // * Signal chunk updates
+                // * Mark which chunks are nonempty, opaque, transparent, view angle
+
+                self.debug_chunk_boxes_tess = Some(
+                    context
+                        .new_tess()
+                        .set_vertices(v)
+                        .set_mode(Mode::Line)
+                        .build()
+                        .unwrap(),
+                );
+            }
+        } else {
+            self.debug_chunk_boxes_tess = None;
+        }
+
         SpaceRendererOutput {
             data: SpaceRendererOutputData {
                 camera: camera.clone(),
                 chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
                 chunk_chart: &self.chunk_chart,
+                debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
                 view_chunk,
                 info: SpaceRenderInfo {
                     chunk_update_count,
@@ -313,6 +362,7 @@ pub(super) struct SpaceRendererOutputData<'a> {
     /// Chunks are handy wrappers around some Tesses
     chunks: &'a HashMap<ChunkPos<CHUNK_SIZE>, Chunk>,
     chunk_chart: &'a ChunkChart<CHUNK_SIZE>,
+    debug_chunk_boxes_tess: &'a Option<Tess<LumBlockVertex>>,
     view_chunk: ChunkPos<CHUNK_SIZE>,
     info: SpaceRenderInfo,
 
@@ -377,7 +427,25 @@ impl<'a> SpaceRendererBound<'a> {
                         // TODO: If the chunk is missing, draw a blocking shape, possibly?
                     }
                     Ok(())
-                })
+                })?;
+
+                u.set_view_matrix(
+                    program_iface,
+                    self.data.camera.view_matrix()
+                        * Matrix4::from_translation(
+                            (self.data.view_chunk.0 * CHUNK_SIZE)
+                                .to_vec()
+                                .map(FreeCoordinate::from),
+                        ),
+                );
+                render_gate.render(&pass.render_state(), |mut tess_gate| {
+                    if let Some(debug_tess) = self.data.debug_chunk_boxes_tess {
+                        tess_gate.render(debug_tess)?;
+                    }
+                    Ok(())
+                })?;
+
+                Ok(())
             },
         )?;
 
