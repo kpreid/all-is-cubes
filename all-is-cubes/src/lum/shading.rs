@@ -135,17 +135,18 @@ pub struct BlockUniformInterface {
 
 impl BlockUniformInterface {
     /// Set all the uniforms, given necessary parameters.
-    pub fn initialize(
+    pub(super) fn initialize(
         &self,
         program_iface: &mut ProgramInterface<'_>,
         space: &SpaceRendererBound<'_>,
     ) {
-        let options: &GraphicsOptions = space.camera.options();
-        self.set_projection_matrix(program_iface, space.camera.projection());
-        self.set_view_matrix(program_iface, space.camera.view_matrix());
+        let camera = &space.data.camera;
+        let options: &GraphicsOptions = camera.options();
+        self.set_projection_matrix(program_iface, camera.projection());
+        self.set_view_matrix(program_iface, camera.view_matrix());
         program_iface.set(
             &self.view_position,
-            space.camera.view_position().map(|s| s as f32).into(),
+            camera.view_position().map(|s| s as f32).into(),
         );
         self.set_block_texture(program_iface, &space.bound_block_texture);
 
@@ -155,7 +156,7 @@ impl BlockUniformInterface {
         );
         program_iface.set(&self.light_offset, space.bound_light_texture.offset.into());
 
-        let view_distance = space.camera.view_distance() as f32;
+        let view_distance = camera.view_distance() as f32;
         let (fog_mode_blend, fog_distance) = match options.fog {
             crate::camera::FogOption::None => (0.0, f32::INFINITY),
             crate::camera::FogOption::Abrupt => (1.0, view_distance),
@@ -164,7 +165,7 @@ impl BlockUniformInterface {
         };
         program_iface.set(&self.fog_mode_blend, fog_mode_blend);
         program_iface.set(&self.fog_distance, fog_distance);
-        program_iface.set(&self.fog_color, space.sky_color.into());
+        program_iface.set(&self.fog_color, space.data.sky_color.into());
     }
 
     /// Type converting wrapper for [`Self::projection_matrix`].

@@ -99,7 +99,7 @@ impl SpaceRenderer {
     /// Prepare to draw a frame, performing the steps that must be done while holding a
     /// `&mut C`; the returned [`SpaceRendererOutput`] is then for use within the
     /// luminance pipeline.
-    pub fn prepare_frame<'a, C>(
+    pub(super) fn prepare_frame<'a, C>(
         &'a mut self,
         context: &mut C,
         camera: &Camera,
@@ -279,54 +279,56 @@ impl SpaceRenderer {
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
         SpaceRendererOutput {
-            sky_color: space.sky_color(),
+            data: SpaceRendererOutputData {
+                camera: camera.clone(),
+                chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
+                chunk_chart: &self.chunk_chart,
+                view_chunk,
+                info: SpaceRenderInfo {
+                    chunk_update_count,
+                    block_update_count,
+                    chunks_drawn: 0,
+                    squares_drawn: 0, // filled later
+                    texture_info,
+                },
+                sky_color: space.sky_color(),
+            },
             block_texture: &mut block_texture_allocator.texture,
             light_texture,
-            camera: camera.clone(),
-            chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
-            chunk_chart: &self.chunk_chart,
-            view_chunk,
-            info: SpaceRenderInfo {
-                chunk_update_count,
-                block_update_count,
-                chunks_drawn: 0,
-                squares_drawn: 0, // filled later
-                texture_info,
-            },
         }
     }
 }
 
 /// Ingredients to actually draw the [`Space`] inside a luminance pipeline, produced by
 /// [`SpaceRenderer::prepare_frame`].
-pub struct SpaceRendererOutput<'a> {
-    /// Space's sky color, to be used as background color (clear color / fog).
-    pub sky_color: Rgb,
-
+pub(super) struct SpaceRendererOutput<'a> {
+    pub(super) data: SpaceRendererOutputData<'a>,
     block_texture: &'a mut BlockTexture,
     light_texture: &'a mut SpaceLightTexture,
-    camera: Camera,
+}
+
+/// The portion of [`SpaceRendererOutput`] which does not vary with the pipeline progress.
+pub(super) struct SpaceRendererOutputData<'a> {
+    pub(super) camera: Camera,
     /// Chunks are handy wrappers around some Tesses
     chunks: &'a HashMap<ChunkPos<CHUNK_SIZE>, Chunk>,
     chunk_chart: &'a ChunkChart<CHUNK_SIZE>,
     view_chunk: ChunkPos<CHUNK_SIZE>,
     info: SpaceRenderInfo,
-}
-/// As [`SpaceRendererOutput`], but past the texture-binding stage of the pipeline.
-/// Note: This must be public to satisfy luminance derive macros' public requirements.
-pub struct SpaceRendererBound<'a> {
+
     /// Space's sky color, to be used as background color (clear color / fog).
     pub(super) sky_color: Rgb,
+}
+
+/// As [`SpaceRendererOutput`], but past the texture-binding stage of the pipeline.
+/// Note: This must be public to satisfy luminance derive macros' public requirements.
+pub(super) struct SpaceRendererBound<'a> {
+    pub(super) data: SpaceRendererOutputData<'a>,
 
     /// Block texture to pass to the shader.
     pub(super) bound_block_texture: BoundBlockTexture<'a>,
     /// Block texture to pass to the shader.
     pub(super) bound_light_texture: SpaceLightTextureBound<'a>,
-    pub(super) camera: Camera,
-    chunks: &'a HashMap<ChunkPos<CHUNK_SIZE>, Chunk>,
-    chunk_chart: &'a ChunkChart<CHUNK_SIZE>,
-    view_chunk: ChunkPos<CHUNK_SIZE>,
-    info: SpaceRenderInfo,
 }
 
 impl<'a> SpaceRendererOutput<'a> {
@@ -334,15 +336,15 @@ impl<'a> SpaceRendererOutput<'a> {
     /// [`ShadingGate`](luminance_front::shading_gate::ShadingGate).
     pub fn bind(self, pipeline: &'a Pipeline<'a>) -> Result<SpaceRendererBound<'a>, PipelineError> {
         Ok(SpaceRendererBound {
-            sky_color: self.sky_color,
+            data: self.data,
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
             bound_light_texture: self.light_texture.bind(pipeline)?,
-            camera: self.camera,
-            chunks: self.chunks,
-            chunk_chart: self.chunk_chart,
-            view_chunk: self.view_chunk,
-            info: self.info,
         })
+    }
+}
+impl<'a> SpaceRendererOutputData<'a> {
+    fn cull(&self, chunk: ChunkPos<CHUNK_SIZE>) -> bool {
+        self.camera.options().use_frustum_culling && !self.camera.aab_in_view(chunk.grid().into())
     }
 }
 impl<'a> SpaceRendererBound<'a> {
@@ -363,9 +365,9 @@ impl<'a> SpaceRendererBound<'a> {
                 u.initialize(program_iface, self);
                 let pass = SpaceRendererPass::Opaque;
                 render_gate.render(&pass.render_state(), |mut tess_gate| {
-                    for p in self.chunk_chart.chunks(self.view_chunk) {
-                        if let Some(chunk) = self.chunks.get(&p) {
-                            if self.cull(p) {
+                    for p in self.data.chunk_chart.chunks(self.data.view_chunk) {
+                        if let Some(chunk) = self.data.chunks.get(&p) {
+                            if self.data.cull(p) {
                                 continue;
                             }
                             chunks_drawn += 1;
@@ -385,16 +387,16 @@ impl<'a> SpaceRendererBound<'a> {
                 u.initialize(program_iface, self);
                 let pass = SpaceRendererPass::Transparent;
                 render_gate.render(&pass.render_state(), |mut tess_gate| {
-                    for p in self.chunk_chart.chunks(self.view_chunk).rev() {
-                        if let Some(chunk) = self.chunks.get(&p) {
-                            if self.cull(p) {
+                    for p in self.data.chunk_chart.chunks(self.data.view_chunk).rev() {
+                        if let Some(chunk) = self.data.chunks.get(&p) {
+                            if self.data.cull(p) {
                                 continue;
                             }
                             squares_drawn += chunk.render(
                                 &mut tess_gate,
                                 pass,
                                 // TODO: avoid adding and then subtracting view_chunk
-                                DepthOrdering::from_view_direction(p.0 - self.view_chunk.0),
+                                DepthOrdering::from_view_direction(p.0 - self.data.view_chunk.0),
                             )?;
                         }
                     }
@@ -406,12 +408,8 @@ impl<'a> SpaceRendererBound<'a> {
         Ok(SpaceRenderInfo {
             chunks_drawn,
             squares_drawn,
-            ..self.info.clone()
+            ..self.data.info.clone()
         })
-    }
-
-    fn cull(&self, chunk: ChunkPos<CHUNK_SIZE>) -> bool {
-        self.camera.options().use_frustum_culling && !self.camera.aab_in_view(chunk.grid().into())
     }
 }
 
