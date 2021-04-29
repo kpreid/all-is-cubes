@@ -168,6 +168,7 @@ where
         let block_programs = &mut self.block_programs;
 
         self.world_camera.set_view_matrix(character.view());
+        let graphics_options = self.world_camera.options(); // arbitrary choice of borrowable source
 
         // Prepare Tess and Texture for space.
         let start_prepare_time = Instant::now();
@@ -188,7 +189,7 @@ where
         let debug_lines_tess = {
             let mut v: Vec<LumBlockVertex> = Vec::new();
 
-            if self.world_camera.options().debug_collision_boxes {
+            if graphics_options.debug_collision_boxes {
                 // Character collision box
                 wireframe_vertices(
                     &mut v,
@@ -206,7 +207,7 @@ where
             }
 
             // Lighting trace at cursor
-            if self.world_camera.options().debug_light_rays_at_cursor {
+            if graphics_options.debug_light_rays_at_cursor {
                 if let Some(cursor) = cursor_result {
                     // TODO: We should be able to draw wireframes in the UI space too, and when we do that will enable supporting this.
                     if cursor.space == character.space {
