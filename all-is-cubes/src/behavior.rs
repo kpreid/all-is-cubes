@@ -10,7 +10,7 @@ use std::fmt::Debug;
 
 use crate::character::{Character, CharacterTransaction};
 use crate::physics::BodyTransaction;
-use crate::transactions::{Transaction, Transactional, UTransactional, UniverseTransaction};
+use crate::transactions::{Transaction, Transactional, UniverseTransaction};
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
@@ -47,7 +47,7 @@ pub struct BehaviorContext<'a, H: Transactional> {
     host_transaction_binder: &'a dyn Fn(H::Transaction) -> UniverseTransaction,
 }
 
-impl<'a, H: UTransactional> BehaviorContext<'a, H> {
+impl<'a, H: Transactional> BehaviorContext<'a, H> {
     fn bind_host(&self, transaction: H::Transaction) -> UniverseTransaction {
         (self.host_transaction_binder)(transaction)
     }
