@@ -313,6 +313,10 @@ pub struct UniverseTransaction {
     members: HashMap<Rc<Name>, AnyTransaction>,
 }
 
+impl Transactional for Universe {
+    type Transaction = UniverseTransaction;
+}
+
 impl From<AnyTransaction> for UniverseTransaction {
     fn from(transaction: AnyTransaction) -> Self {
         let mut members: HashMap<Rc<Name>, AnyTransaction> = HashMap::new();
