@@ -4,7 +4,6 @@
 //! Dynamic add-ons to game objects; we might also have called them “components”.
 
 use ordered_float::NotNan;
-use std::cell::RefCell;
 use std::fmt::Debug;
 
 use crate::apps::Tick;
@@ -19,7 +18,7 @@ pub trait Behavior<H: Transactional>: Debug {
     /// Computes a transaction to apply the effects of this behavior for one timestep.
     ///
     /// TODO: Define what happens if the transaction fails.
-    fn step(&mut self, _context: &BehaviorContext<'_, H>, _tick: Tick) -> UniverseTransaction {
+    fn step(&self, _context: &BehaviorContext<'_, H>, _tick: Tick) -> UniverseTransaction {
         UniverseTransaction::default()
     }
 
@@ -50,30 +49,21 @@ impl<'a, H: Transactional> BehaviorContext<'a, H> {
 }
 
 /// Collects [`Behavior`]s and invokes them.
-///
-/// `BehaviorSet` has interior mutability so that its behaviors can straightforwardly
-/// mutate themselves, while holding a reference to the host object `H` that contains
-/// the set.
 pub(crate) struct BehaviorSet<H> {
-    items: RefCell<Vec<Box<dyn Behavior<H>>>>,
+    items: Vec<Box<dyn Behavior<H>>>,
 }
 
 impl<H: Transactional> BehaviorSet<H> {
     pub fn new() -> Self {
-        BehaviorSet {
-            items: RefCell::new(Vec::new()),
-        }
+        BehaviorSet { items: Vec::new() }
     }
 
     /// Add a behavior to the set.
-    ///
-    /// Design note: This method does not require `&mut self`, but the owner of the set
-    /// should probably count it as a mutation for API purposes anyway.
-    pub fn insert<B>(&self, behavior: B)
+    pub fn insert<B>(&mut self, behavior: B)
     where
         B: Behavior<H> + 'static,
     {
-        self.items.borrow_mut().push(Box::new(behavior));
+        self.items.push(Box::new(behavior));
     }
 
     pub fn step(
@@ -83,7 +73,7 @@ impl<H: Transactional> BehaviorSet<H> {
         tick: Tick,
     ) -> UniverseTransaction {
         let mut transactions = Vec::new();
-        for behavior in self.items.borrow_mut().iter_mut() {
+        for behavior in self.items.iter() {
             let context = &BehaviorContext {
                 host: &*host,
                 host_transaction_binder,
@@ -103,15 +93,10 @@ impl<H: Transactional> BehaviorSet<H> {
 
 impl<H> std::fmt::Debug for BehaviorSet<H> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.items.try_borrow() {
-            Ok(items) => {
-                write!(f, "BehaviorSet(")?;
-                f.debug_list().entries(&*items).finish()?;
-                write!(f, ")")?;
-                Ok(())
-            }
-            Err(_) => write!(f, "BehaviorSet(<currently borrowed>)"),
-        }
+        write!(f, "BehaviorSet(")?;
+        f.debug_list().entries(&*self.items).finish()?;
+        write!(f, ")")?;
+        Ok(())
     }
 }
 
@@ -124,7 +109,7 @@ pub struct AutoRotate {
     pub rate: NotNan<f64>,
 }
 impl Behavior<Character> for AutoRotate {
-    fn step(&mut self, c: &BehaviorContext<'_, Character>, tick: Tick) -> UniverseTransaction {
+    fn step(&self, c: &BehaviorContext<'_, Character>, tick: Tick) -> UniverseTransaction {
         c.bind_host(CharacterTransaction::body(BodyTransaction {
             delta_yaw: self.rate.into_inner() * tick.delta_t.as_secs_f64(),
         }))
@@ -145,7 +130,7 @@ mod tests {
 
     #[test]
     fn behavior_set_debug() {
-        let set = BehaviorSet::<Character>::new();
+        let mut set = BehaviorSet::<Character>::new();
         assert_eq!(format!("{:?}", set), "BehaviorSet([])");
         assert_eq!(format!("{:#?}", set), "BehaviorSet([])");
         set.insert(AutoRotate {
