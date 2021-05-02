@@ -11,7 +11,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::apps::Tick;
-use crate::behavior::{Behavior, BehaviorSet};
+use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::block::{recursive_raycast, Block, EvaluatedBlock};
 use crate::camera::eye_for_look_at;
 use crate::listen::{Listener, Notifier};
@@ -219,6 +219,7 @@ impl Character {
             self.behaviors.step(
                 &self,
                 &(|t: CharacterTransaction| t.bind(self_ref.clone())),
+                CharacterTransaction::behaviors,
                 tick,
             )
         } else {
@@ -288,45 +289,57 @@ impl Transactional for Character {
 pub struct CharacterTransaction {
     body: BodyTransaction,
     inventory: InventoryTransaction,
+    behaviors: BehaviorSetTransaction<Character>,
 }
 
 impl CharacterTransaction {
     pub fn body(t: BodyTransaction) -> Self {
         CharacterTransaction {
             body: t,
-            inventory: Default::default(),
+            ..Default::default()
         }
     }
 
     pub fn inventory(t: InventoryTransaction) -> Self {
         CharacterTransaction {
-            body: Default::default(),
             inventory: t,
+            ..Default::default()
+        }
+    }
+
+    fn behaviors(t: BehaviorSetTransaction<Character>) -> Self {
+        Self {
+            behaviors: t,
+            ..Default::default()
         }
     }
 }
 
+#[allow(clippy::type_complexity)]
 impl Transaction<Character> for CharacterTransaction {
     type CommitCheck = (
         <BodyTransaction as Transaction<Body>>::CommitCheck,
         <InventoryTransaction as Transaction<Inventory>>::CommitCheck,
+        <BehaviorSetTransaction<Character> as Transaction<BehaviorSet<Character>>>::CommitCheck,
     );
     type MergeCheck = (
         <BodyTransaction as Transaction<Body>>::MergeCheck,
         <InventoryTransaction as Transaction<Inventory>>::MergeCheck,
+        <BehaviorSetTransaction<Character> as Transaction<BehaviorSet<Character>>>::MergeCheck,
     );
 
     fn check(&self, target: &Character) -> Result<Self::CommitCheck, ()> {
         Ok((
             self.body.check(&target.body)?,
             self.inventory.check(&target.inventory)?,
+            self.behaviors.check(&target.behaviors)?,
         ))
     }
 
     fn commit(
         &self,
         target: &mut Character,
-        (body_check, inventory_check): Self::CommitCheck,
+        (body_check, inventory_check, behaviors_check): Self::CommitCheck,
     ) -> Result<(), Box<dyn Error>> {
         self.body.commit(&mut target.body, body_check)?;
 
@@ -337,6 +350,9 @@ impl Transaction<Character> for CharacterTransaction {
             target.notifier.notify(CharacterChange::Inventory);
         }
 
+        self.behaviors
+            .commit(&mut target.behaviors, behaviors_check)?;
+
         Ok(())
     }
 
@@ -344,15 +360,23 @@ impl Transaction<Character> for CharacterTransaction {
         Ok((
             self.body.check_merge(&other.body)?,
             self.inventory.check_merge(&other.inventory)?,
+            self.behaviors.check_merge(&other.behaviors)?,
         ))
     }
 
-    fn commit_merge(self, other: Self, (body_check, inventory_check): Self::MergeCheck) -> Self {
+    fn commit_merge(
+        self,
+        other: Self,
+        (body_check, inventory_check, behaviors_check): Self::MergeCheck,
+    ) -> Self {
         Self {
             body: self.body.commit_merge(other.body, body_check),
             inventory: self
                 .inventory
                 .commit_merge(other.inventory, inventory_check),
+            behaviors: self
+                .behaviors
+                .commit_merge(other.behaviors, behaviors_check),
         }
     }
 }
