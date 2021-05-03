@@ -4,6 +4,7 @@
 //! Headless image (and someday video) generation.
 
 use cgmath::Vector2;
+use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::Encoder;
 use std::array::IntoIter;
 use std::borrow::Cow;
@@ -20,6 +21,7 @@ use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::math::{FreeCoordinate, NotNan, Rgba};
 use all_is_cubes::raytracer::{ColorBuf, SpaceRaytracer};
+use all_is_cubes::space::LightUpdatesInfo;
 
 /// Options for recording and output in [`record_main`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -83,16 +85,27 @@ pub(crate) fn record_main(
     mut app: AllIsCubesAppState,
     options: RecordOptions,
 ) -> Result<(), Box<dyn Error>> {
+    let progress_style = ProgressStyle::default_bar()
+        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
+        .on_finish(ProgressFinish::AtCurrentPos);
+
     let mut stderr = std::io::stderr();
-    let _ = write!(stderr, "Preparing...");
+    let _ = writeln!(stderr, "Preparing...");
     let _ = stderr.flush();
 
     let viewport = options.viewport();
     let mut camera = Camera::new(app.graphics_options().snapshot(), viewport);
 
-    // Set up app state
+    // Ensure lighting is ready
     let space_ref = app.character().borrow().space.clone();
-    space_ref.borrow_mut().evaluate_light(1, |_| {});
+    let light_progress = ProgressBar::new(100)
+        .with_style(progress_style.clone())
+        .with_prefix("Lighting");
+    space_ref
+        .borrow_mut()
+        .evaluate_light(1, lighting_progress_adapter(&light_progress));
+    light_progress.finish();
+
     if options.animated() {
         // TODO: replace this with a general scripting mechanism
         app.character().borrow_mut().add_behavior(AutoRotate {
@@ -100,10 +113,11 @@ pub(crate) fn record_main(
         });
     }
 
-    for frame in options.frame_range() {
-        let _ = write!(stderr, "f{}...", frame);
-        let _ = stderr.flush();
-
+    let drawing_progress_bar = ProgressBar::new(options.frame_range().size_hint().0 as u64)
+        .with_style(progress_style)
+        .with_prefix("Drawing");
+    drawing_progress_bar.enable_steady_tick(1000);
+    for frame in drawing_progress_bar.wrap_iter(options.frame_range()) {
         camera.set_view_matrix(app.character().borrow().view());
         let (image_data, _info) = SpaceRaytracer::<ColorBuf>::new(
             &*space_ref.borrow(),
@@ -194,4 +208,15 @@ fn write_color_metadata<W: std::io::Write>(
         .collect::<Box<[u8]>>(),
     )?;
     Ok(())
+}
+
+/// Convert `LightUpdatesInfo` data to an approximate completion progress.
+/// TODO: Improve this and put it in the lighting module (independent of indicatif).
+fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(LightUpdatesInfo) + '_ {
+    let mut worst = 1;
+    move |info| {
+        worst = worst.max(info.queue_count);
+        progress.set_length(worst as u64);
+        progress.set_position((worst - info.queue_count) as u64);
+    }
 }
