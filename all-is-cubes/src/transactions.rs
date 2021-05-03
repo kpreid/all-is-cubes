@@ -212,6 +212,15 @@ impl AnyTransaction {
             Space(t) => t.target.name(),
         }
     }
+
+    /// Returns the transaction out of the [`TransactionInUniverse`] wrapper.
+    fn transaction_as_debug(&self) -> &dyn Debug {
+        use AnyTransaction::*;
+        match self {
+            Character(t) => &t.transaction,
+            Space(t) => &t.transaction,
+        }
+    }
 }
 
 impl Transaction<()> for AnyTransaction {
@@ -395,7 +404,9 @@ impl Debug for UniverseTransaction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = fmt.debug_struct("UniverseTransaction");
         for (name, txn) in &self.members {
-            ds.field(&name.to_string(), txn);
+            // transaction_as_debug() gives us the type-specific transaction without the redundant
+            // TransactionInUniverse wrapper
+            ds.field(&name.to_string(), txn.transaction_as_debug());
         }
         ds.finish()
     }
@@ -434,6 +445,41 @@ mod tests {
                 members: HashMap::new(),
             }
         )
+    }
+
+    #[test]
+    fn universe_txn_debug() {
+        let [block] = make_some_blocks();
+        let mut u = Universe::new();
+        let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let transaction =
+            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block)).bind(space);
+
+        println!("{:#?}", transaction);
+        assert_eq!(
+            format!("{:#?}", transaction),
+            "UniverseTransaction {\n\
+            \x20   [anonymous #0]: SpaceTransaction {\n\
+            \x20       cubes: {\n\
+            \x20           [\n\
+            \x20               0,\n\
+            \x20               0,\n\
+            \x20               0,\n\
+            \x20           ]: CubeTransaction {\n\
+            \x20               old: None,\n\
+            \x20               new: Some(\n\
+            \x20                   Atom(\n\
+            \x20                       BlockAttributes {\n\
+            \x20                           display_name: \"0\",\n\
+            \x20                       },\n\
+            \x20                       Rgba(0.5, 0.5, 0.5, 1.0),\n\
+            \x20                   ),\n\
+            \x20               ),\n\
+            \x20           },\n\
+            \x20       },\n\
+            \x20   },\n\
+            }"
+        );
     }
 
     #[test]
