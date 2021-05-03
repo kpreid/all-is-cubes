@@ -460,22 +460,16 @@ mod tests {
             format!("{:#?}", transaction),
             "UniverseTransaction {\n\
             \x20   [anonymous #0]: SpaceTransaction {\n\
-            \x20       cubes: {\n\
-            \x20           [\n\
-            \x20               0,\n\
-            \x20               0,\n\
-            \x20               0,\n\
-            \x20           ]: CubeTransaction {\n\
-            \x20               old: None,\n\
-            \x20               new: Some(\n\
-            \x20                   Atom(\n\
-            \x20                       BlockAttributes {\n\
-            \x20                           display_name: \"0\",\n\
-            \x20                       },\n\
-            \x20                       Rgba(0.5, 0.5, 0.5, 1.0),\n\
-            \x20                   ),\n\
+            \x20       (+0, +0, +0): CubeTransaction {\n\
+            \x20           old: None,\n\
+            \x20           new: Some(\n\
+            \x20               Atom(\n\
+            \x20                   BlockAttributes {\n\
+            \x20                       display_name: \"0\",\n\
+            \x20                   },\n\
+            \x20                   Rgba(0.5, 0.5, 0.5, 1.0),\n\
             \x20               ),\n\
-            \x20           },\n\
+            \x20           ),\n\
             \x20       },\n\
             \x20   },\n\
             }"

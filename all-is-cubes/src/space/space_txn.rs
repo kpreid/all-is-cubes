@@ -6,17 +6,19 @@
 use std::collections::btree_map::Entry::*;
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::fmt::Debug;
 
 use super::Space;
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::transactions::{Transaction, Transactional};
+use crate::util::{ConciseDebug, CustomFormat as _};
 
 impl Transactional for Space {
     type Transaction = SpaceTransaction;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct SpaceTransaction {
     cubes: BTreeMap<[GridCoordinate; 3], CubeTransaction>,
 }
@@ -98,6 +100,21 @@ impl Transaction<Space> for SpaceTransaction {
         }
 
         Ok(self)
+    }
+}
+
+impl Debug for SpaceTransaction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = fmt.debug_struct("SpaceTransaction");
+        for (cube, txn) in &self.cubes {
+            ds.field(
+                &GridPoint::from(*cube)
+                    .custom_format(ConciseDebug)
+                    .to_string(),
+                txn,
+            );
+        }
+        ds.finish()
     }
 }
 
