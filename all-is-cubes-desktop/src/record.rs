@@ -92,7 +92,7 @@ pub(crate) fn record_main(
 
     // Set up app state
     let space_ref = app.character().borrow().space.clone();
-    space_ref.borrow_mut().evaluate_light(1);
+    space_ref.borrow_mut().evaluate_light(1, |_| {});
     if options.animated() {
         // TODO: replace this with a general scripting mechanism
         app.character().borrow_mut().add_behavior(AutoRotate {

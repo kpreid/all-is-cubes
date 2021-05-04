@@ -104,7 +104,10 @@ pub fn lighting_bench(c: &mut Criterion) {
         b.iter_batched(
             universe_for_lighting_test,
             |universe| {
-                universe.get_default_space().borrow_mut().evaluate_light();
+                universe
+                    .get_default_space()
+                    .borrow_mut()
+                    .evaluate_light(0, |_| {});
             },
             BatchSize::SmallInput,
         )

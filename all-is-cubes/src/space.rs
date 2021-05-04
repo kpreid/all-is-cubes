@@ -529,15 +529,23 @@ impl Space {
     /// `epsilon` specifies a threshold at which to stop doing updates.
     /// Zero means to run to full completion; one is the smallest unit of light level
     /// difference; and so on.
-    pub fn evaluate_light(&mut self, epsilon: u8) -> usize {
+    pub fn evaluate_light(
+        &mut self,
+        epsilon: u8,
+        mut progress_callback: impl FnMut(LightUpdatesInfo),
+    ) -> usize {
         let mut total = 0;
         loop {
+            let info = self.update_lighting_from_queue();
+
+            progress_callback(info);
+
             let LightUpdatesInfo {
                 queue_count,
                 update_count,
                 max_queue_priority,
                 ..
-            } = self.update_lighting_from_queue();
+            } = info;
             total += update_count;
             if queue_count == 0 || max_queue_priority <= epsilon {
                 break;
