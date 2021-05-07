@@ -493,10 +493,8 @@ impl Geometry for LightingUpdateInfo {
             .enlarge(0.1)
             .wireframe_points(output);
         // Draw rays
-        for ray_info in &self.rays {
-            if let Some(ray_info) = ray_info {
-                ray_info.wireframe_points(output);
-            }
+        for ray_info in self.rays.iter().flatten() {
+            ray_info.wireframe_points(output);
         }
     }
 }
