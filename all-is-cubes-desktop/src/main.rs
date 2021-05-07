@@ -5,6 +5,8 @@
 
 #![deny(rust_2018_idioms)]
 #![warn(clippy::cast_lossless)]
+#![warn(clippy::exhaustive_enums)]
+#![warn(clippy::exhaustive_structs)]
 
 use cgmath::Vector2;
 use clap::{value_t, Arg};
@@ -28,6 +30,7 @@ use terminal::{terminal_main_loop, TerminalOptions};
 
 #[derive(Debug, PartialEq, strum::EnumString, strum::EnumIter, strum::IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
+#[non_exhaustive]
 pub enum GraphicsType {
     Headless,
     Window,
