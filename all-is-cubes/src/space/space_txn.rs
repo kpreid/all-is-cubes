@@ -43,9 +43,9 @@ impl SpaceTransaction {
 }
 
 impl Transaction<Space> for SpaceTransaction {
-    type Check = ();
+    type CommitCheck = ();
 
-    fn check(&self, space: &Space) -> Result<Self::Check, ()> {
+    fn check(&self, space: &Space) -> Result<Self::CommitCheck, ()> {
         for (&cube, CubeTransaction { old, new: _ }) in &self.cubes {
             if let Some(old) = old {
                 if space[cube] != *old {
@@ -56,7 +56,7 @@ impl Transaction<Space> for SpaceTransaction {
         Ok(())
     }
 
-    fn commit(&self, target: &mut Space, _check: Self::Check) -> Result<(), Box<dyn Error>> {
+    fn commit(&self, target: &mut Space, _check: Self::CommitCheck) -> Result<(), Box<dyn Error>> {
         for (&cube, CubeTransaction { old: _, new }) in &self.cubes {
             if let Some(new) = new {
                 target.set(cube, new)?;

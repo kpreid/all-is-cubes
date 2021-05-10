@@ -402,14 +402,18 @@ impl Transactional for Body {
 }
 
 impl Transaction<Body> for BodyTransaction {
-    type Check = ();
+    type CommitCheck = ();
 
-    fn check(&self, _body: &Body) -> Result<Self::Check, ()> {
+    fn check(&self, _body: &Body) -> Result<Self::CommitCheck, ()> {
         // No conflicts currently possible.
         Ok(())
     }
 
-    fn commit(&self, body: &mut Body, _: Self::Check) -> Result<(), Box<dyn std::error::Error>> {
+    fn commit(
+        &self,
+        body: &mut Body,
+        _: Self::CommitCheck,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         body.yaw += self.delta_yaw;
         Ok(())
     }

@@ -307,12 +307,12 @@ impl CharacterTransaction {
 }
 
 impl Transaction<Character> for CharacterTransaction {
-    type Check = (
-        <BodyTransaction as Transaction<Body>>::Check,
-        <InventoryTransaction as Transaction<Inventory>>::Check,
+    type CommitCheck = (
+        <BodyTransaction as Transaction<Body>>::CommitCheck,
+        <InventoryTransaction as Transaction<Inventory>>::CommitCheck,
     );
 
-    fn check(&self, target: &Character) -> Result<Self::Check, ()> {
+    fn check(&self, target: &Character) -> Result<Self::CommitCheck, ()> {
         Ok((
             self.body.check(&target.body)?,
             self.inventory.check(&target.inventory)?,
@@ -322,7 +322,7 @@ impl Transaction<Character> for CharacterTransaction {
     fn commit(
         &self,
         target: &mut Character,
-        (body_check, inventory_check): Self::Check,
+        (body_check, inventory_check): Self::CommitCheck,
     ) -> Result<(), Box<dyn Error>> {
         self.body.commit(&mut target.body, body_check)?;
 

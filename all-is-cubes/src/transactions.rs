@@ -31,14 +31,14 @@ pub trait Transaction<T: ?Sized> {
     /// This may be used to pass precalculated values to speed up the commit phase,
     /// or even [`UBorrowMut`]s or similar, but also makes it difficult to accidentally
     /// call `commit` without `check`.
-    type Check: 'static;
+    type CommitCheck: 'static;
 
     /// Checks whether the target's current state meets the preconditions and returns
     /// [`Err`] if it does not. (TODO: Informative error return type.)
     ///
     /// If the preconditions are met, returns [`Ok`] containing data to be passed to
     /// [`Transaction::commit`].
-    fn check(&self, target: &T) -> Result<Self::Check, ()>;
+    fn check(&self, target: &T) -> Result<Self::CommitCheck, ()>;
 
     /// Perform the mutations specified by this transaction. The `check` value should have
     /// been created by a prior call to [`Transaction::commit`].
@@ -53,7 +53,7 @@ pub trait Transaction<T: ?Sized> {
     /// to the particular `T`). The consequences of doing so may include mutating the
     /// wrong components, signaling an error partway through the transaction, or merely
     /// committing the transaction while its preconditions do not hold.
-    fn commit(&self, target: &mut T, check: Self::Check) -> Result<(), Box<dyn Error>>;
+    fn commit(&self, target: &mut T, check: Self::CommitCheck) -> Result<(), Box<dyn Error>>;
 
     /// Convenience method to execute a transaction in one step. Implementations should not
     /// need to override this. Approximately equivalent to:
@@ -137,9 +137,12 @@ impl<O> Transaction<()> for TransactionInUniverse<O>
 where
     O: Transactional + 'static,
 {
-    type Check = (UBorrowMut<O>, <O::Transaction as Transaction<O>>::Check);
+    type CommitCheck = (
+        UBorrowMut<O>,
+        <O::Transaction as Transaction<O>>::CommitCheck,
+    );
 
-    fn check(&self, _dummy_target: &()) -> Result<Self::Check, ()> {
+    fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, ()> {
         let borrow = self.target.borrow_mut();
         let check = self.transaction.check(&borrow)?;
         Ok((borrow, check))
@@ -148,7 +151,7 @@ where
     fn commit(
         &self,
         _dummy_target: &mut (),
-        (mut borrow, check): Self::Check,
+        (mut borrow, check): Self::CommitCheck,
     ) -> Result<(), Box<dyn Error>> {
         self.transaction.commit(&mut borrow, check)
     }
@@ -224,9 +227,9 @@ impl AnyTransaction {
 }
 
 impl Transaction<()> for AnyTransaction {
-    type Check = Box<dyn Any>;
+    type CommitCheck = Box<dyn Any>;
 
-    fn check(&self, _target: &()) -> Result<Self::Check, ()> {
+    fn check(&self, _target: &()) -> Result<Self::CommitCheck, ()> {
         use AnyTransaction::*;
         Ok(match self {
             Character(t) => Box::new(t.check(&())?),
@@ -234,7 +237,7 @@ impl Transaction<()> for AnyTransaction {
         })
     }
 
-    fn commit(&self, _target: &mut (), check: Self::Check) -> Result<(), Box<dyn Error>> {
+    fn commit(&self, _target: &mut (), check: Self::CommitCheck) -> Result<(), Box<dyn Error>> {
         fn commit_helper<O>(
             transaction: &TransactionInUniverse<O>,
             check: Box<dyn Any>,
@@ -243,10 +246,9 @@ impl Transaction<()> for AnyTransaction {
             O: Transactional,
             TransactionInUniverse<O>: Transaction<()>,
         {
-            let check: <TransactionInUniverse<O> as Transaction<()>>::Check =
-                *(check
-                    .downcast()
-                    .map_err(|_| "AnyTransaction: type mismatch in check data")?);
+            let check: <TransactionInUniverse<O> as Transaction<()>>::CommitCheck = *(check
+                .downcast()
+                .map_err(|_| "AnyTransaction: type mismatch in check data")?);
             transaction.commit(&mut (), check)
         }
 
@@ -335,9 +337,9 @@ impl From<AnyTransaction> for UniverseTransaction {
 }
 
 impl Transaction<Universe> for UniverseTransaction {
-    type Check = HashMap<Rc<Name>, Box<dyn Any>>;
+    type CommitCheck = HashMap<Rc<Name>, Box<dyn Any>>;
 
-    fn check(&self, _target: &Universe) -> Result<Self::Check, ()> {
+    fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, ()> {
         // TODO: Enforce that `target` is the universe all the URefs belong to.
 
         let mut checks = HashMap::new();
@@ -347,7 +349,11 @@ impl Transaction<Universe> for UniverseTransaction {
         Ok(checks)
     }
 
-    fn commit(&self, _target: &mut Universe, checks: Self::Check) -> Result<(), Box<dyn Error>> {
+    fn commit(
+        &self,
+        _target: &mut Universe,
+        checks: Self::CommitCheck,
+    ) -> Result<(), Box<dyn Error>> {
         for (name, check) in checks {
             self.members[&name].commit(&mut (), check)?;
         }

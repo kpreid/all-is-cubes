@@ -282,9 +282,9 @@ impl InventoryTransaction {
 }
 
 impl Transaction<Inventory> for InventoryTransaction {
-    type Check = Vec<usize>;
+    type CommitCheck = Vec<usize>;
 
-    fn check(&self, inventory: &Inventory) -> Result<Self::Check, ()> {
+    fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, ()> {
         // Check replacements and notice if any slots are becoming empty
         for (&slot, (old, _new)) in self.replace.iter() {
             if inventory.slots[slot] != *old {
@@ -312,7 +312,7 @@ impl Transaction<Inventory> for InventoryTransaction {
     fn commit(
         &self,
         inventory: &mut Inventory,
-        empty_slots: Self::Check,
+        empty_slots: Self::CommitCheck,
     ) -> Result<(), Box<dyn Error>> {
         for (&slot, (_old, new)) in self.replace.iter() {
             inventory.slots[slot] = new.clone();
