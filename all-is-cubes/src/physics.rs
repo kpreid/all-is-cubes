@@ -403,6 +403,7 @@ impl Transactional for Body {
 
 impl Transaction<Body> for BodyTransaction {
     type CommitCheck = ();
+    type MergeCheck = ();
 
     fn check(&self, _body: &Body) -> Result<Self::CommitCheck, ()> {
         // No conflicts currently possible.
@@ -418,9 +419,13 @@ impl Transaction<Body> for BodyTransaction {
         Ok(())
     }
 
-    fn merge(mut self, other: Self) -> Result<Self, (Self, Self)> {
+    fn check_merge(&self, _other: &Self) -> Result<Self::MergeCheck, ()> {
+        Ok(())
+    }
+
+    fn commit_merge(mut self, other: Self, (): Self::MergeCheck) -> Self {
         self.delta_yaw += other.delta_yaw;
-        Ok(self)
+        self
     }
 }
 

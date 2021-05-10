@@ -311,6 +311,10 @@ impl Transaction<Character> for CharacterTransaction {
         <BodyTransaction as Transaction<Body>>::CommitCheck,
         <InventoryTransaction as Transaction<Inventory>>::CommitCheck,
     );
+    type MergeCheck = (
+        <BodyTransaction as Transaction<Body>>::MergeCheck,
+        <InventoryTransaction as Transaction<Inventory>>::MergeCheck,
+    );
 
     fn check(&self, target: &Character) -> Result<Self::CommitCheck, ()> {
         Ok((
@@ -336,18 +340,19 @@ impl Transaction<Character> for CharacterTransaction {
         Ok(())
     }
 
-    fn merge(mut self, mut other: Self) -> Result<Self, (Self, Self)> {
-        match self.inventory.merge(other.inventory) {
-            Ok(merged) => {
-                self.inventory = merged;
-                Ok(self)
-            }
-            Err((si, oi)) => {
-                // Undo the moves
-                self.inventory = si;
-                other.inventory = oi;
-                Err((self, other))
-            }
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+        Ok((
+            self.body.check_merge(&other.body)?,
+            self.inventory.check_merge(&other.inventory)?,
+        ))
+    }
+
+    fn commit_merge(self, other: Self, (body_check, inventory_check): Self::MergeCheck) -> Self {
+        Self {
+            body: self.body.commit_merge(other.body, body_check),
+            inventory: self
+                .inventory
+                .commit_merge(other.inventory, inventory_check),
         }
     }
 }

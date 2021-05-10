@@ -74,18 +74,44 @@ pub trait Transaction<T: ?Sized> {
         self.commit(target, check)
     }
 
+    /// Type of a value passed from [`Transaction::check_merge`] to
+    /// [`Transaction::merge`].
+    /// This may be used to pass precalculated values to speed up the merge phase,
+    /// but also makes it difficult to accidentally call `merge` without `check_merge`.
+    type MergeCheck: 'static;
+
+    /// Checks whether two transactions can be merged into a single transaction.
+    /// If so, returns [`Ok`] containing data which may be passed to [`Self::merge`].
+    ///
+    /// Generally, “can be merged” means that the two transactions do not have mutually
+    /// exclusive preconditions and are not specify conflicting mutations. However, the
+    /// definition of conflict is type-specific; for example, merging two “add 1 to
+    /// velocity” transactions may produce an “add 2 to velocity” transactions.
+    ///
+    /// This is not necessarily the same as either ordering of applying the two
+    /// transactions sequentially. See [`Self::commit_merge`] for more details.
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()>;
+
     /// Combines two transactions into one which has both effects simultaneously.
     /// This operation must be commutative and have `Default::default` as the identity.
     ///
-    /// Returns [`Err`] if the two transactions conflict, containing the unmodified
-    /// transactions.
-    ///
-    /// TODO: This is hard to implement correctly and efficiently. Review actual use cases
-    /// and see whether recovering from failure is desired and how much information is
-    /// needed from it.
-    fn merge(self, other: Self) -> Result<Self, (Self, Self)>
+    /// May panic if `check` is not the result of a previous call to
+    /// `self.check_merge(&other)` or if either transaction was mutated in the intervening
+    /// time.
+    fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self
     where
         Self: Sized;
+
+    /// Combines two transactions into one which has both effects simultaneously, if possible.
+    ///
+    /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
+    fn merge(self, other: Self) -> Result<Self, ()>
+    where
+        Self: Sized,
+    {
+        let check = self.check_merge(&other)?;
+        Ok(self.commit_merge(other, check))
+    }
 
     /// Specify the target of this transaction as a [`URef`], and erase its type,
     /// so that it can be combined with other transactions in the same universe.
@@ -141,6 +167,7 @@ where
         UBorrowMut<O>,
         <O::Transaction as Transaction<O>>::CommitCheck,
     );
+    type MergeCheck = <O::Transaction as Transaction<O>>::MergeCheck;
 
     fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, ()> {
         let borrow = self.target.borrow_mut();
@@ -156,22 +183,17 @@ where
         self.transaction.commit(&mut borrow, check)
     }
 
-    fn merge(mut self, mut other: Self) -> Result<Self, (Self, Self)> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
         if self.target != other.target {
+            // This is a panic because it indicates a programming error.
             panic!("TransactionInUniverse cannot have multiple targets; use UniverseTransaction instead");
         }
-        match self.transaction.merge(other.transaction) {
-            Ok(merged) => {
-                self.transaction = merged;
-                Ok(self)
-            }
-            Err((st, ot)) => {
-                // Undo the moves
-                self.transaction = st;
-                other.transaction = ot;
-                Err((self, other))
-            }
-        }
+        self.transaction.check_merge(&other.transaction)
+    }
+
+    fn commit_merge(mut self, other: Self, check: Self::MergeCheck) -> Self {
+        self.transaction = self.transaction.commit_merge(other.transaction, check);
+        self
     }
 }
 
@@ -202,17 +224,19 @@ where
 #[derive(Clone, PartialEq)]
 #[non_exhaustive]
 enum AnyTransaction {
+    Noop,
     // TODO: BlockDefTransaction
     Character(TransactionInUniverse<Character>),
     Space(TransactionInUniverse<Space>),
 }
 
 impl AnyTransaction {
-    fn target_name(&self) -> &Rc<Name> {
+    fn target_name(&self) -> Option<&Rc<Name>> {
         use AnyTransaction::*;
         match self {
-            Character(t) => t.target.name(),
-            Space(t) => t.target.name(),
+            Noop => None,
+            Character(t) => Some(t.target.name()),
+            Space(t) => Some(t.target.name()),
         }
     }
 
@@ -220,6 +244,7 @@ impl AnyTransaction {
     fn transaction_as_debug(&self) -> &dyn Debug {
         use AnyTransaction::*;
         match self {
+            Noop => &"AnyTransaction::Noop" as &dyn Debug,
             Character(t) => &t.transaction,
             Space(t) => &t.transaction,
         }
@@ -228,10 +253,12 @@ impl AnyTransaction {
 
 impl Transaction<()> for AnyTransaction {
     type CommitCheck = Box<dyn Any>;
+    type MergeCheck = Box<dyn Any>;
 
     fn check(&self, _target: &()) -> Result<Self::CommitCheck, ()> {
         use AnyTransaction::*;
         Ok(match self {
+            Noop => Box::new(()),
             Character(t) => Box::new(t.check(&())?),
             Space(t) => Box::new(t.check(&())?),
         })
@@ -254,44 +281,58 @@ impl Transaction<()> for AnyTransaction {
 
         use AnyTransaction::*;
         match self {
+            Noop => Ok(()),
             Character(t) => commit_helper(t, check),
             Space(t) => commit_helper(t, check),
         }
     }
 
-    fn merge(self, other: Self) -> Result<Self, (Self, Self)> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+        use AnyTransaction::*;
+        match (self, other) {
+            (Noop, _) => Ok(Box::new(())),
+            (_, Noop) => Ok(Box::new(())),
+            (Character(t1), Character(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
+            (Space(t1), Space(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
+            (_, _) => Err(()),
+        }
+    }
+
+    fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self {
         fn merge_helper<O>(
             t1: TransactionInUniverse<O>,
             t2: TransactionInUniverse<O>,
             rewrapper: fn(TransactionInUniverse<O>) -> AnyTransaction,
-        ) -> Result<AnyTransaction, (AnyTransaction, AnyTransaction)>
+            check: Box<dyn Any>, // contains <TransactionInUniverse<O> as Transaction<()>>::MergeCheck,
+        ) -> AnyTransaction
         where
             O: Transactional,
             TransactionInUniverse<O>: Transaction<()>,
         {
-            match t1.merge(t2) {
-                Ok(t) => Ok(rewrapper(t)),
-                Err((t1, t2)) => Err((rewrapper(t1), rewrapper(t2))),
-            }
+            rewrapper(t1.commit_merge(t2, *check.downcast().unwrap()))
         }
 
         use AnyTransaction::*;
         match (self, other) {
-            (Character(t1), Character(t2)) => merge_helper(t1, t2, Character),
-            (Space(t1), Space(t2)) => merge_helper(t1, t2, Space),
-            (t1, t2) => Err((t1, t2)),
+            (t1, Noop) => t1,
+            (Noop, t2) => t2,
+            (Character(t1), Character(t2)) => merge_helper(t1, t2, Character, check),
+            (Space(t1), Space(t2)) => merge_helper(t1, t2, Space, check),
+            (_, _) => panic!("Mismatched transaction target types"),
         }
+    }
+}
+
+impl Default for AnyTransaction {
+    fn default() -> Self {
+        Self::Noop
     }
 }
 
 /// Hide the wrapper type entirely since its type is determined entirely by its contents.
 impl Debug for AnyTransaction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use AnyTransaction::*;
-        match self {
-            Character(t) => Debug::fmt(t, fmt),
-            Space(t) => Debug::fmt(t, fmt),
-        }
+        Debug::fmt(self.transaction_as_debug(), fmt)
     }
 }
 
@@ -330,14 +371,20 @@ impl Transactional for Universe {
 
 impl From<AnyTransaction> for UniverseTransaction {
     fn from(transaction: AnyTransaction) -> Self {
-        let mut members: HashMap<Rc<Name>, AnyTransaction> = HashMap::new();
-        members.insert(transaction.target_name().clone(), transaction);
-        UniverseTransaction { members }
+        if let Some(name) = transaction.target_name() {
+            let mut members: HashMap<Rc<Name>, AnyTransaction> = HashMap::new();
+            members.insert(name.clone(), transaction);
+            UniverseTransaction { members }
+        } else {
+            UniverseTransaction::default()
+        }
     }
 }
 
 impl Transaction<Universe> for UniverseTransaction {
+    // TODO: Benchmark cheaper HashMaps / using BTreeMap here
     type CommitCheck = HashMap<Rc<Name>, Box<dyn Any>>;
+    type MergeCheck = HashMap<Rc<Name>, Box<dyn Any>>;
 
     fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, ()> {
         // TODO: Enforce that `target` is the universe all the URefs belong to.
@@ -360,48 +407,34 @@ impl Transaction<Universe> for UniverseTransaction {
         Ok(())
     }
 
-    fn merge(mut self, other: Self) -> Result<Self, (Self, Self)>
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+        // TODO: Enforce that other has the same universe.
+        let mut results: Self::MergeCheck = HashMap::new();
+        for (name, t2) in other.members.iter() {
+            if let Some(t1) = self.members.get(name) {
+                results.insert(name.clone(), t1.check_merge(t2)?);
+            }
+        }
+        Ok(results)
+    }
+
+    fn commit_merge(mut self, other: Self, mut check: Self::MergeCheck) -> Self
     where
         Self: Sized,
     {
-        // TODO: Enforce that rhs has the same universe.
-
-        if other
-            .members
-            .keys()
-            .all(|name| !self.members.contains_key(name))
-        {
-            // Fast path: no member merges needed; cannot fail.
-            self.members.extend(other.members);
-            Ok(self)
-
-            // TODO: Add no-cloning fast path when one side of the merge has exactly one
-            // transaction and therefore will either succeed or fail atomically.
-        } else {
-            // Fall back to cloning before merging.
-            let mut members = self.members.clone();
-            for (name, t2) in other.members.iter() {
-                let name = name.clone();
-                let t2 = t2.clone();
-                match members.entry(name) {
-                    Occupied(mut entry) => {
-                        let t1 = entry.get().clone();
-                        match t1.merge(t2) {
-                            Ok(merged) => {
-                                entry.insert(merged);
-                            }
-                            Err(_) => {
-                                return Err((self, other));
-                            }
-                        }
-                    }
-                    Vacant(entry) => {
-                        entry.insert(t2);
-                    }
+        for (name, t2) in other.members.into_iter() {
+            match self.members.entry(name.clone()) {
+                Occupied(mut entry) => {
+                    let subt1 = entry.get_mut();
+                    *subt1 = std::mem::take(subt1)
+                        .commit_merge(t2, check.remove(&name).expect("missing check entry"));
+                }
+                Vacant(entry) => {
+                    entry.insert(t2);
                 }
             }
-            Ok(UniverseTransaction { members })
         }
+        self
     }
 }
 
@@ -415,23 +448,6 @@ impl Debug for UniverseTransaction {
             ds.field(&name.to_string(), txn.transaction_as_debug());
         }
         ds.finish()
-    }
-}
-
-/// Tests that a transaction merge fails, and that it does not mutate the transactions before failing.
-/// Use with `.unwrap()` or `.expect()`.
-#[cfg(test)]
-pub(crate) fn merge_is_rejected<Tr, Ta>(t1: Tr, t2: Tr) -> Result<(), Tr>
-where
-    Tr: Transaction<Ta> + Clone + Debug + PartialEq,
-{
-    match t1.clone().merge(t2.clone()) {
-        Ok(t3) => Err(t3),
-        Err((t1r, t2r)) => {
-            assert_eq!(t1, t1r, "rejected transaction should not be modified");
-            assert_eq!(t2, t2r, "rejected transaction should not be modified");
-            Ok(())
-        }
     }
 }
 
@@ -565,8 +581,11 @@ mod transaction_tester {
         Ta: 'a,
     {
         fn try_merge(self, other: Self) -> Option<Self> {
+            let merge_check = self.transaction.check_merge(&other.transaction).ok()?;
             Some(TransactionAndPredicate {
-                transaction: self.transaction.merge(other.transaction).ok()?,
+                transaction: self
+                    .transaction
+                    .commit_merge(other.transaction, merge_check),
                 predicate: {
                     let p1 = Rc::clone(&self.predicate);
                     let p2 = Rc::clone(&other.predicate);
@@ -645,7 +664,7 @@ mod tests {
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_1)).bind(s.clone());
         let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_2)).bind(s);
-        merge_is_rejected(t1, t2).unwrap();
+        t1.merge(t2).unwrap_err();
     }
 
     #[test]

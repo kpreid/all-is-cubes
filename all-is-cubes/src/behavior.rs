@@ -94,7 +94,9 @@ impl<H: Transactional> BehaviorSet<H> {
                 // TODO: mark for removal and prove it was done
             }
         }
-        let transaction = transactions.into_iter().reduce(|a, b| a.merge(b).unwrap());
+        let transaction = transactions
+            .into_iter()
+            .reduce(|a, b| a.merge(b).expect("TODO: handle merge failure"));
         transaction.unwrap_or_else(UniverseTransaction::default)
     }
 }

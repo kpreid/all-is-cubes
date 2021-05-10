@@ -44,6 +44,7 @@ impl SpaceTransaction {
 
 impl Transaction<Space> for SpaceTransaction {
     type CommitCheck = ();
+    type MergeCheck = ();
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, ()> {
         for (&cube, CubeTransaction { old, new: _ }) in &self.cubes {
@@ -65,24 +66,25 @@ impl Transaction<Space> for SpaceTransaction {
         Ok(())
     }
 
-    fn merge(mut self, other: Self) -> Result<Self, (Self, Self)> {
-        // Check everything before mutating.
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
         for (cube, t1) in self.cubes.iter() {
             if let Some(t2) = other.cubes.get(cube) {
                 if matches!((&t1.old, &t2.old), (Some(a), Some(b)) if a != b) {
                     // Incompatible preconditions will always fail.
-                    return Err((self, other));
+                    return Err(());
                 }
                 if t1.new.is_some() && t2.new.is_some() {
                     // Replacing the same cube twice is not allowed -- even if they're
                     // equal, since doing so could violate an intended conservation law.
                     // TODO: Might want to make that optional.
-                    return Err((self, other));
+                    return Err(());
                 }
             }
         }
+        Ok(())
+    }
 
-        // Perform the merge infallibly.
+    fn commit_merge(mut self, other: Self, (): Self::MergeCheck) -> Self {
         for (cube, t2) in other.cubes {
             match self.cubes.entry(cube) {
                 Occupied(mut entry) => {
@@ -99,8 +101,7 @@ impl Transaction<Space> for SpaceTransaction {
                 }
             }
         }
-
-        Ok(self)
+        self
     }
 }
 
@@ -130,7 +131,7 @@ struct CubeTransaction {
 #[cfg(test)]
 mod tests {
     use crate::content::make_some_blocks;
-    use crate::transactions::{merge_is_rejected, TransactionTester};
+    use crate::transactions::TransactionTester;
 
     use super::*;
 
@@ -166,7 +167,7 @@ mod tests {
         let [block] = make_some_blocks();
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block.clone()));
         let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block.clone()));
-        merge_is_rejected(t1, t2).unwrap();
+        t1.merge(t2).unwrap_err();
     }
 
     #[test]
@@ -174,7 +175,7 @@ mod tests {
         let [b1, b2] = make_some_blocks();
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(b1.clone()));
         let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(b2.clone()));
-        merge_is_rejected(t1, t2).unwrap();
+        t1.merge(t2).unwrap_err();
     }
 
     #[test]
@@ -182,7 +183,7 @@ mod tests {
         let [b1, b2] = make_some_blocks();
         let t1 = SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), None);
         let t2 = SpaceTransaction::set_cube([0, 0, 0], Some(b2.clone()), None);
-        merge_is_rejected(t1, t2).unwrap();
+        t1.merge(t2).unwrap_err();
     }
 
     #[test]

@@ -283,6 +283,7 @@ impl InventoryTransaction {
 
 impl Transaction<Inventory> for InventoryTransaction {
     type CommitCheck = Vec<usize>;
+    type MergeCheck = ();
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, ()> {
         // Check replacements and notice if any slots are becoming empty
@@ -323,21 +324,21 @@ impl Transaction<Inventory> for InventoryTransaction {
         Ok(())
     }
 
-    fn merge(mut self, other: Self) -> Result<Self, (Self, Self)> {
-        // Checks:
-        // Don't allow any touching the same slot at all.
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
         if self
             .replace
             .keys()
             .any(|slot| other.replace.contains_key(slot))
         {
-            return Err((self, other));
+            return Err(());
         }
+        Ok(())
+    }
 
-        // Perform the merge infallibly.
+    fn commit_merge(mut self, other: Self, (): Self::MergeCheck) -> Self {
         self.replace.extend(other.replace);
         self.insert.extend(other.insert);
-        Ok(self)
+        self
     }
 }
 
