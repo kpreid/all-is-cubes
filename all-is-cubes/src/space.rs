@@ -9,8 +9,8 @@ use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::{Rc, Weak};
-use std::time::Duration;
 
+use crate::apps::Tick;
 use crate::block::*;
 use crate::character::Spawn;
 use crate::content::palette;
@@ -497,7 +497,7 @@ impl Space {
     }
 
     /// Advance time in the space.
-    pub fn step(&mut self, _timestep: Duration) -> SpaceStepInfo {
+    pub fn step(&mut self, _tick: Tick) -> SpaceStepInfo {
         // Process changed block definitions.
         for block_index in self.todo.borrow_mut().blocks.drain() {
             self.notifier.notify(SpaceChange::BlockValue(block_index));
@@ -1149,7 +1149,7 @@ mod tests {
         // computations like reevaluation to happen during the notification process.
         assert_eq!(sink.next(), None);
         // Instead, it only happens the next time the space is stepped.
-        space.step(Duration::from_secs(0));
+        space.step(Tick::arbitrary());
         // Now we should see a notification and the evaluated block data having changed.
         assert_eq!(sink.next(), Some(SpaceChange::BlockValue(0)));
         assert_eq!(space.get_evaluated((0, 0, 0)), &new_evaluated);

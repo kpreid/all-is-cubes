@@ -5,6 +5,7 @@ use cgmath::{EuclideanSpace as _, Point2, Vector2, Vector3, Zero as _};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
+use crate::apps::Tick;
 use crate::camera::Viewport;
 use crate::character::Character;
 use crate::listen::{ListenableCell, ListenableSource};
@@ -228,10 +229,10 @@ impl InputProcessor {
     ///
     /// This method should be called *after* [`apply_input`](Self::apply_input), when
     /// applicable.
-    pub fn step(&mut self, timestep: Duration) {
+    pub fn step(&mut self, tick: Tick) {
         let mut to_drop = Vec::new();
         for (key, duration) in self.momentary_timeout.iter_mut() {
-            if let Some(reduced) = duration.checked_sub(timestep) {
+            if let Some(reduced) = duration.checked_sub(tick.delta_t) {
                 *duration = reduced;
             } else {
                 to_drop.push(*key);
@@ -246,8 +247,8 @@ impl InputProcessor {
     }
 
     /// Applies the current input to the given [`Character`].
-    pub fn apply_input(&mut self, character: &mut Character, timestep: Duration) {
-        let dt = timestep.as_secs_f64();
+    pub fn apply_input(&mut self, character: &mut Character, tick: Tick) {
+        let dt = tick.delta_t.as_secs_f64();
         let key_turning_step = 80.0 * dt;
 
         let movement = self.movement();
@@ -375,13 +376,13 @@ mod tests {
 
         input.key_down(Key::Character('5'));
         input.key_up(Key::Character('5'));
-        input.apply_input(&mut *character.borrow_mut(), Duration::from_secs(1));
+        input.apply_input(&mut *character.borrow_mut(), Tick::arbitrary());
         assert_eq!(character.borrow_mut().selected_slots()[1], 4);
 
         // Tenth slot
         input.key_down(Key::Character('0'));
         input.key_up(Key::Character('0'));
-        input.apply_input(&mut *character.borrow_mut(), Duration::from_secs(1));
+        input.apply_input(&mut *character.borrow_mut(), Tick::arbitrary());
         assert_eq!(character.borrow_mut().selected_slots()[1], 9);
     }
 

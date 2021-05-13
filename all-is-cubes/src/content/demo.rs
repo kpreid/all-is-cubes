@@ -191,7 +191,7 @@ fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenErro
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use crate::apps::Tick;
     use strum::IntoEnumIterator as _;
 
     #[test]
@@ -200,7 +200,7 @@ mod tests {
             let mut u = template.build().unwrap();
             let _ = u.get_default_character().borrow();
             let _ = u.get_default_space().borrow();
-            u.step(Duration::from_millis(10));
+            u.step(Tick::arbitrary());
         }
     }
 }

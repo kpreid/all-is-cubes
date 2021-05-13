@@ -3,11 +3,11 @@
 
 //! Dynamic add-ons to game objects; we might also have called them “components”.
 
-use instant::Duration;
 use ordered_float::NotNan;
 use std::cell::RefCell;
 use std::fmt::Debug;
 
+use crate::apps::Tick;
 use crate::character::{Character, CharacterTransaction};
 use crate::physics::BodyTransaction;
 use crate::transactions::{Transaction, Transactional, UniverseTransaction};
@@ -19,11 +19,7 @@ pub trait Behavior<H: Transactional>: Debug {
     /// Computes a transaction to apply the effects of this behavior for one timestep.
     ///
     /// TODO: Define what happens if the transaction fails.
-    fn step(
-        &mut self,
-        _context: &BehaviorContext<'_, H>,
-        _duration: Duration,
-    ) -> UniverseTransaction {
+    fn step(&mut self, _context: &BehaviorContext<'_, H>, _tick: Tick) -> UniverseTransaction {
         UniverseTransaction::default()
     }
 
@@ -85,7 +81,7 @@ impl<H: Transactional> BehaviorSet<H> {
         &self,
         host: &H,
         host_transaction_binder: &dyn Fn(H::Transaction) -> UniverseTransaction,
-        duration: Duration,
+        tick: Tick,
     ) -> UniverseTransaction {
         let mut transactions = Vec::new();
         for behavior in self.items.borrow_mut().iter_mut() {
@@ -94,7 +90,7 @@ impl<H: Transactional> BehaviorSet<H> {
                 host_transaction_binder,
             };
             if behavior.alive(context) {
-                transactions.push(behavior.step(context, duration));
+                transactions.push(behavior.step(context, tick));
             } else {
                 // TODO: mark for removal and prove it was done
             }
@@ -113,13 +109,9 @@ pub struct AutoRotate {
     pub rate: NotNan<f64>,
 }
 impl Behavior<Character> for AutoRotate {
-    fn step(
-        &mut self,
-        c: &BehaviorContext<'_, Character>,
-        duration: Duration,
-    ) -> UniverseTransaction {
+    fn step(&mut self, c: &BehaviorContext<'_, Character>, tick: Tick) -> UniverseTransaction {
         c.bind_host(CharacterTransaction::body(BodyTransaction {
-            delta_yaw: self.rate.into_inner() * duration.as_secs_f64(),
+            delta_yaw: self.rate.into_inner() * tick.delta_t.as_secs_f64(),
         }))
     }
 

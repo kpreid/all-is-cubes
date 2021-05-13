@@ -7,8 +7,8 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
 use std::collections::HashSet;
 use std::fmt;
-use std::time::Duration;
 
+use crate::apps::Tick;
 use crate::block::BlockCollision;
 use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _};
 use crate::raycast::{Ray, RaycastStep};
@@ -126,14 +126,14 @@ impl Body {
     /// per block.
     pub fn step<CC>(
         &mut self,
-        duration: Duration,
+        tick: Tick,
         colliding_space: Option<&Space>,
         mut collision_callback: CC,
     ) -> BodyStepInfo
     where
         CC: FnMut(Contact),
     {
-        let dt = duration.as_secs_f64();
+        let dt = tick.delta_t.as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
 
         // TODO: Reset any non-finite values found to allow recovery from glitches.
@@ -502,9 +502,9 @@ mod tests {
             flying: true,
             ..test_body()
         };
-        body.step(Duration::from_millis(1500), None, collision_noop);
+        body.step(Tick::from_seconds(1.5), None, collision_noop);
         assert_eq!(body.position, Point3::new(3.0, 2.0, 0.0));
-        body.step(Duration::from_millis(1500), None, collision_noop);
+        body.step(Tick::from_seconds(1.5), None, collision_noop);
         assert_eq!(body.position, Point3::new(6.0, 2.0, 0.0));
     }
 
@@ -515,9 +515,9 @@ mod tests {
             flying: false,
             ..test_body()
         };
-        body.step(Duration::from_millis(1500), None, collision_noop);
+        body.step(Tick::from_seconds(1.5), None, collision_noop);
         assert_eq!(body.position, Point3::new(3.0, -43.0, 0.0));
-        body.step(Duration::from_millis(1500), None, collision_noop);
+        body.step(Tick::from_seconds(1.5), None, collision_noop);
         assert_eq!(body.position, Point3::new(6.0, -133.0, 0.0));
     }
 
@@ -533,7 +533,7 @@ mod tests {
         };
 
         let mut contacts = Vec::new();
-        body.step(Duration::from_secs(1), Some(&space), |c| contacts.push(c));
+        body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
 
         assert_eq!(body.position.x, 2.0);
         assert_eq!(body.position.z, 0.0);
@@ -554,7 +554,7 @@ mod tests {
         };
 
         let mut contacts = Vec::new();
-        let info = body.step(Duration::from_secs(1), Some(&space), |c| contacts.push(c));
+        let info = body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
         dbg!(info);
 
         assert_eq!(body.position, Point3::new(1.5, 0.5, 0.5));
@@ -605,11 +605,7 @@ mod tests {
                 // Reset velocity every frame as an approximation of the effect of player input.
                 body.velocity = velocity;
                 position_history.push_front(body.position);
-                body.step(
-                    Duration::from_micros(1_000_000 / 60),
-                    Some(&space),
-                    |_contact| {},
-                );
+                body.step(Tick::from_seconds(1.0 / 60.0), Some(&space), |_contact| {});
 
                 let distance_from_start = max_norm(body.position - start);
                 assert!(distance_from_start < 0.5, "escaped to {:?}", body.position);

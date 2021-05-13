@@ -9,8 +9,8 @@ use ordered_float::NotNan;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
-use std::time::Duration;
 
+use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet};
 use crate::block::{recursive_raycast, Block, EvaluatedBlock};
 use crate::camera::eye_for_look_at;
@@ -169,12 +169,8 @@ impl Character {
     /// Advances time.
     ///
     /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).
-    pub fn step(
-        &mut self,
-        self_ref: Option<&URef<Character>>,
-        duration: Duration,
-    ) -> UniverseTransaction {
-        let dt = duration.as_secs_f64();
+    pub fn step(&mut self, self_ref: Option<&URef<Character>>, tick: Tick) -> UniverseTransaction {
+        let dt = tick.delta_t.as_secs_f64();
         let control_orientation: Matrix3<FreeCoordinate> =
             Matrix3::from_angle_y(-Deg(self.body.yaw));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
@@ -198,7 +194,7 @@ impl Character {
         if let Ok(space) = self.space.try_borrow() {
             let colliding_cubes = &mut self.colliding_cubes;
             colliding_cubes.clear();
-            self.body.step(duration, Some(&*space), |cube| {
+            self.body.step(tick, Some(&*space), |cube| {
                 colliding_cubes.insert(cube);
             });
         } else {
@@ -218,7 +214,7 @@ impl Character {
             self.behaviors.step(
                 &self,
                 &(|t: CharacterTransaction| t.bind(self_ref.clone())),
-                duration,
+                tick,
             )
         } else {
             UniverseTransaction::default()

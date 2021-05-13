@@ -531,7 +531,6 @@ mod tests {
     use super::*;
     use crate::space::Space;
     use std::iter::once;
-    use std::time::Duration;
 
     fn packed_light_test_values() -> impl Iterator<Item = PackedLight> {
         (PackedLightScalar::MIN..PackedLightScalar::MAX)
@@ -659,7 +658,7 @@ mod tests {
         assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light);
 
         // Duration doesn't currently matter
-        let info = space.step(Duration::from_millis(10));
+        let info = space.step(Tick::arbitrary());
         assert_eq!(
             info,
             SpaceStepInfo {

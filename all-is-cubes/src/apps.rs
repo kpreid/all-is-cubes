@@ -107,17 +107,17 @@ impl AllIsCubesAppState {
         // TODO: Catch-up implementation should probably live in FrameClock.
         for _ in 0..FrameClock::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
-                let step_length = self.frame_clock.step_length();
+                let tick = self.frame_clock.tick();
                 self.frame_clock.did_step();
 
                 self.input_processor
-                    .apply_input(&mut *self.character().borrow_mut(), step_length);
-                self.input_processor.step(step_length);
+                    .apply_input(&mut *self.character().borrow_mut(), tick);
+                self.input_processor.step(tick);
 
-                let mut info = self.game_universe.step(step_length);
+                let mut info = self.game_universe.step(tick);
 
                 self.maybe_sync_ui();
-                info += self.ui.step(step_length);
+                info += self.ui.step(tick);
 
                 result = Some(info)
             }

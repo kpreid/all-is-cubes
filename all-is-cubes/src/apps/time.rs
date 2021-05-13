@@ -99,8 +99,11 @@ impl FrameClock {
 
     /// The timestep value that should be passed to [`Universe::step`] when stepping in
     /// response to [`FrameClock::should_step`] returning true.
-    pub fn step_length(&self) -> Duration {
-        Self::STEP_LENGTH
+    #[must_use] // avoid confusion with side-effecting methods
+    pub fn tick(&self) -> Tick {
+        Tick {
+            delta_t: Self::STEP_LENGTH,
+        }
     }
 
     fn cap_step_time(&mut self) {
@@ -113,5 +116,29 @@ impl FrameClock {
 impl Default for FrameClock {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Information to pass from the [`FrameClock`] or other timing mechanism to
+/// the [`Universe`] and other game objects having `step` methods.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Tick {
+    // TODO: Replace this with a rational-number-based system so that we can
+    // (1) step in exact 60ths or other frame rate fractions
+    // (2) have a standard subdivision for slower-than-every-frame events
+    pub(crate) delta_t: Duration,
+}
+
+impl Tick {
+    pub const fn arbitrary() -> Self {
+        Self {
+            delta_t: Duration::from_secs(1),
+        }
+    }
+
+    pub fn from_seconds(dt: f64) -> Self {
+        Self {
+            delta_t: Duration::from_micros((dt * 1e6) as u64),
+        }
     }
 }

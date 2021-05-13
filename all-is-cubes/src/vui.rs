@@ -15,7 +15,7 @@ use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::time::Duration;
 
-use crate::apps::InputProcessor;
+use crate::apps::{InputProcessor, Tick};
 use crate::block::{Block, AIR};
 use crate::camera::{FogOption, GraphicsOptions};
 use crate::content::palette;
@@ -115,7 +115,7 @@ impl Vui {
         options
     }
 
-    pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
+    pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
         // Update crosshair block
         // TODO: Do this with a dirty check
         self.hud_space
@@ -131,7 +131,7 @@ impl Vui {
             .unwrap(); // TODO: Handle internal errors better than panicking
 
         if let Some(ref mut age) = self.tooltip_age {
-            *age += timestep;
+            *age += tick.delta_t;
             if *age > Duration::from_secs(1) {
                 // TODO: log errors
                 let _ = self.set_tooltip_text("");
@@ -139,7 +139,7 @@ impl Vui {
             }
         }
 
-        self.universe.step(timestep)
+        self.universe.step(tick)
     }
 
     // TODO: return type leaks implementation details, ish
@@ -234,9 +234,9 @@ mod tests {
         assert_eq!(vui.tooltip_age, None);
         vui.set_tooltip_text("Hello world").unwrap();
         assert_eq!(vui.tooltip_age, Some(Duration::from_secs(0)));
-        vui.step(Duration::from_millis(500));
+        vui.step(Tick::from_seconds(0.5));
         assert_eq!(vui.tooltip_age, Some(Duration::from_millis(500)));
-        vui.step(Duration::from_millis(501));
+        vui.step(Tick::from_seconds(0.501));
         assert_eq!(vui.tooltip_age, None);
     }
 }

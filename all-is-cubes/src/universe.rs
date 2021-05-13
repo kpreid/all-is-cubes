@@ -15,6 +15,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 
+use crate::apps::Tick;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
@@ -76,7 +77,7 @@ impl Universe {
     }
 
     /// Advance time for all members.
-    pub fn step(&mut self, timestep: Duration) -> UniverseStepInfo {
+    pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
         let start_time = Instant::now();
 
@@ -84,7 +85,7 @@ impl Universe {
             info.space_step += space
                 .try_borrow_mut()
                 .expect("space borrowed during universe.step()")
-                .step(timestep);
+                .step(tick);
         }
 
         let mut transactions = Vec::new();
@@ -93,7 +94,7 @@ impl Universe {
             let transaction = character
                 .try_borrow_mut()
                 .expect("character borrowed during universe.step()")
-                .step(Some(&character.downgrade()), timestep);
+                .step(Some(&character.downgrade()), tick);
             transactions.push(transaction)
         }
         // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
