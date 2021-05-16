@@ -170,6 +170,10 @@ impl Character {
     ///
     /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).
     pub fn step(&mut self, self_ref: Option<&URef<Character>>, tick: Tick) -> UniverseTransaction {
+        if tick.paused() {
+            return UniverseTransaction::default();
+        }
+
         let dt = tick.delta_t.as_secs_f64();
         let control_orientation: Matrix3<FreeCoordinate> =
             Matrix3::from_angle_y(-Deg(self.body.yaw));

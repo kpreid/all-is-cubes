@@ -138,7 +138,7 @@ impl Body {
 
         // TODO: Reset any non-finite values found to allow recovery from glitches.
 
-        if !self.flying {
+        if !self.flying && !tick.paused() {
             self.velocity += GRAVITY * dt;
         }
 
@@ -148,7 +148,7 @@ impl Body {
             None
         };
 
-        if self.velocity.magnitude2() <= VELOCITY_EPSILON_SQUARED {
+        if self.velocity.magnitude2() <= VELOCITY_EPSILON_SQUARED || tick.paused() {
             return BodyStepInfo {
                 quiescent: true,
                 push_out: push_out_info,
@@ -519,6 +519,17 @@ mod tests {
         assert_eq!(body.position, Point3::new(3.0, -43.0, 0.0));
         body.step(Tick::from_seconds(1.5), None, collision_noop);
         assert_eq!(body.position, Point3::new(6.0, -133.0, 0.0));
+    }
+
+    #[test]
+    fn paused_does_not_move() {
+        let mut body = Body {
+            velocity: Vector3::new(2.0, 0.0, 0.0),
+            flying: false,
+            ..test_body()
+        };
+        body.step(Tick::from_seconds(1.5).pause(), None, collision_noop);
+        assert_eq!(body.position, test_body().position);
     }
 
     #[test]

@@ -497,7 +497,7 @@ impl Space {
     }
 
     /// Advance time in the space.
-    pub fn step(&mut self, _tick: Tick) -> SpaceStepInfo {
+    pub fn step(&mut self, tick: Tick) -> SpaceStepInfo {
         // Process changed block definitions.
         for block_index in self.todo.borrow_mut().blocks.drain() {
             self.notifier.notify(SpaceChange::BlockValue(block_index));
@@ -511,7 +511,9 @@ impl Space {
             // lighting influenced by the block.
         }
 
-        // TODO: other world behaviors...
+        if !tick.paused() {
+            // TODO: other world behaviors...
+        }
 
         self.update_lighting_from_queue()
     }
