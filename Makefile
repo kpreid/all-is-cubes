@@ -5,7 +5,7 @@
 # bundled together with conventional names rather than a collection of shell
 # scripts.
 
-.PHONY: all lint test run-dev run-game-server update try-publish-all actually-publish-all
+.PHONY: all lint test test-no-luminance run-dev run-game-server update try-publish-all actually-publish-all
 
 all: all-is-cubes-wasm/node_modules/.bin/webpack
 	cargo build --package all-is-cubes
@@ -27,6 +27,10 @@ test:
 	(cd all-is-cubes-wasm && cargo build --target=wasm32-unknown-unknown)
 	(cd all-is-cubes-wasm && npm test)
 	cargo build --all-targets # Confirm benchmarks etc. compile, even if we don't run them
+
+# Restricted version of 'test' which can run in environments where luminance-* doesn't build
+test-no-luminance:
+	cargo test --package all-is-cubes --no-default-features
 
 run-dev:
 	# Live-reloading webpack dev server; not a game server
