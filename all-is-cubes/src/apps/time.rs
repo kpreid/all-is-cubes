@@ -103,6 +103,7 @@ impl FrameClock {
     pub fn tick(&self) -> Tick {
         Tick {
             delta_t: Self::STEP_LENGTH,
+            paused: false,
         }
     }
 
@@ -127,18 +128,39 @@ pub struct Tick {
     // (1) step in exact 60ths or other frame rate fractions
     // (2) have a standard subdivision for slower-than-every-frame events
     pub(crate) delta_t: Duration,
+
+    paused: bool,
 }
 
 impl Tick {
     pub const fn arbitrary() -> Self {
         Self {
             delta_t: Duration::from_secs(1),
+            paused: false,
         }
     }
 
     pub fn from_seconds(dt: f64) -> Self {
         Self {
             delta_t: Duration::from_micros((dt * 1e6) as u64),
+            paused: false,
         }
+    }
+
+    /// Set the paused flag. See [`Tick::paused`] for more information.
+    #[must_use]
+    pub fn pause(self) -> Self {
+        Self {
+            paused: true,
+            ..self
+        }
+    }
+
+    /// Returns the "paused" state of this Tick. If true, then step operations should
+    /// not perform any changes that reflect "in-game" time passing. They should still
+    /// take care of the side effects of other mutations/transactions, particularly where
+    /// not doing so might lead to a stale or inconsistent view.
+    pub fn paused(&self) -> bool {
+        self.paused
     }
 }
