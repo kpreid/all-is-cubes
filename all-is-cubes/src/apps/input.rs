@@ -86,6 +86,7 @@ impl InputProcessor {
             Key::Character(' ') => true,
             Key::Character(d) if d.is_ascii_digit() => true,
             Key::Character('l') => true,
+            Key::Character('p') => true,
             _ => false,
         }
     }
@@ -96,6 +97,8 @@ impl InputProcessor {
         match key {
             Key::Character(d) if d.is_ascii_digit() => true,
             Key::Character('l') => true,
+            Key::Character('p') => true,
+            // TODO: move slot selection commands here
             _ => false,
         }
     }
@@ -247,7 +250,14 @@ impl InputProcessor {
     }
 
     /// Applies the current input to the given [`Character`].
-    pub fn apply_input(&mut self, character: &mut Character, tick: Tick) {
+    ///
+    /// TODO: We need a better information flow strategy that still keeps InputProcessor not too tied to AllIsCubesAppState.
+    pub fn apply_input(
+        &mut self,
+        character: &mut Character,
+        paused: &ListenableCell<bool>,
+        tick: Tick,
+    ) {
         let dt = tick.delta_t.as_secs_f64();
         let key_turning_step = 80.0 * dt;
 
@@ -274,6 +284,10 @@ impl InputProcessor {
                         // Clear delta tracking just in case
                         self.mouse_previous_pixel_position = None;
                     }
+                }
+                Key::Character('p') => {
+                    // TODO: bind escape key, focus loss, etc to pause
+                    paused.set(!*paused.get());
                 }
                 Key::Character(numeral) if numeral.is_digit(10) => {
                     let digit = numeral.to_digit(10).unwrap() as usize;
@@ -376,13 +390,21 @@ mod tests {
 
         input.key_down(Key::Character('5'));
         input.key_up(Key::Character('5'));
-        input.apply_input(&mut *character.borrow_mut(), Tick::arbitrary());
+        input.apply_input(
+            &mut *character.borrow_mut(),
+            &ListenableCell::new(false),
+            Tick::arbitrary(),
+        );
         assert_eq!(character.borrow_mut().selected_slots()[1], 4);
 
         // Tenth slot
         input.key_down(Key::Character('0'));
         input.key_up(Key::Character('0'));
-        input.apply_input(&mut *character.borrow_mut(), Tick::arbitrary());
+        input.apply_input(
+            &mut *character.borrow_mut(),
+            &ListenableCell::new(false),
+            Tick::arbitrary(),
+        );
         assert_eq!(character.borrow_mut().selected_slots()[1], 9);
     }
 

@@ -45,6 +45,8 @@ pub struct AllIsCubesAppState {
     /// TODO: This needs to handle clicking on the HUD and thus explicitly point into
     /// one of two different spaces.
     cursor_result: Option<Cursor>,
+
+    paused: ListenableCell<bool>,
 }
 
 impl AllIsCubesAppState {
@@ -68,6 +70,7 @@ impl AllIsCubesAppState {
             game_universe,
             ui_dirty: DirtyFlag::new(true),
             cursor_result: None,
+            paused: ListenableCell::new(false),
         };
 
         // TODO: once it's possible to switch characters we will need to clear and reinstall this
@@ -107,11 +110,17 @@ impl AllIsCubesAppState {
         // TODO: Catch-up implementation should probably live in FrameClock.
         for _ in 0..FrameClock::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
-                let tick = self.frame_clock.tick();
+                let mut tick = self.frame_clock.tick();
+                if *self.paused.get() {
+                    tick = tick.pause();
+                }
                 self.frame_clock.did_step();
 
-                self.input_processor
-                    .apply_input(&mut *self.character().borrow_mut(), tick);
+                self.input_processor.apply_input(
+                    &mut *self.character().borrow_mut(),
+                    &self.paused,
+                    tick,
+                );
                 self.input_processor.step(tick);
 
                 let mut info = self.game_universe.step(tick);
