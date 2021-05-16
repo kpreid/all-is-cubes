@@ -39,8 +39,10 @@ pub use icons::*;
 pub(crate) struct Vui {
     universe: Universe,
     current_space: URef<Space>,
+
     hud_blocks: HudBlocks,
     hud_space: URef<Space>,
+    hud_layout: HudLayout,
     aspect_ratio: FreeCoordinate,
 
     /// None if the tooltip is blanked
@@ -59,7 +61,8 @@ impl Vui {
     pub fn new(input_processor: &InputProcessor) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = HudBlocks::new(&mut universe, 16);
-        let hud_space = HudLayout::default().new_space(&mut universe, &hud_blocks);
+        let hud_layout = HudLayout::default();
+        let hud_space = hud_layout.new_space(&mut universe, &hud_blocks);
 
         let todo = Rc::new(RefCell::new(VuiTodo::default()));
         input_processor.mouselook_mode().listen(TodoListener {
@@ -72,6 +75,7 @@ impl Vui {
             current_space: hud_space.clone(),
             hud_blocks,
             hud_space,
+            hud_layout,
             aspect_ratio: 4. / 3., // arbitrary placeholder assumption
 
             tooltip_age: None,
@@ -141,7 +145,7 @@ impl Vui {
             self.hud_space
                 .borrow_mut()
                 .set(
-                    HudLayout::default().crosshair_position(),
+                    self.hud_layout.crosshair_position(),
                     if *self.mouselook_mode.get() {
                         &self.hud_blocks.icons[Icons::Crosshair]
                     } else {
@@ -170,7 +174,7 @@ impl Vui {
         tools: &[Tool],
         selections: &[usize],
     ) -> Result<(), SetCubeError> {
-        HudLayout::default().set_toolbar(
+        self.hud_layout.set_toolbar(
             &mut *self.hud_space.borrow_mut(),
             &self.hud_blocks,
             tools,
@@ -196,11 +200,8 @@ impl Vui {
     // TODO: handle errors in a local/transient way instead of propagating
     pub fn set_tooltip_text(&mut self, text: &str) -> Result<(), SetCubeError> {
         self.tooltip_age = Some(Duration::from_secs(0));
-        HudLayout::default().set_tooltip_text(
-            &mut *self.hud_space.borrow_mut(),
-            &self.hud_blocks,
-            text,
-        )
+        self.hud_layout
+            .set_tooltip_text(&mut *self.hud_space.borrow_mut(), &self.hud_blocks, text)
     }
 }
 
