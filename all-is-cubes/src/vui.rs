@@ -52,13 +52,14 @@ pub(crate) struct Vui {
 
     // Things we're listening to...
     mouselook_mode: ListenableSource<bool>,
+    paused: ListenableSource<bool>,
 }
 
 impl Vui {
     /// `input_processor` is the `InputProcessor` whose state may be reflected on the HUD.
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
-    pub fn new(input_processor: &InputProcessor) -> Self {
+    pub fn new(input_processor: &InputProcessor, paused: ListenableSource<bool>) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = HudBlocks::new(&mut universe, 16);
         let hud_layout = HudLayout::default();
@@ -83,6 +84,7 @@ impl Vui {
             todo,
 
             mouselook_mode: input_processor.mouselook_mode(),
+            paused,
         }
     }
 
@@ -261,7 +263,7 @@ mod tests {
     use super::*;
 
     fn new_vui_for_test() -> Vui {
-        Vui::new(&InputProcessor::new())
+        Vui::new(&InputProcessor::new(), ListenableSource::constant(false))
     }
 
     #[test]

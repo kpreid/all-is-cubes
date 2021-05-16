@@ -59,9 +59,10 @@ impl AllIsCubesAppState {
             .expect("Failure while constructing template");
 
         let input_processor = InputProcessor::new();
+        let paused = ListenableCell::new(false);
 
         let mut new_self = Self {
-            ui: Vui::new(&input_processor),
+            ui: Vui::new(&input_processor, paused.as_source()),
 
             frame_clock: FrameClock::new(),
             input_processor,
@@ -70,7 +71,7 @@ impl AllIsCubesAppState {
             game_universe,
             ui_dirty: DirtyFlag::new(true),
             cursor_result: None,
-            paused: ListenableCell::new(false),
+            paused,
         };
 
         // TODO: once it's possible to switch characters we will need to clear and reinstall this
