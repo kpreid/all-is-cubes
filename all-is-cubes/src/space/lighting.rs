@@ -295,7 +295,7 @@ impl Space {
     fn update_lighting_now_on(
         &mut self,
         cube: GridPoint,
-    ) -> (PackedLightScalar, usize, LightingUpdateInfo) {
+    ) -> (PackedLightScalar, usize, LightUpdateCubeInfo) {
         let (new_light_value, dependencies, mut cost, info) = self.compute_lighting(cube);
         let old_light_value: PackedLight = self.get_lighting(cube);
         let difference_magnitude = new_light_value.difference_magnitude(old_light_value);
@@ -319,7 +319,7 @@ impl Space {
     pub(crate) fn compute_lighting(
         &self,
         cube: GridPoint,
-    ) -> (PackedLight, Vec<GridPoint>, usize, LightingUpdateInfo) {
+    ) -> (PackedLight, Vec<GridPoint>, usize, LightUpdateCubeInfo) {
         // Accumulator of incoming light encountered.
         let mut incoming_light: Rgb = Rgb::ZERO;
         // Number of rays contributing to incoming_light.
@@ -330,7 +330,7 @@ impl Space {
         // one raycast step.
         let mut cost = 0;
         // Diagnostics.
-        let mut info_rays: [Option<LightingUpdateRayInfo>; ALL_RAYS_COUNT] = [None; ALL_RAYS_COUNT];
+        let mut info_rays: [Option<LightUpdateRayInfo>; ALL_RAYS_COUNT] = [None; ALL_RAYS_COUNT];
 
         let ev_origin = self.get_evaluated(cube);
         if ev_origin.opaque {
@@ -399,7 +399,7 @@ impl Space {
                             ray_alpha = 0.0;
 
                             // Diagnostics. TODO: Track transparency to some extent.
-                            *info = Some(LightingUpdateRayInfo {
+                            *info = Some(LightUpdateRayInfo {
                                 ray: Ray {
                                     origin: translated_ray.origin,
                                     direction: translated_ray.direction * 10.0, // TODO: translate hit position into ray
@@ -459,7 +459,7 @@ impl Space {
             new_light_value,
             dependencies,
             cost,
-            LightingUpdateInfo {
+            LightUpdateCubeInfo {
                 cube,
                 result: new_light_value,
                 rays: info_rays,
@@ -469,15 +469,17 @@ impl Space {
 }
 
 /// Diagnostic data returned by lighting updates.
+///
+/// This is detailed information which is not computed except when requested.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
-pub struct LightingUpdateInfo {
+pub struct LightUpdateCubeInfo {
     cube: GridPoint,
     result: PackedLight,
-    rays: [Option<LightingUpdateRayInfo>; ALL_RAYS_COUNT],
+    rays: [Option<LightUpdateRayInfo>; ALL_RAYS_COUNT],
 }
 
-impl Geometry for LightingUpdateInfo {
+impl Geometry for LightUpdateCubeInfo {
     type Coord = FreeCoordinate;
 
     fn translate(self, _offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
@@ -500,14 +502,14 @@ impl Geometry for LightingUpdateInfo {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct LightingUpdateRayInfo {
+pub struct LightUpdateRayInfo {
     ray: Ray,
     trigger_cube: GridPoint,
     value_cube: GridPoint,
     value: PackedLight,
 }
 
-impl Geometry for LightingUpdateRayInfo {
+impl Geometry for LightUpdateRayInfo {
     type Coord = FreeCoordinate;
 
     fn translate(self, _offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
