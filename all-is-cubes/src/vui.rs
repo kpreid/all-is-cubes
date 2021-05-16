@@ -13,6 +13,8 @@ use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::style::PrimitiveStyleBuilder;
 use ordered_float::NotNan;
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
 use std::time::Duration;
 
 use crate::apps::{InputProcessor, Tick};
@@ -20,7 +22,7 @@ use crate::block::{Block, AIR};
 use crate::camera::{FogOption, GraphicsOptions};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
-use crate::listen::ListenableSource;
+use crate::listen::{ListenableSource, Listener};
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::{SetCubeError, Space};
 use crate::tools::Tool;
@@ -44,6 +46,9 @@ pub(crate) struct Vui {
     /// None if the tooltip is blanked
     tooltip_age: Option<Duration>,
 
+    todo: Rc<RefCell<VuiTodo>>,
+
+    // Things we're listening to...
     mouselook_mode: ListenableSource<bool>,
 }
 
@@ -56,6 +61,12 @@ impl Vui {
         let hud_blocks = HudBlocks::new(&mut universe, 16);
         let hud_space = HudLayout::default().new_space(&mut universe, &hud_blocks);
 
+        let todo = Rc::new(RefCell::new(VuiTodo::default()));
+        input_processor.mouselook_mode().listen(TodoListener {
+            target: Rc::downgrade(&todo),
+            handler: |todo| todo.crosshair = true,
+        });
+
         Self {
             universe,
             current_space: hud_space.clone(),
@@ -64,6 +75,8 @@ impl Vui {
             aspect_ratio: 4. / 3., // arbitrary placeholder assumption
 
             tooltip_age: None,
+
+            todo,
 
             mouselook_mode: input_processor.mouselook_mode(),
         }
@@ -116,19 +129,27 @@ impl Vui {
     }
 
     pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
-        // Update crosshair block
-        // TODO: Do this with a dirty check
-        self.hud_space
-            .borrow_mut()
-            .set(
-                HudLayout::default().crosshair_position(),
-                if *self.mouselook_mode.get() {
-                    &self.hud_blocks.icons[Icons::Crosshair]
-                } else {
-                    &AIR
-                },
-            )
-            .unwrap(); // TODO: Handle internal errors better than panicking
+        // Note: clone is necessary to be compatible with borrowing self later
+        // TODO: figure out a better strategy; maybe eventually we will have no self borrows
+        let todo_rc = self.todo.clone();
+        let mut todo = RefCell::borrow_mut(&todo_rc);
+
+        if todo.crosshair {
+            todo.crosshair = false;
+
+            // Update crosshair block
+            self.hud_space
+                .borrow_mut()
+                .set(
+                    HudLayout::default().crosshair_position(),
+                    if *self.mouselook_mode.get() {
+                        &self.hud_blocks.icons[Icons::Crosshair]
+                    } else {
+                        &AIR
+                    },
+                )
+                .unwrap(); // TODO: Handle internal errors better than panicking
+        }
 
         if let Some(ref mut age) = self.tooltip_age {
             *age += tick.delta_t;
@@ -180,6 +201,31 @@ impl Vui {
             &self.hud_blocks,
             text,
         )
+    }
+}
+
+/// [`Vui`]'s set of things that need updating.
+#[derive(Debug, Default)]
+struct VuiTodo {
+    crosshair: bool,
+}
+
+/// [`Listener`] adapter for [`VuiTodo`].
+struct TodoListener {
+    target: Weak<RefCell<VuiTodo>>,
+    handler: fn(&mut VuiTodo),
+}
+
+impl Listener<()> for TodoListener {
+    fn receive(&self, _message: ()) {
+        if let Some(cell) = self.target.upgrade() {
+            let mut todo = RefCell::borrow_mut(&cell);
+            (self.handler)(&mut todo);
+        }
+    }
+
+    fn alive(&self) -> bool {
+        self.target.strong_count() > 0
     }
 }
 
