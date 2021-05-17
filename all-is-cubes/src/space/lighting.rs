@@ -285,8 +285,13 @@ impl Space {
         }
         LightUpdatesInfo {
             update_count: light_update_count,
-            queue_count: self.lighting_update_queue.len(),
             max_update_difference: max_difference,
+            queue_count: self.lighting_update_queue.len(),
+            max_queue_priority: self
+                .lighting_update_queue
+                .peek()
+                .map(|r| r.priority)
+                .unwrap_or(0),
         }
     }
 
@@ -473,24 +478,31 @@ impl Space {
 pub struct LightUpdatesInfo {
     /// Number of blocks whose light data updates are aggregated in this data.
     pub update_count: usize,
-    /// Number of entries in the light update queue.
-    pub queue_count: usize,
     /// The largest change in light value that occurred.
     pub max_update_difference: u8,
+    /// Number of entries in the light update queue.
+    pub queue_count: usize,
+    /// The largest update priority in the queue (corresponds to the size of
+    /// difference that caused the cube to be added).
+    pub max_queue_priority: u8,
 }
 impl std::ops::AddAssign<LightUpdatesInfo> for LightUpdatesInfo {
     fn add_assign(&mut self, other: Self) {
         self.update_count += other.update_count;
-        self.queue_count += other.queue_count;
         self.max_update_difference = self.max_update_difference.max(other.max_update_difference);
+        self.queue_count += other.queue_count;
+        self.max_queue_priority = self.max_queue_priority.max(other.max_queue_priority);
     }
 }
 impl CustomFormat<StatusText> for LightUpdatesInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         write!(
             fmt,
-            "{:4} of {:4} (max diff {:3})",
-            self.update_count, self.queue_count, self.max_update_difference
+            "{:4} (max diff {:3}) of {:4} (max pri {:3})",
+            self.update_count,
+            self.max_update_difference,
+            self.queue_count,
+            self.max_queue_priority
         )?;
         Ok(())
     }
@@ -693,9 +705,9 @@ mod tests {
             info.light,
             LightUpdatesInfo {
                 update_count: 1,
-                queue_count: 0,
                 max_update_difference: new_sky_light.difference_magnitude(former_sky_light),
-                ..LightUpdatesInfo::default()
+                queue_count: 0,
+                max_queue_priority: 0
             }
         );
 
