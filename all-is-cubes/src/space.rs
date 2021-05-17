@@ -24,8 +24,8 @@ mod grid;
 pub use grid::*;
 
 mod lighting;
-pub use lighting::PackedLight;
-use lighting::{initialize_lighting, LightUpdatesInfo, PackedLightScalar};
+use lighting::{initialize_lighting, PackedLightScalar};
+pub use lighting::{LightUpdatesInfo, PackedLight};
 
 mod space_txn;
 pub use space_txn::*;
