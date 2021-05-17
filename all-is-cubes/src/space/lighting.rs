@@ -719,13 +719,15 @@ mod tests {
     #[test]
     fn evaluate_light() {
         let mut space = Space::empty_positive(3, 1, 1);
-        assert_eq!(0, space.evaluate_light());
+        assert_eq!(0, space.evaluate_light(0));
         space.set([1, 0, 0], Rgb::ONE).unwrap();
-        assert_eq!(2, space.evaluate_light());
-        assert_eq!(0, space.evaluate_light());
+        assert_eq!(2, space.evaluate_light(0));
+        assert_eq!(0, space.evaluate_light(0));
         // This is just a smoke test, "is it plausible that it's working".
         // Ideally we'd confirm identical results from repeated step() and single evaluate_light().
     }
+
+    // TODO: test evaluate_light's epsilon parameter
 
     #[test]
     fn lighting_queue_ordering() {
