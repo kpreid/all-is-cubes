@@ -82,8 +82,8 @@ impl FrameClock {
         self.render_dirty = false;
     }
 
-    /// Indicates whether [`Universe::step`] should be performed, given the amount of time
-    /// that this [`FrameClock`] has been informed has passed.
+    /// Indicates whether [`Universe::step`](crate::universe::Universe::step) should be performed,
+    /// given the amount of time that this [`FrameClock`] has been informed has passed.
     ///
     /// When a step *is* performd, [`FrameClock::did_step`] must be called; otherwise, this
     /// will always return true.
@@ -97,8 +97,9 @@ impl FrameClock {
         self.render_dirty = true;
     }
 
-    /// The timestep value that should be passed to [`Universe::step`] when stepping in
-    /// response to [`FrameClock::should_step`] returning true.
+    /// The timestep value that should be passed to
+    /// [`Universe::step`](crate::universe::Universe::step)
+    /// when stepping in response to [`FrameClock::should_step`] returning true.
     #[must_use] // avoid confusion with side-effecting methods
     pub fn tick(&self) -> Tick {
         Tick {
@@ -121,7 +122,7 @@ impl Default for FrameClock {
 }
 
 /// Information to pass from the [`FrameClock`] or other timing mechanism to
-/// the [`Universe`] and other game objects having `step` methods.
+/// the [`Universe`](crate::universe::Universe) and other game objects having `step` methods.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Tick {
     // TODO: Replace this with a rational-number-based system so that we can
