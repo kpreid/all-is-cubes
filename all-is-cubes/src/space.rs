@@ -529,12 +529,12 @@ impl Space {
         let mut total = 0;
         loop {
             let LightUpdatesInfo {
-                light_queue_count,
-                light_update_count,
+                queue_count,
+                update_count,
                 ..
             } = self.update_lighting_from_queue();
-            total += light_update_count;
-            if light_queue_count == 0 {
+            total += update_count;
+            if queue_count == 0 {
                 break;
             }
         }
