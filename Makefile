@@ -31,6 +31,7 @@ test:
 # Restricted version of 'test' which can run in environments where luminance-* doesn't build
 test-no-luminance:
 	cargo test --package all-is-cubes --no-default-features
+	cargo build --package all-is-cubes --no-default-features --all-targets
 
 run-dev:
 	# Live-reloading webpack dev server; not a game server
