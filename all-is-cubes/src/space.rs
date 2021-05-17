@@ -25,7 +25,7 @@ pub use grid::*;
 
 mod lighting;
 pub use lighting::PackedLight;
-use lighting::{initialize_lighting, PackedLightScalar};
+use lighting::{initialize_lighting, LightUpdatesInfo, PackedLightScalar};
 
 mod space_txn;
 pub use space_txn::*;
@@ -515,7 +515,9 @@ impl Space {
             // TODO: other world behaviors...
         }
 
-        self.update_lighting_from_queue()
+        let light = self.update_lighting_from_queue();
+
+        SpaceStepInfo { spaces: 1, light }
     }
 
     /// Perform lighting updates until there are none left to do. Returns the number of
@@ -526,7 +528,7 @@ impl Space {
     pub fn evaluate_light(&mut self) -> usize {
         let mut total = 0;
         loop {
-            let SpaceStepInfo {
+            let LightUpdatesInfo {
                 light_queue_count,
                 light_update_count,
                 ..
@@ -805,12 +807,7 @@ pub enum SpaceChange {
 pub struct SpaceStepInfo {
     /// Number of spaces whose updates were aggregated into this value.
     pub spaces: usize,
-    /// Number of blocks whose light data was updated this step.
-    pub light_update_count: usize,
-    /// Number of entries in the light update queue.
-    pub light_queue_count: usize,
-    /// The largest change in light value that occurred this step.
-    pub max_light_update_difference: u8,
+    pub light: LightUpdatesInfo,
 }
 impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     fn add_assign(&mut self, other: Self) {
@@ -819,22 +816,14 @@ impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
             return;
         }
         self.spaces += other.spaces;
-        self.light_update_count += other.light_update_count;
-        self.light_queue_count += other.light_queue_count;
-        self.max_light_update_difference = self
-            .max_light_update_difference
-            .max(other.max_light_update_difference);
+        self.light += other.light;
     }
 }
 impl CustomFormat<StatusText> for SpaceStepInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         write!(fmt, "{} spaces: ", self.spaces)?;
         if self.spaces > 0 {
-            write!(
-                fmt,
-                "Relighting: {:4} of {:4} (max diff {:3})",
-                self.light_update_count, self.light_queue_count, self.max_light_update_difference
-            )?;
+            write!(fmt, "Relighting: {}", self.light.custom_format(StatusText))?;
         }
         Ok(())
     }
