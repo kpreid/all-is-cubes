@@ -9,17 +9,17 @@
 #![warn(clippy::exhaustive_structs)]
 
 use cgmath::Vector2;
-use clap::{value_t, Arg};
+use clap::{value_t, Arg, ErrorKind};
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use strum::IntoEnumIterator;
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::content::UniverseTemplate;
 
-use crate::record::RecordOptions;
+use crate::record::{RecordAnimationOptions, RecordOptions};
 
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
@@ -89,7 +89,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .short("o")
                 .required_if("graphics", "record")
                 .value_name("FILE")
-                .help("Output file name for 'record' mode."),
+                .help("Output PNG file name for 'record' mode. If animating, a frame number will be inserted."),
+        )
+        .arg(
+            Arg::with_name("duration")
+                .long("duration")
+                .value_name("SECONDS")
+                // TODO: Generalize this to "exit after this much time has passed".
+                .help("Time to record video, in 'record' mode only (omit for still image)."),
         )
         .arg(
             Arg::with_name("verbose")
@@ -131,14 +138,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     match graphics_type {
         GraphicsType::Window => glfw_main_loop(app, title, display_size),
         GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
-        GraphicsType::Record => record_main(
-            app,
-            RecordOptions {
-                output_path: PathBuf::from(options.value_of_os("output").unwrap()),
-                image_size: display_size.unwrap_or_else(|| Vector2::new(640, 480)),
-                animation: None,
-            },
-        ),
+        GraphicsType::Record => record_main(app, parse_record_options(options, display_size)?),
         GraphicsType::Headless => {
             // TODO: Right now this is useless. Eventually, we may have other paths for side
             // effects from the universe, or interesting logging.
@@ -168,6 +168,28 @@ fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
             .map_err(|_| String::from("must be two integers or \"auto\""))?;
         Ok(Some(Vector2::from(dims)))
     }
+}
+
+// TODO: write tests for this (requires factoring out the App definition from main)
+fn parse_record_options(
+    options: clap::ArgMatches<'_>,
+    display_size: Option<Vector2<u32>>,
+) -> Result<RecordOptions, clap::Error> {
+    Ok(RecordOptions {
+        output_path: PathBuf::from(options.value_of_os("output").unwrap()),
+        image_size: display_size.unwrap_or_else(|| Vector2::new(640, 480)),
+        animation: match value_t!(options, "duration", f64) {
+            Ok(duration) => Some(RecordAnimationOptions {
+                frame_count: ((duration * 60.0).round() as usize).max(1),
+                frame_period: Duration::from_nanos((1e9 / 60.0) as u64),
+            }),
+            Err(clap::Error {
+                kind: ErrorKind::ArgumentNotFound,
+                ..
+            }) => None,
+            Err(e) => return Err(e),
+        },
+    })
 }
 
 #[cfg(test)]

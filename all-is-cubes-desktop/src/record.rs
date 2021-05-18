@@ -33,8 +33,8 @@ pub struct RecordOptions {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RecordAnimationOptions {
-    frame_count: usize,
-    frame_period: Duration,
+    pub frame_count: usize,
+    pub frame_period: Duration,
 }
 
 impl RecordOptions {
