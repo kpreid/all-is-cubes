@@ -478,6 +478,7 @@ impl Spawn {
 mod tests {
     use super::*;
     use crate::block::AIR;
+    use crate::transactions::TransactionTester;
     use crate::universe::Universe;
 
     #[test]
@@ -510,6 +511,74 @@ mod tests {
             .execute(&mut character_ref.borrow_mut())
             .unwrap();
         // TODO: Actually assert inventory contents -- no public interface for that
+    }
+
+    #[test]
+    fn transaction_systematic() {
+        let mut universe = Universe::new();
+        let space = Space::empty_positive(1, 1, 1);
+        let space_ref = universe.insert_anonymous(space);
+
+        let old_item = Tool::PlaceBlock(Block::from(rgb_const!(1.0, 0.0, 0.0)));
+        let new_item_1 = Tool::PlaceBlock(Block::from(rgb_const!(0.0, 1.0, 0.0)));
+        let new_item_2 = Tool::PlaceBlock(Block::from(rgb_const!(0.0, 0.0, 1.0)));
+
+        TransactionTester::new()
+            // Body transactions
+            .transaction(
+                CharacterTransaction::body(BodyTransaction::default()),
+                |_, _| Ok(()),
+            )
+            .transaction(
+                CharacterTransaction::body(BodyTransaction { delta_yaw: 1.0 }),
+                |_, _| Ok(()),
+            )
+            // Inventory transactions
+            .transaction(
+                CharacterTransaction::inventory(InventoryTransaction::insert(new_item_1.clone())),
+                |_, after| {
+                    if !after.inventory().slots.contains(&new_item_1) {
+                        return Err("missing added new_item_1".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(
+                CharacterTransaction::inventory(InventoryTransaction::replace(
+                    0,
+                    old_item.clone(),
+                    new_item_1.clone(),
+                )),
+                |_, after| {
+                    if after.inventory().slots[0] != new_item_1 {
+                        return Err("did not replace new_item_1".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(
+                // This one conflicts with the above one
+                CharacterTransaction::inventory(InventoryTransaction::replace(
+                    0,
+                    old_item.clone(),
+                    new_item_2.clone(),
+                )),
+                |_, after| {
+                    if after.inventory().slots[0] != new_item_2 {
+                        return Err("did not replace new_item_2".into());
+                    }
+                    Ok(())
+                },
+            )
+            .target(|| Character::spawn_default(space_ref.clone()))
+            .target(|| {
+                let mut character = Character::spawn_default(space_ref.clone());
+                CharacterTransaction::inventory(InventoryTransaction::insert(old_item.clone()))
+                    .execute(&mut character)
+                    .unwrap();
+                character
+            })
+            .test();
     }
 
     // TODO: more tests

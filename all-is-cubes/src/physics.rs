@@ -30,7 +30,7 @@ pub type Contact = CubeFace;
 
 /// An object with a position, velocity, and collision volume.
 /// What it collides with is determined externally.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Body {
     // TODO: pub space: Option<URef<Space>>   --- or maybe backwards?
@@ -484,6 +484,7 @@ mod tests {
     use crate::block::AIR;
     use crate::content::make_some_blocks;
     use crate::space::{Grid, Space};
+    use crate::transactions::TransactionTester;
 
     fn collision_noop(_: Contact) {}
 
@@ -697,5 +698,27 @@ mod tests {
         do_test((0., -1., 0.), exactly_vertical_yaw, 90.);
     }
 
-    // TODO: more tests
+    #[test]
+    fn body_transaction_systematic() {
+        // TODO: this test is pretty flimsy ... because BodyTransaction hasn't actually got a
+        // full set of operations yet and because the TransactionTester can't quite handle
+        // additive rather than conflicting transactions well
+        TransactionTester::new()
+            .transaction(BodyTransaction::default(), |_, _| Ok(()))
+            .transaction(BodyTransaction { delta_yaw: 10.0 }, |before, after| {
+                if false {
+                    // TODO: figure out how to make this assert work in the presence of more transactions
+                    let expected = &Body {
+                        yaw: before.yaw + 10.0,
+                        ..before.clone()
+                    };
+                    if after != expected {
+                        return Err(format!("unequal to {:#?}", expected).into());
+                    }
+                }
+                Ok(())
+            })
+            .target(test_body)
+            .test();
+    }
 }
