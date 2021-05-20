@@ -73,6 +73,7 @@ impl std::fmt::Debug for Character {
                 &self.velocity_input.custom_format(ConciseDebug),
             )
             .field("colliding_cubes", &self.colliding_cubes)
+            .field("inventory", &self.inventory)
             .field("behaviors", &self.behaviors)
             .finish()
     }
