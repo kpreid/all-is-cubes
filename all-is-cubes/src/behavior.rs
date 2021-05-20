@@ -54,7 +54,6 @@ impl<'a, H: Transactional> BehaviorContext<'a, H> {
 /// `BehaviorSet` has interior mutability so that its behaviors can straightforwardly
 /// mutate themselves, while holding a reference to the host object `H` that contains
 /// the set.
-#[derive(Debug)]
 pub(crate) struct BehaviorSet<H> {
     items: RefCell<Vec<Box<dyn Behavior<H>>>>,
 }
@@ -100,6 +99,20 @@ impl<H: Transactional> BehaviorSet<H> {
     }
 }
 
+impl<H> std::fmt::Debug for BehaviorSet<H> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.items.try_borrow() {
+            Ok(items) => {
+                write!(f, "BehaviorSet(")?;
+                f.debug_list().entries(&*items).finish()?;
+                write!(f, ")")?;
+                Ok(())
+            }
+            Err(_) => write!(f, "BehaviorSet(<currently borrowed>)"),
+        }
+    }
+}
+
 /// A simple behavior for exercising the system, which causes a `Character`'s viewpoint to
 /// rotate without user input.
 /// TODO: Delete this, replace with a more general camera movement scripting mechanism.
@@ -126,7 +139,32 @@ impl Behavior<Character> for AutoRotate {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use super::*;
+
+    #[test]
+    fn behavior_set_debug() {
+        let set = BehaviorSet::<Character>::new();
+        assert_eq!(format!("{:?}", set), "BehaviorSet([])");
+        assert_eq!(format!("{:#?}", set), "BehaviorSet([])");
+        set.insert(AutoRotate {
+            rate: NotNan::new(1.0).unwrap(),
+        });
+        // TODO: Once we have a better behavior to use as a simple test, do so
+        assert_eq!(
+            format!("{:?}", set),
+            "BehaviorSet([AutoRotate { rate: NotNan(1.0) }])",
+        );
+        assert_eq!(
+            format!("{:#?}", set),
+            "BehaviorSet([\n\
+            \x20   AutoRotate {\n\
+            \x20       rate: NotNan(\n\
+            \x20           1.0,\n\
+            \x20       ),\n\
+            \x20   },\n\
+            ])",
+        );
+    }
 
     // TODO: more tests
 }
