@@ -30,13 +30,14 @@ impl SpaceTransaction {
     /// If `old` is not [`None`], requires that the existing block is that block or the
     /// transaction will fail.
     /// If `new` is not [`None`], replaces the existing block with `new`.
-    pub fn set_cube(cube: GridPoint, old: Option<Block>, new: Option<Block>) -> Self {
+    pub fn set_cube(cube: impl Into<GridPoint>, old: Option<Block>, new: Option<Block>) -> Self {
         Self::single(cube, CubeTransaction { old, new })
     }
 
-    fn single(cube: GridPoint, transaction: CubeTransaction) -> Self {
+    fn single(cube: impl Into<GridPoint>, transaction: CubeTransaction) -> Self {
+        let cube: GridPoint = cube.into();
         let mut cubes = BTreeMap::new();
-        cubes.insert(cube.into(), transaction);
+        cubes.insert(cube.into(/* array */), transaction);
         SpaceTransaction { cubes }
     }
 }
@@ -136,10 +137,8 @@ mod tests {
     #[test]
     fn merge_allows_independent() {
         let [b1, b2, b3] = make_some_blocks();
-        let t1 =
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b1.clone()), Some(b2.clone()));
-        let t2 =
-            SpaceTransaction::set_cube(GridPoint::new(1, 0, 0), Some(b1.clone()), Some(b3.clone()));
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b2.clone()));
+        let t2 = SpaceTransaction::set_cube([1, 0, 0], Some(b1.clone()), Some(b3.clone()));
         let t3 = t1.clone().merge(t2.clone()).unwrap();
         assert_eq!(
             t3.cubes.into_iter().collect::<Vec<_>>(),
@@ -165,33 +164,32 @@ mod tests {
     #[test]
     fn merge_rejects_same_new() {
         let [block] = make_some_blocks();
-        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block.clone()));
-        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block.clone()));
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block.clone()));
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block.clone()));
         merge_is_rejected(t1, t2).unwrap();
     }
 
     #[test]
     fn merge_rejects_different_new() {
         let [b1, b2] = make_some_blocks();
-        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(b1.clone()));
-        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(b2.clone()));
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(b1.clone()));
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(b2.clone()));
         merge_is_rejected(t1, t2).unwrap();
     }
 
     #[test]
     fn merge_rejects_different_old() {
         let [b1, b2] = make_some_blocks();
-        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b1.clone()), None);
-        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b2.clone()), None);
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), None);
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], Some(b2.clone()), None);
         merge_is_rejected(t1, t2).unwrap();
     }
 
     #[test]
     fn merge_allows_same_old() {
         let [b1, b2] = make_some_blocks();
-        let t1 =
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b1.clone()), Some(b2.clone()));
-        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b1.clone()), None);
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b2.clone()));
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), None);
         assert_eq!(t1.clone(), t1.clone().merge(t2).unwrap());
     }
 
@@ -201,11 +199,7 @@ mod tests {
         TransactionTester::new()
             .transaction(SpaceTransaction::default(), |_, _| Ok(()))
             .transaction(
-                SpaceTransaction::set_cube(
-                    GridPoint::new(0, 0, 0),
-                    Some(b1.clone()),
-                    Some(b2.clone()),
-                ),
+                SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b2.clone())),
                 |_, after| {
                     if after[[0, 0, 0]] != b2 {
                         return Err("did not set b2".into());
@@ -214,11 +208,7 @@ mod tests {
                 },
             )
             .transaction(
-                SpaceTransaction::set_cube(
-                    GridPoint::new(0, 0, 0),
-                    Some(b1.clone()),
-                    Some(b3.clone()),
-                ),
+                SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b3.clone())),
                 |_, after| {
                     if after[[0, 0, 0]] != b3 {
                         return Err("did not set b3".into());
@@ -227,7 +217,7 @@ mod tests {
                 },
             )
             .transaction(
-                SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(b2.clone())),
+                SpaceTransaction::set_cube([0, 0, 0], None, Some(b2.clone())),
                 |_, after| {
                     if after[[0, 0, 0]] != b2 {
                         return Err("did not set b2".into());
@@ -236,11 +226,11 @@ mod tests {
                 },
             )
             .transaction(
-                SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b2.clone()), None),
+                SpaceTransaction::set_cube([0, 0, 0], Some(b2.clone()), None),
                 |_, _| Ok(()),
             )
             .transaction(
-                SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b1.clone()), None),
+                SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), None),
                 |_, _| Ok(()),
             )
             .target(|| Space::empty_positive(1, 1, 1))
