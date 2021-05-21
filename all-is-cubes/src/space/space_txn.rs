@@ -18,7 +18,7 @@ impl Transactional for Space {
     type Transaction = SpaceTransaction;
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub struct SpaceTransaction {
     cubes: BTreeMap<[GridCoordinate; 3], CubeTransaction>,
 }
@@ -129,7 +129,7 @@ struct CubeTransaction {
 #[cfg(test)]
 mod tests {
     use crate::content::make_some_blocks;
-    use crate::transactions::merge_is_rejected;
+    use crate::transactions::{merge_is_rejected, TransactionTester};
 
     use super::*;
 
@@ -193,5 +193,68 @@ mod tests {
             SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b1.clone()), Some(b2.clone()));
         let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b1.clone()), None);
         assert_eq!(t1.clone(), t1.clone().merge(t2).unwrap());
+    }
+
+    #[test]
+    fn systematic() {
+        let [b1, b2, b3] = make_some_blocks();
+        TransactionTester::new()
+            .transaction(SpaceTransaction::default(), |_, _| Ok(()))
+            .transaction(
+                SpaceTransaction::set_cube(
+                    GridPoint::new(0, 0, 0),
+                    Some(b1.clone()),
+                    Some(b2.clone()),
+                ),
+                |_, after| {
+                    if after[[0, 0, 0]] != b2 {
+                        return Err("did not set b2".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(
+                SpaceTransaction::set_cube(
+                    GridPoint::new(0, 0, 0),
+                    Some(b1.clone()),
+                    Some(b3.clone()),
+                ),
+                |_, after| {
+                    if after[[0, 0, 0]] != b3 {
+                        return Err("did not set b3".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(
+                SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(b2.clone())),
+                |_, after| {
+                    if after[[0, 0, 0]] != b2 {
+                        return Err("did not set b2".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(
+                SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b2.clone()), None),
+                |_, _| Ok(()),
+            )
+            .transaction(
+                SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(b1.clone()), None),
+                |_, _| Ok(()),
+            )
+            .target(|| Space::empty_positive(1, 1, 1))
+            .target(|| {
+                let mut space = Space::empty_positive(1, 1, 1);
+                space.set([0, 0, 0], &b1).unwrap();
+                space
+            })
+            .target(|| {
+                let mut space = Space::empty_positive(1, 1, 1);
+                space.set([0, 0, 0], &b2).unwrap();
+                space
+            })
+            // TODO: more spaces
+            .test();
     }
 }
