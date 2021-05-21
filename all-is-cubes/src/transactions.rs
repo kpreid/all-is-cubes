@@ -579,7 +579,6 @@ mod transaction_tester {
 mod tests {
     use super::*;
     use crate::content::make_some_blocks;
-    use crate::math::GridPoint;
     use crate::space::SpaceTransaction;
 
     #[test]
@@ -598,8 +597,7 @@ mod tests {
         let [block] = make_some_blocks();
         let mut u = Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let transaction =
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block)).bind(space);
+        let transaction = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
 
         println!("{:#?}", transaction);
         assert_eq!(
@@ -628,8 +626,8 @@ mod tests {
         let mut u = Universe::new();
         let s1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let s2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1)).bind(s1);
-        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)).bind(s2);
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_1)).bind(s1);
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_2)).bind(s2);
         let _ = t1.merge(t2).unwrap();
         // TODO: check the contents
     }
@@ -639,9 +637,8 @@ mod tests {
         let [block_1, block_2] = make_some_blocks();
         let mut u = Universe::new();
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_1))
-            .bind(s.clone());
-        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(block_2)).bind(s);
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_1)).bind(s.clone());
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_2)).bind(s);
         merge_is_rejected(t1, t2).unwrap();
     }
 
@@ -650,15 +647,14 @@ mod tests {
         let [old_block, new_block] = make_some_blocks();
         let mut u = Universe::new();
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let t1 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), None, Some(new_block.clone()))
-            .bind(s.clone());
-        let t2 = SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(old_block.clone()), None)
-            .bind(s.clone());
+        let t1 =
+            SpaceTransaction::set_cube([0, 0, 0], None, Some(new_block.clone())).bind(s.clone());
+        let t2 =
+            SpaceTransaction::set_cube([0, 0, 0], Some(old_block.clone()), None).bind(s.clone());
         let t3 = t1.merge(t2).unwrap();
         assert_eq!(
             t3,
-            SpaceTransaction::set_cube(GridPoint::new(0, 0, 0), Some(old_block), Some(new_block))
-                .bind(s)
+            SpaceTransaction::set_cube([0, 0, 0], Some(old_block), Some(new_block)).bind(s)
         );
     }
 }

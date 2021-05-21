@@ -482,7 +482,7 @@ mod tests {
         let transaction = tester.equip_and_use_tool(Tool::DeleteBlock).unwrap();
         assert_eq!(
             transaction,
-            SpaceTransaction::set_cube(GridPoint::new(1, 0, 0), Some(existing.clone()), Some(AIR))
+            SpaceTransaction::set_cube([1, 0, 0], Some(existing.clone()), Some(AIR))
                 .bind(tester.space_ref.clone())
         );
         transaction.execute(&mut tester.universe).unwrap();
@@ -508,12 +508,8 @@ mod tests {
             .unwrap();
         assert_eq!(
             transaction,
-            SpaceTransaction::set_cube(
-                GridPoint::new(0, 0, 0),
-                Some(AIR),
-                Some(tool_block.clone())
-            )
-            .bind(tester.space_ref.clone())
+            SpaceTransaction::set_cube([0, 0, 0], Some(AIR), Some(tool_block.clone()))
+                .bind(tester.space_ref.clone())
         );
         transaction.execute(&mut tester.universe).unwrap();
         print_space(&tester.space(), (-1., 1., 1.));
