@@ -25,6 +25,9 @@ use crate::universe::{Name, UBorrowMut, URef, Universe};
 ///
 /// A [`Transaction`] is not consumed by committing it; it may be used repeatedly. Future
 /// work may include building on this to provide undo/redo functionality.
+///
+/// If a transaction implements [`Default`], then the default value should be a
+/// transaction which has no effects and always succeeds.
 #[must_use]
 pub trait Transaction<T: ?Sized> {
     /// Type of a value passed from [`Transaction::check`] to [`Transaction::commit`].
