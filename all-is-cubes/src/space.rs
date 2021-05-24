@@ -17,7 +17,6 @@ use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
 use crate::math::*;
-use crate::universe::RefError;
 use crate::util::{CustomFormat, StatusText};
 
 mod grid;
@@ -743,11 +742,11 @@ impl SpaceBlockData {
         listener: impl Listener<BlockChange> + 'static,
     ) -> Result<Self, SetCubeError> {
         // TODO: double ref error check suggests that maybe evaluate() and listen() should be one combined operation.
-        let evaluated = block.evaluate().map_err(SetCubeError::BlockDataAccess)?;
+        let evaluated = block.evaluate().map_err(SetCubeError::EvalBlock)?;
         let (gate, block_listener) = listener.gate();
         let _ = block
             .listen(block_listener)
-            .map_err(SetCubeError::BlockDataAccess)?;
+            .map_err(SetCubeError::EvalBlock)?;
         Ok(Self {
             block,
             count: 0,
@@ -784,9 +783,9 @@ pub enum SetCubeError {
     /// The given cube or region is out of the bounds of this Space.
     #[error("{:?} is out of bounds", .0)]
     OutOfBounds(Grid),
-    /// The block data could not be read.
-    #[error("block data could not be read: {0}")]
-    BlockDataAccess(#[from] RefError),
+    /// [`Block::evaluate`] failed on a new block type.
+    #[error("block evaluation failed: {0}")]
+    EvalBlock(#[from] EvalBlockError),
     /// More distinct blocks were added than currently supported.
     #[error("more than {} block types is not yet supported", BlockIndex::MAX as usize + 1)]
     TooManyBlocks(),
@@ -877,7 +876,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::listen::Sink;
     use crate::math::GridPoint;
-    use crate::universe::{Universe, UniverseIndex as _};
+    use crate::universe::{RefError, Universe, UniverseIndex as _};
     use cgmath::EuclideanSpace as _;
     use std::rc::Rc;
 
@@ -926,9 +925,9 @@ mod tests {
 
         let borrow = inner_space_ref.borrow_mut();
         assert_eq!(
-            Err(SetCubeError::BlockDataAccess(RefError::InUse(Rc::new(
-                "bs".into()
-            )))),
+            Err(SetCubeError::EvalBlock(
+                RefError::InUse(Rc::new("bs".into())).into()
+            )),
             outer_space.set((0, 0, 0), &block)
         );
         drop(borrow);
@@ -959,8 +958,12 @@ mod tests {
             "Grid(1..2, 2..3, 3..4) is out of bounds"
         );
         assert_eq!(
-            SetCubeError::BlockDataAccess(RefError::Gone(Rc::new("foo".into()))).to_string(),
-            "block data could not be read: object was deleted: 'foo'"
+            SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone(Rc::new(
+                "foo".into()
+            ))))
+            .to_string(),
+            // TODO: This message is a bit "revealing our exact data structure"...
+            "block evaluation failed: block data inaccessible: object was deleted: 'foo'"
         );
         assert_eq!(
             SetCubeError::TooManyBlocks().to_string(),

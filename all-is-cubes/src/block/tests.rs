@@ -5,10 +5,11 @@ use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
 
 use crate::block::{
-    builder, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef, Evoxel, Resolution,
+    builder, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef, EvalBlockError,
+    Evoxel, Resolution, AIR,
 };
 use crate::content::make_some_blocks;
-use crate::listen::Sink;
+use crate::listen::{NullListener, Sink};
 use crate::math::{GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, GridArray, Space};
 use crate::universe::Universe;
@@ -393,4 +394,30 @@ fn attributes_debug() {
         }),
         "BlockAttributes { display_name: \"y\", selectable: false }",
     );
+}
+
+#[test]
+fn overflow_evaluate() {
+    let mut universe = Universe::new();
+    let block = self_referential_block(&mut universe);
+    assert_eq!(block.evaluate(), Err(EvalBlockError::StackOverflow));
+}
+
+#[test]
+fn overflow_listen() {
+    let mut universe = Universe::new();
+    let block = self_referential_block(&mut universe);
+    // This does *not* produce an error, because Block::Indirect manages its own listening.
+    // TODO: Probably Block::Indirect needs a recursion limit inside that so it doesn't
+    // fire an infinite cycle of listening...? Or perhaps we need to make it difficult to
+    // create recursion at all.
+    assert_eq!(block.listen(NullListener), Ok(()));
+}
+
+/// Helper for overflow_ tests
+fn self_referential_block(universe: &mut Universe) -> Block {
+    let block_def = universe.insert_anonymous(BlockDef::new(AIR));
+    let indirect = Block::Indirect(block_def.clone());
+    *(block_def.borrow_mut().modify()) = indirect.clone();
+    indirect
 }

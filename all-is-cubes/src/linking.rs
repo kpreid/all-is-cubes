@@ -206,7 +206,7 @@ pub enum InGenError {
     Provider(#[from] ProviderError),
 
     /// Failed during [`Space`](crate::space::Space) manipulation.
-    // TODO: Break apart `SetCubeError::BlockDataAccess` to its contents?
+    // TODO: Break apart `SetCubeError::EvalBlock` to its contents?
     #[error(transparent)]
     SetCube(#[from] SetCubeError),
 }

@@ -140,9 +140,17 @@ impl Block {
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require [`URef`] access
     /// to other objects.
-    pub fn evaluate(&self) -> Result<EvaluatedBlock, RefError> {
+    #[inline]
+    pub fn evaluate(&self) -> Result<EvaluatedBlock, EvalBlockError> {
+        self.evaluate_impl(0)
+    }
+
+    fn evaluate_impl(&self, depth: u8) -> Result<EvaluatedBlock, EvalBlockError> {
         match self {
-            Block::Indirect(def_ref) => def_ref.try_borrow()?.block.evaluate(),
+            Block::Indirect(def_ref) => def_ref
+                .try_borrow()?
+                .block
+                .evaluate_impl(next_depth(depth)?),
 
             &Block::Atom(ref attributes, color) => Ok(EvaluatedBlock {
                 attributes: attributes.clone(),
@@ -222,10 +230,25 @@ impl Block {
     /// which would be impossible since it is an enum and all its fields
     /// are public. In contrast, [`BlockDef`] does perform such tracking.
     ///
-    /// This may fail under the same conditions as `evaluate`.
-    pub fn listen(&self, listener: impl Listener<BlockChange> + 'static) -> Result<(), RefError> {
+    /// This may fail under the same conditions as [`Block::evaluate`]; it returns the
+    /// same error type so that callers which both evaluate and listen don't need to
+    /// handle this separately.
+    pub fn listen(
+        &self,
+        listener: impl Listener<BlockChange> + 'static,
+    ) -> Result<(), EvalBlockError> {
+        self.listen_impl(listener, 0)
+    }
+
+    fn listen_impl(
+        &self,
+        listener: impl Listener<BlockChange> + 'static,
+        _depth: u8,
+    ) -> Result<(), EvalBlockError> {
         match self {
             Block::Indirect(def_ref) => {
+                // Note: This does not pass the recursion depth because BlockDef provides
+                // its own internal listening and thus this does not recurse.
                 def_ref.try_borrow_mut()?.listen(listener)?;
             }
             Block::Atom(_, _) => {
@@ -273,6 +296,15 @@ impl Block {
             Block::Atom(_, c) => *c,
             _ => panic!("Block::color not defined for non-atom blocks"),
         }
+    }
+}
+
+/// Recursion limiter helper for evaluate.
+fn next_depth(depth: u8) -> Result<u8, EvalBlockError> {
+    if depth > 32 {
+        Err(EvalBlockError::StackOverflow)
+    } else {
+        Ok(depth + 1)
     }
 }
 
@@ -483,6 +515,17 @@ impl CustomFormat<ConciseDebug> for EvaluatedBlock {
     }
 }
 
+/// Errors resulting from [`Block::evaluate`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub enum EvalBlockError {
+    #[error("block definition contains too much recursion")]
+    StackOverflow,
+    /// This may be temporary or permanent.
+    #[error("block data inaccessible: {0}")]
+    DataRefIs(#[from] RefError),
+}
+
 /// Properties of an individual voxel within [`EvaluatedBlock`].
 ///
 /// This is essentially a subset of the information in a full [`EvaluatedBlock`] and
@@ -655,7 +698,7 @@ impl Drop for BlockDefMut<'_> {
 /// The returned [`Space`] contains each of the blocks; its coordinates will correspond to
 /// those of the input, scaled down by `resolution`.
 ///
-/// Returns [`SetCubeError::BlockDataAccess`] if the `Space` cannot be accessed, and
+/// Returns [`SetCubeError::EvalBlock`] if the `Space` cannot be accessed, and
 /// [`SetCubeError::TooManyBlocks`] if the dimensions would result in too many blocks.
 ///
 /// TODO: add doc test for this
@@ -665,7 +708,12 @@ pub fn space_to_blocks(
     space_ref: URef<Space>,
 ) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
-    let source_grid = space_ref.try_borrow()?.grid();
+    let source_grid = space_ref
+        .try_borrow()
+        // TODO: Not really the right error since this isn't actually an eval error.
+        // Or is it close enough?
+        .map_err(EvalBlockError::DataRefIs)?
+        .grid();
     let destination_grid = source_grid.divide(resolution_g);
 
     let mut destination_space = Space::empty(destination_grid);
