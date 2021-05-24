@@ -167,31 +167,33 @@ void main(void) {
   }
 
   #ifdef ALLOW_TRANSPARENCY
-    if (diffuse_color.a < 1.0) {
-      // Apply volumetric opacity.
-      //
-      // This is a very crude approximation of future support for more general
-      // volumetric/raytraced blocks.
-      
-      // Run a minimal version of the same raycasting algorithm we use on the CPU side.
-      mediump vec3 t_delta = vec3(
-        partial_scale_to_integer_step(v_position_in_cube.x, camera_ray_direction.x),
-        partial_scale_to_integer_step(v_position_in_cube.y, camera_ray_direction.y),
-        partial_scale_to_integer_step(v_position_in_cube.z, camera_ray_direction.z)
-      );
-      // t_delta now represents the distance, in units of
-      // length(camera_ray_direction), to the next cube face. Normalize this
-      // to obtain a length through the volume.
-      mediump float exit_t = min(t_delta.x, min(t_delta.y, t_delta.z));
-      mediump float thickness = exit_t * length(camera_ray_direction);
+    #ifdef VOLUMETRIC
+      if (diffuse_color.a < 1.0) {
+        // Apply volumetric opacity.
+        //
+        // This is a very crude approximation of future support for more general
+        // volumetric/raytraced blocks.
+        
+        // Run a minimal version of the same raycasting algorithm we use on the CPU side.
+        mediump vec3 t_delta = vec3(
+          partial_scale_to_integer_step(v_position_in_cube.x, camera_ray_direction.x),
+          partial_scale_to_integer_step(v_position_in_cube.y, camera_ray_direction.y),
+          partial_scale_to_integer_step(v_position_in_cube.z, camera_ray_direction.z)
+        );
+        // t_delta now represents the distance, in units of
+        // length(camera_ray_direction), to the next cube face. Normalize this
+        // to obtain a length through the volume.
+        mediump float exit_t = min(t_delta.x, min(t_delta.y, t_delta.z));
+        mediump float thickness = exit_t * length(camera_ray_direction);
 
-      // Convert alpha to transmittance (light transmitted / light received).
-      mediump float transmittance = 1.0 - diffuse_color.a;
-      // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
-      transmittance = pow(transmittance, thickness);
-      // Convert back to alpha.
-      diffuse_color.a = 1.0 - transmittance;
-    }
+        // Convert alpha to transmittance (light transmitted / light received).
+        mediump float transmittance = 1.0 - diffuse_color.a;
+        // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
+        transmittance = pow(transmittance, thickness);
+        // Convert back to alpha.
+        diffuse_color.a = 1.0 - transmittance;
+      }
+    #endif
   #else
     // Ban alpha in our opaque mode, to make mistakes show up faster
     // and to prevent transparent holes in the mesh if the opaque mesh's texture

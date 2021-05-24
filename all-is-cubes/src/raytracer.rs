@@ -76,12 +76,12 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         if color.fully_transparent() {
                             continue;
                         }
+                        // TODO: To implement TransparencyOption::Volumetric we need to peek forward to the next change of color and find the distance between them, but only if the alpha is not 0 or 1. (Same here and in the recursive block case.)
                         s.trace_through_surface(
                             pixel_block_data,
                             *color,
                             match impl_fields.options.lighting_display {
                                 LightingOption::None => Rgb::ONE,
-                                // TODO: Implement actual smooth lighting in raytracer
                                 LightingOption::Flat => self.get_lighting(hit.cube_behind()),
                                 LightingOption::Smooth => self.get_interpolated_light(
                                     hit.intersection_point(ray),

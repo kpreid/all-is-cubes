@@ -13,7 +13,7 @@ use luminance_front::shader::{BuiltProgram, Program, ProgramError, ProgramInterf
 use luminance_front::texture::Dim3;
 use luminance_front::Backend;
 
-use crate::camera::{GraphicsOptions, LightingOption};
+use crate::camera::{GraphicsOptions, LightingOption, TransparencyOption};
 use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::VertexSemantics;
@@ -43,6 +43,12 @@ impl BlockPrograms {
         }
         if options.lighting_display == LightingOption::Smooth {
             base_defines.push(("SMOOTH_LIGHTING", "1"));
+        }
+        match options.transparency {
+            TransparencyOption::Surface => {}
+            TransparencyOption::Volumetric => {
+                base_defines.push(("VOLUMETRIC", "1"));
+            }
         }
 
         Ok(BlockPrograms {

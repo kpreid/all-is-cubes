@@ -332,6 +332,9 @@ pub struct GraphicsOptions {
     /// This does not affect the *computation* of lighting.
     pub lighting_display: LightingOption,
 
+    /// Method/fidelity to use for transparency.
+    pub transparency: TransparencyOption,
+
     /// Number of space chunks (16³ groups of blocks) to redraw if needed, per frame.
     ///
     /// Does not apply to raytracing.
@@ -375,6 +378,7 @@ impl Default for GraphicsOptions {
             fov_y: NotNan::new(90.).unwrap(),
             view_distance: NotNan::new(200.).unwrap(),
             lighting_display: LightingOption::Flat,
+            transparency: TransparencyOption::Volumetric,
             chunks_per_frame: 4,
             use_frustum_culling: true,
             debug_chunk_boxes: false,
@@ -407,6 +411,29 @@ pub enum LightingOption {
     Flat,
     /// Light varies across surfaces.
     Smooth,
+}
+
+/// How to render transparent objects; part of a [`GraphicsOptions`].
+///
+/// Note: There is not yet a consistent interpretation of alpha between the `Surface`
+/// and `Volumetric` options; this will probably be changed in the future in favor
+/// of the volumetric interpretation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum TransparencyOption {
+    /// Conventional transparent surfaces.
+    Surface,
+    /// Accounts for the thickness of material passed through; colors' alpha values are
+    /// interpreted as the opacity of a unit thickness of the material.
+    ///
+    /// TODO: Not implemented in the raytracer.
+    /// TODO: Not implemented correctly for recursive blocks.
+    Volumetric,
+    /* TODO: implement this option
+    /// Alpha above or below the given threshold value will be rounded to fully opaque
+    /// or fully transparent, respectively.
+    Threshold(NotNan<f32>),
+    */
 }
 
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.
