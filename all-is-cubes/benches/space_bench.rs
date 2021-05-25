@@ -1,7 +1,9 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{
+    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
+};
 
 use all_is_cubes::content::{axes, make_some_blocks};
 use all_is_cubes::content::{install_landscape_blocks, wavy_landscape};
@@ -97,6 +99,22 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn grid_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Grid");
+
+    let grid = Grid::new([0, 0, 0], [256, 256, 256]);
+    group.throughput(Throughput::Elements(grid.volume() as u64));
+    group.bench_function("Grid::interior_iter", |b| {
+        b.iter(|| {
+            for cube in grid.interior_iter() {
+                black_box(cube);
+            }
+        })
+    });
+
+    group.finish();
+}
+
 pub fn lighting_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("lighting");
     group.sample_size(20);
@@ -134,5 +152,5 @@ fn universe_for_lighting_test() -> Universe {
     universe
 }
 
-criterion_group!(benches, space_bulk_mutation, lighting_bench);
+criterion_group!(benches, space_bulk_mutation, grid_bench, lighting_bench);
 criterion_main!(benches);
