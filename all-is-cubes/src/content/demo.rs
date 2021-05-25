@@ -34,6 +34,7 @@ use crate::universe::{Name, Universe, UniverseIndex};
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum UniverseTemplate {
+    Blank,
     DemoCity,
     CornellBox,
     PhysicsLab,
@@ -44,6 +45,7 @@ impl UniverseTemplate {
     pub fn build(self) -> Result<Universe, GenError> {
         use UniverseTemplate::*;
         match self {
+            Blank => Ok(Universe::new()),
             DemoCity => new_universe_with_space_setup(demo_city),
             CornellBox => new_universe_with_space_setup(cornell_box),
             PhysicsLab => new_universe_with_space_setup(|_| physics_lab(50, 16)),
@@ -212,8 +214,10 @@ mod tests {
     #[test]
     pub fn template_smoke_test() {
         for template in UniverseTemplate::iter() {
-            let mut u = template.build().unwrap();
-            let _ = u.get_default_character().unwrap().borrow();
+            let mut u = template.clone().build().unwrap();
+            if template != UniverseTemplate::Blank {
+                let _ = u.get_default_character().unwrap().borrow();
+            }
             u.step(Tick::arbitrary());
         }
     }
