@@ -4,6 +4,7 @@
 //! Shaders, uniforms, etc.
 
 use cgmath::Matrix4;
+use instant::Instant;
 use luminance::UniformInterface;
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::TextureBinding;
@@ -84,6 +85,7 @@ where
     let concatenated_fragment_shader: String =
         defines + "\n#line 1 0\n" + SHADER_COMMON + "#line 1 1\n" + SHADER_FRAGMENT;
 
+    let start_compile_time = Instant::now();
     let program_attempt: Result<BuiltProgram<_, _, _>, ProgramError> = context
         .new_shader_program::<VertexSemantics, (), BlockUniformInterface>()
         .from_strings(
@@ -92,6 +94,12 @@ where
             None,
             &concatenated_fragment_shader,
         );
+    log::trace!(
+        "Shader compilation took {:.3} s",
+        Instant::now()
+            .duration_since(start_compile_time)
+            .as_secs_f32()
+    );
     match program_attempt {
         Err(error) => Err((format!("{}", error), vec![])),
         Ok(BuiltProgram {
