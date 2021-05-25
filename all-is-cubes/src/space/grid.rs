@@ -5,7 +5,6 @@
 //! ([`GridArray`]), and related.
 
 use cgmath::{Point3, Transform, Vector3};
-use itertools::Itertools as _;
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::ops::Range;
@@ -231,11 +230,8 @@ impl Grid {
     ///         GridPoint::new(10, 21, 32),
     ///     ])
     /// ```
-    pub fn interior_iter(&self) -> impl Iterator<Item = GridPoint> {
-        self.x_range()
-            .cartesian_product(self.y_range())
-            .cartesian_product(self.z_range())
-            .map(|((x, y), z)| GridPoint::new(x, y, z))
+    pub fn interior_iter(self) -> GridIter {
+        GridIter::new(self)
     }
 
     // TODO: decide if this should be public
@@ -486,6 +482,51 @@ impl From<Grid> for Aab {
         )
     }
 }
+
+/// Iterator produced by [`Grid::interior_iter`].
+pub struct GridIter {
+    x_range: Range<GridCoordinate>,
+    y_range: Range<GridCoordinate>,
+    z_range: Range<GridCoordinate>,
+    cube: GridPoint,
+}
+
+impl GridIter {
+    #[inline]
+    fn new(grid: Grid) -> Self {
+        Self {
+            x_range: grid.x_range(),
+            y_range: grid.y_range(),
+            z_range: grid.z_range(),
+            cube: grid.lower_bounds(),
+        }
+    }
+}
+
+impl Iterator for GridIter {
+    type Item = GridPoint;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cube.x >= self.x_range.end {
+            return None;
+        }
+        let result = self.cube;
+        self.cube.z += 1;
+        if self.cube.z >= self.z_range.end {
+            self.cube.z = self.z_range.start;
+            self.cube.y += 1;
+            if self.cube.y >= self.y_range.end {
+                self.cube.y = self.y_range.start;
+                self.cube.x += 1;
+                // When x becomes out of bounds, that signals the end.
+            }
+        }
+        Some(result)
+    }
+}
+
+// TODO: impl ExactSizeIterator for GridIter {}
 
 /// A 3-dimensional array with arbitrary element type instead of [`Space`](super::Space)'s
 /// fixed types.
