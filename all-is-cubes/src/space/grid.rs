@@ -581,12 +581,14 @@ impl<V> GridArray<V> {
     }
 
     /// Returns the [`Grid`] specifying the bounds of this array.
+    #[inline]
     pub fn grid(&self) -> Grid {
         self.grid
     }
 
     /// Returns the element at `position` of this array, or [`None`] if `position` is out
     /// of bounds.
+    #[inline]
     pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
         self.grid.index(position).map(|index| &self.contents[index])
     }
