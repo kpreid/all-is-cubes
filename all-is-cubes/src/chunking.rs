@@ -80,21 +80,27 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         // We can do the squared distance calculation in GridCoordinate integers but only after
         // the squaring.
         let distance_squared = view_distance_in_chunks.powf(2.).ceil() as GridCoordinate;
+
         let candidates = Grid::new((0, 0, 0), Vector3::new(1, 1, 1) * (distance_squared + 1));
-        let mut octant_chunks: Vec<GridVector> = candidates
-            .interior_iter()
-            .map(|gp| gp.to_vec())
-            .filter(|&chunk| {
-                // By subtracting 1 from all coordinates, we include the chunks intersecting
-                // the view sphere centered on the _farthest corner point_ of the
-                // viewpoint-containing chunk. By taking the max, we include those chunks
-                // visible from anywhere else in the chunk.
-                //
-                // The shape formed (after mirroring) is the Minkowski sum of the view sphere
-                // and the chunk cube.
-                int_magnitude_squared(chunk.map(|s| (s - 1).max(0))) <= distance_squared
-            })
-            .collect();
+        let mut octant_chunks: Vec<GridVector> = Vec::with_capacity(candidates.volume());
+        // (This for loop has been measured as slightly faster than a .filter().collect().)
+        for chunk in candidates.interior_iter() {
+            let chunk = chunk.to_vec();
+            // By subtracting 1 from all coordinates, we include the chunks intersecting
+            // the view sphere centered on the _farthest corner point_ of the
+            // viewpoint-containing chunk. By taking the max, we include those chunks
+            // visible from anywhere else in the chunk.
+            //
+            // The shape formed (after mirroring) is the Minkowski sum of the view sphere
+            // and the chunk cube.
+            if int_magnitude_squared(chunk.map(
+                #[inline(always)]
+                |s| (s - 1).max(0),
+            )) <= distance_squared
+            {
+                octant_chunks.push(chunk);
+            }
+        }
         // Sort by distance, with coordinates for tiebreakers.
         octant_chunks.sort_unstable_by_key(ChunkChart::<CHUNK_SIZE>::sort_key);
         Self {
