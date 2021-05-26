@@ -340,7 +340,7 @@ impl SpaceRenderer {
                     squares_drawn: 0, // filled later
                     texture_info,
                 },
-                sky_color: space.sky_color(),
+                sky_color: space.physics().sky_color,
             },
             block_texture: &mut block_texture_allocator.texture,
             light_texture,

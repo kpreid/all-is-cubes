@@ -23,7 +23,7 @@ use crate::math::{
     NoiseFnExt as _, Rgb,
 };
 use crate::raycast::Raycaster;
-use crate::space::{Grid, SetCubeError, Space};
+use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
 use crate::tools::Tool;
 use crate::universe::Universe;
 
@@ -60,7 +60,10 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
 
     // Construct space.
     let mut space = Space::empty(grid);
-    space.set_sky_color(Rgb::new(0.9, 0.9, 1.4));
+    space.set_physics(SpacePhysics {
+        sky_color: Rgb::new(0.9, 0.9, 1.4),
+        ..SpacePhysics::default()
+    });
 
     // Spawn
     let spawn = space.spawn_mut();

@@ -56,15 +56,10 @@ pub struct Space {
     /// Set of members of lighting_update_queue, for deduplication.
     pub(crate) lighting_update_set: HashSet<GridPoint>,
 
-    /// Color of light arriving from outside the space.
-    ///
-    /// This is used for the lighting algorithm and for rendering.
-    // Architecture note: If we get any more fields like this, that are more 'game
-    // mechanics' than the core of what Space's job is, then we should probably
-    // either bundle them all into one struct field, or move them *outside* the
-    // Space into some higher-level concept. (For example, block spaces arguably
-    // should be "abstract" and not have either lighting or a sky color.)
-    sky_color: Rgb,
+    /// Global characteristics such as the behavior of light and gravity.
+    physics: SpacePhysics,
+
+    /// A converted copy of `physics.sky_color`.
     packed_sky_color: PackedLight,
 
     spawn: Spawn,
@@ -96,7 +91,7 @@ impl std::fmt::Debug for Space {
         fmt.debug_struct("Space")
             .field("grid", &self.grid)
             .field("block_data", &self.block_data)
-            .field("sky_color", &self.sky_color)
+            .field("physics", &self.physics)
             .finish() // TODO: use .finish_non_exhaustive() if that stabilizes
     }
 }
@@ -120,7 +115,8 @@ impl Space {
     pub fn empty(grid: Grid) -> Space {
         // TODO: Might actually be worth checking for memory allocation failure here...?
         let volume = grid.volume();
-        let sky_color = palette::DAY_SKY_COLOR;
+        let physics = SpacePhysics::default();
+        let packed_sky_color = physics.sky_color.into();
 
         Space {
             grid,
@@ -134,11 +130,11 @@ impl Space {
                 ..SpaceBlockData::NOTHING
             }],
             contents: vec![0; volume].into_boxed_slice(),
-            lighting: initialize_lighting(grid, sky_color.into()),
+            lighting: initialize_lighting(grid, packed_sky_color),
             lighting_update_queue: BinaryHeap::new(),
             lighting_update_set: HashSet::new(),
-            sky_color,
-            packed_sky_color: sky_color.into(),
+            physics,
+            packed_sky_color,
             spawn: Spawn::default_for_new_space(grid),
             notifier: Notifier::new(),
             todo: Default::default(),
@@ -553,20 +549,20 @@ impl Space {
         total
     }
 
-    /// Returns the sky color; for lighting purposes, this is the illumination assumed
-    /// to arrive from all directions outside the bounds of this space.
-    pub fn sky_color(&self) -> Rgb {
-        self.sky_color
+    /// Returns the current [`SpacePhysics`] data, which determines global characteristics
+    /// such as the behavior of light and gravity.
+    pub fn physics(&self) -> &SpacePhysics {
+        &self.physics
     }
 
-    /// Sets the sky color, as per [`sky_color`](Self::sky_color).
+    /// Sets the physics parameters, as per [`physics`](Self::physics).
     ///
     /// This function does not currently cause any recomputation of cube lighting,
     /// but \[TODO:\] it may later be improved to do so.
-    pub fn set_sky_color(&mut self, color: Rgb) {
-        self.sky_color = color;
-        self.packed_sky_color = self.sky_color.into();
-        // TODO: Also send out a SpaceChange.
+    pub fn set_physics(&mut self, physics: SpacePhysics) {
+        self.packed_sky_color = physics.sky_color.into();
+        self.physics = physics;
+        // TODO: Also send out a SpaceChange notification, if anything is different.
     }
 
     pub fn spawn(&self) -> &Spawn {
@@ -772,6 +768,51 @@ impl SpaceBlockData {
 
     // TODO: Expose the count field? It is the most like an internal bookkeeping field,
     // but might be interesting 'statistics'.
+}
+
+/// The global characteristics of a [`Space`].
+///
+/// This is a separate type so that [`Space`] does not need a large set of accessors
+/// and the state consists of just this and the blocks.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct SpacePhysics {
+    /// Color of light arriving from outside the space, used for light calculation
+    /// and rendering.
+    pub sky_color: Rgb,
+
+    /// Method used to compute the illumination of individual blocks.
+    pub light: LightPhysics,
+}
+
+impl Default for SpacePhysics {
+    fn default() -> Self {
+        Self {
+            sky_color: palette::DAY_SKY_COLOR,
+            light: LightPhysics::default(),
+        }
+    }
+}
+
+/// Method used to compute the illumination of individual blocks in a [`Space`].
+#[non_exhaustive]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum LightPhysics {
+    // TODO: Implement this option.
+    // /// No light. All surface colors are taken exactly as displayed colors. The
+    // /// [`SpacePhysics::sky_color`] is used solely as a background color.
+    // None,
+    /// Raycast-based light propagation and diffuse reflections.
+    #[non_exhaustive]
+    Rays {
+        // TODO: add controls for maximum ray distance, density, etc.
+    },
+}
+
+impl Default for LightPhysics {
+    fn default() -> Self {
+        Self::Rays {}
+    }
 }
 
 /// Ways that [`Space::set`] can fail to make a change.
@@ -1187,7 +1228,10 @@ mod tests {
             \x20           ),\n\
             \x20       },\n\
             \x20   ],\n\
-            \x20   sky_color: Rgb(0.9, 0.9, 1.4),\n\
+            \x20   physics: SpacePhysics {\n\
+            \x20       sky_color: Rgb(0.9, 0.9, 1.4),\n\
+            \x20       light: Rays,\n\
+            \x20   },\n\
             }"
         );
     }

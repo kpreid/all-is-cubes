@@ -53,7 +53,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                     prepare_cubes::<P>(blocks, space)
                 },
                 options,
-                sky_color: space.sky_color(),
+                sky_color: space.physics().sky_color,
             }
             .build(),
         )

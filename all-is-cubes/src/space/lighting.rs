@@ -439,7 +439,7 @@ impl Space {
                     // TODO: set *info even if we hit the sky
 
                     // Note that if ray_alpha has reached zero, this has no effect.
-                    incoming_light += self.sky_color() * ray_alpha;
+                    incoming_light += self.physics.sky_color * ray_alpha;
                     total_rays += 1;
                 }
             }
@@ -672,7 +672,7 @@ mod tests {
     fn initial_lighting_value() {
         let space = Space::empty_positive(1, 1, 1);
         assert_eq!(
-            PackedLight::from(space.sky_color()),
+            PackedLight::from(space.physics().sky_color),
             space.get_lighting((0, 0, 0))
         );
     }
@@ -681,7 +681,7 @@ mod tests {
     fn out_of_bounds_lighting_value() {
         let space = Space::empty_positive(1, 1, 1);
         assert_eq!(
-            PackedLight::from(space.sky_color()),
+            PackedLight::from(space.physics().sky_color),
             space.get_lighting((-1, 0, 0))
         );
     }
@@ -689,9 +689,12 @@ mod tests {
     #[test]
     fn step() {
         let mut space = Space::empty_positive(3, 1, 1);
-        let former_sky_light = PackedLight::from(space.sky_color());
-        space.set_sky_color(Rgb::new(1.0, 0.0, 0.0));
-        let new_sky_light = PackedLight::from(space.sky_color());
+        let former_sky_light = PackedLight::from(space.physics().sky_color);
+        space.set_physics(SpacePhysics {
+            sky_color: Rgb::new(1.0, 0.0, 0.0),
+            ..SpacePhysics::default()
+        });
+        let new_sky_light = PackedLight::from(space.physics().sky_color);
 
         space.set((0, 0, 0), Rgb::ONE).unwrap();
         // Not changed yet... except for the now-opaque block

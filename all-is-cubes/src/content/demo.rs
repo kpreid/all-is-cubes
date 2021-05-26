@@ -11,6 +11,7 @@ use crate::character::Character;
 use crate::content::{demo_city, install_demo_blocks};
 use crate::linking::{GenError, InGenError};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
+use crate::space::SpacePhysics;
 use crate::space::{Grid, Space};
 use crate::universe::{Name, Universe, UniverseIndex};
 
@@ -61,7 +62,10 @@ fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
     );
     let mut space = Space::empty(grid);
     // There shall be no light but that which we make for ourselves!
-    space.set_sky_color(Rgb::new(0., 0., 0.));
+    space.set_physics(SpacePhysics {
+        sky_color: Rgb::ZERO,
+        ..SpacePhysics::default()
+    });
     space.spawn_mut().position = (Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into()).map(|s| NotNan::new(s).unwrap());
 
     let white: Block = Rgba::new(1.0, 1.0, 1.0, 1.0).into();

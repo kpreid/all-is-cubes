@@ -13,7 +13,7 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgba};
-use crate::space::{Grid, SetCubeError, Space};
+use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe};
 use crate::vui::Icons;
@@ -58,7 +58,10 @@ impl HudLayout {
         let grid = self.grid();
         let mut space = Space::empty(grid);
 
-        space.set_sky_color(palette::HUD_SKY);
+        space.set_physics(SpacePhysics {
+            sky_color: palette::HUD_SKY,
+            ..SpacePhysics::default()
+        });
 
         if false {
             // Visualization of the bounds of the space we're drawing.
