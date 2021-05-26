@@ -7,6 +7,7 @@
 use cgmath::{Point3, Transform, Vector3};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
+use std::iter::FusedIterator;
 use std::ops::Range;
 
 use crate::block::Resolution;
@@ -524,9 +525,27 @@ impl Iterator for GridIter {
         }
         Some(result)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match usize::try_from((self.x_range.end - self.cube.x) - 1) {
+            Err(_) => {
+                // x has hit the end, no items left
+                (0, Some(0))
+            }
+            Ok(planes_remaining) => {
+                let rows_remaining = planes_remaining * self.y_range.len()
+                    + usize::try_from((self.y_range.end - self.cube.y) - 1).unwrap_or(0);
+                let cubes_remaining = rows_remaining * self.z_range.len()
+                    + usize::try_from(self.z_range.end - self.cube.z).unwrap();
+
+                (cubes_remaining, Some(cubes_remaining))
+            }
+        }
+    }
 }
 
-// TODO: impl ExactSizeIterator for GridIter {}
+impl ExactSizeIterator for GridIter {}
+impl FusedIterator for GridIter {}
 
 /// A 3-dimensional array with arbitrary element type instead of [`Space`](super::Space)'s
 /// fixed types.
@@ -678,5 +697,25 @@ mod tests {
             \x20   3..33,\n\
             )"
         );
+    }
+
+    #[test]
+    fn grid_iter_size_hint() {
+        let grid = Grid::new([0, 0, 0], [12, 34, 56]);
+        let expected_size = grid.volume();
+        let mut iter = grid.interior_iter();
+
+        // Exact at start
+        assert_eq!(iter.size_hint(), (expected_size, Some(expected_size)));
+
+        for remaining in (1..=expected_size).rev() {
+            assert_eq!(iter.size_hint(), (remaining, Some(remaining)));
+            assert!(iter.next().is_some());
+        }
+
+        // Exact at end
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+        assert!(iter.next().is_none());
+        assert_eq!(iter.size_hint(), (0, Some(0)));
     }
 }
