@@ -140,11 +140,11 @@ impl Block {
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require [`URef`] access
     /// to other objects.
-    #[inline]
     pub fn evaluate(&self) -> Result<EvaluatedBlock, EvalBlockError> {
         self.evaluate_impl(0)
     }
 
+    #[inline]
     fn evaluate_impl(&self, depth: u8) -> Result<EvaluatedBlock, EvalBlockError> {
         match self {
             Block::Indirect(def_ref) => def_ref
@@ -177,28 +177,32 @@ impl Block {
                 // with thin high-resolution blocks (i.e. text).
                 let grid = Grid::new(offset, [resolution_g, resolution_g, resolution_g]);
                 let voxels = block_space
-                    .extract(grid, |_index, sub_block_data, _lighting| {
-                        let sub_evaluated = sub_block_data.evaluated();
-                        Evoxel {
-                            color: sub_evaluated.color,
-                            selectable: sub_evaluated.attributes.selectable,
-                            collision: sub_evaluated.attributes.collision,
-                        }
-                    })
+                    .extract(
+                        grid,
+                        #[inline(always)]
+                        |_index, sub_block_data, _lighting| {
+                            let sub_evaluated = sub_block_data.evaluated();
+                            Evoxel {
+                                color: sub_evaluated.color,
+                                selectable: sub_evaluated.attributes.selectable,
+                                collision: sub_evaluated.attributes.collision,
+                            }
+                        },
+                    )
                     .translate(-offset.to_vec());
                 Ok(EvaluatedBlock {
                     attributes: attributes.clone(),
                     color: Rgba::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels
                     // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
                     resolution,
-                    opaque: voxels
-                        .grid()
-                        .interior_iter()
-                        .all(|p| voxels[p].color.fully_opaque()),
-                    visible: voxels
-                        .grid()
-                        .interior_iter()
-                        .any(|p| !voxels[p].color.fully_transparent()),
+                    opaque: voxels.grid().interior_iter().all(
+                        #[inline(always)]
+                        |p| voxels[p].color.fully_opaque(),
+                    ),
+                    visible: voxels.grid().interior_iter().any(
+                        #[inline(always)]
+                        |p| !voxels[p].color.fully_transparent(),
+                    ),
 
                     voxels: Some(voxels),
                 })

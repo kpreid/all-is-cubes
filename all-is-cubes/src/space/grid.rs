@@ -607,6 +607,7 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
     /// bounds.
     ///
     /// Use [`GridArray::get`] for a non-panicing alternative.
+    #[inline]
     fn index(&self, position: P) -> &Self::Output {
         let position: GridPoint = position.into();
         if let Some(index) = self.grid.index(position) {
