@@ -185,7 +185,7 @@ impl Space {
     pub fn extract<V>(
         &self,
         subgrid: Grid,
-        extractor: impl Fn(Option<BlockIndex>, &SpaceBlockData, PackedLight) -> V,
+        mut extractor: impl FnMut(Option<BlockIndex>, &SpaceBlockData, PackedLight) -> V,
     ) -> GridArray<V> {
         let mut output: Vec<V> = Vec::with_capacity(subgrid.volume());
         for x in subgrid.x_range() {
