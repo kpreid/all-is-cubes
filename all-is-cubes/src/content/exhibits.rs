@@ -104,6 +104,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                 universe,
                 16,
                 8,
+                8..9,
                 BlockAttributes::default(),
                 Text::new("Hello block world", Point::new(0, -16)).into_styled(
                     TextStyleBuilder::new(Font8x16)
@@ -149,6 +150,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                         universe,
                         16,
                         0,
+                        0..1,
                         BlockAttributes {
                             display_name: resolution.to_string().into(),
                             collision: BlockCollision::None,
@@ -211,6 +213,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
                                 universe,
                                 64,
                                 0,
+                                0..1,
                                 BlockAttributes {
                                     display_name: description.clone().into(),
                                     collision: BlockCollision::None,

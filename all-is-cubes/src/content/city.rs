@@ -219,6 +219,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             universe,
             16, // TODO: use a higher resolution once it's supported
             0,
+            0..1,
             BlockAttributes {
                 display_name: format!("Exhibit name {:?}", exhibit.name).into(),
                 collision: BlockCollision::None,

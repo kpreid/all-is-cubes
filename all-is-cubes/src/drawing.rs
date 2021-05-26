@@ -25,7 +25,7 @@ use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::DrawTarget;
 use std::borrow::{Borrow, Cow};
 use std::marker::PhantomData;
-use std::ops::RangeInclusive;
+use std::ops::{Range, RangeInclusive};
 
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
@@ -261,7 +261,11 @@ fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCub
 }
 
 /// Generate a set of blocks which together display the given [`Drawable`] which may be
-/// larger than one block. The Z plane is placed midway through the depth of the block.
+/// larger than one block.
+///
+/// `z` specifies the origin z-coordinate within the blocks.
+/// `z_range` specifies the range which is available for drawing; keeping this small
+/// increases performance due to not processing many empty voxels.
 ///
 /// Returns a `Space` containing all the blocks properly arranged, or an error if reading
 /// the `Drawable`'s color-blocks fails.
@@ -269,6 +273,7 @@ pub fn draw_to_blocks<'c, D, C>(
     universe: &mut Universe,
     resolution: Resolution,
     z: GridCoordinate,
+    z_range: Range<GridCoordinate>,
     attributes: BlockAttributes,
     object: D,
 ) -> Result<Space, SetCubeError>
@@ -277,18 +282,16 @@ where
     D: Dimensions,
     C: VoxelColor<'c>,
 {
+    assert!(z_range.contains(&z));
+
     let top_left_2d = object.top_left();
     let bottom_right_2d = object.bottom_right();
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
     // for text drawing, embedded_graphics assumes a Y-down coordinate system.
     // TODO: Instead, apply matrix transform to bounds
     let drawing_grid = Grid::from_lower_upper(
-        [top_left_2d.x, -bottom_right_2d.y, 0],
-        [
-            bottom_right_2d.x,
-            -top_left_2d.y,
-            GridCoordinate::from(resolution),
-        ],
+        [top_left_2d.x, -bottom_right_2d.y, z_range.start],
+        [bottom_right_2d.x, -top_left_2d.y, z_range.end],
     );
     if false {
         dbg!(top_left_2d, bottom_right_2d, drawing_grid);
@@ -412,6 +415,7 @@ mod tests {
             &mut universe,
             resolution as Resolution,
             z,
+            z..z + 1,
             BlockAttributes::default(),
             drawable,
         )
@@ -446,6 +450,7 @@ mod tests {
             &mut universe,
             resolution as Resolution,
             z,
+            z..z + 1,
             BlockAttributes::default(),
             drawable,
         )
