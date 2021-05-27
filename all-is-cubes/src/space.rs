@@ -23,7 +23,7 @@ mod grid;
 pub use grid::*;
 
 mod lighting;
-use lighting::{initialize_lighting, PackedLightScalar};
+use lighting::PackedLightScalar;
 pub use lighting::{LightUpdatesInfo, PackedLight};
 
 mod space_txn;
@@ -130,7 +130,7 @@ impl Space {
                 ..SpaceBlockData::NOTHING
             }],
             contents: vec![0; volume].into_boxed_slice(),
-            lighting: initialize_lighting(grid, packed_sky_color),
+            lighting: physics.light.initialize_lighting(grid, packed_sky_color),
             lighting_update_queue: BinaryHeap::new(),
             lighting_update_set: HashSet::new(),
             physics,
@@ -194,7 +194,10 @@ impl Space {
                             extractor(
                                 Some(block_index),
                                 &self.block_data[block_index as usize],
-                                self.lighting[cube_index],
+                                match self.physics.light {
+                                    LightPhysics::None => PackedLight::ONE,
+                                    LightPhysics::Rays { .. } => self.lighting[cube_index],
+                                },
                             )
                         }
                         None => extractor(None, &SpaceBlockData::NOTHING, self.packed_sky_color),
@@ -231,10 +234,14 @@ impl Space {
     /// made”.
     #[inline(always)]
     pub fn get_lighting(&self, position: impl Into<GridPoint>) -> PackedLight {
-        self.grid
-            .index(position.into())
-            .map(|contents_index| self.lighting[contents_index])
-            .unwrap_or(self.packed_sky_color)
+        match self.physics.light {
+            LightPhysics::None => PackedLight::ONE,
+            _ => self
+                .grid
+                .index(position.into())
+                .map(|contents_index| self.lighting[contents_index])
+                .unwrap_or(self.packed_sky_color),
+        }
     }
 
     /// Replace the block in this space at the given position.
@@ -336,22 +343,24 @@ impl Space {
         contents_index: usize,
     ) {
         // TODO: Move this into a function in the lighting module since it is so tied to lighting
-        let opaque = self.block_data[block_index as usize].evaluated.opaque;
-        if !opaque {
-            self.light_needs_update(position, PackedLightScalar::MAX);
-        } else {
-            // Since we already have the information, immediately update light value
-            // to zero rather than putting it in the queue.
-            // (It would be mostly okay to skip doing this entirely, but doing it gives
-            // more determinism, and the old value could be temporarily revealed when
-            // the block is removed.)
-            self.lighting[contents_index] = PackedLight::OPAQUE;
-        }
-        for &face in Face::ALL_SIX {
-            let neighbor = position + face.normal_vector();
-            // Skip neighbor light updates in the definitely-black-inside case.
-            if !self.get_evaluated(neighbor).opaque {
-                self.light_needs_update(neighbor, PackedLightScalar::MAX);
+        if self.physics.light != LightPhysics::None {
+            let opaque = self.block_data[block_index as usize].evaluated.opaque;
+            if !opaque {
+                self.light_needs_update(position, PackedLightScalar::MAX);
+            } else {
+                // Since we already have the information, immediately update light value
+                // to zero rather than putting it in the queue.
+                // (It would be mostly okay to skip doing this entirely, but doing it gives
+                // more determinism, and the old value could be temporarily revealed when
+                // the block is removed.)
+                self.lighting[contents_index] = PackedLight::OPAQUE;
+            }
+            for &face in Face::ALL_SIX {
+                let neighbor = position + face.normal_vector();
+                // Skip neighbor light updates in the definitely-black-inside case.
+                if !self.get_evaluated(neighbor).opaque {
+                    self.light_needs_update(neighbor, PackedLightScalar::MAX);
+                }
             }
         }
 
@@ -561,6 +570,13 @@ impl Space {
     /// but \[TODO:\] it may later be improved to do so.
     pub fn set_physics(&mut self, physics: SpacePhysics) {
         self.packed_sky_color = physics.sky_color.into();
+        if self.physics.light != physics.light {
+            // TODO: comparison is too specific once there are parameters -- might be a minor change
+            self.lighting = physics
+                .light
+                .initialize_lighting(self.grid, self.packed_sky_color);
+            // TODO: Need to force updates potentially
+        }
         self.physics = physics;
         // TODO: Also send out a SpaceChange notification, if anything is different.
     }
@@ -798,10 +814,9 @@ impl Default for SpacePhysics {
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum LightPhysics {
-    // TODO: Implement this option.
-    // /// No light. All surface colors are taken exactly as displayed colors. The
-    // /// [`SpacePhysics::sky_color`] is used solely as a background color.
-    // None,
+    /// No light. All surface colors are taken exactly as displayed colors. The
+    /// [`SpacePhysics::sky_color`] is used solely as a background color.
+    None,
     /// Raycast-based light propagation and diffuse reflections.
     #[non_exhaustive]
     Rays {

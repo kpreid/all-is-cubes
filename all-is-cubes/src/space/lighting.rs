@@ -219,10 +219,6 @@ static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
     (*ray_data).try_into().unwrap()
 });
 
-pub(crate) fn initialize_lighting(grid: Grid, color: PackedLight) -> Box<[PackedLight]> {
-    vec![color; grid.volume()].into_boxed_slice()
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct LightUpdateRequest {
     priority: PackedLightScalar,
@@ -257,6 +253,10 @@ impl PartialOrd for LightUpdateRequest {
 
 impl Space {
     pub(crate) fn light_needs_update(&mut self, cube: GridPoint, priority: PackedLightScalar) {
+        if self.physics.light == LightPhysics::None {
+            return;
+        }
+
         if self.grid().contains_cube(cube) && !self.lighting_update_set.contains(&cube) {
             self.lighting_update_queue
                 .push(LightUpdateRequest { priority, cube });
@@ -266,23 +266,26 @@ impl Space {
 
     /// Do some lighting updates.
     pub(crate) fn update_lighting_from_queue(&mut self) -> LightUpdatesInfo {
-        // Do a finite number of updates.
         let mut light_update_count: usize = 0;
         let mut max_difference: PackedLightScalar = 0;
         let mut cost = 0;
-        while let Some(LightUpdateRequest { cube, .. }) = self.lighting_update_queue.pop() {
-            self.lighting_update_set.remove(&cube);
-            light_update_count += 1;
-            // Note: For performance, it is key that this call site ignores the info value
-            // and the functions are inlined. Thus, the info calculation can be
-            // optimized away.
-            let (difference, cube_cost, _) = self.update_lighting_now_on(cube);
-            max_difference = max_difference.max(difference);
-            cost += cube_cost;
-            if cost >= 10000 {
-                break;
+
+        if self.physics.light != LightPhysics::None {
+            while let Some(LightUpdateRequest { cube, .. }) = self.lighting_update_queue.pop() {
+                self.lighting_update_set.remove(&cube);
+                light_update_count += 1;
+                // Note: For performance, it is key that this call site ignores the info value
+                // and the functions are inlined. Thus, the info calculation can be
+                // optimized away.
+                let (difference, cube_cost, _) = self.update_lighting_now_on(cube);
+                max_difference = max_difference.max(difference);
+                cost += cube_cost;
+                if cost >= 10000 {
+                    break;
+                }
             }
         }
+
         LightUpdatesInfo {
             update_count: light_update_count,
             max_update_difference: max_difference,
@@ -324,6 +327,10 @@ impl Space {
         &self,
         cube: GridPoint,
     ) -> (PackedLight, Vec<GridPoint>, usize, LightUpdateCubeInfo) {
+        if self.physics.light == LightPhysics::None {
+            panic!("Light is disabled; should not reach here");
+        }
+
         // Accumulator of incoming light encountered.
         let mut incoming_light: Rgb = Rgb::ZERO;
         // Number of rays contributing to incoming_light.
@@ -469,6 +476,20 @@ impl Space {
                 rays: info_rays,
             },
         )
+    }
+}
+
+impl LightPhysics {
+    /// Generate the lighting data array that a newly created empty [`Space`] should have.
+    pub(crate) fn initialize_lighting(
+        &self,
+        grid: Grid,
+        ambient_color: PackedLight,
+    ) -> Box<[PackedLight]> {
+        match self {
+            LightPhysics::None => Box::new([]),
+            LightPhysics::Rays {} => vec![ambient_color; grid.volume()].into_boxed_slice(),
+        }
     }
 }
 
@@ -776,6 +797,34 @@ mod tests {
             })
         );
         assert_eq!(space.lighting_update_queue.pop(), None);
+    }
+
+    /// Helper to construct a space with LightPhysics set to None
+    fn space_with_disabled_light() -> Space {
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set_physics(SpacePhysics {
+            light: LightPhysics::None,
+            ..SpacePhysics::default()
+        });
+        space
+    }
+
+    #[test]
+    fn disabled_lighting_returns_one_always() {
+        assert_eq!(
+            space_with_disabled_light().get_lighting([0, 0, 0]),
+            PackedLight::ONE
+        );
+    }
+
+    #[test]
+    fn disabled_lighting_does_not_update() {
+        let mut space = space_with_disabled_light();
+        space.light_needs_update(GridPoint::new(0, 0, 0), u8::MAX);
+        assert_eq!(
+            space.step(Tick::arbitrary()).light,
+            LightUpdatesInfo::default()
+        );
     }
 
     // TODO: test sky lighting propagation onto blocks after quiescing
