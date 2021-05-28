@@ -117,6 +117,7 @@ impl HudLayout {
                 2,
             ),
         ));
+        toolbar_text_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
         toolbar_text_space
             .fill_uniform(toolbar_text_space.grid(), Block::from(Rgba::WHITE))
             .unwrap();
@@ -248,6 +249,7 @@ impl HudBlocks {
         let toolbar_frame_block_grid = Grid::new((-1, -1, -1), (5, 3, 3));
         let toolbar_frame_voxel_grid = toolbar_frame_block_grid.multiply(resolution_g);
         let mut toolbar_drawing_space = Space::empty(toolbar_frame_voxel_grid);
+        toolbar_drawing_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
         // TODO: remove y flip
         let display = &mut toolbar_drawing_space.draw_target(GridMatrix::FLIP_Y);
 

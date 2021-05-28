@@ -32,7 +32,7 @@ pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
 use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
-use crate::space::{Grid, SetCubeError, Space};
+use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
 use crate::universe::Universe;
 
 /// Adapter to use a [`Space`] as a [`DrawTarget`].
@@ -295,6 +295,7 @@ where
     }
 
     let mut drawing_space = Space::empty(drawing_grid);
+    drawing_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
     object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
         [0, 0, z],
         Face::PX,

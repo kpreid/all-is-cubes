@@ -111,6 +111,8 @@ impl std::fmt::Debug for SpaceBlockData {
 pub type BlockIndex = u16;
 
 impl Space {
+    // TODO: Add a constructor that takes a SpacePhysics value
+
     /// Constructs a [`Space`] that is entirely filled with [`AIR`].
     pub fn empty(grid: Grid) -> Space {
         // TODO: Might actually be worth checking for memory allocation failure here...?
@@ -799,6 +801,13 @@ pub struct SpacePhysics {
 
     /// Method used to compute the illumination of individual blocks.
     pub light: LightPhysics,
+}
+
+impl SpacePhysics {
+    pub const DEFAULT_FOR_BLOCK: Self = Self {
+        sky_color: rgb_const!(0.5, 0.5, 0.5),
+        light: LightPhysics::None,
+    };
 }
 
 impl Default for SpacePhysics {

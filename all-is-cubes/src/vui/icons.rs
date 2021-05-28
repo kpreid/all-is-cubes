@@ -10,7 +10,7 @@ use crate::block::{Block, AIR_EVALUATED};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgba};
-use crate::space::{Grid, Space};
+use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::Universe;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
@@ -49,6 +49,7 @@ impl Icons {
                         crosshair_resolution.into(),
                         1,
                     );
+                    space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
                     let center_x2 =
                         GridPoint::new(1, 1, 0) * (GridCoordinate::from(crosshair_resolution) - 1);
 
