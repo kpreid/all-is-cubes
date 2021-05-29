@@ -19,9 +19,9 @@ macro_rules! rgb_const {
             // Safety: Only literal values are allowed, which will either be a non-NaN
             // float or a type mismatch.
             $crate::math::Rgb::new_nn(
-                $crate::math::NotNan::unchecked_new($r),
-                $crate::math::NotNan::unchecked_new($g),
-                $crate::math::NotNan::unchecked_new($b),
+                $crate::math::NotNan::new_unchecked($r),
+                $crate::math::NotNan::new_unchecked($g),
+                $crate::math::NotNan::new_unchecked($b),
             )
         }
     };
@@ -34,10 +34,10 @@ macro_rules! rgba_const {
     ($r:literal, $g:literal, $b:literal, $a:literal) => {
         unsafe {
             $crate::math::Rgba::new_nn(
-                $crate::math::NotNan::unchecked_new($r),
-                $crate::math::NotNan::unchecked_new($g),
-                $crate::math::NotNan::unchecked_new($b),
-                $crate::math::NotNan::unchecked_new($a),
+                $crate::math::NotNan::new_unchecked($r),
+                $crate::math::NotNan::new_unchecked($g),
+                $crate::math::NotNan::new_unchecked($b),
+                $crate::math::NotNan::new_unchecked($a),
             )
         }
     };
@@ -69,8 +69,8 @@ pub struct Rgb(Vector3<NotNan<f32>>);
 pub struct Rgba(Vector4<NotNan<f32>>);
 
 // NotNan::zero() and one() exist, but only via traits, which can't be used in const
-const NN0: NotNan<f32> = unsafe { NotNan::unchecked_new(0.0) };
-const NN1: NotNan<f32> = unsafe { NotNan::unchecked_new(1.0) };
+const NN0: NotNan<f32> = unsafe { NotNan::new_unchecked(0.0) };
+const NN1: NotNan<f32> = unsafe { NotNan::new_unchecked(1.0) };
 
 impl Rgb {
     /// Black.
