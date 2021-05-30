@@ -186,11 +186,16 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     .transform(face.matrix(block_resolution).inverse_transform().unwrap())
                     .unwrap();
 
+                // Check the case where the block's voxels don't meet its front face.
+                if !rotated_voxel_range.z_range().contains(&0) {
+                    output_by_face[face].fully_opaque = false;
+                }
+
                 // Layer 0 is the outside surface of the cube and successive layers are
                 // deeper below that surface.
                 for layer in rotated_voxel_range.z_range() {
                     // TODO: Have EvaluatedBlock tell us when a block is fully cubical and opaque,
-                    // and then only scan the first and last layers. EvaluatedBlock.fully_opaque
+                    // and then only scan the first and last layers. EvaluatedBlock.opaque
                     // is not quite that because it is defined to allow concavities.
 
                     // Becomes true if there is any voxel that is both non-fully-transparent and

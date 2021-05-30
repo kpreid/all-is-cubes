@@ -141,6 +141,27 @@ fn evaluate_voxels_not_filling_block() {
     assert_eq!(e.visible, true);
 }
 
+/// Test the situation where the space is smaller than the block: in particular,
+/// even if the space is all opaque, the block should not be counted as opaque.
+#[test]
+fn evaluate_voxels_partial_not_filling() {
+    let resolution = 4;
+    let mut universe = Universe::new();
+    let mut space = Space::empty_positive(2, 4, 4);
+    space
+        .fill_uniform(space.grid(), Block::from(Rgba::WHITE))
+        .unwrap();
+    let space_ref = universe.insert_anonymous(space);
+    let block = Block::builder()
+        .voxels_ref(resolution as Resolution, space_ref.clone())
+        .build();
+
+    let e = block.evaluate().unwrap();
+    assert_eq!(e.resolution, 4);
+    assert_eq!(e.opaque, false);
+    assert_eq!(e.visible, true);
+}
+
 /// Tests that the `offset` field of `Block::Recur` is respected.
 #[test]
 fn recur_with_offset() {

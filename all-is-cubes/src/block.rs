@@ -167,18 +167,21 @@ impl Block {
                 resolution,
                 space: ref space_ref,
             } => {
+                let block_space = space_ref.try_borrow()?;
+
                 // Ensure resolution is at least 1 to not panic on bad data.
                 // (We could eliminate this if Grid allowed a size of zero, but that
                 // might lead to division-by-zero trouble elsewhere...)
                 let resolution_g: GridCoordinate = resolution.max(1).into();
-
-                let block_space = space_ref.try_borrow()?;
-                let grid = Grid::new(offset, [resolution_g, resolution_g, resolution_g])
+                let full_resolution_grid =
+                    Grid::new(offset, [resolution_g, resolution_g, resolution_g]);
+                let occupied_grid = full_resolution_grid
                     .intersection(block_space.grid())
-                    .unwrap_or_else(|| Grid::new(offset, [1, 1, 1])); // TODO: would be nice not to need this arbitrary value
+                    .unwrap_or_else(|| Grid::new(offset, [1, 1, 1]) /* arbitrary value */);
+
                 let voxels = block_space
                     .extract(
-                        grid,
+                        occupied_grid,
                         #[inline(always)]
                         |_index, sub_block_data, _lighting| {
                             let sub_evaluated = sub_block_data.evaluated();
@@ -193,12 +196,13 @@ impl Block {
                 Ok(EvaluatedBlock {
                     attributes: attributes.clone(),
                     color: Rgba::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels
-                    // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
                     resolution,
-                    opaque: voxels.grid().interior_iter().all(
-                        #[inline(always)]
-                        |p| voxels[p].color.fully_opaque(),
-                    ),
+                    // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
+                    opaque: occupied_grid == full_resolution_grid
+                        && voxels.grid().interior_iter().all(
+                            #[inline(always)]
+                            |p| voxels[p].color.fully_opaque(),
+                        ),
                     visible: voxels.grid().interior_iter().any(
                         #[inline(always)]
                         |p| !voxels[p].color.fully_transparent(),
