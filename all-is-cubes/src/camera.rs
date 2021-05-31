@@ -312,7 +312,8 @@ impl Viewport {
 /// Not all of these options are applicable to all renderers.
 ///
 /// TODO: This may not be the best module location. Possibly it should get its own module.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
 #[non_exhaustive]
 pub struct GraphicsOptions {
     /// Whether and how to draw fog obscuring the view distance limit.
@@ -388,7 +389,7 @@ impl Default for GraphicsOptions {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum FogOption {
     /// No fog: objects will maintain their color and disappear raggedly.
@@ -401,7 +402,7 @@ pub enum FogOption {
     Physical,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum LightingOption {
     /// No lighting: objects will be displayed with their original surface color.
@@ -418,7 +419,7 @@ pub enum LightingOption {
 /// Note: There is not yet a consistent interpretation of alpha between the `Surface`
 /// and `Volumetric` options; this will probably be changed in the future in favor
 /// of the volumetric interpretation.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum TransparencyOption {
     /// Conventional transparent surfaces.

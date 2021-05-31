@@ -10,15 +10,22 @@
 
 use std::convert::TryInto;
 use std::error::Error;
+use std::fs::create_dir_all;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use cgmath::Vector2;
 use clap::{value_t, Arg, ErrorKind};
+use directories_next::ProjectDirs;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
+use serde::{de::DeserializeOwned, Serialize};
 use strum::IntoEnumIterator;
 
 use all_is_cubes::apps::AllIsCubesAppState;
+use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::UniverseTemplate;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 
@@ -110,6 +117,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .short("v")
                 .help("Additional logging to stderr."),
         )
+        .arg(
+            Arg::with_name("no_config_files")
+                .long("no-config-files")
+                .help("Ignore all configuration files, using only defaults and command-line options."),
+        )
         .get_matches();
 
     // Convert options we will consult multiple times.
@@ -132,8 +144,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
     }
 
+    let graphics_options = if options.is_present("no_config_files") {
+        GraphicsOptions::default()
+    } else {
+        load_config().expect("Error loading configuration files")
+    };
+
     let start_time = Instant::now();
     let mut app = AllIsCubesAppState::new(universe_template.clone());
+    app.graphics_options_mut().set(graphics_options);
     let app_done_time = Instant::now();
     log::debug!(
         "Initialized game state with {:?} ({:.3} s)",
@@ -200,6 +219,65 @@ fn parse_record_options(
             Err(e) => return Err(e),
         },
     })
+}
+
+fn load_config() -> Result<GraphicsOptions, Box<dyn Error>> {
+    // TODO: make testable
+    let project_dirs = ProjectDirs::from("org.switchb", "", "all-is-cubes")
+        .ok_or_else(|| <Box<dyn Error>>::from("could not find configuration directory"))?;
+    create_dir_all(project_dirs.config_dir())?;
+
+    let graphics_options = read_or_create_default_json_file(
+        "graphics options",
+        &project_dirs.config_dir().join("graphics.json"),
+        GraphicsOptions::default,
+    );
+
+    Ok(graphics_options)
+}
+
+fn read_or_create_default_json_file<V: DeserializeOwned + Serialize>(
+    description: &str,
+    path: &Path,
+    default: fn() -> V,
+) -> V {
+    match File::open(path) {
+        Ok(file) => match serde_json::from_reader(BufReader::new(file)) {
+            Ok(value) => {
+                log::trace!("Loaded {} from {}", description, path.to_string_lossy());
+                value
+            }
+            Err(e) => {
+                log::warn!(
+                    "Syntax error in {} loaded from {}; using default values. Error: {}",
+                    description,
+                    path.to_string_lossy(),
+                    e
+                );
+                default()
+            }
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            log::info!(
+                "No {} file found; creating {}",
+                description,
+                path.to_string_lossy()
+            );
+            let value = default();
+            let json_text = serde_json::to_string_pretty(&value).unwrap();
+            std::fs::write(path, json_text.as_bytes()).expect("Error writing default file");
+            value
+        }
+        Err(e) => {
+            log::error!(
+                "Error while reading {} file {}: {}",
+                description,
+                path.to_string_lossy(),
+                e
+            );
+            default()
+        }
+    }
 }
 
 fn evaluate_light_with_progress(space: &mut Space) {

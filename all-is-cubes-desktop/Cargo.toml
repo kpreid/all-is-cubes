@@ -22,6 +22,7 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.2.0" }
 cgmath = "0.18.0"
 clap = "2.33.3"
 crossterm = "0.20.0"
+directories-next = "2.0.0"
 glfw = "0.41"
 indicatif = "0.16.0"
 log = "0.4.14"
@@ -30,6 +31,8 @@ luminance-front = "0.4.0"
 luminance-glfw = "0.16.0"
 luminance-windowing = "0.10.0"
 png = "0.16.8"
+serde = "1.0.126"
+serde_json = "1.0.64"
 simplelog = "0.10.0"
 strum = { version = "0.21.0", features = ["derive"] }
 termion = "1.5.5" # TODO: Only used for ANSI color table. Remove?
