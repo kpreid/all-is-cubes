@@ -31,5 +31,5 @@ luminance-glfw = "0.15.0"
 luminance-windowing = "0.9"
 png = "0.16.8"
 simplelog = "0.10.0"
-strum = { version = "0.20.0", features = ["derive"] }
+strum = { version = "0.21.0", features = ["derive"] }
 termion = "1.5.5"  # TODO: Only used for ANSI color table. Remove?
