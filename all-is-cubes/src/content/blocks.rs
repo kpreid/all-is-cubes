@@ -25,6 +25,7 @@ pub enum DemoBlocks {
     Road,
     Curb,
     CurbCorner,
+    ExhibitBackground,
 }
 impl BlockModule for DemoBlocks {
     fn namespace() -> &'static str {
@@ -130,6 +131,19 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                     AIR
                 })?
                 .build(),
+
+            ExhibitBackground => {
+                let colors = [
+                    Block::from(Rgba::new(0.825, 0.825, 0.825, 1.0)),
+                    Block::from(Rgba::new(0.75, 0.75, 0.75, 1.0)),
+                ];
+                Block::builder()
+                    .display_name("Exhibit Background")
+                    .voxels_fn(universe, 4, |cube| {
+                        &colors[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
+                    })?
+                    .build()
+            }
         })
     })?
     .install(universe)?;

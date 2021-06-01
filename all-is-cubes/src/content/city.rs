@@ -199,12 +199,11 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         let plot = exhibit_footprint.transform(plot_transform).unwrap();
 
         // Mark the exhibit bounds
-        // TODO: Design a unique block for this
         let enclosure = Grid::from_lower_upper(
             plot.lower_bounds().map(|x| x - 1),
             [plot.upper_bounds().x + 1, 1, plot.upper_bounds().z + 1],
         );
-        space.fill_uniform(enclosure, &landscape_blocks[LandscapeBlocks::Stone])?;
+        space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
 
