@@ -125,7 +125,8 @@ pub struct Raycaster {
     /// for each axis in which we could move. Thus, the least element of t_max
     /// is the next intersection between the grid and the ray.
     t_max: Vector3<FreeCoordinate>,
-    /// The change in t when taking a full grid step along a given axis. Always positive.
+    /// The change in t when taking a full grid step along a given axis.
+    /// Always positive; partially infinite if axis-aligned.
     t_delta: Vector3<FreeCoordinate>,
     /// Last face we passed through.
     last_face: Face,
