@@ -54,6 +54,7 @@ impl Face {
 
     /// Returns which axis this face's normal vector is parallel to, with the numbering
     /// X = 0, Y = 1, Z = 2. Panics if given [`Face::Within`].
+    #[inline]
     pub fn axis_number(self) -> usize {
         match self {
             Face::Within => panic!("Face::Within has no axis number"),
@@ -73,6 +74,7 @@ impl Face {
     /// assert_eq!(Face::NX.is_positive(), false);
     /// assert_eq!(Face::Within.is_positive(), false);
     /// ```
+    #[inline]
     pub fn is_positive(self) -> bool {
         matches!(self, Face::PX | Face::PY | Face::PZ)
     }
@@ -87,6 +89,7 @@ impl Face {
     /// assert_eq!(Face::NX.is_negative(), true);
     /// assert_eq!(Face::Within.is_negative(), false);
     /// ```
+    #[inline]
     pub fn is_negative(self) -> bool {
         matches!(self, Face::NX | Face::NY | Face::NZ)
     }
