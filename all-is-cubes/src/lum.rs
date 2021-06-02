@@ -10,7 +10,7 @@
 
 use std::error::Error;
 
-use cgmath::{Vector3, Zero as _};
+use cgmath::{Transform as _, Vector3, Zero as _};
 use luminance_front::context::GraphicsContext;
 use luminance_front::framebuffer::FramebufferError;
 use luminance_front::pipeline::PipelineError;
@@ -22,6 +22,7 @@ use crate::character::Cursor;
 use crate::content::palette;
 use crate::lum::types::{empty_tess, LumBlockVertex};
 use crate::math::{Aab, Geometry, Rgba};
+use crate::raycast::Face;
 use crate::util::MapExtend;
 
 // TODO: Right now, only the top level renderer struct is public, because it is
@@ -46,13 +47,41 @@ where
     C: GraphicsContext<Backend = Backend>,
 {
     if let Some(cursor) = cursor_result {
+        // Compute an approximate offset that will prevent Z-fighting.
+        let offset_from_surface = 0.001 * cursor.distance;
+
         let mut vertices = Vec::new();
+        // TODO: Maybe highlight the selected face's rectangle
         wireframe_vertices(
             &mut vertices,
             palette::CURSOR_OUTLINE,
-            Aab::from_cube(cursor.place.cube).enlarge(0.01),
+            Aab::from_cube(cursor.place.cube).enlarge(offset_from_surface),
         );
-        // TODO: draw the selected face
+
+        // Frame the cursor intersection point with a diamond.
+        // TODO: This addition is experimental and we may or may not want to keep it.
+        // For now, it visualizes the intersection and face information.
+        let face_frame = cursor.place.face.matrix(0).to_free();
+        for f in [
+            Face::PX,
+            Face::PY,
+            Face::PY,
+            Face::NX,
+            Face::NX,
+            Face::NY,
+            Face::NY,
+            Face::PX,
+        ] {
+            let p = cursor.point
+                + cursor.place.face.normal_vector() * offset_from_surface
+                + face_frame.transform_vector(f.normal_vector() * (1.0 / 32.0));
+            vertices.push(LumBlockVertex::new_colored(
+                p,
+                Vector3::zero(),
+                palette::CURSOR_OUTLINE,
+            ));
+        }
+
         Ok(context
             .new_tess()
             .set_vertices(vertices)

@@ -3,7 +3,9 @@
 
 //! Player-character stuff.
 
-use cgmath::{Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Matrix4, Point3, Vector3};
+use cgmath::{
+    Deg, ElementWise as _, EuclideanSpace as _, InnerSpace as _, Matrix3, Matrix4, Point3, Vector3,
+};
 use num_traits::identities::Zero;
 use ordered_float::NotNan;
 use std::collections::HashSet;
@@ -399,8 +401,9 @@ pub enum CharacterChange {
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck.
-pub fn cursor_raycast(ray: Ray, space_ref: &URef<Space>) -> Option<Cursor> {
+pub fn cursor_raycast(mut ray: Ray, space_ref: &URef<Space>) -> Option<Cursor> {
     // TODO: implement 'reach' radius limit
+    ray.direction = ray.direction.normalize();
     let space = space_ref.try_borrow().ok()?;
     for step in ray.cast().within_grid(space.grid()) {
         let cube = step.cube_ahead();
@@ -422,6 +425,8 @@ pub fn cursor_raycast(ray: Ray, space_ref: &URef<Space>) -> Option<Cursor> {
             return Some(Cursor {
                 space: space_ref.clone(),
                 place: step.cube_face(),
+                point: step.intersection_point(ray),
+                distance: step.t_distance(),
                 block: space[cube].clone(),
                 evaluated: evaluated.clone(),
                 lighting_ahead,
@@ -441,6 +446,9 @@ pub struct Cursor {
     pub space: URef<Space>,
     /// The cube the cursor is at and which face was hit.
     pub place: CubeFace,
+    pub point: Point3<FreeCoordinate>,
+    /// Distance from viewpoint to intersection point.
+    pub distance: FreeCoordinate,
     /// The block that was found in the given cube.
     pub block: Block,
     /// The EvaluatedBlock data for the block.
