@@ -166,20 +166,11 @@ impl Raycaster {
     ) -> Self {
         let origin = origin.into();
         let direction = direction.into();
-        fn improved_signum(x: FreeCoordinate) -> GridCoordinate {
-            // We want 0 as an error indication..
-            if x == 0.0 {
-                0
-            } else {
-                x.signum() as GridCoordinate
-            }
-        }
-
         Self {
             ray: Ray::new(origin, direction),
             emit_current: true,
             cube: origin.map(|x| x.floor() as GridCoordinate),
-            step: direction.map(improved_signum),
+            step: direction.map(signum_101),
             t_max: origin.to_vec().zip(direction, scale_to_integer_step),
             t_delta: direction.map(|x| x.abs().recip()),
             last_face: Face::Within,
@@ -385,6 +376,7 @@ impl Iterator for Raycaster {
                     face: self.last_face,
                 },
                 t_distance: self.last_t_distance,
+                t_max: self.t_max,
             });
         }
     }
@@ -406,6 +398,7 @@ pub struct RaycastStep {
     cube_face: CubeFace,
     /// The distance traversed, as measured in multiples of the supplied direction vector.
     t_distance: FreeCoordinate,
+    t_max: Vector3<FreeCoordinate>,
 }
 
 impl RaycastStep {
@@ -477,13 +470,15 @@ impl RaycastStep {
 
     /// Returns the specific point at which the ray intersected the face.
     ///
-    /// The caller must provide the ray; this is because remembering the ray
-    /// so as to perform a ray-plane intersection is unnecessary overhead
-    /// for all raycasts that don't need this information.
+    /// The caller must provide the original ray; this is because remembering
+    /// the ray so as to perform a ray-plane intersection is unnecessary
+    /// overhead for all raycasts that don't need this information.
     ///
-    /// TODO: Write up any guarantees we make that might fail by default
-    /// (for example, will the point always be within the unit square of the
-    /// face?)
+    /// The returned point is guaranteed to be within the face (a unit square):
+    /// the perpendicular axis's coordinate will have an integer value either equal to
+    /// [`Self::cube_ahead`]'s coordinate on that axis, or that plus 1 if the ray
+    /// entered from the positive direction, and the parallel axes will have coordinates
+    /// no more than +1.0 different.
     ///
     /// ```
     /// use all_is_cubes::cgmath::Point3;
@@ -499,18 +494,44 @@ impl RaycastStep {
     /// assert_eq!(next(), Point3::new(2.0, 0.5, 0.5));
     /// ```
     pub fn intersection_point(&self, ray: Ray) -> Point3<FreeCoordinate> {
-        let mut intersection = ray.origin + ray.direction * self.t_distance;
-        // TODO: Make sure this always falls within the square?
-
-        let CubeFace { cube, face } = self.cube_face;
-        if face != Face::Within {
-            // Make the value on the axis perpendicular to the plane exact, since we can.
-            let axis = face.axis_number();
-            intersection[axis] = FreeCoordinate::from(cube[axis])
-                + face.normal_vector::<FreeCoordinate>()[axis].max(0.0);
+        let face = self.cube_face.face;
+        if face == Face::Within {
+            ray.origin
+        } else {
+            let mut intersection_point = self.cube_face.cube.map(FreeCoordinate::from);
+            for axis in 0..3 {
+                let step_direction = signum_101(ray.direction[axis]);
+                if axis == face.axis_number() {
+                    // This is the plane we just hit.
+                    if step_direction < 0 {
+                        intersection_point[axis] += 1.0;
+                    }
+                } else if step_direction == 0 {
+                    // Ray is perpendicular to this axis, so it does not move from the origin.
+                    intersection_point[axis] = ray.origin[axis];
+                } else {
+                    // Normal cube face hit.
+                    let offset_inside_cube =
+                        (self.t_max[axis] - self.t_distance) * ray.direction[axis];
+                    intersection_point[axis] += if step_direction > 0 {
+                        1. - offset_inside_cube.clamp(0.0, 1.0)
+                    } else {
+                        (-offset_inside_cube).clamp(0.0, 1.0)
+                    };
+                }
+            }
+            intersection_point
         }
+    }
+}
 
-        intersection
+/// 3-valued signum (zero produces zero) rather than the 2-valued one Rust gives,
+/// and with an integer result.
+fn signum_101(x: FreeCoordinate) -> GridCoordinate {
+    if x == 0.0 {
+        0
+    } else {
+        x.signum() as GridCoordinate
     }
 }
 
@@ -569,22 +590,23 @@ mod tests {
         cube: Point3<GridCoordinate>,
         face: Face,
         t_distance: Option<FreeCoordinate>,
+        intersection_point: Option<Point3<FreeCoordinate>>,
     }
 
-    impl From<RaycastStep> for TestStep {
-        fn from(step: RaycastStep) -> Self {
+    impl TestStep {
+        fn from(step: &RaycastStep, ray: Ray) -> Self {
             Self {
                 cube: step.cube_ahead(),
                 face: step.face(),
                 t_distance: Some(step.t_distance()),
+                intersection_point: Some(step.intersection_point(ray)),
             }
         }
-    }
 
-    impl TestStep {
         fn matches(self, step: &RaycastStep) -> bool {
             self.cube == step.cube_ahead() &&
             self.face == step.face() &&
+            self.t_distance.map_or(true, |td| step.t_distance() == td) &&
             self.t_distance.map_or(true, |td| step.t_distance() == td)
         }
     }
@@ -610,7 +632,7 @@ mod tests {
                     actual:   {:?}\n\
                     before: {:?}\n\
                     after:  {:?}\n",
-                    i, expected_step, actual_step.map(TestStep::from), actual_step, r_backup, r
+                    i, expected_step, actual_step.map(|s| TestStep::from(&s, r.ray)), actual_step, r_backup, r
                 );
             }
         }
@@ -630,6 +652,7 @@ mod tests {
             cube: Point3::new(x, y, z),
             face,
             t_distance: Some(t_distance),
+            intersection_point: None,
         }
     }
 
