@@ -562,43 +562,74 @@ mod tests {
     use cgmath::Vector3;
     use rand::{Rng as _, SeedableRng as _};
 
+    /// Alternative to [`RaycastStep`] which contains optional data so partial assertions
+    /// can be written, and contains 'final' values rather than ones used for calculation.
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    struct TestStep {
+        cube: Point3<GridCoordinate>,
+        face: Face,
+        t_distance: Option<FreeCoordinate>,
+    }
+
+    impl From<RaycastStep> for TestStep {
+        fn from(step: RaycastStep) -> Self {
+            Self {
+                cube: step.cube_ahead(),
+                face: step.face(),
+                t_distance: Some(step.t_distance()),
+            }
+        }
+    }
+
+    impl TestStep {
+        fn matches(self, step: &RaycastStep) -> bool {
+            self.cube == step.cube_ahead() &&
+            self.face == step.face() &&
+            self.t_distance.map_or(true, |td| step.t_distance() == td)
+        }
+    }
+
     #[track_caller]
-    fn assert_steps_option<T: IntoIterator<Item = Option<RaycastStep>>>(
+    fn assert_steps_option<T: IntoIterator<Item = Option<TestStep>>>(
         r: &mut Raycaster,
         steps: T,
     ) {
         for (i, expected_step) in steps.into_iter().enumerate() {
             let r_backup = r.clone(); // save for diagnostics
             let actual_step = r.next();
-            if actual_step != expected_step {
+            let matches = match (expected_step, actual_step) {
+                (Some(e), Some(a)) if e.matches(&a) => true,
+                (None, None) => true,
+                _ => false,
+            };
+            if !matches {
                 panic!(
                     "step {}\n\
                     expected: {:?}\n\
+                    found:    {:?}\n\
                     actual:   {:?}\n\
                     before: {:?}\n\
                     after:  {:?}\n",
-                    i, expected_step, actual_step, r_backup, r
+                    i, expected_step, actual_step.map(TestStep::from), actual_step, r_backup, r
                 );
             }
         }
     }
     #[track_caller]
-    fn assert_steps<T: IntoIterator<Item = RaycastStep>>(r: &mut Raycaster, steps: T) {
+    fn assert_steps<T: IntoIterator<Item = TestStep>>(r: &mut Raycaster, steps: T) {
         assert_steps_option(r, steps.into_iter().map(Some))
     }
     #[track_caller]
-    fn assert_only_one_step(r: &mut Raycaster, step: RaycastStep) {
+    fn assert_only_one_step(r: &mut Raycaster, step: TestStep) {
         assert_steps_option(r, vec![Some(step), None, None]);
     }
 
     /// Helper to construct steps
-    fn step(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate, face: Face, t_distance: FreeCoordinate) -> RaycastStep {
-        RaycastStep {
-            cube_face: CubeFace {
-                cube: Point3::new(x, y, z),
-                face,
-            },
-            t_distance,
+    fn step(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate, face: Face, t_distance: FreeCoordinate) -> TestStep {
+        TestStep {
+            cube: Point3::new(x, y, z),
+            face,
+            t_distance: Some(t_distance),
         }
     }
 
