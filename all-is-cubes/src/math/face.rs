@@ -332,9 +332,23 @@ impl<V> FaceMap<V> {
         Face::ALL_SEVEN.iter().copied().map(move |f| (f, &self[f]))
     }
 
+    pub fn into_values(self) -> [V; 7] {
+        [
+            self.within,
+            self.nx,
+            self.ny,
+            self.nz,
+            self.px,
+            self.py,
+            self.pz,
+        ]
+    }
+
+    pub fn into_values_iter(self) -> impl Iterator<Item = V> {
+        std::array::IntoIter::new(self.into_values())
+    }
+
     /// Transform values.
-    ///
-    /// TODO: Should wr do this in terms of iterators?
     pub fn map<U>(self, mut f: impl FnMut(Face, V) -> U) -> FaceMap<U> {
         FaceMap {
             within: f(Face::Within, self.within),
@@ -344,6 +358,19 @@ impl<V> FaceMap<V> {
             px: f(Face::PX, self.px),
             py: f(Face::PY, self.py),
             pz: f(Face::PZ, self.pz),
+        }
+    }
+
+    /// Combine two `FaceMap`s using a function applied to each pair of corresponding values.
+    pub fn zip<U, R>(self, other: FaceMap<U>, mut f: impl FnMut(Face, V, U) -> R) -> FaceMap<R> {
+        FaceMap {
+            within: f(Face::Within, self.within, other.within),
+            nx: f(Face::NX, self.nx, other.nx),
+            ny: f(Face::NY, self.ny, other.ny),
+            nz: f(Face::NZ, self.nz, other.nz),
+            px: f(Face::PX, self.px, other.px),
+            py: f(Face::PY, self.py, other.py),
+            pz: f(Face::PZ, self.pz, other.pz),
         }
     }
 

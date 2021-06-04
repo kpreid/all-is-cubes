@@ -4,7 +4,8 @@
 //! Lighting algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
-use cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3, Zero as _};
+use cgmath::InnerSpace;
+use cgmath::{EuclideanSpace as _, Point3, Vector3};
 use once_cell::sync::Lazy;
 use std::convert::TryInto as _;
 use std::fmt;
@@ -173,54 +174,48 @@ impl From<Rgb> for PackedLight {
     }
 }
 
-const RAY_DIRECTION_STEP: isize = 2;
-const RAYS_PER_FACE: usize = ((1 + RAY_DIRECTION_STEP * 2) * (1 + RAY_DIRECTION_STEP * 2)) as usize;
-const ALL_RAYS_COUNT: usize = RAYS_PER_FACE * 6;
+const RAY_DIRECTION_STEP: isize = 5;
+const RAY_CUBE_EDGE: usize = (RAY_DIRECTION_STEP as usize) * 2 + 1;
+const ALL_RAYS_COUNT: usize = RAY_CUBE_EDGE.pow(3) - (RAY_CUBE_EDGE - 2).pow(3);
 
-/// Fixed configuration of light rays to use for light tracing.
-#[derive(Clone, Copy)]
-struct FaceRayData {
-    face: Face,
-    rays: [Ray; RAYS_PER_FACE],
+#[derive(Debug)]
+struct LightRayData {
+    ray: Ray,
+    face_cosines: FaceMap<f32>,
 }
 
-static LIGHT_RAYS: Lazy<[FaceRayData; 6]> = Lazy::new(|| {
-    let mut ray_data = Vec::new();
-    for &face in Face::ALL_SIX {
-        let origin = Point3::new(0.5, 0.5, 0.5) + face.normal_vector() * 0.25;
-        let mut face_ray_data = FaceRayData {
-            face,
-            rays: [Ray {
-                origin: Point3::origin(),
-                direction: Vector3::zero(),
-            }; RAYS_PER_FACE],
-        };
-        // RAYS_PER_FACE is too big to use convenience traits, so we have to
-        // explicitly index it to write into it. TODO: no longer true in rust 1.47
-        let mut i = 0;
-        for rayx in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
-            for rayy in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
-                // TODO: we can simplify this if we add "transform ray by matrix".
-                face_ray_data.rays[i] = Ray {
-                    origin,
-                    direction: face.matrix(1).to_free().transform_vector(Vector3::new(
-                        rayx as FreeCoordinate,
-                        rayy as FreeCoordinate,
-                        // Constrain the light ray angle to be at most 45° off axis — in fact,
-                        // less (so that we don't send two redundant rays, and it's more like
-                        // a uniform fan).
-                        // This is not actually physically realistic (a real diffuse
-                        // reflecting surface will reflect some light right up till the dot
-                        // product is zero) but it seems like a good place to stop.
-                        -(RAY_DIRECTION_STEP as FreeCoordinate + 0.5),
-                    )),
-                };
-                i += 1;
+static LIGHT_RAYS: Lazy<[LightRayData; ALL_RAYS_COUNT]> = Lazy::new(|| {
+    let mut rays: Vec<LightRayData> = Vec::new();
+    let origin = Point3::new(0.5, 0.5, 0.5);
+
+    // TODO: octahedron instead of cube
+    for x in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
+        for y in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
+            for z in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
+                if x.abs() == RAY_DIRECTION_STEP
+                    || y.abs() == RAY_DIRECTION_STEP
+                    || z.abs() == RAY_DIRECTION_STEP
+                {
+                    let direction = Vector3::new(
+                        x as FreeCoordinate,
+                        y as FreeCoordinate,
+                        z as FreeCoordinate,
+                    )
+                    .normalize();
+                    rays.push(LightRayData {
+                        ray: Ray { origin, direction },
+                        face_cosines: FaceMap::from_fn(|face| {
+                            direction
+                                .map(|s| s as f32)
+                                .dot(face.normal_vector())
+                                .max(0.0)
+                        }),
+                    });
+                }
             }
         }
-        ray_data.push(face_ray_data);
     }
-    (*ray_data).try_into().unwrap()
+    rays.try_into().unwrap()
 });
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -284,7 +279,7 @@ impl Space {
                 let (difference, cube_cost, _) = self.update_lighting_now_on(cube);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
-                if cost >= 10000 {
+                if cost >= 40000 {
                     break;
                 }
             }
@@ -339,6 +334,8 @@ impl Space {
         let mut incoming_light: Rgb = Rgb::ZERO;
         // Number of rays contributing to incoming_light.
         let mut total_rays = 0;
+        // Number of rays, weighted by the ray angle versus local cube faces.
+        let mut total_ray_weight = 0.0;
         // Cubes whose lighting value contributed to the incoming_light value.
         let mut dependencies: Vec<GridPoint> = Vec::new();
         // Approximation of CPU cost of doing the calculation, with one unit defined as
@@ -351,108 +348,120 @@ impl Space {
         if ev_origin.opaque {
             // Opaque blocks are always dark inside.
         } else {
-            for face_ray_data in &*LIGHT_RAYS {
-                let face = face_ray_data.face;
-                // We can and should skip these rays if:
-                // * There is no surface facing into this cube that would reflect arriving light into it.
-                // * There is no surface *within* this cube, ditto.
-                // * The ray isn't going to directly hit a light source.
-                // (Without this last special case, opaque light sources won't look bright.)
-                if !self
-                    .get_evaluated(cube + face.opposite().normal_vector())
-                    .visible
-                    && !ev_origin.visible
-                    && self
-                        .get_evaluated(cube + face.normal_vector())
-                        .attributes
-                        .light_emission
-                        == Rgb::ZERO
-                {
+            let adjacent_faces = if ev_origin.visible {
+                // Non-opaque blocks should work the same as blocks which have all six adjacent faces present.
+                FaceMap::repeat(1.0)
+            } else {
+                FaceMap::from_fn(|face| {
+                    if self
+                        .get_evaluated(cube + face.opposite().normal_vector())
+                        .visible
+                    {
+                        1.0f32
+                    } else {
+                        0.0
+                    }
+                })
+            };
+
+            'each_ray: for LightRayData { ray, face_cosines } in &LIGHT_RAYS[..] {
+                // TODO: Theoretically we should weight light rays by the cosine but that has caused poor behavior in the past.
+                let ray_weight_by_faces = face_cosines
+                    .zip(adjacent_faces, |_face, ray_cosine, reflects| {
+                        ray_cosine * reflects
+                    })
+                    .into_values_iter()
+                    .sum::<f32>();
+                if ray_weight_by_faces <= 0.0 {
                     continue;
                 }
 
-                'each_ray: for ray in &face_ray_data.rays[..] {
-                    let translated_ray =
-                        ray.translate(cube.cast::<FreeCoordinate>().unwrap().to_vec());
-                    let raycaster = translated_ray.cast().within_grid(self.grid());
+                let translated_ray = ray.translate(cube.cast::<FreeCoordinate>().unwrap().to_vec());
+                let raycaster = translated_ray.cast().within_grid(self.grid());
 
-                    // Fraction of the light value that is to be determined by future, rather than past,
-                    // tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
-                    let mut ray_alpha = 1.0_f32;
+                // Fraction of the light value that is to be determined by future, rather than past,
+                // tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
+                let mut ray_alpha = 1.0_f32;
 
-                    let info = &mut info_rays[total_rays];
+                let info = &mut info_rays[total_rays];
 
-                    'raycast: for hit in raycaster {
-                        cost += 1;
-                        let ev_hit = self.get_evaluated(hit.cube_ahead());
-                        if !ev_hit.visible {
-                            // Completely transparent block is passed through.
-                            continue 'raycast;
-                        }
-
-                        // TODO: Implement blocks with some faces opaque.
-                        if ev_hit.opaque {
-                            // On striking a fully opaque block, we use the light value from its
-                            // adjacent cube as the light falling on that face.
-                            let light_cube = hit.cube_behind();
-                            if light_cube == hit.cube_ahead() {
-                                // Don't read the value we're trying to recalculate.
-                                // We hit an opaque block, so this ray is stopping.
-                                continue 'each_ray;
-                            }
-                            let stored_light = self.get_lighting(light_cube);
-
-                            let surface_color = ev_hit.color.to_rgb() * SURFACE_ABSORPTION
-                                + Rgb::ONE * (1. - SURFACE_ABSORPTION);
-                            let light_from_struck_face = ev_hit.attributes.light_emission
-                                + stored_light.value() * surface_color;
-                            incoming_light += light_from_struck_face * ray_alpha;
-                            dependencies.push(light_cube);
-                            cost += 10;
-                            // This terminates the raycast; we don't bounce rays
-                            // (diffuse reflections, not specular/mirror).
-                            ray_alpha = 0.0;
-
-                            // Diagnostics. TODO: Track transparency to some extent.
-                            *info = Some(LightUpdateRayInfo {
-                                ray: Ray {
-                                    origin: translated_ray.origin,
-                                    direction: translated_ray.direction * 10.0, // TODO: translate hit position into ray
-                                },
-                                trigger_cube: hit.cube_ahead(),
-                                value_cube: light_cube,
-                                value: stored_light,
-                            });
-
-                            break;
-                        } else {
-                            // Block is partly transparent and light should pass through.
-                            let light_cube = hit.cube_ahead();
-
-                            let stored_light = if light_cube == cube {
-                                // Don't read the value we're trying to recalculate.
-                                Rgb::ZERO
-                            } else {
-                                self.get_lighting(light_cube).value()
-                            };
-                            // 'coverage' is what fraction of the light ray we assume to hit this block,
-                            // as opposed to passing through it.
-                            // TODO: Compute coverage (and connectivity) in EvaluatedBlock.
-                            let coverage = TRANSPARENT_BLOCK_COVERAGE;
-                            incoming_light += (ev_hit.attributes.light_emission * ray_alpha
-                                + stored_light)
-                                * coverage;
-                            ray_alpha *= 1.0 - coverage;
-                            dependencies.push(hit.cube_ahead());
-                            cost += 10;
-                        }
+                'raycast: for hit in raycaster {
+                    cost += 1;
+                    if hit.t_distance() > 30.0 {
+                        // TODO: arbitrary magic number in limit
+                        // Don't count rays that didn't hit anything close enough.
+                        break 'raycast;
                     }
-                    // TODO: set *info even if we hit the sky
+                    let ev_hit = self.get_evaluated(hit.cube_ahead());
+                    if !ev_hit.visible {
+                        // Completely transparent block is passed through.
+                        continue 'raycast;
+                    }
 
-                    // Note that if ray_alpha has reached zero, this has no effect.
-                    incoming_light += self.physics.sky_color * ray_alpha;
-                    total_rays += 1;
+                    // TODO: Implement blocks with some faces opaque.
+                    if ev_hit.opaque {
+                        // On striking a fully opaque block, we use the light value from its
+                        // adjacent cube as the light falling on that face.
+                        let light_cube = hit.cube_behind();
+                        if light_cube == hit.cube_ahead() {
+                            // Don't read the value we're trying to recalculate.
+                            // We hit an opaque block, so this ray is stopping.
+                            continue 'each_ray;
+                        }
+                        let stored_light = self.get_lighting(light_cube);
+
+                        let surface_color = ev_hit.color.to_rgb() * SURFACE_ABSORPTION
+                            + Rgb::ONE * (1. - SURFACE_ABSORPTION);
+                        let light_from_struck_face =
+                            ev_hit.attributes.light_emission + stored_light.value() * surface_color;
+                        incoming_light += light_from_struck_face * ray_alpha * ray_weight_by_faces;
+                        dependencies.push(light_cube);
+                        cost += 10;
+                        // This terminates the raycast; we don't bounce rays
+                        // (diffuse reflections, not specular/mirror).
+                        ray_alpha = 0.0;
+
+                        // Diagnostics. TODO: Track transparency to some extent.
+                        *info = Some(LightUpdateRayInfo {
+                            ray: Ray {
+                                origin: translated_ray.origin,
+                                direction: translated_ray.direction * 10.0, // TODO: translate hit position into ray
+                            },
+                            trigger_cube: hit.cube_ahead(),
+                            value_cube: light_cube,
+                            value: stored_light,
+                        });
+
+                        break;
+                    } else {
+                        // Block is partly transparent and light should pass through.
+                        let light_cube = hit.cube_ahead();
+
+                        let stored_light = if light_cube == cube {
+                            // Don't read the value we're trying to recalculate.
+                            Rgb::ZERO
+                        } else {
+                            self.get_lighting(light_cube).value()
+                        };
+                        // 'coverage' is what fraction of the light ray we assume to hit this block,
+                        // as opposed to passing through it.
+                        // TODO: Compute coverage (and connectivity) in EvaluatedBlock.
+                        let coverage = TRANSPARENT_BLOCK_COVERAGE;
+                        incoming_light += (ev_hit.attributes.light_emission * ray_alpha
+                            + stored_light)
+                            * coverage
+                            * ray_weight_by_faces;
+                        ray_alpha *= 1.0 - coverage;
+                        dependencies.push(hit.cube_ahead());
+                        cost += 10;
+                    }
                 }
+                // TODO: set *info even if we hit the sky
+
+                // Note that if ray_alpha has reached zero, the sky color has no effect.
+                incoming_light += self.physics.sky_color * ray_alpha * ray_weight_by_faces;
+                total_rays += 1;
+                total_ray_weight += ray_weight_by_faces;
             }
         }
 
@@ -461,7 +470,7 @@ impl Space {
 
         // if total_rays is zero then incoming_light is zero so the result will be zero.
         // We just need to avoid dividing by zero.
-        let scale = NotNan::new(1.0 / total_rays.max(1) as f32).unwrap();
+        let scale = NotNan::new(1.0 / total_ray_weight.max(1.0)).unwrap();
         let new_light_value: PackedLight = if total_rays > 0 {
             PackedLight::some(incoming_light * scale)
         } else if ev_origin.opaque {
