@@ -313,8 +313,9 @@ pub struct FaceMap<V> {
 }
 
 impl<V> FaceMap<V> {
-    /// Compute and store a value for each [`Face`] enum variant.
-    pub fn generate(mut f: impl FnMut(Face) -> V) -> Self {
+    /// Constructs a [`FaceMap`] by using the provided function to compute
+    /// a value for each [`Face`] enum variant.
+    pub fn from_fn(mut f: impl FnMut(Face) -> V) -> Self {
         Self {
             within: f(Face::Within),
             nx: f(Face::NX),
@@ -432,7 +433,7 @@ mod tests {
     #[test]
     fn face_map_iter_in_enum_order() {
         // TODO: Maybe generalize this to _all_ the Face/FaceMap methods that have an ordering?
-        let map = FaceMap::generate(|f| f);
+        let map = FaceMap::from_fn(|f| f);
         assert_eq!(
             Face::ALL_SEVEN.to_vec(),
             map.iter().map(|(_, &v)| v).collect::<Vec<_>>(),

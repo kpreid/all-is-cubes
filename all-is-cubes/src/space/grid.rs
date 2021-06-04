@@ -559,13 +559,13 @@ pub struct GridArray<V> {
 }
 
 impl<V> GridArray<V> {
-    /// Constructs a [`GridArray`] from a function choosing the value at each point.
-    pub fn generate<F>(grid: Grid, f: F) -> Self
+    /// Constructs a [`GridArray`] by using the provided function to compute a value
+    /// for each point.
+    pub fn from_fn<F>(grid: Grid, mut f: F) -> Self
     where
-        F: Fn(GridPoint) -> V,
+        F: FnMut(GridPoint) -> V,
     {
         let mut contents: Vec<V> = Vec::with_capacity(grid.volume());
-        // TODO: Implement optimized index calculation, maybe as an iterator
         for x in grid.x_range() {
             for y in grid.y_range() {
                 for z in grid.z_range() {

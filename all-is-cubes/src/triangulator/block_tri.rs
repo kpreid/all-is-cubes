@@ -87,7 +87,7 @@ impl<V, T> Default for BlockTriangulation<V, T> {
     #[inline]
     fn default() -> Self {
         Self {
-            faces: FaceMap::generate(|_| FaceTriangulation::default()),
+            faces: FaceMap::from_fn(|_| FaceTriangulation::default()),
             textures_used: Vec::new(),
         }
     }
@@ -104,7 +104,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 ) -> BlockTriangulation<V, A::Tile> {
     match &block.voxels {
         None => {
-            let faces = FaceMap::generate(|face| {
+            let faces = FaceMap::from_fn(|face| {
                 if face == Face::Within {
                     // No interior detail for atom blocks.
                     return FaceTriangulation::default();
@@ -148,7 +148,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
         Some(voxels) => {
             // Construct empty output to mutate, because inside the loops we'll be
             // updating `Within` independently of other faces.
-            let mut output_by_face = FaceMap::generate(|face| FaceTriangulation {
+            let mut output_by_face = FaceMap::from_fn(|face| FaceTriangulation {
                 vertices: Vec::new(),
                 indices_opaque: Vec::new(),
                 indices_transparent: Vec::new(),

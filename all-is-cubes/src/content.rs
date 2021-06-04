@@ -41,7 +41,7 @@ pub fn logo_text_extent() -> Grid {
             [top_left_2d.x, -bottom_right_2d.y, 0],
             [bottom_right_2d.x, -top_left_2d.y, 2],
         )
-        .expand(FaceMap::generate(|f| {
+        .expand(FaceMap::from_fn(|f| {
             // Expand horizontally due to the VoxelBrush's size. TODO: We should be able to ask the brush to do this.
             ([Face::PX, Face::PY, Face::NX, Face::NY].contains(&f)) as GridCoordinate
         }))

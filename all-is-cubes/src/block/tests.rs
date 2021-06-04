@@ -77,7 +77,7 @@ fn evaluate_voxels_checked_individually() {
     assert_eq!(e.attributes, attributes);
     assert_eq!(
         e.voxels,
-        Some(GridArray::generate(Grid::for_block(resolution), |point| {
+        Some(GridArray::from_fn(Grid::for_block(resolution), |point| {
             let point = point.cast::<f32>().unwrap();
             Evoxel {
                 color: Rgba::new(point.x, point.y, point.z, 1.0),
@@ -189,7 +189,7 @@ fn recur_with_offset() {
     let e = block_at_offset.evaluate().unwrap();
     assert_eq!(
         e.voxels,
-        Some(GridArray::generate(
+        Some(GridArray::from_fn(
             Grid::for_block(resolution as Resolution),
             |point| {
                 let point = (point + offset).cast::<f32>().unwrap();

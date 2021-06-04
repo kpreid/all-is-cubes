@@ -171,17 +171,17 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
 
             let light_neighborhood = if V::WANTS_LIGHT {
                 match options.lighting_display {
-                    LightingOption::None => FaceMap::generate(|_| PackedLight::ONE),
+                    LightingOption::None => FaceMap::from_fn(|_| PackedLight::ONE),
                     // Note: This is not sufficient neighborhood data for smooth lighting,
                     // but vertex lighting in general can't do smooth lighting unless we pack
                     // the neighborhood into each vertex, which isn't currently in any plans.
                     LightingOption::Flat | LightingOption::Smooth => {
-                        FaceMap::generate(|f| space.get_lighting(cube + f.normal_vector()))
+                        FaceMap::from_fn(|f| space.get_lighting(cube + f.normal_vector()))
                     }
                 }
             } else {
                 // Not read; hopefully the optimizer throws it out.
-                FaceMap::generate(|_| PackedLight::ONE)
+                FaceMap::from_fn(|_| PackedLight::ONE)
             };
 
             for &face in Face::ALL_SEVEN {

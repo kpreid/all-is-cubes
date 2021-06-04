@@ -222,7 +222,7 @@ impl Block {
                         let inverse_matrix = rotation
                             .inverse()
                             .to_positive_octant_matrix(resolution.into());
-                        GridArray::generate(
+                        GridArray::from_fn(
                             voxels.grid().transform(inverse_matrix).unwrap(),
                             |cube| voxels[matrix.transform_cube(cube)],
                         )
