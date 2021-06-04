@@ -561,22 +561,13 @@ pub struct GridArray<V> {
 impl<V> GridArray<V> {
     /// Constructs a [`GridArray`] by using the provided function to compute a value
     /// for each point.
-    pub fn from_fn<F>(grid: Grid, mut f: F) -> Self
+    pub fn from_fn<F>(grid: Grid, f: F) -> Self
     where
         F: FnMut(GridPoint) -> V,
     {
-        let mut contents: Vec<V> = Vec::with_capacity(grid.volume());
-        for x in grid.x_range() {
-            for y in grid.y_range() {
-                for z in grid.z_range() {
-                    contents.push(f(GridPoint::new(x, y, z)));
-                }
-            }
-        }
-
         GridArray {
             grid,
-            contents: contents.into_boxed_slice(),
+            contents: grid.interior_iter().map(f).collect(),
         }
     }
 
