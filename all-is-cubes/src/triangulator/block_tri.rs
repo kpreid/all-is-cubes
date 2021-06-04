@@ -86,8 +86,9 @@ impl<V, T> BlockTriangulation<V, T> {
 impl<V, T> Default for BlockTriangulation<V, T> {
     #[inline]
     fn default() -> Self {
+        // This implementation can't be derived since `V` and `T` don't have defaults themselves.
         Self {
-            faces: FaceMap::from_fn(|_| FaceTriangulation::default()),
+            faces: FaceMap::default(),
             textures_used: Vec::new(),
         }
     }

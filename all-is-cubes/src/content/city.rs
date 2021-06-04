@@ -191,7 +191,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             .expect("exhibit generation failure. TODO: place an error marker and continue instead");
         let exhibit_footprint = exhibit_space.grid();
 
-        let enclosure_footprint = exhibit_footprint.expand(FaceMap::from_fn(|_| 1));
+        let enclosure_footprint = exhibit_footprint.expand(FaceMap::repeat(1));
 
         let plot_transform = planner
             .find_plot(enclosure_footprint)
@@ -376,7 +376,7 @@ impl CityPlanner {
                     }
 
                     let for_occupancy_check =
-                        transformed.expand(FaceMap::from_fn(|_| Self::GAP_BETWEEN_PLOTS));
+                        transformed.expand(FaceMap::repeat(Self::GAP_BETWEEN_PLOTS));
 
                     for occupied in self.occupied_plots.iter() {
                         if occupied.intersection(for_occupancy_check).is_some() {

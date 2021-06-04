@@ -89,7 +89,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                     }
                     TracingBlock::Recur(pixel_block_data, resolution, array) => {
                         let light_neighborhood = match impl_fields.options.lighting_display {
-                            LightingOption::None => FaceMap::from_fn(|_| Rgb::ONE),
+                            LightingOption::None => FaceMap::repeat(Rgb::ONE),
                             // TODO: Implement actual smooth lighting in raytracer
                             LightingOption::Flat | LightingOption::Smooth => {
                                 FaceMap::from_fn(|f| {

@@ -350,6 +350,22 @@ impl<V> FaceMap<V> {
     // TODO: provide more convenience methods for iteration & transformation
 }
 
+impl<V: Clone> FaceMap<V> {
+    /// Constructs a [`FaceMap`] containing clones of the provided value.
+    #[inline]
+    pub fn repeat(value: V) -> Self {
+        Self {
+            within: value.clone(),
+            nx: value.clone(),
+            ny: value.clone(),
+            nz: value.clone(),
+            px: value.clone(),
+            py: value.clone(),
+            pz: value,
+        }
+    }
+}
+
 impl<V> Index<Face> for FaceMap<V> {
     type Output = V;
     fn index(&self, face: Face) -> &V {

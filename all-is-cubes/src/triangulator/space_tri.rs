@@ -171,7 +171,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
 
             let light_neighborhood = if V::WANTS_LIGHT {
                 match options.lighting_display {
-                    LightingOption::None => FaceMap::from_fn(|_| PackedLight::ONE),
+                    LightingOption::None => FaceMap::repeat(PackedLight::ONE),
                     // Note: This is not sufficient neighborhood data for smooth lighting,
                     // but vertex lighting in general can't do smooth lighting unless we pack
                     // the neighborhood into each vertex, which isn't currently in any plans.
@@ -181,7 +181,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 }
             } else {
                 // Not read; hopefully the optimizer throws it out.
-                FaceMap::from_fn(|_| PackedLight::ONE)
+                FaceMap::repeat(PackedLight::ONE)
             };
 
             for &face in Face::ALL_SEVEN {
