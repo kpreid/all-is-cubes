@@ -185,12 +185,14 @@ impl Space {
         subgrid: Grid,
         mut extractor: impl FnMut(Option<BlockIndex>, &SpaceBlockData, PackedLight) -> V,
     ) -> GridArray<V> {
-        let mut output: Vec<V> = Vec::with_capacity(subgrid.volume());
-        for x in subgrid.x_range() {
-            for y in subgrid.y_range() {
-                for z in subgrid.z_range() {
-                    // TODO: Implement optimized index calculation, maybe as an iterator
-                    output.push(match self.grid.index((x, y, z)) {
+        GridArray {
+            grid: subgrid,
+            contents: subgrid
+                .interior_iter()
+                .map(|cube| {
+                    // TODO: Implement an iterator over the indexes (which is not just
+                    // interior_iter().enumerate() because it's a sub-grid).
+                    match self.grid.index(cube) {
                         Some(cube_index) => {
                             let block_index = self.contents[cube_index];
                             extractor(
@@ -203,14 +205,9 @@ impl Space {
                             )
                         }
                         None => extractor(None, &SpaceBlockData::NOTHING, self.packed_sky_color),
-                    });
-                }
-            }
-        }
-
-        GridArray {
-            grid: subgrid,
-            contents: output.into_boxed_slice(),
+                    }
+                })
+                .collect(),
         }
     }
 
