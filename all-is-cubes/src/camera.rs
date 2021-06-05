@@ -283,7 +283,7 @@ impl Viewport {
         -((y as FreeCoordinate + 0.5) / FreeCoordinate::from(self.framebuffer_size.y) * 2.0 - 1.0)
     }
 
-    /// Convert a point in the `self.nominal_size` coordinate system to
+    /// Convert a point in the [`Self::nominal_size`] coordinate system to
     /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel centers) with Y flipped.
     ///
     /// TODO: Some windowing APIs providing float input might have different ideas of pixel centers.

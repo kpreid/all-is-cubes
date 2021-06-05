@@ -492,16 +492,18 @@ pub struct EvaluatedBlock {
     /// The block's color; if made of multiple voxels, then an average or representative
     /// color.
     pub color: Rgba,
-    /// The voxels making up the block, if any; if [`None`], then `self.color` should be
-    /// used as a uniform color value.
+    /// The voxels making up the block, if any; if [`None`], then [`Self::color`]
+    /// should be used as a uniform color value.
     ///
-    /// TODO: Specify how it should be handled if the grid has unsuitable dimensions
-    /// (not cubical, not having an origin of 0, etc.).
+    /// This array may be smaller than the dimensions implied by [`Self::resolution`];
+    /// in which case the out-of-bounds space should be treated as [`Evoxel::AIR`].
+    /// The logical bounds are always the cube computed by [`Grid::for_block`].
     pub voxels: Option<GridArray<Evoxel>>,
-    /// If `self.voxels` is present, then this is the voxel resolution (number of voxels along
-    /// an edge) of the block. The bounds of `voxels` should be ignored
+    /// If [`Self::voxels`] is present, then this is the voxel resolution (number of
+    /// voxels along an edge) of the block.
     ///
-    /// If `self.voxels` is [`None`], then this value should be 1.
+    /// If [`Self::voxels`] is [`None`], then this value is irrelevant and should be set
+    /// to 1.
     pub resolution: Resolution,
     /// Whether the block is known to be completely opaque to light on all six faces.
     ///

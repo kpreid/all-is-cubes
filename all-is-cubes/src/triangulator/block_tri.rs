@@ -24,7 +24,7 @@ use crate::triangulator::{
 /// kept there.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct FaceTriangulation<V> {
-    /// Vertices, as used by `self.indices`.
+    /// Vertices, as used by the indices vectors.
     pub(super) vertices: Vec<V>,
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
     /// in counterclockwise order, for vertices whose coloring is fully opaque (or

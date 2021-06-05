@@ -17,7 +17,7 @@ pub trait CustomFormat<F: Copy> {
         CustomFormatWrapper(format_type, self)
     }
 
-    /// Implement this to provide ConciseDebug formatting for this type.
+    /// Implement this to provide custom formatting for this type.
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: F) -> fmt::Result;
 }
 

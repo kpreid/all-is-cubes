@@ -17,7 +17,7 @@ use std::fmt::Debug;
 pub struct IntAllocator<T: PrimInt + Debug> {
     /// All larger integers are free. If `None`, then zero has not been allocated.
     last_allocated: Option<T>,
-    /// List of integers ≤ than `self.last_allocated` that are free.
+    /// List of integers ≤ than [`Self::last_allocated`] that are free.
     free_list: Vec<T>,
 }
 

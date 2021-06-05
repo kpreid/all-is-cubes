@@ -42,8 +42,8 @@ pub struct Space {
 
     /// The blocks in the space, stored compactly:
     ///
-    /// * Coordinates are transformed to indices by `Grid::index`.
-    /// * Each element is an index into `self.block_data`.
+    /// * Coordinates are transformed to indices by [`Grid::index`].
+    /// * Each element is an index into [`Self::block_data`].
     // TODO: Consider making this use different integer types depending on how
     // many blocks there are, so we can save memory in simple spaces but not have
     // a cap on complex ones.
@@ -161,15 +161,14 @@ impl Space {
     }
 
     /// Returns the internal unstable numeric ID for the block at the given position,
-    /// which may be mapped to a [`Block`] by
-    /// [`Space::.distinct_blocks_unfiltered_iter()`].
-    /// If you are looking for *simple* access, use `space[position]` (the [`Index`]
-    /// trait) instead.
+    /// which may be mapped to a [`Block`] by [`Space::block_data`].
+    /// If you are looking for *simple* access, use `space[position]` (the
+    /// [`std::ops::Index`] trait) instead.
     ///
     /// These IDs may be used to perform efficient processing of many blocks, but they
     /// may be renumbered after any mutation.
     #[inline(always)]
-    pub(crate) fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
+    pub fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
         self.grid
             .index(position.into())
             .map(|contents_index| self.contents[contents_index])
@@ -179,7 +178,7 @@ impl Space {
     ///
     /// If the provided [`Grid`] contains portions outside of this space's grid,
     /// those positions in the output will be treated as if they are filled with [`AIR`]
-    /// and light of the [`Space::sky_color`].
+    /// and lit by [`SpacePhysics::sky_color`].
     pub fn extract<V>(
         &self,
         subgrid: Grid,

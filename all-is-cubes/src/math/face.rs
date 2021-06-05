@@ -413,8 +413,8 @@ impl CubeFace {
         }
     }
 
-    /// Computes the cube that is adjacent in the direction of `self.face`.
-    /// Equal to `self.cube` if the face is [`Face::Within`].
+    /// Computes the cube that is adjacent in the direction of [`self.face`](Self::face).
+    /// Equal to [`self.cube`](Self::cube) if the face is [`Face::Within`].
     #[inline]
     pub fn adjacent(self) -> GridPoint {
         self.cube + self.face.normal_vector()

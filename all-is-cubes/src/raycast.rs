@@ -418,11 +418,11 @@ impl RaycastStep {
         self.cube_face
     }
 
-    /// Returns the face of `self.cube_ahead()` which is being crossed. The face's normal
-    /// vector points away from that cube and towards `self.cube_behind()`.
+    /// Returns the face of [`Self::cube_ahead()`] which is being crossed. The face's normal
+    /// vector points away from that cube and towards [`Self::cube_behind()`].
     ///
     /// If the ray starts within a cube, then the initial step will have a face of
-    /// `Face::Within`.
+    /// [`Face::Within`].
     ///
     /// ```
     /// use all_is_cubes::math::Face;

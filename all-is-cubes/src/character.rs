@@ -54,7 +54,7 @@ pub struct Character {
     // TODO: Figure out what access is needed and add accessors
     inventory: Inventory,
 
-    //. Indices into `self.inventory` slots.
+    /// Indices into [`Self::inventory`] slots.
     selected_slots: [usize; 3],
 
     /// Notifier for modifications.
