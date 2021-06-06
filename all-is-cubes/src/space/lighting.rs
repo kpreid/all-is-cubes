@@ -799,6 +799,26 @@ mod tests {
         assert_eq!(space.lighting_update_queue.pop(), None);
     }
 
+    #[test]
+    fn light_source_self_illumination() {
+        let light = Rgb::new(0.5, 1.0, 2.0);
+        let block = Block::builder()
+            .light_emission(light)
+            .color(Rgba::new(1.0, 0.0, 0.0, 0.33)) // should be irrelevant
+            .build();
+
+        let mut space = Space::empty_positive(3, 3, 3);
+        space.set_physics(SpacePhysics {
+            sky_color: Rgb::ZERO,
+            ..Default::default()
+        });
+        space.set([1, 1, 1], block).unwrap();
+        space.evaluate_light(1, |_| ());
+        // TODO: 0.25 is an empirical value from what the current algorithm does
+        // and is not really justified. In fact, it should probably be 1.
+        assert_eq!(space.get_lighting([1, 1, 1]).value(), light * 0.25);
+    }
+
     /// Helper to construct a space with LightPhysics set to None
     fn space_with_disabled_light() -> Space {
         let mut space = Space::empty_positive(1, 1, 1);
