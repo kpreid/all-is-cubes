@@ -20,6 +20,10 @@ use crate::space::*;
 /// model.
 const SURFACE_ABSORPTION: f32 = 0.75;
 
+/// Placeholder for better block opacity algorithms: any block which is partly transparent
+/// is assumed to intercept this much of the ray passing through.
+const TRANSPARENT_BLOCK_COVERAGE: f32 = 0.25;
+
 /// One component of a `PackedLight`.
 pub(crate) type PackedLightScalar = u8;
 
@@ -434,7 +438,7 @@ impl Space {
                             // 'coverage' is what fraction of the light ray we assume to hit this block,
                             // as opposed to passing through it.
                             // TODO: Compute coverage (and connectivity) in EvaluatedBlock.
-                            let coverage = 0.25;
+                            let coverage = TRANSPARENT_BLOCK_COVERAGE;
                             incoming_light += (ev_hit.attributes.light_emission * ray_alpha
                                 + stored_light)
                                 * coverage;
@@ -814,9 +818,12 @@ mod tests {
         });
         space.set([1, 1, 1], block).unwrap();
         space.evaluate_light(1, |_| ());
-        // TODO: 0.25 is an empirical value from what the current algorithm does
-        // and is not really justified. In fact, it should probably be 1.
-        assert_eq!(space.get_lighting([1, 1, 1]).value(), light * 0.25);
+        // TODO: Arguably TRANSPARENT_BLOCK_COVERAGE shouldn't affect light emission.
+        // Perhaps we should multiply the emission value by the coverage.
+        assert_eq!(
+            space.get_lighting([1, 1, 1]).value(),
+            light * TRANSPARENT_BLOCK_COVERAGE
+        );
     }
 
     /// Helper to construct a space with LightPhysics set to None
