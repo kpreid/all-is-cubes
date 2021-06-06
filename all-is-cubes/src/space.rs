@@ -1249,7 +1249,7 @@ mod tests {
             \x20       },\n\
             \x20   ],\n\
             \x20   physics: SpacePhysics {\n\
-            \x20       sky_color: Rgb(0.9, 0.9, 1.4),\n\
+            \x20       sky_color: Rgb(0.79, 0.79, 1.0),\n\
             \x20       light: Rays,\n\
             \x20   },\n\
             }"
