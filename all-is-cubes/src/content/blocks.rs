@@ -5,15 +5,19 @@
 //! or UI.
 
 use cgmath::{ElementWise as _, EuclideanSpace as _};
+use embedded_graphics::prelude::Point;
+use embedded_graphics::primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable};
 use noise::Seedable as _;
 
 use crate::block::{Block, BlockCollision, AIR};
 use crate::content::landscape::install_landscape_blocks;
-use crate::linking::{BlockModule, BlockProvider, GenError};
+use crate::content::palette;
+use crate::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use crate::math::{
-    int_magnitude_squared, GridCoordinate, GridPoint, GridRotation, GridVector, NoiseFnExt as _,
-    NotNan, Rgb, Rgba,
+    int_magnitude_squared, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
+    NoiseFnExt as _, NotNan, Rgb, Rgba,
 };
+use crate::space::{Grid, Space};
 use crate::universe::Universe;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
@@ -26,6 +30,7 @@ pub enum DemoBlocks {
     Curb,
     CurbCorner,
     ExhibitBackground,
+    Signboard,
 }
 impl BlockModule for DemoBlocks {
     fn namespace() -> &'static str {
@@ -142,6 +147,60 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                     .voxels_fn(universe, 4, |cube| {
                         &colors[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
                     })?
+                    .build()
+            }
+
+            Signboard => {
+                let sign_board = Block::from(palette::PLANK);
+                let sign_post = Block::from(palette::STEEL);
+
+                // This shape has to coordinate with the name-drawing code in city::demo_city.
+                // Haven't thought of a good way to abstract/combine it yet.
+                let resolution = 16;
+                let top_edge = 10;
+
+                let mut space = Space::empty(Grid::for_block(resolution));
+
+                // Sign board
+                {
+                    // space.fill_uniform(
+                    //     Grid::from_lower_upper([0, 8, 15], [16, 16, 16]),
+                    //     &sign_backing,
+                    // )?;
+                    let mut plane = space.draw_target(GridMatrix::from_translation([
+                        0,
+                        0,
+                        (resolution - 1).into(),
+                    ]));
+                    Rectangle::with_corners(
+                        Point::new(0, (resolution / 4).into()),
+                        Point::new((resolution - 1).into(), top_edge),
+                    )
+                    .draw_styled(&PrimitiveStyle::with_fill(&sign_board), &mut plane)?;
+                }
+
+                // Support posts
+                let mut post = |x| -> Result<(), InGenError> {
+                    let mut plane = space.draw_target(
+                        GridMatrix::from_translation([x, 0, 0])
+                            * GridRotation::RZYX.to_rotation_matrix(),
+                    );
+                    let style = &PrimitiveStyle::with_stroke(&sign_post, 2);
+                    let z = (resolution - 3).into();
+                    // Vertical post
+                    Line::new(Point::new(z, 0), Point::new(z, top_edge - 1))
+                        .draw_styled(style, &mut plane)?;
+                    // Diagonal brace
+                    Line::new(Point::new(z - 4, 0), Point::new(z, 4))
+                        .draw_styled(style, &mut plane)?;
+                    Ok(())
+                };
+                post(2)?;
+                post((resolution - 3).into())?;
+
+                Block::builder()
+                    .display_name("Signboard")
+                    .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
         })

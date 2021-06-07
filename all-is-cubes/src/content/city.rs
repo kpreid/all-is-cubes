@@ -8,6 +8,8 @@ use cgmath::{EuclideanSpace as _, One as _, Transform as _, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::FONT_9X18_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::prelude::Dimensions;
+use embedded_graphics::prelude::Transform;
 use embedded_graphics::text::Baseline;
 use embedded_graphics::text::Text;
 use instant::Instant;
@@ -198,6 +200,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         let plot_transform = planner
             .find_plot(enclosure_footprint)
             .expect("Out of city space!");
+        let (plot_rotation, _) = plot_transform.decompose().unwrap();
         let plot = exhibit_footprint.transform(plot_transform).unwrap();
 
         // Mark the exhibit bounds
@@ -217,13 +220,25 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         let name_transform = GridMatrix::from_translation([
             exhibit_footprint.lower_bounds().x - 1,
             0,
-            exhibit_footprint.upper_bounds().z + 2,
-        ]) * GridRotation::from_basis([Face::PX, Face::NZ, Face::PY])
-            .to_rotation_matrix();
+            exhibit_footprint.upper_bounds().z + 1,
+        ]);
+        let name_block_resolution = 32;
         let font = &FONT_9X18_BOLD;
+        let name_bottom_y =
+            (name_block_resolution - font.character_size.height as GridCoordinate) / 2;
+        let name_text = Text::with_baseline(
+            exhibit.name,
+            Point::new(0, -name_bottom_y),
+            MonoTextStyle::new(font, Rgb::ZERO),
+            Baseline::Bottom,
+        );
+        // TODO: This is an awful lot of code to benerate "text is centered on a number of whole blocks"
+        let name_width = name_text.bounding_box().size.width as GridCoordinate;
+        let name_width_in_blocks: GridCoordinate =
+            (name_width + name_block_resolution - 1) / name_block_resolution; // rounding up
         let name_blocks = draw_to_blocks(
             universe,
-            font.character_size.height as Resolution,
+            name_block_resolution as Resolution,
             0,
             0..1,
             BlockAttributes {
@@ -231,25 +246,33 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                 collision: BlockCollision::None,
                 ..BlockAttributes::default()
             },
-            &Text::with_baseline(
-                exhibit.name,
-                Point::new(0, 0),
-                MonoTextStyle::new(font, Rgb::ZERO),
-                Baseline::Bottom,
-            ),
+            &name_text.translate(Point::new(
+                ((name_width_in_blocks * name_block_resolution) - name_width) / 2,
+                0,
+            )),
         )
         .expect("name drawing failure");
-        // TODO: give this an offset of a suitable rotation that won't collide...
+        // Truncate name to not overrun the exhibit itself
+        let truncated_name_grid = name_blocks
+            .grid()
+            .intersection(Grid::new([0, 0, 0], [exhibit_footprint.size().x + 3, 1, 1]))
+            .unwrap();
         space_to_space_copy(
             &name_blocks,
-            name_blocks
-                .grid()
-                // Truncate if necessary
-                .intersection(Grid::new([0, 0, 0], [exhibit_footprint.size().x + 3, 1, 1]))
-                .unwrap(),
+            truncated_name_grid,
             &mut space,
             plot_transform * name_transform,
         )?; // TODO: on failure, place an error marker and continue
+        space.fill_uniform(
+            truncated_name_grid
+                .transform(
+                    plot_transform * name_transform * GridMatrix::from_translation([0, 0, -1]),
+                )
+                .unwrap(),
+            demo_blocks[Signboard]
+                .clone()
+                .rotate(plot_rotation.inverse()),
+        )?;
 
         // Place exhibit content
         space_to_space_copy(

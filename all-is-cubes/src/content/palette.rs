@@ -20,12 +20,14 @@ pub const MISSING_VOXEL_FALLBACK: Rgba = rgba_const!(0.5, 0.0, 1.0, 1.0);
 /// Used in unallocated texture atlas space.
 pub const UNPAINTED_TEXTURE_FALLBACK: Rgba = rgba_const!(0.0, 0.7, 0.7, 1.0);
 
-// "Natural" "landscape" colors.
+// Physical material colors.
 pub const GRASS: Rgb = rgb_const!(0.117, 0.402, 0.029);
 pub const DIRT: Rgb = rgb_const!(0.150, 0.080, 0.058);
 pub const STONE: Rgb = rgb_const!(0.694, 0.672, 0.658);
 pub const TREE_BARK: Rgb = rgb_const!(0.317, 0.072, 0.119); // TODO: never used, wrong
 pub const TREE_LEAVES: Rgb = rgb_const!(0.010, 0.445, 0.033); // TODO: never used, wrong
+pub const STEEL: Rgb = rgb_const!(0.4, 0.4, 0.4); // TODO: not taken from real references
+pub const PLANK: Rgb = rgb_const!(0.8, 0.6, 0.3); // TODO: not taken from real references
 
 // TODO: Decide what we want *actual* logo(type) colors to be.
 pub const LOGO_FILL: Rgb = rgb_const!(0.565, 0.033, 0.184);
