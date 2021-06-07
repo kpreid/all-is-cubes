@@ -14,14 +14,15 @@ publish = false
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
-# There will never be tests runnable on the host environment
-test = false
+# There are some host-runnable unit tests (but we might move those...Z)
+test = true
 crate-type = ["cdylib"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.2.0" }
 console_log = "0.2"
 console_error_panic_hook = "0.1.5"
+form_urlencoded = "1.0.1"
 # Feature enabling for indirect dependency all-is-cubes → random → getrand
 getrandom = { version = "0.2.3", features = ["js"] }
 # Feature enabling for indirect dependency all-is-cubes → instant
@@ -45,6 +46,7 @@ features = [
   "FocusEvent",
   "HtmlElement",
   "KeyboardEvent",
+  "Location",
   "MouseEvent",
   "Text",
   "Window",

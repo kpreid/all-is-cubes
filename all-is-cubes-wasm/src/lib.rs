@@ -13,5 +13,7 @@
 pub mod gameapp;
 #[cfg(target_arch = "wasm32")]
 mod js_bindings;
+#[cfg(any(target_arch = "wasm32", test))]
+mod url_params;
 #[cfg(target_arch = "wasm32")]
 mod web_glue;

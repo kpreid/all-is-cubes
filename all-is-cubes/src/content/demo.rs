@@ -49,6 +49,12 @@ impl UniverseTemplate {
     }
 }
 
+impl Default for UniverseTemplate {
+    fn default() -> Self {
+        Self::DemoCity
+    }
+}
+
 #[rustfmt::skip]
 fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
     // Coordinates are set up based on this dimension because, being blocks, we're not

@@ -16,12 +16,12 @@ use web_sys::{
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::cgmath::{Point2, Vector2};
-use all_is_cubes::content::UniverseTemplate;
 use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::{CustomFormat as _, StatusText, Warnings};
 
 use crate::js_bindings::GuiHelpers;
+use crate::url_params::{options_from_query_string, OptionsInUrl};
 use crate::web_glue::{add_event_listener, get_mandatory_element};
 
 /// Entry point for normal game-in-a-web-page operation.
@@ -50,8 +50,20 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .scene_info_text_node
         .append_data("\nRusting...")?;
 
-    // TODO: Get template choice from URL
-    let app = AllIsCubesAppState::new(UniverseTemplate::DemoCity);
+    let OptionsInUrl {
+        template,
+        graphics_options,
+    } = options_from_query_string(
+        &document
+            .location()
+            .unwrap()
+            .search()?
+            .trim_start_matches('?')
+            .as_bytes(),
+    );
+
+    let app = AllIsCubesAppState::new(template);
+    app.graphics_options_mut().set(graphics_options);
 
     let surface = WebSysWebGL2Surface::from_canvas(gui_helpers.canvas_helper().canvas())
         .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;

@@ -78,6 +78,7 @@ dependencies = [
  "all-is-cubes",
  "console_error_panic_hook",
  "console_log",
+ "form_urlencoded",
  "getrandom 0.2.3",
  "instant",
  "js-sys",

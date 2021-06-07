@@ -104,6 +104,10 @@ impl AllIsCubesAppState {
         self.graphics_options.as_source()
     }
 
+    pub fn graphics_options_mut(&self) -> &ListenableCell<GraphicsOptions> {
+        &self.graphics_options
+    }
+
     /// Steps the universe if the `FrameClock` says it's time to do so.
     /// Always returns info for the last step even if multiple steps were taken.
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
