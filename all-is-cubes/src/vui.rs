@@ -9,8 +9,7 @@
 use cgmath::{Angle as _, Deg, Matrix4, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
-use embedded_graphics::primitives::Rectangle;
-use embedded_graphics::style::PrimitiveStyleBuilder;
+use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
 use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -235,7 +234,7 @@ impl Listener<()> for TodoListener {
 #[allow(unused)] // TODO: not yet used for real
 pub(crate) fn draw_background(space: &mut Space) {
     let grid = space.grid();
-    let background_rect = Rectangle::new(
+    let background_rect = Rectangle::with_corners(
         Point::new(grid.lower_bounds().x, grid.lower_bounds().y),
         Point::new(grid.upper_bounds().x - 1, grid.upper_bounds().y - 1),
     );

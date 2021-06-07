@@ -2,11 +2,13 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use cgmath::{EuclideanSpace as _, Vector2};
-use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
-use embedded_graphics::prelude::{Dimensions as _, Drawable, Pixel, Primitive, Transform as _};
-use embedded_graphics::primitives::{Rectangle, Triangle};
-use embedded_graphics::style::{PrimitiveStyleBuilder, TextStyleBuilder};
+use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::prelude::{Primitive as _, Transform as _};
+use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle, Triangle};
+use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
+use embedded_graphics::Drawable as _;
+use embedded_graphics::Pixel;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
 use crate::content::palette;
@@ -17,6 +19,8 @@ use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe};
 use crate::vui::Icons;
+
+pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
 /// Knows where and how to place graphics within the HUD space, but does not store
 /// the space or any related state itself; depends only on the screen size and other
@@ -203,15 +207,20 @@ impl HudLayout {
         let grid = toolbar_text_space.grid();
         toolbar_text_space.fill_uniform(grid, &AIR).unwrap();
 
-        let text_obj = Text::new(&text, Point::new(grid.size().x / 2, -16)).into_styled(
-            TextStyleBuilder::new(Font8x16)
-                .text_color(&hud_blocks.text)
+        // Note on dimensions: HudFont is currently 13 pixels tall, and we're using
+        // the standard 16-voxel space resolution, and hud_blocks.text has a 1-pixel stroke,
+        // so we have 16 - (13 + 2) = 1 voxel of free alignment, which I've chosen to put on
+        // the top edge.
+        let text_obj = Text::with_text_style(
+            &text,
+            Point::new(grid.size().x / 2, -1),
+            MonoTextStyle::new(&HudFont, &hud_blocks.text),
+            TextStyleBuilder::new()
+                .baseline(Baseline::Bottom)
+                .alignment(Alignment::Center)
                 .build(),
         );
-        text_obj
-            .translate(Point::new(-((text_obj.size().width / 2) as i32), 0))
-            .draw(&mut toolbar_text_space.draw_target(GridMatrix::FLIP_Y))?;
-
+        text_obj.draw(&mut toolbar_text_space.draw_target(GridMatrix::FLIP_Y))?;
         Ok(())
     }
 }
@@ -257,7 +266,7 @@ impl HudBlocks {
         let stroke_width = 1;
         let background_fill = VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, -1));
         let background_stroke = VoxelBrush::single(palette::HUD_TOOLBAR_FRAME);
-        let icon_background_rectangle = Rectangle::new(
+        let icon_background_rectangle = Rectangle::with_corners(
             // TODO: confirm these offsets are exactly right
             Point::new(-padding - stroke_width, -padding - resolution_g),
             Point::new(resolution_g + padding, padding + stroke_width),

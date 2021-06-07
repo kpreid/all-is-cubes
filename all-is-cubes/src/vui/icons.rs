@@ -3,8 +3,7 @@
 
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
-use embedded_graphics::primitives::{Circle, Line};
-use embedded_graphics::style::PrimitiveStyleBuilder;
+use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
 
 use crate::block::{Block, AIR_EVALUATED};
 use crate::drawing::VoxelBrush;

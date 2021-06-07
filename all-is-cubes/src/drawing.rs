@@ -19,10 +19,10 @@
 //!     exclusive upper bounds).
 
 use cgmath::{EuclideanSpace as _, Transform as _};
-use embedded_graphics::drawable::{Drawable, Pixel};
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
-use embedded_graphics::DrawTarget;
+use embedded_graphics::prelude::{DrawTarget, Drawable, Pixel};
+use embedded_graphics::primitives::Rectangle;
 use std::borrow::{Borrow, Cow};
 use std::marker::PhantomData;
 use std::ops::{Range, RangeInclusive};
@@ -63,36 +63,54 @@ impl<'s, C> DrawingPlane<'s, C> {
         self.transform
             .transform_point(GridPoint::new(point.x, point.y, 0))
     }
-
-    /// Common implementation for the [`DrawTarget`] size methods.
-    fn size_for_eg(&self) -> Size {
-        let size = self.space.grid().unsigned_size();
-        Size {
-            width: size.x,
-            height: size.y,
-        }
-    }
 }
 
 /// A [`DrawingPlane`] accepts any color type that implements [`VoxelColor`].
-impl<'c, C> DrawTarget<C> for DrawingPlane<'_, C>
+impl<'c, C> DrawTarget for DrawingPlane<'_, C>
 where
     C: VoxelColor<'c>,
 {
+    type Color = C;
     type Error = SetCubeError;
 
-    fn draw_pixel(&mut self, pixel: Pixel<C>) -> Result<(), Self::Error> {
-        let Pixel(point, color) = pixel;
-        // TODO: Add a cache so we're not reconstructing the block for every single pixel.
-        // (This is possible because `PixelColor: PartialEq`.)
-        // TODO: Need to rotate the brush to match our transform
-        color
-            .into_blocks()
-            .paint(self.space, self.convert_point(point))
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        for Pixel(point, color) in pixels.into_iter() {
+            // TODO: Add a cache so we're not reconstructing the block for every single pixel.
+            // (This is possible because `PixelColor: PartialEq`.)
+            // TODO: Need to rotate the brush to match our transform
+            color
+                .into_blocks()
+                .paint(self.space, self.convert_point(point))?;
+        }
+        Ok(())
     }
+}
 
-    fn size(&self) -> Size {
-        self.size_for_eg()
+impl<C> Dimensions for DrawingPlane<'_, C> {
+    fn bounding_box(&self) -> Rectangle {
+        // Invert our coordinate transform to bring the space's bounds into the drawing
+        // coordinate system. If the transform fails, return a 1×1×1 placeholder rather
+        // than panic.
+        let grid = self
+            .transform
+            .inverse_transform()
+            .and_then(|t| self.space.grid().transform(t))
+            .unwrap_or_else(|| Grid::for_block(1));
+
+        let size = grid.unsigned_size();
+        Rectangle {
+            top_left: Point {
+                x: grid.lower_bounds().x,
+                y: grid.upper_bounds().y,
+            },
+            size: Size {
+                width: size.x,
+                height: size.y,
+            },
+        }
     }
 }
 
@@ -275,17 +293,17 @@ pub fn draw_to_blocks<'c, D, C>(
     z: GridCoordinate,
     z_range: Range<GridCoordinate>,
     attributes: BlockAttributes,
-    object: D,
+    object: &D,
 ) -> Result<Space, SetCubeError>
 where
-    for<'a> &'a D: Drawable<C>,
-    D: Dimensions,
+    D: Drawable<Color = C> + Dimensions,
     C: VoxelColor<'c>,
 {
     assert!(z_range.contains(&z));
 
-    let top_left_2d = object.top_left();
-    let bottom_right_2d = object.bottom_right();
+    let bbox = object.bounding_box();
+    let top_left_2d = bbox.top_left;
+    let bottom_right_2d = bbox.bottom_right().unwrap_or(top_left_2d);
     // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
     // for text drawing, embedded_graphics assumes a Y-down coordinate system.
     // TODO: Instead, apply matrix transform to bounds
@@ -322,8 +340,9 @@ mod tests {
     use crate::math::Rgba;
     use crate::raytracer::print_space;
     use crate::universe::Universe;
-    use embedded_graphics::primitives::{Primitive, Rectangle};
-    use embedded_graphics::style::{PrimitiveStyle, PrimitiveStyleBuilder};
+    use embedded_graphics::primitives::{
+        Primitive, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle,
+    };
 
     /// Test using a particular color type with [`DrawingPlane`].
     fn test_color_drawing<'c, C>(color_value: C, expected_block: &Block)
@@ -409,15 +428,15 @@ mod tests {
         let resolution: GridCoordinate = 16;
         let z = 4;
         let mut universe = Universe::new();
-        let drawable =
-            Rectangle::new(Point::new(0, 0), Point::new(2, 3)).into_styled(a_primitive_style());
+        let drawable = Rectangle::with_corners(Point::new(0, 0), Point::new(2, 3))
+            .into_styled(a_primitive_style());
         let space = draw_to_blocks(
             &mut universe,
             resolution as Resolution,
             z,
             z..z + 1,
             BlockAttributes::default(),
-            drawable,
+            &drawable,
         )
         .unwrap();
         assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
@@ -444,15 +463,15 @@ mod tests {
         let resolution: GridCoordinate = 16;
         let z = 4;
         let mut universe = Universe::new();
-        let drawable =
-            Rectangle::new(Point::new(-3, -2), Point::new(0, 0)).into_styled(a_primitive_style());
+        let drawable = Rectangle::with_corners(Point::new(-3, -2), Point::new(0, 0))
+            .into_styled(a_primitive_style());
         let space = draw_to_blocks(
             &mut universe,
             resolution as Resolution,
             z,
             z..z + 1,
             BlockAttributes::default(),
-            drawable,
+            &drawable,
         )
         .unwrap();
         assert_eq!(space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));

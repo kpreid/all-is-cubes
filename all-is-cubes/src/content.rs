@@ -4,9 +4,13 @@
 //! Built-in content: either demos or basic shapes and colors used in the UI.
 
 use cgmath::{Vector3, Vector4};
-use embedded_graphics::fonts::{Font8x16, Text};
-use embedded_graphics::prelude::{Dimensions, Drawable, Point, Transform};
-use embedded_graphics::style::{Styled, TextStyle, TextStyleBuilder};
+use embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
+use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::prelude::{Dimensions as _, Drawable, Point};
+use embedded_graphics::text::Alignment;
+use embedded_graphics::text::Baseline;
+use embedded_graphics::text::Text;
+use embedded_graphics::text::TextStyleBuilder;
 use std::borrow::Cow;
 use std::convert::{TryFrom, TryInto};
 
@@ -30,16 +34,20 @@ pub mod palette;
 
 /// Draw the All Is Cubes logo text.
 pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) -> Result<(), SetCubeError> {
-    logo_text_drawable(|d| d.draw(&mut space.draw_target(midpoint_transform * GridMatrix::FLIP_Y)))
+    logo_text_drawable(|d| {
+        d.draw(&mut space.draw_target(midpoint_transform * GridMatrix::FLIP_Y))
+    })?;
+    Ok(())
 }
 
 pub fn logo_text_extent() -> Grid {
     logo_text_drawable(|d| {
-        let top_left_2d = d.top_left();
-        let bottom_right_2d = d.bottom_right();
+        let bounding_box = d.bounding_box();
+        let top_left_2d = bounding_box.top_left;
+        let bottom_right_2d = bounding_box.bottom_right().unwrap();
         Grid::from_lower_upper(
-            [top_left_2d.x, -bottom_right_2d.y, 0],
-            [bottom_right_2d.x, -top_left_2d.y, 2],
+            [top_left_2d.x, -(bottom_right_2d.y - 1), 0],
+            [bottom_right_2d.x - 1, -top_left_2d.y, 2],
         )
         .expand(FaceMap::from_fn(|f| {
             // Expand horizontally due to the VoxelBrush's size. TODO: We should be able to ask the brush to do this.
@@ -52,7 +60,7 @@ pub fn logo_text_extent() -> Grid {
 /// Unfortunately there is no way to return an owned Drawable.
 fn logo_text_drawable<F, R>(f: F) -> R
 where
-    F: for<'a> FnOnce(Styled<Text<'static>, TextStyle<&VoxelBrush<'a>, Font8x16>>) -> R,
+    F: for<'a> FnOnce(Text<'static, MonoTextStyle<'a, &VoxelBrush<'a>>>) -> R,
 {
     let foreground_text_block: Block = palette::LOGO_FILL.into();
     let background_text_block: Block = palette::LOGO_STROKE.into();
@@ -64,10 +72,16 @@ where
         ((0, -1, 0), &background_text_block),
     ]);
 
-    let mut styled_text = Text::new("All is Cubes", Point::new(0, 0))
-        .into_styled(TextStyleBuilder::new(Font8x16).text_color(&brush).build());
-    styled_text = styled_text.translate(Point::zero() - styled_text.size() / 2);
-    f(styled_text)
+    let text = Text::with_text_style(
+        "All is Cubes",
+        Point::new(0, 0),
+        MonoTextStyle::new(&FONT_9X15_BOLD, &brush),
+        TextStyleBuilder::new()
+            .alignment(Alignment::Center)
+            .baseline(Baseline::Middle)
+            .build(),
+    );
+    f(text)
 }
 
 /// Generate a set of distinct atom blocks for use in tests. They will have distinct

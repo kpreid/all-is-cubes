@@ -5,15 +5,17 @@
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
 use cgmath::{EuclideanSpace as _, One as _, Transform as _, Vector3};
-use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
-use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::style::TextStyleBuilder;
+use embedded_graphics::mono_font::iso_8859_1::FONT_9X18_BOLD;
+use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::text::Baseline;
+use embedded_graphics::text::Text;
 use instant::Instant;
 use noise::Seedable as _;
 use ordered_float::NotNan;
 use strum::IntoEnumIterator;
 
+use crate::block::Resolution;
 use crate::block::{BlockAttributes, BlockCollision, AIR};
 use crate::content::{logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS};
 use crate::drawing::{draw_to_blocks, VoxelBrush};
@@ -201,7 +203,11 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         // Mark the exhibit bounds
         let enclosure = Grid::from_lower_upper(
             plot.lower_bounds().map(|x| x - 1),
-            [plot.upper_bounds().x + 1, 1, plot.upper_bounds().z + 1],
+            [
+                plot.upper_bounds().x + 1,
+                1.max(plot.lower_bounds()[1]), // handles case where plot is floating
+                plot.upper_bounds().z + 1,
+            ],
         );
         space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
 
@@ -214,9 +220,10 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             exhibit_footprint.upper_bounds().z + 2,
         ]) * GridRotation::from_basis([Face::PX, Face::NZ, Face::PY])
             .to_rotation_matrix();
+        let font = &FONT_9X18_BOLD;
         let name_blocks = draw_to_blocks(
             universe,
-            16, // TODO: use a higher resolution once it's supported
+            font.character_size.height as Resolution,
             0,
             0..1,
             BlockAttributes {
@@ -224,10 +231,11 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                 collision: BlockCollision::None,
                 ..BlockAttributes::default()
             },
-            Text::new(exhibit.name, Point::new(0, -16)).into_styled(
-                TextStyleBuilder::new(Font8x16)
-                    .text_color(Rgb888::new(0, 0, 0))
-                    .build(),
+            &Text::with_baseline(
+                exhibit.name,
+                Point::new(0, 0),
+                MonoTextStyle::new(font, Rgb::ZERO),
+                Baseline::Bottom,
             ),
         )
         .expect("name drawing failure");

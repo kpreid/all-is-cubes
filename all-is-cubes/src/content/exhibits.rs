@@ -7,10 +7,11 @@
 use cgmath::{
     Basis2, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2, Vector2, Vector3,
 };
-use embedded_graphics::fonts::{Font8x16, Text};
 use embedded_graphics::geometry::Point;
+use embedded_graphics::mono_font::iso_8859_1::{FONT_6X10, FONT_8X13_BOLD};
+use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::style::TextStyleBuilder;
+use embedded_graphics::text::{Baseline, Text};
 use ordered_float::NotNan;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
@@ -118,10 +119,11 @@ const TEXT: Exhibit = Exhibit {
             8,
             8..9,
             BlockAttributes::default(),
-            Text::new("Hello block world", Point::new(0, -16)).into_styled(
-                TextStyleBuilder::new(Font8x16)
-                    .text_color(Rgb888::new(120, 100, 200))
-                    .build(),
+            &Text::with_baseline(
+                "Hello block world",
+                Point::new(0, 0),
+                MonoTextStyle::new(&FONT_8X13_BOLD, Rgb888::new(80, 60, 100)),
+                Baseline::Bottom,
             ),
         )?;
         Ok(space)
@@ -161,7 +163,7 @@ const RESOLUTIONS: Exhibit = Exhibit {
                 location + GridVector::unit_y(),
                 &draw_to_blocks(
                     universe,
-                    16,
+                    32,
                     0,
                     0..1,
                     BlockAttributes {
@@ -169,10 +171,11 @@ const RESOLUTIONS: Exhibit = Exhibit {
                         collision: BlockCollision::None,
                         ..BlockAttributes::default()
                     },
-                    Text::new(&resolution.to_string(), Point::new(0, -16)).into_styled(
-                        TextStyleBuilder::new(Font8x16)
-                            .text_color(Rgb888::new(10, 10, 10))
-                            .build(),
+                    &Text::with_baseline(
+                        &resolution.to_string(),
+                        Point::new(0, -1),
+                        MonoTextStyle::new(&FONT_6X10, Rgb888::new(10, 10, 10)),
+                        Baseline::Bottom,
                     ),
                 )?[GridPoint::origin()],
             )?;
@@ -205,7 +208,7 @@ const COLORS: Exhibit = Exhibit {
             );
             let color_srgb = color.with_alpha_one().to_srgb_32bit();
             let description = format!(
-                "{:0.2}\n{:0.2}\n{:0.2}\n#{:02x}{:02x}{:02x} srgb",
+                "Linear\n  {:0.2}\n  {:0.2}\n  {:0.2}\nsRGB\n  #{:02x}{:02x}{:02x}",
                 color.red(),
                 color.green(),
                 color.blue(),
@@ -220,10 +223,11 @@ const COLORS: Exhibit = Exhibit {
                         .color(color.with_alpha_one())
                         .build(),
                 ),
-                [0, 1, 0] => Some(
+                [0, 1, 0] => Some({
+                    let resolution = 64;
                     draw_to_blocks(
                         universe,
-                        64,
+                        resolution,
                         0,
                         0..1,
                         BlockAttributes {
@@ -231,20 +235,17 @@ const COLORS: Exhibit = Exhibit {
                             collision: BlockCollision::None,
                             ..BlockAttributes::default()
                         },
-                        Text::new(
+                        &Text::with_baseline(
                             &description,
-                            Point::new(0, -16 * (description.lines().count() as i32)),
-                        )
-                        .into_styled(
-                            TextStyleBuilder::new(Font8x16)
-                                .text_color(Rgb888::new(10, 10, 10))
-                                .build(),
+                            Point::new(0, -i32::from(resolution)),
+                            MonoTextStyle::new(&FONT_6X10, Rgb888::new(10, 10, 10)),
+                            Baseline::Top,
                         ),
                     )
                     .unwrap()[GridPoint::origin()] // TODO: Give Space an into_single_element() ?
                     .clone()
-                    .rotate(GridRotation::RXzY),
-                ),
+                    .rotate(GridRotation::RXzY)
+                }),
                 _ => None,
             }
         })?;
