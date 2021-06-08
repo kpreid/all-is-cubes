@@ -202,93 +202,52 @@ impl Body {
     where
         CC: FnMut(Contact),
     {
-        let mut already_colliding: HashSet<Contact> = HashSet::new();
+        let maybe_hit = collide_along_ray(
+            space,
+            Ray::new(self.position, delta_position),
+            self.collision_box,
+            collision_callback,
+        );
 
-        let ray = Ray::new(self.position, delta_position);
-        // Note: no `.within_grid()` because that would not work when the leading
-        // corner is not within the grid.
-        for (ray_step, step_aab) in aab_raycast(self.collision_box, ray, false) {
-            if ray_step.t_distance() >= 1.0 {
-                // Movement is unobstructed in this timestep.
-                break;
-            }
-            if ray_step.face() == Face::Within {
-                // If we are intersecting a block, we are allowed to leave it; pretend
-                // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
-                // maybe there's no clear direction.)
-                for box_cube in Self::collision_test(&space, step_aab) {
-                    already_colliding.insert(Contact {
-                        cube: box_cube,
-                        face: ray_step.face(),
-                    });
-                }
-                continue;
-            }
+        if let Some(ray_step) = maybe_hit {
+            // Advance however much straight-line distance is available.
+            // But a little bit back from that, to avoid floating point error pushing us
+            // into being already colliding next frame.
+            let unobstructed_distance_along_ray =
+                (ray_step.t_distance() - POSITION_EPSILON / delta_position.magnitude()).max(0.0);
+            let unobstructed_delta_position = delta_position * unobstructed_distance_along_ray;
+            self.position += unobstructed_delta_position;
+            // Figure the distance we have have left.
+            delta_position -= unobstructed_delta_position;
+            // Convert it to sliding movement for the axes we didn't collide in.
+            delta_position[ray_step.face().axis_number()] = 0.0;
 
-            // Loop over all the cubes that our AAB is just now intersecting and check if
-            // any of them are solid.
-            let mut hit_something = false;
-            for box_cube in Self::collision_test(&space, step_aab) {
-                let contact = Contact {
-                    cube: box_cube,
-                    face: ray_step.face(),
-                };
-                if !already_colliding.contains(&contact) {
-                    hit_something = true;
-                    collision_callback(contact);
-                }
-            }
+            // Absorb velocity in that direction.
+            self.velocity[ray_step.face().axis_number()] = 0.0;
 
-            // Now that we've found _all_ the contacts, handle the collision.
-            if hit_something {
-                // Advance however much straight-line distance is available.
-                // But a little bit back from that, to avoid floating point error pushing us
-                // into being already colliding next frame.
-                let unobstructed_distance_along_ray = (ray_step.t_distance()
-                    - POSITION_EPSILON / delta_position.magnitude())
-                .max(0.0);
-                let unobstructed_delta_position = delta_position * unobstructed_distance_along_ray;
-                self.position += unobstructed_delta_position;
-                // Figure the distance we have have left.
-                delta_position -= unobstructed_delta_position;
-                // Convert it to sliding movement for the axes we didn't collide in.
-                delta_position[ray_step.face().axis_number()] = 0.0;
-
-                // Absorb velocity in that direction.
-                self.velocity[ray_step.face().axis_number()] = 0.0;
-
-                return (
-                    delta_position,
-                    MoveSegment {
-                        delta_position: unobstructed_delta_position,
-                        stopped_by: Some(ray_step.cube_face()),
-                    },
-                );
-            }
-        }
-
-        // We did not hit anything for the length of the raycast. Proceed unobstructed.
-        self.position += delta_position;
-        (
-            Vector3::zero(),
-            MoveSegment {
+            (
                 delta_position,
-                stopped_by: None,
-            },
-        )
-    }
-
-    /// TODO: Refactor and tidy this...
-    fn collision_test(space: &Space, aab: Aab) -> impl Iterator<Item = GridPoint> + '_ {
-        aab.round_up_to_grid().interior_iter().filter(move |&cube| {
-            // TODO: change this from `==` to `match` to allow for expansion of the enum
-            space.get_evaluated(cube).attributes.collision == BlockCollision::Hard
-        })
+                MoveSegment {
+                    delta_position: unobstructed_delta_position,
+                    stopped_by: Some(ray_step.cube_face()),
+                },
+            )
+        } else {
+            // We did not hit anything for the length of the raycast. Proceed unobstructed.
+            self.position += delta_position;
+            (
+                Vector3::zero(),
+                MoveSegment {
+                    delta_position,
+                    stopped_by: None,
+                },
+            )
+        }
     }
 
     /// Check if we're intersecting any blocks and fix that if so.
     fn push_out(&mut self, space: &Space) -> Option<Vector3<FreeCoordinate>> {
-        let colliding = Self::collision_test(space, self.collision_box_abs())
+        let colliding = find_colliding_cubes(space, self.collision_box_abs())
             .next()
             .is_some();
         if colliding {
@@ -427,6 +386,70 @@ impl Transaction<Body> for BodyTransaction {
         self.delta_yaw += other.delta_yaw;
         self
     }
+}
+
+fn collide_along_ray<CC>(
+    space: &Space,
+    ray: Ray,
+    aab: Aab,
+    mut collision_callback: CC,
+) -> Option<RaycastStep>
+where
+    CC: FnMut(Contact),
+{
+    let mut already_colliding: HashSet<Contact> = HashSet::new();
+
+    // Note: no `.within_grid()` because that would not work when the leading
+    // corner is not within the grid.
+    for (ray_step, step_aab) in aab_raycast(aab, ray, false) {
+        if ray_step.t_distance() >= 1.0 {
+            // Movement is unobstructed in this timestep.
+            break;
+        }
+        if ray_step.face() == Face::Within {
+            // If we are intersecting a block, we are allowed to leave it; pretend
+            // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
+            // maybe there's no clear direction.)
+            for box_cube in find_colliding_cubes(&space, step_aab) {
+                let contact = Contact {
+                    cube: box_cube,
+                    face: ray_step.face(),
+                };
+                already_colliding.insert(contact);
+            }
+            continue;
+        }
+
+        // Loop over all the cubes that our AAB is just now intersecting and check if
+        // any of them are solid.
+        let mut hit_something = false;
+        for box_cube in find_colliding_cubes(&space, step_aab) {
+            let contact = Contact {
+                cube: box_cube,
+                face: ray_step.face(),
+            };
+            if !already_colliding.contains(&contact) {
+                hit_something = true;
+                collision_callback(contact);
+            }
+        }
+
+        // Now that we've found _all_ the contacts, report the collision.
+        if hit_something {
+            return Some(ray_step);
+        }
+    }
+
+    None
+}
+
+/// Returns an iterator over all blocks in `space` which intersect `aab`, accounting for
+/// collision options.
+fn find_colliding_cubes(space: &Space, aab: Aab) -> impl Iterator<Item = GridPoint> + '_ {
+    aab.round_up_to_grid().interior_iter().filter(move |&cube| {
+        // TODO: change this from `==` to `match` to allow for expansion of the enum
+        space.get_evaluated(cube).attributes.collision == BlockCollision::Hard
+    })
 }
 
 /// Given a ray describing movement of the origin of an AAB, perform a raycast to find
