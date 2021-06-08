@@ -202,34 +202,35 @@ impl Body {
     where
         CC: FnMut(Contact),
     {
-        let maybe_hit = collide_along_ray(
+        let collision = collide_along_ray(
             space,
             Ray::new(self.position, delta_position),
             self.collision_box,
             collision_callback,
         );
 
-        if let Some(ray_step) = maybe_hit {
+        if let Some(collision) = collision {
+            let axis = collision.cube_face.face.axis_number();
             // Advance however much straight-line distance is available.
             // But a little bit back from that, to avoid floating point error pushing us
             // into being already colliding next frame.
             let unobstructed_distance_along_ray =
-                (ray_step.t_distance() - POSITION_EPSILON / delta_position.magnitude()).max(0.0);
+                (collision.t_distance - POSITION_EPSILON / delta_position.magnitude()).max(0.0);
             let unobstructed_delta_position = delta_position * unobstructed_distance_along_ray;
             self.position += unobstructed_delta_position;
             // Figure the distance we have have left.
             delta_position -= unobstructed_delta_position;
             // Convert it to sliding movement for the axes we didn't collide in.
-            delta_position[ray_step.face().axis_number()] = 0.0;
+            delta_position[axis] = 0.0;
 
             // Absorb velocity in that direction.
-            self.velocity[ray_step.face().axis_number()] = 0.0;
+            self.velocity[axis] = 0.0;
 
             (
                 delta_position,
                 MoveSegment {
                     delta_position: unobstructed_delta_position,
-                    stopped_by: Some(ray_step.cube_face()),
+                    stopped_by: Some(collision.cube_face),
                 },
             )
         } else {
@@ -388,12 +389,21 @@ impl Transaction<Body> for BodyTransaction {
     }
 }
 
+/// Result of [`collide_along_ray`] which specifies a collision point possibly inside the cube.
+#[derive(Debug)]
+struct CollisionRayEnd {
+    /// Non-colliding length of the provided ray.
+    t_distance: FreeCoordinate,
+    /// Cube in the provided space collided with, and the orientation of the surface collided with.
+    cube_face: CubeFace,
+}
+
 fn collide_along_ray<CC>(
     space: &Space,
     ray: Ray,
     aab: Aab,
     mut collision_callback: CC,
-) -> Option<RaycastStep>
+) -> Option<CollisionRayEnd>
 where
     CC: FnMut(Contact),
 {
@@ -436,7 +446,10 @@ where
 
         // Now that we've found _all_ the contacts, report the collision.
         if hit_something {
-            return Some(ray_step);
+            return Some(CollisionRayEnd {
+                t_distance: ray_step.t_distance(),
+                cube_face: ray_step.cube_face(),
+            });
         }
     }
 
