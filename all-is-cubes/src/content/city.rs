@@ -19,6 +19,7 @@ use strum::IntoEnumIterator;
 
 use crate::block::Resolution;
 use crate::block::{BlockAttributes, BlockCollision, AIR};
+use crate::content::palette;
 use crate::content::{logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS};
 use crate::drawing::{draw_to_blocks, VoxelBrush};
 use crate::linking::{BlockProvider, InGenError};
@@ -229,7 +230,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         let name_text = Text::with_baseline(
             exhibit.name,
             Point::new(0, -name_bottom_y),
-            MonoTextStyle::new(font, Rgb::ZERO),
+            MonoTextStyle::new(font, palette::ALMOST_BLACK),
             Baseline::Bottom,
         );
         // TODO: This is an awful lot of code to benerate "text is centered on a number of whole blocks"

@@ -21,6 +21,11 @@ pub const MISSING_VOXEL_FALLBACK: Rgba = rgba_const!(0.5, 0.0, 1.0, 1.0);
 pub const UNPAINTED_TEXTURE_FALLBACK: Rgba = rgba_const!(0.0, 0.7, 0.7, 1.0);
 
 // Physical material colors.
+/// A realistic value for typical black materials, which do not absorb all light.
+///
+/// (The particular value 0.046875 was chosen to be an exactly representable simple
+/// fraction, 3/64.)
+pub const ALMOST_BLACK: Rgb = rgb_const!(0.046875, 0.046875, 0.046875);
 pub const GRASS: Rgb = rgb_const!(0.117, 0.402, 0.029);
 pub const DIRT: Rgb = rgb_const!(0.150, 0.080, 0.058);
 pub const STONE: Rgb = rgb_const!(0.694, 0.672, 0.658);

@@ -15,6 +15,7 @@ use embedded_graphics::text::{Baseline, Text};
 use ordered_float::NotNan;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
+use crate::content::palette;
 use crate::content::Exhibit;
 use crate::drawing::draw_to_blocks;
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba};
@@ -174,7 +175,7 @@ const RESOLUTIONS: Exhibit = Exhibit {
                     &Text::with_baseline(
                         &resolution.to_string(),
                         Point::new(0, -1),
-                        MonoTextStyle::new(&FONT_6X10, Rgb888::new(10, 10, 10)),
+                        MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
                         Baseline::Bottom,
                     ),
                 )?[GridPoint::origin()],
@@ -238,7 +239,7 @@ const COLORS: Exhibit = Exhibit {
                         &Text::with_baseline(
                             &description,
                             Point::new(0, -i32::from(resolution)),
-                            MonoTextStyle::new(&FONT_6X10, Rgb888::new(10, 10, 10)),
+                            MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
                             Baseline::Top,
                         ),
                     )

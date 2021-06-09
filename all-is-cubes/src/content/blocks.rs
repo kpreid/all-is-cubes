@@ -105,7 +105,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                             .mul_element_wise(GridVector::new(1, 0, 1)),
                     ) <= 4i32.pow(2)
                     {
-                        rgb_const!(0.1, 0.1, 0.1).into()
+                        palette::ALMOST_BLACK.into()
                     } else {
                         AIR.clone()
                     }
