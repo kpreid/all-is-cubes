@@ -123,7 +123,7 @@ const TEXT: Exhibit = Exhibit {
             &Text::with_baseline(
                 "Hello block world",
                 Point::new(0, 0),
-                MonoTextStyle::new(&FONT_8X13_BOLD, Rgb888::new(80, 60, 100)),
+                MonoTextStyle::new(&FONT_8X13_BOLD, Rgb888::new(120, 100, 200)),
                 Baseline::Bottom,
             ),
         )?;

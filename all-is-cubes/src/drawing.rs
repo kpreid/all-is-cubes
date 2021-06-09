@@ -117,13 +117,9 @@ impl<C> Dimensions for DrawingPlane<'_, C> {
 /// Adapt embedded_graphics's most general color type to ours.
 // TODO: Also adapt the other types, so that if someone wants to use them they can.
 impl From<Rgb888> for Rgb {
+    #[inline]
     fn from(color: Rgb888) -> Rgb {
-        // TODO: This is (debatably) wrong; it should default to presuming sRGB and converting out.
-        Rgb::new(
-            f32::from(color.r()) / 255.0,
-            f32::from(color.g()) / 255.0,
-            f32::from(color.b()) / 255.0,
-        )
+        Rgba::from_srgb_32bit([color.r(), color.g(), color.b(), u8::MAX]).to_rgb()
     }
 }
 
