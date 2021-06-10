@@ -30,6 +30,12 @@ pub type GridVector = Vector3<GridCoordinate>;
 /// Coordinates that are not locked to the cube grid.
 pub type FreeCoordinate = f64;
 
+#[inline]
+pub(crate) fn smoothstep(x: f64) -> f64 {
+    let x = x.clamp(0.0, 1.0);
+    3. * x.powi(2) - 2. * x.powi(3)
+}
+
 /// Compute the squared magnitude of a [`GridVector`].
 ///
 /// [`cgmath::InnerSpace::magnitude2`] would do the same but only for floats.

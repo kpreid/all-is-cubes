@@ -68,6 +68,7 @@ bool valid_light(vec4 light) {
 
 #ifdef SMOOTH_LIGHTING
 // Compute the interpolated ('smooth') light for the surface from light_texture.
+// This implementation is duplicated in Rust at src/raytracer.rs
 lowp vec3 interpolated_space_light() {
   // About half the size of the smallest permissible voxel.
   const highp float above_surface_epsilon = 0.5 / 256.0;

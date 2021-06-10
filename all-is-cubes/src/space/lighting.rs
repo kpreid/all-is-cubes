@@ -4,8 +4,7 @@
 //! Lighting algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
-use cgmath::InnerSpace;
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Vector4};
 use once_cell::sync::Lazy;
 use std::convert::TryInto as _;
 use std::fmt;
@@ -106,6 +105,29 @@ impl PackedLight {
     }
 
     // TODO: Expose LightStatus once we are more confident in its API stability
+
+    /// Returns true if the light value is meaningful, or false if it is
+    /// inside an opaque block or in empty unlit air (in which case [`Self::value`]
+    /// always returns zero).
+    pub(crate) fn valid(&self) -> bool {
+        self.status == LightStatus::Visible
+    }
+
+    /// The fourth component is either 0 or 1 indicating whether this is a "valid"
+    /// light value; one which is neither inside an opaque block nor in empty unlit
+    /// air.
+    pub(crate) fn value_and_valid(&self) -> Vector4<f32> {
+        Vector4::new(
+            Self::scalar_out(self.value[0]),
+            Self::scalar_out(self.value[1]),
+            Self::scalar_out(self.value[2]),
+            if self.status == LightStatus::Visible {
+                1.0
+            } else {
+                0.0
+            },
+        )
+    }
 
     #[inline]
     pub(crate) fn as_texel(self) -> (u8, u8, u8, u8) {

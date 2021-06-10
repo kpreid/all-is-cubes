@@ -13,18 +13,20 @@
 //! In the future (or currently, if I forgot to update this comment), it will be used
 //! as a means to display the state of `Space`s used for testing inline in test output.
 
-use cgmath::{InnerSpace as _, Matrix4, Point2, Vector2, Vector3, Zero as _};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Matrix4, Point2, Vector2, Vector3, Zero as _};
+use cgmath::{Point3, Vector4};
 use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
-use crate::block::{recursive_raycast, Evoxel, Resolution};
+use crate::block::{recursive_ray, Evoxel, Resolution};
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, LightingOption, Viewport};
-use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
+use crate::math::{smoothstep, GridCoordinate};
+use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
-use crate::space::{GridArray, PackedLight, Space, SpaceBlockData};
+use crate::space::{Grid, GridArray, PackedLight, Space, SpaceBlockData};
 
 /// Precomputed data for raytracing a single frame of a single Space, and bearer of the
 /// methods for actually performing raytracing.
@@ -80,24 +82,20 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                             match impl_fields.options.lighting_display {
                                 LightingOption::None => Rgb::ONE,
                                 // TODO: Implement actual smooth lighting in raytracer
-                                LightingOption::Flat | LightingOption::Smooth => {
-                                    self.get_lighting(hit.cube_behind())
-                                }
+                                LightingOption::Flat => self.get_lighting(hit.cube_behind()),
+                                LightingOption::Smooth => self.get_interpolated_light(
+                                    hit.intersection_point(ray),
+                                    hit.face(),
+                                ),
                             },
                             hit.face(),
                         );
                     }
                     TracingBlock::Recur(pixel_block_data, resolution, array) => {
-                        let light_neighborhood = match impl_fields.options.lighting_display {
-                            LightingOption::None => FaceMap::repeat(Rgb::ONE),
-                            // TODO: Implement actual smooth lighting in raytracer
-                            LightingOption::Flat | LightingOption::Smooth => {
-                                FaceMap::from_fn(|f| {
-                                    self.get_lighting(hit.cube_ahead() + f.normal_vector())
-                                })
-                            }
-                        };
-                        for subcube_hit in recursive_raycast(ray, hit.cube_ahead(), *resolution) {
+                        let resolution = *resolution;
+                        let sub_ray = recursive_ray(ray, hit.cube_ahead(), resolution);
+                        let antiscale = FreeCoordinate::from(resolution).recip();
+                        for subcube_hit in sub_ray.cast().within_grid(Grid::for_block(resolution)) {
                             if s.count_step_should_stop() {
                                 break;
                             }
@@ -105,7 +103,20 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                                 s.trace_through_surface(
                                     pixel_block_data,
                                     voxel.color,
-                                    light_neighborhood[subcube_hit.face()],
+                                    match impl_fields.options.lighting_display {
+                                        LightingOption::None => Rgb::ONE,
+                                        LightingOption::Flat => self.get_lighting(
+                                            hit.cube_ahead() + subcube_hit.face().normal_vector(),
+                                        ),
+                                        LightingOption::Smooth => self.get_interpolated_light(
+                                            subcube_hit.intersection_point(sub_ray) * antiscale
+                                                + hit
+                                                    .cube_ahead()
+                                                    .map(FreeCoordinate::from)
+                                                    .to_vec(),
+                                            subcube_hit.face(),
+                                        ),
+                                    },
                                     subcube_hit.face(),
                                 );
                             }
@@ -174,6 +185,18 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 
     #[inline]
+    fn get_packed_light(&self, cube: GridPoint) -> PackedLight {
+        // TODO: wrong unwrap_or value
+        self.0.with(|impl_fields| {
+            impl_fields
+                .cubes
+                .get(cube)
+                .map(|b| b.lighting)
+                .unwrap_or(PackedLight::NO_RAYS)
+        })
+    }
+
+    #[inline]
     fn get_lighting(&self, cube: GridPoint) -> Rgb {
         self.0.with(|impl_fields| {
             impl_fields
@@ -182,6 +205,74 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                 .map(|b| b.lighting.value())
                 .unwrap_or(*impl_fields.sky_color)
         })
+    }
+
+    fn get_interpolated_light(&self, point: Point3<FreeCoordinate>, face: Face) -> Rgb {
+        // This implementation is duplicated in GLSL at src/lum/shaders/fragment.glsl
+
+        // About half the size of the smallest permissible voxel.
+        let above_surface_epsilon = 0.5 / 256.0;
+
+        // The position we should start with for light lookup and interpolation.
+        let origin = point.to_vec() + face.normal_vector() * above_surface_epsilon;
+
+        // Find linear interpolation coefficients based on where we are relative to
+        // a half-cube-offset grid.
+        let reference_frame = face.matrix(0).to_free();
+        let mut mix_1 = (origin.dot(reference_frame.x.truncate()) - 0.5).rem_euclid(1.0);
+        let mut mix_2 = (origin.dot(reference_frame.y.truncate()) - 0.5).rem_euclid(1.0);
+
+        // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on
+        fn flip_mix(
+            mix: &mut FreeCoordinate,
+            dir: Vector4<FreeCoordinate>,
+        ) -> Vector3<FreeCoordinate> {
+            let dir = dir.truncate();
+            if *mix > 0.5 {
+                *mix = 1.0 - *mix;
+                -dir
+            } else {
+                dir
+            }
+        }
+        let dir_1 = flip_mix(&mut mix_1, reference_frame.x);
+        let dir_2 = flip_mix(&mut mix_2, reference_frame.y);
+
+        // Modify interpolation by smoothstep to change the visual impression towards
+        // "blurred blocks" and away from the diamond-shaped gradients of linear interpolation
+        // which, being so familiar, can give an unfortunate impression of "here is
+        // a closeup of a really low-resolution texture".
+        let mix_1 = smoothstep(mix_1);
+        let mix_2 = smoothstep(mix_2);
+
+        // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
+        let get_light = |p: Vector3<FreeCoordinate>| {
+            self.get_packed_light(Point3::from_vec(
+                (origin + p).map(|s| s.floor() as GridCoordinate),
+            ))
+        };
+        let lin_lo = -0.5;
+        let lin_hi = 0.5;
+        let near12 = get_light(lin_lo * dir_1 + lin_lo * dir_2);
+        let near1far2 = get_light(lin_lo * dir_1 + lin_hi * dir_2);
+        let near2far1 = get_light(lin_hi * dir_1 + lin_lo * dir_2);
+        let far12 = get_light(lin_hi * dir_1 + lin_hi * dir_2);
+
+        // Perform bilinear interpolation.
+        if !near1far2.valid() && !near2far1.valid() {
+            near12.value()
+        } else {
+            fn mix(x: Vector4<f32>, y: Vector4<f32>, a: FreeCoordinate) -> Vector4<f32> {
+                let a = a as f32;
+                x * (1. - a) + y * a
+            }
+            let v = mix(
+                mix(near12.value_and_valid(), near1far2.value_and_valid(), mix_2),
+                mix(near2far1.value_and_valid(), far12.value_and_valid(), mix_2),
+                mix_1,
+            );
+            Rgb::try_from(v.truncate() / v.w.max(0.1)).unwrap()
+        }
     }
 }
 
