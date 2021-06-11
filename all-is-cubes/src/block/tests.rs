@@ -57,7 +57,7 @@ fn evaluate_invisible_atom() {
 
 #[test]
 fn evaluate_voxels_checked_individually() {
-    let resolution = 4;
+    let resolution = 2;
     let mut universe = Universe::new();
 
     let attributes = BlockAttributes {
@@ -86,6 +86,7 @@ fn evaluate_voxels_checked_individually() {
             }
         }))
     );
+    assert_eq!(e.color, Rgba::new(0.5, 0.5, 0.5, 1.0));
     assert_eq!(e.resolution, resolution);
     assert_eq!(e.opaque, true);
     assert_eq!(e.visible, true);
@@ -112,15 +113,20 @@ fn evaluate_transparent_voxels() {
         .build();
 
     let e = block.evaluate().unwrap();
+    assert_eq!(
+        e.color,
+        Rgba::new(0.0, 0.0, 0.0, 1.0 - (0.5 / f32::from(resolution.pow(3))))
+    );
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, true);
 }
 
 #[test]
 fn evaluate_voxels_not_filling_block() {
+    let resolution = 4;
     let mut universe = Universe::new();
     let block = Block::builder()
-        .voxels_fn(&mut universe, 4, |point| {
+        .voxels_fn(&mut universe, resolution, |point| {
             Block::from(Rgba::new(
                 0.0,
                 0.0,
@@ -136,6 +142,10 @@ fn evaluate_voxels_not_filling_block() {
         .build();
 
     let e = block.evaluate().unwrap();
+    assert_eq!(
+        e.color,
+        Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution.pow(3)))
+    );
     assert_eq!(e.resolution, 4);
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, true);
@@ -157,6 +167,7 @@ fn evaluate_voxels_partial_not_filling() {
         .build();
 
     let e = block.evaluate().unwrap();
+    assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 0.5));
     assert_eq!(e.resolution, 4);
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, true);

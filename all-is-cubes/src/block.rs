@@ -4,8 +4,9 @@
 //! Definition of blocks, which are game objects which live in the grid of a
 //! [`Space`]. See [`Block`] for details.
 
-use cgmath::{EuclideanSpace as _, Point3};
+use cgmath::{EuclideanSpace as _, Point3, Vector4, Zero as _};
 use std::borrow::Cow;
+use std::convert::TryFrom as _;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
@@ -179,12 +180,17 @@ impl Block {
                     .intersection(block_space.grid())
                     .unwrap_or_else(|| Grid::new(offset, [1, 1, 1]) /* arbitrary value */);
 
+                // TODO: The color sum actually needs to be weighted by alpha. (Too bad we're not using premultiplied alpha.)
+                // TODO: Should not be counting interior voxels for the color, only visible surfaces.
+
+                let mut color_sum: Vector4<f32> = Vector4::zero();
                 let voxels = block_space
                     .extract(
                         occupied_grid,
                         #[inline(always)]
                         |_index, sub_block_data, _lighting| {
                             let sub_evaluated = sub_block_data.evaluated();
+                            color_sum += sub_evaluated.color.into();
                             Evoxel {
                                 color: sub_evaluated.color,
                                 selectable: sub_evaluated.attributes.selectable,
@@ -193,9 +199,15 @@ impl Block {
                         },
                     )
                     .translate(-offset.to_vec());
+
                 Ok(EvaluatedBlock {
                     attributes: attributes.clone(),
-                    color: Rgba::new(0.5, 0.5, 0.5, 1.0), // TODO replace this with averaging the voxels
+                    // The single color is the mean of the actual block colors.
+                    color: Rgba::try_from(
+                        (color_sum.truncate() / (occupied_grid.volume() as f32))
+                            .extend(color_sum.w / (full_resolution_grid.volume() as f32)),
+                    )
+                    .expect("Recursive block color computation produced NaN"),
                     resolution,
                     // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
                     opaque: occupied_grid == full_resolution_grid
