@@ -20,6 +20,7 @@ use crate::content::Exhibit;
 use crate::drawing::draw_to_blocks;
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba};
 use crate::space::{Grid, Space};
+use crate::universe::Universe;
 
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     TRANSPARENCY,
@@ -268,20 +269,27 @@ const CHUNK_CHART: Exhibit = Exhibit {
 
 const MAKE_SOME_BLOCKS: Exhibit = Exhibit {
     name: "make_some_blocks",
-    factory: |_this, _universe| {
-        use crate::content::make_some_blocks;
+    factory: |_this, mut universe| {
+        use crate::content::{make_some_blocks, make_some_voxel_blocks};
         const ROWS: GridCoordinate = 5;
-        let rows: [Vec<Block>; ROWS as usize] = [
-            Vec::from(make_some_blocks::<5>()),
-            Vec::from(make_some_blocks::<4>()),
-            Vec::from(make_some_blocks::<3>()),
-            Vec::from(make_some_blocks::<2>()),
-            Vec::from(make_some_blocks::<1>()),
+        fn make_both_blocks<const N: usize>(universe: &mut Universe) -> (Vec<Block>, Vec<Block>) {
+            (
+                Vec::from(make_some_blocks::<N>()),
+                Vec::from(make_some_voxel_blocks::<N>(universe)),
+            )
+        }
+        let rows: [(Vec<Block>, Vec<Block>); ROWS as usize] = [
+            make_both_blocks::<5>(&mut universe),
+            make_both_blocks::<4>(&mut universe),
+            make_both_blocks::<3>(&mut universe),
+            make_both_blocks::<2>(&mut universe),
+            make_both_blocks::<1>(&mut universe),
         ];
-        let mut space = Space::empty_positive(1, ROWS, ROWS);
-        for (y, blocks) in std::array::IntoIter::new(rows).enumerate() {
-            for (h, block) in blocks.into_iter().enumerate() {
-                space.set([0, y as GridCoordinate, h as GridCoordinate], block)?;
+        let mut space = Space::empty_positive(3, ROWS, ROWS);
+        for (y, (blocks_a, blocks_v)) in std::array::IntoIter::new(rows).enumerate() {
+            for (h, (block_a, block_v)) in blocks_a.into_iter().zip(blocks_v).enumerate() {
+                space.set([0, y as GridCoordinate, h as GridCoordinate], block_a)?;
+                space.set([2, y as GridCoordinate, h as GridCoordinate], block_v)?;
             }
         }
         Ok(space)

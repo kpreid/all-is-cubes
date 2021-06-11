@@ -19,6 +19,7 @@ use crate::drawing::VoxelBrush;
 use crate::math::{FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, Rgb, Rgba};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, SetCubeError, Space};
+use crate::universe::Universe;
 
 mod blocks;
 pub use blocks::*;
@@ -84,8 +85,9 @@ where
     f(text)
 }
 
-/// Generate a set of distinct atom blocks for use in tests. They will have distinct
-/// colors and names, and all other attributes default.
+/// Generate a set of distinct [`Block::Atom`] blocks for use in tests.
+/// They will have distinct colors and names, and all other attributes default.
+/// They will be fully opaque.
 ///
 /// ```
 /// use all_is_cubes::block::Block;
@@ -95,23 +97,81 @@ where
 /// assert_ne!(blocks[0], blocks[1]);
 /// assert_ne!(blocks[0], blocks[2]);
 /// assert_ne!(blocks[1], blocks[2]);
+/// assert_eq!(blocks[0].evaluate().unwrap().voxels, None);
 /// ```
 pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
-    let mut vec: Vec<Block> = Vec::with_capacity(COUNT);
-    for i in 0..COUNT {
-        let luminance = if COUNT > 1 {
-            i as f32 / (COUNT - 1) as f32
+    color_sequence_for_make_blocks(COUNT)
+        .map(|(i, color)| {
+            Block::builder()
+                .display_name(i.to_string())
+                .color(color)
+                .build()
+        })
+        .collect::<Vec<_>>()
+        .try_into() // convert to array
+        .unwrap()
+}
+
+/// Generate a set of distinct [`Block::Recur`] blocks for use in tests.
+/// They will have distinct appearances and names, and all other attributes default.
+/// They will be fully opaque.
+///
+/// ```
+/// use all_is_cubes::block::Block;
+/// use all_is_cubes::content::make_some_voxel_blocks;
+/// use all_is_cubes::universe::Universe;
+///
+/// let mut universe = Universe::new();
+/// let blocks: [Block; 3] = make_some_voxel_blocks(&mut universe);
+/// assert_ne!(blocks[0], blocks[1]);
+/// assert_ne!(blocks[0], blocks[2]);
+/// assert_ne!(blocks[1], blocks[2]);
+/// assert_eq!(blocks[0].evaluate().unwrap().resolution, 16);
+/// ```
+pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [Block; COUNT] {
+    let resolution = 16;
+    color_sequence_for_make_blocks(COUNT)
+        .map(|(i, color)| {
+            let mut block_space = Space::empty(Grid::for_block(resolution));
+            block_space
+                .fill_uniform(block_space.grid(), Block::from(color))
+                .unwrap();
+            axes(&mut block_space).unwrap();
+            for &face in Face::ALL_SIX {
+                Text::with_text_style(
+                    &i.to_string(),
+                    Point::new(i32::from(resolution / 2), i32::from(resolution / 2)),
+                    MonoTextStyle::new(&FONT_9X15_BOLD, palette::ALMOST_BLACK),
+                    TextStyleBuilder::new()
+                        .baseline(Baseline::Middle)
+                        .alignment(Alignment::Center)
+                        .build(),
+                )
+                .draw(
+                    &mut block_space.draw_target(face.matrix(GridCoordinate::from(resolution) - 1)),
+                )
+                .unwrap();
+            }
+
+            Block::builder()
+                .display_name(i.to_string())
+                .voxels_ref(resolution, universe.insert_anonymous(block_space))
+                .build()
+        })
+        .collect::<Vec<_>>()
+        .try_into() // convert to array
+        .unwrap()
+}
+
+fn color_sequence_for_make_blocks(n: usize) -> impl Iterator<Item = (usize, Rgba)> {
+    (0..n).map(move |i| {
+        let luminance = if n > 1 {
+            i as f32 / (n - 1) as f32
         } else {
             0.5
         };
-        vec.push(
-            Block::builder()
-                .display_name(i.to_string())
-                .color(Rgba::new(luminance, luminance, luminance, 1.0))
-                .build(),
-        );
-    }
-    vec.try_into().unwrap()
+        (i, Rgba::new(luminance, luminance, luminance, 1.0))
+    })
 }
 
 /// Draw the Space's axes as lines of blocks centered on (0, 0, 0).
@@ -211,6 +271,18 @@ mod tests {
                     Rgba::new(1.0, 1.0, 1.0, 1.0)
                 )
             ]
+        );
+    }
+
+    #[test]
+    fn make_some_blocks_multiple_call_equality() {
+        assert_eq!(make_some_blocks::<3>(), make_some_blocks::<3>());
+
+        // Note: If we ever get "functional" procedural generation blocks, make_some_voxel_blocks should use it and this will change.
+        let universe = &mut Universe::new();
+        assert_ne!(
+            make_some_voxel_blocks::<3>(universe),
+            make_some_voxel_blocks::<3>(universe)
         );
     }
 }
