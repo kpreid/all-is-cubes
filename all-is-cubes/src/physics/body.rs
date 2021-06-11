@@ -5,7 +5,8 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
 use std::fmt;
 
-use super::{aab_raycast, collide_along_ray, find_colliding_cubes, Contact, POSITION_EPSILON};
+use super::collision::{aab_raycast, collide_along_ray, find_colliding_cubes, Contact};
+use super::POSITION_EPSILON;
 use crate::apps::Tick;
 use crate::block::BlockCollision;
 use crate::math::{Aab, CubeFace, FreeCoordinate, Geometry as _};
