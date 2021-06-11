@@ -5,12 +5,14 @@
 
 use cgmath::Point3;
 use ordered_float::NotNan;
+use std::convert::TryInto as _;
 
 use crate::block::Block;
 use crate::character::Character;
 use crate::content::{demo_city, install_demo_blocks};
 use crate::linking::{GenError, InGenError};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
+use crate::space::LightPhysics;
 use crate::space::SpacePhysics;
 use crate::space::{Grid, Space};
 use crate::universe::{Name, Universe, UniverseIndex};
@@ -70,6 +72,9 @@ fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
     // There shall be no light but that which we make for ourselves!
     space.set_physics(SpacePhysics {
         sky_color: Rgb::ZERO,
+        light: LightPhysics::Rays {
+            maximum_distance: (box_size * 2).try_into().unwrap_or(u16::MAX),
+        },
         ..SpacePhysics::default()
     });
     space.spawn_mut().position = (Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into()).map(|s| NotNan::new(s).unwrap());

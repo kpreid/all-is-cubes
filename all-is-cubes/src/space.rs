@@ -823,15 +823,21 @@ pub enum LightPhysics {
     /// [`SpacePhysics::sky_color`] is used solely as a background color.
     None,
     /// Raycast-based light propagation and diffuse reflections.
+    ///
+    /// TODO: Need a to provide a builder or struct type so that this can be constructed.
     #[non_exhaustive]
     Rays {
-        // TODO: add controls for maximum ray distance, density, etc.
+        /// The maximum distance a simulated light ray will travel; blocks farther than
+        /// that distance apart will never have direct influence on each other.
+        maximum_distance: u16,
     },
 }
 
 impl Default for LightPhysics {
     fn default() -> Self {
-        Self::Rays {}
+        Self::Rays {
+            maximum_distance: 30,
+        }
     }
 }
 
@@ -1225,7 +1231,11 @@ mod tests {
 
     #[test]
     fn space_debug() {
-        let space = Space::empty_positive(1, 1, 1);
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set_physics(SpacePhysics {
+            light: LightPhysics::None,
+            ..SpacePhysics::default()
+        });
         println!("{:#?}", space);
         assert_eq!(
             format!("{:#?}", space),
@@ -1250,7 +1260,7 @@ mod tests {
             \x20   ],\n\
             \x20   physics: SpacePhysics {\n\
             \x20       sky_color: Rgb(0.79, 0.79, 1.0),\n\
-            \x20       light: Rays,\n\
+            \x20       light: None,\n\
             \x20   },\n\
             }"
         );

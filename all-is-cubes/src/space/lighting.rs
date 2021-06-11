@@ -184,6 +184,7 @@ struct LightRayData {
     face_cosines: FaceMap<f32>,
 }
 
+// TODO: Make multiple ray patterns that suit the maximum_distance parameter.
 static LIGHT_RAYS: Lazy<[LightRayData; ALL_RAYS_COUNT]> = Lazy::new(|| {
     let mut rays: Vec<LightRayData> = Vec::new();
     let origin = Point3::new(0.5, 0.5, 0.5);
@@ -326,9 +327,12 @@ impl Space {
         &self,
         cube: GridPoint,
     ) -> (PackedLight, Vec<GridPoint>, usize, LightUpdateCubeInfo) {
-        if self.physics.light == LightPhysics::None {
-            panic!("Light is disabled; should not reach here");
-        }
+        let maximum_distance = match self.physics.light {
+            LightPhysics::None => {
+                panic!("Light is disabled; should not reach here");
+            }
+            LightPhysics::Rays { maximum_distance } => FreeCoordinate::from(maximum_distance),
+        };
 
         // Accumulator of incoming light encountered.
         let mut incoming_light: Rgb = Rgb::ZERO;
@@ -364,6 +368,7 @@ impl Space {
                 })
             };
 
+            // TODO: Choose a ray pattern that suits the maximum_distance.
             'each_ray: for LightRayData { ray, face_cosines } in &LIGHT_RAYS[..] {
                 // TODO: Theoretically we should weight light rays by the cosine but that has caused poor behavior in the past.
                 let ray_weight_by_faces = face_cosines
@@ -387,7 +392,7 @@ impl Space {
 
                 'raycast: for hit in raycaster {
                     cost += 1;
-                    if hit.t_distance() > 30.0 {
+                    if hit.t_distance() > maximum_distance {
                         // TODO: arbitrary magic number in limit
                         // Don't count rays that didn't hit anything close enough.
                         break 'raycast;
@@ -501,7 +506,7 @@ impl LightPhysics {
     ) -> Box<[PackedLight]> {
         match self {
             LightPhysics::None => Box::new([]),
-            LightPhysics::Rays {} => vec![ambient_color; grid.volume()].into_boxed_slice(),
+            LightPhysics::Rays { .. } => vec![ambient_color; grid.volume()].into_boxed_slice(),
         }
     }
 }
