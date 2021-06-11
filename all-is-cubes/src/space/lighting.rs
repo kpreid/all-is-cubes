@@ -357,10 +357,18 @@ impl Space {
                 FaceMap::repeat(1.0)
             } else {
                 FaceMap::from_fn(|face| {
+                    // We want directions that either face away from visible faces, or towards light sources.
                     if self
                         .get_evaluated(cube + face.opposite().normal_vector())
                         .visible
+                        || self
+                            .get_evaluated(cube + face.normal_vector())
+                            .attributes
+                            .light_emission
+                            != Rgb::ZERO
                     {
+                        // TODO: Once we have fancier block opacity precomputations, use them to
+                        // have weights besides 1.0
                         1.0f32
                     } else {
                         0.0
@@ -817,26 +825,62 @@ mod tests {
         assert_eq!(space.lighting_update_queue.pop(), None);
     }
 
-    #[test]
-    fn light_source_self_illumination() {
-        let light = Rgb::new(0.5, 1.0, 2.0);
-        let block = Block::builder()
-            .light_emission(light)
-            .color(Rgba::new(1.0, 0.0, 0.0, 0.33)) // should be irrelevant
-            .build();
-
+    fn light_source_test_space(block: Block) -> Space {
         let mut space = Space::empty_positive(3, 3, 3);
         space.set_physics(SpacePhysics {
             sky_color: Rgb::ZERO,
             ..Default::default()
         });
         space.set([1, 1, 1], block).unwrap();
-        space.evaluate_light(1, |_| ());
+        space.evaluate_light(0, |_| ());
+        space
+    }
+
+    #[test]
+    fn light_source_self_illumination_transparent() {
+        let light = Rgb::new(0.5, 1.0, 2.0);
+        let block = Block::builder()
+            .light_emission(light)
+            .color(Rgba::new(1.0, 0.0, 0.0, 0.33)) // irrelevant except for alpha
+            .build();
+
+        let space = light_source_test_space(block);
         // TODO: Arguably TRANSPARENT_BLOCK_COVERAGE shouldn't affect light emission.
         // Perhaps we should multiply the emission value by the coverage.
         assert_eq!(
             space.get_lighting([1, 1, 1]).value(),
             light * TRANSPARENT_BLOCK_COVERAGE
+        );
+    }
+
+    #[test]
+    fn light_source_self_illumination_opaque() {
+        let light = Rgb::new(0.5, 1.0, 2.0);
+        let block = Block::builder()
+            .light_emission(light)
+            .color(Rgba::new(1.0, 1.0, 1.0, 1.0)) // irrelevant except for alph
+            .build();
+
+        let space = light_source_test_space(block);
+        assert_eq!(space.get_lighting([1, 1, 1]), PackedLight::OPAQUE,);
+        let adjacents = FaceMap::from_fn(|face| {
+            space
+                .get_lighting(GridPoint::new(1, 1, 1) + face.normal_vector())
+                .value()
+        });
+        assert_eq!(
+            adjacents,
+            // TODO: make this test less fragile. The asymmetry isn't even wanted;
+            // I think it's probably due to exactly diagonal rays.
+            FaceMap {
+                within: Rgb::new(0.0, 0.0, 0.0),
+                nx: Rgb::new(0.13631347, 0.27262694, 0.5452539),
+                ny: Rgb::new(0.16928194, 0.3385639, 0.6771278),
+                nz: Rgb::new(0.2102241, 0.4204482, 0.8408964),
+                px: Rgb::new(0.13631347, 0.27262694, 0.5452539),
+                py: Rgb::new(0.16928194, 0.3385639, 0.6771278),
+                pz: Rgb::new(0.2102241, 0.4204482, 0.8408964)
+            },
         );
     }
 
