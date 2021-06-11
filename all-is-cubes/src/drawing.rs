@@ -336,9 +336,7 @@ mod tests {
     use crate::math::Rgba;
     use crate::raytracer::print_space;
     use crate::universe::Universe;
-    use embedded_graphics::primitives::{
-        Primitive, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle,
-    };
+    use embedded_graphics::primitives::{Primitive, PrimitiveStyle, Rectangle};
 
     /// Test using a particular color type with [`DrawingPlane`].
     fn test_color_drawing<'c, C>(color_value: C, expected_block: &Block)
@@ -361,9 +359,10 @@ mod tests {
 
     #[test]
     fn draw_with_eg_rgb888() {
+        // Note that there is a conversion from sRGB to linear.
         test_color_drawing(
             Rgb888::new(0, 127, 255),
-            &Rgba::new(0.0, 127.0 / 255.0, 1.0, 1.0).into(),
+            &Rgba::new(0.0, 0.21223073, 1.0, 1.0).into(),
         );
     }
 
@@ -409,14 +408,12 @@ mod tests {
         todo!("test a case where a SetCubeError is propagated");
     }
 
-    fn a_primitive_style() -> PrimitiveStyle<Rgb888> {
-        PrimitiveStyleBuilder::new()
-            .fill_color(Rgb888::new(0, 127, 255))
-            .build()
+    fn a_primitive_style() -> PrimitiveStyle<Rgba> {
+        PrimitiveStyle::with_fill(a_primitive_color())
     }
     /// Cube color corresponding to a_primitive_style().
     fn a_primitive_color() -> Rgba {
-        Rgba::new(0.0, 127.0 / 255.0, 1.0, 1.0)
+        Rgba::new(0.0, 0.5, 1.5, 1.0)
     }
 
     #[test]
