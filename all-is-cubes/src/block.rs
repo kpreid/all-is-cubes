@@ -77,7 +77,7 @@ impl Block {
     /// Returns a new [`BlockBuilder`] which may be used to construct a [`Block`] value
     /// from various inputs with convenient syntax.
     pub const fn builder() -> BlockBuilder<builder::NeedsColorOrVoxels> {
-        BlockBuilder::<builder::NeedsColorOrVoxels>::default()
+        BlockBuilder::<builder::NeedsColorOrVoxels>::new()
     }
 
     /// Rotates this block by the specified rotation.

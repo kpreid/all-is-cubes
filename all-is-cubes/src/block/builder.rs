@@ -19,7 +19,6 @@ use crate::universe::{Name, URef, Universe, UniverseIndex};
 /// ```
 /// use all_is_cubes::block::Block;
 /// use all_is_cubes::math::Rgba;
-/// use std::borrow::Cow;
 ///
 /// let block = Block::builder()
 ///    .display_name("BROWN")
@@ -28,8 +27,8 @@ use crate::universe::{Name, URef, Universe, UniverseIndex};
 ///
 /// assert_eq!(block.evaluate().unwrap().color, Rgba::new(0.5, 0.5, 0., 1.));
 /// assert_eq!(
-///     block.evaluate().unwrap().attributes.display_name,
-///     Cow::Borrowed("BROWN"),
+///     block.evaluate().unwrap().attributes.display_name.as_ref(),
+///     "BROWN",
 /// );
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,13 +39,13 @@ pub struct BlockBuilder<C> {
 
 impl Default for BlockBuilder<NeedsColorOrVoxels> {
     fn default() -> Self {
-        // Delegate to inherent impl const fn
-        Self::default()
+        Self::new()
     }
 }
 
 impl BlockBuilder<NeedsColorOrVoxels> {
-    pub const fn default() -> BlockBuilder<NeedsColorOrVoxels> {
+    /// Common implementation of [`Block::builder`] and [`Default::default`]; use one of those to call this.
+    pub(super) const fn new() -> BlockBuilder<NeedsColorOrVoxels> {
         BlockBuilder {
             attributes: BlockAttributes::default(),
             content: NeedsColorOrVoxels,
@@ -172,6 +171,9 @@ impl<C> BlockBuilder<C> {
 
 /// Voxel-specific builder methods.
 impl BlockBuilder<BlockBuilderVoxels> {
+    /// Sets the coordinate offset for building a [`Block::Recur`]:
+    /// the lower-bound corner of the region of the [`Space`]
+    /// which will be used for block voxels. The default is zero.
     pub fn offset(mut self, offset: GridPoint) -> Self {
         self.content.offset = offset;
         self
