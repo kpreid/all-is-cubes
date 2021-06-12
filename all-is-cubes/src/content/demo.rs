@@ -214,7 +214,6 @@ mod tests {
         for template in UniverseTemplate::iter() {
             let mut u = template.build().unwrap();
             let _ = u.get_default_character().borrow();
-            let _ = u.get_default_space().borrow();
             u.step(Tick::arbitrary());
         }
     }

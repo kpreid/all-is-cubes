@@ -69,9 +69,6 @@ impl Universe {
     }
 
     // TODO: temporary shortcuts to be replaced with more nuance
-    pub fn get_default_space(&self) -> URef<Space> {
-        self.get(&"space".into()).unwrap()
-    }
     pub fn get_default_character(&self) -> URef<Character> {
         self.get(&"character".into()).unwrap()
     }

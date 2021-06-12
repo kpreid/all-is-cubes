@@ -9,7 +9,7 @@ use all_is_cubes::content::{axes, make_some_blocks};
 use all_is_cubes::content::{install_landscape_blocks, wavy_landscape};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::space::{Grid, Space};
-use all_is_cubes::universe::{Universe, UniverseIndex as _};
+use all_is_cubes::universe::{URef, Universe, UniverseIndex as _};
 
 pub fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
@@ -122,10 +122,8 @@ pub fn lighting_bench(c: &mut Criterion) {
         b.iter_batched(
             universe_for_lighting_test,
             |universe| {
-                universe
-                    .get_default_space()
-                    .borrow_mut()
-                    .evaluate_light(0, |_| {});
+                let space: URef<Space> = universe.get(&"space".into()).unwrap();
+                space.borrow_mut().evaluate_light(0, |_| {});
             },
             BatchSize::SmallInput,
         )
