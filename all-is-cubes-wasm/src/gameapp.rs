@@ -4,7 +4,6 @@
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
 use std::cell::{BorrowMutError, RefCell};
-use std::fmt::Write as _;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
@@ -18,7 +17,7 @@ use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
-use all_is_cubes::util::{CustomFormat as _, StatusText, Warnings};
+use all_is_cubes::util::Warnings;
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl};
@@ -315,30 +314,10 @@ impl WebGameRoot {
             // Do graphics
             let render_info = self.renderer.render_frame(self.app.cursor_result());
 
-            // Compute info text.
-            // TODO: This should be platform-independent code.
-            let mut info_text = String::new();
-            if let Some(character_ref) = self.app.character() {
-                write!(
-                    info_text,
-                    "{}",
-                    character_ref.borrow().custom_format(StatusText)
-                )
-                .unwrap();
-            }
-            write!(
-                info_text,
-                "\n\n{:#?}\n\n{:#?}\n\n",
-                self.last_step_info.custom_format(StatusText),
-                render_info.custom_format(StatusText),
-            )
-            .unwrap();
-            match self.app.cursor_result() {
-                Some(cursor) => write!(info_text, "{}", cursor),
-                None => write!(info_text, "No block"),
-            }
-            .unwrap();
-            self.static_dom.scene_info_text_node.set_data(&info_text);
+            // Update info text
+            self.static_dom
+                .scene_info_text_node
+                .set_data(&format!("{}", self.app.info_text(render_info)));
         }
 
         if self.app.frame_clock.should_step() && !self.step_callback_scheduled {

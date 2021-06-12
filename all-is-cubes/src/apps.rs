@@ -3,6 +3,8 @@
 
 //! Components for "apps", or game clients: user interface and top-level state.
 
+use std::fmt::Display;
+
 use crate::camera::{Camera, GraphicsOptions};
 use crate::character::{cursor_raycast, Character, CharacterChange, Cursor};
 use crate::content::UniverseTemplate;
@@ -11,6 +13,7 @@ use crate::space::Space;
 use crate::tools::ToolError;
 use crate::transactions::Transaction;
 use crate::universe::{URef, Universe, UniverseStepInfo};
+use crate::util::{CustomFormat, StatusText};
 use crate::vui::Vui;
 
 mod input;
@@ -38,6 +41,8 @@ pub struct AllIsCubesAppState {
     game_universe: Universe,
     game_character: Option<URef<Character>>,
 
+    paused: ListenableCell<bool>,
+
     ui: Vui,
     ui_dirty: DirtyFlag,
 
@@ -46,7 +51,7 @@ pub struct AllIsCubesAppState {
     /// one of two different spaces.
     cursor_result: Option<Cursor>,
 
-    paused: ListenableCell<bool>,
+    last_step_info: UniverseStepInfo,
 }
 
 impl AllIsCubesAppState {
@@ -69,9 +74,10 @@ impl AllIsCubesAppState {
             graphics_options: ListenableCell::new(GraphicsOptions::default()),
             game_character: game_universe.get_default_character(),
             game_universe,
+            paused,
             ui_dirty: DirtyFlag::new(true),
             cursor_result: None,
-            paused,
+            last_step_info: UniverseStepInfo::default(),
         };
 
         // TODO: once it's possible to switch characters we will need to clear and reinstall this
@@ -136,6 +142,7 @@ impl AllIsCubesAppState {
                 self.maybe_sync_ui();
                 info += self.ui.step(tick);
 
+                self.last_step_info = info;
                 result = Some(info)
             }
         }
@@ -188,5 +195,36 @@ impl AllIsCubesAppState {
         } else {
             Err(ToolError::NothingSelected) // TODO: slightly wrong
         }
+    }
+
+    /// Returns textual information intended to be overlaid as a HUD on top of the rendered scene
+    /// containing diagnostic information about rendering and stepping.
+    pub fn info_text<T>(&self, render: T) -> InfoText<'_, T> {
+        InfoText { app: self, render }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct InfoText<'a, T> {
+    app: &'a AllIsCubesAppState,
+    render: T,
+}
+
+impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(character_ref) = self.app.character() {
+            write!(f, "{}", character_ref.borrow().custom_format(StatusText)).unwrap();
+        }
+        write!(
+            f,
+            "\n\n{:#?}\n\n{:#?}\n\n",
+            self.app.last_step_info.custom_format(StatusText),
+            self.render.custom_format(StatusText),
+        )?;
+        match self.app.cursor_result() {
+            Some(cursor) => write!(f, "{}", cursor),
+            None => write!(f, "No block"),
+        }?;
+        Ok(())
     }
 }
