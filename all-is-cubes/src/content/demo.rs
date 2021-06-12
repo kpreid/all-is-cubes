@@ -213,7 +213,7 @@ mod tests {
     pub fn template_smoke_test() {
         for template in UniverseTemplate::iter() {
             let mut u = template.build().unwrap();
-            let _ = u.get_default_character().borrow();
+            let _ = u.get_default_character().unwrap().borrow();
             u.step(Tick::arbitrary());
         }
     }

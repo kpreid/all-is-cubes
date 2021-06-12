@@ -3,8 +3,8 @@
 
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
-use std::borrow::Cow;
 use std::cell::{BorrowMutError, RefCell};
+use std::fmt::Write as _;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
@@ -80,7 +80,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error)));
         JsValue::from_str(&*error)
     })?;
-    renderer.set_character(Some(app.character().clone()));
+    renderer.set_character(app.character().map(Clone::clone));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
     static_dom.scene_info_text_node.append_data("\nGL ready.")?;
@@ -316,18 +316,29 @@ impl WebGameRoot {
             let render_info = self.renderer.render_frame(self.app.cursor_result());
 
             // Compute info text.
-            // TODO: tidy up cursor result formatting, make it reusable
-            let cursor_result_text = match self.app.cursor_result() {
-                Some(cursor) => Cow::Owned(format!("{}", cursor)),
-                None => Cow::Borrowed("No block"),
-            };
-            self.static_dom.scene_info_text_node.set_data(&format!(
-                "{:#?}\n\n{:#?}\n\n{:#?}\n\n{}",
-                self.app.character().borrow().custom_format(StatusText),
+            // TODO: This should be platform-independent code.
+            let mut info_text = String::new();
+            if let Some(character_ref) = self.app.character() {
+                write!(
+                    info_text,
+                    "{}",
+                    character_ref.borrow().custom_format(StatusText)
+                )
+                .unwrap();
+            }
+            write!(
+                info_text,
+                "\n\n{:#?}\n\n{:#?}\n\n",
                 self.last_step_info.custom_format(StatusText),
                 render_info.custom_format(StatusText),
-                cursor_result_text
-            ));
+            )
+            .unwrap();
+            match self.app.cursor_result() {
+                Some(cursor) => write!(info_text, "{}", cursor),
+                None => write!(info_text, "No block"),
+            }
+            .unwrap();
+            self.static_dom.scene_info_text_node.set_data(&info_text);
         }
 
         if self.app.frame_clock.should_step() && !self.step_callback_scheduled {

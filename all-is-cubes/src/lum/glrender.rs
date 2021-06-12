@@ -159,13 +159,21 @@ where
             // TODO: going to need invalidation of chunks etc. here
         }
 
+        let surface = &mut self.surface;
+        let block_programs = &mut self.block_programs;
+
         let character: &Character = &*(if let Some(character_ref) = &self.character {
             character_ref.borrow()
         } else {
+            // Nothing to draw; clear screen and exit
+            surface
+                .new_pipeline_gate()
+                .pipeline(&self.back_buffer, &PipelineState::default(), |_, _| Ok(()))
+                .assume()
+                .into_result()
+                .unwrap();
             return info;
         });
-        let surface = &mut self.surface;
-        let block_programs = &mut self.block_programs;
 
         self.world_camera.set_view_matrix(character.view());
         let graphics_options = self.world_camera.options(); // arbitrary choice of borrowable source

@@ -69,8 +69,8 @@ impl Universe {
     }
 
     // TODO: temporary shortcuts to be replaced with more nuance
-    pub fn get_default_character(&self) -> URef<Character> {
-        self.get(&"character".into()).unwrap()
+    pub fn get_default_character(&self) -> Option<URef<Character>> {
+        self.get(&"character".into())
     }
 
     /// Advance time for all members.

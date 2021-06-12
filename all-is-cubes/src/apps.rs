@@ -36,7 +36,7 @@ pub struct AllIsCubesAppState {
     graphics_options: ListenableCell<GraphicsOptions>,
 
     game_universe: Universe,
-    game_character: URef<Character>,
+    game_character: Option<URef<Character>>,
 
     ui: Vui,
     ui_dirty: DirtyFlag,
@@ -75,20 +75,21 @@ impl AllIsCubesAppState {
         };
 
         // TODO: once it's possible to switch characters we will need to clear and reinstall this
-        new_self
-            .game_character
-            .borrow()
-            .listen(new_self.ui_dirty.listener().filter(|msg| match msg {
-                CharacterChange::Inventory | CharacterChange::Selections => Some(()),
-            }));
+        if let Some(character_ref) = &new_self.game_character {
+            character_ref
+                .borrow()
+                .listen(new_self.ui_dirty.listener().filter(|msg| match msg {
+                    CharacterChange::Inventory | CharacterChange::Selections => Some(()),
+                }));
+        }
         new_self.maybe_sync_ui();
 
         new_self
     }
 
     /// Returns a reference to the [`Character`] that should be shown to the user.
-    pub fn character(&self) -> &URef<Character> {
-        &self.game_character
+    pub fn character(&self) -> Option<&URef<Character>> {
+        self.game_character.as_ref()
     }
 
     /// Returns a mutable reference to the [`Universe`].
@@ -121,11 +122,13 @@ impl AllIsCubesAppState {
                 }
                 self.frame_clock.did_step();
 
-                self.input_processor.apply_input(
-                    &mut *self.character().borrow_mut(),
-                    &self.paused,
-                    tick,
-                );
+                if let Some(character_ref) = &self.game_character {
+                    self.input_processor.apply_input(
+                        &mut character_ref.borrow_mut(),
+                        &self.paused,
+                        tick,
+                    );
+                }
                 self.input_processor.step(tick);
 
                 let mut info = self.game_universe.step(tick);
@@ -142,10 +145,12 @@ impl AllIsCubesAppState {
     fn maybe_sync_ui(&mut self) {
         if self.ui_dirty.get_and_clear() {
             // TODO: Exact interaction between Character and Vui probably shouldn't be AllIsCubesAppState's responsibility.
-            let character = self.game_character.borrow();
-            self.ui
-                .set_toolbar(&character.inventory().slots, &character.selected_slots())
-                .unwrap();
+            if let Some(character_ref) = &self.game_character {
+                let character = character_ref.borrow();
+                self.ui
+                    .set_toolbar(&character.inventory().slots, &character.selected_slots())
+                    .unwrap();
+            }
         }
     }
 
@@ -160,10 +165,11 @@ impl AllIsCubesAppState {
             .and_then(|ray| cursor_raycast(ray, &self.ui.current_space()));
 
         if self.cursor_result.is_none() {
-            let character = self.game_character.borrow_mut();
-            self.cursor_result = ndc_pos
-                .map(|p| game_camera.project_ndc_into_world(p))
-                .and_then(|ray| cursor_raycast(ray, &character.space));
+            if let Some(character_ref) = &self.game_character {
+                self.cursor_result = ndc_pos
+                    .map(|p| game_camera.project_ndc_into_world(p))
+                    .and_then(|ray| cursor_raycast(ray, &character_ref.borrow().space));
+            }
         }
     }
 
@@ -173,8 +179,8 @@ impl AllIsCubesAppState {
 
     /// TODO: Should have click feedback in VUI, not via return value.
     pub fn click(&mut self, button: usize) -> Result<(), ToolError> {
-        if let Some(cursor) = &self.cursor_result {
-            let transaction = Character::click(self.game_character.clone(), cursor, button)?;
+        if let (Some(cursor), Some(character_ref)) = (&self.cursor_result, &self.game_character) {
+            let transaction = Character::click(character_ref.clone(), cursor, button)?;
             transaction
                 .execute(self.universe_mut())
                 .map_err(|e| ToolError::Internal(e.to_string()))?;

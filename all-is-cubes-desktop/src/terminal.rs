@@ -202,7 +202,12 @@ impl TerminalMain {
     }
 
     fn draw(&mut self) -> crossterm::Result<()> {
-        let character = &*self.app.character().borrow();
+        let character = match self.app.character() {
+            Some(character_ref) => character_ref.borrow(),
+            None => {
+                return Ok(());
+            }
+        };
         self.camera.set_view_matrix(character.view());
 
         let color_mode = self.options.colors;

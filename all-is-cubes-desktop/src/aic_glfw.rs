@@ -62,7 +62,7 @@ pub fn glfw_main_loop(
             error
         })?;
 
-    renderer.set_character(Some(app.character().clone()));
+    renderer.set_character(app.character().map(Clone::clone));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
     let ready_time = Instant::now();

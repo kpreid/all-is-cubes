@@ -19,9 +19,11 @@ use std::time::Duration;
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{Camera, Viewport};
+use all_is_cubes::character::Character;
 use all_is_cubes::math::{FreeCoordinate, NotNan, Rgba};
 use all_is_cubes::raytracer::{ColorBuf, SpaceRaytracer};
 use all_is_cubes::space::LightUpdatesInfo;
+use all_is_cubes::universe::URef;
 
 /// Options for recording and output in [`record_main`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -96,8 +98,15 @@ pub(crate) fn record_main(
     let viewport = options.viewport();
     let mut camera = Camera::new(app.graphics_options().snapshot(), viewport);
 
+    // Get character or fail.
+    // (We could instead try to render a blank scene, but that is probably not wanted.)
+    let character_ref: URef<Character> = app
+        .character()
+        .ok_or_else(|| Box::<dyn Error>::from("Character not found"))?
+        .clone();
+
     // Ensure lighting is ready
-    let space_ref = app.character().borrow().space.clone();
+    let space_ref = character_ref.borrow().space.clone();
     let light_progress = ProgressBar::new(100)
         .with_style(progress_style.clone())
         .with_prefix("Lighting");
@@ -108,7 +117,7 @@ pub(crate) fn record_main(
 
     if options.animated() {
         // TODO: replace this with a general scripting mechanism
-        app.character().borrow_mut().add_behavior(AutoRotate {
+        character_ref.borrow_mut().add_behavior(AutoRotate {
             rate: NotNan::new(45.0).unwrap(),
         });
     }
@@ -118,7 +127,7 @@ pub(crate) fn record_main(
         .with_prefix("Drawing");
     drawing_progress_bar.enable_steady_tick(1000);
     for frame in drawing_progress_bar.wrap_iter(options.frame_range()) {
-        camera.set_view_matrix(app.character().borrow().view());
+        camera.set_view_matrix(character_ref.borrow().view());
         let (image_data, _info) = SpaceRaytracer::<ColorBuf>::new(
             &*space_ref.borrow(),
             app.graphics_options().snapshot(),
