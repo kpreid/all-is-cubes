@@ -69,7 +69,10 @@ pub fn glfw_main_loop(
         app.maybe_step_universe();
         if app.frame_clock.should_draw() {
             app.update_cursor(renderer.ui_camera(), renderer.world_camera());
-            let _render_info = renderer.render_frame(app.cursor_result());
+            let render_info = renderer.render_frame(app.cursor_result()).unwrap();
+            renderer
+                .add_info_text(&format!("{}", app.info_text(render_info)))
+                .unwrap();
             renderer.surface.window.swap_buffers();
             app.frame_clock.did_draw();
         } else {

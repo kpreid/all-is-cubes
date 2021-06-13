@@ -3,7 +3,17 @@
 
 //! Top level of the `luminance`-based renderer.
 
+use embedded_graphics::mono_font::iso_8859_1::FONT_10X20;
+use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::pixelcolor::Rgb888;
+use embedded_graphics::prelude::{Drawable, Point};
+use embedded_graphics::text::Baseline;
+use embedded_graphics::text::Text;
 use instant::Instant; // wasm-compatible replacement for std::time::Instant
+use luminance::blending::Blending;
+use luminance::blending::Equation;
+use luminance::blending::Factor;
+use luminance::depth_test::DepthWrite;
 use luminance_front::context::GraphicsContext;
 use luminance_front::framebuffer::Framebuffer;
 use luminance_front::pipeline::PipelineState;
@@ -18,6 +28,7 @@ use crate::camera::{Camera, GraphicsOptions, Viewport};
 use crate::character::{Character, Cursor};
 use crate::content::palette;
 use crate::listen::{DirtyFlag, ListenableSource};
+use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::lum::shading::BlockPrograms;
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::LumBlockVertex;
@@ -42,6 +53,7 @@ where
     pub surface: C,
     back_buffer: Framebuffer<Dim2, (), ()>,
     block_programs: BlockPrograms,
+    info_text_texture: FullFrameTexture,
 
     // Rendering state
     character: Option<URef<Character>>,
@@ -73,12 +85,18 @@ where
             viewport.framebuffer_size.into(),
         )?;
 
+        let full_frame = FullFramePainter::basic_program(&mut surface)?;
+
+        let mut info_text_texture = full_frame.new_texture();
+        info_text_texture.resize(&mut surface, viewport).unwrap();
+
         Ok(Self {
             graphics_options,
             graphics_options_dirty,
             surface,
             back_buffer,
             block_programs,
+            info_text_texture,
             character: None,
             world_renderer: None,
             ui_renderer: None,
@@ -105,6 +123,10 @@ where
                 self.ui_camera.fov_y(),
             ));
         }
+
+        self.info_text_texture
+            .resize(&mut self.surface, viewport)
+            .unwrap();
 
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut self.surface,
@@ -140,7 +162,7 @@ where
         &self.ui_camera
     }
 
-    /// Draw a frame.
+    /// Draw a frame, excluding info text overlay.
     pub fn render_frame(
         &mut self,
         cursor_result: &Option<Cursor>,
@@ -286,14 +308,13 @@ where
                 &self.back_buffer,
                 // TODO: port skybox cube map code
                 &PipelineState::default().enable_clear_color(false),
-                |pipeline, mut shading_gate| {
+                |ref pipeline, ref mut shading_gate| {
                     if let Some(ui_output) = ui_output {
                         // TODO: Ignoring info
                         ui_output
-                            .bind(&pipeline)?
-                            .render(&mut shading_gate, block_programs)?;
+                            .bind(pipeline)?
+                            .render(shading_gate, block_programs)?;
                     }
-
                     Ok(())
                 },
             )
@@ -303,6 +324,45 @@ where
         info.draw_time = Instant::now().duration_since(start_draw_time);
         info.frame_time = Instant::now().duration_since(start_frame_time);
         Ok(info)
+    }
+
+    pub fn add_info_text(&mut self, text: &str) -> Result<(), GraphicsResourceError> {
+        let info_text_texture = &mut self.info_text_texture;
+        info_text_texture.data().fill(0);
+        Text::with_baseline(
+            text,
+            Point::new(5, 5),
+            MonoTextStyle::new(&FONT_10X20, Rgb888::new(0, 0, 0)),
+            Baseline::Top,
+        )
+        .draw(info_text_texture)
+        .unwrap(); // TODO: use .into_ok() when stable
+        info_text_texture.upload()?;
+
+        self.surface
+            .new_pipeline_gate()
+            .pipeline(
+                &self.back_buffer,
+                &PipelineState::default().enable_clear_color(false),
+                |ref pipeline, ref mut shading_gate| -> Result<(), GraphicsResourceError> {
+                    let success = info_text_texture.render(
+                        &RenderState::default()
+                            .set_depth_write(DepthWrite::Off)
+                            .set_blending(Some(Blending {
+                                equation: Equation::Additive,
+                                src: Factor::One,
+                                dst: Factor::SrcAlphaComplement,
+                            })),
+                        pipeline,
+                        shading_gate,
+                    )?;
+                    assert!(success);
+
+                    Ok(())
+                },
+            )
+            .into_result()?;
+        Ok(())
     }
 }
 
