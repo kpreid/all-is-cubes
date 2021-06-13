@@ -13,7 +13,6 @@ use std::time::Instant;
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::lum::GLRenderer;
-use all_is_cubes::util::Warnings;
 
 /// Run GLFW-based rendering and event loop.
 ///
@@ -53,14 +52,7 @@ pub fn glfw_main_loop(
     } = GlfwSurface::new_gl33(window_title, WindowOpt::default().set_dim(dim))?;
     let viewport = map_glfw_viewport(&context.window);
     // TODO: this is duplicated code with the wasm version; use a logging system to remove it
-    let mut renderer = GLRenderer::new(context, app.graphics_options(), viewport)
-        .handle_warnings(|warning| {
-            eprintln!("GLSL warning:\n{}", warning);
-        })
-        .map_err(|error| {
-            eprintln!("GLSL error:\n{}", error);
-            error
-        })?;
+    let mut renderer = GLRenderer::new(context, app.graphics_options(), viewport)?;
 
     renderer.set_character(app.character().map(Clone::clone));
     renderer.set_ui_space(Some(app.ui_space().clone()));

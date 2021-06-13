@@ -18,7 +18,6 @@ use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::VertexSemantics;
 use crate::math::FreeCoordinate;
-use crate::util::{Warnings as _, WarningsResult};
 
 /// Type of the block shader program (output of [`prepare_block_program`]).
 pub type BlockProgram = Program<VertexSemantics, (), BlockUniformInterface>;
@@ -33,7 +32,7 @@ impl BlockPrograms {
     pub(crate) fn compile<C>(
         context: &mut C,
         options: &GraphicsOptions,
-    ) -> WarningsResult<BlockPrograms, String, String>
+    ) -> Result<BlockPrograms, String>
     where
         C: GraphicsContext<Backend = Backend>,
     {
@@ -45,20 +44,16 @@ impl BlockPrograms {
             base_defines.push(("SMOOTH_LIGHTING", "1"));
         }
 
-        let mut warnings = Vec::new();
-        let this = BlockPrograms {
-            opaque: prepare_block_program(context, base_defines.iter().copied())
-                .move_warnings(&mut warnings)?,
+        Ok(BlockPrograms {
+            opaque: prepare_block_program(context, base_defines.iter().copied())?,
             transparent: prepare_block_program(
                 context,
                 base_defines
                     .iter()
                     .chain([("ALLOW_TRANSPARENCY", "1")].iter())
                     .copied(),
-            )
-            .move_warnings(&mut warnings)?,
-        };
-        Ok((this, warnings))
+            )?,
+        })
     }
 }
 
@@ -66,7 +61,7 @@ impl BlockPrograms {
 fn prepare_block_program<'a, C>(
     context: &mut C,
     defines: impl IntoIterator<Item = (&'a str, &'a str)>,
-) -> WarningsResult<BlockProgram, String, String>
+) -> Result<BlockProgram, String>
 where
     C: GraphicsContext<Backend = Backend>,
 {
@@ -105,15 +100,19 @@ where
     result
 }
 
+/// Unwraps [`BuiltProgram`] and logs any warnings.
 pub(crate) fn map_shader_result<Sem, Out, Uni>(
     program_attempt: Result<BuiltProgram<Sem, Out, Uni>, ProgramError>,
-) -> WarningsResult<Program<Sem, Out, Uni>, String, String> {
+) -> Result<Program<Sem, Out, Uni>, String> {
+    // TODO:
     match program_attempt {
-        Err(error) => Err((format!("{}", error), vec![])),
-        Ok(BuiltProgram { program, warnings }) => Ok((
-            program,
-            warnings.into_iter().map(|w| format!("{}", w)).collect(),
-        )),
+        Err(error) => Err(format!("{}", error)),
+        Ok(BuiltProgram { program, warnings }) => {
+            for warning in warnings {
+                log::warn!("{}", warning);
+            }
+            Ok(program)
+        }
     }
 }
 

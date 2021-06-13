@@ -25,7 +25,7 @@ use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
 use crate::space::Space;
 use crate::universe::URef;
-use crate::util::{CustomFormat, StatusText, WarningsResult};
+use crate::util::{CustomFormat, StatusText};
 use crate::vui::Vui;
 
 /// Game world/UI renderer targeting `luminance`.
@@ -61,34 +61,30 @@ where
         mut surface: C,
         graphics_options: ListenableSource<GraphicsOptions>,
         viewport: Viewport,
-    ) -> WarningsResult<Self, String, String> {
+    ) -> Result<Self, String> {
         let graphics_options_dirty = DirtyFlag::new(false);
         graphics_options.listen(graphics_options_dirty.listener());
         let initial_options = &*graphics_options.get();
 
-        // TODO: If WarningsResult continues being a thing, need a better success propagation strategy
-        let (block_programs, warnings) = BlockPrograms::compile(&mut surface, initial_options)?;
+        let block_programs = BlockPrograms::compile(&mut surface, initial_options)?;
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut surface,
             viewport.framebuffer_size.into(),
         )
         .unwrap(); // TODO error handling
 
-        Ok((
-            Self {
-                graphics_options,
-                graphics_options_dirty,
-                surface,
-                back_buffer,
-                block_programs,
-                character: None,
-                world_renderer: None,
-                ui_renderer: None,
-                ui_camera: Camera::new(Vui::graphics_options(initial_options.clone()), viewport),
-                world_camera: Camera::new(initial_options.clone(), viewport),
-            },
-            warnings,
-        ))
+        Ok(Self {
+            graphics_options,
+            graphics_options_dirty,
+            surface,
+            back_buffer,
+            block_programs,
+            character: None,
+            world_renderer: None,
+            ui_renderer: None,
+            ui_camera: Camera::new(Vui::graphics_options(initial_options.clone()), viewport),
+            world_camera: Camera::new(initial_options.clone(), viewport),
+        })
     }
 
     /// Returns the last [`Viewport`] provided.

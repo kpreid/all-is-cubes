@@ -17,7 +17,6 @@ use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
-use all_is_cubes::util::Warnings;
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl};
@@ -71,14 +70,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         surface,
         app.graphics_options(),
         gui_helpers.canvas_helper().viewport(),
-    )
-    .handle_warnings(|warning| {
-        console::warn_1(&JsValue::from_str(&format!("GLSL warning:\n{}", warning)));
-    })
-    .map_err(|error| {
-        console::error_1(&JsValue::from_str(&format!("GLSL error:\n{}", error)));
-        JsValue::from_str(&*error)
-    })?;
+    )?;
     renderer.set_character(app.character().map(Clone::clone));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
