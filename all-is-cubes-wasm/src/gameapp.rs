@@ -64,13 +64,14 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     app.graphics_options_mut().set(graphics_options);
 
     let surface = WebSysWebGL2Surface::from_canvas(gui_helpers.canvas_helper().canvas())
-        .map_err(|e| Error::new(&format!("did not initialize WebGL: {:?}", e)))?;
+        .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
 
     let mut renderer = GLRenderer::new(
         surface,
         app.graphics_options(),
         gui_helpers.canvas_helper().viewport(),
-    )?;
+    )
+    .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
     renderer.set_character(app.character().map(Clone::clone));
     renderer.set_ui_space(Some(app.ui_space().clone()));
 
@@ -299,12 +300,16 @@ impl WebGameRoot {
         if should_draw {
             // TODO do projection updates only when needed
             self.renderer
-                .set_viewport(self.gui_helpers.canvas_helper().viewport());
+                .set_viewport(self.gui_helpers.canvas_helper().viewport())
+                .unwrap();
             self.app
                 .update_cursor(self.renderer.ui_camera(), self.renderer.world_camera());
 
             // Do graphics
-            let render_info = self.renderer.render_frame(self.app.cursor_result());
+            let render_info = self
+                .renderer
+                .render_frame(self.app.cursor_result())
+                .expect("error in render_frame");
 
             // Update info text
             self.static_dom

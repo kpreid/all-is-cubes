@@ -8,9 +8,14 @@
 
 #![cfg(feature = "lum")]
 
+use std::error::Error;
+
 use cgmath::{Vector3, Zero as _};
 use luminance_front::context::GraphicsContext;
-use luminance_front::tess::{Mode, Tess};
+use luminance_front::framebuffer::FramebufferError;
+use luminance_front::pipeline::PipelineError;
+use luminance_front::tess::{Mode, Tess, TessError};
+use luminance_front::texture::TextureError;
 use luminance_front::Backend;
 
 use crate::character::Cursor;
@@ -35,7 +40,7 @@ mod types;
 pub(crate) fn make_cursor_tess<C>(
     context: &mut C,
     cursor_result: &Option<Cursor>,
-) -> Tess<LumBlockVertex>
+) -> Result<Tess<LumBlockVertex>, GraphicsResourceError>
 where
     C: GraphicsContext<Backend = Backend>,
 {
@@ -47,12 +52,11 @@ where
             Aab::from_cube(cursor.place.cube).enlarge(0.01),
         );
         // TODO: draw the selected face
-        context
+        Ok(context
             .new_tess()
             .set_vertices(vertices)
             .set_mode(Mode::Line)
-            .build()
-            .unwrap()
+            .build()?)
     } else {
         empty_tess(context)
     }
@@ -68,4 +72,45 @@ where
     geometry.wireframe_points(&mut MapExtend::new(vertices, |p| {
         LumBlockVertex::new_colored(p, Vector3::zero(), color)
     }))
+}
+
+/// Error arising when GPU/platform resources could not be obtained, or there is a bug
+/// or incompatibility, and the requested graphics initialization or drawing could not be
+/// completed.
+#[derive(Debug, thiserror::Error)]
+#[error("graphics error (in {0}): {source}", context.as_ref().map(|s| s.as_ref()).unwrap_or("?"))]
+pub struct GraphicsResourceError {
+    context: Option<String>,
+    #[source]
+    source: Box<dyn Error>,
+}
+
+impl GraphicsResourceError {
+    pub(crate) fn new<E: Error + 'static>(source: E) -> Self {
+        GraphicsResourceError {
+            context: None,
+            source: Box::new(source),
+        }
+    }
+}
+
+impl From<FramebufferError> for GraphicsResourceError {
+    fn from(source: FramebufferError) -> Self {
+        GraphicsResourceError::new(source)
+    }
+}
+impl From<PipelineError> for GraphicsResourceError {
+    fn from(source: PipelineError) -> Self {
+        GraphicsResourceError::new(source)
+    }
+}
+impl From<TessError> for GraphicsResourceError {
+    fn from(source: TessError) -> Self {
+        GraphicsResourceError::new(source)
+    }
+}
+impl From<TextureError> for GraphicsResourceError {
+    fn from(source: TextureError) -> Self {
+        GraphicsResourceError::new(source)
+    }
 }

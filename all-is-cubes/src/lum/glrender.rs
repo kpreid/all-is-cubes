@@ -21,6 +21,7 @@ use crate::listen::{DirtyFlag, ListenableSource};
 use crate::lum::shading::BlockPrograms;
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::LumBlockVertex;
+use crate::lum::GraphicsResourceError;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
 use crate::space::Space;
@@ -61,7 +62,7 @@ where
         mut surface: C,
         graphics_options: ListenableSource<GraphicsOptions>,
         viewport: Viewport,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, GraphicsResourceError> {
         let graphics_options_dirty = DirtyFlag::new(false);
         graphics_options.listen(graphics_options_dirty.listener());
         let initial_options = &*graphics_options.get();
@@ -70,8 +71,7 @@ where
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut surface,
             viewport.framebuffer_size.into(),
-        )
-        .unwrap(); // TODO error handling
+        )?;
 
         Ok(Self {
             graphics_options,
@@ -93,7 +93,7 @@ where
     }
 
     /// Sets the expected viewport dimensions. Use in case of window resizing.
-    pub fn set_viewport(&mut self, viewport: Viewport) {
+    pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), GraphicsResourceError> {
         self.world_camera.set_viewport(viewport);
 
         self.ui_camera.set_viewport(viewport);
@@ -109,8 +109,8 @@ where
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut self.surface,
             viewport.framebuffer_size.into(),
-        )
-        .unwrap(); // TODO error handling
+        )?;
+        Ok(())
     }
 
     /// Sets the [`Character`] whose view we render.
@@ -141,7 +141,10 @@ where
     }
 
     /// Draw a frame.
-    pub fn render_frame(&mut self, cursor_result: &Option<Cursor>) -> RenderInfo {
+    pub fn render_frame(
+        &mut self,
+        cursor_result: &Option<Cursor>,
+    ) -> Result<RenderInfo, GraphicsResourceError> {
         let mut info = RenderInfo::default();
         let start_frame_time = Instant::now();
 
@@ -166,9 +169,8 @@ where
                 .new_pipeline_gate()
                 .pipeline(&self.back_buffer, &PipelineState::default(), |_, _| Ok(()))
                 .assume()
-                .into_result()
-                .unwrap();
-            return info;
+                .into_result()?;
+            return Ok(info);
         });
 
         self.world_camera.set_view_matrix(character.view());
@@ -180,10 +182,10 @@ where
             self.world_renderer = Some(SpaceRenderer::new(character.space.clone()));
         }
         let world_renderer = self.world_renderer.as_mut().unwrap();
-        let world_output = world_renderer.prepare_frame(surface, &self.world_camera);
+        let world_output = world_renderer.prepare_frame(surface, &self.world_camera)?;
 
         let ui_output = if let Some(ui_renderer) = &mut self.ui_renderer {
-            Some(ui_renderer.prepare_frame(surface, &self.ui_camera))
+            Some(ui_renderer.prepare_frame(surface, &self.ui_camera)?)
         } else {
             None
         };
@@ -232,14 +234,13 @@ where
                         .new_tess()
                         .set_vertices(v)
                         .set_mode(Mode::Line)
-                        .build()
-                        .unwrap(),
+                        .build()?,
                 )
             }
         };
 
         // TODO: cache
-        let cursor_tess = make_cursor_tess(surface, &cursor_result);
+        let cursor_tess = make_cursor_tess(surface, &cursor_result)?;
 
         let start_draw_time = Instant::now();
         surface
@@ -277,8 +278,7 @@ where
                 },
             )
             .assume()
-            .into_result()
-            .unwrap();
+            .into_result()?;
 
         surface
             .new_pipeline_gate()
@@ -298,12 +298,11 @@ where
                 },
             )
             .assume()
-            .into_result()
-            .unwrap();
+            .into_result()?;
 
         info.draw_time = Instant::now().duration_since(start_draw_time);
         info.frame_time = Instant::now().duration_since(start_frame_time);
-        info
+        Ok(info)
     }
 }
 

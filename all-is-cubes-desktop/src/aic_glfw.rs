@@ -153,7 +153,9 @@ pub fn glfw_main_loop(
 
                 // Window state
                 WindowEvent::FramebufferSize(..) | WindowEvent::ContentScale(..) => {
-                    renderer.set_viewport(map_glfw_viewport(&renderer.surface.window));
+                    renderer
+                        .set_viewport(map_glfw_viewport(&renderer.surface.window))
+                        .unwrap();
                 }
                 WindowEvent::Focus(has_focus) => {
                     app.input_processor.key_focus(has_focus);

@@ -10,6 +10,7 @@ use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
 use std::convert::TryFrom as _;
 
+use crate::lum::GraphicsResourceError;
 use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
 use crate::space::PackedLight;
 use crate::triangulator::{BlockVertex, Coloring, GfxVertex};
@@ -190,16 +191,15 @@ impl GfxVertex for LumBlockVertex {
 
 /// Constructs a <code>[Tess]&lt;[LumBlockVertex]&gt;</code> that renders nothing but does
 /// not provoke a runtime error.
-pub fn empty_tess<C>(context: &mut C) -> Tess<LumBlockVertex>
+pub fn empty_tess<C>(context: &mut C) -> Result<Tess<LumBlockVertex>, GraphicsResourceError>
 where
     C: GraphicsContext<Backend = Backend>,
 {
-    context
+    Ok(context
         .new_tess()
         .set_vertices(vec![LumBlockVertex::DUMMY])
         .set_mode(Mode::Triangle)
-        .build()
-        .unwrap()
+        .build()?)
 }
 
 #[cfg(test)]

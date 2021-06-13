@@ -32,7 +32,7 @@ use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::shading::BlockPrograms;
 use crate::lum::types::LumBlockVertex;
-use crate::lum::wireframe_vertices;
+use crate::lum::{wireframe_vertices, GraphicsResourceError};
 use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
 use crate::raycast::Face;
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
@@ -108,7 +108,7 @@ impl SpaceRenderer {
         &'a mut self,
         context: &mut C,
         camera: &Camera,
-    ) -> SpaceRendererOutput<'a>
+    ) -> Result<SpaceRendererOutput<'a>, GraphicsResourceError>
     where
         C: GraphicsContext<Backend = Backend>,
     {
@@ -120,15 +120,16 @@ impl SpaceRenderer {
             .try_borrow()
             .expect("TODO: return a trivial result instead of panic.");
 
-        let block_texture_allocator = self.block_texture.get_or_insert_with(|| {
-            // TODO: friendlier error
-            LumAtlasAllocator::new(context).expect("texture setup failure")
-        });
+        if self.block_texture.is_none() {
+            self.block_texture = Some(LumAtlasAllocator::new(context)?);
+        }
+        let block_texture_allocator = self.block_texture.as_mut().unwrap();
 
-        let light_texture = self.light_texture.get_or_insert_with(|| {
+        if self.light_texture.is_none() {
             todo.light = None; // signal to update everything
-            SpaceLightTexture::new(context, space.grid()).expect("texture setup failure")
-        });
+            self.light_texture = Some(SpaceLightTexture::new(context, space.grid())?);
+        }
+        let light_texture = self.light_texture.as_mut().unwrap();
 
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
@@ -206,22 +207,16 @@ impl SpaceRenderer {
             }
         }
 
-        let texture_info = block_texture_allocator
-            .flush()
-            .expect("block texture write failure"); // TODO: recover from this error
+        let texture_info = block_texture_allocator.flush()?;
 
         // Update light texture
         if let Some(set) = &mut todo.light {
             // TODO: work in larger, ahem, chunks
             for cube in set.drain() {
-                light_texture
-                    .update(space, Grid::new(cube, [1, 1, 1]))
-                    .expect("light texture write failure");
+                light_texture.update(space, Grid::new(cube, [1, 1, 1]))?;
             }
         } else {
-            light_texture
-                .update_all(space)
-                .expect("light texture write failure");
+            light_texture.update_all(space)?;
             todo.light = Some(HashSet::new());
         }
 
@@ -318,15 +313,14 @@ impl SpaceRenderer {
                         .new_tess()
                         .set_vertices(v)
                         .set_mode(Mode::Line)
-                        .build()
-                        .unwrap(),
+                        .build()?,
                 );
             }
         } else {
             self.debug_chunk_boxes_tess = None;
         }
 
-        SpaceRendererOutput {
+        Ok(SpaceRendererOutput {
             data: SpaceRendererOutputData {
                 camera: camera.clone(),
                 chunks: &self.chunks, // TODO visibility culling, and don't allocate every frame
@@ -344,7 +338,7 @@ impl SpaceRenderer {
             },
             block_texture: &mut block_texture_allocator.texture,
             light_texture,
-        }
+        })
     }
 }
 
@@ -624,7 +618,7 @@ impl Chunk {
             *tess_option = None;
         }
 
-        // TODO: replace unwrap()s with an error logging/flagging mechanism
+        // TODO: replace unwrap()s with an error logging/flagging mechanism that can do partial drawing
         if new_triangulation.is_empty() {
             // Render zero vertices by not rendering anything.
             *tess_option = None;

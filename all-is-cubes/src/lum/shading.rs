@@ -17,6 +17,7 @@ use crate::camera::{GraphicsOptions, LightingOption};
 use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::VertexSemantics;
+use crate::lum::GraphicsResourceError;
 use crate::math::FreeCoordinate;
 
 /// Type of the block shader program (output of [`prepare_block_program`]).
@@ -32,7 +33,7 @@ impl BlockPrograms {
     pub(crate) fn compile<C>(
         context: &mut C,
         options: &GraphicsOptions,
-    ) -> Result<BlockPrograms, String>
+    ) -> Result<BlockPrograms, GraphicsResourceError>
     where
         C: GraphicsContext<Backend = Backend>,
     {
@@ -61,7 +62,7 @@ impl BlockPrograms {
 fn prepare_block_program<'a, C>(
     context: &mut C,
     defines: impl IntoIterator<Item = (&'a str, &'a str)>,
-) -> Result<BlockProgram, String>
+) -> Result<BlockProgram, GraphicsResourceError>
 where
     C: GraphicsContext<Backend = Backend>,
 {
@@ -103,10 +104,10 @@ where
 /// Unwraps [`BuiltProgram`] and logs any warnings.
 pub(crate) fn map_shader_result<Sem, Out, Uni>(
     program_attempt: Result<BuiltProgram<Sem, Out, Uni>, ProgramError>,
-) -> Result<Program<Sem, Out, Uni>, String> {
+) -> Result<Program<Sem, Out, Uni>, GraphicsResourceError> {
     // TODO:
     match program_attempt {
-        Err(error) => Err(format!("{}", error)),
+        Err(error) => Err(GraphicsResourceError::new(error)),
         Ok(BuiltProgram { program, warnings }) => {
             for warning in warnings {
                 log::warn!("{}", warning);
