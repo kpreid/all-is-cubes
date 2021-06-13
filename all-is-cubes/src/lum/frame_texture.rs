@@ -24,6 +24,7 @@ use luminance_front::Backend;
 use crate::camera::Viewport;
 use crate::lum::shading::map_shader_result;
 use crate::lum::GraphicsResourceError;
+use crate::space::Grid;
 
 /// Resources for drawing a texture onto the entire framebuffer.
 /// This is stateless and can be shared by multiple textures,
@@ -178,16 +179,21 @@ impl DrawTarget for FullFrameTexture {
         I: IntoIterator<Item = embedded_graphics::Pixel<Self::Color>>,
     {
         if let Some(texture) = &self.texture {
+            // Borrow Grid's indexing logic to do our 2D indexing (and set up for a Y flip)
             let [width, height] = texture.size();
+            let grid = Grid::new(
+                [0, (1 - height as i32), 0],
+                [1, height as i32, width as i32],
+            );
+
             for Pixel(point, color) in pixels.into_iter() {
-                // TODO: bounds checking
-                let index = (point.x as usize
-                    + ((height as i32) - 1 - point.y) as usize * width as usize)
-                    * 4;
-                self.local_data[index] = color.r();
-                self.local_data[index + 1] = color.g();
-                self.local_data[index + 2] = color.b();
-                self.local_data[index + 3] = 255;
+                if let Some(index) = grid.index([0, -point.y, point.x]) {
+                    let index = index * 4; // four channels
+                    self.local_data[index] = color.r();
+                    self.local_data[index + 1] = color.g();
+                    self.local_data[index + 2] = color.b();
+                    self.local_data[index + 3] = 255;
+                }
             }
         }
         Ok(())
