@@ -10,6 +10,7 @@ use cgmath::{
 };
 use itertools::Itertools as _;
 use ordered_float::NotNan;
+use std::convert::TryInto as _;
 
 use crate::math::{Aab, FreeCoordinate};
 use crate::raycast::Ray;
@@ -293,6 +294,14 @@ impl Viewport {
             (nominal_point.x + 0.5) / self.nominal_size.x * 2.0 - 1.0,
             -((nominal_point.y + 0.5) / self.nominal_size.y * 2.0 - 1.0),
         )
+    }
+
+    /// Computes the number of pixels in the framebuffer.
+    /// Returns [`None`] if that number does not fit in a [`usize`].
+    pub fn pixel_count(&self) -> Option<usize> {
+        let w: usize = self.framebuffer_size.x.try_into().ok()?;
+        let h: usize = self.framebuffer_size.y.try_into().ok()?;
+        w.checked_mul(h)
     }
 
     // TODO: Maybe have a validate() that checks if the data is not fit for producing an

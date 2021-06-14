@@ -167,7 +167,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     fn trace_scene_to_image_impl(&self, camera: &Camera) -> (Box<[P::Pixel]>, RaytraceInfo) {
         let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
-        let mut image = Vec::with_capacity(viewport_size.x.checked_add(viewport_size.y).unwrap());
+        let mut image = Vec::with_capacity(viewport.pixel_count().expect("image too large"));
 
         let mut total_info = RaytraceInfo::default();
         for ych in 0..viewport_size.y {
