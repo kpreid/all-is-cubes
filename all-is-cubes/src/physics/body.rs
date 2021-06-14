@@ -15,10 +15,6 @@ use crate::space::Space;
 use crate::transactions::{Transaction, Transactional};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
-/// Gravity vector, in cubes/s².
-/// TODO: Should probably be a property of the Space or something.
-const GRAVITY: Vector3<FreeCoordinate> = Vector3::new(0., -20., 0.);
-
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 
@@ -133,7 +129,9 @@ impl Body {
         // TODO: Reset any non-finite values found to allow recovery from glitches.
 
         if !self.flying && !tick.paused() {
-            self.velocity += GRAVITY * dt;
+            if let Some(space) = colliding_space {
+                self.velocity += space.physics().gravity.map(|c| c.into_inner()) * dt;
+            }
         }
 
         let push_out_info = if let Some(space) = colliding_space {

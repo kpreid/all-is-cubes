@@ -3,6 +3,7 @@
 
 //! That which contains many blocks.
 
+use cgmath::Vector3;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::binary_heap::BinaryHeap;
@@ -17,6 +18,7 @@ use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
 use crate::math::*;
+use crate::util::ConciseDebug;
 use crate::util::{CustomFormat, StatusText};
 
 mod grid;
@@ -788,27 +790,49 @@ impl SpaceBlockData {
 ///
 /// This is a separate type so that [`Space`] does not need a large set of accessors
 /// and the state consists of just this and the blocks.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct SpacePhysics {
+    /// Gravity vector for moving objects, in cubes/s².
+    pub gravity: Vector3<NotNan<FreeCoordinate>>,
+
     /// Color of light arriving from outside the space, used for light calculation
     /// and rendering.
     pub sky_color: Rgb,
 
     /// Method used to compute the illumination of individual blocks.
     pub light: LightPhysics,
+    // When adding a field, don't forget to expand the Debug impl.
 }
 
 impl SpacePhysics {
     pub const DEFAULT_FOR_BLOCK: Self = Self {
+        gravity: Vector3::new(notnan!(0.), notnan!(0.), notnan!(0.)),
         sky_color: rgb_const!(0.5, 0.5, 0.5),
         light: LightPhysics::None,
     };
 }
 
+impl fmt::Debug for SpacePhysics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SpacePhysics")
+            .field(
+                "gravity",
+                &self
+                    .gravity
+                    .map(NotNan::into_inner)
+                    .custom_format(ConciseDebug),
+            )
+            .field("sky_color", &self.sky_color)
+            .field("light", &self.light)
+            .finish()
+    }
+}
+
 impl Default for SpacePhysics {
     fn default() -> Self {
         Self {
+            gravity: Vector3::new(notnan!(0.), notnan!(-20.), notnan!(0.)),
             sky_color: palette::DAY_SKY_COLOR,
             light: LightPhysics::default(),
         }
@@ -1259,6 +1283,7 @@ mod tests {
             \x20       },\n\
             \x20   ],\n\
             \x20   physics: SpacePhysics {\n\
+            \x20       gravity: (+0.000, -20.000, +0.000),\n\
             \x20       sky_color: Rgb(0.79, 0.79, 1.0),\n\
             \x20       light: None,\n\
             \x20   },\n\

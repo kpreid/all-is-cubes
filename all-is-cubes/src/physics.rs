@@ -22,6 +22,7 @@ mod tests {
     use crate::math::Aab;
     use crate::raycast::CubeFace;
     use crate::raycast::Face;
+    use crate::space::SpacePhysics;
     use crate::space::{Grid, Space};
     use cgmath::Vector3;
     use cgmath::{InnerSpace as _, Point3, Zero as _};
@@ -54,14 +55,19 @@ mod tests {
 
     #[test]
     fn freefall_with_gravity() {
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set_physics(SpacePhysics {
+            gravity: Vector3::new(notnan!(0.0), notnan!(-20.0), notnan!(0.0)),
+            ..SpacePhysics::default()
+        });
         let mut body = Body {
             velocity: Vector3::new(2.0, 0.0, 0.0),
             flying: false,
             ..test_body()
         };
-        body.step(Tick::from_seconds(1.5), None, collision_noop);
+        body.step(Tick::from_seconds(1.5), Some(&space), collision_noop);
         assert_eq!(body.position, Point3::new(3.0, -43.0, 0.0));
-        body.step(Tick::from_seconds(1.5), None, collision_noop);
+        body.step(Tick::from_seconds(1.5), Some(&space), collision_noop);
         assert_eq!(body.position, Point3::new(6.0, -133.0, 0.0));
     }
 
