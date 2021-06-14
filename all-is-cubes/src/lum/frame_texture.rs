@@ -1,9 +1,8 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use cgmath::Vector2;
+use cgmath::Zero;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::OriginDimensions;
@@ -20,6 +19,8 @@ use luminance_front::shading_gate::ShadingGate;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::texture::{Dim2, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, Wrap};
 use luminance_front::Backend;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::camera::Viewport;
 use crate::lum::shading::map_shader_result;
@@ -65,6 +66,7 @@ impl FullFramePainter {
         FullFrameTexture {
             ff: self.clone(),
             texture: None,
+            last_size: Vector2::zero(),
             local_data: Box::new([]),
             texture_is_valid: false,
         }
@@ -99,11 +101,16 @@ pub(crate) struct FullFrameTexture {
     /// Reference to the [`Program`] and [`Tess`] we're using.
     ff: Rc<FullFramePainter>,
     texture: Option<Texture<Dim2, NormRGBA8UI>>,
+    last_size: Vector2<u32>,
     local_data: Box<[u8]>,
     texture_is_valid: bool,
 }
 
 impl FullFrameTexture {
+    /// Adjusts the texture size to the given framebuffer size.
+    ///
+    /// The current texture data will be discarded if and only if the given size is
+    /// different than the previous size.
     pub fn resize<C>(
         &mut self,
         context: &mut C,
@@ -113,8 +120,11 @@ impl FullFrameTexture {
         C: GraphicsContext<Backend = Backend>,
     {
         let size = viewport.framebuffer_size;
-        self.local_data = vec![0; (size.x as usize) * (size.y as usize) * 4].into_boxed_slice();
+        if size == self.last_size {
+            return Ok(());
+        }
 
+        self.local_data = vec![0; (size.x as usize) * (size.y as usize) * 4].into_boxed_slice();
         self.texture_is_valid = false;
         self.texture = Some(Texture::new(
             context,
@@ -128,6 +138,7 @@ impl FullFrameTexture {
                 ..Sampler::default()
             },
         )?);
+        self.last_size = size;
 
         Ok(())
     }
