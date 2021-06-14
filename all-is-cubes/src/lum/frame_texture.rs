@@ -13,7 +13,7 @@ use embedded_graphics::Pixel;
 use luminance::UniformInterface;
 use luminance_front::context::GraphicsContext;
 use luminance_front::pipeline::{Pipeline, TextureBinding};
-use luminance_front::pixel::{NormUnsigned, SRGBA8UI};
+use luminance_front::pixel::{NormRGBA8UI, NormUnsigned};
 use luminance_front::render_state::RenderState;
 use luminance_front::shader::{Program, Uniform};
 use luminance_front::shading_gate::ShadingGate;
@@ -36,6 +36,11 @@ pub(crate) struct FullFramePainter {
 }
 
 impl FullFramePainter {
+    /// Construct a [`FullFramePainter`] with the default shader program.
+    ///
+    /// This program copies values to the framebuffer with no conversion, and as such,
+    /// expects the texture to produce sRGB values. That is, the pixel format should
+    /// *not* be one which implicitly converts sRGB to linear.
     pub fn basic_program<C: GraphicsContext<Backend = Backend>>(
         context: &mut C,
     ) -> Result<Rc<Self>, GraphicsResourceError> {
@@ -73,7 +78,7 @@ impl FullFramePainter {
         render_state: &RenderState,
         pipeline: &Pipeline<'_>,
         shading_gate: &mut ShadingGate<'_>,
-        texture: &mut Texture<Dim2, SRGBA8UI>,
+        texture: &mut Texture<Dim2, NormRGBA8UI>,
     ) -> Result<(), GraphicsResourceError> {
         let tess = &self.tess;
         let bound_texture = pipeline.bind_texture(texture)?;
@@ -93,7 +98,7 @@ impl FullFramePainter {
 pub(crate) struct FullFrameTexture {
     /// Reference to the [`Program`] and [`Tess`] we're using.
     ff: Rc<FullFramePainter>,
-    texture: Option<Texture<Dim2, SRGBA8UI>>,
+    texture: Option<Texture<Dim2, NormRGBA8UI>>,
     local_data: Box<[u8]>,
     texture_is_valid: bool,
 }
