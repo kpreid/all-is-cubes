@@ -475,8 +475,7 @@ mod tests {
         assert_eq!(space.get_lighting((1, 0, 0)), former_sky_light);
         assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light);
 
-        // Duration doesn't currently matter
-        let info = space.step(Tick::arbitrary());
+        let (info, _) = space.step(None, Tick::arbitrary());
         assert_eq!(
             info.light,
             LightUpdatesInfo {
@@ -609,7 +608,7 @@ mod tests {
         let mut space = space_with_disabled_light();
         space.light_needs_update(GridPoint::new(0, 0, 0), u8::MAX);
         assert_eq!(
-            space.step(Tick::arbitrary()).light,
+            space.step(None, Tick::arbitrary()).0.light,
             LightUpdatesInfo::default()
         );
     }

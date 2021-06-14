@@ -9,6 +9,7 @@ use std::error::Error;
 use std::fmt::Debug;
 
 use super::Space;
+use crate::behavior::BehaviorSetTransaction;
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::transactions::PreconditionFailed;
@@ -22,6 +23,7 @@ impl Transactional for Space {
 #[derive(Clone, Default, PartialEq)]
 pub struct SpaceTransaction {
     cubes: BTreeMap<[GridCoordinate; 3], CubeTransaction>,
+    behaviors: BehaviorSetTransaction<Space>,
 }
 
 impl SpaceTransaction {
@@ -39,7 +41,17 @@ impl SpaceTransaction {
         let cube: GridPoint = cube.into();
         let mut cubes = BTreeMap::new();
         cubes.insert(cube.into(/* array */), transaction);
-        SpaceTransaction { cubes }
+        SpaceTransaction {
+            cubes,
+            ..Default::default()
+        }
+    }
+
+    pub fn behaviors(t: BehaviorSetTransaction<Space>) -> Self {
+        Self {
+            behaviors: t,
+            ..Default::default()
+        }
     }
 }
 

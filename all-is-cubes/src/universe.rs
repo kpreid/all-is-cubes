@@ -78,22 +78,26 @@ impl Universe {
         let mut info = UniverseStepInfo::default();
         let start_time = Instant::now();
 
+        let mut transactions = Vec::new();
+
         for space in self.spaces.values() {
-            info.space_step += space
+            let (space_info, transaction) = space
                 .try_borrow_mut()
                 .expect("space borrowed during universe.step()")
-                .step(tick);
+                .step(Some(&space.downgrade()), tick);
+            transactions.push(transaction);
+            info.space_step += space_info;
         }
 
-        let mut transactions = Vec::new();
         for character in self.characters.values() {
             // TODO: Make URootRef::downgrade() non-allocating
             let transaction = character
                 .try_borrow_mut()
                 .expect("character borrowed during universe.step()")
                 .step(Some(&character.downgrade()), tick);
-            transactions.push(transaction)
+            transactions.push(transaction);
         }
+
         // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
         for t in transactions {
             if let Err(e) = t.execute(self) {

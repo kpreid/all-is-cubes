@@ -11,12 +11,15 @@ use std::fmt;
 use std::rc::{Rc, Weak};
 
 use crate::apps::Tick;
+use crate::behavior::BehaviorSet;
 use crate::block::*;
 use crate::character::Spawn;
 use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
 use crate::math::*;
+use crate::transactions::{Transaction as _, UniverseTransaction};
+use crate::universe::URef;
 use crate::util::ConciseDebug;
 use crate::util::{CustomFormat, StatusText};
 
@@ -67,6 +70,10 @@ pub struct Space {
     /// A converted copy of `physics.sky_color`.
     packed_sky_color: PackedLight,
 
+    // TODO: Replace this with something that has a spatial index so we can
+    // search for behaviors in specific regions
+    behaviors: BehaviorSet<Space>,
+
     spawn: Spawn,
 
     notifier: Notifier<SpaceChange>,
@@ -97,6 +104,7 @@ impl std::fmt::Debug for Space {
             .field("grid", &self.grid)
             .field("block_data", &self.block_data)
             .field("physics", &self.physics)
+            .field("behaviors", &self.behaviors)
             .finish_non_exhaustive()
     }
 }
@@ -142,6 +150,7 @@ impl Space {
             last_light_updates: Vec::new(),
             physics,
             packed_sky_color,
+            behaviors: BehaviorSet::new(),
             spawn: Spawn::default_for_new_space(grid),
             notifier: Notifier::new(),
             todo: Default::default(),
@@ -506,7 +515,11 @@ impl Space {
     }
 
     /// Advance time in the space.
-    pub fn step(&mut self, tick: Tick) -> SpaceStepInfo {
+    pub fn step(
+        &mut self,
+        self_ref: Option<&URef<Space>>,
+        tick: Tick,
+    ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
         for block_index in self.todo.borrow_mut().blocks.drain() {
             self.notifier.notify(SpaceChange::BlockValue(block_index));
@@ -520,13 +533,21 @@ impl Space {
             // lighting influenced by the block.
         }
 
-        if !tick.paused() {
-            // TODO: other world behaviors...
+        let mut transaction = UniverseTransaction::default();
+        if let Some(self_ref) = self_ref {
+            if !tick.paused() {
+                transaction = self.behaviors.step(
+                    &*self,
+                    &(|t: SpaceTransaction| t.bind(self_ref.clone())),
+                    SpaceTransaction::behaviors,
+                    tick,
+                );
+            }
         }
 
         let light = self.update_lighting_from_queue();
 
-        SpaceStepInfo { spaces: 1, light }
+        (SpaceStepInfo { spaces: 1, light }, transaction)
     }
 
     /// Perform lighting updates until there are none left to do. Returns the number of
@@ -1256,7 +1277,7 @@ mod tests {
         // computations like reevaluation to happen during the notification process.
         assert_eq!(sink.next(), None);
         // Instead, it only happens the next time the space is stepped.
-        space.step(Tick::arbitrary());
+        let (_, _) = space.step(None, Tick::arbitrary());
         // Now we should see a notification and the evaluated block data having changed.
         assert_eq!(sink.next(), Some(SpaceChange::BlockValue(0)));
         assert_eq!(space.get_evaluated((0, 0, 0)), &new_evaluated);
@@ -1297,6 +1318,7 @@ mod tests {
             \x20       sky_color: Rgb(0.79, 0.79, 1.0),\n\
             \x20       light: None,\n\
             \x20   },\n\
+            \x20   behaviors: BehaviorSet([]),\n\
             \x20   ..\n\
             }"
         );
