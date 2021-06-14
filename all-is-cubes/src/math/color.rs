@@ -8,6 +8,8 @@ pub use ordered_float::{FloatIsNan, NotNan};
 use std::convert::{TryFrom, TryInto};
 use std::ops::{Add, AddAssign, Mul, Sub};
 
+use crate::math::notnan;
+
 /// Allows writing a constant [`Rgb`] color value, provided that its components are float
 /// literals.
 ///
@@ -15,15 +17,11 @@ use std::ops::{Add, AddAssign, Mul, Sub};
 #[macro_export]
 macro_rules! rgb_const {
     ($r:literal, $g:literal, $b:literal) => {
-        unsafe {
-            // Safety: Only literal values are allowed, which will either be a non-NaN
-            // float or a type mismatch.
-            $crate::math::Rgb::new_nn(
-                $crate::math::NotNan::new_unchecked($r),
-                $crate::math::NotNan::new_unchecked($g),
-                $crate::math::NotNan::new_unchecked($b),
-            )
-        }
+        $crate::math::Rgb::new_nn(
+            $crate::math::notnan!($r),
+            $crate::math::notnan!($g),
+            $crate::math::notnan!($b),
+        )
     };
 }
 
@@ -32,14 +30,12 @@ macro_rules! rgb_const {
 #[macro_export]
 macro_rules! rgba_const {
     ($r:literal, $g:literal, $b:literal, $a:literal) => {
-        unsafe {
-            $crate::math::Rgba::new_nn(
-                $crate::math::NotNan::new_unchecked($r),
-                $crate::math::NotNan::new_unchecked($g),
-                $crate::math::NotNan::new_unchecked($b),
-                $crate::math::NotNan::new_unchecked($a),
-            )
-        }
+        $crate::math::Rgba::new_nn(
+            $crate::math::notnan!($r),
+            $crate::math::notnan!($g),
+            $crate::math::notnan!($b),
+            $crate::math::notnan!($a),
+        )
     };
 }
 
@@ -69,8 +65,8 @@ pub struct Rgb(Vector3<NotNan<f32>>);
 pub struct Rgba(Vector4<NotNan<f32>>);
 
 // NotNan::zero() and one() exist, but only via traits, which can't be used in const
-const NN0: NotNan<f32> = unsafe { NotNan::new_unchecked(0.0) };
-const NN1: NotNan<f32> = unsafe { NotNan::new_unchecked(1.0) };
+const NN0: NotNan<f32> = notnan!(0.0);
+const NN1: NotNan<f32> = notnan!(1.0);
 
 impl Rgb {
     /// Black.
