@@ -470,7 +470,8 @@ impl Space {
         }
     }
 
-    /// Provides an [`embedded_graphics::DrawTarget`] adapter for 2.5D drawing.
+    /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
+    /// adapter for 2.5D drawing.
     ///
     /// For more information on how to use this, see
     /// [`all_is_cubes::drawing`](crate::drawing).

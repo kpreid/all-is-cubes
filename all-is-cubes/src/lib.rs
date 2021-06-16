@@ -43,7 +43,7 @@ pub mod raycast;
 pub mod raytracer;
 pub mod space;
 mod tools;
-mod transactions;
+pub mod transactions;
 pub mod triangulator;
 pub mod universe;
 pub mod util;
