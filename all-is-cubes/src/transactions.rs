@@ -14,7 +14,9 @@ use crate::universe::{Name, UBorrowMut, URef, Universe};
 
 /// A `Transaction` is a description of a mutation to an object or collection thereof that
 /// should occur in a logically atomic fashion (all or nothing), with a set of
-/// preconditions for it to happen at all. Transactions are used:
+/// preconditions for it to happen at all.
+///
+/// Transactions are used:
 ///
 /// * to enable game objects to describe effects on their containers in a way compatible
 ///   with Rust's ownership rules (e.g. a [`Tool`](crate::tools::Tool) may affect its
@@ -63,7 +65,7 @@ pub trait Transaction<T: ?Sized> {
     ///
     /// ```rust,ignore
     /// # use all_is_cubes::universe::Universe;
-    /// # use all_is_cubes::transactions::UniverseTransaction;
+    /// # use all_is_cubes::transactions::{Transaction, UniverseTransaction};
     /// # let transaction = UniverseTransaction::default();
     /// # let target = &mut Universe::new();
     /// let check = transaction.check(target)?;
@@ -89,7 +91,7 @@ pub trait Transaction<T: ?Sized> {
     /// Generally, “can be merged” means that the two transactions do not have mutually
     /// exclusive preconditions and are not specify conflicting mutations. However, the
     /// definition of conflict is type-specific; for example, merging two “add 1 to
-    /// velocity” transactions may produce an “add 2 to velocity” transactions.
+    /// velocity” transactions may produce an “add 2 to velocity” transaction.
     ///
     /// This is not necessarily the same as either ordering of applying the two
     /// transactions sequentially. See [`Self::commit_merge`] for more details.
@@ -137,6 +139,10 @@ pub trait Transactional {
     type Transaction: Transaction<Self>;
 }
 
+/// Conversion from concrete transaction types to [`UniverseTransaction`].
+///
+/// Most code should be able to call [`Transaction::bind`] rather than mentioning this
+/// trait at all.
 pub trait UTransactional: Transactional + 'static
 where
     Self: Sized,
@@ -144,7 +150,7 @@ where
     /// Specify the target of the transaction as a [`URef`], and erase its type,
     /// so that it can be combined with other transactions in the same universe.
     ///
-    /// This is also available as [`Transaction::bind`]
+    /// This is also available as [`Transaction::bind`].
     fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction;
 }
 
