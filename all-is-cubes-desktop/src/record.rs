@@ -164,7 +164,7 @@ fn write_frame(
 ) -> Result<(), std::io::Error> {
     let byte_raster = image_data
         .iter()
-        .flat_map(|c| IntoIter::new(c.to_srgb_32bit()))
+        .flat_map(|c| c.to_srgb_32bit())
         .collect::<Vec<u8>>();
     png_writer.write_image_data(&byte_raster)?;
     Ok(())
@@ -213,7 +213,7 @@ fn write_color_metadata<W: std::io::Write>(
             15000, // Blue x
             6000,  // Blue y
         ])
-        .flat_map(|v| IntoIter::new(u32::to_be_bytes(v)))
+        .flat_map(u32::to_be_bytes)
         .collect::<Box<[u8]>>(),
     )?;
     Ok(())

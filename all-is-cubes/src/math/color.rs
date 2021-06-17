@@ -490,7 +490,7 @@ mod tests {
             .into_iter()
             .filter(|&(o, _, r)| {
                 IntoIter::new(o)
-                    .zip(IntoIter::new(r))
+                    .zip(r)
                     .any(|(a, b)| (i16::from(a) - i16::from(b)).abs() > 1)
             })
             .collect::<Vec<_>>();

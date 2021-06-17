@@ -316,7 +316,7 @@ impl Geometry for Aab {
             p[axis_0] = l[axis_0];
             vertices[vbase + 7] = p;
         }
-        output.extend(std::array::IntoIter::new(vertices));
+        output.extend(vertices);
     }
 }
 
