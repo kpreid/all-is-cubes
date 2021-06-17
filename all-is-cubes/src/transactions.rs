@@ -497,6 +497,7 @@ mod transaction_tester {
         Tr: Transaction<Ta> + Clone + Debug + 'a,
         Ta: Debug + 'a,
     {
+        #[allow(clippy::new_without_default)]
         pub fn new() -> Self {
             Self {
                 transactions: Vec::new(),
