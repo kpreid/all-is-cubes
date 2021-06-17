@@ -376,8 +376,11 @@ mod any_transaction {
     }
 }
 
-/// Combination of [`Transaction`]s to be applied to one or more objects in a
-/// [`Universe`] somultaneously.
+/// A [`Transaction`] which operates on one or more objects in a [`Universe`]
+/// simultaneously.
+///
+/// Construct this by calling [`Transaction::bind`] on other transaction types
+/// and combine them into larger transactions with [`Transaction::merge`].
 #[derive(Clone, Default, PartialEq)]
 #[must_use]
 pub struct UniverseTransaction {
