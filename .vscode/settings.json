@@ -3,5 +3,6 @@
     "rust-analyzer.assist.importMergeBehavior": "last",
     "rust-analyzer.assist.importPrefix": "by_crate",
     "rust-analyzer.checkOnSave.command": "clippy",
-    "rust-analyzer.checkOnSave.allTargets": true
+    "rust-analyzer.checkOnSave.allTargets": true,
+    "rust-analyzer.assist.importGranularity": "module"
 }
