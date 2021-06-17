@@ -11,7 +11,9 @@ use std::sync::Arc;
 use crate::apps::Tick;
 use crate::character::{Character, CharacterTransaction};
 use crate::physics::BodyTransaction;
-use crate::transactions::{Transaction, Transactional, UniverseTransaction};
+use crate::transactions::{
+    PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
+};
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
@@ -143,10 +145,10 @@ impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
     type CommitCheck = ();
     type MergeCheck = ();
 
-    fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, ()> {
+    fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, PreconditionFailed> {
         if matches!(self.replace.keys().copied().max(), Some(index) if index >= target.items.len())
         {
-            Err(())
+            Err(PreconditionFailed {})
         } else {
             Ok(())
         }
@@ -164,14 +166,14 @@ impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
         Ok(())
     }
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         // Don't allow any touching the same slot at all.
         if self
             .replace
             .keys()
             .any(|slot| other.replace.contains_key(slot))
         {
-            return Err(());
+            return Err(TransactionConflict {});
         }
         Ok(())
     }

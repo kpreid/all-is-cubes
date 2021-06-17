@@ -43,7 +43,7 @@ pub trait Transaction<T: ?Sized> {
     ///
     /// If the preconditions are met, returns [`Ok`] containing data to be passed to
     /// [`Transaction::commit`].
-    fn check(&self, target: &T) -> Result<Self::CommitCheck, ()>;
+    fn check(&self, target: &T) -> Result<Self::CommitCheck, PreconditionFailed>;
 
     /// Perform the mutations specified by this transaction. The `check` value should have
     /// been created by a prior call to [`Transaction::commit`].
@@ -61,7 +61,7 @@ pub trait Transaction<T: ?Sized> {
     fn commit(&self, target: &mut T, check: Self::CommitCheck) -> Result<(), Box<dyn Error>>;
 
     /// Convenience method to execute a transaction in one step. Implementations should not
-    /// need to override this. Approximately equivalent to:
+    /// need to override this. Equivalent to:
     ///
     /// ```rust,ignore
     /// # use all_is_cubes::universe::Universe;
@@ -73,9 +73,7 @@ pub trait Transaction<T: ?Sized> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     fn execute(&self, target: &mut T) -> Result<(), Box<dyn Error>> {
-        let check = self
-            .check(target)
-            .map_err(|()| "Transaction precondition not met")?;
+        let check = self.check(target)?;
         self.commit(target, check)
     }
 
@@ -95,7 +93,7 @@ pub trait Transaction<T: ?Sized> {
     ///
     /// This is not necessarily the same as either ordering of applying the two
     /// transactions sequentially. See [`Self::commit_merge`] for more details.
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()>;
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict>;
 
     /// Combines two transactions into one which has both effects simultaneously.
     /// This operation must be commutative and have `Default::default` as the identity.
@@ -110,7 +108,7 @@ pub trait Transaction<T: ?Sized> {
     /// Combines two transactions into one which has both effects simultaneously, if possible.
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
-    fn merge(self, other: Self) -> Result<Self, ()>
+    fn merge(self, other: Self) -> Result<Self, TransactionConflict>
     where
         Self: Sized,
     {
@@ -130,6 +128,18 @@ pub trait Transaction<T: ?Sized> {
         UTransactional::bind(target, self)
     }
 }
+
+/// Error type returned by [`Transaction::check`].
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[non_exhaustive] // We might want to add further information later
+#[error("Transaction precondition not met")]
+pub struct PreconditionFailed {}
+
+/// Error type returned by [`Transaction::check_merge`].
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[non_exhaustive] // We might want to add further information later
+#[error("Conflict between transactions")]
+pub struct TransactionConflict {}
 
 /// Specifies a canonical transaction type for a target type.
 ///
@@ -178,7 +188,7 @@ where
     );
     type MergeCheck = <O::Transaction as Transaction<O>>::MergeCheck;
 
-    fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, ()> {
+    fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
         let borrow = self.target.borrow_mut();
         let check = self.transaction.check(&borrow)?;
         Ok((borrow, check))
@@ -192,7 +202,7 @@ where
         self.transaction.commit(&mut borrow, check)
     }
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         if self.target != other.target {
             // This is a panic because it indicates a programming error.
             panic!("TransactionInUniverse cannot have multiple targets; use UniverseTransaction instead");
@@ -264,7 +274,7 @@ impl Transaction<()> for AnyTransaction {
     type CommitCheck = Box<dyn Any>;
     type MergeCheck = Box<dyn Any>;
 
-    fn check(&self, _target: &()) -> Result<Self::CommitCheck, ()> {
+    fn check(&self, _target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
         use AnyTransaction::*;
         Ok(match self {
             Noop => Box::new(()),
@@ -296,14 +306,14 @@ impl Transaction<()> for AnyTransaction {
         }
     }
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         use AnyTransaction::*;
         match (self, other) {
             (Noop, _) => Ok(Box::new(())),
             (_, Noop) => Ok(Box::new(())),
             (Character(t1), Character(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
             (Space(t1), Space(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
-            (_, _) => Err(()),
+            (_, _) => Err(TransactionConflict {}),
         }
     }
 
@@ -395,7 +405,7 @@ impl Transaction<Universe> for UniverseTransaction {
     type CommitCheck = HashMap<Rc<Name>, Box<dyn Any>>;
     type MergeCheck = HashMap<Rc<Name>, Box<dyn Any>>;
 
-    fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, ()> {
+    fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
         // TODO: Enforce that `target` is the universe all the URefs belong to.
 
         let mut checks = HashMap::new();
@@ -416,7 +426,7 @@ impl Transaction<Universe> for UniverseTransaction {
         Ok(())
     }
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         // TODO: Enforce that other has the same universe.
         let mut results: Self::MergeCheck = HashMap::new();
         for (name, t2) in other.members.iter() {

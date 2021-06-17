@@ -12,7 +12,9 @@ use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
 use crate::space::{SetCubeError, SpaceTransaction};
-use crate::transactions::{Transaction, UniverseTransaction};
+use crate::transactions::{
+    PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
+};
 use crate::universe::{RefError, URef};
 use crate::vui::Icons;
 
@@ -285,11 +287,11 @@ impl Transaction<Inventory> for InventoryTransaction {
     type CommitCheck = Vec<usize>;
     type MergeCheck = ();
 
-    fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, ()> {
+    fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
         // Check replacements and notice if any slots are becoming empty
         for (&slot, (old, _new)) in self.replace.iter() {
             if inventory.slots[slot] != *old {
-                return Err(()); // TODO: detailed errors so we can signal where the conflict was
+                return Err(PreconditionFailed {}); // TODO: detailed errors so we can signal where the conflict was
             }
         }
 
@@ -304,7 +306,7 @@ impl Transaction<Inventory> for InventoryTransaction {
             .take(self.insert.len())
             .collect::<Vec<_>>();
         if empty_slots.len() < self.insert.len() {
-            return Err(());
+            return Err(PreconditionFailed {});
         }
 
         Ok(empty_slots)
@@ -324,13 +326,13 @@ impl Transaction<Inventory> for InventoryTransaction {
         Ok(())
     }
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         if self
             .replace
             .keys()
             .any(|slot| other.replace.contains_key(slot))
         {
-            return Err(());
+            return Err(TransactionConflict {});
         }
         Ok(())
     }
@@ -610,7 +612,7 @@ mod tests {
         assert_eq!(inventory.slots, contents);
         assert_eq!(
             InventoryTransaction::insert(new_item.clone()).check(&inventory),
-            Err(()), // TODO: transactions should have detailed errors
+            Err(PreconditionFailed {}),
         );
         assert_eq!(inventory.slots, contents);
     }

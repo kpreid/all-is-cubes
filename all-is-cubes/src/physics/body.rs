@@ -12,7 +12,7 @@ use crate::block::BlockCollision;
 use crate::math::{Aab, CubeFace, FreeCoordinate, Geometry as _};
 use crate::raycast::Ray;
 use crate::space::Space;
-use crate::transactions::{Transaction, Transactional};
+use crate::transactions::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
@@ -379,7 +379,7 @@ impl Transaction<Body> for BodyTransaction {
     type CommitCheck = ();
     type MergeCheck = ();
 
-    fn check(&self, _body: &Body) -> Result<Self::CommitCheck, ()> {
+    fn check(&self, _body: &Body) -> Result<Self::CommitCheck, PreconditionFailed> {
         // No conflicts currently possible.
         Ok(())
     }
@@ -393,7 +393,7 @@ impl Transaction<Body> for BodyTransaction {
         Ok(())
     }
 
-    fn check_merge(&self, _other: &Self) -> Result<Self::MergeCheck, ()> {
+    fn check_merge(&self, _other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         Ok(())
     }
 

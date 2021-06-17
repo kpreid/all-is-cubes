@@ -11,7 +11,8 @@ use std::fmt::Debug;
 use super::Space;
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
-use crate::transactions::{Transaction, Transactional};
+use crate::transactions::PreconditionFailed;
+use crate::transactions::{Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat as _};
 
 impl Transactional for Space {
@@ -46,11 +47,11 @@ impl Transaction<Space> for SpaceTransaction {
     type CommitCheck = ();
     type MergeCheck = ();
 
-    fn check(&self, space: &Space) -> Result<Self::CommitCheck, ()> {
+    fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
         for (&cube, CubeTransaction { old, new: _ }) in &self.cubes {
             if let Some(old) = old {
                 if space[cube] != *old {
-                    return Err(());
+                    return Err(PreconditionFailed {});
                 }
             }
         }
@@ -66,18 +67,18 @@ impl Transaction<Space> for SpaceTransaction {
         Ok(())
     }
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, ()> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         for (cube, t1) in self.cubes.iter() {
             if let Some(t2) = other.cubes.get(cube) {
                 if matches!((&t1.old, &t2.old), (Some(a), Some(b)) if a != b) {
                     // Incompatible preconditions will always fail.
-                    return Err(());
+                    return Err(TransactionConflict {});
                 }
                 if t1.new.is_some() && t2.new.is_some() {
                     // Replacing the same cube twice is not allowed -- even if they're
                     // equal, since doing so could violate an intended conservation law.
                     // TODO: Might want to make that optional.
-                    return Err(());
+                    return Err(TransactionConflict {});
                 }
             }
         }
