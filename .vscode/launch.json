@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'all-is-cubes'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=all-is-cubes"
+                ],
+                "filter": {
+                    "name": "all-is-cubes",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'all-is-cubes'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=all-is-cubes",
+                    "--package=all-is-cubes-desktop"
+                ],
+                "filter": {
+                    "name": "all-is-cubes",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+    ]
+}
