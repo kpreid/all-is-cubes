@@ -140,7 +140,7 @@ impl TerminalMain {
         self.out.queue(Clear(ClearType::All))?;
 
         loop {
-            'input: while crossterm::event::poll(Duration::from_secs(0))? {
+            'input: while crossterm::event::poll(Duration::ZERO)? {
                 let event = crossterm::event::read()?;
                 if let Some(aic_event) = map_crossterm_event(&event) {
                     if self.app.input_processor.key_momentary(aic_event) {

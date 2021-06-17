@@ -32,7 +32,7 @@ impl FrameClock {
         Self {
             last_absolute_time: None,
             render_dirty: true,
-            accumulated_step_time: Duration::default(),
+            accumulated_step_time: Duration::ZERO,
         }
     }
 

@@ -200,7 +200,7 @@ impl Vui {
 
     // TODO: handle errors in a local/transient way instead of propagating
     pub fn set_tooltip_text(&mut self, text: &str) -> Result<(), SetCubeError> {
-        self.tooltip_age = Some(Duration::from_secs(0));
+        self.tooltip_age = Some(Duration::ZERO);
         self.hud_layout
             .set_tooltip_text(&mut *self.hud_space.borrow_mut(), &self.hud_blocks, text)
     }
@@ -281,7 +281,7 @@ mod tests {
         let mut vui = new_vui_for_test();
         assert_eq!(vui.tooltip_age, None);
         vui.set_tooltip_text("Hello world").unwrap();
-        assert_eq!(vui.tooltip_age, Some(Duration::from_secs(0)));
+        assert_eq!(vui.tooltip_age, Some(Duration::ZERO));
         vui.step(Tick::from_seconds(0.5));
         assert_eq!(vui.tooltip_age, Some(Duration::from_millis(500)));
         vui.step(Tick::from_seconds(0.501));
