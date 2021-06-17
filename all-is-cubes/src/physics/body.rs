@@ -54,6 +54,7 @@ pub struct Body {
     /// This does not affect the behavior of the [`Body`] itself; it has nothing to do with
     /// the direction of the velocity.
     pub pitch: FreeCoordinate,
+    // When adding a field, don't forget to expand the Debug impl.
 }
 
 impl std::fmt::Debug for Body {

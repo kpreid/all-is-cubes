@@ -544,6 +544,7 @@ impl CustomFormat<ConciseDebug> for EvaluatedBlock {
             .field("color", &self.color)
             .field("opaque", &self.opaque)
             .field("visible", &self.visible)
+            .field("resolution", &self.resolution)
             .field("voxels", &"...")
             .finish()
     }

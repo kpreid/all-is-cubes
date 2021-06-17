@@ -94,7 +94,7 @@ impl std::fmt::Debug for Space {
             .field("grid", &self.grid)
             .field("block_data", &self.block_data)
             .field("physics", &self.physics)
-            .finish() // TODO: use .finish_non_exhaustive() if that stabilizes
+            .finish_non_exhaustive()
     }
 }
 
@@ -105,7 +105,7 @@ impl std::fmt::Debug for SpaceBlockData {
         fmt.debug_struct("SpaceBlockData")
             .field("count", &self.count)
             .field("block", &self.block)
-            .finish() // TODO: use .finish_non_exhaustive() if that stabilizes
+            .finish_non_exhaustive()
     }
 }
 
@@ -1281,6 +1281,7 @@ mod tests {
             \x20               },\n\
             \x20               Rgba(0.0, 0.0, 0.0, 0.0),\n\
             \x20           ),\n\
+            \x20           ..\n\
             \x20       },\n\
             \x20   ],\n\
             \x20   physics: SpacePhysics {\n\
@@ -1288,6 +1289,7 @@ mod tests {
             \x20       sky_color: Rgb(0.79, 0.79, 1.0),\n\
             \x20       light: None,\n\
             \x20   },\n\
+            \x20   ..\n\
             }"
         );
     }
