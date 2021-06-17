@@ -149,17 +149,15 @@ impl TerminalMain {
                     }
                 }
                 match event {
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Esc, ..
-                    })
-                    | Event::Key(KeyEvent {
-                        code: KeyCode::Char('c'),
-                        modifiers: KeyModifiers::CONTROL,
-                    })
-                    | Event::Key(KeyEvent {
-                        code: KeyCode::Char('d'),
-                        modifiers: KeyModifiers::CONTROL,
-                    }) => {
+                    Event::Key(
+                        KeyEvent {
+                            code: KeyCode::Esc, ..
+                        }
+                        | KeyEvent {
+                            code: KeyCode::Char('c' | 'd'),
+                            modifiers: KeyModifiers::CONTROL,
+                        },
+                    ) => {
                         return Ok(());
                     }
                     Event::Key(KeyEvent {
