@@ -63,7 +63,7 @@ pub trait Transaction<T: ?Sized> {
     /// Convenience method to execute a transaction in one step. Implementations should not
     /// need to override this. Equivalent to:
     ///
-    /// ```rust,ignore
+    /// ```rust
     /// # use all_is_cubes::universe::Universe;
     /// # use all_is_cubes::transactions::{Transaction, UniverseTransaction};
     /// # let transaction = UniverseTransaction::default();
