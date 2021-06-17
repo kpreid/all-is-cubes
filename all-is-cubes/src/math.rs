@@ -3,9 +3,6 @@
 
 //! Mathematical utilities and decisions.
 
-// TODO: bad lint will be fixed by https://github.com/rust-lang/rust-clippy/pull/7120
-#![allow(clippy::single_component_path_imports)]
-
 use std::iter::FusedIterator;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
