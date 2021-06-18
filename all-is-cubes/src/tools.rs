@@ -271,6 +271,7 @@ impl InventoryTransaction {
 impl Transaction<Inventory> for InventoryTransaction {
     type CommitCheck = Vec<usize>;
     type MergeCheck = ();
+    type Output = ();
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
         // Check replacements and notice if any slots are becoming empty

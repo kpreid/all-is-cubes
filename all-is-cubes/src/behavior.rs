@@ -144,6 +144,7 @@ impl<H> BehaviorSetTransaction<H> {
 impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
     type CommitCheck = ();
     type MergeCheck = ();
+    type Output = ();
 
     fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, PreconditionFailed> {
         if matches!(self.replace.keys().copied().max(), Some(index) if index >= target.items.len())

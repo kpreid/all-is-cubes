@@ -46,6 +46,7 @@ impl SpaceTransaction {
 impl Transaction<Space> for SpaceTransaction {
     type CommitCheck = ();
     type MergeCheck = ();
+    type Output = ();
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
         for (&cube, CubeTransaction { old, new: _ }) in &self.cubes {

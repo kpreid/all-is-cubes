@@ -379,6 +379,7 @@ impl Transactional for Body {
 impl Transaction<Body> for BodyTransaction {
     type CommitCheck = ();
     type MergeCheck = ();
+    type Output = ();
 
     fn check(&self, _body: &Body) -> Result<Self::CommitCheck, PreconditionFailed> {
         // No conflicts currently possible.

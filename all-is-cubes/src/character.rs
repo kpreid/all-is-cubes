@@ -329,6 +329,7 @@ impl Transaction<Character> for CharacterTransaction {
         <InventoryTransaction as Transaction<Inventory>>::MergeCheck,
         <BehaviorSetTransaction<Character> as Transaction<BehaviorSet<Character>>>::MergeCheck,
     );
+    type Output = ();
 
     fn check(&self, target: &Character) -> Result<Self::CommitCheck, PreconditionFailed> {
         Ok((

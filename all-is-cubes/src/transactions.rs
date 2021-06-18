@@ -38,6 +38,13 @@ pub trait Transaction<T: ?Sized> {
     /// call `commit` without `check`.
     type CommitCheck: 'static;
 
+    /// The result of a [`Transaction::commit()`] or [`Transaction::execute()`].
+    ///
+    /// The [`Transaction`] trait imposes no requirements on this value, but it may be
+    /// a change-notification message which could be redistributed via the target's
+    /// owner's [`Notifier`](crate::listen::Notifier).
+    type Output;
+
     /// Checks whether the target's current state meets the preconditions and returns
     /// [`Err`] if it does not. (TODO: Informative error return type.)
     ///
@@ -58,7 +65,11 @@ pub trait Transaction<T: ?Sized> {
     /// to the particular `T`). The consequences of doing so may include mutating the
     /// wrong components, signaling an error partway through the transaction, or merely
     /// committing the transaction while its preconditions do not hold.
-    fn commit(&self, target: &mut T, check: Self::CommitCheck) -> Result<(), Box<dyn Error>>;
+    fn commit(
+        &self,
+        target: &mut T,
+        check: Self::CommitCheck,
+    ) -> Result<Self::Output, Box<dyn Error>>;
 
     /// Convenience method to execute a transaction in one step. Implementations should not
     /// need to override this. Equivalent to:
@@ -69,10 +80,12 @@ pub trait Transaction<T: ?Sized> {
     /// # let transaction = UniverseTransaction::default();
     /// # let target = &mut Universe::new();
     /// let check = transaction.check(target)?;
-    /// transaction.commit(target, check)?;
+    /// # let _output: () =
+    /// transaction.commit(target, check)?
+    /// # ;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    fn execute(&self, target: &mut T) -> Result<(), Box<dyn Error>> {
+    fn execute(&self, target: &mut T) -> Result<Self::Output, Box<dyn Error>> {
         let check = self.check(target)?;
         self.commit(target, check)
     }
@@ -187,6 +200,7 @@ where
         <O::Transaction as Transaction<O>>::CommitCheck,
     );
     type MergeCheck = <O::Transaction as Transaction<O>>::MergeCheck;
+    type Output = <O::Transaction as Transaction<O>>::Output;
 
     fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
         let borrow = self.target.borrow_mut();
@@ -198,7 +212,7 @@ where
         &self,
         _dummy_target: &mut (),
         (mut borrow, check): Self::CommitCheck,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<Self::Output, Box<dyn Error>> {
         self.transaction.commit(&mut borrow, check)
     }
 
@@ -273,6 +287,7 @@ impl AnyTransaction {
 impl Transaction<()> for AnyTransaction {
     type CommitCheck = Box<dyn Any>;
     type MergeCheck = Box<dyn Any>;
+    type Output = ();
 
     fn check(&self, _target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
         use AnyTransaction::*;
@@ -295,7 +310,7 @@ impl Transaction<()> for AnyTransaction {
             let check: <TransactionInUniverse<O> as Transaction<()>>::CommitCheck = *(check
                 .downcast()
                 .map_err(|_| "AnyTransaction: type mismatch in check data")?);
-            transaction.commit(&mut (), check)
+            transaction.commit(&mut (), check).map(|_| ())
         }
 
         use AnyTransaction::*;
@@ -407,6 +422,7 @@ impl Transaction<Universe> for UniverseTransaction {
     // TODO: Benchmark cheaper HashMaps / using BTreeMap here
     type CommitCheck = HashMap<Rc<Name>, Box<dyn Any>>;
     type MergeCheck = HashMap<Rc<Name>, Box<dyn Any>>;
+    type Output = ();
 
     fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
         // TODO: Enforce that `target` is the universe all the URefs belong to.
@@ -547,7 +563,7 @@ mod transaction_tester {
                     let before = target_factory();
                     let mut target = target_factory();
                     if let Ok(check) = tap.transaction.check(&target) {
-                        let () = tap
+                        let _: Tr::Output = tap
                             .transaction
                             .commit(&mut target, check)
                             .expect("Transaction failed to commit");
