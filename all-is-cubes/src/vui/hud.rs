@@ -1,12 +1,10 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use cgmath::{EuclideanSpace as _, Vector2};
+use cgmath::{Vector2};
 use embedded_graphics::geometry::Point;
-use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::{Primitive as _, Transform as _};
 use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle, Triangle};
-use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use embedded_graphics::Drawable as _;
 use embedded_graphics::Pixel;
 
@@ -14,9 +12,9 @@ use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
-use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgba};
-use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
-use crate::tools::Tool;
+use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, Rgba};
+use crate::space::{Grid, Space, SpacePhysics};
+
 use crate::universe::{URef, Universe};
 use crate::vui::Icons;
 
@@ -30,7 +28,7 @@ pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFo
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HudLayout {
     size: Vector2<GridCoordinate>,
-    toolbar_positions: usize,
+    pub(crate) toolbar_positions: usize,
 }
 
 // TODO: This will probably not make sense once we have aspect ratio adaptations
@@ -48,10 +46,6 @@ const TOOLBAR_STEP: GridCoordinate = 2;
 impl HudLayout {
     pub(crate) fn grid(&self) -> Grid {
         Grid::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
-    }
-
-    fn text_resolution(&self) -> Resolution {
-        16
     }
 
     // TODO: taking the entire Universe doesn't seem like the best interface
@@ -111,30 +105,6 @@ impl HudLayout {
             }
         }
 
-        // Set up toolbar info text space
-        let frame = self.toolbar_text_frame();
-        let mut toolbar_text_space = Space::empty(Grid::new(
-            GridPoint::origin(),
-            GridVector::new(
-                frame.size().x * GridCoordinate::from(self.text_resolution()),
-                frame.size().y * GridCoordinate::from(self.text_resolution()),
-                2,
-            ),
-        ));
-        toolbar_text_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
-        let toolbar_text_blocks = space_to_blocks(
-            self.text_resolution(),
-            BlockAttributes::default(),
-            universe.insert_anonymous(toolbar_text_space),
-        )
-        .unwrap();
-        debug_assert_eq!(toolbar_text_blocks.grid().size(), frame.size());
-        space
-            .fill(frame, |p| {
-                Some(&toolbar_text_blocks[p - frame.lower_bounds().to_vec()])
-            })
-            .unwrap();
-
         space.fast_evaluate_light();
 
         universe.insert_anonymous(space)
@@ -145,95 +115,28 @@ impl HudLayout {
         GridPoint::new(self.size.x / 2, self.size.y / 2, 0)
     }
 
-    fn tool_icon_position(&self, index: usize) -> GridPoint {
+    pub(crate) fn tool_icon_position(&self, index: usize) -> GridPoint {
         let x_start =
             (self.size.x - (self.toolbar_positions as GridCoordinate) * TOOLBAR_STEP + 1) / 2;
         // TODO: set depth sensibly
         GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 1, 1)
     }
 
-    fn toolbar_text_frame(&self) -> Grid {
+    pub(super) fn toolbar_text_frame(&self) -> Grid {
         Grid::new((0, 3, 0), (self.size.x, 1, 1))
-    }
-
-    /// Repaint the toolbar with a new set of tools and selected tools.
-    ///
-    /// Returns an error if using the tools' icons produced an error — or possibly if
-    /// there was a drawing layout problem.
-    // TODO: Error return should probably be something other than SetCubeError
-    pub(crate) fn set_toolbar(
-        &self,
-        space: &mut Space,
-        hud_blocks: &HudBlocks,
-        tools: &[Tool],
-        selections: &[usize],
-    ) -> Result<(), SetCubeError> {
-        for (index, tool) in tools.iter().enumerate() {
-            if index >= self.toolbar_positions {
-                break;
-            }
-
-            let position = self.tool_icon_position(index);
-            // Draw icon
-            space.set(position, &*tool.icon(&hud_blocks.icons))?;
-            // Draw pointers.
-            // TODO: refactor to not use FLIP_Y now that it isn't a hardcoded feature
-            let toolbar_disp = &mut space
-                .draw_target(GridMatrix::from_translation(position.to_vec()) * GridMatrix::FLIP_Y);
-            for sel in 0..2 {
-                let slot = selections.get(sel).copied().unwrap_or(usize::MAX);
-                let brush: &VoxelBrush<'_> =
-                    &hud_blocks.toolbar_pointer[sel][usize::from(slot == index)];
-                Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn set_tooltip_text(
-        &self,
-        space: &mut Space,
-        hud_blocks: &HudBlocks,
-        text: &str,
-    ) -> Result<(), SetCubeError> {
-        let mut toolbar_text_space =
-            if let Block::Recur { space, .. } = &space[self.toolbar_text_frame().lower_bounds()] {
-                space.borrow_mut()
-            } else {
-                panic!("failed to retrieve toolbar space")
-            };
-        let grid = toolbar_text_space.grid();
-        toolbar_text_space.fill_uniform(grid, &AIR).unwrap();
-
-        // Note on dimensions: HudFont is currently 13 pixels tall, and we're using
-        // the standard 16-voxel space resolution, and hud_blocks.text has a 1-pixel stroke,
-        // so we have 16 - (13 + 2) = 1 voxel of free alignment, which I've chosen to put on
-        // the top edge.
-        let text_obj = Text::with_text_style(
-            text,
-            Point::new(grid.size().x / 2, -1),
-            MonoTextStyle::new(&HudFont, &hud_blocks.text),
-            TextStyleBuilder::new()
-                .baseline(Baseline::Bottom)
-                .alignment(Alignment::Center)
-                .build(),
-        );
-        text_obj.draw(&mut toolbar_text_space.draw_target(GridMatrix::FLIP_Y))?;
-        Ok(())
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct HudBlocks {
     pub(crate) icons: BlockProvider<Icons>,
-    text: VoxelBrush<'static>,
+    pub(crate) text: VoxelBrush<'static>,
     toolbar_left_cap: VoxelBrush<'static>,
     toolbar_right_cap: VoxelBrush<'static>,
     toolbar_divider: VoxelBrush<'static>,
     toolbar_middle: VoxelBrush<'static>,
     /// Outer index is "which pointer", inner index is "shown or hidden".
-    toolbar_pointer: [[VoxelBrush<'static>; 2]; 2],
+    pub(crate) toolbar_pointer: [[VoxelBrush<'static>; 2]; 2],
 }
 
 impl HudBlocks {

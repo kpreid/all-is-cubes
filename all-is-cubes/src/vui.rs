@@ -6,31 +6,34 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
+use std::sync::{Arc, Mutex};
+
 use cgmath::{Angle as _, Deg, Matrix4, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
 use ordered_float::NotNan;
-use std::borrow::Cow;
-use std::cell::RefCell;
-use std::rc::{Rc, Weak};
-use std::time::Duration;
 
 use crate::apps::{InputProcessor, Tick};
-use crate::block::{Block, AIR};
+use crate::block::Block;
 use crate::camera::{FogOption, GraphicsOptions};
+use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::listen::{ListenableSource, Listener};
 use crate::math::{FreeCoordinate, GridMatrix};
-use crate::space::{SetCubeError, Space};
-use crate::tools::Tool;
+use crate::space::Space;
+
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
 mod hud;
 use hud::*;
 mod icons;
 pub use icons::*;
+mod widget;
+pub(crate) use widget::*;
 
 /// `Vui` builds user interfaces out of voxels. It owns a `Universe` dedicated to the
 /// purpose and draws into spaces to form the HUD and menus.
@@ -42,10 +45,10 @@ pub(crate) struct Vui {
     hud_blocks: HudBlocks,
     hud_space: URef<Space>,
     hud_layout: HudLayout,
+    hud_widgets: Vec<Box<dyn WidgetController>>,
     aspect_ratio: FreeCoordinate,
 
-    /// None if the tooltip is blanked
-    tooltip_age: Option<Duration>,
+    tooltip_state: Arc<Mutex<TooltipState>>,
 
     todo: Rc<RefCell<VuiTodo>>,
 
@@ -56,19 +59,39 @@ pub(crate) struct Vui {
 
 impl Vui {
     /// `input_processor` is the `InputProcessor` whose state may be reflected on the HUD.
+    /// `character` is the `Character` whose inventory is displayed. TODO: Allow for character switching
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
-    pub fn new(input_processor: &InputProcessor, paused: ListenableSource<bool>) -> Self {
+    pub fn new(
+        input_processor: &InputProcessor,
+        paused: ListenableSource<bool>,
+        character: Option<URef<Character>>,
+    ) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = HudBlocks::new(&mut universe, 16);
         let hud_layout = HudLayout::default();
         let hud_space = hud_layout.new_space(&mut universe, &hud_blocks);
 
         let todo = Rc::new(RefCell::new(VuiTodo::default()));
-        input_processor.mouselook_mode().listen(TodoListener {
-            target: Rc::downgrade(&todo),
-            handler: |todo| todo.crosshair = true,
-        });
+        let tooltip_state = Arc::default();
+        if let Some(character_ref) = &character {
+            TooltipState::bind_to_character(&tooltip_state, character_ref.clone());
+        }
+
+        // TODO: HudLayout should take care of this maybe
+        let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
+            Box::new(ToolbarController::new(character, &hud_layout)),
+            Box::new(CrosshairController::new(
+                hud_layout.crosshair_position(),
+                input_processor.mouselook_mode(),
+            )),
+            Box::new(TooltipController::new(
+                Arc::clone(&tooltip_state),
+                &mut hud_space.borrow_mut(),
+                &hud_layout,
+                &mut universe,
+            )),
+        ];
 
         Self {
             universe,
@@ -76,9 +99,10 @@ impl Vui {
             hud_blocks,
             hud_space,
             hud_layout,
+            hud_widgets,
             aspect_ratio: 4. / 3., // arbitrary placeholder assumption
 
-            tooltip_age: None,
+            tooltip_state,
 
             todo,
 
@@ -134,83 +158,24 @@ impl Vui {
     }
 
     pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
-        // Note: clone is necessary to be compatible with borrowing self later
-        // TODO: figure out a better strategy; maybe eventually we will have no self borrows
-        let todo_rc = self.todo.clone();
-        let mut todo = RefCell::borrow_mut(&todo_rc);
-
-        if todo.crosshair {
-            todo.crosshair = false;
-
-            // Update crosshair block
-            self.hud_space
-                .borrow_mut()
-                .set(
-                    self.hud_layout.crosshair_position(),
-                    if *self.mouselook_mode.get() {
-                        &self.hud_blocks.icons[Icons::Crosshair]
-                    } else {
-                        &AIR
-                    },
-                )
-                .unwrap(); // TODO: Handle internal errors better than panicking
-        }
-
-        if let Some(ref mut age) = self.tooltip_age {
-            *age += tick.delta_t;
-            if *age > Duration::from_secs(1) {
-                // TODO: log errors
-                let _ = self.set_tooltip_text("");
-                self.tooltip_age = None;
+        let sv = WidgetSpaceView {
+            hud_blocks: &self.hud_blocks,
+            space: self.hud_space.clone(),
+        };
+        for controller in &mut self.hud_widgets {
+            if let Err(e) = controller.step(&sv, tick) {
+                // TODO: reduce log-spam if this ever happens
+                log::error!("VUI widget error: {}\nSource:{:#?}", e, controller);
             }
         }
 
         self.universe.step(tick)
     }
-
-    // TODO: return type leaks implementation details, ish
-    // (but we do want to return/log an error rather than eithe panicking or doing nothing)
-    pub fn set_toolbar(
-        &mut self,
-        tools: &[Tool],
-        selections: &[usize],
-    ) -> Result<(), SetCubeError> {
-        self.hud_layout.set_toolbar(
-            &mut *self.hud_space.borrow_mut(),
-            &self.hud_blocks,
-            tools,
-            selections,
-        )?;
-
-        // TODO: We should do this only if the actual selected item changed (but we don't yet
-        // have enough state information to track that).
-        // TODO: It's inefficient to perform a non-cached block evaluation just for the sake of
-        // getting the text — should we have a partial evaluation? Should tools keep evaluated
-        // icons on offer?
-        let text = selections
-            .get(1)
-            .and_then(|&i| tools.get(i))
-            .and_then(|tool| tool.icon(&self.hud_blocks.icons).evaluate().ok())
-            .map(|ev_block| ev_block.attributes.display_name)
-            .unwrap_or(Cow::Borrowed(""));
-        self.set_tooltip_text(&text)?;
-
-        Ok(())
-    }
-
-    // TODO: handle errors in a local/transient way instead of propagating
-    pub fn set_tooltip_text(&mut self, text: &str) -> Result<(), SetCubeError> {
-        self.tooltip_age = Some(Duration::ZERO);
-        self.hud_layout
-            .set_tooltip_text(&mut *self.hud_space.borrow_mut(), &self.hud_blocks, text)
-    }
 }
 
 /// [`Vui`]'s set of things that need updating.
 #[derive(Debug, Default)]
-struct VuiTodo {
-    crosshair: bool,
-}
+struct VuiTodo {}
 
 /// [`Listener`] adapter for [`VuiTodo`].
 struct TodoListener {
@@ -262,7 +227,11 @@ mod tests {
     use super::*;
 
     fn new_vui_for_test() -> Vui {
-        Vui::new(&InputProcessor::new(), ListenableSource::constant(false))
+        Vui::new(
+            &InputProcessor::new(),
+            ListenableSource::constant(false),
+            None,
+        )
     }
 
     #[test]
@@ -274,17 +243,5 @@ mod tests {
     fn background_smoke_test() {
         let mut space = Space::empty_positive(100, 100, 10);
         draw_background(&mut space);
-    }
-
-    #[test]
-    fn tooltip_timeout() {
-        let mut vui = new_vui_for_test();
-        assert_eq!(vui.tooltip_age, None);
-        vui.set_tooltip_text("Hello world").unwrap();
-        assert_eq!(vui.tooltip_age, Some(Duration::ZERO));
-        vui.step(Tick::from_seconds(0.5));
-        assert_eq!(vui.tooltip_age, Some(Duration::from_millis(500)));
-        vui.step(Tick::from_seconds(0.501));
-        assert_eq!(vui.tooltip_age, None);
     }
 }

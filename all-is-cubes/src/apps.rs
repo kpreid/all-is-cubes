@@ -6,9 +6,9 @@
 use std::fmt::{self, Display};
 
 use crate::camera::{Camera, GraphicsOptions};
-use crate::character::{cursor_raycast, Character, CharacterChange, Cursor};
+use crate::character::{cursor_raycast, Character, Cursor};
 use crate::content::UniverseTemplate;
-use crate::listen::{DirtyFlag, ListenableCell, ListenableSource, Listener as _};
+use crate::listen::{ListenableCell, ListenableSource};
 use crate::space::Space;
 use crate::tools::ToolError;
 use crate::transactions::Transaction;
@@ -44,7 +44,6 @@ pub struct AllIsCubesAppState {
     paused: ListenableCell<bool>,
 
     ui: Vui,
-    ui_dirty: DirtyFlag,
 
     /// Last cursor raycast result.
     /// TODO: This needs to handle clicking on the HUD and thus explicitly point into
@@ -65,32 +64,20 @@ impl AllIsCubesAppState {
 
         let input_processor = InputProcessor::new();
         let paused = ListenableCell::new(false);
+        let game_character = game_universe.get_default_character();
 
-        let mut new_self = Self {
-            ui: Vui::new(&input_processor, paused.as_source()),
+        Self {
+            ui: Vui::new(&input_processor, paused.as_source(), game_character.clone()),
 
             frame_clock: FrameClock::new(),
             input_processor,
             graphics_options: ListenableCell::new(GraphicsOptions::default()),
-            game_character: game_universe.get_default_character(),
+            game_character,
             game_universe,
             paused,
-            ui_dirty: DirtyFlag::new(true),
             cursor_result: None,
             last_step_info: UniverseStepInfo::default(),
-        };
-
-        // TODO: once it's possible to switch characters we will need to clear and reinstall this
-        if let Some(character_ref) = &new_self.game_character {
-            character_ref
-                .borrow()
-                .listen(new_self.ui_dirty.listener().filter(|msg| match msg {
-                    CharacterChange::Inventory(_) | CharacterChange::Selections => Some(()),
-                }));
         }
-        new_self.maybe_sync_ui();
-
-        new_self
     }
 
     /// Returns a reference to the [`Character`] that should be shown to the user.
@@ -139,7 +126,6 @@ impl AllIsCubesAppState {
 
                 let mut info = self.game_universe.step(tick);
 
-                self.maybe_sync_ui();
                 info += self.ui.step(tick);
 
                 self.last_step_info = info.clone();
@@ -147,18 +133,6 @@ impl AllIsCubesAppState {
             }
         }
         result
-    }
-
-    fn maybe_sync_ui(&mut self) {
-        if self.ui_dirty.get_and_clear() {
-            // TODO: Exact interaction between Character and Vui probably shouldn't be AllIsCubesAppState's responsibility.
-            if let Some(character_ref) = &self.game_character {
-                let character = character_ref.borrow();
-                self.ui
-                    .set_toolbar(&character.inventory().slots, &character.selected_slots())
-                    .unwrap();
-            }
-        }
     }
 
     /// Call this once per frame to update the cursor raycast.
