@@ -6,6 +6,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::sync::Arc;
 
 use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
@@ -271,7 +272,7 @@ impl InventoryTransaction {
 impl Transaction<Inventory> for InventoryTransaction {
     type CommitCheck = Vec<usize>;
     type MergeCheck = ();
-    type Output = ();
+    type Output = InventoryChange;
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
         // Check replacements and notice if any slots are becoming empty
@@ -302,14 +303,19 @@ impl Transaction<Inventory> for InventoryTransaction {
         &self,
         inventory: &mut Inventory,
         empty_slots: Self::CommitCheck,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<Self::Output, Box<dyn Error>> {
+        let mut modified_slots = Vec::with_capacity(self.replace.len() + self.insert.len());
         for (&slot, (_old, new)) in self.replace.iter() {
             inventory.slots[slot] = new.clone();
+            modified_slots.push(slot);
         }
         for (slot, item) in empty_slots.into_iter().zip(self.insert.iter()) {
             inventory.slots[slot] = item.clone();
+            modified_slots.push(slot);
         }
-        Ok(())
+        Ok(InventoryChange {
+            slots: modified_slots.into(),
+        })
     }
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
@@ -328,6 +334,13 @@ impl Transaction<Inventory> for InventoryTransaction {
         self.insert.extend(other.insert);
         self
     }
+}
+
+/// Description of a change to an [`Inventory`] for use in listeners.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct InventoryChange {
+    slots: Arc<[usize]>,
 }
 
 #[cfg(test)]
@@ -556,9 +569,14 @@ mod tests {
         let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
 
         assert_eq!(inventory.slots[2], Tool::None);
-        InventoryTransaction::insert(new_item.clone())
-            .execute(&mut inventory)
-            .unwrap();
+        assert_eq!(
+            InventoryTransaction::insert(new_item.clone())
+                .execute(&mut inventory)
+                .unwrap(),
+            InventoryChange {
+                slots: Arc::new([2])
+            }
+        );
         assert_eq!(inventory.slots[2], new_item);
     }
 
