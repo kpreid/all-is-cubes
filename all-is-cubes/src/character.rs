@@ -19,7 +19,7 @@ use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, BodyTransaction, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
-use crate::tools::{Inventory, InventoryTransaction, Tool, ToolError};
+use crate::tools::{Inventory, InventoryChange, InventoryTransaction, Tool, ToolError};
 use crate::transactions::{
     PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
@@ -348,9 +348,10 @@ impl Transaction<Character> for CharacterTransaction {
 
         // TODO: Perhaps Transaction should have an explicit cheap ".is_empty()"?
         if self.inventory != Default::default() {
-            self.inventory
+            let change = self
+                .inventory
                 .commit(&mut target.inventory, inventory_check)?;
-            target.notifier.notify(CharacterChange::Inventory);
+            target.notifier.notify(CharacterChange::Inventory(change));
         }
 
         self.behaviors
@@ -390,8 +391,8 @@ impl Transaction<Character> for CharacterTransaction {
 pub enum CharacterChange {
     // We'll probably want more but these are the ones needed for now.
     // (Also note that anything that's a public field can't be reliably notified about.)
-    /// Inventory slot contents. (TODO: This should specify which slot changed.)
-    Inventory,
+    /// Inventory contents.
+    Inventory(InventoryChange),
     /// Which inventory slots are selected.
     Selections,
 }
@@ -508,8 +509,11 @@ impl Spawn {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate::block::AIR;
+    use crate::listen::Sink;
     use crate::transactions::TransactionTester;
     use crate::universe::Universe;
 
@@ -536,12 +540,25 @@ mod tests {
         let mut universe = Universe::new();
         let space = Space::empty_positive(1, 1, 1);
         let space_ref = universe.insert_anonymous(space);
-        let character_ref = universe.insert_anonymous(Character::spawn_default(space_ref.clone()));
+        let character = Character::spawn_default(space_ref.clone());
+        let mut sink = Sink::new();
+        character.listen(sink.listener());
+        let character_ref = universe.insert_anonymous(character);
 
         let item = Tool::PlaceBlock(AIR);
         CharacterTransaction::inventory(InventoryTransaction::insert(item.clone()))
             .execute(&mut character_ref.borrow_mut())
             .unwrap();
+
+        // Check notification
+        assert_eq!(
+            sink.next(),
+            Some(CharacterChange::Inventory(InventoryChange {
+                slots: Arc::new([0])
+            })),
+        );
+        assert_eq!(sink.next(), None);
+
         // TODO: Actually assert inventory contents -- no public interface for that
     }
 

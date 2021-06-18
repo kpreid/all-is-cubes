@@ -85,7 +85,7 @@ impl AllIsCubesAppState {
             character_ref
                 .borrow()
                 .listen(new_self.ui_dirty.listener().filter(|msg| match msg {
-                    CharacterChange::Inventory | CharacterChange::Selections => Some(()),
+                    CharacterChange::Inventory(_) | CharacterChange::Selections => Some(()),
                 }));
         }
         new_self.maybe_sync_ui();

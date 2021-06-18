@@ -340,7 +340,7 @@ impl Transaction<Inventory> for InventoryTransaction {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct InventoryChange {
-    slots: Arc<[usize]>,
+    pub slots: Arc<[usize]>,
 }
 
 #[cfg(test)]
