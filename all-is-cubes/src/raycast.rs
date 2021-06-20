@@ -762,6 +762,98 @@ mod tests {
             step(10, 20, 30, Face::Within, 0.0));
     }
 
+    /// Test the case where the starting point is exactly on a cube border
+    /// and the ray is mostly aligned with that axis.
+    #[test]
+    fn start_on_cube_edge_parallel() {
+        // Positive origin, positive direction
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(10.0, 20.5, 30.5),
+                Vector3::new(2.0, 0.1, 0.1)),
+            vec![
+                step(10, 20, 30, Face::Within, 0.0),
+                step(11, 20, 30, Face::NX, 0.5),
+                step(12, 20, 30, Face::NX, 1.0),
+            ]);
+        // Positive origin, negative direction
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(10.0, 20.5, 30.5),
+                Vector3::new(-2.0, 0.1, 0.1)),
+            vec![
+                step(10, 20, 30, Face::Within, 0.0),
+                step(9, 20, 30, Face::PX, 0.5),
+                step(8, 20, 30, Face::PX, 1.0),
+            ]);
+        // Negative origin, positive direction
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(-10.0, 20.5, 30.5),
+                Vector3::new(2.0, 0.1, 0.1)),
+            vec![
+                step(-10, 20, 30, Face::Within, 0.0),
+                step(-9, 20, 30, Face::NX, 0.5),
+                step(-8, 20, 30, Face::NX, 1.0),
+            ]);
+        // Negative origin, negative direction
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(-10.0, 20.5, 30.5),
+                Vector3::new(-2.0, 0.1, 0.1)),
+            vec![
+                step(-10, 20, 30, Face::Within, 0.0),
+                step(-11, 20, 30, Face::PX, 0.5),
+                step(-12, 20, 30, Face::PX, 1.0),
+            ]);
+    }
+
+    /// Test the case where the starting point is exactly on a cube border
+    /// and the ray is mostly perpendicular to that axis.
+    #[test]
+    fn start_on_cube_edge_perpendicular() {
+        // Positive origin, positive direction
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(10.0, 20.5, 30.5),
+                Vector3::new(0.125, 1.0, 0.0)),
+            vec![
+                step(10, 20, 30, Face::Within, 0.0),
+                step(10, 21, 30, Face::NY, 0.5),
+                step(10, 22, 30, Face::NY, 1.5),
+            ]);
+        // Positive origin, negative direction
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(10.0, 20.5, 30.5),
+                Vector3::new(-0.125, -1.0, 0.0)),
+            vec![
+                step(10, 20, 30, Face::Within, 0.0),
+                step(10, 19, 30, Face::PY, 0.5),
+                step(10, 18, 30, Face::PY, 1.5),
+            ]);
+        // Negative origin, positive direction
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(-10.0, -20.5, 30.5),
+                Vector3::new(0.125, 1.0, 0.0)),
+            vec![
+                step(-10, -21, 30, Face::Within, 0.0),
+                step(-10, -20, 30, Face::NY, 0.5),
+                step(-10, -19, 30, Face::NY, 1.5),
+            ]);
+        // Negative origin, negative direction
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(-10.0, -20.5, 30.5),
+                Vector3::new(-0.125, -1.0, 0.0)),
+            vec![
+                step(-10, -21, 30, Face::Within, 0.0),
+                step(-10, -22, 30, Face::PY, 0.5),
+                step(-10, -23, 30, Face::PY, 1.5),
+            ]);
+    }
+
     #[test]
     fn within_grid() {
         // Ray oriented diagonally on the -X side of a grid that is short on the X axis.
@@ -896,6 +988,14 @@ mod tests {
         assert_eq!(scale_to_integer_step(0.0, 0.0), FreeCoordinate::INFINITY);
         assert_eq!(scale_to_integer_step(0.0, -0.0), FreeCoordinate::INFINITY);
         assert_eq!(scale_to_integer_step(-0.0, 0.0), FreeCoordinate::INFINITY);
+    }
+
+    #[test]
+    fn scale_to_integer_step_starting_on_integer() {
+        assert_eq!(scale_to_integer_step(3.0, 0.5), 2.0);
+        assert_eq!(scale_to_integer_step(3.0, -0.5), 2.0);
+        assert_eq!(scale_to_integer_step(-3.0, 0.5), 2.0);
+        assert_eq!(scale_to_integer_step(-3.0, -0.5), 2.0);
     }
     
     #[test]
