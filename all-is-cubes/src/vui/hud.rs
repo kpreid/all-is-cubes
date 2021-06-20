@@ -122,9 +122,6 @@ impl HudLayout {
             ),
         ));
         toolbar_text_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
-        toolbar_text_space
-            .fill_uniform(toolbar_text_space.grid(), Block::from(Rgba::WHITE))
-            .unwrap();
         let toolbar_text_blocks = space_to_blocks(
             self.text_resolution(),
             BlockAttributes::default(),
