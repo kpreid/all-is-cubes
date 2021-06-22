@@ -89,6 +89,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                                 ),
                             },
                             hit.face(),
+                            &impl_fields.options,
                         );
                     }
                     TracingBlock::Recur(pixel_block_data, resolution, array) => {
@@ -118,6 +119,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                                         ),
                                     },
                                     subcube_hit.face(),
+                                    &impl_fields.options,
                                 );
                             }
                         }
@@ -535,7 +537,9 @@ impl<P: PixelBuf> TracingState<P> {
         surface: Rgba,
         lighting: Rgb,
         face: Face,
+        options: &GraphicsOptions,
     ) {
+        let surface = options.transparency.limit_alpha(surface);
         if surface.fully_transparent() {
             return;
         }
