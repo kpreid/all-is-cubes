@@ -45,7 +45,7 @@ impl BlockPrograms {
             base_defines.push(("SMOOTH_LIGHTING", "1"));
         }
         match options.transparency {
-            TransparencyOption::Surface => {}
+            TransparencyOption::Surface | TransparencyOption::Threshold(_) => {}
             TransparencyOption::Volumetric => {
                 base_defines.push(("VOLUMETRIC", "1"));
             }

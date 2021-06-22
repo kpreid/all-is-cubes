@@ -12,7 +12,7 @@ use itertools::Itertools as _;
 use ordered_float::NotNan;
 use std::convert::TryInto as _;
 
-use crate::math::{Aab, FreeCoordinate};
+use crate::math::{Aab, FreeCoordinate, Rgba};
 use crate::raycast::Ray;
 use crate::space::Grid;
 
@@ -429,11 +429,32 @@ pub enum TransparencyOption {
     /// TODO: Not implemented in the raytracer.
     /// TODO: Not implemented correctly for recursive blocks.
     Volumetric,
-    /* TODO: implement this option
     /// Alpha above or below the given threshold value will be rounded to fully opaque
     /// or fully transparent, respectively.
     Threshold(NotNan<f32>),
-    */
+}
+
+impl TransparencyOption {
+    /// Replace a color's alpha value according to the requested threshold,
+    /// if any.
+    #[inline]
+    pub(crate) fn limit_alpha(&self, color: Rgba) -> Rgba {
+        match *self {
+            Self::Threshold(t) => {
+                if color.alpha() > t {
+                    color.to_rgb().with_alpha_one()
+                } else {
+                    Rgba::TRANSPARENT
+                }
+            }
+            _ => color,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn will_output_alpha(&self) -> bool {
+        !matches!(self, Self::Threshold(_))
+    }
 }
 
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.
