@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, AIR};
@@ -62,7 +62,11 @@ fn checkerboard_setup() -> (Space, BlockTriangulations<BlockVertex, TestTextureT
         })
         .unwrap();
 
-    let block_triangulations = triangulate_blocks(&space, &mut TestTextureAllocator::new(16));
+    let block_triangulations = triangulate_blocks(
+        &space,
+        &mut TestTextureAllocator::new(16),
+        &TransparencyOption::Volumetric,
+    );
 
     (space, block_triangulations)
 }

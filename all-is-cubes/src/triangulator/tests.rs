@@ -7,7 +7,7 @@ use cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 
 use super::*;
 use crate::block::{Block, BlockAttributes, Resolution, AIR};
-use crate::camera::GraphicsOptions;
+use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
 use crate::math::{Face, GridRotation};
 use crate::math::{Face::*, FaceMap, FreeCoordinate, GridPoint, Rgba};
@@ -43,6 +43,19 @@ fn test_triangulate_block(block: Block) -> BlockTriangulation<BlockVertex, TestT
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(16),
+        &TransparencyOption::Volumetric,
+    )
+}
+
+/// Test helper to call `triangulate_block` alone without a `Space`,
+/// and with the transparency option set to `Threshold(0.5)`.
+fn test_triangulate_block_threshold(
+    block: Block,
+) -> BlockTriangulation<BlockVertex, TestTextureTile> {
+    triangulate_block(
+        &block.evaluate().unwrap(),
+        &mut TestTextureAllocator::new(16),
+        &TransparencyOption::Threshold(notnan!(0.5)),
     )
 }
 
@@ -56,7 +69,7 @@ fn triangulate_blocks_and_space(
     SpaceTriangulation<BlockVertex>,
 ) {
     let mut tex = TestTextureAllocator::new(texture_resolution);
-    let block_triangulations = triangulate_blocks(space, &mut tex);
+    let block_triangulations = triangulate_blocks(space, &mut tex, &TransparencyOption::Volumetric);
     let space_triangulation: SpaceTriangulation<BlockVertex> = triangulate_space(
         space,
         space.grid(),
@@ -106,8 +119,11 @@ fn excludes_hidden_faces_of_blocks() {
 fn no_panic_on_missing_blocks() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    let block_triangulations: BlockTriangulations<BlockVertex, _> =
-        triangulate_blocks(&space, &mut TestTextureAllocator::new(43));
+    let block_triangulations: BlockTriangulations<BlockVertex, _> = triangulate_blocks(
+        &space,
+        &mut TestTextureAllocator::new(43),
+        &TransparencyOption::Volumetric,
+    );
     assert_eq!(block_triangulations.len(), 1); // check our assumption
 
     // This should not panic; visual glitches are preferable to failure.
@@ -353,7 +369,7 @@ fn except_within<T: Clone>(without: T, within: T) -> FaceMap<T> {
 }
 
 #[test]
-fn fully_opaque_atom() {
+fn atom_transparency() {
     assert_eq!(
         test_triangulate_block(Block::from(Rgba::WHITE))
             .faces
@@ -372,6 +388,21 @@ fn fully_opaque_atom() {
             .map(|_, ft| ft.fully_opaque),
         except_within(false, false)
     );
+}
+
+#[test]
+fn atom_transparency_thresholded() {
+    // Threshold means that triangulations of partial transparency should be exactly the same as 0 or 1
+    assert_eq!(
+        test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.25))).faces,
+        test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.0))).faces,
+    );
+    assert_eq!(
+        test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.75))).faces,
+        test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 1.0))).faces,
+    );
+
+    // TODO: also test voxels -- including self-occlusion (thresholded voxel in front of truly opaque voxel)
 }
 
 #[test]
@@ -457,7 +488,7 @@ fn handling_allocation_failure() {
     let capacity = 0;
     tex.set_capacity(capacity);
     let block_triangulations: BlockTriangulations<BlockVertex, _> =
-        triangulate_blocks(&space, &mut tex);
+        triangulate_blocks(&space, &mut tex, &TransparencyOption::Volumetric);
 
     // Check results.
     assert_eq!(tex.count_allocated(), capacity);

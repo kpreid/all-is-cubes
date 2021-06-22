@@ -9,6 +9,7 @@ use cgmath::{Point2, Point3, Transform as _};
 use std::fmt::Debug;
 
 use crate::block::{EvaluatedBlock, Evoxel};
+use crate::camera::TransparencyOption;
 use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
 use crate::space::Space;
@@ -102,6 +103,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // This will allow for efficient implementation of animated blocks.
     block: &EvaluatedBlock,
     texture_allocator: &mut A,
+    transparency: &TransparencyOption,
 ) -> BlockTriangulation<V, A::Tile> {
     match &block.voxels {
         None => {
@@ -110,15 +112,16 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     // No interior detail for atom blocks.
                     return FaceTriangulation::default();
                 }
+                let color = transparency.limit_alpha(block.color);
 
                 let mut vertices: Vec<V> = Vec::new();
                 let mut indices_opaque: Vec<u32> = Vec::new();
                 let mut indices_transparent: Vec<u32> = Vec::new();
-                if !block.color.fully_transparent() {
+                if !color.fully_transparent() {
                     vertices.reserve_exact(4);
                     push_quad(
                         &mut vertices,
-                        if block.color.fully_opaque() {
+                        if color.fully_opaque() {
                             indices_opaque.reserve_exact(6);
                             &mut indices_opaque
                         } else {
@@ -129,12 +132,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         /* depth= */ 0.,
                         Point2 { x: 0., y: 0. },
                         Point2 { x: 1., y: 1. },
-                        QuadColoring::<A::Tile>::Solid(block.color),
+                        QuadColoring::<A::Tile>::Solid(color),
                         1,
                     );
                 }
                 FaceTriangulation {
-                    fully_opaque: block.color.fully_opaque(),
+                    fully_opaque: color.fully_opaque(),
                     vertices,
                     indices_opaque,
                     indices_transparent,
@@ -216,7 +219,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             let cube: Point3<GridCoordinate> =
                                 transform.transform_point(Point3::new(s, t, layer));
 
-                            let color = voxels.get(cube).unwrap_or(&Evoxel::AIR).color;
+                            let color = transparency
+                                .limit_alpha(voxels.get(cube).unwrap_or(&Evoxel::AIR).color);
 
                             if layer == 0 && !color.fully_opaque() {
                                 // If the first layer is transparent in any cube at all, then the face is
@@ -229,7 +233,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 let obscuring_cube = cube + face.normal_vector();
                                 !voxels
                                     .get(obscuring_cube)
-                                    .map(|ev| ev.color.fully_opaque())
+                                    .map(|ev| transparency.limit_alpha(ev.color).fully_opaque())
                                     .unwrap_or(false)
                             } {
                                 layer_is_visible_somewhere = true;
@@ -328,11 +332,14 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
+    transparency: &TransparencyOption,
 ) -> BlockTriangulations<V, A::Tile> {
     space
         .block_data()
         .iter()
-        .map(|block_data| triangulate_block(block_data.evaluated(), texture_allocator))
+        .map(|block_data| {
+            triangulate_block(block_data.evaluated(), texture_allocator, transparency)
+        })
         .collect()
 }
 

@@ -146,8 +146,11 @@ impl SpaceRenderer {
             // * The space signaled SpaceChange::EveryBlock.
             let start_triangulation_time = Instant::now();
             todo.all_blocks_and_chunks = false;
-            self.block_triangulations =
-                Vec::from(triangulate_blocks(space, block_texture_allocator));
+            self.block_triangulations = Vec::from(triangulate_blocks(
+                space,
+                block_texture_allocator,
+                &graphics_options.transparency,
+            ));
             self.block_versioning =
                 vec![self.block_version_counter; self.block_triangulations.len()];
             block_update_count = self.block_triangulations.len();
@@ -183,8 +186,11 @@ impl SpaceRenderer {
 
             for index in todo.blocks.drain() {
                 let index: usize = index.into();
-                let new_triangulation =
-                    triangulate_block(block_data[index].evaluated(), block_texture_allocator);
+                let new_triangulation = triangulate_block(
+                    block_data[index].evaluated(),
+                    block_texture_allocator,
+                    &graphics_options.transparency,
+                );
 
                 // Only invalidate the chunks if we actually have different data.
                 // Note: This comparison depends on such things as the definition of PartialEq
@@ -442,29 +448,33 @@ impl<'a> SpaceRendererBound<'a> {
             },
         )?;
 
-        shading_gate.shade(
-            &mut block_programs.transparent,
-            |ref mut program_iface, u, mut render_gate| {
-                u.initialize(program_iface, self);
-                let pass = SpaceRendererPass::Transparent;
-                render_gate.render(&pass.render_state(), |mut tess_gate| {
-                    for p in self.data.chunk_chart.chunks(self.data.view_chunk).rev() {
-                        if let Some(chunk) = self.data.chunks.get(&p) {
-                            if self.data.cull(p) {
-                                continue;
+        if self.data.camera.options().transparency.will_output_alpha() {
+            shading_gate.shade(
+                &mut block_programs.transparent,
+                |ref mut program_iface, u, mut render_gate| {
+                    u.initialize(program_iface, self);
+                    let pass = SpaceRendererPass::Transparent;
+                    render_gate.render(&pass.render_state(), |mut tess_gate| {
+                        for p in self.data.chunk_chart.chunks(self.data.view_chunk).rev() {
+                            if let Some(chunk) = self.data.chunks.get(&p) {
+                                if self.data.cull(p) {
+                                    continue;
+                                }
+                                squares_drawn += chunk.render(
+                                    &mut tess_gate,
+                                    pass,
+                                    // TODO: avoid adding and then subtracting view_chunk
+                                    DepthOrdering::from_view_direction(
+                                        p.0 - self.data.view_chunk.0,
+                                    ),
+                                )?;
                             }
-                            squares_drawn += chunk.render(
-                                &mut tess_gate,
-                                pass,
-                                // TODO: avoid adding and then subtracting view_chunk
-                                DepthOrdering::from_view_direction(p.0 - self.data.view_chunk.0),
-                            )?;
                         }
-                    }
-                    Ok(())
-                })
-            },
-        )?;
+                        Ok(())
+                    })
+                },
+            )?;
+        }
 
         Ok(SpaceRenderInfo {
             chunks_drawn,
