@@ -14,10 +14,12 @@
 //! messages, which will then be read and cleared by a separate part of the game loop.
 
 use indexmap::IndexSet;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::rc::{Rc, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// to a set of listeners which implement some form of weak-reference semantics
@@ -264,22 +266,24 @@ where
 /// A [`Listener`] destination which only stores a single flag indicating if any messages
 /// were received.
 pub struct DirtyFlag {
-    flag: Rc<Cell<bool>>,
+    flag: Arc<AtomicBool>,
 }
 impl Debug for DirtyFlag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("DirtyFlag").field(&self.flag.get()).finish()
+        f.debug_tuple("DirtyFlag")
+            .field(&self.flag.load(Ordering::Relaxed))
+            .finish()
     }
 }
 
 struct DirtyFlagListener {
-    weak_flag: Weak<Cell<bool>>,
+    weak_flag: std::sync::Weak<AtomicBool>,
 }
 impl DirtyFlag {
-    /// Constructs a new [`DirtyFlag`] with the flag value set to [`false`].
+    /// Constructs a new [`DirtyFlag`] with the given initial value.
     pub fn new(value: bool) -> Self {
         Self {
-            flag: Rc::new(Cell::new(value)),
+            flag: Arc::new(AtomicBool::new(value)),
         }
     }
 
@@ -287,19 +291,19 @@ impl DirtyFlag {
     /// message.
     pub fn listener<M>(&self) -> impl Listener<M> {
         DirtyFlagListener {
-            weak_flag: Rc::downgrade(&self.flag),
+            weak_flag: Arc::downgrade(&self.flag),
         }
     }
 
     /// Returns the flag value, setting it to [`false`] at the same time.
     pub fn get_and_clear(&self) -> bool {
-        self.flag.replace(false)
+        self.flag.swap(false, Ordering::Acquire)
     }
 }
 impl<M> Listener<M> for DirtyFlagListener {
     fn receive(&self, _message: M) {
         if let Some(cell) = self.weak_flag.upgrade() {
-            cell.set(true);
+            cell.store(true, Ordering::Release);
         }
     }
     fn alive(&self) -> bool {
