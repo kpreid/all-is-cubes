@@ -130,12 +130,12 @@ impl PackedLight {
     }
 
     #[inline]
-    pub(crate) fn as_texel(self) -> (u8, u8, u8, u8) {
+    pub(crate) fn as_texel(self) -> [u8; 4] {
         let Self {
             value: Vector3 { x, y, z },
             status,
         } = self;
-        (x, y, z, status as u8)
+        [x, y, z, status as u8]
     }
 
     #[inline]

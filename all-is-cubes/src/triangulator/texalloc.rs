@@ -18,9 +18,7 @@ use crate::space::GridArray;
 use crate::triangulator::TextureCoordinate;
 
 /// RGBA color data accepted by [`TextureAllocator`].
-///
-/// TODO: Use bytemuck as needed to make this [u8; 4] instead.
-pub type Texel = (u8, u8, u8, u8);
+pub type Texel = [u8; 4];
 
 /// Allocator of 3D regions ("tiles") in a texture atlas to paint block voxels into.
 /// Implement this trait using the target graphics API's 3D texture type.
@@ -143,7 +141,7 @@ impl TextureTile for TestTextureTile {
         in_tile
     }
 
-    fn write(&mut self, data: &[(u8, u8, u8, u8)]) {
+    fn write(&mut self, data: &[Texel]) {
         // Validate data size.
         assert_eq!(
             data.len(),

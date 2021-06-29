@@ -56,7 +56,7 @@ impl FullFramePainter {
             program: RefCell::new(program),
             tess: context
                 .new_tess()
-                .set_vertex_nb(3)
+                .set_render_vertex_nb(3)
                 .set_mode(Mode::Triangle)
                 .build()?,
         }))
@@ -126,8 +126,7 @@ impl FullFrameTexture {
 
         self.local_data = vec![0; (size.x as usize) * (size.y as usize) * 4].into_boxed_slice();
         self.texture_is_valid = false;
-        self.texture = Some(Texture::new(
-            context,
+        self.texture = Some(context.new_texture_no_texels(
             [size.x, size.y],
             0, // mipmaps
             Sampler {

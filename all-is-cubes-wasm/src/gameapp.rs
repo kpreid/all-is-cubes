@@ -63,8 +63,13 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let app = AllIsCubesAppState::new(template);
     app.graphics_options_mut().set(graphics_options);
 
-    let surface = WebSysWebGL2Surface::from_canvas(gui_helpers.canvas_helper().canvas())
-        .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
+    // TODO: Configure context parameters to taste
+    let surface = WebSysWebGL2Surface::from_canvas(
+        web_sys::window().unwrap(), // TODO messy
+        document.clone(),
+        gui_helpers.canvas_helper().canvas(),
+    )
+    .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
 
     let mut renderer = GLRenderer::new(
         surface,

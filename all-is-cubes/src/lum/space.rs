@@ -848,8 +848,7 @@ impl SpaceLightTexture {
             nz: 0,
             within: 0,
         });
-        let texture = Texture::new(
-            context,
+        let texture = context.new_texture_no_texels(
             texture_grid.unsigned_size().into(),
             /* mipmaps= */ 0,
             Sampler::default(), // sampler options don't matter because we're using texelFetch()

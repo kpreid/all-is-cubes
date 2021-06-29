@@ -84,8 +84,7 @@ impl LumAtlasAllocator {
             row_length: 16,
         };
 
-        let mut texture = Texture::new(
-            context,
+        let mut texture = context.new_texture_no_texels(
             layout.dimensions(),
             0, // mipmaps
             Sampler {
