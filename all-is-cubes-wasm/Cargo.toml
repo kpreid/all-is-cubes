@@ -29,7 +29,7 @@ getrandom = { version = "0.2.3", features = ["js"] }
 instant = { version = "0.1.9", features = ["wasm-bindgen"] }
 js-sys = "0.3.47"
 log = "0.4.14"
-luminance = "0.43.2"
+luminance = "0.44.0"
 luminance-front = "0.3.1"
 luminance-web-sys = "0.2.3"
 luminance-webgl = "0.3.1"
