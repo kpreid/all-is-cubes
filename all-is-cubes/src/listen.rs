@@ -19,7 +19,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::rc::{Rc, Weak};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// to a set of listeners which implement some form of weak-reference semantics
@@ -192,20 +192,20 @@ impl<M> Listener<M> for NullListener {
 ///
 /// TODO: This type turns out to be only useful in tests. Rework it to be more fitting.
 pub struct Sink<M> {
-    messages: Rc<RefCell<IndexSet<M>>>,
+    messages: Arc<RwLock<IndexSet<M>>>,
 }
 struct SinkListener<M> {
-    weak_messages: Weak<RefCell<IndexSet<M>>>,
+    weak_messages: std::sync::Weak<RwLock<IndexSet<M>>>,
 }
 
 impl<M> Sink<M>
 where
-    M: Eq + Hash + Clone,
+    M: Eq + Hash + Clone + Send + Sync,
 {
     /// Constructs a new empty [`Sink`].
     pub fn new() -> Self {
         Self {
-            messages: Rc::new(RefCell::new(IndexSet::new())),
+            messages: Arc::new(RwLock::new(IndexSet::new())),
         }
     }
 
@@ -213,7 +213,7 @@ where
     #[allow(dead_code)] // TODO: only used in tests but maybe should be public
     pub fn listener(&self) -> impl Listener<M> {
         SinkListener {
-            weak_messages: Rc::downgrade(&self.messages),
+            weak_messages: Arc::downgrade(&self.messages),
         }
     }
 
@@ -229,7 +229,7 @@ where
     /// assert!(!sink.take_equal(2));  // Now removed
     /// ```
     pub fn take_equal(&self, message: M) -> bool {
-        self.messages.borrow_mut().swap_remove(&message)
+        self.messages.write().unwrap().swap_remove(&message)
     }
 }
 /// As an [`Iterator`], yields all messages currently waiting in arbitrary order.
@@ -241,13 +241,16 @@ where
 {
     type Item = M;
     fn next(&mut self) -> Option<M> {
-        self.messages.borrow_mut().pop()
+        self.messages.write().unwrap().pop()
     }
 }
-impl<M: Eq + Hash + Clone> Listener<M> for SinkListener<M> {
+impl<M> Listener<M> for SinkListener<M>
+where
+    M: Eq + Hash + Clone + Send + Sync,
+{
     fn receive(&self, message: M) {
         if let Some(cell) = self.weak_messages.upgrade() {
-            cell.borrow_mut().insert(message);
+            cell.write().unwrap().insert(message);
         }
     }
     fn alive(&self) -> bool {
@@ -256,7 +259,7 @@ impl<M: Eq + Hash + Clone> Listener<M> for SinkListener<M> {
 }
 impl<M> Default for Sink<M>
 where
-    M: Eq + Hash + Clone,
+    M: Eq + Hash + Clone + Send + Sync,
 {
     fn default() -> Self {
         Self::new()
