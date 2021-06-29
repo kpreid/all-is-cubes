@@ -23,11 +23,11 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// to a set of listeners which implement some form of weak-reference semantics
 /// to allow cleanup.
-pub struct Notifier<M: Clone> {
+pub struct Notifier<M> {
     listeners: RefCell<Vec<Box<dyn Listener<M>>>>,
 }
 
-impl<M: Clone> Notifier<M> {
+impl<M: Clone + Send> Notifier<M> {
     /// Constructs a new empty [`Notifier`].
     pub fn new() -> Self {
         Self {
@@ -95,13 +95,13 @@ impl<M: Clone> Notifier<M> {
     }
 }
 
-impl<M: Clone> Default for Notifier<M> {
+impl<M: Clone + Send> Default for Notifier<M> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<M: Clone> Debug for Notifier<M> {
+impl<M> Debug for Notifier<M> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Ok(listeners) = self.listeners.try_borrow() {
             fmt.debug_tuple("Notifier").field(&listeners.len()).finish()
@@ -369,8 +369,8 @@ where
 /// A [`Listener`] which forwards messages through a [`Notifier`].
 /// Constructed by [`Notifier::forwarder`].
 #[derive(Debug)]
-struct NotifierForwarder<M: Clone>(Weak<Notifier<M>>);
-impl<M: Clone> Listener<M> for NotifierForwarder<M> {
+struct NotifierForwarder<M>(Weak<Notifier<M>>);
+impl<M: Clone + Send> Listener<M> for NotifierForwarder<M> {
     fn receive(&self, message: M) {
         if let Some(notifier) = self.0.upgrade() {
             notifier.notify(message);
