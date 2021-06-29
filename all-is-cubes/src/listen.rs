@@ -169,8 +169,8 @@ where
     /// assert!(!sink.take_equal("discarded"));
     /// ```
     fn gate(self) -> (Gate, GateListener<Self>) {
-        let signaller = Rc::new(());
-        let weak = Rc::downgrade(&signaller);
+        let signaller = Arc::new(());
+        let weak = Arc::downgrade(&signaller);
         (Gate(signaller), GateListener { weak, target: self })
     }
 }
@@ -345,12 +345,12 @@ where
 /// Construct this using [`ListenerHelper::gate`], or if a placeholder instance with no
 /// effect is required, [`Gate::default`].
 #[derive(Clone, Debug, Default)]
-pub struct Gate(Rc<()>);
+pub struct Gate(Arc<()>);
 
 /// [`Listener`] implementation which discards messages when the corresponding [`Gate`]
 /// is dropped. Construct this using [`ListenerHelper::gate`].
 pub struct GateListener<T> {
-    weak: Weak<()>,
+    weak: std::sync::Weak<()>,
     target: T,
 }
 impl<M, T> Listener<M> for GateListener<T>
