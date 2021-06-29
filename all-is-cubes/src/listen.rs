@@ -17,9 +17,9 @@ use indexmap::IndexSet;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::rc::{Rc, Weak};
+use std::rc::Weak;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// to a set of listeners which implement some form of weak-reference semantics
@@ -386,21 +386,20 @@ impl<M: Clone> Listener<M> for NotifierForwarder<M> {
 /// and which has reference-counted read-only handles to read it.
 #[derive(Debug)]
 pub struct ListenableCell<T> {
-    // TODO: Migrate to thread-safe storage once we have a use case.
-    storage: Rc<ListenableCellStorage<T>>,
+    storage: Arc<ListenableCellStorage<T>>,
 }
 /// Access to a value that might change (provided by a [`ListenableCell`]) or be [a
 /// constant](ListenableSource::constant), and which can be listened to.
 #[derive(Clone, Debug)]
 pub struct ListenableSource<T> {
-    storage: Rc<ListenableCellStorage<T>>,
+    storage: Arc<ListenableCellStorage<T>>,
 }
 #[derive(Debug)]
 struct ListenableCellStorage<T> {
-    /// RefCell because it's mutable; Rc because we want to be able to clone out of it to
+    /// Mutex because it's mutable; Arc because we want to be able to clone out of it to
     /// avoid holding the cell borrowed.
     /// TODO: Look into strategies to make this cheaper?
-    cell: RefCell<Rc<T>>,
+    cell: Mutex<Arc<T>>,
 
     /// Notifier to track listeners.
     /// `None` if this is a constant cell.
@@ -410,22 +409,20 @@ struct ListenableCellStorage<T> {
     notifier: Option<Notifier<()>>,
 }
 
-// Note: The `T: Sync` bound is not mandatory; it's intended to preserve the future
-// possibility of making the whole thing thread-safe. Might be a bad idea.
 impl<T: Clone + Sync> ListenableCell<T> {
     /// Creates a new [`ListenableCell`] containing the given value.
     pub fn new(value: T) -> Self {
         Self {
-            storage: Rc::new(ListenableCellStorage {
-                cell: RefCell::new(Rc::new(value)),
+            storage: Arc::new(ListenableCellStorage {
+                cell: Mutex::new(Arc::new(value)),
                 notifier: Some(Notifier::new()),
             }),
         }
     }
 
     /// Returns a reference to the current value of the cell.
-    pub fn get(&self) -> Rc<T> {
-        self.storage.cell.borrow().clone()
+    pub fn get(&self) -> Arc<T> {
+        self.storage.cell.lock().unwrap().clone()
     }
 
     /// Sets the contained value and sends out a change notification.
@@ -433,16 +430,12 @@ impl<T: Clone + Sync> ListenableCell<T> {
     /// Caution: While listeners are *expected* not to have immediate side effects on
     /// notification, this cannot be enforced.
     pub fn set(&self, value: T) {
-        let mut borrow = self.storage.cell.borrow_mut();
-        *borrow = Rc::new(value);
+        *self.storage.cell.lock().unwrap() = Arc::new(value);
         self.storage
             .notifier
             .as_ref()
             .expect("can't happen: set() on a constant cell")
             .notify(());
-        // Notifying while still holding the `RefMut` enforces that listeners don't try to
-        // read the cell immedately.
-        drop(borrow);
     }
 
     /// Returns a [`ListenableSource`] which provides read-only access to the value
@@ -459,22 +452,23 @@ impl<T: Clone + Sync> ListenableSource<T> {
     /// never change.
     pub fn constant(value: T) -> Self {
         Self {
-            storage: Rc::new(ListenableCellStorage {
-                cell: RefCell::new(Rc::new(value)),
+            storage: Arc::new(ListenableCellStorage {
+                cell: Mutex::new(Arc::new(value)),
                 notifier: None,
             }),
         }
     }
 
     /// Returns a reference to the current value of the cell.
-    // TODO: Consider storing a 'local' copy of the Rc so we can borrow it rather than cloning the Rc every time?
-    pub fn get(&self) -> Rc<T> {
-        self.storage.cell.borrow().clone()
+    // TODO: Consider storing a 'local' copy of the Rc so we can borrow it rather than cloning the Arc every time?
+    pub fn get(&self) -> Arc<T> {
+        Arc::clone(&*self.storage.cell.lock().unwrap())
     }
 
     /// Returns a clone of the current value of the cell.
     pub fn snapshot(&self) -> T {
-        (**self.storage.cell.borrow()).clone()
+        // TODO: This was originally written to avoid cloning the Rc if cloning the value is the final goal, but under threading we don't want to hold the lock unnecessarily or possibly cause it to be poisoned due to the clone operation panicking. What's the best option? Should this method just be deleted?
+        T::clone(&*self.get())
     }
 
     /// Subscribes to change notifications.
