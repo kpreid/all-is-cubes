@@ -17,9 +17,8 @@ use indexmap::IndexSet;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::rc::Weak;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock, Weak};
 
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// to a set of listeners which implement some form of weak-reference semantics
@@ -57,13 +56,13 @@ impl<M: Clone> Notifier<M> {
     /// need to fan out listener registrations to all of its current dependencies.
     ///
     /// ```
-    /// use std::rc::Rc;
+    /// use std::sync::Arc;
     /// use all_is_cubes::listen::{Notifier, Sink};
     ///
     /// let notifier_1 = Notifier::new();
-    /// let notifier_2 = Rc::new(Notifier::new());
+    /// let notifier_2 = Arc::new(Notifier::new());
     /// let mut sink = Sink::new();
-    /// notifier_1.listen(Notifier::forwarder(Rc::downgrade(&notifier_2)));
+    /// notifier_1.listen(Notifier::forwarder(Arc::downgrade(&notifier_2)));
     /// notifier_2.listen(sink.listener());
     ///
     /// notifier_1.notify("a");
@@ -195,7 +194,7 @@ pub struct Sink<M> {
     messages: Arc<RwLock<IndexSet<M>>>,
 }
 struct SinkListener<M> {
-    weak_messages: std::sync::Weak<RwLock<IndexSet<M>>>,
+    weak_messages: Weak<RwLock<IndexSet<M>>>,
 }
 
 impl<M> Sink<M>
@@ -280,7 +279,7 @@ impl Debug for DirtyFlag {
 }
 
 struct DirtyFlagListener {
-    weak_flag: std::sync::Weak<AtomicBool>,
+    weak_flag: Weak<AtomicBool>,
 }
 impl DirtyFlag {
     /// Constructs a new [`DirtyFlag`] with the given initial value.
@@ -350,7 +349,7 @@ pub struct Gate(Arc<()>);
 /// [`Listener`] implementation which discards messages when the corresponding [`Gate`]
 /// is dropped. Construct this using [`ListenerHelper::gate`].
 pub struct GateListener<T> {
-    weak: std::sync::Weak<()>,
+    weak: Weak<()>,
     target: T,
 }
 impl<M, T> Listener<M> for GateListener<T>

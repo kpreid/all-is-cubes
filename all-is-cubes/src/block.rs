@@ -4,11 +4,12 @@
 //! Definition of blocks, which are game objects which live in the grid of a
 //! [`Space`]. See [`Block`] for details.
 
-use cgmath::{EuclideanSpace as _, Point3, Vector4, Zero as _};
 use std::borrow::Cow;
 use std::convert::TryFrom as _;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
+use std::sync::Arc;
+
+use cgmath::{EuclideanSpace as _, Point3, Vector4, Zero as _};
 
 use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
@@ -657,14 +658,14 @@ pub struct BlockDef {
     block: Block,
     // TODO: It might be a good idea to cache EvaluatedBlock here, since we're doing
     // mutation tracking anyway.
-    notifier: Rc<Notifier<BlockChange>>,
+    notifier: Arc<Notifier<BlockChange>>,
     block_listen_gate: Gate,
 }
 
 impl BlockDef {
     pub fn new(block: Block) -> Self {
-        let notifier = Rc::new(Notifier::new());
-        let (gate, block_listener) = Notifier::forwarder(Rc::downgrade(&notifier)).gate();
+        let notifier = Arc::new(Notifier::new());
+        let (gate, block_listener) = Notifier::forwarder(Arc::downgrade(&notifier)).gate();
         // TODO: Log if listening fails. We can't meaningfully fail this because we want to do the
         // parallel operation in `BlockDefMut::drop` but it does indicate trouble if it happens.
         let _ = block.listen(block_listener);
@@ -730,7 +731,8 @@ impl Drop for BlockDefMut<'_> {
         let block_def = &mut self.0;
 
         // Swap out what we're listening to
-        let (gate, block_listener) = Notifier::forwarder(Rc::downgrade(&block_def.notifier)).gate();
+        let (gate, block_listener) =
+            Notifier::forwarder(Arc::downgrade(&block_def.notifier)).gate();
         let _ = block_def.block.listen(block_listener);
         block_def.block_listen_gate = gate; // old gate is now dropped
 
