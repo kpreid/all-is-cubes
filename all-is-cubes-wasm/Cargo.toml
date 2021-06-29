@@ -50,6 +50,7 @@ features = [
   "MouseEvent",
   "Text",
   "Window",
+  "WebGlContextAttributes",
 ]
 
 [dev-dependencies]

@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
     console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,
-    KeyboardEvent, MouseEvent, Text,
+    KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
 };
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
@@ -63,11 +63,13 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let app = AllIsCubesAppState::new(template);
     app.graphics_options_mut().set(graphics_options);
 
-    // TODO: Configure context parameters to taste
-    let surface = WebSysWebGL2Surface::from_canvas(
+    let surface = WebSysWebGL2Surface::from_canvas_with_params(
         web_sys::window().unwrap(), // TODO messy
         document.clone(),
         gui_helpers.canvas_helper().canvas(),
+        // This is set for parity with the `luminance_windowing` defaults.
+        // TODO: Probably `GraphicsOptions` should get an antialias/MSAA field.
+        WebGlContextAttributes::new().antialias(false),
     )
     .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
 
