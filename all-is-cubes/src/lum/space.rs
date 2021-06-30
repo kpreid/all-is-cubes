@@ -19,11 +19,10 @@ use luminance_front::tess::{Mode, Tess};
 use luminance_front::tess_gate::TessGate;
 use luminance_front::texture::{Dim3, GenMipmaps, Sampler, Texture, TextureError};
 use luminance_front::Backend;
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::fmt;
-use std::rc::{Rc, Weak};
+use std::sync::{Arc, Mutex, Weak};
 
 use crate::camera::{Camera, GraphicsOptions};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
@@ -50,7 +49,7 @@ const CHUNK_SIZE: GridCoordinate = 16;
 /// Manages cached data and GPU resources for drawing a single [`Space`].
 pub struct SpaceRenderer {
     space: URef<Space>,
-    todo: Rc<RefCell<SpaceRendererTodo>>,
+    todo: Arc<Mutex<SpaceRendererTodo>>,
     block_triangulations: Vec<BlockTriangulation<LumBlockVertex, LumAtlasTile>>,
     /// Version IDs used to track whether chunks have stale block triangulations.
     /// Indices are block indices and values are version numbers.
@@ -78,8 +77,8 @@ impl SpaceRenderer {
         let space_borrowed = space.borrow_mut();
 
         let todo = SpaceRendererTodo::default();
-        let todo_rc = Rc::new(RefCell::new(todo));
-        space_borrowed.listen(TodoListener(Rc::downgrade(&todo_rc)));
+        let todo_rc = Arc::new(Mutex::new(todo));
+        space_borrowed.listen(TodoListener(Arc::downgrade(&todo_rc)));
 
         Self {
             space,
@@ -113,7 +112,7 @@ impl SpaceRenderer {
         C: GraphicsContext<Backend = Backend>,
     {
         let graphics_options = camera.options();
-        let mut todo = self.todo.borrow_mut();
+        let mut todo = self.todo.lock().unwrap();
 
         let space = &*self
             .space
@@ -777,38 +776,39 @@ impl ChunkTodo {
 }
 
 /// [`Listener`] adapter for [`SpaceRendererTodo`].
-struct TodoListener(Weak<RefCell<SpaceRendererTodo>>);
+struct TodoListener(Weak<Mutex<SpaceRendererTodo>>);
 
 impl Listener<SpaceChange> for TodoListener {
     fn receive(&self, message: SpaceChange) {
         if let Some(cell) = self.0.upgrade() {
-            let mut todo = cell.borrow_mut();
-            match message {
-                SpaceChange::EveryBlock => {
-                    todo.all_blocks_and_chunks = true;
-                    todo.blocks.clear();
-                    todo.chunks.clear();
-                    todo.light = None;
-                }
-                SpaceChange::Block(p) => {
-                    todo.modify_block_and_adjacent(p, |chunk_todo| {
-                        chunk_todo.update_triangulation = true;
-                    });
-                }
-                SpaceChange::Lighting(p) => {
-                    // None means everything
-                    if let Some(set) = &mut todo.light {
-                        set.insert(p);
+            if let Ok(mut todo) = cell.lock() {
+                match message {
+                    SpaceChange::EveryBlock => {
+                        todo.all_blocks_and_chunks = true;
+                        todo.blocks.clear();
+                        todo.chunks.clear();
+                        todo.light = None;
                     }
-                }
-                SpaceChange::Number(index) => {
-                    if !todo.all_blocks_and_chunks {
-                        todo.blocks.insert(index);
+                    SpaceChange::Block(p) => {
+                        todo.modify_block_and_adjacent(p, |chunk_todo| {
+                            chunk_todo.update_triangulation = true;
+                        });
                     }
-                }
-                SpaceChange::BlockValue(index) => {
-                    if !todo.all_blocks_and_chunks {
-                        todo.blocks.insert(index);
+                    SpaceChange::Lighting(p) => {
+                        // None means everything
+                        if let Some(set) = &mut todo.light {
+                            set.insert(p);
+                        }
+                    }
+                    SpaceChange::Number(index) => {
+                        if !todo.all_blocks_and_chunks {
+                            todo.blocks.insert(index);
+                        }
+                    }
+                    SpaceChange::BlockValue(index) => {
+                        if !todo.all_blocks_and_chunks {
+                            todo.blocks.insert(index);
+                        }
                     }
                 }
             }
@@ -912,11 +912,10 @@ mod tests {
 
     // TODO: Arrange, somehow, to test the parts that need a GraphicsContext
 
-    fn read_todo_chunks(
-        todo: &RefCell<SpaceRendererTodo>,
-    ) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
+    fn read_todo_chunks(todo: &Mutex<SpaceRendererTodo>) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
         let mut v = todo
-            .borrow()
+            .lock()
+            .unwrap()
             .chunks
             .iter()
             .map(|(&p, &ct)| (p, ct))
@@ -929,9 +928,9 @@ mod tests {
 
     #[test]
     fn update_adjacent_chunk_positive() {
-        let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
-        let listener = TodoListener(Rc::downgrade(&todo));
-        todo.borrow_mut().chunks.extend(vec![
+        let todo: Arc<Mutex<SpaceRendererTodo>> = Default::default();
+        let listener = TodoListener(Arc::downgrade(&todo));
+        todo.lock().unwrap().chunks.extend(vec![
             (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
             (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
             (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
@@ -965,9 +964,9 @@ mod tests {
 
     #[test]
     fn update_adjacent_chunk_negative() {
-        let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
-        let listener = TodoListener(Rc::downgrade(&todo));
-        todo.borrow_mut().chunks.extend(vec![
+        let todo: Arc<Mutex<SpaceRendererTodo>> = Default::default();
+        let listener = TodoListener(Arc::downgrade(&todo));
+        todo.lock().unwrap().chunks.extend(vec![
             (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
             (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
             (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
@@ -1001,15 +1000,16 @@ mod tests {
 
     #[test]
     fn todo_ignores_absent_chunks() {
-        let todo: Rc<RefCell<SpaceRendererTodo>> = Default::default();
-        let listener = TodoListener(Rc::downgrade(&todo));
+        let todo: Arc<Mutex<SpaceRendererTodo>> = Default::default();
+        let listener = TodoListener(Arc::downgrade(&todo));
 
         let p = GridPoint::new(1, 1, 1) * (CHUNK_SIZE / 2);
         // Nothing happens...
         listener.receive(SpaceChange::Block(p));
         assert_eq!(read_todo_chunks(&todo), vec![]);
         // until the chunk exists in the table already.
-        todo.borrow_mut()
+        todo.lock()
+            .unwrap()
             .chunks
             .insert(ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN);
         listener.receive(SpaceChange::Block(p));
