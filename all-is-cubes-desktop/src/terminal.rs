@@ -274,8 +274,8 @@ impl TerminalMain {
             // TODO: This is a mess
             let (_, color1) = image[(char_pos.y * 2) * row + char_pos.x];
             let (_, color2) = image[(char_pos.y * 2 + 1) * row + char_pos.x];
-            let color1 = color1.and_then(|c| self.options.colors.convert(c));
-            let color2 = color2.and_then(|c| self.options.colors.convert(c));
+            let color1 = self.options.colors.convert(color1);
+            let color2 = self.options.colors.convert(color2);
             if color1 == color2 {
                 (
                     // TODO: Offer choice of showing character sometimes. Also use characters for dithering.
@@ -297,7 +297,7 @@ impl TerminalMain {
             }
         } else {
             let (ref text, color) = image[char_pos.y * row + char_pos.x];
-            let mapped_color = match color.and_then(|c| self.options.colors.convert(c)) {
+            let mapped_color = match self.options.colors.convert(color) {
                 Some(color) => Colors::new(Color::Black, color),
                 None => Colors::new(Color::Reset, Color::Reset),
             };
@@ -383,12 +383,23 @@ impl ColorMode {
         }
     }
 
-    fn convert(self, rgb: Rgba) -> Option<Color> {
-        match self {
-            ColorMode::None => None,
+    /// Convert RGB color to a Crossterm [`Color`] value according to this mode.
+    ///
+    /// The input and output [`Option`]s have different meanings:
+    ///
+    /// * If the input color is [`None`] then the output is "reset"
+    ///   (i.e. the "not colored" colors).
+    /// * This function returns [`None`] if color is disabled and no color control
+    ///   sequences should be produced — i.e. the input is ignored.
+    fn convert(self, input: Option<Rgba>) -> Option<Color> {
+        match (input, self) {
+            // Mode None produces no output no matter what.
+            (_, ColorMode::None) => None,
+            // Input None means Reset.
+            (None, _) => Some(Color::Reset),
             // ColorMode::Sixteen => {}
-            ColorMode::TwoFiftySix => {
-                let [r, g, b, _] = rgb.to_srgb_32bit();
+            (Some(rgba), ColorMode::TwoFiftySix) => {
+                let [r, g, b, _] = rgba.to_srgb_32bit();
 
                 // Crossterm doesn't have a convenient 216-color table. Use Termion's.
                 use termion::color::AnsiValue;
@@ -399,8 +410,8 @@ impl ColorMode {
 
                 Some(Color::AnsiValue(byte))
             }
-            ColorMode::Rgb => {
-                let [r, g, b, _] = rgb.to_srgb_32bit();
+            (Some(rgba), ColorMode::Rgb) => {
+                let [r, g, b, _] = rgba.to_srgb_32bit();
                 let c = Color::Rgb { r, g, b };
                 Some(c)
             }
