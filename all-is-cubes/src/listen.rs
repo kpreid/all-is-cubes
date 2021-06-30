@@ -143,7 +143,7 @@ where
     /// TODO: Doc test
     fn filter<MI, F>(self, function: F) -> Filter<F, Self>
     where
-        F: Fn(MI) -> Option<M>,
+        F: Fn(MI) -> Option<M> + Sync,
     {
         Filter {
             function,
@@ -326,7 +326,7 @@ pub struct Filter<F, T> {
 }
 impl<MI, MO, F, T> Listener<MI> for Filter<F, T>
 where
-    F: Fn(MI) -> Option<MO>,
+    F: Fn(MI) -> Option<MO> + Send + Sync,
     T: Listener<MO>,
 {
     fn receive(&self, message: MI) {
