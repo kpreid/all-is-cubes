@@ -133,6 +133,9 @@ const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
 pub struct BlockUniformInterface {
     projection_matrix: Uniform<[[f32; 4]; 4]>,
     view_matrix: Uniform<[[f32; 4]; 4]>,
+    /// Eye position in world coordinates.
+    /// Marked unbound because it is unused by the `BlockPrograms::opaque` program.
+    #[uniform(unbound)]
     view_position: Uniform<[f32; 3]>,
     block_texture: Uniform<TextureBinding<Dim3, NormUnsigned>>,
 
