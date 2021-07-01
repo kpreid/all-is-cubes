@@ -354,6 +354,7 @@ impl Space {
                 // more determinism, and the old value could be temporarily revealed when
                 // the block is removed.)
                 self.lighting[contents_index] = PackedLight::OPAQUE;
+                self.notifier.notify(SpaceChange::Lighting(position));
             }
             for &face in Face::ALL_SIX {
                 let neighbor = position + face.normal_vector();
@@ -1142,6 +1143,10 @@ mod tests {
         // Note: Sink currently reports things in reverse of insertion order.
         assert_eq!(
             Some(SpaceChange::Block(GridPoint::new(0, 0, 0))),
+            sink.next()
+        );
+        assert_eq!(
+            Some(SpaceChange::Lighting(GridPoint::new(0, 0, 0))),
             sink.next()
         );
         assert_eq!(Some(SpaceChange::Number(1)), sink.next());

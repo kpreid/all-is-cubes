@@ -644,6 +644,7 @@ impl Geometry for LightUpdateRayInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::listen::Sink;
     use crate::space::Space;
     use std::iter::once;
 
@@ -849,6 +850,28 @@ mod tests {
             })
         );
         assert_eq!(space.lighting_update_queue.pop(), None);
+    }
+
+    /// There's a special case for setting cubes to opaque. That case must do the usual
+    /// light update and notification.
+    #[test]
+    fn set_cube_opaque_notification() {
+        let mut space = Space::empty_positive(1, 1, 1);
+        let mut sink = Sink::new();
+        space.listen(
+            sink.listener()
+                .filter(|change| matches!(change, SpaceChange::Lighting(_)).then(|| change)),
+        );
+        // Self-test that the initial condition is not trivially the answer we're looking for
+        assert_ne!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
+
+        space.set([0, 0, 0], Block::from(Rgb::ONE)).unwrap();
+
+        assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
+        assert_eq!(
+            Some(SpaceChange::Lighting(GridPoint::new(0, 0, 0))),
+            sink.next()
+        );
     }
 
     fn light_source_test_space(block: Block) -> Space {
