@@ -159,13 +159,12 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         use crate::block::Block;
         use crate::math::Rgba;
 
-        let extent = GridVector::new(
-            self.octant_chunks.iter().map(|v| v.x).max().unwrap_or(0) + 1,
-            self.octant_chunks.iter().map(|v| v.y).max().unwrap_or(0) + 1,
-            self.octant_chunks.iter().map(|v| v.z).max().unwrap_or(0) + 1,
-        );
-        let mut space =
-            crate::space::Space::empty(Grid::new(Point3::from_vec(-extent), extent * 2));
+        let mut max = GridPoint::origin();
+        for chunk in self.octant_chunks.iter().copied() {
+            max = max.zip(Point3::from_vec(chunk), GridCoordinate::max);
+        }
+        let extent = Grid::from_lower_upper(max.map(|c| -c - 1), max.map(|c| c + 2));
+        let mut space = crate::space::Space::empty(extent);
         // TODO: use wireframe blocks instead, or something that will highlight the counts better
         let base_octant_chunk = Block::builder()
             .display_name("Base octant chunk")
