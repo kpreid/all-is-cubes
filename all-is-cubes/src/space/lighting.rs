@@ -277,16 +277,61 @@ impl PartialOrd for LightUpdateRequest {
     }
 }
 
+/// A priority queue for [`LightUpdateRequest`]s which contains cubes
+/// at most once, even when added with different priorities.
+pub(super) struct LightUpdateQueue {
+    queue: BinaryHeap<LightUpdateRequest>,
+    set: HashSet<GridPoint>,
+}
+
+impl LightUpdateQueue {
+    pub fn new() -> Self {
+        Self {
+            queue: BinaryHeap::new(),
+            set: HashSet::new(),
+        }
+    }
+
+    /// Insert a request if no request with the same cube is present.
+    ///
+    /// TODO: Higher priorities should override lower ones.
+    #[inline]
+    pub fn insert(&mut self, request: LightUpdateRequest) {
+        if self.set.insert(request.cube) {
+            self.queue.push(request);
+        }
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> Option<LightUpdateRequest> {
+        let result = self.queue.pop();
+        if let Some(LightUpdateRequest { cube, .. }) = result {
+            self.set.remove(&cube);
+        }
+        result
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    #[inline]
+    pub fn peek_priority(&self) -> PackedLightScalar {
+        self.queue.peek().map(|r| r.priority).unwrap_or(0)
+    }
+}
+
+/// Methods on Space that specifically implement the lighting algorithm.
 impl Space {
     pub(crate) fn light_needs_update(&mut self, cube: GridPoint, priority: PackedLightScalar) {
         if self.physics.light == LightPhysics::None {
             return;
         }
 
-        if self.grid().contains_cube(cube) && !self.lighting_update_set.contains(&cube) {
-            self.lighting_update_queue
-                .push(LightUpdateRequest { priority, cube });
-            self.lighting_update_set.insert(cube);
+        if self.grid().contains_cube(cube) {
+            self.light_update_queue
+                .insert(LightUpdateRequest { priority, cube });
         }
     }
 
@@ -297,8 +342,7 @@ impl Space {
         let mut cost = 0;
 
         if self.physics.light != LightPhysics::None {
-            while let Some(LightUpdateRequest { cube, .. }) = self.lighting_update_queue.pop() {
-                self.lighting_update_set.remove(&cube);
+            while let Some(LightUpdateRequest { cube, .. }) = self.light_update_queue.pop() {
                 light_update_count += 1;
                 // Note: For performance, it is key that this call site ignores the info value
                 // and the functions are inlined. Thus, the info calculation can be
@@ -315,12 +359,8 @@ impl Space {
         LightUpdatesInfo {
             update_count: light_update_count,
             max_update_difference: max_difference,
-            queue_count: self.lighting_update_queue.len(),
-            max_queue_priority: self
-                .lighting_update_queue
-                .peek()
-                .map(|r| r.priority)
-                .unwrap_or(0),
+            queue_count: self.light_update_queue.len(),
+            max_queue_priority: self.light_update_queue.peek_priority(),
         }
     }
 
@@ -815,41 +855,41 @@ mod tests {
         space.light_needs_update(GridPoint::new(0, 0, 2), 200);
         space.light_needs_update(GridPoint::new(0, 0, 1), 100);
         assert_eq!(
-            space.lighting_update_queue.pop(),
+            space.light_update_queue.pop(),
             Some(LightUpdateRequest {
                 cube: GridPoint::new(0, 0, 2),
                 priority: 200
             })
         );
         assert_eq!(
-            space.lighting_update_queue.pop(),
+            space.light_update_queue.pop(),
             Some(LightUpdateRequest {
                 cube: GridPoint::new(0, 0, 1),
                 priority: 100
             })
         );
         assert_eq!(
-            space.lighting_update_queue.pop(),
+            space.light_update_queue.pop(),
             Some(LightUpdateRequest {
                 cube: GridPoint::new(0, 0, 0),
                 priority: 0
             })
         );
         assert_eq!(
-            space.lighting_update_queue.pop(),
+            space.light_update_queue.pop(),
             Some(LightUpdateRequest {
                 cube: GridPoint::new(1, 0, 0),
                 priority: 0
             })
         );
         assert_eq!(
-            space.lighting_update_queue.pop(),
+            space.light_update_queue.pop(),
             Some(LightUpdateRequest {
                 cube: GridPoint::new(2, 0, 0),
                 priority: 0
             })
         );
-        assert_eq!(space.lighting_update_queue.pop(), None);
+        assert_eq!(space.light_update_queue.pop(), None);
     }
 
     /// There's a special case for setting cubes to opaque. That case must do the usual

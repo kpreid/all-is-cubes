@@ -25,7 +25,7 @@ mod grid;
 pub use grid::*;
 
 mod lighting;
-use lighting::PackedLightScalar;
+use lighting::{LightUpdateQueue, PackedLightScalar};
 pub use lighting::{LightUpdatesInfo, PackedLight};
 
 mod space_txn;
@@ -53,10 +53,8 @@ pub struct Space {
 
     /// Parallel array to `contents` for lighting data.
     pub(crate) lighting: Box<[PackedLight]>,
-    /// Queue of positions that could really use lighting updates.
-    pub(crate) lighting_update_queue: BinaryHeap<lighting::LightUpdateRequest>,
-    /// Set of members of lighting_update_queue, for deduplication.
-    pub(crate) lighting_update_set: HashSet<GridPoint>,
+    /// Queue of cubes whose light values should be updated.
+    light_update_queue: LightUpdateQueue,
 
     /// Global characteristics such as the behavior of light and gravity.
     physics: SpacePhysics,
@@ -135,8 +133,7 @@ impl Space {
             }],
             contents: vec![0; volume].into_boxed_slice(),
             lighting: physics.light.initialize_lighting(grid, packed_sky_color),
-            lighting_update_queue: BinaryHeap::new(),
-            lighting_update_set: HashSet::new(),
+            light_update_queue: LightUpdateQueue::new(),
             physics,
             packed_sky_color,
             spawn: Spawn::default_for_new_space(grid),
