@@ -83,16 +83,13 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         .inventory
         .push(Tool::PlaceBlock(demo_blocks[Lamp].clone()));
 
-    // Fill in flat ground
+    // Fill basic layers, underground and top
     space.fill_uniform(
-        Grid::from_lower_upper(
-            (-radius_xz, -ground_depth, -radius_xz),
-            (radius_xz, 0, radius_xz),
-        ),
+        planner.y_range(-ground_depth, 0),
         &landscape_blocks[LandscapeBlocks::Stone],
     )?;
     space.fill_uniform(
-        Grid::from_lower_upper((-radius_xz, 0, -radius_xz), (radius_xz, 1, radius_xz)),
+        planner.y_range(0, 1),
         &landscape_blocks[LandscapeBlocks::Grass],
     )?;
 
@@ -127,11 +124,13 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         let curb_y = GridVector::unit_y();
         for (i, step) in raycaster.enumerate() {
             let i = i as GridCoordinate;
+            // Road surface
             for p in -road_radius..=road_radius {
                 space.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
             }
+
+            // Curbs
             if i > road_radius {
-                // Curbs
                 for (side, &p) in [-(road_radius + 1), road_radius + 1].iter().enumerate() {
                     // TODO: should be able to express this in look-at terms.
                     let mut curb = demo_blocks[Curb].clone().rotate(GridRotation::from_basis([
@@ -147,11 +146,23 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                 }
             }
 
+            // Lampposts
             if (i - lamp_position_radius) % lamp_spacing == 0 {
                 for p in &[-lamp_position_radius, lamp_position_radius] {
                     lamp_brush.paint(
                         &mut space,
                         step.cube_ahead() + GridVector::new(0, 1, 0) + perpendicular * *p,
+                    )?;
+                }
+            }
+
+            // Dig underground passages
+            // TODO: They need a connection to the surface
+            for p in -road_radius..=road_radius {
+                for z in -5..0 {
+                    space.set(
+                        step.cube_ahead() + perpendicular * p + Vector3::unit_y() * z,
+                        &AIR,
                     )?;
                 }
             }
@@ -422,5 +433,13 @@ impl CityPlanner {
             }
         }
         None
+    }
+
+    fn y_range(&self, lower_y: GridCoordinate, upper_y: GridCoordinate) -> Grid {
+        let mut lower = self.space_grid.lower_bounds();
+        let mut upper = self.space_grid.upper_bounds();
+        lower.y = lower_y;
+        upper.y = upper_y;
+        Grid::from_lower_upper(lower, upper)
     }
 }
