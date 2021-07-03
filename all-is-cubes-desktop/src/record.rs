@@ -3,9 +3,6 @@
 
 //! Headless image (and someday video) generation.
 
-use cgmath::Vector2;
-use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
-use png::Encoder;
 use std::array::IntoIter;
 use std::borrow::Cow;
 use std::error::Error;
@@ -16,13 +13,16 @@ use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use cgmath::Vector2;
+use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
+use png::Encoder;
+
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::character::Character;
 use all_is_cubes::math::{FreeCoordinate, NotNan, Rgba};
 use all_is_cubes::raytracer::{ColorBuf, SpaceRaytracer};
-use all_is_cubes::space::LightUpdatesInfo;
 use all_is_cubes::universe::URef;
 
 /// Options for recording and output in [`record_main`].
@@ -92,8 +92,6 @@ pub(crate) fn record_main(
         .on_finish(ProgressFinish::AtCurrentPos);
 
     let mut stderr = std::io::stderr();
-    let _ = writeln!(stderr, "Preparing...");
-    let _ = stderr.flush();
 
     let viewport = options.viewport();
     let mut camera = Camera::new(app.graphics_options().snapshot(), viewport);
@@ -105,15 +103,7 @@ pub(crate) fn record_main(
         .ok_or_else(|| Box::<dyn Error>::from("Character not found"))?
         .clone();
 
-    // Ensure lighting is ready
     let space_ref = character_ref.borrow().space.clone();
-    let light_progress = ProgressBar::new(100)
-        .with_style(progress_style.clone())
-        .with_prefix("Lighting");
-    space_ref
-        .borrow_mut()
-        .evaluate_light(1, lighting_progress_adapter(&light_progress));
-    light_progress.finish();
 
     if options.animated() {
         // TODO: replace this with a general scripting mechanism
@@ -217,15 +207,4 @@ fn write_color_metadata<W: std::io::Write>(
         .collect::<Box<[u8]>>(),
     )?;
     Ok(())
-}
-
-/// Convert `LightUpdatesInfo` data to an approximate completion progress.
-/// TODO: Improve this and put it in the lighting module (independent of indicatif).
-fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(LightUpdatesInfo) + '_ {
-    let mut worst = 1;
-    move |info| {
-        worst = worst.max(info.queue_count);
-        progress.set_length(worst as u64);
-        progress.set_position((worst - info.queue_count) as u64);
-    }
 }

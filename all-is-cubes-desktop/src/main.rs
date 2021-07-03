@@ -8,16 +8,19 @@
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
 
-use cgmath::Vector2;
-use clap::{value_t, Arg, ErrorKind};
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
+
+use cgmath::Vector2;
+use clap::{value_t, Arg, ErrorKind};
+use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use strum::IntoEnumIterator;
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::content::UniverseTemplate;
+use all_is_cubes::space::{LightUpdatesInfo, Space};
 
 use crate::record::{RecordAnimationOptions, RecordOptions};
 
@@ -83,6 +86,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .default_value("demo-city")
                 .help("Which world template to use."),
         )
+        .arg(Arg::with_name("precompute_light")
+            .long("precompute-light")
+            .help("Fully calculate light before starting the game."))
         .arg(
             Arg::with_name("output")
                 .long("output")
@@ -134,6 +140,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         universe_template,
         app_done_time.duration_since(start_time).as_secs_f32()
     );
+
+    if options.is_present("precompute_light") || graphics_type == GraphicsType::Record {
+        evaluate_light_with_progress(&mut app.character().unwrap().borrow().space.borrow_mut());
+    }
 
     match graphics_type {
         GraphicsType::Window => glfw_main_loop(app, title, display_size),
@@ -190,6 +200,32 @@ fn parse_record_options(
             Err(e) => return Err(e),
         },
     })
+}
+
+fn evaluate_light_with_progress(space: &mut Space) {
+    let light_progress = ProgressBar::new(100)
+        .with_style(common_progress_style())
+        .with_prefix("Lighting");
+    space.evaluate_light(1, lighting_progress_adapter(&light_progress));
+    light_progress.finish();
+}
+
+/// Convert `LightUpdatesInfo` data to an approximate completion progress.
+/// TODO: Improve this and put it in the lighting module (independent of indicatif).
+fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(LightUpdatesInfo) + '_ {
+    let mut worst = 1;
+    move |info| {
+        worst = worst.max(info.queue_count);
+        progress.set_length(worst as u64);
+        progress.set_position((worst - info.queue_count) as u64);
+    }
+}
+
+/// [`ProgressStyle`] for progress bars we display.
+fn common_progress_style() -> ProgressStyle {
+    ProgressStyle::default_bar()
+        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
+        .on_finish(ProgressFinish::AtCurrentPos)
 }
 
 #[cfg(test)]
