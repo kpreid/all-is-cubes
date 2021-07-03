@@ -4,10 +4,13 @@
 //! Lighting algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Vector4};
-use once_cell::sync::Lazy;
+use std::collections::hash_map::Entry;
+use std::collections::BTreeSet;
 use std::convert::TryInto as _;
 use std::fmt;
+
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Vector4};
+use once_cell::sync::Lazy;
 
 use crate::math::*;
 use crate::raycast::Ray;
@@ -144,19 +147,22 @@ impl PackedLight {
 
     #[inline]
     fn difference_magnitude(self, other: PackedLight) -> PackedLightScalar {
-        if other.status != self.status {
-            // A non-opaque block changing to an opaque one, or similar, changes the
-            // results of the rest of the algorithm so should be counted as a difference
-            // (and a high-priority one) even if it's still changing zero to zero.
-            return PackedLightScalar::MAX;
-        }
-
         fn dm(a: PackedLightScalar, b: PackedLightScalar) -> PackedLightScalar {
             a.max(b) - a.min(b)
         }
-        dm(self.value[0], other.value[0])
+        let mut difference = dm(self.value[0], other.value[0])
             .max(dm(self.value[1], other.value[1]))
-            .max(dm(self.value[2], other.value[2]))
+            .max(dm(self.value[2], other.value[2]));
+
+        if other.status != self.status {
+            // A non-opaque block changing to an opaque one, or similar, changes the
+            // results of the rest of the algorithm so should be counted as a difference
+            // even if it's still changing zero to zero.
+            // TODO: Tune this number for fast settling and good results.
+            difference = difference.saturating_add(PackedLightScalar::MAX / 4);
+        }
+
+        difference
     }
 
     fn scalar_in(value: impl Into<f32>) -> PackedLightScalar {
@@ -280,33 +286,53 @@ impl PartialOrd for LightUpdateRequest {
 /// A priority queue for [`LightUpdateRequest`]s which contains cubes
 /// at most once, even when added with different priorities.
 pub(super) struct LightUpdateQueue {
-    queue: BinaryHeap<LightUpdateRequest>,
-    set: HashSet<GridPoint>,
+    /// Sorted storage of queue elements.
+    /// This is a BTreeSet rather than a BinaryHeap so that items can be removed.
+    queue: BTreeSet<LightUpdateRequest>,
+    /// Maps GridPoint to priority value. This allows deduplicating entries, including
+    /// removing low-priority entries in favor of high-priority ones
+    table: HashMap<GridPoint, PackedLightScalar>,
 }
 
 impl LightUpdateQueue {
     pub fn new() -> Self {
         Self {
-            queue: BinaryHeap::new(),
-            set: HashSet::new(),
+            queue: BTreeSet::new(),
+            table: HashMap::new(),
         }
     }
 
-    /// Insert a request if no request with the same cube is present.
-    ///
-    /// TODO: Higher priorities should override lower ones.
+    /// Insert a queue entry or increase the priority of an existing one.
     #[inline]
     pub fn insert(&mut self, request: LightUpdateRequest) {
-        if self.set.insert(request.cube) {
-            self.queue.push(request);
+        match self.table.entry(request.cube) {
+            Entry::Occupied(mut e) => {
+                let existing_priority = *e.get();
+                if request.priority > existing_priority {
+                    let removed = self.queue.remove(&LightUpdateRequest {
+                        cube: request.cube,
+                        priority: existing_priority,
+                    });
+                    debug_assert!(removed);
+                    e.insert(request.priority);
+                    self.queue.insert(request);
+                }
+            }
+            Entry::Vacant(e) => {
+                e.insert(request.priority);
+                self.queue.insert(request);
+            }
         }
     }
 
     #[inline]
     pub fn pop(&mut self) -> Option<LightUpdateRequest> {
-        let result = self.queue.pop();
-        if let Some(LightUpdateRequest { cube, .. }) = result {
-            self.set.remove(&cube);
+        // This can become self.queue.pop_last() when that's stable
+        let result = self.queue.iter().rev().next().copied();
+        if let Some(request) = result {
+            let removed_queue = self.queue.remove(&request);
+            let removed_table = self.table.remove(&request.cube);
+            debug_assert!(removed_queue && removed_table.is_some());
         }
         result
     }
@@ -318,7 +344,14 @@ impl LightUpdateQueue {
 
     #[inline]
     pub fn peek_priority(&self) -> PackedLightScalar {
-        self.queue.peek().map(|r| r.priority).unwrap_or(0)
+        // This can become self.queue.last() when that's stable
+        self.queue
+            .iter()
+            .rev()
+            .next()
+            .copied()
+            .map(|r| r.priority)
+            .unwrap_or(0)
     }
 }
 

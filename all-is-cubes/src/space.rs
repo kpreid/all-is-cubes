@@ -6,7 +6,6 @@
 use cgmath::Vector3;
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::{Rc, Weak};
