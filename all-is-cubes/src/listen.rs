@@ -23,6 +23,9 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// to a set of listeners which implement some form of weak-reference semantics
 /// to allow cleanup.
+///
+/// TODO: Modify this to be `Sync` so that things that contain one can be used from
+/// multiple threads.
 pub struct Notifier<M> {
     listeners: RefCell<Vec<Box<dyn Listener<M>>>>,
 }
