@@ -47,6 +47,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     let lamp_spacing = 20;
     let sky_height = 30;
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
+    let underground_floor_y = -5;
     let radius_xz = 60;
     let grid = Grid::from_lower_upper(
         (-radius_xz, -ground_depth, -radius_xz),
@@ -82,6 +83,9 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     spawn
         .inventory
         .push(Tool::PlaceBlock(demo_blocks[Lamp].clone()));
+    spawn
+        .inventory
+        .push(Tool::PlaceBlock(demo_blocks[Sconce].clone()));
 
     // Fill basic layers, underground and top
     space.fill_uniform(
@@ -119,6 +123,12 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     for &face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
         let forward: GridVector = face.normal_vector();
         let perpendicular: GridVector = forward.cross(Face::PY.normal_vector());
+        // TODO: should be able to express this in look-at terms.
+        let road_aligned_rotation =
+            GridRotation::from_basis([face.cross(Face::PY), Face::PY, face]);
+        let other_side_of_road =
+            GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]) * road_aligned_rotation;
+        let rotations = [other_side_of_road, road_aligned_rotation];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within_grid(space.grid());
         let curb_y = GridVector::unit_y();
@@ -132,17 +142,10 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             // Curbs
             if i > road_radius {
                 for (side, &p) in [-(road_radius + 1), road_radius + 1].iter().enumerate() {
-                    // TODO: should be able to express this in look-at terms.
-                    let mut curb = demo_blocks[Curb].clone().rotate(GridRotation::from_basis([
-                        face.cross(Face::PY),
-                        Face::PY,
-                        face,
-                    ]));
-                    if side == 0 {
-                        curb =
-                            curb.rotate(GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]));
-                    }
-                    space.set(step.cube_ahead() + perpendicular * p + curb_y, curb)?;
+                    space.set(
+                        step.cube_ahead() + perpendicular * p + curb_y,
+                        demo_blocks[Curb].clone().rotate(rotations[side]),
+                    )?;
                 }
             }
 
@@ -159,10 +162,21 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             // Dig underground passages
             // TODO: They need a connection to the surface
             for p in -road_radius..=road_radius {
-                for z in -5..0 {
+                for z in underground_floor_y..0 {
                     space.set(
                         step.cube_ahead() + perpendicular * p + Vector3::unit_y() * z,
                         &AIR,
+                    )?;
+                }
+            }
+
+            // Underground lighting
+            if (i - lamp_position_radius) % 7 == 0 {
+                // Underground lamps
+                for (side, &p) in [-road_radius, road_radius].iter().enumerate() {
+                    space.set(
+                        step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
+                        demo_blocks[Sconce].clone().rotate(GridRotation::RzYX * rotations[side]),
                     )?;
                 }
             }

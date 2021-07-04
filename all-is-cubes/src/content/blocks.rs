@@ -26,6 +26,7 @@ use crate::universe::Universe;
 pub enum DemoBlocks {
     Lamp,
     Lamppost,
+    Sconce,
     Road,
     Curb,
     CurbCorner,
@@ -106,6 +107,24 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                     ) <= 4i32.pow(2)
                     {
                         palette::ALMOST_BLACK.into()
+                    } else {
+                        AIR.clone()
+                    }
+                })?
+                .build(),
+
+            Sconce => Block::builder()
+                .display_name("Sconce")
+                .light_emission(Rgb::new(8.0, 7.0, 6.0))
+                .voxels_fn(universe, resolution, |p| {
+                    // TODO: fancier appearance with a bracket
+                    if int_magnitude_squared(
+                        (p * 2 + one_diagonal
+                            - center_point_doubled.mul_element_wise(GridPoint::new(1, 1, 0)))
+                        .mul_element_wise(GridVector::new(3, 1, 1)),
+                    ) <= resolution_g.pow(2)
+                    {
+                        Rgba::WHITE.into()
                     } else {
                         AIR.clone()
                     }
