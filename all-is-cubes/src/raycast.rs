@@ -549,7 +549,11 @@ fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeC
     // problem is now s + t * ds = 1
     let result = (1.0 - s) / ds;
 
-    // Debugging a rare failure... This may be fixed now.
+    // TODO: This is a check for a mysterious algorithm failure.
+    // It *might* be just that a `s` close to an integer from below and a very small `ds`
+    // can combine to round down to zero because the last failure we got logged '(1, 0) => NaN'
+    // (with {} formatting instead of {:?}), but attempts to trigger this case in tests
+    // have not yet succeeded. If that hypothesis does prove out, then we should just return Infinity.
     assert!(
         result.signum() > 0.0 || ds.is_nan() || s.is_nan(),
         "scale_to_integer_step failed ({}, {}) => {}",
