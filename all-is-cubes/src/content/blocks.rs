@@ -55,12 +55,12 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
     install_landscape_blocks(universe, resolution)?;
 
     use DemoBlocks::*;
-    let road_color: Block = Rgba::new(0.314, 0.306, 0.353, 1.0).into();
+    let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
-    let road_noise_v = noise::Value::new().set_seed(0x51b19f6a);
+    let road_noise_v = noise::Value::new().set_seed(0x52b19f6a);
     let road_noise = noise::ScaleBias::new(&road_noise_v)
         .set_bias(1.0)
-        .set_scale(0.04);
+        .set_scale(0.12);
 
     let curb_fn = |cube: GridPoint| {
         let width = resolution_g / 3;
