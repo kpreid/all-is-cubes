@@ -65,7 +65,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     let surface = WebSysWebGL2Surface::from_canvas_with_params(
         web_sys::window().unwrap(), // TODO messy
-        document.clone(),
+        document,
         gui_helpers.canvas_helper().canvas(),
         // This is set for parity with the `luminance_windowing` defaults.
         // TODO: Probably `GraphicsOptions` should get an antialias/MSAA field.
