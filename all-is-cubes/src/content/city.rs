@@ -15,7 +15,6 @@ use embedded_graphics::text::Text;
 use instant::Instant;
 use noise::Seedable as _;
 use ordered_float::NotNan;
-use strum::IntoEnumIterator;
 
 use crate::block::Resolution;
 use crate::block::{BlockAttributes, BlockCollision, AIR};
@@ -38,6 +37,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     use DemoBlocks::*;
+    use LandscapeBlocks::*;
 
     // Layout parameters
     // TODO: move to CityPlanner
@@ -77,25 +77,21 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         (grid.center() + Vector3::new(0.5, 2.91, 8.5)).map(|s| NotNan::new(s).unwrap());
     spawn.flying = false;
     // Initial inventory contents. TODO: Make a better list.
-    for block in LandscapeBlocks::iter().map(|key| landscape_blocks[key].clone()) {
-        spawn.inventory.push(Tool::PlaceBlock(block));
+    for block in [
+        &landscape_blocks[Grass],
+        &landscape_blocks[Dirt],
+        &landscape_blocks[Stone],
+        &demo_blocks[Lamp],
+        &demo_blocks[Sconce],
+        &demo_blocks[Road],
+        &demo_blocks[Signboard],
+    ] {
+        spawn.inventory.push(Tool::PlaceBlock(block.clone()));
     }
-    spawn
-        .inventory
-        .push(Tool::PlaceBlock(demo_blocks[Lamp].clone()));
-    spawn
-        .inventory
-        .push(Tool::PlaceBlock(demo_blocks[Sconce].clone()));
 
     // Fill basic layers, underground and top
-    space.fill_uniform(
-        planner.y_range(-ground_depth, 0),
-        &landscape_blocks[LandscapeBlocks::Stone],
-    )?;
-    space.fill_uniform(
-        planner.y_range(0, 1),
-        &landscape_blocks[LandscapeBlocks::Grass],
-    )?;
+    space.fill_uniform(planner.y_range(-ground_depth, 0), &landscape_blocks[Stone])?;
+    space.fill_uniform(planner.y_range(0, 1), &landscape_blocks[Grass])?;
 
     // Stray grass
     let grass_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
@@ -110,9 +106,9 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                 return None;
             }
             if grass_noise.at_cube(cube) > grass_threshold * 2. {
-                Some(&landscape_blocks[LandscapeBlocks::GrassBlades2])
+                Some(&landscape_blocks[GrassBlades2])
             } else if grass_noise.at_cube(cube) > grass_threshold {
-                Some(&landscape_blocks[LandscapeBlocks::GrassBlades1])
+                Some(&landscape_blocks[GrassBlades1])
             } else {
                 None
             }
@@ -176,7 +172,9 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                 for (side, &p) in [-road_radius, road_radius].iter().enumerate() {
                     space.set(
                         step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
-                        demo_blocks[Sconce].clone().rotate(GridRotation::RzYX * rotations[side]),
+                        demo_blocks[Sconce]
+                            .clone()
+                            .rotate(GridRotation::RzYX * rotations[side]),
                     )?;
                 }
             }
