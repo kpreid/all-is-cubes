@@ -576,9 +576,8 @@ pub struct GridOverflowError(String);
 /// TODO: Should we rebuild Space on top of this?
 #[derive(Clone, Debug, Eq, Hash, PartialEq)] // TODO: nondefault Debug
 pub struct GridArray<V> {
-    // TODO: consider replacing crate visibility with a constructor that checks the array length
-    pub(crate) grid: Grid,
-    pub(crate) contents: Box<[V]>,
+    grid: Grid,
+    contents: Box<[V]>,
 }
 
 impl<V> GridArray<V> {

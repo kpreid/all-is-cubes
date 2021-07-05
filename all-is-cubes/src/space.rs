@@ -198,30 +198,24 @@ impl Space {
         subgrid: Grid,
         mut extractor: impl FnMut(Option<BlockIndex>, &SpaceBlockData, PackedLight) -> V,
     ) -> GridArray<V> {
-        GridArray {
-            grid: subgrid,
-            contents: subgrid
-                .interior_iter()
-                .map(|cube| {
-                    // TODO: Implement an iterator over the indexes (which is not just
-                    // interior_iter().enumerate() because it's a sub-grid).
-                    match self.grid.index(cube) {
-                        Some(cube_index) => {
-                            let block_index = self.contents[cube_index];
-                            extractor(
-                                Some(block_index),
-                                &self.block_data[block_index as usize],
-                                match self.physics.light {
-                                    LightPhysics::None => PackedLight::ONE,
-                                    LightPhysics::Rays { .. } => self.lighting[cube_index],
-                                },
-                            )
-                        }
-                        None => extractor(None, &SpaceBlockData::NOTHING, self.packed_sky_color),
-                    }
-                })
-                .collect(),
-        }
+        GridArray::from_fn(subgrid, |cube| {
+            // TODO: Implement an iterator over the indexes (which is not just
+            // interior_iter().enumerate() because it's a sub-grid).
+            match self.grid.index(cube) {
+                Some(cube_index) => {
+                    let block_index = self.contents[cube_index];
+                    extractor(
+                        Some(block_index),
+                        &self.block_data[block_index as usize],
+                        match self.physics.light {
+                            LightPhysics::None => PackedLight::ONE,
+                            LightPhysics::Rays { .. } => self.lighting[cube_index],
+                        },
+                    )
+                }
+                None => extractor(None, &SpaceBlockData::NOTHING, self.packed_sky_color),
+            }
+        })
     }
 
     /// Gets the [`EvaluatedBlock`] of the block in this space at the given position.
