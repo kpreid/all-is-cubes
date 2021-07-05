@@ -538,9 +538,14 @@ fn signum_101(x: FreeCoordinate) -> GridCoordinate {
 /// it means that the less-than comparisons in the raycast algorithm will never pick
 /// the corresponding axis. If any input is NaN, returns NaN.
 fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeCoordinate {
-    // Simplify to positive case only.
-    // `.signum()` ensures a negative zero can't cause us to return negative infinity.
-    if ds.signum() < 0.0 {
+    if ds == 0.0 && !s.is_nan() {
+        // Explicitly handle zero case.
+        // This almost could be implicit, but it is possible for the below division to
+        // return NaN instead of +inf, in the case where (1.0 - s) rounds down to zero.
+        return FreeCoordinate::INFINITY;
+    } else if ds < 0.0 {
+        // Simplify to positive case only.
+        // Note that the previous condition eliminated the case of negative zero.
         s = -s;
         ds = -ds;
     }
@@ -549,12 +554,7 @@ fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeC
     // problem is now s + t * ds = 1
     let result = (1.0 - s) / ds;
 
-    // TODO: This is a check for a mysterious algorithm failure.
-    // It *might* be just that a `s` close to an integer from below and a very small `ds`
-    // can combine to round down to zero because the last failure we got logged '(1, 0) => NaN'
-    // (with {} formatting instead of {:?}), but attempts to trigger this case in tests
-    // have not yet succeeded. If that hypothesis does prove out, then we should just return Infinity.
-    assert!(
+    debug_assert!(
         result.signum() > 0.0 || ds.is_nan() || s.is_nan(),
         "scale_to_integer_step failed ({}, {}) => {}",
         s,
@@ -1007,5 +1007,14 @@ mod tests {
         assert!(scale_to_integer_step(1.5, FreeCoordinate::NAN).is_nan());
         assert!(scale_to_integer_step(FreeCoordinate::NAN, 1.0).is_nan());
         assert!(scale_to_integer_step(FreeCoordinate::NAN, 0.0).is_nan());
+    }
+
+    /// Edge case found by fuzzing.
+    #[test]
+    fn scale_to_integer_step_small_offset() {
+        assert_eq!(
+            scale_to_integer_step(-0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000019656826074480345, 0.0),
+            FreeCoordinate::INFINITY,
+        );
     }
 }
