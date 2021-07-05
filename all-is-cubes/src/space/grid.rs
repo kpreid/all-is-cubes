@@ -37,36 +37,53 @@ impl Grid {
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 15.
     ///
+    /// Panics if the sizes are non-positive or the resulting range would cause
+    /// numeric overflow.
+    ///
     /// TODO: Rename this to be parallel with from_lower_upper
     #[track_caller]
-    pub fn new(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridVector>) -> Grid {
+    pub fn new(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridVector>) -> Self {
+        Self::checked_new(lower_bounds.into(), sizes.into()).expect("Grid::new")
+    }
+
+    /// Constructs a [`Grid`] from coordinate lower bounds and sizes.
+    ///
+    /// For example, if on one axis the lower bound is 5 and the size is 10,
+    /// then the positions where blocks can exist are numbered 5 through 14
+    /// (inclusive) and the occupied volume (from a perspective of continuous
+    /// rather than discrete coordinates) spans 5 to 15.
+    ///
+    /// Returns [`Err`] if the sizes are non-positive or the resulting range would cause
+    /// numeric overflow.
+    ///
+    /// TODO: Rename this to be parallel with from_lower_upper
+    pub fn checked_new(
+        lower_bounds: impl Into<GridPoint>,
+        sizes: impl Into<GridVector>,
+    ) -> Result<Self, GridOverflowError> {
         let lower_bounds = lower_bounds.into();
         let sizes = sizes.into();
 
-        // TODO: Replace assert! with nice error reporting and then test it
+        // TODO: Test these error cases.
+        // TODO: Replace string error construction with an error enum.
         for i in 0..3 {
-            assert!(
-                sizes[i] > 0,
-                "Grid sizes[{}] must be > 0, not {}",
-                i,
-                sizes[i]
-            );
-            assert!(
-                lower_bounds[i].checked_add(sizes[i]).is_some(),
-                "Grid lower_bounds[{}] too large for sizes",
-                i
-            );
+            if sizes[i] <= 0 {
+                return Err(GridOverflowError(format!(
+                    "sizes[{}] must be > 0, not {}",
+                    i, sizes[i]
+                )));
+            }
+            lower_bounds[i].checked_add(sizes[i]).ok_or_else(|| {
+                GridOverflowError(format!("lower_bounds[{}] too large for sizes", i))
+            })?;
         }
-        assert!(
-            Self::checked_volume_helper(sizes).is_ok(),
-            "Grid volume too large; {:?} overflows",
-            sizes
-        );
+        Self::checked_volume_helper(sizes)
+            .map_err(|()| GridOverflowError(format!("volume too large; {:?} overflows", sizes)))?;
 
-        Grid {
+        Ok(Grid {
             lower_bounds,
             sizes,
-        }
+        })
     }
 
     /// Constructs a [`Grid`] from inclusive lower bounds and exclusive upper bounds.
@@ -546,6 +563,12 @@ impl Iterator for GridIter {
 
 impl ExactSizeIterator for GridIter {}
 impl FusedIterator for GridIter {}
+
+/// Error when a [`Grid`] cannot be constructed from the given input.
+// TODO: Make this an enum
+#[derive(Clone, Debug, thiserror::Error, Eq, PartialEq)]
+#[error("{0}")]
+pub struct GridOverflowError(String);
 
 /// A 3-dimensional array with arbitrary element type instead of [`Space`](super::Space)'s
 /// fixed types.
