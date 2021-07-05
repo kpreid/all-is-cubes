@@ -384,6 +384,30 @@ impl std::fmt::Debug for Rgba {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Rgb {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::math::arbitrary_notnan;
+        Ok(Rgb::new_nn(
+            arbitrary_notnan(u)?,
+            arbitrary_notnan(u)?,
+            arbitrary_notnan(u)?,
+        ))
+    }
+}
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Rgba {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::math::arbitrary_notnan;
+        Ok(Rgba::new_nn(
+            arbitrary_notnan(u)?,
+            arbitrary_notnan(u)?,
+            arbitrary_notnan(u)?,
+            arbitrary_notnan(u)?,
+        ))
+    }
+}
+
 fn component_to_srgb_8bit(c: NotNan<f32>) -> u8 {
     // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_forward_transformation_(CIE_XYZ_to_sRGB)> (version as of Feb 3, 2020)
     // Strip NotNan

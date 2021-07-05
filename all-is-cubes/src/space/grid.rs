@@ -502,6 +502,17 @@ impl From<Grid> for Aab {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Grid {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Grid::checked_new(
+            GridPoint::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
+            GridVector::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
+        )
+        .map_err(|_| arbitrary::Error::IncorrectFormat)
+    }
+}
+
 /// Iterator produced by [`Grid::interior_iter`].
 pub struct GridIter {
     x_range: Range<GridCoordinate>,
@@ -653,6 +664,27 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
     }
 }
 // TODO: impl IndexMut for GridArray
+
+#[cfg(feature = "arbitrary")]
+use arbitrary::Arbitrary;
+#[cfg(feature = "arbitrary")]
+impl<'a, V: Arbitrary<'a>> Arbitrary<'a> for GridArray<V> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let grid: Grid = u.arbitrary()?;
+
+        if grid.volume() > 2_usize.pow(16) {
+            // Let's not spend too much memory on generating arbitrary length arrays.
+            // This does reduce coverage...
+            return Err(arbitrary::Error::IncorrectFormat);
+        }
+
+        let contents: Box<[V]> = u
+            .arbitrary_iter()?
+            .take(grid.volume())
+            .collect::<Result<Box<[V]>, _>>()?;
+        GridArray::from_elements(grid, contents).ok_or(arbitrary::Error::NotEnoughData)
+    }
+}
 
 #[cfg(test)]
 mod tests {

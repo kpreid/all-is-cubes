@@ -42,6 +42,13 @@ macro_rules! notnan {
 }
 pub(crate) use notnan;
 
+#[cfg(feature = "arbitrary")]
+pub(crate) fn arbitrary_notnan<'a, T: num_traits::Float + arbitrary::Arbitrary<'a>>(
+    u: &mut arbitrary::Unstructured<'a>,
+) -> arbitrary::Result<NotNan<T>> {
+    NotNan::new(u.arbitrary()?).map_err(|_| arbitrary::Error::IncorrectFormat)
+}
+
 #[inline]
 pub(crate) fn smoothstep(x: f64) -> f64 {
     let x = x.clamp(0.0, 1.0);

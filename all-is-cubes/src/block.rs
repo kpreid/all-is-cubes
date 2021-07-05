@@ -44,6 +44,7 @@ pub type Resolution = u8;
 /// To obtain the concrete appearance and behavior of a block, use [`Block::evaluate`] to
 /// obtain an [`EvaluatedBlock`] value, preferably with caching.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+//#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Block {
     /// A block whose definition is stored in a [`Universe`](crate::universe::Universe).
@@ -461,9 +462,22 @@ impl Default for BlockAttributes {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(BlockAttributes {
+            display_name: Cow::Owned(u.arbitrary()?),
+            selectable: u.arbitrary()?,
+            collision: u.arbitrary()?,
+            light_emission: u.arbitrary()?,
+        })
+    }
+}
+
 /// Specifies the effect on a [`Body`](crate::physics::Body) of colliding with the
 /// [`Block`] this applies to.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum BlockCollision {
     /// No effect.
@@ -507,6 +521,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
 /// A “flattened” and snapshotted form of [`Block`] which contains all information needed
 /// for rendering and physics, and does not require dereferencing [`URef`]s.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct EvaluatedBlock {
     /// The block's attributes.
@@ -567,6 +582,7 @@ pub enum EvalBlockError {
 /// This is essentially a subset of the information in a full [`EvaluatedBlock`] and
 /// its [`BlockAttributes`].
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct Evoxel {
     // TODO: Maybe we should convert to a smaller color format at this point?
