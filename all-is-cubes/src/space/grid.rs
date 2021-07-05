@@ -593,6 +593,22 @@ impl<V> GridArray<V> {
         }
     }
 
+    /// Constructs a [`GridArray`] containing the provided elements, which must be in the
+    /// ordering used by [`GridArray::interior_iter`].
+    ///
+    /// Returns [`None`] if the number of elements does not match [`grid.volume()`](Grid::volume).
+    pub fn from_elements(grid: Grid, elements: impl Into<Box<[V]>>) -> Option<Self> {
+        let elements = elements.into();
+        if elements.len() == grid.volume() {
+            Some(GridArray {
+                grid,
+                contents: elements,
+            })
+        } else {
+            None
+        }
+    }
+
     /// Returns the [`Grid`] specifying the bounds of this array.
     #[inline]
     pub fn grid(&self) -> Grid {
@@ -733,5 +749,20 @@ mod tests {
         assert_eq!(iter.size_hint(), (0, Some(0)));
         assert!(iter.next().is_none());
         assert_eq!(iter.size_hint(), (0, Some(0)));
+    }
+
+    #[test]
+    fn array_from_elements() {
+        let grid = Grid::new([10, 0, 0], [4, 1, 1]);
+        assert_eq!(
+            GridArray::from_fn(grid, |p| p.x),
+            GridArray::from_elements(grid, vec![10i32, 11, 12, 13]).unwrap(),
+        );
+    }
+
+    #[test]
+    fn array_from_elements_error() {
+        let grid = Grid::new([10, 0, 0], [4, 1, 1]);
+        assert_eq!(GridArray::from_elements(grid, vec![10i32, 11, 12]), None);
     }
 }
