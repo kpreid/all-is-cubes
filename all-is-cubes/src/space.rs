@@ -24,8 +24,11 @@ mod grid;
 pub use grid::*;
 
 mod lighting;
-use lighting::{LightUpdateQueue, PackedLightScalar};
-pub use lighting::{LightUpdatesInfo, PackedLight};
+pub use lighting::LightUpdatesInfo;
+
+mod light_data;
+pub use light_data::PackedLight;
+use light_data::{LightUpdateQueue, PackedLightScalar};
 
 mod space_txn;
 pub use space_txn::*;
