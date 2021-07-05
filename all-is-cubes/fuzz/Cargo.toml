@@ -1,0 +1,38 @@
+
+[package]
+name = "all-is-cubes-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.all-is-cubes]
+path = ".."
+features = ["arbitrary"]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_raycast"
+path = "fuzz_targets/fuzz_raycast.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_block_eval"
+path = "fuzz_targets/fuzz_block_eval.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_triangulator"
+path = "fuzz_targets/fuzz_triangulator.rs"
+test = false
+doc = false
