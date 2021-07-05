@@ -194,27 +194,30 @@ impl Raycaster {
     }
 
     #[inline(always)]
-    fn step(&mut self) {
+    fn step(&mut self) -> Result<(), ()> {
         // t_max stores the t-value at which we cross a cube boundary along the
         // X axis, per component. Therefore, choosing the least t_max axis
         // chooses the closest cube boundary.
         if self.t_max.x < self.t_max.y {
             if self.t_max.x < self.t_max.z {
-                self.step_on_axis(0 /* x */);
+                self.step_on_axis(0 /* x */)
             } else {
-                self.step_on_axis(2 /* z */);
+                self.step_on_axis(2 /* z */)
             }
         } else {
             if self.t_max.y < self.t_max.z {
-                self.step_on_axis(1 /* y */);
+                self.step_on_axis(1 /* y */)
             } else {
-                self.step_on_axis(2 /* z */);
+                self.step_on_axis(2 /* z */)
             }
         }
     }
 
+    /// Make a step in the appropriate direction along the given axis.
+    ///
+    /// If this step would overflow the [`GridCoordinate`] range, returns [`Err`].
     #[inline(always)]
-    fn step_on_axis(&mut self, axis: usize) {
+    fn step_on_axis(&mut self, axis: usize) -> Result<(), ()> {
         assert!(
             self.step[axis] != 0,
             "step_on_axis on axis {} which is zero; state = {:#?}",
@@ -229,8 +232,8 @@ impl Raycaster {
         // but that seems an excessive computation to save a field.
         self.last_t_distance = self.t_max[axis];
 
-        // Move into the new cube.
-        self.cube[axis] += self.step[axis];
+        // Move into the new cube, checking for overflow.
+        self.cube[axis] = self.cube[axis].checked_add(self.step[axis]).ok_or(())?;
 
         // Update t_max to reflect that we have crossed the previous t_max boundary.
         self.t_max[axis] += self.t_delta[axis];
@@ -243,6 +246,8 @@ impl Raycaster {
             [Face::PZ, Face::Within, Face::NZ],
         ];
         self.last_face = FACE_TABLE[axis][(self.step[axis] + 1) as usize];
+
+        Ok(())
     }
 
     #[inline(always)]
@@ -351,7 +356,7 @@ impl Iterator for Raycaster {
                     // Can't make progress, and we already have done emit_current duty, so stop.
                     return None;
                 }
-                self.step();
+                self.step().ok()?;
             }
 
             if self.is_out_of_bounds(1) {
@@ -647,6 +652,11 @@ mod tests {
         assert_steps_option(r, vec![Some(step), None, None]);
     }
 
+    #[track_caller]
+    fn assert_no_steps(mut raycaster: Raycaster) {
+        assert_steps(&mut raycaster, vec![]);
+    }
+
     /// Helper to construct steps
     fn step(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate, face: Face, t_distance: FreeCoordinate) -> TestStep {
         TestStep {
@@ -856,6 +866,52 @@ mod tests {
                 step(-10, -22, 30, Face::PY, 0.5),
                 step(-10, -23, 30, Face::PY, 1.5),
             ]);
+    }
+
+    #[test]
+    fn start_outside_of_integer_range() {
+        assert_no_steps(Raycaster::new(
+            [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MAX) + 0.5],
+            [0.0, 0.0, -1.0],
+        ));
+        assert_no_steps(Raycaster::new(
+            [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MAX) + 1.5],
+            [0.0, 0.0, -1.0],
+        ));
+        assert_no_steps(Raycaster::new(
+            [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MIN) - 0.5],
+            [0.0, 0.0, -1.0],
+        ));
+        assert_no_steps(Raycaster::new(
+            [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MIN) - 1.5],
+            [0.0, 0.0, -1.0],
+        ));
+    }
+
+    /// If we start inside the range of `GridCoordinate`s and exit, this should
+    /// stop (as if we were `within_grid` the entire space) rather than panicking.
+    #[test]
+    fn exiting_integer_range() {
+        assert_steps_option(
+            &mut Raycaster::new(
+                [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MAX) + 0.5],
+                [0.0, 0.0, 1.0],
+            ),
+            vec![
+                Some(step(0, 0, GridCoordinate::MAX, Face::Within, 0.0)),
+                None,
+            ],
+        );
+        assert_steps_option(
+            &mut Raycaster::new(
+                [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MIN) + 0.5],
+                [0.0, 0.0, -1.0],
+            ),
+            vec![
+                Some(step(0, 0, GridCoordinate::MIN, Face::Within, 0.0)),
+                None,
+            ],
+        );
     }
 
     #[test]
