@@ -15,16 +15,21 @@ libfuzzer-sys = "0.4"
 path = ".."
 features = ["arbitrary"]
 
-
 [[bin]]
-name = "fuzz_raycast"
-path = "fuzz_targets/fuzz_raycast.rs"
+name = "fuzz_block_eval"
+path = "fuzz_targets/fuzz_block_eval.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "fuzz_block_eval"
-path = "fuzz_targets/fuzz_block_eval.rs"
+name = "fuzz_physics"
+path = "fuzz_targets/fuzz_physics.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_raycast"
+path = "fuzz_targets/fuzz_raycast.rs"
 test = false
 doc = false
 
