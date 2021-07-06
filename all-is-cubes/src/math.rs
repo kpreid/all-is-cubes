@@ -265,7 +265,48 @@ impl Aab {
         )
     }
 
-    pub(crate) fn round_up_to_grid(self) -> Grid {
+    /// Construct the [`Grid`] containing all cubes this [`Aab`] intersects.
+    ///
+    /// Grid cubes are considered to be half-open ranges, so, for example, an [`Aab`] with
+    /// exact integer bounds on some axis will convert exactly as one might intuitively
+    /// expect, while non-integer bounds will be rounded outward:
+    ///
+    /// ```
+    /// use all_is_cubes::{math::Aab, space::Grid};
+    ///
+    /// let grid = Aab::from_lower_upper([3.0, 0.5, 0.0], [5.0, 1.5, 1.0])
+    ///     .round_up_to_grid();
+    /// assert_eq!(grid, Grid::from_lower_upper([3, 0, 0], [5, 2, 1]));
+    ///
+    /// assert!(grid.contains_cube([4, 1, 0]));
+    /// assert!(!grid.contains_cube([5, 1, 0]));
+    /// ```
+    ///
+    /// If the floating-point coordinates are out of [`GridCoordinate`]'s numeric range,
+    /// then they will be clamped.
+    ///
+    /// ```
+    /// # use all_is_cubes::{math::Aab, space::Grid};
+    /// use all_is_cubes::math::{FreeCoordinate, GridCoordinate};
+    ///
+    /// assert_eq!(
+    ///     Aab::from_lower_upper(
+    ///         [3.0, 0.0, 0.0],
+    ///         [(GridCoordinate::MAX as FreeCoordinate) * 10.0, 1.0, 1.0],
+    ///     ).round_up_to_grid(),
+    ///     Grid::from_lower_upper([3, 0, 0], [GridCoordinate::MAX, 1, 1]),
+    /// );
+    /// assert_eq!(
+    ///     Aab::from_lower_upper(
+    ///         [3.0, 0.0, 0.0],
+    ///         [FreeCoordinate::INFINITY, 1.0, 1.0],
+    ///     ).round_up_to_grid(),
+    ///     Grid::from_lower_upper([3, 0, 0], [GridCoordinate::MAX, 1, 1]),
+    /// );
+    /// ```
+    ///
+    /// (There is no handling of NaN, because [`Aab`] does not allow NaN values.)
+    pub fn round_up_to_grid(self) -> Grid {
         Grid::from_lower_upper(
             self.lower_bounds.map(|c| c.floor() as GridCoordinate),
             self.upper_bounds.map(|c| c.ceil() as GridCoordinate),
