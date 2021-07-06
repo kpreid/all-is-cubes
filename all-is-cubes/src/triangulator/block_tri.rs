@@ -12,7 +12,7 @@ use crate::block::{EvaluatedBlock, Evoxel};
 use crate::camera::TransparencyOption;
 use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
-use crate::space::Space;
+use crate::space::{Grid, Space};
 use crate::triangulator::{
     copy_voxels_to_texture, push_quad, BlockVertex, GreedyMesher, QuadColoring, TextureAllocator,
     TextureCoordinate,
@@ -150,6 +150,17 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             }
         }
         Some(voxels) => {
+            // Exit when the voxel data is not at all in the right volume.
+            // This dodges some integer overflow cases on bad input.
+            // TODO: Add a test for this case
+            if voxels
+                .grid()
+                .intersection(Grid::for_block(block.resolution))
+                .is_none()
+            {
+                return BlockTriangulation::default();
+            }
+
             // Construct empty output to mutate, because inside the loops we'll be
             // updating `Within` independently of other faces.
             let mut output_by_face = FaceMap::from_fn(|face| FaceTriangulation {
