@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "all-is-cubes",
+  "all-is-cubes/fuzz",
   "all-is-cubes-desktop",
   "all-is-cubes-server",
   "all-is-cubes-wasm",

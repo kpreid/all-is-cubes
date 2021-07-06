@@ -15,9 +15,6 @@ libfuzzer-sys = "0.4"
 path = ".."
 features = ["arbitrary"]
 
-# Prevent this from interfering with workspaces
-[workspace]
-members = ["."]
 
 [[bin]]
 name = "fuzz_raycast"
