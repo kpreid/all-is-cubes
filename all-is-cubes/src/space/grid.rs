@@ -159,8 +159,9 @@ impl Grid {
     #[inline(always)] // very hot code
     pub fn index(&self, point: impl Into<GridPoint>) -> Option<usize> {
         let point = point.into();
-        let deoffsetted = point - self.lower_bounds;
+        let mut deoffsetted = Vector3 { x: 0, y: 0, z: 0 };
         for i in 0..3 {
+            deoffsetted[i] = point[i].checked_sub(self.lower_bounds[i])?;
             if deoffsetted[i] < 0 || deoffsetted[i] >= self.sizes[i] {
                 return None;
             }
@@ -665,6 +666,25 @@ mod tests {
             Grid::for_block(Resolution::MAX),
             Grid::new((0, 0, 0), (255, 255, 255))
         );
+    }
+
+    #[test]
+    fn index_overflow() {
+        // Indexing calculates (point - lower_bounds), so this would overflow in the negative direction if the overflow weren't checked.
+        // Note that MAX - 1 is the highest allowed lower bound since the exclusive upper bound must be representable.
+        let low_grid = Grid::new([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
+        assert_eq!(low_grid.index([0, 0, 0]), None);
+        assert_eq!(low_grid.index([-1, 0, 0]), None);
+        assert_eq!(low_grid.index([-2, 0, 0]), None);
+        assert_eq!(low_grid.index([GridCoordinate::MIN, 0, 0]), None);
+        // But, an actually in-bounds cube should still work.
+        assert_eq!(low_grid.index([GridCoordinate::MAX - 1, 0, 0]), Some(0));
+
+        let high_grid = Grid::new([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
+        assert_eq!(high_grid.index([0, 0, 0]), None);
+        assert_eq!(high_grid.index([1, 0, 0]), None);
+        assert_eq!(high_grid.index([2, 0, 0]), None);
+        assert_eq!(high_grid.index([GridCoordinate::MAX - 1, 0, 0]), Some(0));
     }
 
     #[test]
