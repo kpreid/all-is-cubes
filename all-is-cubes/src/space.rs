@@ -137,13 +137,19 @@ impl Space {
             grid,
             block_to_index: {
                 let mut map = HashMap::new();
-                map.insert(AIR.clone(), 0);
+                if volume > 0 {
+                    map.insert(AIR, 0);
+                }
                 map
             },
-            block_data: vec![SpaceBlockData {
-                count: volume,
-                ..SpaceBlockData::NOTHING
-            }],
+            block_data: if volume > 0 {
+                vec![SpaceBlockData {
+                    count: volume,
+                    ..SpaceBlockData::NOTHING
+                }]
+            } else {
+                vec![]
+            },
             contents: vec![0; volume].into_boxed_slice(),
             lighting: physics.light.initialize_lighting(grid, packed_sky_color),
             light_update_queue: LightUpdateQueue::new(),
@@ -993,6 +999,15 @@ mod tests {
 
     // TODO: test consistency between the index and get_* methods
     // TODO: test fill() equivalence and error handling
+
+    #[test]
+    fn initial_state_consistency() {
+        Space::empty_positive(0, 0, 0).consistency_check();
+        Space::empty_positive(1, 0, 0).consistency_check();
+        Space::empty_positive(1, 1, 1).consistency_check();
+        Space::empty_positive(10, 20, 30).consistency_check();
+        Space::empty(Grid::new([1, 2, 3], [10, 20, 30])).consistency_check();
+    }
 
     /// set() returns Ok when the cube was changed or already equal.
     #[test]

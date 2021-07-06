@@ -5,7 +5,6 @@
 //! ([`GridArray`]), and related.
 
 use cgmath::{Point3, Transform, Vector3};
-use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::iter::FusedIterator;
 use std::ops::Range;
@@ -15,18 +14,23 @@ use crate::math::{
     Aab, Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
 };
 
-/// Specifies the coordinate extent of a [`Space`](super::Space), as an axis-aligned box
-/// with integer coordinates whose volume is between 1 and [`usize::MAX`].
+/// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
+/// [`Grid`]s are used to specify the coordinate extent of [`Space`](super::Space)s, and
+/// regions within them.
 ///
-/// When we refer to “a cube” in a `Grid`, that is a unit cube which is identified by the
+/// When we refer to “a cube” in a [`Grid`], that is a unit cube which is identified by the
 /// integer coordinates of its most negative corner. Hence, coordinate bounds are always
 /// half-open intervals: lower inclusive and upper exclusive.
 ///
-/// TODO: Do we really need the minimum of 1?
+/// A grid may have a zero-size range in any direction, thus making the total volume of the
+/// grid zero. The different possibilities are not considered equal; thus, points, lines, and
+/// planes may be represented (though this is not itself a routine use of a [`Grid`]).
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Grid {
     lower_bounds: GridPoint,
-    sizes: GridVector, // checked to be always positive
+    /// Constructor checks ensure this is non-negative and that adding it
+    /// to lower_bounds will not overflow.
+    sizes: GridVector,
 }
 
 impl Grid {
@@ -37,8 +41,8 @@ impl Grid {
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 15.
     ///
-    /// Panics if the sizes are non-positive or the resulting range would cause
-    /// numeric overflow.
+    /// Panics if the sizes are non-negative or the resulting range would cause
+    /// numeric overflow. Use [`Grid::checked_new`] to avoid panics.
     ///
     /// TODO: Rename this to be parallel with from_lower_upper
     #[track_caller]
@@ -53,7 +57,7 @@ impl Grid {
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 15.
     ///
-    /// Returns [`Err`] if the sizes are non-positive or the resulting range would cause
+    /// Returns [`Err`] if the sizes are non-negative or the resulting range would cause
     /// numeric overflow.
     ///
     /// TODO: Rename this to be parallel with from_lower_upper
@@ -67,9 +71,9 @@ impl Grid {
         // TODO: Test these error cases.
         // TODO: Replace string error construction with an error enum.
         for i in 0..3 {
-            if sizes[i] <= 0 {
+            if sizes[i] < 0 {
                 return Err(GridOverflowError(format!(
-                    "sizes[{}] must be > 0, not {}",
+                    "sizes[{}] must be ≥ 0, not {}",
                     i, sizes[i]
                 )));
             }
@@ -102,11 +106,11 @@ impl Grid {
     }
 
     /// Constructs a [`Grid`] with a volume of 1, containing the specified cube.
-    pub const fn single_cube(cube: GridPoint) -> Grid {
-        Grid {
-            lower_bounds: cube,
-            sizes: GridVector::new(1, 1, 1),
-        }
+    ///
+    /// Panics if `cube` has any coordinates equal to [`GridCoordinate::MAX`](i32::MAX)
+    /// since that is not valid, as per [`Grid::new`].
+    pub fn single_cube(cube: GridPoint) -> Grid {
+        Grid::new(cube, [1, 1, 1])
     }
 
     /// Constructs a [`Grid`] with a cubical volume in the positive octant, as is used
@@ -131,14 +135,23 @@ impl Grid {
         Ok(volume)
     }
 
-    /// Computes the volume of this space in blocks, i.e. the sum of all sizes.
+    /// Computes the volume of this grid in cubes, i.e. the sum of all sizes.
     ///
     /// ```
-    /// let grid = all_is_cubes::space::Grid::new((-10, 3, 7), (100, 200, 300));
+    /// let grid = all_is_cubes::space::Grid::new([-10, 3, 7], [100, 200, 300]);
     /// assert_eq!(grid.volume(), 6_000_000);
+
+    /// let grid = all_is_cubes::space::Grid::new([0, 0, 0], [100, 200, 0]);
+    /// assert_eq!(grid.volume(), 0);
     /// ```
     pub fn volume(&self) -> usize {
         Self::checked_volume_helper(self.sizes).unwrap()
+    }
+
+    /// Returns whether the grid contains no cubes (its volume is zero).
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.sizes[0] == 0 || self.sizes[1] == 0 || self.sizes[2] == 0
     }
 
     /// Determines whether a point lies within the grid and, if it does, returns the flattened
@@ -274,6 +287,8 @@ impl Grid {
 
     /// Returns whether this grid includes every cube in the other grid.
     ///
+    /// TODO: Precisely define the behavior on zero volume grids.
+    ///
     /// ```
     /// use all_is_cubes::space::Grid;
     /// assert!(Grid::new((4, 4, 4), (6, 6, 6)).contains_grid(
@@ -297,6 +312,8 @@ impl Grid {
     }
 
     /// Returns the intersection of two grids, or None if they have no cubes in common.
+    ///
+    /// TODO: Precisely define the behavior on zero volume grids.
     ///
     /// ```
     /// use all_is_cubes::space::Grid;
@@ -326,23 +343,32 @@ impl Grid {
         Some(Grid::from_lower_upper(lower, upper))
     }
 
-    /// Returns a random cube contained by the grid.
+    /// Returns a random cube contained by the grid, if there are any.
     ///
     /// ```
+    /// use all_is_cubes::space::Grid;
     /// use rand::SeedableRng;
-    /// let grid = all_is_cubes::space::Grid::new((4, 4, 4), (6, 6, 6));
-    /// let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+    /// let mut rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+    ///
+    /// let grid = Grid::new([4, 4, 4], [6, 6, 6]);
     /// for _ in 0..50 {
-    ///     assert!(grid.contains_cube(grid.random_cube(&mut rng)));
+    ///     assert!(grid.contains_cube(grid.random_cube(rng).unwrap()));
     /// }
+    ///
+    /// let empty_grid = Grid::new([1, 2, 3], [0, 9, 9]);
+    /// assert_eq!(empty_grid.random_cube(rng), None);
     /// ```
-    pub fn random_cube(&self, rng: &mut impl rand::Rng) -> GridPoint {
-        let upper_bounds = self.upper_bounds();
-        GridPoint::new(
-            rng.gen_range(self.lower_bounds[0]..upper_bounds[0]),
-            rng.gen_range(self.lower_bounds[1]..upper_bounds[1]),
-            rng.gen_range(self.lower_bounds[2]..upper_bounds[2]),
-        )
+    pub fn random_cube(&self, rng: &mut impl rand::Rng) -> Option<GridPoint> {
+        if self.is_empty() {
+            None
+        } else {
+            let upper_bounds = self.upper_bounds();
+            Some(GridPoint::new(
+                rng.gen_range(self.lower_bounds[0]..upper_bounds[0]),
+                rng.gen_range(self.lower_bounds[1]..upper_bounds[1]),
+                rng.gen_range(self.lower_bounds[2]..upper_bounds[2]),
+            ))
+        }
     }
 
     /// Moves the grid to another location with unchanged size and orientation.
@@ -356,6 +382,7 @@ impl Grid {
     /// );
     /// ```
     pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
+        // TODO: Must check for upper bounds overflow
         Self {
             lower_bounds: self.lower_bounds + offset.into(),
             sizes: self.sizes,
@@ -369,19 +396,16 @@ impl Grid {
     /// TODO: Find the proper mathematical concept to explain that.
     /// TODO: Check and error in that case.
     ///
-    /// Returns [`None`] if the transformation resulted in zero volume.
+    /// TODO: Fail nicely on numeric overflow.
+    /// The `Option` return is not currently used.
     pub fn transform(self, transform: GridMatrix) -> Option<Self> {
         let mut p1 = transform.transform_point(self.lower_bounds());
         let mut p2 = transform.transform_point(self.upper_bounds());
+
+        // Swap coordinates in case of rotation or reflection.
         for axis in 0..3 {
-            match p1[axis].cmp(&p2[axis]) {
-                Ordering::Greater => {
-                    std::mem::swap(&mut p1[axis], &mut p2[axis]);
-                }
-                Ordering::Equal => {
-                    return None; // Result would be zero volume.
-                }
-                Ordering::Less => {}
+            if p1[axis] > p2[axis] {
+                std::mem::swap(&mut p1[axis], &mut p2[axis]);
             }
         }
         Some(Self::from_lower_upper(p1, p2))
@@ -434,8 +458,6 @@ impl Grid {
 
     /// Scales the grid up by the given factor.
     ///
-    /// Panics if the scale is zero.
-    ///
     /// ```
     /// # use all_is_cubes::space::Grid;
     /// assert_eq!(
@@ -446,9 +468,6 @@ impl Grid {
     #[inline]
     #[track_caller]
     pub fn multiply(self, scale: GridCoordinate) -> Self {
-        // Note: This restriction exists only because zero volume Grids are not
-        // permitted, and if we change that, this should match.
-        assert!(scale != 0, "Grid::multiply: scale must be != 0");
         Self::new(self.lower_bounds * scale, self.sizes * scale)
     }
 
@@ -528,7 +547,13 @@ impl GridIter {
             x_range: grid.x_range(),
             y_range: grid.y_range(),
             z_range: grid.z_range(),
-            cube: grid.lower_bounds(),
+            cube: if grid.is_empty() {
+                // The next() algorithm assumes that if self.cube.x is in self.x_range then that
+                // cube should be produced, but this is true only in the nonempty case.
+                grid.upper_bounds()
+            } else {
+                grid.lower_bounds()
+            },
         }
     }
 }
@@ -606,7 +631,7 @@ impl<V> GridArray<V> {
     }
 
     /// Constructs a [`GridArray`] containing the provided elements, which must be in the
-    /// ordering used by [`GridArray::interior_iter`].
+    /// ordering used by [`Grid::interior_iter`].
     ///
     /// Returns [`None`] if the number of elements does not match [`grid.volume()`](Grid::volume).
     pub fn from_elements(grid: Grid, elements: impl Into<Box<[V]>>) -> Option<Self> {
@@ -691,6 +716,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn zero_is_valid() {
+        assert_eq!(
+            Grid::new([1, 2, 3], [0, 1, 1]),
+            Grid::from_lower_upper([1, 2, 3], [1, 3, 4]),
+        );
+
+        assert_eq!(Grid::new([1, 2, 3], [0, 1, 1]).volume(), 0,);
+    }
+
+    #[test]
     fn for_block() {
         assert_eq!(Grid::for_block(1), Grid::new((0, 0, 0), (1, 1, 1)));
         assert_eq!(Grid::for_block(10), Grid::new((0, 0, 0), (10, 10, 10)));
@@ -753,7 +788,7 @@ mod tests {
     }
 
     #[test]
-    fn transform_error_simple() {
+    fn transform_degenerate() {
         assert_eq!(
             Grid::new([1, 2, 3], [10, 20, 30]).transform(GridMatrix::new(
                 1, 0, 0, //
@@ -761,7 +796,7 @@ mod tests {
                 0, 0, 1, //
                 3, 4, 5
             )),
-            None
+            Some(Grid::new([4, 4, 8], [10, 0, 30]))
         );
     }
 
@@ -781,6 +816,26 @@ mod tests {
             \x20   3..33,\n\
             )"
         );
+    }
+
+    #[test]
+    fn grid_iter_zero() {
+        fn assert_no_items(grid: Grid) {
+            assert_eq!(
+                grid.interior_iter().collect::<Vec<_>>(),
+                vec![],
+                "{:?}",
+                grid
+            );
+        }
+
+        assert_no_items(Grid::new([0, 0, 0], [0, 0, 0]));
+        assert_no_items(Grid::new([0, 0, 0], [0, 0, 1]));
+        assert_no_items(Grid::new([0, 0, 0], [0, 1, 0]));
+        assert_no_items(Grid::new([0, 0, 0], [0, 1, 1]));
+        assert_no_items(Grid::new([0, 0, 0], [1, 0, 0]));
+        assert_no_items(Grid::new([0, 0, 0], [1, 0, 1]));
+        assert_no_items(Grid::new([0, 0, 0], [1, 1, 0]));
     }
 
     #[test]
