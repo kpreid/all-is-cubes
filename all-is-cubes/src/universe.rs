@@ -91,7 +91,7 @@ impl Universe {
 
         for character in self.characters.values() {
             // TODO: Make URootRef::downgrade() non-allocating
-            let transaction = character
+            let (_body_step_info, transaction) = character
                 .try_borrow_mut()
                 .expect("character borrowed during universe.step()")
                 .step(Some(&character.downgrade()), tick);

@@ -18,7 +18,7 @@ use crate::block::{recursive_raycast, Block, EvaluatedBlock};
 use crate::camera::eye_for_look_at;
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
-use crate::physics::{Body, BodyTransaction, Contact};
+use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
 use crate::tools::{Inventory, InventoryChange, InventoryTransaction, Tool, ToolError};
@@ -174,9 +174,13 @@ impl Character {
     /// Advances time.
     ///
     /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).
-    pub fn step(&mut self, self_ref: Option<&URef<Character>>, tick: Tick) -> UniverseTransaction {
+    pub fn step(
+        &mut self,
+        self_ref: Option<&URef<Character>>,
+        tick: Tick,
+    ) -> (Option<BodyStepInfo>, UniverseTransaction) {
         if tick.paused() {
-            return UniverseTransaction::default();
+            return (None, UniverseTransaction::default());
         }
 
         let dt = tick.delta_t.as_secs_f64();
@@ -200,15 +204,16 @@ impl Character {
         self.body.velocity +=
             (velocity_target - self.body.velocity).mul_element_wise(stiffness) * dt;
 
-        if let Ok(space) = self.space.try_borrow() {
+        let body_step_info = if let Ok(space) = self.space.try_borrow() {
             let colliding_cubes = &mut self.colliding_cubes;
             colliding_cubes.clear();
-            self.body.step(tick, Some(&*space), |cube| {
+            Some(self.body.step(tick, Some(&*space), |cube| {
                 colliding_cubes.insert(cube);
-            });
+            }))
         } else {
             // TODO: set a warning flag
-        }
+            None
+        };
 
         if velocity_target.y > 0. {
             self.body.flying = true;
@@ -219,7 +224,7 @@ impl Character {
         // TODO: Think about what order we want sequence of effects to be in. In particular,
         // combining behavior calls with step() means behaviors on different characters
         // see other characters as not having been stepped yet.
-        if let Some(self_ref) = self_ref {
+        let transaction = if let Some(self_ref) = self_ref {
             self.behaviors.step(
                 &self,
                 &(|t: CharacterTransaction| t.bind(self_ref.clone())),
@@ -228,7 +233,9 @@ impl Character {
             )
         } else {
             UniverseTransaction::default()
-        }
+        };
+
+        (body_step_info, transaction)
     }
 
     /// Maximum range for normal keyboard input should be -1 to 1
