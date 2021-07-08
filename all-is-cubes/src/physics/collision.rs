@@ -24,6 +24,14 @@ pub(crate) struct CollisionRayEnd {
     pub cube_face: CubeFace,
 }
 
+/// Move `aab`'s origin along the line segment from `ray.origin` to `ray.origin + ray.direction`,
+/// and find the first point at which it collides with `space`'s collidable blocks.
+///
+/// The return value specifies the distance achieved and the normal (face) of the surface collided
+///  with; if [`None`], then no obstacles were met along the full length of the line segment.
+///
+/// `collision_callback` is called once for each colliding cube — any one of them would have been
+/// sufficient to stop the ray, but all are reported.
 pub(crate) fn collide_along_ray<CC>(
     space: &Space,
     ray: Ray,
