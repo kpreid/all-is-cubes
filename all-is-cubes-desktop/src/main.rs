@@ -48,11 +48,11 @@ pub enum GraphicsType {
     Record,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // TODO: put version numbers in the title when used as a window title
-    let title = "All is Cubes";
+// TODO: put version numbers in the title when used as a window title
+static TITLE: &str = "All is Cubes";
 
-    let options = clap::App::new(title)
+fn app() -> clap::App<'static, 'static> {
+    clap::App::new(TITLE)
         .version(clap::crate_version!()) // TODO: include all_is_cubes library version
         .author(clap::crate_authors!())
         .about(clap::crate_description!())
@@ -122,7 +122,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .long("no-config-files")
                 .help("Ignore all configuration files, using only defaults and command-line options."),
         )
-        .get_matches();
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let options = app().get_matches();
 
     // Convert options we will consult multiple times.
     let display_size = parse_dimensions(options.value_of("display_size").unwrap()).unwrap();
@@ -165,7 +168,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     match graphics_type {
-        GraphicsType::Window => glfw_main_loop(app, title, display_size),
+        GraphicsType::Window => glfw_main_loop(app, TITLE, display_size),
         GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
         GraphicsType::Record => record_main(app, parse_record_options(options, display_size)?),
         GraphicsType::Headless => {
