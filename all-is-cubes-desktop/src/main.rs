@@ -202,7 +202,6 @@ fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
     }
 }
 
-// TODO: write tests for this (requires factoring out the App definition from main)
 fn parse_record_options(
     options: clap::ArgMatches<'_>,
     display_size: Option<Vector2<u32>>,
@@ -312,6 +311,51 @@ fn common_progress_style() -> ProgressStyle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_record_options() {
+        fn parse(args: &[&str]) -> clap::Result<RecordOptions> {
+            parse_record_options(
+                app().get_matches_from_safe(
+                    std::iter::once("all-is-cubes").chain(args.iter().cloned()),
+                )?,
+                None,
+            )
+        }
+
+        assert_eq!(
+            parse(&["-g", "record", "-o", "output.png"]).unwrap(),
+            RecordOptions {
+                output_path: PathBuf::from("output.png"),
+                image_size: Vector2::new(640, 480),
+                animation: None,
+            },
+        );
+        assert_eq!(
+            parse(&["-g", "record", "-o", "fancy.png", "--duration", "3"]).unwrap(),
+            RecordOptions {
+                output_path: PathBuf::from("fancy.png"),
+                image_size: Vector2::new(640, 480),
+                animation: Some(RecordAnimationOptions {
+                    frame_count: 180,
+                    frame_period: Duration::from_nanos((1e9 / 60.0) as u64),
+                }),
+            },
+        );
+
+        // TODO: exercise display size, perhaps with better data flow
+
+        // Check expected errors. TODO: Better contains-string assert
+        // No output file
+        assert!(parse(&["-g", "record"])
+            .unwrap_err()
+            .to_string()
+            .contains("required arguments"));
+        assert!(parse(&["-g", "record", "-o", "o.png", "--duration", "X"])
+            .unwrap_err()
+            .to_string()
+            .contains("'X' isn't"));
+    }
 
     #[test]
     fn test_parse_dimensions() {
