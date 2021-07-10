@@ -51,7 +51,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         SpaceRaytracer(
             SpaceRaytracerImplBuilder {
                 blocks: prepare_blocks::<P>(space),
-                cubes_builder: |blocks: &[TracingBlock<P::BlockData>]| {
+                cubes_builder: |blocks: &Box<[TracingBlock<P::BlockData>]>| {
                     prepare_cubes::<P>(blocks, space)
                 },
                 options,
