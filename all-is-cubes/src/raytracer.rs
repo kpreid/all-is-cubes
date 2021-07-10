@@ -48,10 +48,11 @@ struct SpaceRaytracerImpl<P: PixelBuf> {
 impl<P: PixelBuf> SpaceRaytracer<P> {
     /// Snapshots the given [`Space`] to prepare for raytracing it.
     pub fn new(space: &Space, options: GraphicsOptions) -> Self {
+        #[allow(clippy::borrowed_box)]
         SpaceRaytracer(
             SpaceRaytracerImplBuilder {
                 blocks: prepare_blocks::<P>(space),
-                cubes_builder: |blocks: &[TracingBlock<P::BlockData>]| {
+                cubes_builder: |blocks: &Box<[TracingBlock<P::BlockData>]>| {
                     prepare_cubes::<P>(blocks, space)
                 },
                 options,
