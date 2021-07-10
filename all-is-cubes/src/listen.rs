@@ -21,11 +21,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock, Weak};
 
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
-/// to a set of listeners which implement some form of weak-reference semantics
-/// to allow cleanup.
+/// of type `M` to a set of listeners, each of which usually holds a weak reference
+/// to allow it to be removed when the actual recipient is gone or uninterested.
 ///
 /// TODO: Modify this to be `Sync` so that things that contain one can be used from
-/// multiple threads.
+/// multiple threads. This will require every `Listener` to be `Sync`.
+///
+/// TODO: Currently, each message is [`Clone`]d for each recipient. This is fine for
+/// most cases, but in some cases it would be cheaper to pass a reference. We could
+/// make Notifier and Listener always take `&M`, but it's not clear how to use
+/// references *some* of the time — making `M` be a reference type can't have a
+/// satisfactory lifetime.
 pub struct Notifier<M> {
     listeners: RefCell<Vec<Box<dyn Listener<M>>>>,
 }
