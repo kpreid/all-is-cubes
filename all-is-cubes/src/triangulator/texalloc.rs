@@ -79,6 +79,36 @@ pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
     })
 }
 
+/// Null [`TextureAllocator`]; rejects all allocations.
+///
+/// Used for generating textureless meshes. TODO: Modify triangulator to actually
+/// generate separate triangles when textures are unavailable.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct NoTextures;
+
+impl TextureAllocator for NoTextures {
+    type Tile = NoTextures;
+
+    fn resolution(&self) -> GridCoordinate {
+        1
+    }
+
+    fn allocate(&mut self) -> Option<Self::Tile> {
+        None
+    }
+}
+
+impl TextureTile for NoTextures {
+    fn texcoord(&self, _in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
+        unimplemented!()
+    }
+
+    fn write(&mut self, _data: &[Texel]) {
+        unimplemented!()
+    }
+}
+
 /// [`TextureAllocator`] which discards all input except for counting calls; for testing.
 ///
 /// This type is public so that it may be used in benchmarks and such.
