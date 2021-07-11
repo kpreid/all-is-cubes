@@ -32,6 +32,7 @@ use crate::util::MapExtend;
 mod block_texture;
 mod frame_texture;
 mod glrender;
+mod raytrace_to_texture;
 pub use glrender::*;
 mod shading;
 mod space;
