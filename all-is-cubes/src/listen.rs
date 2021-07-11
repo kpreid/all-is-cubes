@@ -141,8 +141,9 @@ pub trait Listener<M> {
     fn alive(&self) -> bool;
 }
 
-/// Methods for adapting listeners that would make `Listener` not [object-safe]
-/// (https://doc.rust-lang.org/book/ch17-02-trait-objects.html).
+/// Methods for adapting listeners that would make `Listener` not [object-safe].
+///
+/// [object-safe]: https://doc.rust-lang.org/book/ch17-02-trait-objects.html
 pub trait ListenerHelper<M>
 where
     Self: Sized,

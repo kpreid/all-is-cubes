@@ -18,9 +18,8 @@ use crate::universe::{Name, UBorrowMut, URef, Universe};
 ///
 /// Transactions are used:
 ///
-/// * to enable game objects to describe effects on their containers in a way compatible
-///   with Rust's ownership rules (e.g. a [`Tool`](crate::tools::Tool) may affect its
-///   containing [`Character`]),
+/// * to enable game objects to have effects on their containers in a way compatible
+///   with Rust's ownership rules,
 /// * to avoid “item duplication” type bugs by checking all preconditions before making
 ///   any changes, and
 /// * to avoid update-order-dependent game mechanics by applying effects in batches.
