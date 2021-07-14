@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector4, Zero as _};
 
-use crate::listen::{Gate, Listener, ListenerHelper, Notifier};
+use crate::listen::{Gate, Listener, Notifier};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};

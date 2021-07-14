@@ -16,7 +16,7 @@ use crate::block::*;
 use crate::character::Spawn;
 use crate::content::palette;
 use crate::drawing::DrawingPlane;
-use crate::listen::{Gate, Listener, ListenerHelper as _, Notifier};
+use crate::listen::{Gate, Listener, Notifier};
 use crate::math::*;
 use crate::transactions::{Transaction as _, UniverseTransaction};
 use crate::universe::URef;

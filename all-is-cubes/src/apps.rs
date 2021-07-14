@@ -8,7 +8,7 @@ use std::fmt::Display;
 use crate::camera::{Camera, GraphicsOptions};
 use crate::character::{cursor_raycast, Character, CharacterChange, Cursor};
 use crate::content::UniverseTemplate;
-use crate::listen::{DirtyFlag, ListenableCell, ListenableSource, ListenerHelper as _};
+use crate::listen::{DirtyFlag, ListenableCell, ListenableSource, Listener as _};
 use crate::space::Space;
 use crate::tools::ToolError;
 use crate::transactions::Transaction;

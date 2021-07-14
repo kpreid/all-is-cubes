@@ -139,20 +139,13 @@ pub trait Listener<M> {
     /// because its destination is no longer interested in them or they would not
     /// have any effects on the rest of the system.
     fn alive(&self) -> bool;
-}
 
-/// Methods for adapting listeners that would make `Listener` not [object-safe].
-///
-/// [object-safe]: https://doc.rust-lang.org/book/ch17-02-trait-objects.html
-pub trait ListenerHelper<M>
-where
-    Self: Sized,
-{
     /// Apply a map/filter function to incoming messages.
     ///
     /// TODO: Doc test
     fn filter<MI, F>(self, function: F) -> Filter<F, Self>
     where
+        Self: Sized,
         F: Fn(MI) -> Option<M> + Sync,
     {
         Filter {
@@ -167,7 +160,7 @@ where
     /// This may be used to stop forwarding messages when a dependency no longer exists.
     ///
     /// ```
-    /// use all_is_cubes::listen::{Listener, ListenerHelper, Gate, Sink};
+    /// use all_is_cubes::listen::{Listener, Gate, Sink};
     ///
     /// let sink = Sink::new();
     /// let (gate, gated) = sink.listener().gate();
@@ -177,13 +170,15 @@ where
     /// gated.receive("discarded");
     /// assert!(!sink.take_equal("discarded"));
     /// ```
-    fn gate(self) -> (Gate, GateListener<Self>) {
+    fn gate(self) -> (Gate, GateListener<Self>)
+    where
+        Self: Sized,
+    {
         let signaller = Arc::new(());
         let weak = Arc::downgrade(&signaller);
         (Gate(signaller), GateListener { weak, target: self })
     }
 }
-impl<M, L: Listener<M> + Sized> ListenerHelper<M> for L {}
 
 /// A [`Listener`] which discards all messages and is suitable for filling
 /// listener parameters when no listener is needed.
