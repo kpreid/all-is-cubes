@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
+use all_is_cubes::camera::GraphicsOptions;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, AIR};
@@ -10,17 +10,17 @@ use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::triangulator::{
     triangulate_blocks, triangulate_space, BlockTriangulations, BlockVertex, SpaceTriangulation,
-    TestTextureAllocator, TestTextureTile,
+    TestTextureAllocator, TestTextureTile, TriangulatorOptions,
 };
 
 pub fn triangulator_bench(c: &mut Criterion) {
-    let options = GraphicsOptions::default();
+    let options = &TriangulatorOptions::new(&GraphicsOptions::default());
 
     c.bench_function("triangulate_space: checkerboard, new buffer", |b| {
         b.iter_batched(
-            checkerboard_setup,
+            || checkerboard_setup(options),
             |(space, block_triangulations)| {
-                triangulate_space(&space, space.grid(), &options, &*block_triangulations)
+                triangulate_space(&space, space.grid(), options, &*block_triangulations)
             },
             BatchSize::SmallInput,
         );
@@ -29,9 +29,9 @@ pub fn triangulator_bench(c: &mut Criterion) {
     c.bench_function("triangulate_space: checkerboard, reused buffer", |b| {
         b.iter_batched(
             || {
-                let (space, block_triangulations) = checkerboard_setup();
+                let (space, block_triangulations) = checkerboard_setup(options);
                 let mut buffer = SpaceTriangulation::new();
-                buffer.compute(&space, space.grid(), &options, &*block_triangulations);
+                buffer.compute(&space, space.grid(), options, &*block_triangulations);
                 // Sanity check that we're actually rendering as much as we expect.
                 assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
                 (space, block_triangulations, buffer)
@@ -42,14 +42,16 @@ pub fn triangulator_bench(c: &mut Criterion) {
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
                 // and so this will become a meaningful benchmark of how much CPU time we're
                 // spending or saving on that.
-                buffer.compute(&space, space.grid(), &options, &*block_triangulations)
+                buffer.compute(&space, space.grid(), options, &*block_triangulations)
             },
             BatchSize::SmallInput,
         );
     });
 }
 
-fn checkerboard_setup() -> (Space, BlockTriangulations<BlockVertex, TestTextureTile>) {
+fn checkerboard_setup(
+    options: &TriangulatorOptions,
+) -> (Space, BlockTriangulations<BlockVertex, TestTextureTile>) {
     let grid = Grid::new((0, 0, 0), (16, 16, 16));
     let mut space = Space::empty(grid);
     let mut blocks: [Block; 2] = make_some_blocks();
@@ -62,11 +64,8 @@ fn checkerboard_setup() -> (Space, BlockTriangulations<BlockVertex, TestTextureT
         })
         .unwrap();
 
-    let block_triangulations = triangulate_blocks(
-        &space,
-        &mut TestTextureAllocator::new(),
-        &TransparencyOption::Volumetric,
-    );
+    let block_triangulations =
+        triangulate_blocks(&space, &mut TestTextureAllocator::new(), options);
 
     (space, block_triangulations)
 }

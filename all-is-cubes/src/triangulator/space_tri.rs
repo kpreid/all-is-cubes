@@ -7,10 +7,9 @@ use std::convert::TryInto;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::camera::{GraphicsOptions, LightingOption};
 use crate::math::{Face, FaceMap, GridCoordinate, GridRotation};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
-use crate::triangulator::{BlockTriangulation, GfxVertex};
+use crate::triangulator::{BlockTriangulation, GfxVertex, TriangulatorOptions};
 
 /// Computes a triangle mesh of a [`Space`].
 ///
@@ -20,7 +19,7 @@ use crate::triangulator::{BlockTriangulation, GfxVertex};
 pub fn triangulate_space<'p, V, T, P>(
     space: &Space,
     bounds: Grid,
-    options: &GraphicsOptions,
+    options: &TriangulatorOptions,
     block_triangulations: P,
 ) -> SpaceTriangulation<V>
 where
@@ -142,7 +141,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
         &mut self,
         space: &Space,
         bounds: Grid,
-        options: &GraphicsOptions,
+        options: &TriangulatorOptions,
         mut block_triangulations: P,
     ) where
         P: BlockTriangulationProvider<'p, V, T>,
@@ -170,14 +169,13 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
             let inst = V::instantiate_block(cube);
 
             let light_neighborhood = if V::WANTS_LIGHT {
-                match options.lighting_display {
-                    LightingOption::None => FaceMap::repeat(PackedLight::ONE),
+                if options.use_space_light {
                     // Note: This is not sufficient neighborhood data for smooth lighting,
                     // but vertex lighting in general can't do smooth lighting unless we pack
                     // the neighborhood into each vertex, which isn't currently in any plans.
-                    LightingOption::Flat | LightingOption::Smooth => {
-                        FaceMap::from_fn(|f| space.get_lighting(cube + f.normal_vector()))
-                    }
+                    FaceMap::from_fn(|f| space.get_lighting(cube + f.normal_vector()))
+                } else {
+                    FaceMap::repeat(PackedLight::ONE)
                 }
             } else {
                 // Not read; hopefully the optimizer throws it out.

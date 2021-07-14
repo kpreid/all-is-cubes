@@ -9,14 +9,14 @@ use bitvec::prelude::BitVec;
 use cgmath::Point3;
 use instant::Instant;
 
-use crate::camera::{Camera, GraphicsOptions};
+use crate::camera::Camera;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
 use crate::listen::Listener;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
     triangulate_block, triangulate_blocks, BlockTriangulation, BlockTriangulationProvider,
-    GfxVertex, SpaceTriangulation, TextureAllocator,
+    GfxVertex, SpaceTriangulation, TextureAllocator, TriangulatorOptions,
 };
 use crate::universe::URef;
 
@@ -125,6 +125,7 @@ where
         IF: FnMut(&SpaceTriangulation<Vert>, &mut D),
     {
         let graphics_options = camera.options();
+        let tri_options = &TriangulatorOptions::new(graphics_options);
         let max_updates = graphics_options.chunks_per_frame.into();
         let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
@@ -137,6 +138,9 @@ where
             // TODO: report error
             return (CstUpdateInfo::default(), view_chunk);
         };
+
+        // TODO: If tri_options changed, invalidate all blocks and chunks
+        // (And when we work on that, make it so we aren't recomputing tri_options unconditionally)
 
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
@@ -157,7 +161,7 @@ where
             self.block_triangulations = Vec::from(triangulate_blocks(
                 space,
                 block_texture_allocator,
-                &graphics_options.transparency,
+                tri_options,
             ));
             self.block_versioning =
                 vec![self.block_version_counter; self.block_triangulations.len()];
@@ -197,7 +201,7 @@ where
                 let new_triangulation = triangulate_block(
                     block_data[index].evaluated(),
                     block_texture_allocator,
-                    &graphics_options.transparency,
+                    tri_options,
                 );
 
                 // Only invalidate the chunks if we actually have different data.
@@ -263,7 +267,7 @@ where
                 chunk.update_triangulation(
                     todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
                     &*space,
-                    camera.options(),
+                    tri_options,
                     &self.block_triangulations,
                     &self.block_versioning,
                 );
@@ -339,7 +343,7 @@ where
         &mut self,
         chunk_todo: &mut ChunkTodo,
         space: &Space,
-        options: &GraphicsOptions,
+        options: &TriangulatorOptions,
         block_triangulations: &[BlockTriangulation<Vert, Tex::Tile>],
         block_versioning: &[u32],
     ) {
@@ -471,7 +475,7 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
                         });
                     }
                     SpaceChange::Lighting(_p) => {
-                        // TODO: We should optionally track light updates as chunk updata if Vert::WANTS_LIGHT is true.
+                        // TODO: We should optionally track light updates as chunk updates if Vert::WANTS_LIGHT is true.
                     }
                     SpaceChange::Number(index) => {
                         if !todo.all_blocks_and_chunks {
@@ -511,7 +515,7 @@ mod tests {
 
     use super::*;
     use crate::block::Block;
-    use crate::camera::Viewport;
+    use crate::camera::{GraphicsOptions, Viewport};
     use crate::math::GridCoordinate;
     use crate::space::SpaceTransaction;
     use crate::triangulator::{BlockVertex, NoTextures};

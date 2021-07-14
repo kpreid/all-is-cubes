@@ -458,6 +458,19 @@ impl TransparencyOption {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for TransparencyOption {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::math::arbitrary_notnan;
+        Ok(match u.choose(&[0, 1, 2])? {
+            0 => Self::Surface,
+            1 => Self::Volumetric,
+            2 => Self::Threshold(arbitrary_notnan(u)?),
+            _ => unreachable!(),
+        })
+    }
+}
+
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.
 ///
 /// `direction` points in the direction the camera should be relative to the space.

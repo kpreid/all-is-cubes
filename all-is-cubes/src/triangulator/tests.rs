@@ -44,7 +44,10 @@ fn test_triangulate_block(block: Block) -> BlockTriangulation<BlockVertex, TestT
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
-        &TransparencyOption::Volumetric,
+        &TriangulatorOptions {
+            transparency: TransparencyOption::Volumetric,
+            ..TriangulatorOptions::dont_care_for_test()
+        },
     )
 }
 
@@ -56,7 +59,10 @@ fn test_triangulate_block_threshold(
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
-        &TransparencyOption::Threshold(notnan!(0.5)),
+        &TriangulatorOptions {
+            transparency: TransparencyOption::Threshold(notnan!(0.5)),
+            ..TriangulatorOptions::dont_care_for_test()
+        },
     )
 }
 
@@ -68,14 +74,11 @@ fn triangulate_blocks_and_space(
     BlockTriangulations<BlockVertex, TestTextureTile>,
     SpaceTriangulation<BlockVertex>,
 ) {
+    let options = &TriangulatorOptions::new(&GraphicsOptions::default());
     let mut tex = TestTextureAllocator::new();
-    let block_triangulations = triangulate_blocks(space, &mut tex, &TransparencyOption::Volumetric);
-    let space_triangulation: SpaceTriangulation<BlockVertex> = triangulate_space(
-        space,
-        space.grid(),
-        &GraphicsOptions::default(),
-        &*block_triangulations,
-    );
+    let block_triangulations = triangulate_blocks(space, &mut tex, options);
+    let space_triangulation: SpaceTriangulation<BlockVertex> =
+        triangulate_space(space, space.grid(), options, &*block_triangulations);
     (tex, block_triangulations, space_triangulation)
 }
 
@@ -122,7 +125,7 @@ fn no_panic_on_missing_blocks() {
     let block_triangulations: BlockTriangulations<BlockVertex, _> = triangulate_blocks(
         &space,
         &mut TestTextureAllocator::new(),
-        &TransparencyOption::Volumetric,
+        &TriangulatorOptions::dont_care_for_test(),
     );
     assert_eq!(block_triangulations.len(), 1); // check our assumption
 
@@ -131,7 +134,7 @@ fn no_panic_on_missing_blocks() {
     triangulate_space(
         &space,
         space.grid(),
-        &GraphicsOptions::default(),
+        &TriangulatorOptions::dont_care_for_test(),
         &*block_triangulations,
     );
 }
@@ -500,7 +503,7 @@ fn handling_allocation_failure() {
     let capacity = 0;
     tex.set_capacity(capacity);
     let block_triangulations: BlockTriangulations<BlockVertex, _> =
-        triangulate_blocks(&space, &mut tex, &TransparencyOption::Volumetric);
+        triangulate_blocks(&space, &mut tex, &TriangulatorOptions::dont_care_for_test());
 
     // Check results.
     assert_eq!(tex.count_allocated(), capacity);

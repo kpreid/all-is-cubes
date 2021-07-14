@@ -9,12 +9,12 @@ use cgmath::{Point2, Point3, Transform as _};
 use std::fmt::Debug;
 
 use crate::block::{EvaluatedBlock, Evoxel};
-use crate::camera::TransparencyOption;
 use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
 use crate::space::{Grid, Space};
 use crate::triangulator::{
     copy_voxels_to_texture, push_quad, BlockVertex, GreedyMesher, QuadColoring, TextureAllocator,
+    TriangulatorOptions,
 };
 
 /// Describes how to draw one [`Face`] of a [`Block`].
@@ -70,6 +70,10 @@ pub struct BlockTriangulation<V, T> {
 
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates stay valid.
+    ///
+    /// TODO: Each block triangulations used to require more than one tile, but no longer
+    /// do. Convert this to an Option, unless we decide that e.g. we want the triangulator
+    /// to be responsible for optimizing opaque blocks into 6 face textures.
     pub(super) textures_used: Vec<T>,
 }
 
@@ -102,7 +106,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     // This will allow for efficient implementation of animated blocks.
     block: &EvaluatedBlock,
     texture_allocator: &mut A,
-    transparency: &TransparencyOption,
+    options: &TriangulatorOptions,
 ) -> BlockTriangulation<V, A::Tile> {
     match &block.voxels {
         None => {
@@ -111,7 +115,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     // No interior detail for atom blocks.
                     return FaceTriangulation::default();
                 }
-                let color = transparency.limit_alpha(block.color);
+                let color = options.transparency.limit_alpha(block.color);
 
                 let mut vertices: Vec<V> = Vec::new();
                 let mut indices_opaque: Vec<u32> = Vec::new();
@@ -224,7 +228,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             let cube: Point3<GridCoordinate> =
                                 transform.transform_point(Point3::new(s, t, layer));
 
-                            let color = transparency
+                            let color = options
+                                .transparency
                                 .limit_alpha(voxels.get(cube).unwrap_or(&Evoxel::AIR).color);
 
                             if layer == 0 && !color.fully_opaque() {
@@ -233,14 +238,17 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 output_by_face[face].fully_opaque = false;
                             }
 
-                            if !color.fully_transparent() && {
+                            let voxel_is_visible = !color.fully_transparent() && {
                                 // Compute whether this voxel is not hidden behind another
                                 let obscuring_cube = cube + face.normal_vector();
                                 !voxels
                                     .get(obscuring_cube)
-                                    .map(|ev| transparency.limit_alpha(ev.color).fully_opaque())
+                                    .map(|ev| {
+                                        options.transparency.limit_alpha(ev.color).fully_opaque()
+                                    })
                                     .unwrap_or(false)
-                            } {
+                            };
+                            if voxel_is_visible {
                                 layer_is_visible_somewhere = true;
                                 visible_image.push(color);
                             } else {
@@ -334,14 +342,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
-    transparency: &TransparencyOption,
+    options: &TriangulatorOptions,
 ) -> BlockTriangulations<V, A::Tile> {
     space
         .block_data()
         .iter()
-        .map(|block_data| {
-            triangulate_block(block_data.evaluated(), texture_allocator, transparency)
-        })
+        .map(|block_data| triangulate_block(block_data.evaluated(), texture_allocator, options))
         .collect()
 }
 
