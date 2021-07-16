@@ -137,7 +137,7 @@ impl Character {
     }
 
     /// Registers a listener for mutations of this character.
-    pub fn listen(&self, listener: impl Listener<CharacterChange> + 'static) {
+    pub fn listen(&self, listener: impl Listener<CharacterChange> + Send + Sync + 'static) {
         self.notifier.listen(listener)
     }
     /// Computes the view matrix for this character's eye; the translation and rotation from

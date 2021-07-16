@@ -282,14 +282,14 @@ impl Block {
     /// handle this separately.
     pub fn listen(
         &self,
-        listener: impl Listener<BlockChange> + 'static,
+        listener: impl Listener<BlockChange> + Send + Sync + 'static,
     ) -> Result<(), EvalBlockError> {
         self.listen_impl(listener, 0)
     }
 
     fn listen_impl(
         &self,
-        listener: impl Listener<BlockChange> + 'static,
+        listener: impl Listener<BlockChange> + Send + Sync + 'static,
         _depth: u8,
     ) -> Result<(), EvalBlockError> {
         match self {
@@ -774,7 +774,10 @@ impl BlockDef {
 
     /// Registers a listener for mutations of any data sources which may affect the
     /// [`Block::evaluate`] result from blocks defined using this block definition.
-    pub fn listen(&self, listener: impl Listener<BlockChange> + 'static) -> Result<(), RefError> {
+    pub fn listen(
+        &self,
+        listener: impl Listener<BlockChange> + Send + Sync + 'static,
+    ) -> Result<(), RefError> {
         // TODO: Need to arrange listening to the contained block, and either translate
         // that here or have our own notifier generate forwardings.
         self.notifier.listen(listener);

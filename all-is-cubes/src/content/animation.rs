@@ -59,7 +59,9 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
     }
 }
 
-impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> Behavior<Space> for AnimatedVoxels<F> {
+impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> Behavior<Space>
+    for AnimatedVoxels<F>
+{
     fn step(
         &self,
         context: &BehaviorContext<'_, Space>,

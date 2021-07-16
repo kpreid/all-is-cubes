@@ -18,7 +18,7 @@ use crate::transactions::{
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
-pub trait Behavior<H: Transactional>: Debug {
+pub trait Behavior<H: Transactional>: Debug + Send + Sync {
     /// Computes a transaction to apply the effects of this behavior for one timestep.
     ///
     /// TODO: Define what happens if the transaction fails.

@@ -14,7 +14,6 @@
 //! messages, which will then be read and cleared by a separate part of the game loop.
 
 use indexmap::IndexSet;
-use std::cell::RefCell;
 use std::fmt;
 use std::hash::Hash;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -33,7 +32,7 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 /// references *some* of the time — making `M` be a reference type can't have a
 /// satisfactory lifetime.
 pub struct Notifier<M> {
-    listeners: RefCell<Vec<Box<dyn Listener<M>>>>,
+    listeners: RwLock<Vec<Box<dyn Listener<M> + Send + Sync>>>,
 }
 
 impl<M: Clone + Send> Notifier<M> {
@@ -45,14 +44,11 @@ impl<M: Clone + Send> Notifier<M> {
     }
 
     /// Add a [`Listener`] to this set of listeners.
-    pub fn listen<L: Listener<M> + 'static>(&self, listener: L) {
+    pub fn listen<L: Listener<M> + Send + Sync + 'static>(&self, listener: L) {
         if !listener.alive() {
             return;
         }
-        let mut listeners = self
-            .listeners
-            .try_borrow_mut()
-            .expect("Adding listeners while a notification is being sent is not implemented");
+        let mut listeners = self.listeners.write().unwrap();
         Self::cleanup(&mut listeners);
         listeners.push(Box::new(listener));
     }
@@ -86,13 +82,13 @@ impl<M: Clone + Send> Notifier<M> {
 
     /// Deliver a message to all [`Listener`]s.
     pub fn notify(&self, message: M) {
-        for listener in self.listeners.borrow().iter() {
+        for listener in self.listeners.read().unwrap().iter() {
             listener.receive(message.clone());
         }
     }
 
     /// Discard all dead weak pointers in `listeners`.
-    fn cleanup(listeners: &mut Vec<Box<dyn Listener<M>>>) {
+    fn cleanup(listeners: &mut Vec<Box<dyn Listener<M> + Send + Sync>>) {
         let mut i = 0;
         while i < listeners.len() {
             if listeners[i].alive() {
@@ -112,7 +108,7 @@ impl<M: Clone + Send> Default for Notifier<M> {
 
 impl<M> fmt::Debug for Notifier<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Ok(listeners) = self.listeners.try_borrow() {
+        if let Ok(listeners) = self.listeners.try_read() {
             fmt.debug_tuple("Notifier").field(&listeners.len()).finish()
         } else {
             fmt.debug_tuple("Notifier").field(&"?").finish()
@@ -131,8 +127,8 @@ pub trait Listener<M> {
     ///
     /// As a Listener may be called from various contexts, this method should avoid
     /// triggering further side effects, by setting dirty flags or inserting into
-    /// message queues — definitely not taking a lock or borrowing a [`RefCell`] that
-    /// is not for the sole use of the [`Listener`] and its destination.
+    /// message queues — definitely not taking a lock that is not for the sole use
+    /// of the `Listener` and its destination.
     fn receive(&self, message: M);
 
     /// Returns [`false`] if the [`Listener`] should not receive any further messages
@@ -507,7 +503,7 @@ impl<T: Clone + Sync> ListenableSource<T> {
     }
 
     /// Subscribes to change notifications.
-    pub fn listen(&self, listener: impl Listener<()> + 'static) {
+    pub fn listen(&self, listener: impl Listener<()> + Send + Sync + 'static) {
         if let Some(notifier) = &self.storage.notifier {
             notifier.listen(listener);
         }

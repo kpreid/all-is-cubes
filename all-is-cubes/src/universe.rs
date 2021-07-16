@@ -4,15 +4,13 @@
 //! Top-level game state container.
 
 use std::borrow::Borrow;
-use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::rc::{Rc, Weak};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 use std::time::Duration;
 
 use instant::Instant;
@@ -310,7 +308,7 @@ pub enum InsertError {
 
 /// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
 /// parameterized with this somewhat less hairy.
-type StrongEntryRef<T> = Rc<RefCell<UEntry<T>>>;
+type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
 
 /// A reference from an object in a [`Universe`] to another.
 ///
@@ -326,7 +324,7 @@ pub struct URef<T> {
     /// Reference to the object. Weak because we don't want to create reference cycles;
     /// the assumption is that the overall game system will keep the [`Universe`] alive
     /// and that [`Universe`] will ensure no entry goes away while referenced.
-    weak_ref: Weak<RefCell<UEntry<T>>>,
+    weak_ref: Weak<RwLock<UEntry<T>>>,
     name: Arc<Name>,
 }
 
@@ -334,6 +332,8 @@ impl<T: 'static> URef<T> {
     pub fn name(&self) -> &Arc<Name> {
         &self.name
     }
+
+    // TODO: Update docs to match RwLock instead of RefCell.
 
     /// Borrow the value, in the sense of [`RefCell::borrow`], and panic on failure.
     #[track_caller]
@@ -343,11 +343,10 @@ impl<T: 'static> URef<T> {
 
     /// Borrow the value, in the sense of [`RefCell::try_borrow`].
     pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
-        let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Rc<RefCell<UEntry<T>>>| {
-            let borrow: Ref<'_, UEntry<T>> = strong
-                .try_borrow()
-                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
-            Ok(Ref::map(borrow, |entry| &entry.data))
+        let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
+            strong
+                .try_read()
+                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))
         })?;
         Ok(UBorrow(inner))
     }
@@ -359,9 +358,9 @@ impl<T: 'static> URef<T> {
     where
         F: FnOnce(&mut T) -> Out,
     {
-        let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
+        let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
         let mut borrow = strong
-            .try_borrow_mut()
+            .try_write()
             .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
         Ok(function(&mut borrow.data))
     }
@@ -372,11 +371,10 @@ impl<T: 'static> URef<T> {
     /// the check-then-commit pattern; use [`URef::try_modify`] instead for other
     /// purposes.
     pub(crate) fn try_borrow_mut(&self) -> Result<UBorrowMutImpl<T>, RefError> {
-        UBorrowMutImpl::try_new(self.upgrade()?, |strong: &Rc<RefCell<UEntry<T>>>| {
-            let borrow: RefMut<'_, UEntry<T>> = strong
-                .try_borrow_mut()
-                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
-            Ok(RefMut::map(borrow, |entry| &mut entry.data))
+        UBorrowMutImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
+            strong
+                .try_write()
+                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))
         })
     }
 
@@ -454,7 +452,7 @@ impl<T: Debug> Debug for UBorrow<T> {
 impl<T> Deref for UBorrow<T> {
     type Target = T;
     fn deref(&self) -> &T {
-        &**self.0.borrow_guard()
+        &self.0.borrow_guard().data
     }
 }
 impl<T> AsRef<T> for UBorrow<T> {
@@ -474,7 +472,7 @@ struct UBorrowImpl<T: 'static> {
     strong: StrongEntryRef<T>,
     #[borrows(strong)]
     #[covariant]
-    guard: Ref<'this, T>,
+    guard: RwLockReadGuard<'this, UEntry<T>>,
 }
 
 /// Parallel to [`UBorrowImpl`], but for mutable access.
@@ -488,14 +486,23 @@ pub(crate) struct UBorrowMutImpl<T: 'static> {
     strong: StrongEntryRef<T>,
     #[borrows(strong)]
     #[not_covariant]
-    pub(crate) guard: RefMut<'this, T>,
+    guard: RwLockWriteGuard<'this, UEntry<T>>,
+}
+
+impl<T> UBorrowMutImpl<T> {
+    pub(crate) fn with_data_mut<F, Out>(&mut self, function: F) -> Out
+    where
+        F: FnOnce(&mut T) -> Out,
+    {
+        self.with_guard_mut(|entry| function(&mut entry.data))
+    }
 }
 
 /// The data of an entry in a `Universe`.
 #[derive(Debug)]
 struct UEntry<T> {
-    // TODO: It might make more sense for data to be a RefCell<T> (instead of the
-    // RefCell containing UEntry), but we don't have enough examples to be certain yet.
+    // TODO: It might make more sense for data to be a RwLock<T> (instead of the
+    // RwLock containing UEntry), but we don't have enough examples to be certain yet.
     data: T,
     name: Arc<Name>,
 }
@@ -512,7 +519,7 @@ impl<T> URootRef<T> {
     fn new(name: Name, initial_value: T) -> Self {
         let name = Arc::new(name);
         URootRef {
-            strong_ref: Rc::new(RefCell::new(UEntry {
+            strong_ref: Arc::new(RwLock::new(UEntry {
                 data: initial_value,
                 name: name.clone(),
             })),
@@ -526,7 +533,7 @@ impl<T> URootRef<T> {
     /// like where the ref is being held, and it will probably need to be renamed.
     fn downgrade(&self) -> URef<T> {
         URef {
-            weak_ref: Rc::downgrade(&self.strong_ref),
+            weak_ref: Arc::downgrade(&self.strong_ref),
             name: Arc::clone(&self.name),
         }
     }
@@ -568,6 +575,13 @@ mod tests {
     use super::*;
     use crate::block::{Block, BlockDefTransaction, AIR};
     use crate::content::make_some_blocks;
+
+    fn _test_thread_safety()
+    where
+        URef<Character>: Send + Sync,
+        Universe: Send + Sync,
+    {
+    }
 
     #[test]
     fn universe_debug_empty() {

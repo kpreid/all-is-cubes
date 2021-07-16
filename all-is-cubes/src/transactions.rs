@@ -203,11 +203,11 @@ where
     type Output = <O::Transaction as Transaction<O>>::Output;
 
     fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
-        let borrow = self
+        let mut borrow = self
             .target
             .try_borrow_mut()
             .expect("Attempted to execute transaction with target already borrowed");
-        let check = borrow.with_guard(|g| self.transaction.check(g))?;
+        let check = borrow.with_data_mut(|target_data| self.transaction.check(target_data))?;
         Ok((borrow, check))
     }
 
@@ -216,7 +216,7 @@ where
         _dummy_target: &mut (),
         (mut borrow, check): Self::CommitCheck,
     ) -> Result<Self::Output, Box<dyn Error>> {
-        borrow.with_guard_mut(|g| self.transaction.commit(g, check))
+        borrow.with_data_mut(|target_data| self.transaction.commit(target_data, check))
     }
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {

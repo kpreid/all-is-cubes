@@ -3,12 +3,12 @@
 
 //! That which contains many blocks.
 
-use cgmath::Vector3;
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::rc::{Rc, Weak};
+use std::sync::{Arc, Mutex, Weak};
+
+use cgmath::Vector3;
 
 use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet};
@@ -86,7 +86,7 @@ pub struct Space {
     notifier: Notifier<SpaceChange>,
 
     /// Storage for incoming change notifications from blocks.
-    todo: Rc<RefCell<SpaceTodo>>,
+    todo: Arc<Mutex<SpaceTodo>>,
 }
 
 /// Information about the interpretation of a block index.
@@ -202,7 +202,7 @@ impl Space {
     }
 
     /// Registers a listener for mutations of this space.
-    pub fn listen(&self, listener: impl Listener<SpaceChange> + 'static) {
+    pub fn listen(&self, listener: impl Listener<SpaceChange> + Send + Sync + 'static) {
         self.notifier.listen(listener)
     }
 
@@ -564,7 +564,7 @@ impl Space {
         tick: Tick,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
-        for block_index in self.todo.borrow_mut().blocks.drain() {
+        for block_index in self.todo.lock().unwrap().blocks.drain() {
             self.notifier.notify(SpaceChange::BlockValue(block_index));
             let data: &mut SpaceBlockData = &mut self.block_data[usize::from(block_index)];
             // TODO: handle error by switching to a "broken block" state.
@@ -715,7 +715,7 @@ impl Space {
 
     fn listener_for_block(&self, index: BlockIndex) -> SpaceBlockChangeListener {
         SpaceBlockChangeListener {
-            todo: Rc::downgrade(&self.todo),
+            todo: Arc::downgrade(&self.todo),
             index,
         }
     }
@@ -834,7 +834,7 @@ impl SpaceBlockData {
 
     fn new(
         block: Block,
-        listener: impl Listener<BlockChange> + 'static,
+        listener: impl Listener<BlockChange> + Send + Sync + 'static,
     ) -> Result<Self, SetCubeError> {
         // TODO: double ref error check suggests that maybe evaluate() and listen() should be one combined operation.
         let evaluated = block.evaluate().map_err(SetCubeError::EvalBlock)?;
@@ -1035,15 +1035,17 @@ struct SpaceTodo {
 }
 
 struct SpaceBlockChangeListener {
-    todo: Weak<RefCell<SpaceTodo>>,
+    todo: Weak<Mutex<SpaceTodo>>,
     index: BlockIndex,
 }
 
 impl Listener<BlockChange> for SpaceBlockChangeListener {
     fn receive(&self, _: BlockChange) {
-        if let Some(cell) = self.todo.upgrade() {
-            let mut todo = cell.borrow_mut();
-            todo.blocks.insert(self.index);
+        if let Some(todo_mutex) = self.todo.upgrade() {
+            if let Ok(mut todo) = todo_mutex.lock() {
+                todo.blocks.insert(self.index);
+            }
+            // If the mutex is poisoned, do nothing so we don't propagate failure to the notifier.
         }
     }
 
