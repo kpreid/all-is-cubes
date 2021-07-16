@@ -3,8 +3,6 @@
 
 //! Top-level game state container.
 
-use instant::Instant; // wasm-compatible replacement for std::time::Instant
-use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::HashMap;
@@ -13,7 +11,11 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 use std::time::Duration;
+
+use instant::Instant; // wasm-compatible replacement for std::time::Instant
+use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
 
 use crate::apps::Tick;
 use crate::block::BlockDef;
@@ -324,11 +326,11 @@ pub struct URef<T> {
     /// the assumption is that the overall game system will keep the [`Universe`] alive
     /// and that [`Universe`] will ensure no entry goes away while referenced.
     weak_ref: Weak<RefCell<UEntry<T>>>,
-    name: Rc<Name>,
+    name: Arc<Name>,
 }
 
 impl<T: 'static> URef<T> {
-    pub fn name(&self) -> &Rc<Name> {
+    pub fn name(&self) -> &Arc<Name> {
         &self.name
     }
 
@@ -352,7 +354,7 @@ impl<T: 'static> URef<T> {
         // Kludge: OwningHandle doesn't let us try_borrow, so waste one to check.
         strong
             .try_borrow()
-            .map_err(|_| RefError::InUse(Rc::clone(&self.name)))?;
+            .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
 
         Ok(UBorrow(
             OwningRef::new(OwningHandle::new(strong)).map(|entry| &entry.data),
@@ -366,7 +368,7 @@ impl<T: 'static> URef<T> {
         // Kludge: OwningHandle doesn't let us try_borrow, so waste one to check.
         strong
             .try_borrow_mut()
-            .map_err(|_| RefError::InUse(Rc::clone(&self.name)))?;
+            .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
 
         Ok(UBorrowMut(
             OwningRefMut::new(OwningHandle::new_mut(strong)).map_mut(|entry| &mut entry.data),
@@ -376,7 +378,7 @@ impl<T: 'static> URef<T> {
     fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {
         self.weak_ref
             .upgrade()
-            .ok_or_else(|| RefError::Gone(Rc::clone(&self.name)))
+            .ok_or_else(|| RefError::Gone(Arc::clone(&self.name)))
     }
 }
 
@@ -418,10 +420,10 @@ impl<T> Clone for URef<T> {
 pub enum RefError {
     /// Target was deleted, or its entire universe was dropped.
     #[error("object was deleted: {0}")]
-    Gone(Rc<Name>),
+    Gone(Arc<Name>),
     /// Target is currently incompatibly borrowed.
     #[error("object was in use at the same time: {0}")]
-    InUse(Rc<Name>),
+    InUse(Arc<Name>),
 }
 
 /// A wrapper type for an immutably borrowed value from an [`URef`].
@@ -498,7 +500,7 @@ struct UEntry<T> {
     // RefCell containing UEntry. However. it will require fiddling with the
     // owning_ref pileup to do that, and might not be possible.
     data: T,
-    name: Rc<Name>,
+    name: Arc<Name>,
 }
 
 /// The unique reference to an entry in a `Universe` from that `Universe`.
@@ -506,12 +508,12 @@ struct UEntry<T> {
 #[derive(Debug)]
 struct URootRef<T> {
     strong_ref: StrongEntryRef<T>,
-    name: Rc<Name>,
+    name: Arc<Name>,
 }
 
 impl<T> URootRef<T> {
     fn new(name: Name, initial_value: T) -> Self {
-        let name = Rc::new(name);
+        let name = Arc::new(name);
         URootRef {
             strong_ref: Rc::new(RefCell::new(UEntry {
                 data: initial_value,
@@ -528,7 +530,7 @@ impl<T> URootRef<T> {
     fn downgrade(&self) -> URef<T> {
         URef {
             weak_ref: Rc::downgrade(&self.strong_ref),
-            name: Rc::clone(&self.name),
+            name: Arc::clone(&self.name),
         }
     }
 
@@ -620,7 +622,7 @@ Universe {
         let _borrow_1 = r.borrow_mut();
         assert_eq!(
             r.try_borrow().unwrap_err(),
-            RefError::InUse(Rc::new(Name::Anonym(0)))
+            RefError::InUse(Arc::new(Name::Anonym(0)))
         );
     }
 
@@ -631,22 +633,22 @@ Universe {
         let _borrow_1 = r.borrow();
         assert_eq!(
             r.try_borrow_mut().unwrap_err(),
-            RefError::InUse(Rc::new(Name::Anonym(0)))
+            RefError::InUse(Arc::new(Name::Anonym(0)))
         );
     }
 
     #[test]
     fn ref_error_format() {
         assert_eq!(
-            RefError::InUse(Rc::new("foo".into())).to_string(),
+            RefError::InUse(Arc::new("foo".into())).to_string(),
             "object was in use at the same time: 'foo'"
         );
         assert_eq!(
-            RefError::Gone(Rc::new("foo".into())).to_string(),
+            RefError::Gone(Arc::new("foo".into())).to_string(),
             "object was deleted: 'foo'"
         );
         assert_eq!(
-            RefError::Gone(Rc::new(Name::Anonym(123))).to_string(),
+            RefError::Gone(Arc::new(Name::Anonym(123))).to_string(),
             "object was deleted: [anonymous #123]"
         );
     }

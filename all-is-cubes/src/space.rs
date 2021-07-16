@@ -995,7 +995,7 @@ mod tests {
     use crate::math::GridPoint;
     use crate::universe::{RefError, Universe, UniverseIndex as _};
     use cgmath::EuclideanSpace as _;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     // TODO: test consistency between the index and get_* methods
     // TODO: test fill() equivalence and error handling
@@ -1052,7 +1052,7 @@ mod tests {
         let borrow = inner_space_ref.borrow_mut();
         assert_eq!(
             Err(SetCubeError::EvalBlock(
-                RefError::InUse(Rc::new("bs".into())).into()
+                RefError::InUse(Arc::new("bs".into())).into()
             )),
             outer_space.set((0, 0, 0), &block)
         );
@@ -1084,7 +1084,7 @@ mod tests {
             "Grid(1..2, 2..3, 3..4) is out of bounds"
         );
         assert_eq!(
-            SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone(Rc::new(
+            SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone(Arc::new(
                 "foo".into()
             ))))
             .to_string(),

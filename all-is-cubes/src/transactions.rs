@@ -6,7 +6,7 @@ use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Debug;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::character::Character;
 use crate::space::Space;
@@ -263,7 +263,7 @@ enum AnyTransaction {
 }
 
 impl AnyTransaction {
-    fn target_name(&self) -> Option<&Rc<Name>> {
+    fn target_name(&self) -> Option<&Arc<Name>> {
         use AnyTransaction::*;
         match self {
             Noop => None,
@@ -398,7 +398,7 @@ mod any_transaction {
 #[derive(Clone, Default, PartialEq)]
 #[must_use]
 pub struct UniverseTransaction {
-    members: HashMap<Rc<Name>, AnyTransaction>,
+    members: HashMap<Arc<Name>, AnyTransaction>,
 }
 
 impl Transactional for Universe {
@@ -408,7 +408,7 @@ impl Transactional for Universe {
 impl From<AnyTransaction> for UniverseTransaction {
     fn from(transaction: AnyTransaction) -> Self {
         if let Some(name) = transaction.target_name() {
-            let mut members: HashMap<Rc<Name>, AnyTransaction> = HashMap::new();
+            let mut members: HashMap<Arc<Name>, AnyTransaction> = HashMap::new();
             members.insert(name.clone(), transaction);
             UniverseTransaction { members }
         } else {
@@ -419,8 +419,8 @@ impl From<AnyTransaction> for UniverseTransaction {
 
 impl Transaction<Universe> for UniverseTransaction {
     // TODO: Benchmark cheaper HashMaps / using BTreeMap here
-    type CommitCheck = HashMap<Rc<Name>, Box<dyn Any>>;
-    type MergeCheck = HashMap<Rc<Name>, Box<dyn Any>>;
+    type CommitCheck = HashMap<Arc<Name>, Box<dyn Any>>;
+    type MergeCheck = HashMap<Arc<Name>, Box<dyn Any>>;
     type Output = ();
 
     fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -494,6 +494,7 @@ pub use transaction_tester::*;
 mod transaction_tester {
     use super::*;
     use std::error::Error;
+    use std::rc::Rc;
 
     /// Tool for testing that a type of transaction obeys the rules:
     ///
