@@ -192,6 +192,37 @@ impl<M> Listener<M> for NullListener {
     }
 }
 
+/// A [`Listener`] which delivers messages by calling a function on a [`Weak`] reference's
+/// referent.
+pub(crate) struct FnListener<F, T> {
+    function: F,
+    weak_target: Weak<T>,
+}
+
+impl<F, T> FnListener<F, T> {
+    pub(crate) fn new(target: &Arc<T>, function: F) -> Self {
+        Self {
+            function,
+            weak_target: Arc::downgrade(target),
+        }
+    }
+}
+
+impl<M, F, T> Listener<M> for FnListener<F, T>
+where
+    F: Fn(&T, M),
+{
+    fn receive(&self, message: M) {
+        if let Some(strong_target) = self.weak_target.upgrade() {
+            (self.function)(&*strong_target, message);
+        }
+    }
+
+    fn alive(&self) -> bool {
+        self.weak_target.strong_count() > 0
+    }
+}
+
 /// A [`Listener`] destination which stores all the messages it receives, deduplicated.
 ///
 /// TODO: This type turns out to be only useful in tests. Rework it to be more fitting.
