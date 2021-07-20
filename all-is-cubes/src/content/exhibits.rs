@@ -19,7 +19,7 @@ use crate::content::{palette, DemoBlocks, Exhibit};
 use crate::drawing::draw_to_blocks;
 use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
-    Face, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba,
+    Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba,
 };
 use crate::space::{Grid, Space};
 use crate::universe::Universe;
@@ -31,6 +31,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     RESOLUTIONS,
     MAKE_SOME_BLOCKS,
     ROTATIONS,
+    COLOR_LIGHTS,
     CHUNK_CHART,
     SWIMMING_POOL,
     COLORS,
@@ -302,6 +303,80 @@ const COLORS: Exhibit = Exhibit {
                 _ => None,
             }
         })?;
+
+        Ok(space)
+    },
+};
+
+const COLOR_LIGHTS: Exhibit = Exhibit {
+    name: "Colored Lights",
+    factory: |_this, _universe| {
+        let room_width = 7;
+        let room_length = 12;
+        let room_height = 5;
+        let interior = Grid::new([0, 0, 0], [room_width, room_height, room_length]);
+        let mut space = Space::empty(interior.expand(FaceMap::from_fn(|_| 1)));
+
+        // Construct room. TODO: Use more differentiated blocks
+        let wall = Block::builder()
+            .display_name("Color room wall")
+            .color(rgba_const!(0.5, 0.5, 0.5, 1.0))
+            .build();
+        space.fill_uniform(space.grid(), &wall)?;
+        space.fill_uniform(interior, &AIR)?;
+
+        // Vertical separators
+        let separator_width = 2;
+        space.fill_uniform(
+            Grid::new([0, room_height / 2, 0], [separator_width, 1, room_length]),
+            &wall,
+        )?;
+        space.fill_uniform(
+            Grid::new(
+                [room_width - separator_width, room_height / 2, 0],
+                [separator_width, 1, room_length],
+            ),
+            &wall,
+        )?;
+
+        // Entrance door
+        space.fill_uniform(
+            Grid::new([room_width / 2 - 1, 0, room_length], [3, 2, 1]),
+            &AIR,
+        )?;
+
+        let colors = [
+            rgb_const!(1.0, 0.0, 0.0),
+            rgb_const!(1.0, 1.0, 0.0),
+            rgb_const!(0.0, 1.0, 0.0),
+            rgb_const!(0.0, 1.0, 1.0),
+            rgb_const!(0.0, 0.0, 1.0),
+            rgb_const!(1.0, 0.0, 1.0),
+        ];
+        for (i, color) in colors.iter().copied().enumerate() {
+            let z =
+                (i as GridCoordinate) * (room_length - 1) / (colors.len() as GridCoordinate - 1);
+            let p = GridPoint::new(if i % 2 == 0 { 1 } else { room_width - 2 }, 0, z);
+            space.set(
+                p,
+                Block::builder()
+                    .display_name("Colored light with colored surface")
+                    .color(color.with_alpha_one())
+                    .light_emission(color * 1.2)
+                    .build(),
+            )?;
+            space.set(
+                p + GridVector::new(0, room_height - 1, 0),
+                Block::builder()
+                    .display_name("Colored light with white surface")
+                    .color(Rgba::WHITE)
+                    .light_emission(color * 10.0)
+                    .build(),
+            )?;
+        }
+
+        // TODO: Add an RGBCMY section, and also a color-temperature section (or maybe different buildings)
+        // sRGB white is D65, or approximately 6500 K.
 
         Ok(space)
     },
