@@ -259,7 +259,8 @@ impl Space {
                         *info = Some(LightUpdateRayInfo {
                             ray: Ray {
                                 origin: translated_ray.origin,
-                                direction: translated_ray.direction * 10.0, // TODO: translate hit position into ray
+                                direction: hit.intersection_point(translated_ray)
+                                    - translated_ray.origin,
                             },
                             trigger_cube: hit.cube_ahead(),
                             value_cube: light_cube,
