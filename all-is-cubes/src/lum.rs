@@ -10,7 +10,7 @@
 
 use std::error::Error;
 
-use cgmath::{Transform as _, Vector3, Zero as _};
+use cgmath::{Point3, Transform as _, Vector3, Zero as _};
 use luminance_front::context::GraphicsContext;
 use luminance_front::framebuffer::FramebufferError;
 use luminance_front::pipeline::PipelineError;
@@ -21,7 +21,7 @@ use luminance_front::Backend;
 use crate::character::Cursor;
 use crate::content::palette;
 use crate::lum::types::{empty_tess, LumBlockVertex};
-use crate::math::{Aab, Geometry, Rgba};
+use crate::math::{Aab, FreeCoordinate, Geometry, Rgba};
 use crate::raycast::Face;
 use crate::util::MapExtend;
 
@@ -100,9 +100,12 @@ where
     E: Extend<LumBlockVertex>,
     G: Geometry,
 {
-    geometry.wireframe_points(&mut MapExtend::new(vertices, |p| {
-        LumBlockVertex::new_colored(p, Vector3::zero(), color)
-    }))
+    geometry.wireframe_points(&mut MapExtend::new(
+        vertices,
+        |(p, vertex_color): (Point3<FreeCoordinate>, Option<Rgba>)| {
+            LumBlockVertex::new_colored(p, Vector3::zero(), vertex_color.unwrap_or(color))
+        },
+    ))
 }
 
 /// Error arising when GPU/platform resources could not be obtained, or there is a bug

@@ -10,7 +10,7 @@
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
-use crate::math::{FreeCoordinate, Geometry, GridCoordinate};
+use crate::math::{FreeCoordinate, Geometry, GridCoordinate, Rgba};
 use crate::space::Grid;
 
 /// Closely related types.
@@ -81,10 +81,10 @@ impl Geometry for Ray {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<Point3<FreeCoordinate>>,
+        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
     {
         // TODO: add an arrowhead
-        output.extend([self.origin, self.origin + self.direction]);
+        output.extend([(self.origin, None), (self.origin + self.direction, None)]);
     }
 }
 

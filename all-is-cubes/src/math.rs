@@ -74,11 +74,14 @@ pub trait Geometry {
 
     /// Represent this object as a line drawing, or wireframe.
     ///
-    /// The returned points should be in pairs, each pair defining a line segment.
+    /// The generated points should be in pairs, each pair defining a line segment.
     /// If there are an odd number of vertices, the caller should ignore the last.
+    ///
+    /// TODO: This should probably return an iterator instead, but defining the type
+    /// will be awkward until `type_alias_impl_trait` is stable.
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<Point3<FreeCoordinate>>;
+        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>;
 }
 
 /// Axis-Aligned Box data type.
@@ -335,9 +338,9 @@ impl Geometry for Aab {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<Point3<FreeCoordinate>>,
+        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
     {
-        let mut vertices = [Point3::origin(); 24];
+        let mut vertices = [(Point3::origin(), None); 24];
         let l = self.lower_bounds_p();
         let u = self.upper_bounds_p();
         for axis_0 in 0..3_usize {
@@ -346,20 +349,20 @@ impl Geometry for Aab {
             let axis_2 = (axis_0 + 2).rem_euclid(3);
             let mut p = l;
             // Walk from lower to upper in a helix.
-            vertices[vbase] = p;
+            vertices[vbase].0 = p;
             p[axis_0] = u[axis_0];
-            vertices[vbase + 1] = p;
-            vertices[vbase + 2] = p;
+            vertices[vbase + 1].0 = p;
+            vertices[vbase + 2].0 = p;
             p[axis_1] = u[axis_1];
-            vertices[vbase + 3] = p;
-            vertices[vbase + 4] = p;
+            vertices[vbase + 3].0 = p;
+            vertices[vbase + 4].0 = p;
             p[axis_2] = u[axis_2];
-            vertices[vbase + 5] = p;
+            vertices[vbase + 5].0 = p;
             // Go back and fill in the remaining bar.
             p[axis_2] = l[axis_2];
-            vertices[vbase + 6] = p;
+            vertices[vbase + 6].0 = p;
             p[axis_0] = l[axis_0];
-            vertices[vbase + 7] = p;
+            vertices[vbase + 7].0 = p;
         }
         output.extend(vertices);
     }
@@ -435,9 +438,10 @@ mod tests {
     #[test]
     fn aab_wireframe_smoke_test() {
         let aab = Aab::from_cube(Point3::new(1, 2, 3));
-        let mut wireframe: Vec<Point3<FreeCoordinate>> = Vec::new();
+        let mut wireframe: Vec<(Point3<FreeCoordinate>, Option<Rgba>)> = Vec::new();
         aab.wireframe_points(&mut wireframe);
-        for vertex in wireframe {
+        for (vertex, color) in wireframe {
+            assert!(color.is_none());
             assert!(vertex.x == 1.0 || vertex.x == 2.0);
             assert!(vertex.y == 2.0 || vertex.y == 3.0);
             assert!(vertex.z == 3.0 || vertex.z == 4.0);

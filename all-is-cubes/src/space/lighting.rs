@@ -395,7 +395,7 @@ impl Geometry for LightUpdateCubeInfo {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<Point3<FreeCoordinate>>,
+        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
     {
         // Draw output cube
         Aab::from_cube(self.cube)
@@ -425,7 +425,7 @@ impl Geometry for LightUpdateRayInfo {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<Point3<FreeCoordinate>>,
+        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
     {
         // TODO: represent self.value somehoe
         Aab::from_cube(self.value_cube)
