@@ -14,6 +14,7 @@ use crate::math::*;
 use crate::raycast::Ray;
 use crate::space::light_data::*;
 use crate::space::*;
+use crate::util::MapExtend;
 
 /// This parameter determines to what degree absorption of light due to a block surface's
 /// color is taken into account. At zero, it is not (all surfaces are perfectly
@@ -427,11 +428,15 @@ impl Geometry for LightUpdateRayInfo {
     where
         E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
     {
-        // TODO: represent self.value somehoe
         Aab::from_cube(self.value_cube)
             .enlarge(0.01)
             .wireframe_points(output);
-        self.ray.wireframe_points(output);
+        self.ray.wireframe_points(&mut MapExtend::new(
+            output,
+            |(p, _): (Point3<FreeCoordinate>, Option<Rgba>)| {
+                (p, Some(self.value.value().with_alpha_one()))
+            },
+        ))
     }
 }
 
