@@ -368,7 +368,7 @@ impl Space {
                         PackedLight::OPAQUE
                     } else {
                         if this_cube_evaluated.visible_or_animated()
-                            || std::array::IntoIter::new(Face::ALL_SIX).any(|face| {
+                            || Face::ALL_SIX.into_iter().any(|face| {
                                 self.get_evaluated(cube + face.normal_vector())
                                     .visible_or_animated()
                             })

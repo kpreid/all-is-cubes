@@ -631,7 +631,7 @@ const MAKE_SOME_BLOCKS: Exhibit = Exhibit {
             make_both_blocks::<1>(&mut universe),
         ];
         let mut space = Space::empty_positive(3, ROWS, ROWS);
-        for (y, (blocks_a, blocks_v)) in std::array::IntoIter::new(rows).enumerate() {
+        for (y, (blocks_a, blocks_v)) in rows.into_iter().enumerate() {
             for (h, (block_a, block_v)) in blocks_a.into_iter().zip(blocks_v).enumerate() {
                 space.set([0, y as GridCoordinate, h as GridCoordinate], block_a)?;
                 space.set([2, y as GridCoordinate, h as GridCoordinate], block_v)?;

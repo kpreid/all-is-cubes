@@ -3,7 +3,6 @@
 
 //! Headless image (and someday video) generation.
 
-use std::array::IntoIter;
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::fs::File;
@@ -243,7 +242,7 @@ fn write_color_metadata<W: std::io::Write>(
     // Write compatibility chromaticity information
     png_writer.write_chunk(
         ChunkType(*b"cHRM"),
-        &IntoIter::new([
+        &[
             31270, // White Point x
             32900, // White Point y
             64000, // Red x
@@ -252,7 +251,8 @@ fn write_color_metadata<W: std::io::Write>(
             60000, // Green y
             15000, // Blue x
             6000,  // Blue y
-        ])
+        ]
+        .into_iter()
         .flat_map(u32::to_be_bytes)
         .collect::<Box<[u8]>>(),
     )?;

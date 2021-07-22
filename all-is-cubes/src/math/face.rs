@@ -367,7 +367,8 @@ impl<V> FaceMap<V> {
     }
 
     pub fn into_values_iter(self) -> impl Iterator<Item = V> {
-        std::array::IntoIter::new(self.into_values())
+        // TODO: eliminate this as not really useful in Rust 2021
+        self.into_values().into_iter()
     }
 
     /// Transform values.
@@ -509,7 +510,7 @@ impl Geometry for CubeFace {
         ];
         // TODO: this is a messy kludge and really we should be stealing corner points
         // from the AAB instead, but there isn't yet a good way to do that.
-        output.extend(IntoIterator::into_iter(X_POINTS).map(|p| {
+        output.extend(X_POINTS.into_iter().map(|p| {
             (
                 (face_matrix.transform_point(p))
                     .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)

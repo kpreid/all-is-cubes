@@ -453,7 +453,6 @@ fn component_from_srgb_8bit(c: u8) -> NotNan<f32> {
 mod tests {
     use super::*;
     use itertools::Itertools;
-    use std::array::IntoIter;
 
     // TODO: Add tests of the color not-NaN mechanisms.
 
@@ -503,7 +502,7 @@ mod tests {
         // Filter out correct roundtrip results.
         let bad = results
             .into_iter()
-            .filter(|&(o, _, r)| IntoIter::new(o).zip(r).any(|(a, b)| a != b))
+            .filter(|&(o, _, r)| o.into_iter().zip(r).any(|(a, b)| a != b))
             .collect::<Vec<_>>();
         assert_eq!(bad, vec![]);
     }

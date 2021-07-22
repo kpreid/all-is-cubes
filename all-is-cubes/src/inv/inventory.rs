@@ -602,7 +602,7 @@ mod tests {
         ];
         const MAX: u16 = u16::MAX;
         let gen_slots = move || {
-            IntoIterator::into_iter([
+            [
                 0,
                 1,
                 2,
@@ -614,8 +614,9 @@ mod tests {
                 MAX - 2,
                 MAX - 1,
                 MAX,
-            ])
-            .cartesian_product(IntoIterator::into_iter(tools.clone()))
+            ]
+            .into_iter()
+            .cartesian_product(tools.clone())
             .map(|(count, item)| Slot::stack(count, item))
         };
         for slot1_in in gen_slots() {
