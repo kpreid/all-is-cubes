@@ -282,7 +282,7 @@ where
                 &self.back_buffer,
                 // TODO: port skybox cube map code
                 &PipelineState::default()
-                    .set_clear_color(world_output.data.sky_color.with_alpha_one().into()),
+                    .set_clear_color(world_output.data.sky_color.with_alpha_one().to_srgb_float()),
                 |pipeline, mut shading_gate| {
                     let world_output_bound = world_output.bind(&pipeline)?;
                     // Space

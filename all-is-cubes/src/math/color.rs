@@ -223,6 +223,18 @@ impl Rgba {
         ))
     }
 
+    /// Converts this color to sRGB (nonlinear RGB components).
+    // TODO: decide whether to make this public and what to call it -- it is rarely needed
+    #[inline]
+    pub(crate) fn to_srgb_float(self) -> [f32; 4] {
+        [
+            component_to_srgb(self.0.x),
+            component_to_srgb(self.0.y),
+            component_to_srgb(self.0.z),
+            self.0.w.into_inner(),
+        ]
+    }
+
     /// Converts this color lossily to sRGB 8-bits-per-component color.
     #[inline]
     pub fn to_srgb_32bit(self) -> [u8; 4] {
@@ -408,18 +420,20 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgba {
     }
 }
 
-fn component_to_srgb_8bit(c: NotNan<f32>) -> u8 {
+fn component_to_srgb(c: NotNan<f32>) -> f32 {
     // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_forward_transformation_(CIE_XYZ_to_sRGB)> (version as of Feb 3, 2020)
     // Strip NotNan
     let c = c.into_inner();
     // Apply sRGB gamma curve
-    let c = if c <= 0.0031308 {
+    if c <= 0.0031308 {
         c * (323. / 25.)
     } else {
         (211. * c.powf(5. / 12.) - 11.) / 200.
-    };
-    // Convert to integer
-    (c * 255.) as u8
+    }
+}
+
+fn component_to_srgb_8bit(c: NotNan<f32>) -> u8 {
+    (component_to_srgb(c) * 255.).round() as u8
 }
 
 #[inline]
@@ -468,13 +482,13 @@ mod tests {
     fn rgba_to_srgb_32bit() {
         assert_eq!(
             Rgba::new(0.125, 0.25, 0.5, 0.75).to_srgb_32bit(),
-            [99, 136, 187, 191]
+            [99, 137, 188, 191]
         );
 
         // Test saturation
         assert_eq!(
             Rgba::new(0.5, -1.0, 10.0, 1.0).to_srgb_32bit(),
-            [187, 0, 255, 255]
+            [188, 0, 255, 255]
         );
     }
 
@@ -507,16 +521,31 @@ mod tests {
             .collect::<Vec<_>>();
         // Print all the results before asserting
         eprintln!("{:#?}", results);
-        // Filter with a max difference of 1. TODO: Fix rounding errors, if that's what they are,
-        // so there's an exact round trip of all the 8-bit values.
+        // Filter out correct roundtrip results.
         let bad = results
             .into_iter()
             .filter(|&(o, _, r)| {
                 IntoIter::new(o)
                     .zip(r)
-                    .any(|(a, b)| (i16::from(a) - i16::from(b)).abs() > 1)
+                    .any(|(a, b)| a != b)
             })
             .collect::<Vec<_>>();
         assert_eq!(bad, vec![]);
+    }
+
+    #[test]
+    fn srgb_float() {
+        let color = Rgba::new(0.05, 0.1, 0.4, 0.5);
+        let srgb_float = color.to_srgb_float();
+        let srgb_32bit = color.to_srgb_32bit();
+        assert_eq!(
+            srgb_32bit,
+            [
+                (srgb_float[0] * 255.).round() as u8,
+                (srgb_float[1] * 255.).round() as u8,
+                (srgb_float[2] * 255.).round() as u8,
+                (srgb_float[3] * 255.).round() as u8
+            ]
+        );
     }
 }
