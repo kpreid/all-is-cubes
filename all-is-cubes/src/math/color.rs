@@ -46,7 +46,8 @@ macro_rules! rgba_const {
 ///   things which it is reasonable to “overexpose”. (No meaning is given to negative
 ///   values, but they are permitted.)
 /// * NaN is banned so that [`Eq`] may be implemented. (Infinities are permitted.)
-/// * Color values are linear (gamma = 1).
+/// * Color values are linear (gamma = 1), but use the same RGB primaries as sRGB
+///   (Rec. 709).
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Rgb(Vector3<NotNan<f32>>);
 
@@ -57,7 +58,8 @@ pub struct Rgb(Vector3<NotNan<f32>>);
 ///   things which it is reasonable to “overexpose”. (No meaning is given to negative
 ///   values, but they are permitted.)
 /// * NaN is banned so that [`Eq`] may be implemented. (Infinities are permitted.)
-/// * Color values are linear (gamma = 1).
+/// * Color values are linear (gamma = 1), but use the same RGB primaries as sRGB
+///   (Rec. 709).
 /// * The alpha is not premultiplied.
 /// * Alpha values less than zero and greater than one will be treated equivalently to
 ///   zero and one, respectively, but are preserved rather than clipped.
