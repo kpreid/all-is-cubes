@@ -193,10 +193,11 @@ impl Rgba {
         Rgb(self.0.truncate())
     }
 
-    // TODO: We should probably use sRGB rather than linear everywhere.
+    // TODO: remove this because linear 8-bit is bad for dark colors.
+    // It is currently used in textures.
     /// Converts this color lossily to linear 8-bits-per-component color.
     #[inline]
-    pub fn to_linear_32bit(self) -> [u8; 4] {
+    pub(crate) fn to_linear_32bit(self) -> [u8; 4] {
         #[inline]
         fn convert_component(x: NotNan<f32>) -> u8 {
             // As of Rust 1.45, `as` on float to int is saturating, which is safe and what
@@ -209,18 +210,6 @@ impl Rgba {
             convert_component(self.blue()),
             convert_component(self.alpha()),
         ]
-    }
-
-    // TODO: Stop using a tuple
-    #[inline]
-    pub fn from_linear_32bit((r, g, b, a): (u8, u8, u8, u8)) -> Self {
-        // TODO: make this const when Rust `const_fn_floating_point_arithmetic` is stable
-        Self(Vector4::new(
-            component_from_linear_8bit(r),
-            component_from_linear_8bit(g),
-            component_from_linear_8bit(b),
-            component_from_linear_8bit(a),
-        ))
     }
 
     /// Converts this color to sRGB (nonlinear RGB components).
@@ -524,11 +513,7 @@ mod tests {
         // Filter out correct roundtrip results.
         let bad = results
             .into_iter()
-            .filter(|&(o, _, r)| {
-                IntoIter::new(o)
-                    .zip(r)
-                    .any(|(a, b)| a != b)
-            })
+            .filter(|&(o, _, r)| IntoIter::new(o).zip(r).any(|(a, b)| a != b))
             .collect::<Vec<_>>();
         assert_eq!(bad, vec![]);
     }
