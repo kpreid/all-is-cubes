@@ -275,7 +275,7 @@ where
         // TODO: cache
         let cursor_tess = make_cursor_tess(surface, &cursor_result)?;
 
-        let start_draw_time = Instant::now();
+        let start_draw_world_time = Instant::now();
         surface
             .new_pipeline_gate()
             .pipeline(
@@ -313,6 +313,7 @@ where
             .assume()
             .into_result()?;
 
+        let start_draw_ui_time = Instant::now();
         surface
             .new_pipeline_gate()
             .pipeline(
@@ -332,8 +333,10 @@ where
             .assume()
             .into_result()?;
 
-        info.draw_time = Instant::now().duration_since(start_draw_time);
-        info.frame_time = Instant::now().duration_since(start_frame_time);
+        let end_time = Instant::now();
+        info.draw_world_time = start_draw_ui_time.duration_since(start_draw_world_time);
+        info.draw_ui_time = end_time.duration_since(start_draw_ui_time);
+        info.frame_time = end_time.duration_since(start_frame_time);
         Ok(info)
     }
 
@@ -382,7 +385,8 @@ where
 pub struct RenderInfo {
     frame_time: Duration,
     prepare_time: Duration,
-    draw_time: Duration,
+    draw_world_time: Duration,
+    draw_ui_time: Duration,
     space: SpaceRenderInfo,
 }
 
@@ -390,10 +394,11 @@ impl CustomFormat<StatusText> for RenderInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         writeln!(
             fmt,
-            "Frame time: {} (prep {}, draw {})",
+            "Frame time: {} (prep {}, draw world {}, ui {})",
             self.frame_time.custom_format(StatusText),
             self.prepare_time.custom_format(StatusText),
-            self.draw_time.custom_format(StatusText),
+            self.draw_world_time.custom_format(StatusText),
+            self.draw_ui_time.custom_format(StatusText),
         )?;
         write!(fmt, "{}", self.space.custom_format(StatusText))?;
         Ok(())
