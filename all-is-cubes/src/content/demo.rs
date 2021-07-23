@@ -9,7 +9,7 @@ use std::convert::TryInto as _;
 
 use crate::block::Block;
 use crate::character::Character;
-use crate::content::{demo_city, install_demo_blocks};
+use crate::content::{atrium::atrium, demo_city, install_demo_blocks};
 use crate::linking::{GenError, InGenError};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::LightPhysics;
@@ -36,6 +36,7 @@ use crate::universe::{Name, Universe, UniverseIndex};
 pub enum UniverseTemplate {
     Blank,
     DemoCity,
+    Atrium,
     CornellBox,
     PhysicsLab,
     // TODO: add an "nothing, you get a blank editor" option once we have enough editing support.
@@ -47,6 +48,7 @@ impl UniverseTemplate {
         match self {
             Blank => Ok(Universe::new()),
             DemoCity => new_universe_with_space_setup(demo_city),
+            Atrium => new_universe_with_space_setup(atrium),
             CornellBox => new_universe_with_space_setup(cornell_box),
             PhysicsLab => new_universe_with_space_setup(|_| physics_lab(50, 16)),
         }

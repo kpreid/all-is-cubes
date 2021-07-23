@@ -23,6 +23,7 @@ use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
 
+mod atrium;
 mod blocks;
 pub use blocks::*;
 mod city;

@@ -316,6 +316,7 @@ pub struct FaceMap<V> {
 impl<V> FaceMap<V> {
     /// Constructs a [`FaceMap`] by using the provided function to compute
     /// a value for each [`Face`] enum variant.
+    #[inline]
     pub fn from_fn(mut f: impl FnMut(Face) -> V) -> Self {
         Self {
             within: f(Face::Within),
@@ -325,6 +326,26 @@ impl<V> FaceMap<V> {
             px: f(Face::PX),
             py: f(Face::PY),
             pz: f(Face::PZ),
+        }
+    }
+
+    /// Constructs a [`FaceMap`] whose negative and positive directions are
+    /// equal, and whose [`Face::Within`] value is the default.
+    // TODO: Evaluate whether this is a good API.
+    #[inline]
+    pub(crate) fn symmetric(values: impl Into<Vector3<V>>) -> Self
+    where
+        V: Default + Clone,
+    {
+        let values = values.into();
+        Self {
+            within: Default::default(),
+            nx: values.x.clone(),
+            px: values.x,
+            ny: values.y.clone(),
+            py: values.y,
+            nz: values.z.clone(),
+            pz: values.z,
         }
     }
 
