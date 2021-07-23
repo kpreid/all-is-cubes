@@ -329,14 +329,12 @@ impl Space {
 
 impl LightPhysics {
     /// Generate the lighting data array that a newly created empty [`Space`] should have.
-    pub(crate) fn initialize_lighting(
-        &self,
-        grid: Grid,
-        ambient_color: PackedLight,
-    ) -> Box<[PackedLight]> {
+    pub(crate) fn initialize_lighting(&self, grid: Grid) -> Box<[PackedLight]> {
         match self {
             LightPhysics::None => Box::new([]),
-            LightPhysics::Rays { .. } => vec![ambient_color; grid.volume()].into_boxed_slice(),
+            LightPhysics::Rays { .. } => {
+                vec![PackedLight::NO_RAYS; grid.volume()].into_boxed_slice()
+            }
         }
     }
 }
@@ -450,10 +448,7 @@ mod tests {
     #[test]
     fn initial_lighting_value() {
         let space = Space::empty_positive(1, 1, 1);
-        assert_eq!(
-            PackedLight::from(space.physics().sky_color),
-            space.get_lighting((0, 0, 0))
-        );
+        assert_eq!(PackedLight::NO_RAYS, space.get_lighting((0, 0, 0)));
     }
 
     #[test]
@@ -468,33 +463,32 @@ mod tests {
     #[test]
     fn step() {
         let mut space = Space::empty_positive(3, 1, 1);
-        let former_sky_light = PackedLight::from(space.physics().sky_color);
         space.set_physics(SpacePhysics {
             sky_color: Rgb::new(1.0, 0.0, 0.0),
             ..SpacePhysics::default()
         });
-        let new_sky_light = PackedLight::from(space.physics().sky_color);
+        let sky_light = PackedLight::from(space.physics().sky_color);
 
         space.set((0, 0, 0), Rgb::ONE).unwrap();
         // Not changed yet... except for the now-opaque block
         assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::OPAQUE);
-        assert_eq!(space.get_lighting((1, 0, 0)), former_sky_light);
-        assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light);
+        assert_eq!(space.get_lighting((1, 0, 0)), PackedLight::NO_RAYS);
+        assert_eq!(space.get_lighting((2, 0, 0)), PackedLight::NO_RAYS);
 
         let (info, _) = space.step(None, Tick::arbitrary());
         assert_eq!(
             info.light,
             LightUpdatesInfo {
                 update_count: 1,
-                max_update_difference: new_sky_light.difference_priority(former_sky_light),
+                max_update_difference: sky_light.difference_priority(PackedLight::NO_RAYS),
                 queue_count: 0,
                 max_queue_priority: 0
             }
         );
 
         assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::OPAQUE); // opaque
-        assert_eq!(space.get_lighting((1, 0, 0)), new_sky_light); // updated
-        assert_eq!(space.get_lighting((2, 0, 0)), former_sky_light); // not updated
+        assert_eq!(space.get_lighting((1, 0, 0)), sky_light); // updated
+        assert_eq!(space.get_lighting((2, 0, 0)), PackedLight::NO_RAYS); // not updated/not relevant
     }
 
     #[test]
@@ -569,7 +563,7 @@ mod tests {
             .build();
 
         let space = light_source_test_space(block);
-        assert_eq!(space.get_lighting([1, 1, 1]), PackedLight::OPAQUE,);
+        assert_eq!(space.get_lighting([1, 1, 1]), PackedLight::OPAQUE);
         let adjacents = FaceMap::from_fn(|face| {
             space
                 .get_lighting(GridPoint::new(1, 1, 1) + face.normal_vector())
@@ -581,11 +575,11 @@ mod tests {
             // I think it's probably due to exactly diagonal rays.
             FaceMap {
                 within: Rgb::new(0.0, 0.0, 0.0),
-                nx: Rgb::new(0.13631347, 0.27262694, 0.5452539),
-                ny: Rgb::new(0.16928194, 0.3385639, 0.6771278),
+                nx: Rgb::new(0.13053422, 0.26106843, 0.52213687),
+                ny: Rgb::new(0.16210495, 0.3242099, 0.6484198),
                 nz: Rgb::new(0.2102241, 0.4204482, 0.8408964),
-                px: Rgb::new(0.13631347, 0.27262694, 0.5452539),
-                py: Rgb::new(0.16928194, 0.3385639, 0.6771278),
+                px: Rgb::new(0.13053422, 0.26106843, 0.52213687),
+                py: Rgb::new(0.16210495, 0.3242099, 0.6484198),
                 pz: Rgb::new(0.2102241, 0.4204482, 0.8408964)
             },
         );

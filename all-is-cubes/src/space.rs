@@ -131,7 +131,6 @@ impl Space {
         // TODO: Might actually be worth checking for memory allocation failure here...?
         let volume = grid.volume();
         let physics = SpacePhysics::default();
-        let packed_sky_color = physics.sky_color.into();
 
         Space {
             grid,
@@ -151,11 +150,13 @@ impl Space {
                 vec![]
             },
             contents: vec![0; volume].into_boxed_slice(),
-            lighting: physics.light.initialize_lighting(grid, packed_sky_color),
+
+            lighting: physics.light.initialize_lighting(grid),
+            packed_sky_color: physics.sky_color.into(),
             light_update_queue: LightUpdateQueue::new(),
             last_light_updates: Vec::new(),
+
             physics,
-            packed_sky_color,
             behaviors: BehaviorSet::new(),
             spawn: Spawn::default_for_new_space(grid),
             notifier: Notifier::new(),
@@ -219,6 +220,8 @@ impl Space {
                         },
                     )
                 }
+                // The light value would be more consistent if it were PackedLight::NO_RAYS when
+                // there is no interior adjacent block, but probably nobody will actually care.
                 None => extractor(None, &SpaceBlockData::NOTHING, self.packed_sky_color),
             }
         })
@@ -597,10 +600,8 @@ impl Space {
     pub fn set_physics(&mut self, physics: SpacePhysics) {
         self.packed_sky_color = physics.sky_color.into();
         if self.physics.light != physics.light {
-            // TODO: comparison is too specific once there are parameters -- might be a minor change
-            self.lighting = physics
-                .light
-                .initialize_lighting(self.grid, self.packed_sky_color);
+            // TODO: comparison is too specific once there are parameters -- might be a minor change of color etc.
+            self.lighting = physics.light.initialize_lighting(self.grid);
             // TODO: Need to force updates potentially
         }
         self.physics = physics;
