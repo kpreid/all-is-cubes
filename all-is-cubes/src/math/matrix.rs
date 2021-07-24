@@ -378,6 +378,10 @@ impl GridRotation {
     /// ```
     pub const COUNTERCLOCKWISE: Self = Self::RzYX;
 
+    /// Constructs a rotation from a basis: that is, the returned rotation will
+    /// rotate `PX` into `basis[0]`, `PY` into `basis[1]`, and `PZ` into `basis[2]`.
+    ///
+    /// Panics if the three provided axes are not mutually perpendicular.
     #[inline]
     pub fn from_basis(basis: impl Into<Vector3<Face>>) -> Self {
         let basis: Vector3<Face> = basis.into();
