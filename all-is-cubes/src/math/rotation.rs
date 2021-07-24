@@ -160,6 +160,45 @@ impl GridRotation {
         }
     }
 
+    /// Find the rotation (without reflection) which rotates `source` to `destination`.
+    /// and leaves `up` unaffected. (This might also be considered a “look at” operation).
+    ///
+    /// If it is not possible to leave `up` unaffected, returns [`None`]. (Trying two
+    /// perpendicular `up` directions will always succeed.)
+    ///
+    /// If any of the arguments is [`Face::Within`], returns [`None`].
+    pub fn from_to(source: Face, destination: Face, up: Face) -> Option<Self> {
+        use Face::*;
+        let perpendicular = source.cross(up);
+        if source == destination {
+            Some(Self::IDENTITY)
+        } else if perpendicular == Within {
+            // up was parallel to source, or one of them was Within.
+            None
+        } else {
+            // Find rotation from the frame source=NZ up=PY to the actual given one.
+            let canonical_to_given = Self::from_basis([perpendicular, up, source.opposite()]);
+            let given_to_canonical = canonical_to_given.inverse();
+            debug_assert!(!canonical_to_given.is_reflection());
+
+            // The destination expressed in that frame.
+            let canonical_destination = given_to_canonical.transform(destination);
+            // Find which of the four rotations in a plane matches.
+            let canonical_rotation = match canonical_destination {
+                Within | NY | PY => {
+                    // Tried to rotate into the up vector or into Within.
+                    return None;
+                }
+                NZ => Self::IDENTITY,
+                PX => Self::CLOCKWISE,
+                PZ => Self::RxYz,
+                NX => Self::COUNTERCLOCKWISE,
+            };
+            // Transform that rotation into the given frame.
+            Some(canonical_to_given * canonical_rotation * given_to_canonical)
+        }
+    }
+
     // TODO: public? do we want this to be our API? should this also be a From impl?
     #[inline]
     #[rustfmt::skip] // dense data layout
@@ -463,5 +502,46 @@ mod tests {
         }
         assert_eq!(set.len(), GridRotation::ALL.len());
         assert_eq!(48, GridRotation::ALL.len());
+    }
+
+    /// The set of possible inputs is small enough to test its properties exhaustively
+    #[test]
+    fn from_to_exhaustive() {
+        for &from_face in Face::ALL_SEVEN {
+            for &to_face in Face::ALL_SEVEN {
+                for &up_face in Face::ALL_SEVEN {
+                    let result = GridRotation::from_to(from_face, to_face, up_face);
+                    let info = (from_face, to_face, up_face, result);
+                    match result {
+                        Some(result) => {
+                            assert!(!result.is_reflection());
+                            assert_eq!(
+                                result.transform(from_face),
+                                to_face,
+                                "wrong from-to: {:?}",
+                                info
+                            );
+                            assert_eq!(
+                                result.transform(up_face),
+                                up_face,
+                                "did not preserve up vector: {:?}",
+                                info
+                            );
+                        }
+                        None => {
+                            assert!(
+                                from_face == Within
+                                    || to_face == Within
+                                    || up_face == Within
+                                    || up_face.axis_number() == from_face.axis_number()
+                                    || up_face.axis_number() == to_face.axis_number(),
+                                "returned None incorrectly: {:?}",
+                                info
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 }
