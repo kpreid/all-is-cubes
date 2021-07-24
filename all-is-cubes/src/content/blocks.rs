@@ -4,7 +4,7 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-use cgmath::{ElementWise as _, EuclideanSpace as _};
+use cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
 use embedded_graphics::prelude::Point;
 use embedded_graphics::primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable};
 use noise::Seedable as _;
@@ -27,6 +27,7 @@ pub enum DemoBlocks {
     Lamp,
     Lamppost,
     Sconce,
+    Arrow,
     Road,
     Curb,
     CurbCorner,
@@ -130,6 +131,53 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                     }
                 })?
                 .build(),
+
+            Arrow => {
+                let mut space = Space::empty(Grid::for_block(resolution));
+
+                // Support legs, identifying the down / -Y direction.
+                let leg = Block::from(palette::STEEL);
+                space.fill_uniform(
+                    Grid::new(
+                        [resolution_g / 2 - 1, 0, resolution_g / 2 - 1],
+                        [2, resolution_g / 2, 2],
+                    ),
+                    &leg,
+                )?;
+
+                // Arrow body
+                let base_body_color = rgb_const!(0.5, 0.5, 0.5);
+                space.fill(space.grid(), |p| {
+                    // TODO: We really need better procgen tools
+                    let p2 = p * 2 + one_diagonal - center_point_doubled;
+                    let r = p2
+                        .mul_element_wise(Vector3::new(1, 1, 0))
+                        .map(|c| f64::from(c) / 2.0)
+                        .magnitude();
+                    let body_radius = if p.z < 6 {
+                        f64::from(p.z) / 1.5 + 1.0
+                    } else {
+                        2.0
+                    };
+                    if r < body_radius {
+                        // Shade the body with an axis-indicating color.
+                        Some(Block::from(Rgb::new(
+                            base_body_color.red().into_inner()
+                                + (p2.x as f32 / resolution_g as f32),
+                            base_body_color.green().into_inner()
+                                + (p2.y as f32 / resolution_g as f32),
+                            base_body_color.red().into_inner(),
+                        )))
+                    } else {
+                        None
+                    }
+                })?;
+
+                Block::builder()
+                    .display_name("Arrow")
+                    .voxels_ref(resolution, universe.insert_anonymous(space))
+                    .build()
+            }
 
             Curb => Block::builder()
                 .display_name("Curb")

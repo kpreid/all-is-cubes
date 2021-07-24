@@ -85,6 +85,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         &demo_blocks[Sconce],
         &demo_blocks[Road],
         &demo_blocks[Signboard],
+        &demo_blocks[Arrow],
     ] {
         spawn.inventory.push(Tool::PlaceBlock(block.clone()));
     }
