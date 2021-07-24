@@ -119,10 +119,8 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     // Roads and lamps
     for &face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
         let forward: GridVector = face.normal_vector();
-        let perpendicular: GridVector = forward.cross(Face::PY.normal_vector());
-        // TODO: should be able to express this in look-at terms.
-        let road_aligned_rotation =
-            GridRotation::from_basis([face.cross(Face::PY), Face::PY, face]);
+        let perpendicular: GridVector = GridRotation::CLOCKWISE.transform(face).normal_vector();
+        let road_aligned_rotation = GridRotation::from_to(Face::NZ, face, Face::PY).unwrap();
         let other_side_of_road =
             GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]) * road_aligned_rotation;
         let rotations = [other_side_of_road, road_aligned_rotation];
