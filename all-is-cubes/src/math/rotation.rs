@@ -291,6 +291,25 @@ impl GridRotation {
         }
     }
 
+    /// Returns whether this is a reflection.
+    ///
+    /// ```
+    /// use all_is_cubes::math::{GridRotation, Face::*};
+    ///
+    /// assert!(!GridRotation::IDENTITY.is_reflection());
+    /// assert!(!GridRotation::from_basis([PX, PZ, NY]).is_reflection());
+    /// assert!(GridRotation::from_basis([PX, PZ, PY]).is_reflection());
+    /// ```
+    #[inline]
+    pub const fn is_reflection(self) -> bool {
+        // In a coordinate system of the *same handedness*, the cross product computes
+        // the same
+
+        let Vector3 { x, y, z } = self.to_basis();
+        // u8 casts are a kludge to make == work as a const fn.
+        x.cross(y) as u8 != z as u8
+    }
+
     /// Returns the inverse of this rotation; the one which undoes this.
     ///
     /// ```
@@ -417,6 +436,21 @@ mod tests {
             GridRotation::IDENTITY,
             GridRotation::COUNTERCLOCKWISE * GridRotation::CLOCKWISE
         );
+    }
+
+    #[test]
+    fn is_reflection_consistency() {
+        for a in GridRotation::ALL {
+            for b in GridRotation::ALL {
+                assert_eq!(
+                    a.is_reflection() ^ b.is_reflection(),
+                    (a * b).is_reflection(),
+                    "{:?}, {:?}",
+                    a,
+                    b,
+                );
+            }
+        }
     }
 
     /// Test that `GridRotation::ALL` is complete.
