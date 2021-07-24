@@ -15,10 +15,12 @@ use embedded_graphics::text::{Baseline, Text};
 use ordered_float::NotNan;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
-use crate::content::palette;
-use crate::content::Exhibit;
+use crate::content::{palette, DemoBlocks, Exhibit};
 use crate::drawing::draw_to_blocks;
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba};
+use crate::linking::{BlockProvider, InGenError};
+use crate::math::{
+    Face, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba,
+};
 use crate::space::{Grid, Space};
 use crate::universe::Universe;
 
@@ -27,10 +29,11 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     KNOT,
     TEXT,
     RESOLUTIONS,
-    COLORS,
-    CHUNK_CHART,
     MAKE_SOME_BLOCKS,
+    ROTATIONS,
+    CHUNK_CHART,
     SWIMMING_POOL,
+    COLORS,
 ];
 
 const TRANSPARENCY: Exhibit = Exhibit {
@@ -180,6 +183,54 @@ const RESOLUTIONS: Exhibit = Exhibit {
                         Baseline::Bottom,
                     ),
                 )?[GridPoint::origin()],
+            )?;
+        }
+
+        Ok(space)
+    },
+};
+
+const ROTATIONS: Exhibit = Exhibit {
+    name: "Rotations",
+    factory: |_this, universe| {
+        let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+        let mut space = Space::empty(Grid::new([-2, 0, -2], [5, 5, 5]));
+
+        let [_, central_block] = crate::content::make_some_voxel_blocks(universe);
+        let pointing_block = &demo_blocks[DemoBlocks::Arrow];
+
+        let center = GridPoint::new(0, 0, 0);
+        space.set(center, central_block)?;
+
+        let mut place_rotated_arrow =
+            |pos: GridPoint, rot: GridRotation| -> Result<(), InGenError> {
+                space.set(pos, pointing_block.clone().rotate(rot))?;
+                space.set(
+                    pos + GridVector::unit_y(),
+                    &draw_to_blocks(
+                        universe,
+                        32,
+                        0,
+                        0..1,
+                        BlockAttributes {
+                            collision: BlockCollision::None,
+                            ..BlockAttributes::default()
+                        },
+                        &Text::with_baseline(
+                            &format!("{:?}", rot),
+                            Point::new(0, -1),
+                            MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                            Baseline::Bottom,
+                        ),
+                    )?[GridPoint::origin()],
+                )?;
+                Ok(())
+            };
+
+        for face in [Face::PX, Face::PZ, Face::NX, Face::NZ] {
+            place_rotated_arrow(
+                center + face.normal_vector() * 2,
+                GridRotation::from_to(Face::NZ, face.opposite(), Face::PY).unwrap(),
             )?;
         }
 
