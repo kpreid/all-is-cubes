@@ -125,7 +125,7 @@ impl Face {
     /// }
     /// ```
     #[inline]
-    pub fn cross(self, other: Self) -> Self {
+    pub const fn cross(self, other: Self) -> Self {
         use Face::*;
         match (self, other) {
             // Zero input
