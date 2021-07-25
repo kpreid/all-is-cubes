@@ -68,7 +68,7 @@ pub enum Block {
 
     /// Identical to another block, but with rotated coordinates.
     ///
-    /// Specifically, the given rotation specifies how the given block's coordinate
+    /// Specifically, the given rotation specifies how the contained block's coordinate
     /// system is rotated into this block's.
     // TODO: Hmm, it'd be nice if this common case wasn't another allocation — should we
     // have an outer struct with a rotation field instead??
@@ -241,13 +241,13 @@ impl Block {
                 let resolution = base.resolution;
                 Ok(EvaluatedBlock {
                     voxels: base.voxels.map(|voxels| {
-                        let matrix = rotation.to_positive_octant_matrix(resolution.into());
-                        let inverse_matrix = rotation
+                        let inner_to_outer = rotation.to_positive_octant_matrix(resolution.into());
+                        let outer_to_inner = rotation
                             .inverse()
                             .to_positive_octant_matrix(resolution.into());
                         GridArray::from_fn(
-                            voxels.grid().transform(inverse_matrix).unwrap(),
-                            |cube| voxels[matrix.transform_cube(cube)],
+                            voxels.grid().transform(inner_to_outer).unwrap(),
+                            |cube| voxels[outer_to_inner.transform_cube(cube)],
                         )
                     }),
                     ..base

@@ -174,7 +174,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                         step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
                         demo_blocks[Sconce]
                             .clone()
-                            .rotate(GridRotation::RzYX * rotations[side]),
+                            .rotate(GridRotation::CLOCKWISE * rotations[side]),
                     )?;
                 }
             }
@@ -293,9 +293,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                     plot_transform * name_transform * GridMatrix::from_translation([0, 0, -1]),
                 )
                 .unwrap(),
-            demo_blocks[Signboard]
-                .clone()
-                .rotate(plot_rotation.inverse()),
+            demo_blocks[Signboard].clone().rotate(plot_rotation),
         )?;
 
         // Place exhibit content
@@ -342,7 +340,7 @@ fn space_to_space_copy(
 ) -> Result<(), SetCubeError> {
     // TODO: don't panic
     let dst_to_src_transform = src_to_dst_transform.inverse_transform().unwrap();
-    let (block_rotation, _) = dst_to_src_transform
+    let (block_rotation, _) = src_to_dst_transform
         .decompose()
         .expect("could not decompose transform");
     dst.fill(src_grid.transform(src_to_dst_transform).unwrap(), |p| {
