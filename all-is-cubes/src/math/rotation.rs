@@ -239,8 +239,8 @@ impl GridRotation {
     ///
     /// Such matrices are suitable for rotating the voxels of a block, provided
     /// that the coordinates are then transformed with [`GridMatrix::transform_cube`],
-    /// *not* [`GridMatrix::transform_point`] (due to the lower-corner format of cube
-    /// coordinates).
+    /// *not* [`GridMatrix::transform_point`](cgmath::Transform::transform_point)
+    /// (due to the lower-corner format of cube coordinates).
     /// ```
     /// # use all_is_cubes::{math::{GridPoint, GridRotation}, space::Grid};
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_matrix(4);

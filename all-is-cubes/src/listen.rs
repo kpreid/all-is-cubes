@@ -60,7 +60,7 @@ impl<M: Clone + Send> Notifier<M> {
     /// Returns a [`Listener`] which forwards messages to the listeners registered with
     /// this `Notifier`, provided that it is owned by an `Rc`.
     ///
-    /// This may be used together with [`ListenerHelper::filter`] to forward notifications
+    /// This may be used together with [`Listener::filter`] to forward notifications
     /// of changes in dependencies. Using this operation means that the dependent does not
     /// need to fan out listener registrations to all of its current dependencies.
     ///
@@ -346,13 +346,13 @@ where
 
 /// Controls a [`Listener`] chain by discarding messages when this gate is dropped.
 ///
-/// Construct this using [`ListenerHelper::gate`], or if a placeholder instance with no
+/// Construct this using [`Listener::gate`], or if a placeholder instance with no
 /// effect is required, [`Gate::default`].
 #[derive(Clone, Debug, Default)]
 pub struct Gate(Arc<()>);
 
 /// [`Listener`] implementation which discards messages when the corresponding [`Gate`]
-/// is dropped. Construct this using [`ListenerHelper::gate`].
+/// is dropped. Construct this using [`Listener::gate`].
 pub struct GateListener<T> {
     weak: Weak<()>,
     target: T,
