@@ -601,8 +601,18 @@ impl Space {
         self.packed_sky_color = physics.sky_color.into();
         let old_physics = std::mem::replace(&mut self.physics, physics);
         if self.physics.light != old_physics.light {
-            // TODO: comparison is too specific once there are parameters -- might be a minor change of color etc.
+            // TODO: == comparison is too broad once there are parameters -- might be a minor change of color etc.
             self.lighting = self.physics.light.initialize_lighting(self.grid);
+
+            match self.physics.light {
+                LightPhysics::None => {
+                    self.light_update_queue.clear();
+                }
+                LightPhysics::Rays { .. } => {
+                    // TODO: initialize light
+                }
+            }
+
             // TODO: Need to force light updates
         }
         // TODO: Also send out a SpaceChange notification, if anything is different.
@@ -1332,5 +1342,48 @@ mod tests {
             \x20   ..\n\
             }"
         );
+    }
+
+    #[test]
+    fn set_physics_light_none() {
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set([0, 0, 0], Rgba::new(1.0, 1.0, 1.0, 0.5)).unwrap();
+        assert_eq!(space.light_update_queue.len(), 1);
+        // Check that a no-op update doesn't clear
+        space.set_physics(SpacePhysics::default());
+        assert_eq!(space.light_update_queue.len(), 1);
+
+        space.set_physics(SpacePhysics {
+            light: LightPhysics::None,
+            ..SpacePhysics::default()
+        });
+
+        // No light data and no queue
+        assert_eq!(space.light_update_queue.len(), 0);
+        assert_eq!(space.lighting.len(), 0);
+        // TODO: test what change notifications are sent
+    }
+
+    #[test]
+    fn set_physics_light_rays() {
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set([0, 0, 0], Rgba::new(1.0, 1.0, 1.0, 0.5)).unwrap();
+        space.set_physics(SpacePhysics {
+            light: LightPhysics::None,
+            ..SpacePhysics::default()
+        });
+        assert_eq!(space.light_update_queue.len(), 0);
+
+        // This is the set_physics we're actually testing
+        space.set_physics(SpacePhysics {
+            light: LightPhysics::Rays {
+                maximum_distance: 10,
+            },
+            ..SpacePhysics::default()
+        });
+
+        // TODO: assert_eq!(space.light_update_queue.len(), 1);
+        assert_eq!(space.lighting.len(), 1);
+        // TODO: test what change notifications are sent
     }
 }

@@ -297,6 +297,11 @@ impl LightUpdateQueue {
             .map(|r| r.priority)
             .unwrap_or(0)
     }
+
+    pub fn clear(&mut self) {
+        self.queue.clear();
+        self.table.clear();
+    }
 }
 
 #[cfg(test)]
