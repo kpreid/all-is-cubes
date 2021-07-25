@@ -184,7 +184,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 FaceMap::repeat(PackedLight::ONE)
             };
 
-            for &face in Face::ALL_SEVEN {
+            for face in Face::ALL_SEVEN {
                 let adjacent_cube = cube + face.normal_vector();
                 if space
                     .get_block_index(adjacent_cube)

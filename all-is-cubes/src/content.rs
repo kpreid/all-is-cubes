@@ -137,7 +137,7 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
                 .fill_uniform(block_space.grid(), Block::from(color))
                 .unwrap();
             axes(&mut block_space).unwrap();
-            for &face in Face::ALL_SIX {
+            for face in Face::ALL_SIX {
                 Text::with_text_style(
                     &i.to_string(),
                     Point::new(i32::from(resolution / 2), i32::from(resolution / 2)),
@@ -192,7 +192,7 @@ fn color_sequence_for_make_blocks(n: usize) -> impl Iterator<Item = (usize, Rgba
 /// assert_ne!(space[(0, 0, -10)], AIR);
 /// ```
 pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
-    for &face in Face::ALL_SIX {
+    for face in Face::ALL_SIX {
         let axis = face.axis_number();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())

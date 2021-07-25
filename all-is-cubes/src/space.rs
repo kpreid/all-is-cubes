@@ -371,7 +371,7 @@ impl Space {
                 self.lighting[contents_index] = PackedLight::OPAQUE;
                 self.notifier.notify(SpaceChange::Lighting(position));
             }
-            for &face in Face::ALL_SIX {
+            for face in Face::ALL_SIX {
                 let neighbor = position + face.normal_vector();
                 // Skip neighbor light updates in the definitely-black-inside case.
                 if !self.get_evaluated(neighbor).opaque {

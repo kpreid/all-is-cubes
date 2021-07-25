@@ -437,7 +437,7 @@ impl Mul<Self> for GridRotation {
     /// let transform_2 = GridRotation::from_basis([PY, PZ, PX]);
     ///
     /// // Demonstrate the directionality of concatenation.
-    /// for &face in Face::ALL_SEVEN {
+    /// for face in Face::ALL_SEVEN {
     ///     assert_eq!(
     ///         (transform_1 * transform_2).transform(face),
     ///         transform_1.transform(transform_2.transform(face)),
@@ -507,9 +507,9 @@ mod tests {
     /// The set of possible inputs is small enough to test its properties exhaustively
     #[test]
     fn from_to_exhaustive() {
-        for &from_face in Face::ALL_SEVEN {
-            for &to_face in Face::ALL_SEVEN {
-                for &up_face in Face::ALL_SEVEN {
+        for from_face in Face::ALL_SEVEN {
+            for to_face in Face::ALL_SEVEN {
+                for up_face in Face::ALL_SEVEN {
                     let result = GridRotation::from_to(from_face, to_face, up_face);
                     let info = (from_face, to_face, up_face, result);
                     match result {

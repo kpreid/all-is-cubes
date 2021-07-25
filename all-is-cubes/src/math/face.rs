@@ -39,10 +39,9 @@ pub enum Face {
 
 impl Face {
     /// All the values of [`Face`] except for [`Face::Within`].
-    pub const ALL_SIX: &'static [Face; 6] =
-        &[Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
+    pub const ALL_SIX: [Face; 6] = [Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
     /// All the values of [`Face`], with [`Face::Within`] listed first.
-    pub const ALL_SEVEN: &'static [Face; 7] = &[
+    pub const ALL_SEVEN: [Face; 7] = [
         Face::Within,
         Face::NX,
         Face::NY,
@@ -113,8 +112,8 @@ impl Face {
     /// ```
     /// use all_is_cubes::math::Face;
     ///
-    /// for &face1 in Face::ALL_SEVEN {
-    ///     for &face2 in Face::ALL_SEVEN {
+    /// for face1 in Face::ALL_SEVEN {
+    ///     for face2 in Face::ALL_SEVEN {
     ///         // Cross product of faces is identical to cross product of vectors.
     ///         assert_eq!(
     ///             face1.cross(face2).normal_vector::<f64>(),
@@ -269,7 +268,7 @@ impl TryFrom<GridVector> for Face {
     /// use std::convert::TryFrom;
     ///
     /// // A Face may be converted from its normal vector.
-    /// for &face in Face::ALL_SEVEN {
+    /// for face in Face::ALL_SEVEN {
     ///     assert_eq!(Face::try_from(face.normal_vector()), Ok(face));
     /// }
     ///
@@ -466,7 +465,7 @@ mod tests {
 
     #[test]
     fn face_matrix_does_not_scale_or_reflect() {
-        for &face in Face::ALL_SIX {
+        for face in Face::ALL_SIX {
             assert_eq!(1.0, face.matrix(7).to_free().determinant());
         }
     }

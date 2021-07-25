@@ -190,7 +190,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 
             // Walk through the planes (layers) of the block, figuring out what geometry to
             // generate for each layer and whether it needs a texture.
-            for &face in Face::ALL_SIX {
+            for face in Face::ALL_SIX {
                 let transform = face.matrix(block_resolution - 1);
 
                 // Rotate the voxel array's extent into our local coordinate system, so we can find
