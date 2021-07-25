@@ -247,16 +247,14 @@ fn rotate_rotated_consistency() {
     let [block] = make_some_voxel_blocks(&mut universe);
     assert!(matches!(block, Block::Recur { .. }));
 
+    // Two rotations not in the same plane, so they are not commutative.
     let rotation_1 = GridRotation::RyXZ;
     let rotation_2 = GridRotation::RXyZ;
 
-    let rotated_twice = block
-        .clone()
-        .rotate(GridRotation::RyXZ)
-        .rotate(GridRotation::RXyZ);
+    let rotated_twice = block.clone().rotate(rotation_1).rotate(rotation_2);
     let two_rotations = Block::Rotated(
-        rotation_1,
-        Box::new(Block::Rotated(rotation_2, Box::new(block))),
+        rotation_2,
+        Box::new(Block::Rotated(rotation_1, Box::new(block))),
     );
     assert_ne!(rotated_twice, two_rotations, "Oops; test is ineffective");
 
