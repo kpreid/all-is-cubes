@@ -595,8 +595,7 @@ impl Space {
 
     /// Sets the physics parameters, as per [`physics`](Self::physics).
     ///
-    /// This function does not currently cause any recomputation of cube lighting,
-    /// but \[TODO:\] it may later be improved to do so.
+    /// This may cause recomputation of lighting.
     pub fn set_physics(&mut self, physics: SpacePhysics) {
         self.packed_sky_color = physics.sky_color.into();
         let old_physics = std::mem::replace(&mut self.physics, physics);
@@ -609,7 +608,7 @@ impl Space {
                     self.light_update_queue.clear();
                 }
                 LightPhysics::Rays { .. } => {
-                    // TODO: initialize light
+                    self.fast_evaluate_light();
                 }
             }
 
@@ -1366,8 +1365,9 @@ mod tests {
 
     #[test]
     fn set_physics_light_rays() {
-        let mut space = Space::empty_positive(1, 1, 1);
+        let mut space = Space::empty_positive(2, 1, 1);
         space.set([0, 0, 0], Rgba::new(1.0, 1.0, 1.0, 0.5)).unwrap();
+        space.set([1, 0, 0], Rgba::new(1.0, 1.0, 1.0, 1.0)).unwrap();
         space.set_physics(SpacePhysics {
             light: LightPhysics::None,
             ..SpacePhysics::default()
@@ -1382,8 +1382,10 @@ mod tests {
             ..SpacePhysics::default()
         });
 
-        // TODO: assert_eq!(space.light_update_queue.len(), 1);
-        assert_eq!(space.lighting.len(), 1);
+        assert_eq!(space.lighting.len(), 2);
+        assert_eq!(space.get_lighting([0, 0, 0]), space.packed_sky_color);
+        assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::OPAQUE);
+        assert_eq!(space.light_update_queue.len(), 1);
         // TODO: test what change notifications are sent
     }
 }

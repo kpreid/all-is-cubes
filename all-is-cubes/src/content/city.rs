@@ -27,6 +27,7 @@ use crate::math::{
     NoiseFnExt as _, Rgb,
 };
 use crate::raycast::Raycaster;
+use crate::space::LightPhysics;
 use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
 use crate::tools::Tool;
 use crate::universe::Universe;
@@ -68,6 +69,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     let mut space = Space::empty(grid);
     space.set_physics(SpacePhysics {
         sky_color: Rgb::new(0.9, 0.9, 1.4),
+        light: LightPhysics::None, // disable until we are done with bulk updates
         ..SpacePhysics::default()
     });
 
@@ -326,6 +328,12 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         GridMatrix::from_translation([0, 12, -radius_xz]),
         &mut space,
     )?;
+
+    // Enable light computation
+    space.set_physics(SpacePhysics {
+        light: SpacePhysics::default().light,
+        ..space.physics().clone()
+    });
 
     Ok(space)
 }

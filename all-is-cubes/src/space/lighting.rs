@@ -325,6 +325,55 @@ impl Space {
             },
         )
     }
+
+    /// Clear and recompute light data and update queue, in a way which gets fast approximate
+    /// results suitable for flat landscapes mostly lit from above (the +Y axis).
+    pub(crate) fn fast_evaluate_light(&mut self) {
+        self.light_update_queue.clear(); // Going to refill it
+
+        if self.physics.light == LightPhysics::None {
+            return;
+        }
+
+        let grid = self.grid();
+        for x in grid.x_range() {
+            for z in grid.z_range() {
+                let mut covered = false;
+                for y in grid.y_range().rev() {
+                    let cube = GridPoint::new(x, y, z);
+                    let index = grid.index(cube).unwrap();
+
+                    let this_cube_evaluated =
+                        &self.block_data[self.contents[index] as usize].evaluated;
+                    self.lighting[index] = if this_cube_evaluated.opaque {
+                        covered = true;
+                        PackedLight::OPAQUE
+                    } else {
+                        if this_cube_evaluated.visible
+                            || std::array::IntoIter::new(Face::ALL_SIX)
+                                .any(|face| self.get_evaluated(cube + face.normal_vector()).visible)
+                        {
+                            // In this case (and only this case), we are guessing rather than being certain,
+                            // so we need to schedule a proper update.
+                            // (Bypassing `self.light_needs_update()` to skip bounds checks).
+                            self.light_update_queue.insert(LightUpdateRequest {
+                                priority: PackedLightScalar::MAX,
+                                cube,
+                            });
+
+                            if covered {
+                                PackedLight::ZERO
+                            } else {
+                                self.packed_sky_color
+                            }
+                        } else {
+                            PackedLight::NO_RAYS
+                        }
+                    };
+                }
+            }
+        }
+    }
 }
 
 impl LightPhysics {
