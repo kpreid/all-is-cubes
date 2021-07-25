@@ -599,12 +599,12 @@ impl Space {
     /// but \[TODO:\] it may later be improved to do so.
     pub fn set_physics(&mut self, physics: SpacePhysics) {
         self.packed_sky_color = physics.sky_color.into();
-        if self.physics.light != physics.light {
+        let old_physics = std::mem::replace(&mut self.physics, physics);
+        if self.physics.light != old_physics.light {
             // TODO: comparison is too specific once there are parameters -- might be a minor change of color etc.
-            self.lighting = physics.light.initialize_lighting(self.grid);
-            // TODO: Need to force updates potentially
+            self.lighting = self.physics.light.initialize_lighting(self.grid);
+            // TODO: Need to force light updates
         }
-        self.physics = physics;
         // TODO: Also send out a SpaceChange notification, if anything is different.
     }
 
