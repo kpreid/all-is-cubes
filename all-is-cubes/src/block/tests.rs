@@ -10,9 +10,9 @@ use crate::block::{
     builder, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef, EvalBlockError,
     Evoxel, Resolution, AIR,
 };
-use crate::content::make_some_blocks;
+use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
-use crate::math::{GridPoint, GridVector, Rgb, Rgba};
+use crate::math::{GridPoint, GridRotation, GridVector, Rgb, Rgba};
 use crate::space::{Grid, GridArray, Space};
 use crate::universe::Universe;
 
@@ -237,6 +237,33 @@ fn indirect_equivalence() {
     let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
     let eval_def = block_def_ref.borrow().block.evaluate();
     assert_eq!(eval_bare, eval_def);
+}
+
+/// Check that Block::rotate's pre-composition is consistent with the interpretation
+/// used by evaluating Block::Rotated.
+#[test]
+fn rotate_rotated_consistency() {
+    let mut universe = Universe::new();
+    let [block] = make_some_voxel_blocks(&mut universe);
+    assert!(matches!(block, Block::Recur { .. }));
+
+    let rotation_1 = GridRotation::RyXZ;
+    let rotation_2 = GridRotation::RXyZ;
+
+    let rotated_twice = block
+        .clone()
+        .rotate(GridRotation::RyXZ)
+        .rotate(GridRotation::RXyZ);
+    let two_rotations = Block::Rotated(
+        rotation_1,
+        Box::new(Block::Rotated(rotation_2, Box::new(block))),
+    );
+    assert_ne!(rotated_twice, two_rotations, "Oops; test is ineffective");
+
+    assert_eq!(
+        rotated_twice.evaluate().unwrap(),
+        two_rotations.evaluate().unwrap()
+    );
 }
 
 #[test]
