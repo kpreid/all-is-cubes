@@ -135,6 +135,8 @@ impl HudLayout {
             })
             .unwrap();
 
+        space.fast_evaluate_light();
+
         universe.insert_anonymous(space)
     }
 
