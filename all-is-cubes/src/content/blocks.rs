@@ -118,14 +118,16 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 .display_name("Sconce")
                 .light_emission(Rgb::new(8.0, 7.0, 6.0))
                 .voxels_fn(universe, resolution, |p| {
-                    // TODO: fancier appearance with a bracket
-                    if int_magnitude_squared(
+                    // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
+                    let r2 = int_magnitude_squared(
                         (p * 2 + one_diagonal
                             - center_point_doubled.mul_element_wise(GridPoint::new(1, 1, 0)))
                         .mul_element_wise(GridVector::new(3, 1, 1)),
-                    ) <= resolution_g.pow(2)
-                    {
+                    );
+                    if r2 <= (resolution_g - 2).pow(2) {
                         Rgba::WHITE.into()
+                    } else if r2 <= (resolution_g + 4).pow(2) && p.z == 0 {
+                        palette::ALMOST_BLACK.into()
                     } else {
                         AIR.clone()
                     }
