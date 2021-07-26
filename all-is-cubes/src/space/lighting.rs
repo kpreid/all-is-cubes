@@ -171,7 +171,12 @@ impl Space {
 
         let ev_origin = self.get_evaluated(cube);
         if ev_origin.opaque {
-            // Opaque blocks are always dark inside.
+            // Opaque blocks are always dark inside — unless they are light sources.
+            if !opaque_for_light_computation(ev_origin) {
+                incoming_light += ev_origin.attributes.light_emission;
+                total_rays += 1;
+                total_ray_weight += 1.0;
+            }
         } else {
             let adjacent_faces = if ev_origin.visible {
                 // Non-opaque blocks should work the same as blocks which have all six adjacent faces present.
@@ -345,7 +350,7 @@ impl Space {
 
                     let this_cube_evaluated =
                         &self.block_data[self.contents[index] as usize].evaluated;
-                    self.lighting[index] = if this_cube_evaluated.opaque {
+                    self.lighting[index] = if opaque_for_light_computation(this_cube_evaluated) {
                         covered = true;
                         PackedLight::OPAQUE
                     } else {
@@ -488,6 +493,17 @@ impl Geometry for LightUpdateRayInfo {
     }
 }
 
+/// A special definition of opacity for the lighting algorithm:
+/// we want to treat opaque light-emitting blocks similarly to transparent blocks
+/// *when deciding to compute light for them*, because this produces better results
+/// for smooth (interpolated) lighting.
+///
+/// This function is fairly straightforward; it exists for purposes of *documenting
+/// the places that care about this* rather than for code reduction.
+pub(crate) fn opaque_for_light_computation(block: &EvaluatedBlock) -> bool {
+    block.opaque && block.attributes.light_emission == Rgb::ZERO
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -608,11 +624,11 @@ mod tests {
         let light = Rgb::new(0.5, 1.0, 2.0);
         let block = Block::builder()
             .light_emission(light)
-            .color(Rgba::new(1.0, 1.0, 1.0, 1.0)) // irrelevant except for alph
+            .color(Rgba::new(1.0, 1.0, 1.0, 1.0)) // irrelevant except for alpha
             .build();
 
         let space = light_source_test_space(block);
-        assert_eq!(space.get_lighting([1, 1, 1]), PackedLight::OPAQUE);
+        assert_eq!(space.get_lighting([1, 1, 1]), light.into());
         let adjacents = FaceMap::from_fn(|face| {
             space
                 .get_lighting(GridPoint::new(1, 1, 1) + face.normal_vector())
@@ -623,7 +639,7 @@ mod tests {
             // TODO: make this test less fragile. The asymmetry isn't even wanted;
             // I think it's probably due to exactly diagonal rays.
             FaceMap {
-                within: Rgb::new(0.0, 0.0, 0.0),
+                within: light,
                 nx: Rgb::new(0.13053422, 0.26106843, 0.52213687),
                 ny: Rgb::new(0.16210495, 0.3242099, 0.6484198),
                 nz: Rgb::new(0.2102241, 0.4204482, 0.8408964),

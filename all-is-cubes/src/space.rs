@@ -18,6 +18,7 @@ use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::*;
+use crate::space::lighting::opaque_for_light_computation;
 use crate::transactions::{Transaction as _, UniverseTransaction};
 use crate::universe::URef;
 use crate::util::ConciseDebug;
@@ -362,10 +363,8 @@ impl Space {
     ) {
         // TODO: Move this into a function in the lighting module since it is so tied to lighting
         if self.physics.light != LightPhysics::None {
-            let opaque = self.block_data[block_index as usize].evaluated.opaque;
-            if !opaque {
-                self.light_needs_update(position, PackedLightScalar::MAX);
-            } else {
+            let evaluated = &self.block_data[block_index as usize].evaluated;
+            if opaque_for_light_computation(evaluated) {
                 // Since we already have the information, immediately update light value
                 // to zero rather than putting it in the queue.
                 // (It would be mostly okay to skip doing this entirely, but doing it gives
@@ -373,6 +372,8 @@ impl Space {
                 // the block is removed.)
                 self.lighting[contents_index] = PackedLight::OPAQUE;
                 self.notifier.notify(SpaceChange::Lighting(position));
+            } else {
+                self.light_needs_update(position, PackedLightScalar::MAX);
             }
             for face in Face::ALL_SIX {
                 let neighbor = position + face.normal_vector();
