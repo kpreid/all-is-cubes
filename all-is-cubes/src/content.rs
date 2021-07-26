@@ -16,7 +16,9 @@ use std::convert::{TryFrom, TryInto};
 
 use crate::block::Block;
 use crate::drawing::VoxelBrush;
-use crate::math::{FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, Rgb, Rgba};
+use crate::math::{
+    FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::Universe;
@@ -223,6 +225,27 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
             )?;
         }
     }
+    Ok(())
+}
+
+/// Given a room's bounding box, act on its four walls.
+///
+/// The function is given the bottom-left (from an exterior perspective) corner cube
+/// of each wall, the rightward direction of the wall, and its length (counted such
+/// that each wall overlaps its neighbor at the corner).
+///
+/// TODO: There is probably other worldgen code that should be using this now that we've invented it.
+pub(crate) fn four_walls<F, E>(bounding_box: Grid, mut f: F) -> Result<(), E>
+where
+    F: FnMut(GridPoint, Face, GridCoordinate) -> Result<(), E>,
+{
+    let low = bounding_box.lower_bounds();
+    let high = bounding_box.upper_bounds() - GridVector::new(1, 1, 1);
+    let size = bounding_box.size();
+    f(low, Face::PZ, size.z)?;
+    f(GridPoint::new(low.x, low.y, high.z), Face::PX, size.x)?;
+    f(GridPoint::new(high.x, low.y, high.z), Face::NZ, size.z)?;
+    f(GridPoint::new(high.x, low.y, low.z), Face::NX, size.x)?;
     Ok(())
 }
 

@@ -11,17 +11,20 @@ use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::{FONT_6X10, FONT_8X13_BOLD};
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb888;
+use embedded_graphics::prelude::Size;
+use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::{Baseline, Text};
 use ordered_float::NotNan;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
-use crate::content::{palette, DemoBlocks, Exhibit};
+use crate::content::{four_walls, palette, DemoBlocks, Exhibit};
 use crate::drawing::draw_to_blocks;
 use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
-    Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba,
+    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
+    Rgb, Rgba,
 };
-use crate::space::{Grid, Space};
+use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::Universe;
 
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
@@ -310,33 +313,121 @@ const COLORS: Exhibit = Exhibit {
 
 const COLOR_LIGHTS: Exhibit = Exhibit {
     name: "Colored Lights",
-    factory: |_this, _universe| {
+    factory: |_this, universe| {
         let room_width = 7;
         let room_length = 12;
         let room_height = 5;
         let interior = Grid::new([0, 0, 0], [room_width, room_height, room_length]);
         let mut space = Space::empty(interior.expand(FaceMap::from_fn(|_| 1)));
 
-        // Construct room. TODO: Use more differentiated blocks
-        let wall = Block::builder()
+        let light_colors = [
+            rgb_const!(1.0, 0.0, 0.0),
+            rgb_const!(1.0, 1.0, 0.0),
+            rgb_const!(0.0, 1.0, 0.0),
+            rgb_const!(0.0, 1.0, 1.0),
+            rgb_const!(0.0, 0.0, 1.0),
+            rgb_const!(1.0, 0.0, 1.0),
+        ];
+        let surface_colors = [
+            rgb_const!(1.0, 0.0, 0.0),
+            rgb_const!(1.0, 1.0, 0.0),
+            rgb_const!(0.0, 1.0, 0.0),
+            rgb_const!(0.0, 1.0, 1.0),
+            rgb_const!(0.0, 0.0, 1.0),
+            rgb_const!(1.0, 0.0, 1.0),
+            rgb_const!(0.25, 0.25, 0.25),
+            rgb_const!(0.75, 0.75, 0.75),
+            rgb_const!(1.0, 1.0, 1.0),
+        ];
+
+        // Room wall block with test card
+        let wall_color_block = Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0));
+        let wall_resolution = 16;
+        let wall_block = {
+            let colors_as_blocks: Vec<Block> =
+                surface_colors.iter().copied().map(Block::from).collect();
+            let mut wall_block_space = Space::empty(Grid::for_block(wall_resolution));
+            wall_block_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK); // TODO:
+            wall_block_space.fill_uniform(wall_block_space.grid(), &wall_color_block)?;
+            for rotation in [
+                GridRotation::IDENTITY,
+                GridRotation::CLOCKWISE,
+                GridRotation::CLOCKWISE * GridRotation::CLOCKWISE,
+                GridRotation::COUNTERCLOCKWISE,
+            ] {
+                let mut plane = wall_block_space.draw_target(
+                    rotation.to_positive_octant_matrix(GridCoordinate::from(wall_resolution) - 1)
+                        * GridMatrix::from_translation([4, 4, 15]),
+                );
+                for (i, swatch_block) in colors_as_blocks.iter().enumerate() {
+                    let i = i as GridCoordinate;
+                    Rectangle::new(Point::new((i % 3) * 3, (i / 3) * 3), Size::new(2, 2))
+                        .draw_styled(&PrimitiveStyle::with_fill(swatch_block), &mut plane)?;
+                }
+            }
+
+            Block::builder()
+                .display_name("Color room wall")
+                .voxels_ref(wall_resolution, universe.insert_anonymous(wall_block_space))
+                .build()
+        };
+
+        // Wall corner
+        let corner = Block::builder()
             .display_name("Color room wall")
-            .color(rgba_const!(0.5, 0.5, 0.5, 1.0))
+            .voxels_fn(universe, wall_resolution, |p| {
+                if p.x.pow(2) + p.z.pow(2) < GridCoordinate::from(wall_resolution).pow(2) {
+                    &wall_color_block
+                } else {
+                    &AIR
+                }
+            })?
             .build();
-        space.fill_uniform(space.grid(), &wall)?;
-        space.fill_uniform(interior, &AIR)?;
+
+        // Construct room.
+        // Floor
+        // TODO: Make this easier with an operation like "flatten a Grid to one face"
+        space.fill_uniform(
+            Grid::new([0, -1, 0], [room_width, 1, room_length]),
+            &wall_block,
+        )?;
+        // Ceiling
+        space.fill_uniform(
+            Grid::new([0, room_height, 0], [room_width, 1, room_length]),
+            &wall_block,
+        )?;
+        // TODO: Make four_walls more helpful
+        four_walls(space.grid(), |origin, direction, length| {
+            space.fill_uniform(
+                Grid::new(origin + GridVector::unit_y(), [1, room_height + 1, 1]),
+                corner
+                    .clone()
+                    .rotate(GridRotation::from_to(Face::NZ, direction, Face::PY).unwrap()),
+            )?;
+            // TODO: four_walls should provide this automatically as a convenience
+            let wall_excluding_corners = Grid::single_cube(origin + direction.normal_vector())
+                .union(Grid::single_cube(
+                    origin
+                        + direction.normal_vector() * (length - 2)
+                        + GridVector::new(0, room_height + 1, 0),
+                ))
+                .unwrap();
+            space.fill_uniform(wall_excluding_corners, &wall_block)?;
+            Ok::<(), InGenError>(())
+        })?;
 
         // Vertical separators
         let separator_width = 2;
         space.fill_uniform(
             Grid::new([0, room_height / 2, 0], [separator_width, 1, room_length]),
-            &wall,
+            &wall_block,
         )?;
         space.fill_uniform(
             Grid::new(
                 [room_width - separator_width, room_height / 2, 0],
                 [separator_width, 1, room_length],
             ),
-            &wall,
+            &wall_block,
         )?;
 
         // Entrance door
@@ -345,17 +436,10 @@ const COLOR_LIGHTS: Exhibit = Exhibit {
             &AIR,
         )?;
 
-        let colors = [
-            rgb_const!(1.0, 0.0, 0.0),
-            rgb_const!(1.0, 1.0, 0.0),
-            rgb_const!(0.0, 1.0, 0.0),
-            rgb_const!(0.0, 1.0, 1.0),
-            rgb_const!(0.0, 0.0, 1.0),
-            rgb_const!(1.0, 0.0, 1.0),
-        ];
-        for (i, color) in colors.iter().copied().enumerate() {
-            let z =
-                (i as GridCoordinate) * (room_length - 1) / (colors.len() as GridCoordinate - 1);
+        // Place lights
+        for (i, color) in light_colors.iter().copied().enumerate() {
+            let z = (i as GridCoordinate) * (room_length - 1)
+                / (light_colors.len() as GridCoordinate - 1);
             let p = GridPoint::new(if i % 2 == 0 { 1 } else { room_width - 2 }, 0, z);
             space.set(
                 p,
