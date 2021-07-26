@@ -347,7 +347,10 @@ impl Space {
             self.side_effects_of_set(new_block_index, position, contents_index);
             Ok(true)
         } else {
-            Err(SetCubeError::OutOfBounds(Grid::single_cube(position)))
+            Err(SetCubeError::OutOfBounds {
+                modification: Grid::single_cube(position),
+                space_bounds: self.grid,
+            })
         }
     }
 
@@ -420,8 +423,11 @@ impl Space {
         F: FnMut(GridPoint) -> Option<B>,
         B: std::borrow::Borrow<Block>,
     {
-        if !self.grid().contains_grid(region) {
-            return Err(SetCubeError::OutOfBounds(region));
+        if !self.grid.contains_grid(region) {
+            return Err(SetCubeError::OutOfBounds {
+                modification: region,
+                space_bounds: self.grid,
+            });
         }
         for cube in region.interior_iter() {
             if let Some(block) = function(cube) {
@@ -458,8 +464,11 @@ impl Space {
         region: Grid,
         block: impl Into<Cow<'b, Block>>,
     ) -> Result<(), SetCubeError> {
-        if !self.grid().contains_grid(region) {
-            Err(SetCubeError::OutOfBounds(region))
+        if !self.grid.contains_grid(region) {
+            Err(SetCubeError::OutOfBounds {
+                modification: region,
+                space_bounds: self.grid,
+            })
         } else if self.grid() == region {
             // We're overwriting the entire space, so we might as well re-initialize it.
             let block = block.into();
@@ -912,8 +921,11 @@ impl Default for LightPhysics {
 #[non_exhaustive]
 pub enum SetCubeError {
     /// The given cube or region is out of the bounds of this Space.
-    #[error("{:?} is out of bounds", .0)]
-    OutOfBounds(Grid),
+    #[error("{:?} is outside of the bounds {:?}", .modification, .space_bounds)]
+    OutOfBounds {
+        modification: Grid,
+        space_bounds: Grid,
+    },
     /// [`Block::evaluate`] failed on a new block type.
     #[error("block evaluation failed: {0}")]
     EvalBlock(#[from] EvalBlockError),

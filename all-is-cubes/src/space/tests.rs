@@ -47,9 +47,15 @@ fn set_failure_out_of_bounds() {
     let [block] = make_some_blocks();
     let pt = GridPoint::new(1, 0, 0);
     let ptg = Grid::single_cube(pt);
-    let mut space = Space::empty_positive(1, 1, 1);
-    assert_eq!(Err(SetCubeError::OutOfBounds(ptg)), space.set(pt, &block));
-    assert_eq!(Err(SetCubeError::OutOfBounds(ptg)), space.set(pt, &AIR));
+    let space_bounds = Grid::new([0, 0, 0], [1, 1, 1]);
+    let mut space = Space::empty(space_bounds);
+
+    let error = Err(SetCubeError::OutOfBounds {
+        modification: ptg,
+        space_bounds,
+    });
+    assert_eq!(space.set(pt, &block), error);
+    assert_eq!(space.set(pt, &AIR), error);
 
     space.consistency_check(); // bonus testing
 }
@@ -96,9 +102,13 @@ fn set_failure_too_many() {
 #[test]
 fn set_error_format() {
     assert_eq!(
-        SetCubeError::OutOfBounds(Grid::single_cube(GridPoint::new(1, 2, 3))).to_string(),
+        SetCubeError::OutOfBounds {
+            modification: Grid::single_cube(GridPoint::new(1, 2, 3)),
+            space_bounds: Grid::new([0, 0, 0], [2, 2, 2])
+        }
+        .to_string(),
         // TODO: simplify the single cube case
-        "Grid(1..2, 2..3, 3..4) is out of bounds"
+        "Grid(1..2, 2..3, 3..4) is outside of the bounds Grid(0..2, 0..2, 0..2)"
     );
     assert_eq!(
         SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone(Arc::new(
@@ -232,7 +242,13 @@ fn fill_out_of_bounds() {
     let mut space = Space::empty_positive(2, 1, 1);
     let fill_grid = Grid::new((1, 0, 0), (1, 2, 1));
     let result = space.fill(fill_grid, |_| None::<Block>);
-    assert_eq!(result, Err(SetCubeError::OutOfBounds(fill_grid)));
+    assert_eq!(
+        result,
+        Err(SetCubeError::OutOfBounds {
+            modification: fill_grid,
+            space_bounds: Grid::new([0, 0, 0], [2, 1, 1])
+        })
+    );
 }
 
 /// Test filling an entire space with one block using [`Space::fill`].

@@ -232,10 +232,16 @@ mod tests {
 
     #[test]
     fn gen_error_message() {
-        let e = GenError::failure(SetCubeError::OutOfBounds(Grid::for_block(1)), "x".into());
+        let e = GenError::failure(
+            SetCubeError::OutOfBounds {
+                modification: Grid::for_block(1),
+                space_bounds: Grid::for_block(3),
+            },
+            "x".into(),
+        );
         assert_eq!(
             e.to_string(),
-            "Grid(0..1, 0..1, 0..1) is out of bounds\nwhile setting up 'x'"
+            "Grid(0..1, 0..1, 0..1) is outside of the bounds Grid(0..3, 0..3, 0..3)\nwhile setting up 'x'"
         );
     }
 
@@ -248,7 +254,10 @@ mod tests {
             Ok(())
         }
         fn b() -> Result<(), InGenError> {
-            Err(SetCubeError::OutOfBounds(Grid::for_block(1)))?;
+            Err(SetCubeError::OutOfBounds {
+                modification: Grid::for_block(1),
+                space_bounds: Grid::for_block(1),
+            })?;
             Ok(())
         }
         let r = a();
