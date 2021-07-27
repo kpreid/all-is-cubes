@@ -480,10 +480,13 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum BlockCollision {
-    /// No effect.
+    /// The block can be passed through; it is not an obstacle (though intersecting it
+    /// might cause other effects).
     None,
-    /// The block is a perfectly solid obstacle.
-    /// TODO: Define the effect on recursive blocks once we have voxel collision.
+    /// The block is a perfectly solid obstacle; or, if it has voxels, then those voxels'
+    /// collision behaviors are used. (TODO: Voxel collision not yet implemented.)
+    ///
+    /// This is the default value used for most blocks.
     Hard,
     // Future values might include bouncy solid, water-like resistance, force fields, etc.
 }
