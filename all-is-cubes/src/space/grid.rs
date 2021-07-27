@@ -321,14 +321,15 @@ impl Grid {
     /// let g1 = Grid::new([1, 2, 3], [4, 5, 6]);
     /// assert_eq!(g1.intersection(g1), Some(g1));
     /// assert_eq!(
-    ///     Grid::new((0, 0, 0), (2, 2, 2)).intersection(
-    ///        Grid::new([2, 0, 0], (2, 1, 2))),
+    ///     Grid::new([0, 0, 0], [2, 2, 2]).intersection(
+    ///        Grid::new([2, 0, 0], [2, 1, 2])),
     ///     None);
-    /// assert_eq!(Grid::new([0, 0, 0], [2, 2, 2]).intersection(
-    ///     Grid::new([1, 0, 0], [2, 1, 2])),
+    /// assert_eq!(
+    ///     Grid::new([0, 0, 0], [2, 2, 2]).intersection(
+    ///         Grid::new([1, 0, 0], [2, 1, 2])),
     ///     Some(Grid::new([1, 0, 0], [1, 1, 2])));
     /// ```
-    pub fn intersection(&self, other: Grid) -> Option<Grid> {
+    pub fn intersection(self, other: Grid) -> Option<Grid> {
         let lower = self
             .lower_bounds()
             .zip(other.lower_bounds(), GridCoordinate::max);
@@ -341,6 +342,32 @@ impl Grid {
             }
         }
         Some(Grid::from_lower_upper(lower, upper))
+    }
+
+    /// Returns the smallest [`Grid`] which fully encloses the two inputs,
+    /// or [`GridOverflowError`] if the volume of the result exceeds [`usize::MAX`].
+    ///
+    /// ```
+    /// use all_is_cubes::space::Grid;
+    ///
+    /// let g1 = Grid::new([1, 2, 3], [1, 1, 1]);
+    /// assert_eq!(g1.union(g1), Ok(g1));
+    ///
+    /// let g2 = Grid::new([4, 7, 11], [1, 1, 1]);
+    /// assert_eq!(g1.union(g2), Ok(Grid::from_lower_upper([1, 2, 3], [5, 8, 12])));
+    ///
+    /// let u = i32::MAX - 1;
+    /// g1.union(Grid::new([u, u, u], [1, 1, 1]))
+    ///     .unwrap_err();
+    /// ```
+    pub fn union(self, other: Grid) -> Result<Grid, GridOverflowError> {
+        let lower = self
+            .lower_bounds()
+            .zip(other.lower_bounds(), GridCoordinate::min);
+        let upper = self
+            .upper_bounds()
+            .zip(other.upper_bounds(), GridCoordinate::max);
+        Self::checked_new(lower, upper - lower)
     }
 
     /// Returns a random cube contained by the grid, if there are any.
