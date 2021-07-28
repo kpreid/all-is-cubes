@@ -61,6 +61,15 @@ impl Ray {
         Raycaster::new(self.origin, self.direction)
     }
 
+    /// Scale the ray's coordinates by the given factor.
+    #[allow(dead_code)] // TODO: this is expected to be used by voxel collision
+    pub(crate) fn scale(self, scale: FreeCoordinate) -> Self {
+        Self {
+            origin: self.origin * scale,
+            direction: self.direction * scale,
+        }
+    }
+
     fn advance(self, t: FreeCoordinate) -> Self {
         Self {
             origin: self.origin + t * self.direction,
