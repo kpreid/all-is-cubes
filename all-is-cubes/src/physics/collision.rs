@@ -7,10 +7,10 @@ use cgmath::{EuclideanSpace as _, Vector3, Zero as _};
 use std::collections::HashSet;
 
 use super::POSITION_EPSILON;
-use crate::block::BlockCollision;
+use crate::block::{BlockCollision, EvaluatedBlock, Evoxel};
 use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _, GridPoint};
 use crate::raycast::{Ray, RaycastStep};
-use crate::space::Space;
+use crate::space::{GridArray, Space};
 
 /// An individual collision contact.
 pub type Contact = CubeFace;
@@ -32,13 +32,14 @@ pub(crate) struct CollisionRayEnd {
 ///
 /// `collision_callback` is called once for each colliding cube — any one of them would have been
 /// sufficient to stop the ray, but all are reported.
-pub(crate) fn collide_along_ray<CC>(
-    space: &Space,
+pub(crate) fn collide_along_ray<Sp, CC>(
+    space: &Sp,
     ray: Ray,
     aab: Aab,
     mut collision_callback: CC,
 ) -> Option<CollisionRayEnd>
 where
+    Sp: CollisionSpace,
     CC: FnMut(Contact),
 {
     let mut already_colliding: HashSet<Contact> = HashSet::new();
@@ -54,7 +55,7 @@ where
             // If we are intersecting a block, we are allowed to leave it; pretend
             // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
             // maybe there's no clear direction.)
-            for box_cube in find_colliding_cubes(&space, step_aab) {
+            for box_cube in find_colliding_cubes(space, step_aab) {
                 let contact = Contact {
                     cube: box_cube,
                     face: ray_step.face(),
@@ -67,7 +68,7 @@ where
         // Loop over all the cubes that our AAB is just now intersecting and check if
         // any of them are solid.
         let mut hit_something = false;
-        for box_cube in find_colliding_cubes(&space, step_aab) {
+        for box_cube in find_colliding_cubes(space, step_aab) {
             let contact = Contact {
                 cube: box_cube,
                 face: ray_step.face(),
@@ -92,14 +93,58 @@ where
 
 /// Returns an iterator over all blocks in `space` which intersect `aab`, accounting for
 /// collision options.
-pub(crate) fn find_colliding_cubes(
-    space: &Space,
-    aab: Aab,
-) -> impl Iterator<Item = GridPoint> + '_ {
+pub(crate) fn find_colliding_cubes<Sp>(space: &Sp, aab: Aab) -> impl Iterator<Item = GridPoint> + '_
+where
+    Sp: CollisionSpace,
+{
     aab.round_up_to_grid().interior_iter().filter(move |&cube| {
         // TODO: change this from `==` to `match` to allow for expansion of the enum
-        space.get_evaluated(cube).attributes.collision == BlockCollision::Hard
+        Sp::collision(space.get_cell(cube)) == BlockCollision::Hard
     })
+}
+
+/// Abstraction over voxel arrays that the collision detection algorithm can use,
+/// i.e. [`Space`] and `GridArray<Evoxel>`.
+pub(crate) trait CollisionSpace {
+    type Cell;
+
+    /// Retrieve a cell value from the grid.
+    /// Should return a non-colliding value if the point is out of bounds.
+    fn get_cell(&self, cube: GridPoint) -> &Self::Cell;
+
+    /// Retrieve a cell's collision behavior option.
+    fn collision(cell: &Self::Cell) -> BlockCollision;
+}
+
+impl CollisionSpace for Space {
+    type Cell = EvaluatedBlock;
+
+    #[inline]
+    fn get_cell(&self, cube: GridPoint) -> &Self::Cell {
+        self.get_evaluated(cube)
+    }
+
+    #[inline]
+    fn collision(cell: &Self::Cell) -> BlockCollision {
+        cell.attributes.collision
+    }
+}
+
+// TODO: This impl is not yet used; it will be used for voxel block collision.
+// It exists now as a piece of incremental progress and to prove that `CollisionSpace`
+// *can* be implemented for EvaluatedBlock.
+impl CollisionSpace for GridArray<Evoxel> {
+    type Cell = Evoxel;
+
+    #[inline]
+    fn get_cell(&self, cube: GridPoint) -> &Self::Cell {
+        self.get(cube).unwrap_or(&Evoxel::AIR)
+    }
+
+    #[inline]
+    fn collision(cell: &Self::Cell) -> BlockCollision {
+        cell.collision
+    }
 }
 
 /// Given a ray describing movement of the origin of an AAB, perform a raycast to find
