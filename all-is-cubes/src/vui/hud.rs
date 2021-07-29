@@ -211,7 +211,7 @@ impl HudLayout {
         // so we have 16 - (13 + 2) = 1 voxel of free alignment, which I've chosen to put on
         // the top edge.
         let text_obj = Text::with_text_style(
-            &text,
+            text,
             Point::new(grid.size().x / 2, -1),
             MonoTextStyle::new(&HudFont, &hud_blocks.text),
             TextStyleBuilder::new()

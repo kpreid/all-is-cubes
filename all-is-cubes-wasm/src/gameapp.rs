@@ -52,7 +52,7 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         template,
         graphics_options,
     } = options_from_query_string(
-        &document
+        document
             .location()
             .unwrap()
             .search()?
@@ -265,7 +265,7 @@ impl WebGameRoot {
             move |event: E| {
                 Self::upgrade_in_callback(&weak_self_ref, |this| callback(&mut *this, event))
             },
-            &AddEventListenerOptions::new().passive(passive),
+            AddEventListenerOptions::new().passive(passive),
         );
     }
 

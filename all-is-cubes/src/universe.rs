@@ -129,9 +129,9 @@ impl Universe {
 impl std::fmt::Debug for Universe {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = fmt.debug_struct("Universe");
-        format_members::<BlockDef>(&self, &mut ds);
-        format_members::<Character>(&self, &mut ds);
-        format_members::<Space>(&self, &mut ds);
+        format_members::<BlockDef>(self, &mut ds);
+        format_members::<Character>(self, &mut ds);
+        format_members::<Space>(self, &mut ds);
         ds.finish()
     }
 }

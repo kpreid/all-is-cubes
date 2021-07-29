@@ -20,7 +20,7 @@ use crate::universe::Universe;
 fn evaluate_opaque_atom_and_attributes() {
     let color = Rgba::new(1.0, 2.0, 3.0, 1.0);
     let attributes = BlockAttributes {
-        display_name: Cow::Borrowed(&"hello world"),
+        display_name: Cow::Borrowed("hello world"),
         selectable: false,
         collision: BlockCollision::None,
         light_emission: Rgb::ONE,
@@ -63,7 +63,7 @@ fn evaluate_voxels_checked_individually() {
     let mut universe = Universe::new();
 
     let attributes = BlockAttributes {
-        display_name: Cow::Borrowed(&"hello world"),
+        display_name: Cow::Borrowed("hello world"),
         ..BlockAttributes::default()
     };
     let block = Block::builder()

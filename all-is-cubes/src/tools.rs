@@ -86,7 +86,7 @@ impl Tool {
             Self::Activate => Cow::Borrowed(&predefined[Icons::Activate]),
             Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
-            Self::PlaceBlock(block) => Cow::Borrowed(&block),
+            Self::PlaceBlock(block) => Cow::Borrowed(block),
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
         }
     }

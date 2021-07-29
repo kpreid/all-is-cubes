@@ -104,7 +104,7 @@ impl AllIsCubesAppState {
     }
 
     pub fn ui_space(&self) -> &URef<Space> {
-        &self.ui.current_space()
+        self.ui.current_space()
     }
 
     pub fn graphics_options(&self) -> ListenableSource<GraphicsOptions> {
@@ -169,7 +169,7 @@ impl AllIsCubesAppState {
 
         self.cursor_result = ndc_pos
             .map(|p| ui_camera.project_ndc_into_world(p))
-            .and_then(|ray| cursor_raycast(ray, &self.ui.current_space()));
+            .and_then(|ray| cursor_raycast(ray, self.ui.current_space()));
 
         if self.cursor_result.is_none() {
             if let Some(character_ref) = &self.game_character {

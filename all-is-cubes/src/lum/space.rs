@@ -267,7 +267,7 @@ impl SpaceRenderer {
                     .update(
                         context,
                         todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
-                        &space,
+                        space,
                         graphics_options,
                         &self.block_triangulations,
                         &self.block_versioning,

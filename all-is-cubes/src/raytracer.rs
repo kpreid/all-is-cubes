@@ -90,7 +90,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                                 ),
                             },
                             hit.face(),
-                            &impl_fields.options,
+                            impl_fields.options,
                         );
                     }
                     TracingBlock::Recur(pixel_block_data, resolution, array) => {
@@ -120,7 +120,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                                         ),
                                     },
                                     subcube_hit.face(),
-                                    &impl_fields.options,
+                                    impl_fields.options,
                                 );
                             }
                         }
@@ -434,7 +434,7 @@ fn print_space_impl<F: FnMut(&str)>(
     ));
 
     SpaceRaytracer::<CharacterBuf>::new(space, GraphicsOptions::default())
-        .trace_scene_to_text(&camera, &"\n", move |s| {
+        .trace_scene_to_text(&camera, "\n", move |s| {
             write(s);
             let r: Result<(), ()> = Ok(());
             r
@@ -708,15 +708,15 @@ impl PixelBuf for CharacterBuf {
             .chars()
             .next()
             .map(|c| Cow::Owned(c.to_string()))
-            .unwrap_or(Cow::Borrowed(&" "))
+            .unwrap_or(Cow::Borrowed(" "))
     }
 
     fn error_block_data() -> Self::BlockData {
-        Cow::Borrowed(&"X")
+        Cow::Borrowed("X")
     }
 
     fn sky_block_data() -> Self::BlockData {
-        Cow::Borrowed(&" ")
+        Cow::Borrowed(" ")
     }
 
     #[inline]

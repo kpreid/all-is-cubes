@@ -226,7 +226,7 @@ impl Character {
         // see other characters as not having been stepped yet.
         let transaction = if let Some(self_ref) = self_ref {
             self.behaviors.step(
-                &self,
+                self,
                 &(|t: CharacterTransaction| t.bind(self_ref.clone())),
                 CharacterTransaction::behaviors,
                 tick,

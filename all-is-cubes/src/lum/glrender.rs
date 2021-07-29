@@ -273,7 +273,7 @@ where
         };
 
         // TODO: cache
-        let cursor_tess = make_cursor_tess(surface, &cursor_result)?;
+        let cursor_tess = make_cursor_tess(surface, cursor_result)?;
 
         let start_draw_world_time = Instant::now();
         surface
