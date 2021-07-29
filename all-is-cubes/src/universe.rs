@@ -3,20 +3,21 @@
 
 //! Top-level game state container.
 
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::Borrow;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::time::Duration;
 
-use instant::Instant; // wasm-compatible replacement for std::time::Instant
-use owning_ref::{OwningHandle, OwningRef, OwningRefMut};
+use instant::Instant;
+use ouroboros::self_referencing;
+// wasm-compatible replacement for std::time::Instant
 
 use crate::apps::Tick;
 use crate::block::BlockDef;
@@ -342,30 +343,13 @@ impl<T: 'static> URef<T> {
 
     /// Borrow the value, in the sense of [`RefCell::try_borrow`].
     pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
-        let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
-
-        // Kludge: OwningHandle doesn't let us try_borrow, so waste one to check.
-        strong
-            .try_borrow()
-            .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
-
-        Ok(UBorrow(
-            OwningRef::new(OwningHandle::new(strong)).map(|entry| &entry.data),
-        ))
-    }
-
-    /// Borrow the value mutably, in the sense of [`RefCell::try_borrow_mut`].
-    pub fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, RefError> {
-        let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
-
-        // Kludge: OwningHandle doesn't let us try_borrow, so waste one to check.
-        strong
-            .try_borrow_mut()
-            .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
-
-        Ok(UBorrowMut(
-            OwningRefMut::new(OwningHandle::new_mut(strong)).map_mut(|entry| &mut entry.data),
-        ))
+        let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Rc<RefCell<UEntry<T>>>| {
+            let borrow: Ref<'_, UEntry<T>> = strong
+                .try_borrow()
+                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
+            Ok(Ref::map(borrow, |entry| &entry.data))
+        })?;
+        Ok(UBorrow(inner))
     }
 
     /// Apply the given function to the `&mut T` inside.
@@ -380,6 +364,20 @@ impl<T: 'static> URef<T> {
             .try_borrow_mut()
             .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
         Ok(function(&mut borrow.data))
+    }
+
+    /// Gain mutable access but don't use it immediately.
+    ///
+    /// This function is not exposed publicly, but only used in transactions to allow
+    /// the check-then-commit pattern; use [`URef::try_modify`] instead for other
+    /// purposes.
+    pub(crate) fn try_borrow_mut(&self) -> Result<UBorrowMutImpl<T>, RefError> {
+        UBorrowMutImpl::try_new(self.upgrade()?, |strong: &Rc<RefCell<UEntry<T>>>| {
+            let borrow: RefMut<'_, UEntry<T>> = strong
+                .try_borrow_mut()
+                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
+            Ok(RefMut::map(borrow, |entry| &mut entry.data))
+        })
     }
 
     /// Shortcut for executing a transaction.
@@ -446,28 +444,17 @@ pub enum RefError {
 }
 
 /// A wrapper type for an immutably borrowed value from an [`URef`].
-pub struct UBorrow<T: 'static>(
-    OwningRef<OwningHandle<StrongEntryRef<T>, Ref<'static, UEntry<T>>>, T>,
-);
-/// A wrapper type for a mutably borrowed value from an [`URef`].
-pub struct UBorrowMut<T: 'static>(
-    OwningRefMut<OwningHandle<StrongEntryRef<T>, RefMut<'static, UEntry<T>>>, T>,
-);
+pub struct UBorrow<T: 'static>(UBorrowImpl<T>);
+
+impl<T: Debug> Debug for UBorrow<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "UBorrow({:?})", **self)
+    }
+}
 impl<T> Deref for UBorrow<T> {
     type Target = T;
     fn deref(&self) -> &T {
-        self.0.deref()
-    }
-}
-impl<T> Deref for UBorrowMut<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        self.0.deref()
-    }
-}
-impl<T> DerefMut for UBorrowMut<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        self.0.deref_mut()
+        &**self.0.borrow_guard()
     }
 }
 impl<T> AsRef<T> for UBorrow<T> {
@@ -475,49 +462,40 @@ impl<T> AsRef<T> for UBorrow<T> {
         self.deref()
     }
 }
-impl<T> AsRef<T> for UBorrowMut<T> {
-    fn as_ref(&self) -> &T {
-        self.deref()
-    }
-}
-impl<T> AsMut<T> for UBorrowMut<T> {
-    fn as_mut(&mut self) -> &mut T {
-        self.deref_mut()
-    }
-}
 impl<T> Borrow<T> for UBorrow<T> {
     fn borrow(&self) -> &T {
         self.deref()
     }
 }
-impl<T> Borrow<T> for UBorrowMut<T> {
-    fn borrow(&self) -> &T {
-        self.deref()
-    }
-}
-impl<T> BorrowMut<T> for UBorrowMut<T> {
-    fn borrow_mut(&mut self) -> &mut T {
-        self.deref_mut()
-    }
+
+/// Implementation of [`UBorrow`], split out to hide all `self_referencing` details.
+#[self_referencing]
+struct UBorrowImpl<T: 'static> {
+    strong: StrongEntryRef<T>,
+    #[borrows(strong)]
+    #[covariant]
+    guard: Ref<'this, T>,
 }
 
-impl<T: Debug> Debug for UBorrow<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "UBorrow({:?})", **self)
-    }
-}
-impl<T: Debug> Debug for UBorrowMut<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "UBorrowMut({:?})", **self)
-    }
+/// Parallel to [`UBorrowImpl`], but for mutable access.
+///
+/// This type is not exposed publicly, but only used in transactions to allow
+/// the check-then-commit pattern; use [`URef::try_modify`] instead for other
+/// purposes.
+#[self_referencing]
+#[derive(Debug)]
+pub(crate) struct UBorrowMutImpl<T: 'static> {
+    strong: StrongEntryRef<T>,
+    #[borrows(strong)]
+    #[not_covariant]
+    pub(crate) guard: RefMut<'this, T>,
 }
 
 /// The data of an entry in a `Universe`.
 #[derive(Debug)]
 struct UEntry<T> {
-    // Note: It might make more sense for data to be a RefCell<T> (instead of the
-    // RefCell containing UEntry. However. it will require fiddling with the
-    // owning_ref pileup to do that, and might not be possible.
+    // TODO: It might make more sense for data to be a RefCell<T> (instead of the
+    // RefCell containing UEntry), but we don't have enough examples to be certain yet.
     data: T,
     name: Arc<Name>,
 }

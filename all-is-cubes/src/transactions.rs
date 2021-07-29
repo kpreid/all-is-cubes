@@ -11,7 +11,7 @@ use std::sync::Arc;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
-use crate::universe::{Name, UBorrowMut, URef, Universe};
+use crate::universe::{Name, UBorrowMutImpl, URef, Universe};
 
 /// A `Transaction` is a description of a mutation to an object or collection thereof that
 /// should occur in a logically atomic fashion (all or nothing), with a set of
@@ -196,7 +196,7 @@ where
     O: Transactional + 'static,
 {
     type CommitCheck = (
-        UBorrowMut<O>,
+        UBorrowMutImpl<O>,
         <O::Transaction as Transaction<O>>::CommitCheck,
     );
     type MergeCheck = <O::Transaction as Transaction<O>>::MergeCheck;
@@ -207,7 +207,7 @@ where
             .target
             .try_borrow_mut()
             .expect("Attempted to execute transaction with target already borrowed");
-        let check = self.transaction.check(&borrow)?;
+        let check = borrow.with_guard(|g| self.transaction.check(g))?;
         Ok((borrow, check))
     }
 
@@ -216,7 +216,7 @@ where
         _dummy_target: &mut (),
         (mut borrow, check): Self::CommitCheck,
     ) -> Result<Self::Output, Box<dyn Error>> {
-        self.transaction.commit(&mut borrow, check)
+        borrow.with_guard_mut(|g| self.transaction.commit(g, check))
     }
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
