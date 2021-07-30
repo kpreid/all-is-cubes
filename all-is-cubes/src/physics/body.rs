@@ -203,7 +203,11 @@ impl Body {
         );
 
         if let Some(collision) = collision {
-            let axis = collision.cube_face.face.axis_number();
+            let axis = collision
+                .cube_face
+                .face
+                .axis_number()
+                .expect("Face::Within collisions should not reach here");
             // Advance however much straight-line distance is available.
             // But a little bit back from that, to avoid floating point error pushing us
             // into being already colliding next frame.

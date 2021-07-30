@@ -52,14 +52,16 @@ impl Face {
     ];
 
     /// Returns which axis this face's normal vector is parallel to, with the numbering
-    /// X = 0, Y = 1, Z = 2. Panics if given [`Face::Within`].
+    /// X = 0, Y = 1, Z = 2, or [`None`] if the face is [`Face::Within`].
+    ///
+    /// The numeric type is [`usize`] for convenient use in array indexing.
     #[inline]
-    pub fn axis_number(self) -> usize {
+    pub const fn axis_number(self) -> Option<usize> {
         match self {
-            Face::Within => panic!("Face::Within has no axis number"),
-            Face::NX | Face::PX => 0,
-            Face::NY | Face::PY => 1,
-            Face::NZ | Face::PZ => 2,
+            Face::Within => None,
+            Face::NX | Face::PX => Some(0),
+            Face::NY | Face::PY => Some(1),
+            Face::NZ | Face::PZ => Some(2),
         }
     }
 

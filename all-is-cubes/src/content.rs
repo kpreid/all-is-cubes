@@ -195,7 +195,7 @@ fn color_sequence_for_make_blocks(n: usize) -> impl Iterator<Item = (usize, Rgba
 /// ```
 pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
     for face in Face::ALL_SIX {
-        let axis = face.axis_number();
+        let axis = face.axis_number().unwrap();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within_grid(space.grid());

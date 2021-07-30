@@ -318,14 +318,15 @@ impl GridRotation {
     pub fn transform(self, face: Face) -> Face {
         // TODO: there ought to be a much cleaner way to express this
         // ... and it should be a const fn, too
-        if face == Face::Within {
-            face
-        } else {
-            let p = self.to_basis()[face.axis_number()];
-            if face.is_negative() {
-                p.opposite()
-            } else {
-                p
+        match face.axis_number() {
+            None => face,
+            Some(axis_number) => {
+                let p = self.to_basis()[axis_number];
+                if face.is_negative() {
+                    p.opposite()
+                } else {
+                    p
+                }
             }
         }
     }

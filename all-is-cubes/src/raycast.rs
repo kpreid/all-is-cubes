@@ -236,7 +236,7 @@ impl Raycaster {
 
         // Save t position before we update it.
         // We could back-compute this instead as
-        //     let axis = self.last_face.axis_number();
+        //     let axis = self.last_face.axis_number().unwrap();
         //     self.t_max[axis] - self.t_delta[axis]
         // but that seems an excessive computation to save a field.
         self.last_t_distance = self.t_max[axis];
@@ -505,14 +505,14 @@ impl RaycastStep {
     /// assert_eq!(next(), Point3::new(2.0, 0.5, 0.5));
     /// ```
     pub fn intersection_point(&self, ray: Ray) -> Point3<FreeCoordinate> {
-        let face = self.cube_face.face;
-        if face == Face::Within {
+        let current_face_axis = self.cube_face.face.axis_number();
+        if current_face_axis.is_none() {
             ray.origin
         } else {
             let mut intersection_point = self.cube_face.cube.map(FreeCoordinate::from);
             for axis in 0..3 {
                 let step_direction = signum_101(ray.direction[axis]);
-                if axis == face.axis_number() {
+                if Some(axis) == current_face_axis {
                     // This is the plane we just hit.
                     if step_direction < 0 {
                         intersection_point[axis] += 1.0;
