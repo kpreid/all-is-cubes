@@ -1,0 +1,14 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2018"
+publish = false
+
+[[bin]]
+name = "xtask"
+# Rename main file so that the workspace only has one main.rs
+path = "src/xtask.rs"
+
+[dependencies]
+clap = "2.33.3"
+xaction = "0.2.4"
