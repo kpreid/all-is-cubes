@@ -291,9 +291,14 @@ impl Space {
                             + stored_light)
                             * coverage
                             * ray_weight_by_faces;
-                        ray_alpha *= 1.0 - coverage;
-                        dependencies.push(hit.cube_ahead());
                         cost += 10;
+                        ray_alpha *= 1.0 - coverage;
+
+                        dependencies.push(hit.cube_ahead());
+                        // We did not read hit.cube_behind(), but we want to trigger its updates
+                        // anyway, because otherwise, transparent blocks' neighbors will *never*
+                        // get their light updated except when the block is initially placed.
+                        dependencies.push(hit.cube_behind());
                     }
                 }
                 // TODO: set *info even if we hit the sky
