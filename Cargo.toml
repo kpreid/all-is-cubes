@@ -4,12 +4,13 @@ members = [
   "all-is-cubes-desktop",
   "all-is-cubes-server",
   "all-is-cubes-wasm",
+  "xtask",
 
   # Including this makes the fuzz targets automatically built so we know they aren't broken.
   # But, `cargo test` sometimes ignores `[[bin]] test = false` directives,
   #     https://github.com/rust-lang/cargo/issues/8338
   # so doing this causes test failures in thise circumstances.
-  # As a substitute, I've included explicitly building the fuzz targets in the Makefile.
+  # As a substitute, I've included explicitly building the fuzz targets in the `xtask` build process.
   # 
   # "all-is-cubes/fuzz",
 ]

@@ -17,19 +17,19 @@ This repository is divided into three Rust packages, split roughly according to 
 * `all-is-cubes-wasm/` is the game app code for the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`. In order to use this, you must use either webpack-dev-server or the web server described next.
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains a preconfigured HTTP static file server.
 
-Because of the complication of having some wasm-specific code, some commands for building, testing, and running the entire project are collected in the `Makefile` for convenience and to ensure all non-Rust files are built when needed:
+Because of the complication of having some wasm-specific code, some commands for building, testing, and running the entire project are collected in the `xtask` build tool for convenience and to ensure all non-Rust files are built when needed:
 
-*   Test: `make test`
+*   Run all tests: `cargo xtask test`
 
-*   Lint: `make lint`
+*   Build and lint all the code: `cargo xtask lint`
 
-*   Development server: `make run-dev`
+*   Development server: `cargo xtask run-dev`
 
     Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-wasm/`.*
 
 *   Run the desktop/console game: `cargo run --bin all-is-cubes -- <options>`
 
-*   Run the non-dev-mode game server: `make run-server`
+*   Run the non-dev-mode game server: `cargo xtask run-game-server`
 
 Stability and versioning
 ------------------------
