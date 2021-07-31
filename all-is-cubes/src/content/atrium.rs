@@ -21,9 +21,9 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     let blocks = install_atrium_blocks(universe)?;
 
     let ceiling_height = 6;
-    let between_small_arches = 2;
+    let between_small_arches = 3;
     let between_large_arches = between_small_arches * 2 + 1;
-    let balcony_radius = 3;
+    let balcony_radius = 4;
     let large_arch_count = Vector3::new(1, 0, 5); // x, dummy y, z
 
     let origin = Grid::new([0, 0, 0], [1, 1, 1]);
@@ -99,47 +99,47 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     // Arches and atrium walls
     #[rustfmt::skip]
     let arches_pattern = GridArray::from_y_flipped_array([[
-        *br"######", // Roof edge height
-        *br"###.##",
-        *br"######",
-        *br"######",
-        *br"######",
-        *br"###.##",
-        *br"######",
-        *br"######", // top floor height
-        *br"#/\#/\",
-        *br"|  o  ",
-        *br"|  o  ",
-        *br"|  o  ", 
-        *br"######",
-        *br"######", // balcony floor height
-        *br"##/ \#",
-        *br"#/   \",
-        *br"G     ",
-        *br"G     ",
-        *br"G     ", 
-        *br"G     ",
+        *br"########", // Roof edge height
+        *br"####.###",
+        *br"########",
+        *br"########",
+        *br"########",
+        *br"####.###",
+        *br"########",
+        *br"########", // top floor height
+        *br"#/ \#/ \",
+        *br"|   o   ",
+        *br"|   o   ",
+        *br"|   o   ", 
+        *br"########",
+        *br"########", // balcony floor height
+        *br"###/ \##",
+        *br"#/     \",
+        *br"G       ",
+        *br"G       ",
+        *br"G       ", 
+        *br"G       ",
     ], [
-        *br"      ", // roof edge height
-        *br"      ",
-        *br"      ",
-        *br"      ",
-        *br"      ",
-        *br"      ",
-        *br"TTTTTT",
-        *br"   f  ", // top floor height
-        *br"      ",
-        *br"      ",
-        *br"      ",
-        *br"      ",
-        *br"TTTTTT",
-        *br"      ", // balcony floor height
-        *br"      ",
-        *br"      ",
-        *br"      ",
-        *br"      ",
-        *br"      ", 
-        *br"P     ",
+        *br"        ", // roof edge height
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"TTTTTTTT",
+        *br"    f   ", // top floor height
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"TTTTTTTT",
+        *br"        ", // balcony floor height
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ", 
+        *br"P       ",
     ]]);
     four_walls(
         arches_footprint.translate([0, WALL, 0]),
