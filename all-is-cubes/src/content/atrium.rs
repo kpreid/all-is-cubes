@@ -120,7 +120,7 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
         *br"G       ", 
         *br"G       ",
     ], [
-        *br"        ", // roof edge height
+        *br"TTTTTTTT", // roof edge height
         *br"        ",
         *br"        ",
         *br"        ",
@@ -166,13 +166,9 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     Ok(space)
 }
 
-fn map_text_block(
-    ascii: u8,
-    blocks: &BlockProvider<AtriumBlocks>,
-    original_block: &Block,
-) -> Block {
+fn map_text_block(ascii: u8, blocks: &BlockProvider<AtriumBlocks>, existing_block: Block) -> Block {
     match ascii {
-        b' ' => original_block.clone(),
+        b' ' => existing_block,
         b'.' => AIR,
         b'#' => blocks[AtriumBlocks::SolidBricks]
             .clone()
@@ -184,15 +180,39 @@ fn map_text_block(
         b'\\' => blocks[AtriumBlocks::ArchBricks]
             .clone()
             .rotate(GridRotation::CLOCKWISE * GridRotation::CLOCKWISE),
-        b'T' => blocks[AtriumBlocks::Molding]
-            .clone()
-            .rotate(GridRotation::CLOCKWISE),
+        b'T' => possibly_corner_block(
+            existing_block,
+            &blocks[AtriumBlocks::Molding]
+                .clone()
+                .rotate(GridRotation::CLOCKWISE),
+            &blocks[AtriumBlocks::MoldingCorner]
+                .clone()
+                .rotate(GridRotation::CLOCKWISE),
+        ),
         // Not-yet-implemented decoration placeholder blocks
         b'P' | b'f' => Block::from(rgba_const!(1.0, 0.5, 0.5, 1.0)),
         _ => panic!(
             "Unrecognized block character {:?}",
             std::str::from_utf8(&[ascii])
         ),
+    }
+}
+
+/// Given a block in "straight" and "corner" forms, replace empty air with the straight
+/// form and replace a rotated straight form with the corner form.
+/// TODO: explain the corner connectivity/rotation assumption
+fn possibly_corner_block(existing_block: Block, new_block: &Block, new_corner: &Block) -> Block {
+    let adjacent_ccw = new_block.clone().rotate(GridRotation::COUNTERCLOCKWISE);
+    let adjacent_cw = new_block.clone().rotate(GridRotation::CLOCKWISE);
+    if existing_block == AIR {
+        new_block.clone()
+    } else if existing_block == adjacent_cw {
+        new_corner.clone()
+    } else if existing_block == adjacent_ccw {
+        new_corner.clone().rotate(GridRotation::COUNTERCLOCKWISE)
+    } else {
+        // Don't overwrite
+        existing_block
     }
 }
 
@@ -224,7 +244,7 @@ fn arch_row(
 
 // TODO: figure out what the general version of this is and move it elsewhere
 fn fill_space_transformed(
-    src: impl Fn(GridPoint, &Block) -> Block,
+    src: impl Fn(GridPoint, Block) -> Block,
     src_grid: Grid,
     dst: &mut Space,
     src_to_dst_transform: GridMatrix,
@@ -239,10 +259,10 @@ fn fill_space_transformed(
         .unwrap()
         .interior_iter()
     {
-        dst.set(
-            cube,
-            src(dst_to_src_transform.transform_cube(cube), &dst[cube]).rotate(block_rotation),
-        )?;
+        let existing_block = dst[cube].clone().rotate(block_rotation.inverse());
+        let new_block =
+            src(dst_to_src_transform.transform_cube(cube), existing_block).rotate(block_rotation);
+        dst.set(cube, new_block)?;
     }
     Ok(())
 }
@@ -258,6 +278,7 @@ pub enum AtriumBlocks {
     SquareColumn,
     SmallColumn,
     Molding,
+    MoldingCorner,
 }
 impl BlockModule for AtriumBlocks {
     fn namespace() -> &'static str {
@@ -290,6 +311,14 @@ fn install_atrium_blocks(
             &grout_base
         } else {
             &stone_base
+        }
+    };
+    let molding_fn = |p: GridPoint| {
+        let shape: [GridCoordinate; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 3, 4, 4, 3];
+        if p.x < shape[p.y as usize] {
+            brick_pattern(p)
+        } else {
+            &AIR
         }
     };
 
@@ -359,14 +388,18 @@ fn install_atrium_blocks(
             AtriumBlocks::Molding => Block::builder()
                 .display_name("Atrium Top Edge Molding")
                 .collision(BlockCollision::None) // TODO: once voxel collision is implemented, remove this
-                .voxels_fn(universe, resolution, |p| {
-                    let shape: [GridCoordinate; 16] =
-                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 3, 4, 4, 3];
-                    if p.x < shape[p.y as usize] {
-                        brick_pattern(p)
-                    } else {
-                        &AIR
+                .voxels_fn(universe, resolution, molding_fn)?
+                .build(),
+            AtriumBlocks::MoldingCorner => Block::builder()
+                .display_name("Atrium Top Edge Molding Corner")
+                .collision(BlockCollision::None) // TODO: once voxel collision is implemented, remove this
+                .voxels_fn(universe, resolution, |mut p| {
+                    if p.x > p.z {
+                        p = GridRotation::COUNTERCLOCKWISE
+                            .to_positive_octant_matrix(resolution.into())
+                            .transform_cube(p);
                     }
+                    molding_fn(p)
                 })?
                 .build(),
         })
