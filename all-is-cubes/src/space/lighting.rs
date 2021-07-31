@@ -23,10 +23,6 @@ use crate::util::MapExtend;
 /// model.
 const SURFACE_ABSORPTION: f32 = 0.75;
 
-/// Placeholder for better block opacity algorithms: any block which is partly transparent
-/// is assumed to intercept this much of the ray passing through.
-const TRANSPARENT_BLOCK_COVERAGE: f32 = 0.25;
-
 const RAY_DIRECTION_STEP: isize = 5;
 const RAY_CUBE_EDGE: usize = (RAY_DIRECTION_STEP as usize) * 2 + 1;
 const ALL_RAYS_COUNT: usize = RAY_CUBE_EDGE.pow(3) - (RAY_CUBE_EDGE - 2).pow(3);
@@ -285,8 +281,9 @@ impl Space {
                         };
                         // 'coverage' is what fraction of the light ray we assume to hit this block,
                         // as opposed to passing through it.
-                        // TODO: Compute coverage (and connectivity) in EvaluatedBlock.
-                        let coverage = TRANSPARENT_BLOCK_COVERAGE;
+                        // The block evaluation algorithm incidentally computes a suitable
+                        // approximation as an alpha value.
+                        let coverage = ev_hit.color.alpha().into_inner().clamp(0.0, 1.0);
                         incoming_light += (ev_hit.attributes.light_emission * ray_alpha
                             + stored_light)
                             * coverage
@@ -610,18 +607,16 @@ mod tests {
     #[test]
     fn light_source_self_illumination_transparent() {
         let light = Rgb::new(0.5, 1.0, 2.0);
+        let alpha = 0.125;
         let block = Block::builder()
             .light_emission(light)
-            .color(Rgba::new(1.0, 0.0, 0.0, 0.33)) // irrelevant except for alpha
+            .color(Rgba::new(1.0, 0.0, 0.0, alpha)) // irrelevant except for alpha
             .build();
 
         let space = light_source_test_space(block);
-        // TODO: Arguably TRANSPARENT_BLOCK_COVERAGE shouldn't affect light emission.
+        // TODO: Arguably the coverage/alpha shouldn't affect light emission.
         // Perhaps we should multiply the emission value by the coverage.
-        assert_eq!(
-            space.get_lighting([1, 1, 1]).value(),
-            light * TRANSPARENT_BLOCK_COVERAGE
-        );
+        assert_eq!(space.get_lighting([1, 1, 1]).value(), light * alpha);
     }
 
     #[test]
