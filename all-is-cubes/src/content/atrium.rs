@@ -99,25 +99,54 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     // Arches and atrium walls
     #[rustfmt::skip]
     let arches_pattern = GridArray::from_y_flipped_array([[
+        *br"######", // Roof edge height
+        *br"### ##",
         *br"######",
+        *br"######",
+        *br"######",
+        *br"######",
+        *br"### ##",
+        *br"######", // top floor height
         *br"#/\#/\",
         *br"|  o  ",
         *br"|  o  ",
         *br"|  o  ", 
         *br"#RRRRR",
-        *br"######",
+        *br"######", // balcony floor height
         *br"##/ \#",
         *br"#/   \",
         *br"G     ",
         *br"G     ",
         *br"G     ", 
         *br"G     ",
-    ]]).map(|c| map_text_block(c, &blocks));
+    ], [
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"   f  ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ",
+        *br"      ", 
+        *br"P     ",
+    ]]);
     four_walls(
         arches_footprint.translate([0, WALL, 0]),
         |origin, direction, length| {
             arch_row(
                 &mut space,
+                &blocks,
                 origin,
                 between_large_arches + WALL,
                 length / (between_large_arches + WALL),
@@ -137,12 +166,16 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     Ok(space)
 }
 
-fn map_text_block(ascii: u8, blocks: &BlockProvider<AtriumBlocks>) -> Block {
+fn map_text_block(
+    ascii: u8,
+    blocks: &BlockProvider<AtriumBlocks>,
+    original_block: &Block,
+) -> Block {
     match ascii {
-        b' ' => AIR.clone(),
+        b' ' => original_block.clone(),
         b'#' => blocks[AtriumBlocks::SolidBricks]
             .clone()
-            .rotate(GridRotation::COUNTERCLOCKWISE),
+            .rotate(GridRotation::CLOCKWISE),
         b'G' => blocks[AtriumBlocks::GroundColumn].clone(),
         b'o' => blocks[AtriumBlocks::SmallColumn].clone(),
         b'|' => blocks[AtriumBlocks::SquareColumn].clone(),
@@ -152,7 +185,9 @@ fn map_text_block(ascii: u8, blocks: &BlockProvider<AtriumBlocks>) -> Block {
             .rotate(GridRotation::CLOCKWISE * GridRotation::CLOCKWISE),
         b'R' => blocks[AtriumBlocks::BalconyRailing]
             .clone()
-            .rotate(GridRotation::COUNTERCLOCKWISE),
+            .rotate(GridRotation::CLOCKWISE),
+        // Not-yet-implemented decoration placeholder blocks
+        b'P' | b'f' => Block::from(rgba_const!(1.0, 0.5, 0.5, 1.0)),
         _ => panic!(
             "Unrecognized block character {:?}",
             std::str::from_utf8(&[ascii])
@@ -163,19 +198,20 @@ fn map_text_block(ascii: u8, blocks: &BlockProvider<AtriumBlocks>) -> Block {
 #[allow(clippy::too_many_arguments)]
 fn arch_row(
     space: &mut Space,
+    blocks: &BlockProvider<AtriumBlocks>,
     first_column_base: GridPoint,
     section_length: GridCoordinate,
     section_count: GridCoordinate,
     parallel: Face,
-    pattern: &GridArray<Block>,
+    pattern: &GridArray<u8>,
 ) -> Result<(), InGenError> {
     let offset = parallel.normal_vector() * section_length;
-    let rotation = GridRotation::from_to(Face::PX, parallel, Face::PY).unwrap();
+    let rotation = GridRotation::from_to(Face::NX, parallel, Face::PY).unwrap();
     for i in 0..section_count {
-        let column_base = first_column_base + offset * i;
+        let column_base = first_column_base + offset * (i + 1);
 
-        array_to_space_copy(
-            pattern,
+        fill_space_transformed(
+            |p, block| map_text_block(pattern[p], blocks, block),
             pattern.grid(),
             space,
             GridMatrix::from_translation(column_base.to_vec())
@@ -185,9 +221,9 @@ fn arch_row(
     Ok::<(), InGenError>(())
 }
 
-// TODO: this is a copy of `city::space_to_space_copy` and should be moved and generalized
-fn array_to_space_copy(
-    src: &GridArray<Block>,
+// TODO: figure out what the general version of this is and move it elsewhere
+fn fill_space_transformed(
+    src: impl Fn(GridPoint, &Block) -> Block,
     src_grid: Grid,
     dst: &mut Space,
     src_to_dst_transform: GridMatrix,
@@ -197,13 +233,17 @@ fn array_to_space_copy(
     let (block_rotation, _) = src_to_dst_transform
         .decompose()
         .expect("could not decompose transform");
-    dst.fill(src_grid.transform(src_to_dst_transform).unwrap(), |p| {
-        Some(
-            src[dst_to_src_transform.transform_cube(p)]
-                .clone()
-                .rotate(block_rotation),
-        )
-    })
+    for cube in src_grid
+        .transform(src_to_dst_transform)
+        .unwrap()
+        .interior_iter()
+    {
+        dst.set(
+            cube,
+            src(dst_to_src_transform.transform_cube(cube), &dst[cube]).rotate(block_rotation),
+        )?;
+    }
+    Ok(())
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
