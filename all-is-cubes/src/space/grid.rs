@@ -673,6 +673,33 @@ impl<V> GridArray<V> {
         }
     }
 
+    /// Constructs a [`GridArray`] from nested Rust arrays in [Z][Y[X] order with the Y axis
+    /// mirrored. The result's grid's lower bounds are zero.
+    ///
+    /// Note: The current implementation requires that `V` implement [`Clone`], and will
+    /// clone each element once, but this may be improved in the future.
+    // TODO: Decide if this is a good public interface.
+    // TODO: Reimplement this in terms of adopting the elements as a linear array, then performing an axis swap.
+    // TODO: Test.
+    pub(crate) fn from_y_flipped_array<const DX: usize, const DY: usize, const DZ: usize>(
+        array: [[[V; DX]; DY]; DZ],
+    ) -> Self
+    where
+        V: Clone,
+    {
+        Self::from_fn(
+            Grid::new(
+                [0, 0, 0],
+                [
+                    DX as GridCoordinate,
+                    DY as GridCoordinate,
+                    DZ as GridCoordinate,
+                ],
+            ),
+            |p| array[p.z as usize][(DY - 1) - (p.y as usize)][p.x as usize].clone(),
+        )
+    }
+
     /// Returns the [`Grid`] specifying the bounds of this array.
     #[inline]
     pub fn grid(&self) -> Grid {
@@ -692,6 +719,17 @@ impl<V> GridArray<V> {
     pub fn translate(mut self, offset: impl Into<GridVector>) -> Self {
         self.grid = self.grid.translate(offset);
         self
+    }
+
+    /// Apply `f` to each element of the array, producing a new array of the results.
+    pub fn map<T, F>(self, f: F) -> GridArray<T>
+    where
+        F: FnMut(V) -> T,
+    {
+        GridArray {
+            grid: self.grid,
+            contents: self.contents.into_vec().into_iter().map(f).collect(),
+        }
     }
 }
 
@@ -898,5 +936,21 @@ mod tests {
     fn array_from_elements_error() {
         let grid = Grid::new([10, 0, 0], [4, 1, 1]);
         assert_eq!(GridArray::from_elements(grid, vec![10i32, 11, 12]), None);
+    }
+
+    #[test]
+    fn array_from_y_flipped() {
+        let array = GridArray::from_y_flipped_array([
+            [*b"abcd", *b"efgh", *b"ijkl"],
+            [*b"mnop", *b"qrst", *b"uvwx"],
+        ]);
+        assert_eq!(
+            array,
+            GridArray::from_elements(
+                Grid::new([0, 0, 0], [4, 3, 2]),
+                *b"iueqamjvfrbnkwgscolxhtdp"
+            )
+            .unwrap()
+        );
     }
 }
