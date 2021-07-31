@@ -5,7 +5,7 @@
 
 use cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
 
-use crate::block::{Block, AIR};
+use crate::block::{Block, BlockCollision, AIR};
 use crate::content::four_walls;
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 
@@ -100,18 +100,18 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     #[rustfmt::skip]
     let arches_pattern = GridArray::from_y_flipped_array([[
         *br"######", // Roof edge height
-        *br"### ##",
+        *br"###.##",
         *br"######",
         *br"######",
         *br"######",
+        *br"###.##",
         *br"######",
-        *br"### ##",
         *br"######", // top floor height
         *br"#/\#/\",
         *br"|  o  ",
         *br"|  o  ",
         *br"|  o  ", 
-        *br"#RRRRR",
+        *br"######",
         *br"######", // balcony floor height
         *br"##/ \#",
         *br"#/   \",
@@ -120,20 +120,20 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
         *br"G     ", 
         *br"G     ",
     ], [
+        *br"      ", // roof edge height
         *br"      ",
         *br"      ",
         *br"      ",
         *br"      ",
         *br"      ",
+        *br"TTTTTT",
+        *br"   f  ", // top floor height
         *br"      ",
         *br"      ",
         *br"      ",
         *br"      ",
-        *br"   f  ",
-        *br"      ",
-        *br"      ",
-        *br"      ",
-        *br"      ",
+        *br"TTTTTT",
+        *br"      ", // balcony floor height
         *br"      ",
         *br"      ",
         *br"      ",
@@ -173,6 +173,7 @@ fn map_text_block(
 ) -> Block {
     match ascii {
         b' ' => original_block.clone(),
+        b'.' => AIR,
         b'#' => blocks[AtriumBlocks::SolidBricks]
             .clone()
             .rotate(GridRotation::CLOCKWISE),
@@ -183,7 +184,7 @@ fn map_text_block(
         b'\\' => blocks[AtriumBlocks::ArchBricks]
             .clone()
             .rotate(GridRotation::CLOCKWISE * GridRotation::CLOCKWISE),
-        b'R' => blocks[AtriumBlocks::BalconyRailing]
+        b'T' => blocks[AtriumBlocks::Molding]
             .clone()
             .rotate(GridRotation::CLOCKWISE),
         // Not-yet-implemented decoration placeholder blocks
@@ -256,7 +257,7 @@ pub enum AtriumBlocks {
     GroundColumn,
     SquareColumn,
     SmallColumn,
-    BalconyRailing,
+    Molding,
 }
 impl BlockModule for AtriumBlocks {
     fn namespace() -> &'static str {
@@ -355,12 +356,13 @@ fn install_atrium_blocks(
                     }
                 })?
                 .build(),
-            AtriumBlocks::BalconyRailing => Block::builder()
-                .display_name("Atrium Railing")
+            AtriumBlocks::Molding => Block::builder()
+                .display_name("Atrium Top Edge Molding")
+                .collision(BlockCollision::None) // TODO: once voxel collision is implemented, remove this
                 .voxels_fn(universe, resolution, |p| {
                     let shape: [GridCoordinate; 16] =
-                        [6, 6, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 7, 8, 8, 7];
-                    if (p.x - resolution_g / 2).abs() < shape[p.y as usize] {
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 3, 4, 4, 3];
+                    if p.x < shape[p.y as usize] {
                         brick_pattern(p)
                     } else {
                         &AIR
