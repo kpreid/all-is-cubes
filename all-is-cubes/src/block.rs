@@ -245,6 +245,7 @@ impl Block {
                         let outer_to_inner = rotation
                             .inverse()
                             .to_positive_octant_matrix(resolution.into());
+                        // TODO: Add a shuffle-in-place rotation operation to GridArray and try implementing this using that, which should have less unnecessary arithmetic
                         GridArray::from_fn(
                             voxels.grid().transform(inner_to_outer).unwrap(),
                             |cube| voxels[outer_to_inner.transform_cube(cube)],
