@@ -11,7 +11,7 @@ use std::fmt;
 use std::rc::{Rc, Weak};
 
 use crate::apps::Tick;
-use crate::behavior::BehaviorSet;
+use crate::behavior::{Behavior, BehaviorSet};
 use crate::block::*;
 use crate::character::Spawn;
 use crate::content::palette;
@@ -636,6 +636,13 @@ impl Space {
 
     pub fn spawn_mut(&mut self) -> &mut Spawn {
         &mut self.spawn
+    }
+
+    pub fn add_behavior<B>(&mut self, behavior: B)
+    where
+        B: Behavior<Self> + 'static,
+    {
+        self.behaviors.insert(behavior);
     }
 
     /// Finds or assigns an index to denote the block.
