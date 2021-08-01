@@ -753,7 +753,22 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
         }
     }
 }
-// TODO: impl IndexMut for GridArray
+impl<P: Into<GridPoint>, V> std::ops::IndexMut<P> for GridArray<V> {
+    /// Returns the element at `position` of this array, or panics if `position` is out of
+    /// bounds.
+    #[inline]
+    fn index_mut(&mut self, position: P) -> &mut Self::Output {
+        let position: GridPoint = position.into();
+        if let Some(index) = self.grid.index(position) {
+            &mut self.contents[index]
+        } else {
+            panic!(
+                "GridArray position out of range {:?} in {:?}",
+                position, self.grid
+            )
+        }
+    }
+}
 
 #[cfg(feature = "arbitrary")]
 use arbitrary::Arbitrary;
