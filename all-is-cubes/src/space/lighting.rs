@@ -284,9 +284,9 @@ impl Space {
                         // The block evaluation algorithm incidentally computes a suitable
                         // approximation as an alpha value.
                         let coverage = ev_hit.color.alpha().into_inner().clamp(0.0, 1.0);
-                        incoming_light += (ev_hit.attributes.light_emission * ray_alpha
-                            + stored_light)
+                        incoming_light += (ev_hit.attributes.light_emission + stored_light)
                             * coverage
+                            * ray_alpha
                             * ray_weight_by_faces;
                         cost += 10;
                         ray_alpha *= 1.0 - coverage;
