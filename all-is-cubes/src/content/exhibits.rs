@@ -4,8 +4,11 @@
 //! Miscellanous demonstrations of capability and manual test-cases.
 //! The exhibits defined in this file are combined into [`crate::content::demo_city`].
 
+use std::f64::consts::PI;
+
 use cgmath::{
-    Basis2, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2, Vector2, Vector3,
+    Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
+    Vector2, Vector3,
 };
 use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::{FONT_6X10, FONT_8X13_BOLD};
@@ -79,11 +82,13 @@ const KNOT: Exhibit = Exhibit {
         let resolution = 16;
         let toroidal_radius = 24.;
         let knot_split_radius = 9.;
-        let strand_radius = 6.;
+        let strand_radius = 4.;
         let twists = 2.5;
 
         let mut drawing_space = Space::empty(footprint.multiply(resolution));
-        let paint = Block::from(Rgba::new(0.9, 0.9, 0.9, 1.0));
+        let paint1 = Block::from(Rgba::new(0.7, 0.7, 0.7, 1.0));
+        let paint2 = Block::from(Rgba::new(0.1, 0.1, 0.9, 1.0));
+        let paint3 = Block::from(Rgba::new(0.9, 0.7, 0.1, 1.0));
         drawing_space.fill(drawing_space.grid(), |p| {
             // Measure from midpoint of odd dimension space
             let p = p - Vector3::new(1, 1, 1) * (resolution / 2);
@@ -92,16 +97,37 @@ const KNOT: Exhibit = Exhibit {
 
             let cylindrical = Vector2::new((p.x.powi(2) + p.y.powi(2)).sqrt(), p.z);
             let torus_cross_section = cylindrical - Vector2::new(toroidal_radius, 0.);
-            let angle = Rad(p.x.atan2(p.y));
+            let knot_center_angle = Rad(p.x.atan2(p.y));
             let rotated_cross_section =
-                Basis2::from_angle(angle * twists).rotate_vector(torus_cross_section);
-            let knot_center_1 = rotated_cross_section - Vector2::new(knot_split_radius, 0.);
-            let knot_center_2 = rotated_cross_section + Vector2::new(knot_split_radius, 0.);
+                Basis2::from_angle(knot_center_angle * twists).rotate_vector(torus_cross_section);
 
-            if knot_center_1.magnitude() < strand_radius
-                || knot_center_2.magnitude() < strand_radius
+            let angle_if_within_strand = |offset: Vector2<f64>| {
+                let knot_center = rotated_cross_section
+                    .mul_element_wise(Vector2::new(1.0, 2.0_f64.sqrt().recip()))
+                    + offset;
+                if knot_center.magnitude() < strand_radius {
+                    // Add center angle to add twist relative to the strands.
+                    Some(knot_center.x.atan2(knot_center.y) + knot_center_angle.0)
+                } else {
+                    None
+                }
+            };
+
+            // Compute stripe pattern
+            // Note that the second strand is rotated by PI so they join up
+            if let Some(strand_radial_angle) =
+                angle_if_within_strand(Vector2::new(-knot_split_radius, 0.)).or_else(|| {
+                    angle_if_within_strand(Vector2::new(knot_split_radius, 0.)).map(|a| a + PI)
+                })
             {
-                Some(&paint)
+                let unit_range = (strand_radial_angle / (PI * 2.)).rem_euclid(1.0);
+                Some(if unit_range < 0.25 {
+                    &paint2
+                } else if (0.5..0.75).contains(&unit_range) {
+                    &paint3
+                } else {
+                    &paint1
+                })
             } else {
                 None
             }
