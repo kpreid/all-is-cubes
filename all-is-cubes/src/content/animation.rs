@@ -6,11 +6,14 @@
 use std::fmt;
 
 use instant::Duration;
+use rand::{Rng as _, SeedableRng as _};
+use rand_xoshiro::Xoshiro256Plus;
 
+use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorContext};
-use crate::block::Block;
-use crate::math::GridPoint;
-use crate::space::{Grid, Space, SpaceTransaction};
+use crate::block::{Block, AIR};
+use crate::math::{GridPoint, GridVector};
+use crate::space::{Grid, GridArray, Space, SpaceTransaction};
 use crate::transactions::Transaction;
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
@@ -93,5 +96,107 @@ impl<F> fmt::Debug for AnimatedVoxels<F> {
             .field("frame", &self.frame)
             .field("frame_period", &self.frame_period)
             .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Fire {
+    blocks: [Block; 4],
+    /// The bounds of this array determine the affected blocks.
+    fire_state: GridArray<u8>,
+    rng: Xoshiro256Plus,
+    /// Time accumulation not yet equal to a whole frame.
+    /// TODO: Give [`Tick`] a concept of discrete time units we can reuse instead of
+    /// separate things having their own float-based clocks.
+    accumulator: Duration,
+}
+
+impl Fire {
+    pub(crate) fn new(bounds: Grid) -> Self {
+        let rng = Xoshiro256Plus::seed_from_u64(2385993827);
+        let blocks = [
+            AIR,
+            Block::from(rgba_const!(1.0, 0.5, 0.0, 1.0)),
+            Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)),
+            Block::from(rgba_const!(1.0, 1.0, 0.0, 1.0)),
+        ];
+        Self {
+            blocks,
+            fire_state: GridArray::from_fn(bounds, |_cube| 0),
+            rng,
+            accumulator: Duration::ZERO,
+        }
+    }
+
+    fn tick_state(&mut self, tick: Tick) -> bool {
+        const PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 32);
+        self.accumulator += tick.delta_t;
+        if self.accumulator >= PERIOD {
+            self.accumulator -= PERIOD;
+        } else {
+            return false;
+        }
+
+        // To ripple changes upward, we need to iterate downward
+        let grid = self.fire_state.grid();
+        for z in grid.z_range() {
+            for y in grid.y_range().rev() {
+                for x in grid.x_range() {
+                    let cube = GridPoint::new(x, y, z);
+                    self.fire_state[cube] = if y == 0 {
+                        (self.fire_state[cube] + self.rng.gen_range(0..3))
+                            .saturating_sub(1)
+                            .min(self.blocks.len() as u8 - 1)
+                    } else {
+                        let below = self.fire_state[cube + GridVector::new(0, -1, 0)];
+                        if !self.rng.gen_bool(0.25) {
+                            below.saturating_sub(1)
+                        } else {
+                            below
+                        }
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    fn paint(&self) -> SpaceTransaction {
+        let mut txn = SpaceTransaction::default();
+        for cube in self.fire_state.grid().interior_iter() {
+            let block: &Block = &self.blocks[self.fire_state[cube] as usize];
+            txn = txn
+                .merge(SpaceTransaction::set_cube(cube, None, Some(block.clone())))
+                .unwrap();
+        }
+        txn
+    }
+}
+
+impl Behavior<Space> for Fire {
+    fn step(
+        &self,
+        context: &BehaviorContext<'_, Space>,
+        tick: Tick,
+    ) -> crate::transactions::UniverseTransaction {
+        let mut mut_self = self.clone();
+        if mut_self.tick_state(tick) {
+            let paint_txn = mut_self.paint();
+            context
+                .replace_self(mut_self)
+                .merge(context.bind_host(paint_txn))
+                .unwrap()
+        } else {
+            context.replace_self(mut_self)
+        }
+    }
+
+    fn alive(&self, _context: &BehaviorContext<'_, Space>) -> bool {
+        true
+    }
+
+    fn ephemeral(&self) -> bool {
+        false
     }
 }

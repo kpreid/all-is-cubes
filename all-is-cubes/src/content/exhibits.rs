@@ -20,7 +20,7 @@ use embedded_graphics::text::{Baseline, Text};
 use ordered_float::NotNan;
 
 use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, AIR};
-use crate::content::{four_walls, palette, AnimatedVoxels, DemoBlocks, Exhibit};
+use crate::content::{four_walls, palette, AnimatedVoxels, DemoBlocks, Exhibit, Fire};
 use crate::drawing::draw_to_blocks;
 use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
@@ -172,40 +172,56 @@ const ANIMATION: Exhibit = Exhibit {
         let footprint = Grid::new([0, 0, 0], [3, 1, 2]);
         let mut space = Space::empty(footprint);
 
-        let resolution = 8;
-        let mut block_space = Space::empty(Grid::for_block(resolution));
-        block_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
-        // The length of this pattern is set so that the block will sometimes be fully opaque and sometimes be invisible.
-        let fills = [
-            AIR,
-            AIR,
-            AIR,
-            AIR,
-            AIR,
-            Block::from(Rgb::new(0.0, 0.3, 0.0)),
-            Block::from(Rgb::new(0.0, 0.7, 0.0)),
-            Block::from(Rgb::new(0.0, 1.0, 0.0)),
-            Block::from(Rgb::new(0.0, 0.7, 0.7)),
-            Block::from(Rgb::new(0.0, 0.3, 1.0)),
-        ];
-        let repeats_per_fill = 6;
-        block_space.add_behavior(AnimatedVoxels::new(move |p, frame| {
-            let n = fills.len() as GridCoordinate * repeats_per_fill;
-            let location_offset = p.x + p.y + p.z;
-            let time_offset = (frame as GridCoordinate).rem_euclid(n);
-            let value = location_offset.wrapping_sub(time_offset);
-            fills[value
-                .div_euclid(repeats_per_fill)
-                .rem_euclid(fills.len() as GridCoordinate) as usize]
-                .clone()
-        }));
-        let sweep_block = Block::builder()
-            .animation_hint(AnimationHint::CONTINUOUS)
-            .voxels_ref(resolution, universe.insert_anonymous(block_space))
-            .build();
+        let sweep_block = {
+            let resolution = 8;
+            let mut block_space = Space::empty(Grid::for_block(resolution));
+            block_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
+            // The length of this pattern is set so that the block will sometimes be fully opaque and sometimes be invisible.
+            let fills = [
+                AIR,
+                AIR,
+                AIR,
+                AIR,
+                AIR,
+                Block::from(Rgb::new(0.0, 0.3, 0.0)),
+                Block::from(Rgb::new(0.0, 0.7, 0.0)),
+                Block::from(Rgb::new(0.0, 1.0, 0.0)),
+                Block::from(Rgb::new(0.0, 0.7, 0.7)),
+                Block::from(Rgb::new(0.0, 0.3, 1.0)),
+            ];
+            let repeats_per_fill = 6;
+            block_space.add_behavior(AnimatedVoxels::new(move |p, frame| {
+                let n = fills.len() as GridCoordinate * repeats_per_fill;
+                let location_offset = p.x + p.y + p.z;
+                let time_offset = (frame as GridCoordinate).rem_euclid(n);
+                let value = location_offset.wrapping_sub(time_offset);
+                fills[value
+                    .div_euclid(repeats_per_fill)
+                    .rem_euclid(fills.len() as GridCoordinate) as usize]
+                    .clone()
+            }));
+            Block::builder()
+                .animation_hint(AnimationHint::CONTINUOUS)
+                .voxels_ref(resolution, universe.insert_anonymous(block_space))
+                .build()
+        };
 
-        space.set([0, 0, 0], &sweep_block)?;
-        space.set([2, 0, 0], sweep_block)?;
+        let fire_block = {
+            let fire_resolution = 12;
+            Block::builder()
+                .light_emission(rgb_const!(1.4, 1.0, 0.8) * 8.0)
+                .voxels_ref(fire_resolution, {
+                    let fire_grid = Grid::for_block(fire_resolution);
+                    let mut space = Space::empty(fire_grid);
+                    space.set([0, 0, 0], Rgb::ONE)?; // placeholder for not fully transparent so first pass lighting is better
+                    space.add_behavior(Fire::new(fire_grid));
+                    universe.insert_anonymous(space)
+                })
+                .build()
+        };
+
+        space.set([0, 0, 0], sweep_block)?;
+        space.set([2, 0, 0], fire_block)?;
 
         Ok(space)
     },
