@@ -9,7 +9,7 @@ use std::error::Error;
 use std::fmt::Debug;
 
 use super::Space;
-use crate::behavior::BehaviorSetTransaction;
+use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::transactions::PreconditionFailed;
@@ -56,8 +56,10 @@ impl SpaceTransaction {
 }
 
 impl Transaction<Space> for SpaceTransaction {
-    type CommitCheck = ();
-    type MergeCheck = ();
+    type CommitCheck =
+        <BehaviorSetTransaction<Space> as Transaction<BehaviorSet<Space>>>::CommitCheck;
+    type MergeCheck =
+        <BehaviorSetTransaction<Space> as Transaction<BehaviorSet<Space>>>::MergeCheck;
     type Output = ();
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -68,15 +70,16 @@ impl Transaction<Space> for SpaceTransaction {
                 }
             }
         }
-        Ok(())
+        self.behaviors.check(&space.behaviors)
     }
 
-    fn commit(&self, target: &mut Space, _check: Self::CommitCheck) -> Result<(), Box<dyn Error>> {
+    fn commit(&self, space: &mut Space, check: Self::CommitCheck) -> Result<(), Box<dyn Error>> {
         for (&cube, CubeTransaction { old: _, new }) in &self.cubes {
             if let Some(new) = new {
-                target.set(cube, new)?;
+                space.set(cube, new)?;
             }
         }
+        self.behaviors.commit(&mut space.behaviors, check)?;
         Ok(())
     }
 
@@ -95,10 +98,10 @@ impl Transaction<Space> for SpaceTransaction {
                 }
             }
         }
-        Ok(())
+        self.behaviors.check_merge(&other.behaviors)
     }
 
-    fn commit_merge(mut self, other: Self, (): Self::MergeCheck) -> Self {
+    fn commit_merge(mut self, other: Self, check: Self::MergeCheck) -> Self {
         for (cube, t2) in other.cubes {
             match self.cubes.entry(cube) {
                 Occupied(mut entry) => {
@@ -115,6 +118,7 @@ impl Transaction<Space> for SpaceTransaction {
                 }
             }
         }
+        self.behaviors = self.behaviors.commit_merge(other.behaviors, check);
         self
     }
 }
@@ -130,6 +134,7 @@ impl Debug for SpaceTransaction {
                 txn,
             );
         }
+        ds.field("behaviors", &self.behaviors);
         ds.finish()
     }
 }
