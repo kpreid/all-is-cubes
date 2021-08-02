@@ -134,7 +134,9 @@ impl Debug for SpaceTransaction {
                 txn,
             );
         }
-        ds.field("behaviors", &self.behaviors);
+        if !self.behaviors.is_empty() {
+            ds.field("behaviors", &self.behaviors);
+        }
         ds.finish()
     }
 }

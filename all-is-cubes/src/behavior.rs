@@ -130,6 +130,11 @@ pub struct BehaviorSetTransaction<H> {
 }
 
 impl<H> BehaviorSetTransaction<H> {
+    // TODO: replace this with an empty constant or Default::default to compare with, once that's stable in Rust
+    pub(crate) fn is_empty(&self) -> bool {
+        self.replace.is_empty() && self.insert.is_empty()
+    }
+
     fn replace(index: usize, new: Arc<dyn Behavior<H>>) -> Self {
         // TODO: Should inventories store `Rc<Tool>` so callers can avoid cloning for the sake of `old`s?
         let mut replace = BTreeMap::new();
