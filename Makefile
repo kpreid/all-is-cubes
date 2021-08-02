@@ -27,6 +27,7 @@ test:
 	(cd all-is-cubes-wasm && cargo build --target=wasm32-unknown-unknown)
 	(cd all-is-cubes-wasm && npm test)
 	cargo build --all-targets # Confirm benchmarks etc. compile, even if we don't run them
+	(cd all-is-cubes/fuzz && cargo build) # Fuzz targets are not in the workspace
 
 # Restricted version of 'test' which can run in environments where luminance-* doesn't build
 test-no-luminance:

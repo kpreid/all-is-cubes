@@ -1,3 +1,5 @@
+[workspace]
+# Excludes this from containing workspace; see top-level Cargo.toml for explanation
 
 [package]
 name = "all-is-cubes-fuzz"
