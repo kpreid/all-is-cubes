@@ -410,7 +410,7 @@ pub struct BlockAttributes {
     /// The default value is [`Rgb::ZERO`].
     pub light_emission: Rgb,
     // TODO: add 'behavior' functionality, if we don't come up with something else
-
+    pub animation_hint: AnimationHint,
     // Reminder: When adding new fields, add them to the Debug implementation.
 }
 
@@ -435,6 +435,9 @@ impl std::fmt::Debug for BlockAttributes {
             if self.light_emission != Self::default().light_emission {
                 s.field("light_emission", &self.light_emission);
             }
+            if self.animation_hint != Self::default().animation_hint {
+                s.field("animation_hint", &self.animation_hint);
+            }
             s.finish()
         }
     }
@@ -451,6 +454,7 @@ impl BlockAttributes {
             selectable: true,
             collision: BlockCollision::Hard,
             light_emission: Rgb::ZERO,
+            animation_hint: AnimationHint::UNCHANGING,
         }
     }
 }
@@ -471,6 +475,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             selectable: u.arbitrary()?,
             collision: u.arbitrary()?,
             light_emission: u.arbitrary()?,
+            animation_hint: u.arbitrary()?,
         })
     }
 }
@@ -490,6 +495,65 @@ pub enum BlockCollision {
     /// This is the default value used for most blocks.
     Hard,
     // Future values might include bouncy solid, water-like resistance, force fields, etc.
+}
+
+/// Specifies how the appearance of a [`Block`] might change, for the benefit of rendering
+/// algorithms. This hint applies both to a block's definition changing and to it being
+/// replaced with some successor block.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct AnimationHint {
+    /// Expect that the block might soon be replaced with an unrelated block.
+    /// Suggestion: avoid combining it with other block meshes.
+    pub(crate) expect_replace: bool,
+
+    /// Expect that the block's shape will change; some of its voxels will move between
+    /// the categories “fully opaque”, “fully transparent”, and “in between”.
+    /// Suggestion: use a rendering strategy which is shape-independent.
+    pub(crate) expect_shape_update: bool,
+
+    /// Expect that the block's voxels' colors (and alpha other than the special 0 and 1
+    /// cases) will change.
+    /// Suggestion: prepare to update texturing without unnecesarily regenerating the mesh.
+    pub(crate) expect_color_update: bool,
+}
+
+impl AnimationHint {
+    /// There are no expectations that the block is soon going to change.
+    ///
+    /// This is the default value of this type and within [`BlockAttributes`].
+    pub const UNCHANGING: Self = Self {
+        expect_replace: false,
+        expect_shape_update: false,
+        expect_color_update: false,
+    };
+
+    /// The block is not going to exist in its current form for long.
+    ///
+    /// This suggests using a rendering technique which is comparatively expensive
+    /// per-block but allows it (and any successors that are also `TEMPORARY`) to be added
+    /// and removed cheaply.
+    pub const TEMPORARY: Self = Self {
+        expect_replace: true,
+        ..Self::UNCHANGING
+    };
+
+    /// The block's appearance is expected to change very frequently, but not by replacing
+    /// the block in its [`Space`].
+    ///
+    /// This suggests using a rendering technique which optimizes for not needing to e.g.
+    /// rebuild chunk meshes.
+    pub const CONTINUOUS: Self = Self {
+        expect_color_update: true,
+        expect_shape_update: true,
+        ..Self::UNCHANGING
+    };
+}
+
+impl Default for AnimationHint {
+    fn default() -> Self {
+        Self::UNCHANGING
+    }
 }
 
 /// Generic 'empty'/'null' block. It is used by [`Space`] to respond to out-of-bounds requests.
@@ -520,6 +584,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     selectable: false,
     collision: BlockCollision::None,
     light_emission: Rgb::ZERO,
+    animation_hint: AnimationHint::UNCHANGING,
 };
 
 /// A “flattened” and snapshotted form of [`Block`] which contains all information needed

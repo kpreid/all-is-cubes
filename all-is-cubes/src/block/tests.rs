@@ -7,8 +7,8 @@ use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
 
 use crate::block::{
-    builder, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef, EvalBlockError,
-    Evoxel, Resolution, AIR,
+    builder, AnimationHint, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef,
+    EvalBlockError, Evoxel, Resolution, AIR,
 };
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
@@ -357,13 +357,15 @@ fn builder_every_field() {
             .color(color)
             .selectable(false)
             .light_emission(light_emission)
+            .animation_hint(AnimationHint::TEMPORARY)
             .build(),
         Block::Atom(
             BlockAttributes {
                 display_name: "hello world".into(),
                 collision: BlockCollision::None,
                 selectable: false,
-                light_emission
+                light_emission,
+                animation_hint: AnimationHint::TEMPORARY,
             },
             color
         ),
@@ -410,6 +412,7 @@ fn attributes_default_equivalent() {
 
 #[test]
 fn attributes_debug() {
+    use pretty_assertions::assert_eq;
     let default = BlockAttributes::default;
     fn debug(a: BlockAttributes) -> String {
         format!("{:?}", a)
@@ -442,6 +445,13 @@ fn attributes_debug() {
             ..default()
         }),
         "BlockAttributes { light_emission: Rgb(1.0, 2.0, 3.0) }",
+    );
+    assert_eq!(
+        &*debug(BlockAttributes {
+            animation_hint: AnimationHint::TEMPORARY,
+            ..default()
+        }),
+        "BlockAttributes { animation_hint: AnimationHint { expect_replace: true, expect_shape_update: false, expect_color_update: false } }",
     );
 
     // Test a case of multiple attributes

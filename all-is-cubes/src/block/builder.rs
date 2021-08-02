@@ -6,7 +6,7 @@
 use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
 
-use crate::block::{Block, BlockAttributes, BlockCollision, BlockDef, Resolution};
+use crate::block::{AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, Resolution};
 use crate::math::{GridPoint, Rgb, Rgba};
 use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
 use crate::universe::{Name, URef, Universe, UniverseIndex};
@@ -87,6 +87,12 @@ impl<C> BlockBuilder<C> {
     /// Sets the value for [`BlockAttributes::light_emission`].
     pub fn light_emission(mut self, value: impl Into<Rgb>) -> Self {
         self.attributes.light_emission = value.into();
+        self
+    }
+
+    /// Sets the value for [`BlockAttributes::animation_hint`].
+    pub fn animation_hint(mut self, value: AnimationHint) -> Self {
+        self.attributes.animation_hint = value;
         self
     }
 
