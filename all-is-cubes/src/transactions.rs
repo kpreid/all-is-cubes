@@ -644,6 +644,7 @@ mod tests {
     use super::*;
     use crate::content::make_some_blocks;
     use crate::space::SpaceTransaction;
+    use indoc::indoc;
 
     #[test]
     fn universe_txn_has_default() {
@@ -658,6 +659,7 @@ mod tests {
 
     #[test]
     fn universe_txn_debug() {
+        use pretty_assertions::assert_eq;
         let [block] = make_some_blocks();
         let mut u = Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
@@ -665,22 +667,24 @@ mod tests {
 
         println!("{:#?}", transaction);
         assert_eq!(
-            format!("{:#?}", transaction),
-            "UniverseTransaction {\n\
-            \x20   [anonymous #0]: SpaceTransaction {\n\
-            \x20       (+0, +0, +0): CubeTransaction {\n\
-            \x20           old: None,\n\
-            \x20           new: Some(\n\
-            \x20               Atom(\n\
-            \x20                   BlockAttributes {\n\
-            \x20                       display_name: \"0\",\n\
-            \x20                   },\n\
-            \x20                   Rgba(0.5, 0.5, 0.5, 1.0),\n\
-            \x20               ),\n\
-            \x20           ),\n\
-            \x20       },\n\
-            \x20   },\n\
-            }"
+            format!("{:#?}\n", transaction),
+            indoc! {"
+                UniverseTransaction {
+                    [anonymous #0]: SpaceTransaction {
+                        (+0, +0, +0): CubeTransaction {
+                            old: None,
+                            new: Some(
+                                Atom(
+                                    BlockAttributes {
+                                        display_name: \"0\",
+                                    },
+                                    Rgba(0.5, 0.5, 0.5, 1.0),
+                                ),
+                            ),
+                        },
+                    },
+                }
+            "}
         );
     }
 

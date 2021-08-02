@@ -5,14 +5,17 @@
 //!
 //! Note that some sub-modules have their own test modules.
 
+use std::sync::Arc;
+
+use cgmath::EuclideanSpace as _;
+use indoc::indoc;
+
 use super::*;
 use crate::block::AIR;
 use crate::content::make_some_blocks;
 use crate::listen::Sink;
 use crate::math::GridPoint;
 use crate::universe::{RefError, Universe, UniverseIndex as _};
-use cgmath::EuclideanSpace as _;
-use std::sync::Arc;
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling
@@ -327,6 +330,7 @@ fn listens_to_block_changes() {
 
 #[test]
 fn space_debug() {
+    use pretty_assertions::assert_eq;
     let mut space = Space::empty_positive(1, 1, 1);
     space.set_physics(SpacePhysics {
         light: LightPhysics::None,
@@ -334,35 +338,37 @@ fn space_debug() {
     });
     println!("{:#?}", space);
     assert_eq!(
-        format!("{:#?}", space),
-        "Space {\n\
-        \x20   grid: Grid(\n\
-        \x20       0..1,\n\
-        \x20       0..1,\n\
-        \x20       0..1,\n\
-        \x20   ),\n\
-        \x20   block_data: [\n\
-        \x20       SpaceBlockData {\n\
-        \x20           count: 1,\n\
-        \x20           block: Atom(\n\
-        \x20               BlockAttributes {\n\
-        \x20                   display_name: \"<air>\",\n\
-        \x20                   selectable: false,\n\
-        \x20                   collision: None,\n\
-        \x20               },\n\
-        \x20               Rgba(0.0, 0.0, 0.0, 0.0),\n\
-        \x20           ),\n\
-        \x20           ..\n\
-        \x20       },\n\
-        \x20   ],\n\
-        \x20   physics: SpacePhysics {\n\
-        \x20       gravity: (+0.000, -20.000, +0.000),\n\
-        \x20       sky_color: Rgb(0.79, 0.79, 1.0),\n\
-        \x20       light: None,\n\
-        \x20   },\n\
-        \x20   behaviors: BehaviorSet([]),\n\
-        \x20   ..\n\
-        }"
+        format!("{:#?}\n", space),
+        indoc! {"
+            Space {
+                grid: Grid(
+                    0..1,
+                    0..1,
+                    0..1,
+                ),
+                block_data: [
+                    SpaceBlockData {
+                        count: 1,
+                        block: Atom(
+                            BlockAttributes {
+                                display_name: \"<air>\",
+                                selectable: false,
+                                collision: None,
+                            },
+                            Rgba(0.0, 0.0, 0.0, 0.0),
+                        ),
+                        ..
+                    },
+                ],
+                physics: SpacePhysics {
+                    gravity: (+0.000, -20.000, +0.000),
+                    sky_color: Rgb(0.79, 0.79, 1.0),
+                    light: None,
+                },
+                behaviors: BehaviorSet([]),
+                ..
+            }
+        "}
     );
 }
 

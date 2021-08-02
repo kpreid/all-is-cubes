@@ -252,9 +252,11 @@ mod tests {
     use crate::math::FreeCoordinate;
     use crate::space::Space;
     use crate::universe::Universe;
+    use indoc::indoc;
 
     #[test]
     fn behavior_set_debug() {
+        use pretty_assertions::assert_eq;
         let mut set = BehaviorSet::<Character>::new();
         assert_eq!(format!("{:?}", set), "BehaviorSet([])");
         assert_eq!(format!("{:#?}", set), "BehaviorSet([])");
@@ -267,14 +269,16 @@ mod tests {
             "BehaviorSet([AutoRotate { rate: NotNan(1.0) }])",
         );
         assert_eq!(
-            format!("{:#?}", set),
-            "BehaviorSet([\n\
-            \x20   AutoRotate {\n\
-            \x20       rate: NotNan(\n\
-            \x20           1.0,\n\
-            \x20       ),\n\
-            \x20   },\n\
-            ])",
+            format!("{:#?}\n", set),
+            indoc! {"
+                BehaviorSet([
+                    AutoRotate {
+                        rate: NotNan(
+                            1.0,
+                        ),
+                    },
+                ])
+            "},
         );
     }
 

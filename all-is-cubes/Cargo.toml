@@ -59,3 +59,5 @@ thiserror = "1.0.22"
 
 [dev-dependencies]
 criterion = "0.3.3"
+indoc = "1.0.3"
+pretty_assertions = "0.7.2"

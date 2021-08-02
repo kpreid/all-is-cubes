@@ -779,6 +779,7 @@ impl<'a, V: Arbitrary<'a>> Arbitrary<'a> for GridArray<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
 
     #[test]
     fn zero_is_valid() {
@@ -873,13 +874,14 @@ mod tests {
         println!("{:#?}", grid);
         assert_eq!(format!("{:?}", grid), "Grid(1..11, 2..22, 3..33)");
         assert_eq!(
-            format!("{:#?}", grid),
-            "\
-            Grid(\n\
-            \x20   1..11,\n\
-            \x20   2..22,\n\
-            \x20   3..33,\n\
-            )"
+            format!("{:#?}\n", grid),
+            indoc! {"
+                Grid(
+                    1..11,
+                    2..22,
+                    3..33,
+                )
+            "}
         );
     }
 
