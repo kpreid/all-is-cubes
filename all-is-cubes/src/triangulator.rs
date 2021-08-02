@@ -16,6 +16,8 @@ mod block_vertex;
 pub use block_vertex::*;
 mod block_tri;
 pub use block_tri::*;
+mod chunked_tri;
+pub(crate) use chunked_tri::*; // TODO: candidate for being public
 mod space_tri;
 pub use space_tri::*;
 mod planar;
