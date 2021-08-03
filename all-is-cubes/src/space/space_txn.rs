@@ -84,8 +84,19 @@ impl Transaction<Space> for SpaceTransaction {
     }
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
-        for (cube, t1) in self.cubes.iter() {
-            if let Some(t2) = other.cubes.get(cube) {
+        let mut cubes1 = &self.cubes;
+        let mut cubes2 = &other.cubes;
+        if cubes1.len() > cubes2.len() {
+            // The cost of the check is the cost of iterating over keys, so iterate over
+            // the smaller map rather than the larger.
+            // TODO: We can improve further by taking advantage of sortedness, using the
+            // first and last of one set to iterate over a range of the other.
+            // std::collections::btree_set::Intersection implements something like this,
+            // but unfortunately, does not have an analogue for BTreeMap.
+            std::mem::swap(&mut cubes1, &mut cubes2);
+        }
+        for (cube, t1) in cubes1.iter() {
+            if let Some(t2) = cubes2.get(cube) {
                 if matches!((&t1.old, &t2.old), (Some(a), Some(b)) if a != b) {
                     // Incompatible preconditions will always fail.
                     return Err(TransactionConflict {});
@@ -101,7 +112,10 @@ impl Transaction<Space> for SpaceTransaction {
         self.behaviors.check_merge(&other.behaviors)
     }
 
-    fn commit_merge(mut self, other: Self, check: Self::MergeCheck) -> Self {
+    fn commit_merge(mut self, mut other: Self, check: Self::MergeCheck) -> Self {
+        if other.cubes.len() > self.cubes.len() {
+            std::mem::swap(&mut self, &mut other);
+        }
         for (cube, t2) in other.cubes {
             match self.cubes.entry(cube) {
                 Occupied(mut entry) => {
