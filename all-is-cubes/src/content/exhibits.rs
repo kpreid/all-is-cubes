@@ -5,6 +5,7 @@
 //! The exhibits defined in this file are combined into [`crate::content::demo_city`].
 
 use std::f64::consts::PI;
+use std::fmt::Debug;
 
 use cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
@@ -17,9 +18,11 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::Size;
 use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::{Baseline, Text};
+use instant::Duration;
 use ordered_float::NotNan;
 
-use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
+use crate::behavior::{Behavior, BehaviorContext};
+use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, AIR};
 use crate::content::{four_walls, palette, DemoBlocks, Exhibit};
 use crate::drawing::draw_to_blocks;
 use crate::linking::{BlockProvider, InGenError};
@@ -27,7 +30,8 @@ use crate::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
     Rgb, Rgba,
 };
-use crate::space::{Grid, Space, SpacePhysics};
+use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
+use crate::transactions::Transaction;
 use crate::universe::Universe;
 
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
@@ -35,6 +39,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     KNOT,
     TEXT,
     RESOLUTIONS,
+    ANIMATION,
     MAKE_SOME_BLOCKS,
     ROTATIONS,
     COLOR_LIGHTS,
@@ -164,6 +169,133 @@ const TEXT: Exhibit = Exhibit {
         Ok(space)
     },
 };
+
+const ANIMATION: Exhibit = Exhibit {
+    name: "Animation",
+    factory: |_this, universe| {
+        let footprint = Grid::new([0, 0, 0], [3, 1, 2]);
+        let mut space = Space::empty(footprint);
+
+        let resolution = 8;
+        let mut block_space = Space::empty(Grid::for_block(resolution));
+        block_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
+        // The length of this pattern is set so that the block will sometimes be fully opaque and sometimes be invisible.
+        let fills = [
+            AIR,
+            AIR,
+            AIR,
+            AIR,
+            AIR,
+            Block::from(Rgb::new(0.0, 0.3, 0.0)),
+            Block::from(Rgb::new(0.0, 0.7, 0.0)),
+            Block::from(Rgb::new(0.0, 1.0, 0.0)),
+            Block::from(Rgb::new(0.0, 0.7, 0.7)),
+            Block::from(Rgb::new(0.0, 0.3, 1.0)),
+        ];
+        let repeats_per_fill = 6;
+        block_space.add_behavior(AnimatedVoxels::new(move |p, frame| {
+            let n = fills.len() as GridCoordinate * repeats_per_fill;
+            let location_offset = p.x + p.y + p.z;
+            let time_offset = (frame as GridCoordinate).rem_euclid(n);
+            let value = location_offset.wrapping_sub(time_offset);
+            fills[value
+                .div_euclid(repeats_per_fill)
+                .rem_euclid(fills.len() as GridCoordinate) as usize]
+                .clone()
+        }));
+        let sweep_block = Block::builder()
+            .animation_hint(AnimationHint::CONTINUOUS)
+            .voxels_ref(resolution, universe.insert_anonymous(block_space))
+            .build();
+
+        space.set([0, 0, 0], &sweep_block)?;
+        space.set([2, 0, 0], sweep_block)?;
+
+        Ok(space)
+    },
+};
+
+/// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
+/// voxels.
+#[derive(Clone, Eq, PartialEq)]
+struct AnimatedVoxels<F> {
+    /// The function to compute the voxels.
+    function: F,
+    /// The frame number, periodically incremented and fed to the function.
+    frame: u64,
+    /// How much time to wait before incrementing the frame counter.
+    frame_period: Duration,
+    /// Time accumulation not yet equal to a whole frame.
+    /// Always less than `frame_period`.
+    /// TODO: Give [`Tick`] a concept of discrete time units we can reuse instead of
+    /// separate things having their own float-based clocks.
+    accumulator: Duration,
+}
+
+impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
+    fn new(function: F) -> Self {
+        let frame_period = Duration::from_nanos(1_000_000_000 / 16);
+        Self {
+            function,
+            frame: 0,
+            frame_period,
+            accumulator: frame_period,
+        }
+    }
+
+    fn paint(&self, grid: Grid) -> SpaceTransaction {
+        let mut txn = SpaceTransaction::default();
+        for cube in grid.interior_iter() {
+            let block = (self.function)(cube, self.frame);
+            // TODO: This transaction constructing and merging is neither ergonomic nor efficient.
+            // Maybe we should have a SpaceTransaction::set_cube(&mut self, cube, block) instead.
+            txn = txn
+                .merge(SpaceTransaction::set_cube(cube, None, Some(block.clone())))
+                .unwrap();
+        }
+        txn
+    }
+}
+
+impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> Behavior<Space> for AnimatedVoxels<F> {
+    fn step(
+        &self,
+        context: &BehaviorContext<'_, Space>,
+        tick: crate::apps::Tick,
+    ) -> crate::transactions::UniverseTransaction {
+        let mut mut_self: AnimatedVoxels<F> = self.clone();
+        mut_self.accumulator += tick.delta_t;
+        if mut_self.accumulator >= mut_self.frame_period {
+            mut_self.accumulator -= mut_self.frame_period;
+            mut_self.frame = mut_self.frame.wrapping_add(1);
+
+            let paint_txn = mut_self.paint(context.host.grid());
+            context
+                .replace_self(mut_self)
+                .merge(context.bind_host(paint_txn))
+                .unwrap()
+        } else {
+            context.replace_self(mut_self)
+        }
+    }
+
+    fn alive(&self, _context: &BehaviorContext<'_, Space>) -> bool {
+        true
+    }
+
+    fn ephemeral(&self) -> bool {
+        false
+    }
+}
+
+impl<F> Debug for AnimatedVoxels<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AnimatedVoxels")
+            .field("frame", &self.frame)
+            .field("frame_period", &self.frame_period)
+            .finish_non_exhaustive()
+    }
+}
 
 const RESOLUTIONS: Exhibit = Exhibit {
     name: "Resolutions",
