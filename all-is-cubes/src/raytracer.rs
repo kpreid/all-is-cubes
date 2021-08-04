@@ -43,11 +43,13 @@ struct SpaceRaytracerImpl<P: PixelBuf> {
 
     options: GraphicsOptions,
     sky_color: Rgb,
+    packed_sky_color: PackedLight,
 }
 
 impl<P: PixelBuf> SpaceRaytracer<P> {
     /// Snapshots the given [`Space`] to prepare for raytracing it.
     pub fn new(space: &Space, options: GraphicsOptions) -> Self {
+        let sky_color = space.physics().sky_color;
         #[allow(clippy::borrowed_box)]
         SpaceRaytracer(
             SpaceRaytracerImplBuilder {
@@ -56,7 +58,8 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                     prepare_cubes::<P>(blocks, space)
                 },
                 options,
-                sky_color: space.physics().sky_color,
+                sky_color,
+                packed_sky_color: sky_color.into(),
             }
             .build(),
         )
@@ -189,13 +192,12 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
 
     #[inline]
     fn get_packed_light(&self, cube: GridPoint) -> PackedLight {
-        // TODO: wrong unwrap_or value
         self.0.with(|impl_fields| {
             impl_fields
                 .cubes
                 .get(cube)
                 .map(|b| b.lighting)
-                .unwrap_or(PackedLight::NO_RAYS)
+                .unwrap_or(*impl_fields.packed_sky_color)
         })
     }
 
