@@ -196,13 +196,17 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 // Rotate the voxel array's extent into our local coordinate system, so we can find
                 // out what range to iterate over.
                 // TODO: Avoid using a matrix inversion
+                // TODO: Intersect the input voxels.grid() with the block bounds so we don't scan *more* than we should.
                 let rotated_voxel_range = voxels
                     .grid()
                     .transform(face.matrix(block_resolution).inverse_transform().unwrap())
                     .unwrap();
 
-                // Check the case where the block's voxels don't meet its front face.
-                if !rotated_voxel_range.z_range().contains(&0) {
+                // Check the case where the block's voxels don't meet its front face, or don't fill that face.
+                if !rotated_voxel_range.z_range().contains(&0)
+                    || rotated_voxel_range.x_range() != (0..block_resolution)
+                    || rotated_voxel_range.y_range() != (0..block_resolution)
+                {
                     output_by_face[face].fully_opaque = false;
                 }
 

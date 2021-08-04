@@ -405,6 +405,7 @@ fn atom_transparency_thresholded() {
     // TODO: also test voxels -- including self-occlusion (thresholded voxel in front of truly opaque voxel)
 }
 
+/// Test [`BlockTriangulation::fully_opaque`] results from basic voxels.
 #[test]
 fn fully_opaque_voxels() {
     let resolution = 8;
@@ -430,6 +431,38 @@ fn fully_opaque_voxels() {
             nx: true,
             ny: true,
             nz: true,
+            px: false,
+            py: false,
+            pz: false,
+        }
+    );
+}
+
+/// Test [`BlockTriangulation::fully_opaque`] when the voxels are all individually opaque,
+/// but don't fill the cube.
+#[test]
+fn fully_opaque_partial_block() {
+    let mut u = Universe::new();
+    let block = Block::builder()
+        .voxels_ref(8, {
+            // The dimensions don't meet the PX face.
+            let mut block_space = Space::empty(Grid::new([0, 0, 0], [4, 8, 8]));
+            // But the blocks are all opaque.
+            block_space
+                .fill_uniform(block_space.grid(), Block::from(Rgba::WHITE))
+                .unwrap();
+            u.insert_anonymous(block_space)
+        })
+        .build();
+    assert_eq!(
+        test_triangulate_block(block)
+            .faces
+            .map(|_, ft| ft.fully_opaque),
+        FaceMap {
+            within: false,
+            nx: true,
+            ny: false,
+            nz: false,
             px: false,
             py: false,
             pz: false,
