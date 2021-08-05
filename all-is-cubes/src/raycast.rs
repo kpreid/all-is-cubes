@@ -594,9 +594,11 @@ fn ray_plane_intersection(
 #[cfg(test)]
 #[rustfmt::skip]
 mod tests {
+    use crate::math::{Aab, FaceMap};
+
     use super::*;
     use cgmath::Vector3;
-    use rand::{Rng as _, SeedableRng as _};
+    use rand::{SeedableRng as _};
 
     /// Alternative to [`RaycastStep`] which contains optional data so partial assertions
     /// can be written, and contains 'final' values rather than ones used for calculation.
@@ -1001,22 +1003,14 @@ mod tests {
     fn intersection_point_random_test() {
         // A one-cube grid, so that all possible rays should either intersect
         // exactly this cube, or none at all.
-        let grid = Grid::new((0, 0, 0), (1, 1, 1));
+        let grid = Grid::new([0, 0, 0], [1, 1, 1]);
+        let ray_origins: Aab = grid.expand(FaceMap::repeat(1)).into();
 
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for _ in 0..1000 {
-            // TODO: When/if cgmath gets updated, use cgmath's random vectors
             let ray = Ray::new(
-                Point3::new(
-                    rng.gen_range(-1. ..=2.),
-                    rng.gen_range(-1. ..=2.),
-                    rng.gen_range(-1. ..=2.),
-                ),
-                Vector3::new(
-                    rng.gen_range(-1. ..=1.),
-                    rng.gen_range(-1. ..=1.),
-                    rng.gen_range(-1. ..=1.),
-                ),
+                ray_origins.random_point(&mut rng),
+                Aab::new(-1., 1., -1., 1., -1., 1.).random_point(&mut rng).to_vec(),
             );
             let steps: Vec<RaycastStep> = ray.cast().within_grid(grid).collect();
             match &steps[..] {
