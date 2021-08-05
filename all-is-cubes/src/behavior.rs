@@ -5,7 +5,7 @@
 
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 use std::sync::Arc;
 
 use crate::apps::Tick;
@@ -111,7 +111,7 @@ impl<H: Transactional> BehaviorSet<H> {
 }
 
 impl<H> std::fmt::Debug for BehaviorSet<H> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "BehaviorSet(")?;
         f.debug_list().entries(&*self.items).finish()?;
         write!(f, ")")?;

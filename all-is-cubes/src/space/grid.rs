@@ -4,10 +4,12 @@
 //! Axis-aligned integer-coordinate box volumes ([`Grid`]), arrays bounded by them
 //! ([`GridArray`]), and related.
 
-use cgmath::{Point3, Transform, Vector3};
 use std::convert::TryFrom;
+use std::fmt;
 use std::iter::FusedIterator;
 use std::ops::Range;
+
+use cgmath::{Point3, Transform, Vector3};
 
 use crate::block::Resolution;
 use crate::math::{
@@ -529,8 +531,8 @@ impl Grid {
     }
 }
 
-impl std::fmt::Debug for Grid {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Grid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Grid")
             .field(&self.x_range())
             .field(&self.y_range())

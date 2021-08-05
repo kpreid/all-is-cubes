@@ -57,8 +57,8 @@ pub struct Body {
     // When adding a field, don't forget to expand the Debug impl.
 }
 
-impl std::fmt::Debug for Body {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Body {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Body")
             .field("position", &self.position.custom_format(ConciseDebug))
             .field("velocity", &self.velocity.custom_format(ConciseDebug))

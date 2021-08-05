@@ -15,7 +15,7 @@
 
 use indexmap::IndexSet;
 use std::cell::RefCell;
-use std::fmt::Debug;
+use std::fmt;
 use std::hash::Hash;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock, Weak};
@@ -110,8 +110,8 @@ impl<M: Clone + Send> Default for Notifier<M> {
     }
 }
 
-impl<M> Debug for Notifier<M> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<M> fmt::Debug for Notifier<M> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Ok(listeners) = self.listeners.try_borrow() {
             fmt.debug_tuple("Notifier").field(&listeners.len()).finish()
         } else {
@@ -275,8 +275,8 @@ where
 pub struct DirtyFlag {
     flag: Arc<AtomicBool>,
 }
-impl Debug for DirtyFlag {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for DirtyFlag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DirtyFlag")
             .field(&self.flag.load(Ordering::Relaxed))
             .finish()

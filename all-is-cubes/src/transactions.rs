@@ -5,7 +5,7 @@ use std::any::Any;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 use std::sync::Arc;
 
 use crate::character::Character;
@@ -364,7 +364,7 @@ impl Default for AnyTransaction {
 
 /// Hide the wrapper type entirely since its type is determined entirely by its contents.
 impl Debug for AnyTransaction {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         Debug::fmt(self.transaction_as_debug(), fmt)
     }
 }
@@ -477,7 +477,7 @@ impl Transaction<Universe> for UniverseTransaction {
 
 /// This formatting is chosen to be similar to [`Universe`]'s.
 impl Debug for UniverseTransaction {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = fmt.debug_struct("UniverseTransaction");
         for (name, txn) in &self.members {
             // transaction_as_debug() gives us the type-specific transaction without the redundant

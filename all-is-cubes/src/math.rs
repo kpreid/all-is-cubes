@@ -3,6 +3,7 @@
 
 //! Mathematical utilities and decisions.
 
+use std::fmt;
 use std::iter::FusedIterator;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
@@ -330,8 +331,8 @@ impl Aab {
     }
 }
 
-impl std::fmt::Debug for Aab {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Aab {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt,
             "Aab({:?} to {:?})",

@@ -1,6 +1,10 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::cell::RefCell;
+use std::fmt;
+use std::rc::Rc;
+
 use cgmath::Vector2;
 use cgmath::Zero;
 use embedded_graphics::draw_target::DrawTarget;
@@ -19,8 +23,6 @@ use luminance_front::shading_gate::ShadingGate;
 use luminance_front::tess::{Mode, Tess};
 use luminance_front::texture::{Dim2, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, Wrap};
 use luminance_front::Backend;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 use crate::camera::Viewport;
 use crate::lum::shading::map_shader_result;
@@ -173,8 +175,8 @@ impl FullFrameTexture {
     }
 }
 
-impl std::fmt::Debug for FullFrameTexture {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for FullFrameTexture {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FullFrameTexture")
             // Skipping .ff because it can't be usefully printed
             .field("texture", &self.texture.is_some())

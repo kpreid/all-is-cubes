@@ -39,7 +39,7 @@ impl From<&str> for Name {
     }
 }
 impl Display for Name {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Name::Specific(name) => write!(f, "'{}'", name),
             Name::Anonym(index) => write!(f, "[anonymous #{}]", index),
@@ -126,8 +126,8 @@ impl Universe {
     }
 }
 
-impl std::fmt::Debug for Universe {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Universe {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = fmt.debug_struct("Universe");
         format_members::<BlockDef>(self, &mut ds);
         format_members::<Character>(self, &mut ds);
@@ -135,7 +135,7 @@ impl std::fmt::Debug for Universe {
         ds.finish()
     }
 }
-fn format_members<T>(universe: &Universe, ds: &mut std::fmt::DebugStruct<'_, '_>)
+fn format_members<T>(universe: &Universe, ds: &mut fmt::DebugStruct<'_, '_>)
 where
     Universe: UniverseTable<T>,
 {
@@ -483,12 +483,12 @@ impl<T> BorrowMut<T> for UBorrowMut<T> {
 }
 
 impl<T: Debug> Debug for UBorrow<T> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "UBorrow({:?})", **self)
     }
 }
 impl<T: Debug> Debug for UBorrowMut<T> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "UBorrowMut({:?})", **self)
     }
 }

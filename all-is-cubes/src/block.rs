@@ -6,6 +6,7 @@
 
 use std::borrow::Cow;
 use std::convert::TryFrom as _;
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -414,9 +415,9 @@ pub struct BlockAttributes {
     // Reminder: When adding new fields, add them to the Debug implementation.
 }
 
-impl std::fmt::Debug for BlockAttributes {
+impl fmt::Debug for BlockAttributes {
     /// Only attributes which differ from the default are shown.
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self == &Self::default() {
             // Avoid the braceless formatting used for structs with literally no fields.
             write!(f, "BlockAttributes {{}}")
@@ -623,7 +624,7 @@ pub struct EvaluatedBlock {
 }
 
 impl CustomFormat<ConciseDebug> for EvaluatedBlock {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>, _: ConciseDebug) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         fmt.debug_struct("EvaluatedBlock")
             .field("attributes", &self.attributes)
             .field("color", &self.color)

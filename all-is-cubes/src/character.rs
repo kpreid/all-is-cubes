@@ -68,8 +68,8 @@ pub struct Character {
     pub(crate) behaviors: BehaviorSet<Character>,
 }
 
-impl std::fmt::Debug for Character {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Character {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Character")
             .field("body", &self.body)
             .field(
@@ -466,8 +466,8 @@ pub struct Cursor {
 
 // TODO: this probably shouldn't be Display any more, but Debug or ConciseDebug
 // — or just a regular method.
-impl std::fmt::Display for Cursor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Cursor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Block at {:?}\n{:#?}\nLighting within {:?}, behind {:?}",

@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::Display;
+use std::fmt::{self, Display};
 use std::hash::Hash;
 use std::ops::Index;
 use strum::IntoEnumIterator;
@@ -151,8 +151,8 @@ impl GenError {
     }
 }
 
-impl std::fmt::Display for GenError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for GenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.detail)?;
         if let Some(name) = &self.for_object {
             write!(f, "\nwhile setting up {}", name)?;

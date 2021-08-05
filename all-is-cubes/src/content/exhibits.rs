@@ -5,7 +5,7 @@
 //! The exhibits defined in this file are combined into [`crate::content::demo_city`].
 
 use std::f64::consts::PI;
-use std::fmt::Debug;
+use std::fmt;
 
 use cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
@@ -288,8 +288,8 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> Behavior<Space> for Anima
     }
 }
 
-impl<F> Debug for AnimatedVoxels<F> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<F> fmt::Debug for AnimatedVoxels<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AnimatedVoxels")
             .field("frame", &self.frame)
             .field("frame_period", &self.frame_period)

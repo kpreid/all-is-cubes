@@ -6,7 +6,7 @@
 use std::collections::btree_map::Entry::*;
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt;
 
 use super::Space;
 use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
@@ -137,8 +137,8 @@ impl Transaction<Space> for SpaceTransaction {
     }
 }
 
-impl Debug for SpaceTransaction {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for SpaceTransaction {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = fmt.debug_struct("SpaceTransaction");
         for (cube, txn) in &self.cubes {
             ds.field(

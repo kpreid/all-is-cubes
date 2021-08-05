@@ -3,6 +3,8 @@
 
 //! Vertices and related types for the triangulator.
 
+use std::fmt;
+
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgba};
@@ -66,8 +68,8 @@ pub enum Coloring {
     },
 }
 
-impl std::fmt::Debug for BlockVertex {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for BlockVertex {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Print compactly on single line even if the formatter is in prettyprint mode.
         write!(
             fmt,
@@ -78,9 +80,9 @@ impl std::fmt::Debug for BlockVertex {
         )
     }
 }
-impl std::fmt::Debug for Coloring {
+impl fmt::Debug for Coloring {
     // TODO: test formatting of this
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Coloring::Solid(color) => write!(fmt, "Solid({:?})", color),
             Coloring::Texture { pos, .. } => {

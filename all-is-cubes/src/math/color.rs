@@ -3,10 +3,12 @@
 
 //! Color data types. This module is private but reexported by its parent.
 
+use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::ops::{Add, AddAssign, Mul, Sub};
+
 use cgmath::{ElementWise as _, Vector3, Vector4};
 pub use ordered_float::{FloatIsNan, NotNan};
-use std::convert::{TryFrom, TryInto};
-use std::ops::{Add, AddAssign, Mul, Sub};
 
 use crate::math::notnan;
 
@@ -363,8 +365,8 @@ impl Mul<f32> for Rgb {
     }
 }
 
-impl std::fmt::Debug for Rgb {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Rgb {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt,
             "Rgb({:?}, {:?}, {:?})",
@@ -374,8 +376,8 @@ impl std::fmt::Debug for Rgb {
         )
     }
 }
-impl std::fmt::Debug for Rgba {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Rgba {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt,
             "Rgba({:?}, {:?}, {:?}, {:?})",

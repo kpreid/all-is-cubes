@@ -3,7 +3,7 @@
 
 //! Components for "apps", or game clients: user interface and top-level state.
 
-use std::fmt::Display;
+use std::fmt::{self, Display};
 
 use crate::camera::{Camera, GraphicsOptions};
 use crate::character::{cursor_raycast, Character, CharacterChange, Cursor};
@@ -211,7 +211,7 @@ pub struct InfoText<'a, T> {
 }
 
 impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(character_ref) = self.app.character() {
             write!(f, "{}", character_ref.borrow().custom_format(StatusText)).unwrap();
         }
