@@ -7,7 +7,7 @@ use cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
 use noise::Seedable;
 
 use crate::block::{Block, BlockCollision, AIR};
-use crate::content::{four_walls, scale_color};
+use crate::content::{four_walls, palette, scale_color, Fire};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{
     FaceMap, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector, NoiseFnExt as _, Rgb,
@@ -196,8 +196,10 @@ fn map_text_block(ascii: u8, blocks: &BlockProvider<AtriumBlocks>, existing_bloc
                 .clone()
                 .rotate(GridRotation::CLOCKWISE),
         ),
+        // TODO: These are supposed to be planters
+        b'P' => blocks[AtriumBlocks::Firepot].clone(),
         // Not-yet-implemented decoration placeholder blocks
-        b'P' | b'f' => Block::from(rgba_const!(1.0, 0.5, 0.5, 1.0)),
+        b'f' => Block::from(rgba_const!(1.0, 0.5, 0.5, 1.0)),
         _ => panic!(
             "Unrecognized block character {:?}",
             std::str::from_utf8(&[ascii])
@@ -286,6 +288,7 @@ pub enum AtriumBlocks {
     SmallColumn,
     Molding,
     MoldingCorner,
+    Firepot,
 }
 impl BlockModule for AtriumBlocks {
     fn namespace() -> &'static str {
@@ -424,6 +427,43 @@ fn install_atrium_blocks(
                     }
                     molding_fn(p)
                 })?
+                .build(),
+            AtriumBlocks::Firepot => Block::builder()
+                .display_name("Firepot")
+                // .light_emission(rgb_const!(1.4, 1.0, 0.8) * 4.0)
+                .voxels_ref(resolution, {
+                    let mut space = Space::empty(Grid::for_block(resolution));
+                    // Use a darker color to dampen the effect of interior light
+                    let body_block = Block::from(palette::STEEL * 0.2);
+                    space.fill(
+                        Grid::from_lower_upper(
+                            [0, 0, 0],
+                            [resolution_g, resolution_g / 2, resolution_g],
+                        ),
+                        |p| {
+                            let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
+                            if mid.x.max(mid.z) + (mid.y / 2) < resolution_g + 4 {
+                                Some(&body_block)
+                            } else {
+                                None
+                            }
+                        },
+                    )?;
+                    let fire_inset = 2;
+                    if false {
+                        // TODO: Actually enable the fire. We need graphics optimizations for animation first, or this will swamp chunk updating capacity.
+                        space.add_behavior(Fire::new(Grid::from_lower_upper(
+                            // Vertical overlap will be overwritten, making a bowl shape
+                            [fire_inset, resolution_g / 2 - 2, fire_inset],
+                            [
+                                resolution_g - fire_inset,
+                                resolution_g,
+                                resolution_g - fire_inset,
+                            ],
+                        )));
+                    }
+                    universe.insert_anonymous(space)
+                })
                 .build(),
         })
     })?
