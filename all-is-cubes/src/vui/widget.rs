@@ -282,15 +282,16 @@ impl TooltipController {
         universe: &mut Universe,
     ) -> Self {
         let frame = layout.toolbar_text_frame();
-        let mut text_space = Space::empty(Grid::new(
+        let text_space = Space::builder(Grid::new(
             GridPoint::origin(),
             GridVector::new(
                 frame.size().x * GridCoordinate::from(Self::RESOLUTION),
                 frame.size().y * GridCoordinate::from(Self::RESOLUTION),
                 2,
             ),
-        ));
-        text_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
+        ))
+        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+        .build_empty();
         let text_space_ref = universe.insert_anonymous(text_space);
         let toolbar_text_blocks = space_to_blocks(
             Self::RESOLUTION,

@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use cgmath::{Vector2};
+use cgmath::Vector2;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Primitive as _, Transform as _};
 use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle, Triangle};
@@ -54,12 +54,12 @@ impl HudLayout {
     pub(crate) fn new_space(&self, universe: &mut Universe, hud_blocks: &HudBlocks) -> URef<Space> {
         let Vector2 { x: w, y: h } = self.size;
         let grid = self.grid();
-        let mut space = Space::empty(grid);
-
-        space.set_physics(SpacePhysics {
-            sky_color: palette::HUD_SKY,
-            ..SpacePhysics::default()
-        });
+        let mut space = Space::builder(grid)
+            .physics(SpacePhysics {
+                sky_color: palette::HUD_SKY,
+                ..SpacePhysics::default()
+            })
+            .build_empty();
 
         if false {
             // Visualization of the bounds of the space we're drawing.
@@ -159,8 +159,9 @@ impl HudBlocks {
         // Draw toolbar icon frame, twice so we can have start-middle-end shapes.
         let toolbar_frame_block_grid = Grid::new((-1, -1, -1), (5, 3, 3));
         let toolbar_frame_voxel_grid = toolbar_frame_block_grid.multiply(resolution_g);
-        let mut toolbar_drawing_space = Space::empty(toolbar_frame_voxel_grid);
-        toolbar_drawing_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
+        let mut toolbar_drawing_space = Space::builder(toolbar_frame_voxel_grid)
+            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+            .build_empty();
         // TODO: remove y flip
         let display = &mut toolbar_drawing_space.draw_target(GridMatrix::FLIP_Y);
 

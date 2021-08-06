@@ -10,10 +10,11 @@ use crate::block::{Block, BlockCollision, AIR};
 use crate::content::{four_walls, palette, scale_color, Fire};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{
-    FaceMap, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector, NoiseFnExt as _, Rgb,
+    FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
+    NoiseFnExt as _, Rgb,
 };
 use crate::raycast::Face;
-use crate::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
+use crate::space::{Grid, GridArray, SetCubeError, Space};
 use crate::universe::Universe;
 
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
@@ -55,7 +56,14 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
         }
     };
 
-    let mut space = Space::empty(space_grid);
+    let mut space = Space::builder(space_grid)
+        .spawn_position(Point3::new(
+            0.5,
+            1.91 + FreeCoordinate::from(ceiling_height + 2),
+            10.0,
+        ))
+        .sky_color(Rgb::new(1.0, 1.0, 0.9843) * 4.0)
+        .build_empty();
 
     // Outer walls
     four_walls(
@@ -158,16 +166,6 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
         },
     )?;
 
-    // Other space setup
-    space.spawn_mut().position = Point3::new(
-        notnan!(0.5),
-        notnan!(1.91) + f64::from(ceiling_height + 2),
-        notnan!(10.0),
-    );
-    space.set_physics(SpacePhysics {
-        sky_color: Rgb::new(1.0, 1.0, 0.9843) * 4.0,
-        ..SpacePhysics::default()
-    });
     space.fast_evaluate_light();
 
     Ok(space)
@@ -432,7 +430,7 @@ fn install_atrium_blocks(
                 .display_name("Firepot")
                 // .light_emission(rgb_const!(1.4, 1.0, 0.8) * 4.0)
                 .voxels_ref(resolution, {
-                    let mut space = Space::empty(Grid::for_block(resolution));
+                    let mut space = Space::for_block(resolution).build_empty();
                     // Use a darker color to dampen the effect of interior light
                     let body_block = Block::from(palette::STEEL * 0.2);
                     space.fill(

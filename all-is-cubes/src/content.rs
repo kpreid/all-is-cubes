@@ -137,7 +137,7 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
     let resolution = 16;
     color_sequence_for_make_blocks(COUNT)
         .map(|(i, color)| {
-            let mut block_space = Space::empty(Grid::for_block(resolution));
+            let mut block_space = Space::for_block(resolution).build_empty();
             block_space
                 .fill_uniform(block_space.grid(), Block::from(color))
                 .unwrap();

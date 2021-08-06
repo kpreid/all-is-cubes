@@ -12,9 +12,7 @@ use crate::character::Character;
 use crate::content::{atrium::atrium, demo_city, install_demo_blocks};
 use crate::linking::{GenError, InGenError};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
-use crate::space::LightPhysics;
-use crate::space::SpacePhysics;
-use crate::space::{Grid, Space};
+use crate::space::{Grid, LightPhysics, Space};
 use crate::universe::{Name, Universe, UniverseIndex};
 
 /// Selection of initial content for constructing a new [`Universe`].
@@ -72,16 +70,14 @@ fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
         (-1, -1, -1),
         GridVector::new(1, 1, 1) * box_size + GridVector::new(2, 2, 2),
     );
-    let mut space = Space::empty(grid);
-    // There shall be no light but that which we make for ourselves!
-    space.set_physics(SpacePhysics {
-        sky_color: Rgb::ZERO,
-        light: LightPhysics::Rays {
+    let mut space = Space::builder(grid)
+        // There shall be no light but that which we make for ourselves!
+        .sky_color(Rgb::ZERO)
+        .light_physics(LightPhysics::Rays {
             maximum_distance: (box_size * 2).try_into().unwrap_or(u16::MAX),
-        },
-        ..SpacePhysics::default()
-    });
-    space.spawn_mut().position = (Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into()).map(|s| NotNan::new(s).unwrap());
+        })
+        .spawn_position(Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into())
+        .build_empty();
 
     let white: Block = Rgba::new(1.0, 1.0, 1.0, 1.0).into();
     let red: Block = Rgba::new(0.57, 0.025, 0.025, 1.0).into();

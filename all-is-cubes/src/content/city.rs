@@ -18,6 +18,7 @@ use ordered_float::NotNan;
 
 use crate::block::Resolution;
 use crate::block::{BlockAttributes, BlockCollision, AIR};
+use crate::character::Spawn;
 use crate::content::palette;
 use crate::content::{logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS};
 use crate::drawing::{draw_to_blocks, VoxelBrush};
@@ -66,31 +67,33 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     ]);
 
     // Construct space.
-    let mut space = Space::empty(grid);
-    space.set_physics(SpacePhysics {
-        sky_color: Rgb::new(0.9, 0.9, 1.4),
-        light: LightPhysics::None, // disable until we are done with bulk updates
-        ..SpacePhysics::default()
-    });
-
-    // Spawn
-    let spawn = space.spawn_mut();
-    spawn.position =
-        (grid.center() + Vector3::new(0.5, 2.91, 8.5)).map(|s| NotNan::new(s).unwrap());
-    spawn.flying = false;
-    // Initial inventory contents. TODO: Make a better list.
-    for block in [
-        &landscape_blocks[Grass],
-        &landscape_blocks[Dirt],
-        &landscape_blocks[Stone],
-        &demo_blocks[Lamp],
-        &demo_blocks[Sconce],
-        &demo_blocks[Road],
-        &demo_blocks[Signboard],
-        &demo_blocks[Arrow],
-    ] {
-        spawn.inventory.push(Tool::PlaceBlock(block.clone()));
-    }
+    let mut space = Space::builder(grid)
+        .sky_color(Rgb::new(0.9, 0.9, 1.4))
+        .light_physics(LightPhysics::None) // disable until we are done with bulk updates
+        .spawn({
+            // TODO: Add incremental spawn configuration to SpaceBuilder?
+            let mut spawn = Spawn {
+                position: (grid.center() + Vector3::new(0.5, 2.91, 8.5))
+                    .map(|s| NotNan::new(s).unwrap()),
+                flying: false,
+                ..Spawn::default_for_new_space(grid)
+            };
+            // Initial inventory contents. TODO: Make a better list.
+            for block in [
+                &landscape_blocks[Grass],
+                &landscape_blocks[Dirt],
+                &landscape_blocks[Stone],
+                &demo_blocks[Lamp],
+                &demo_blocks[Sconce],
+                &demo_blocks[Road],
+                &demo_blocks[Signboard],
+                &demo_blocks[Arrow],
+            ] {
+                spawn.inventory.push(Tool::PlaceBlock(block.clone()));
+            }
+            spawn
+        })
+        .build_empty();
 
     // Fill basic layers, underground and top
     space.fill_uniform(planner.y_range(-ground_depth, 0), &landscape_blocks[Stone])?;

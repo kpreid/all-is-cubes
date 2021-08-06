@@ -8,7 +8,7 @@ use std::borrow::Cow;
 
 use crate::block::{AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, Resolution};
 use crate::math::{GridPoint, Rgb, Rgba};
-use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
+use crate::space::{Grid, SetCubeError, Space};
 use crate::universe::{Name, URef, Universe, UniverseIndex};
 
 /// Tool for constructing [`Block`] values conveniently.
@@ -144,8 +144,8 @@ impl<C> BlockBuilder<C> {
         B: std::borrow::Borrow<Block>,
     {
         let grid = Grid::for_block(resolution);
-        let mut space = Space::empty(grid);
-        space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
+        let mut space = Space::builder(grid).build_empty();
+        // TODO: Teach the SpaceBuilder to accept a function in the same way
         space.fill(grid, |point| Some(function(point)))?;
         Ok(self.voxels_ref(resolution, universe.insert_anonymous(space)))
     }

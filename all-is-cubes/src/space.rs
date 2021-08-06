@@ -24,6 +24,9 @@ use crate::universe::URef;
 use crate::util::ConciseDebug;
 use crate::util::{CustomFormat, StatusText};
 
+mod builder;
+pub use builder::SpaceBuilder;
+
 mod grid;
 pub use grid::*;
 
@@ -128,13 +131,37 @@ impl fmt::Debug for SpaceBlockData {
 pub type BlockIndex = u16;
 
 impl Space {
-    // TODO: Add a constructor that takes a SpacePhysics value
+    /// Returns a [`SpaceBuilder`] configured for a block,
+    /// which may be used to construct a new [`Space`].
+    ///
+    /// This means that its bounds are as per [`Grid::for_block()`], and its
+    /// [`physics`](Self::physics) is [`SpacePhysics::DEFAULT_FOR_BLOCK`].
+    pub fn for_block(resolution: Resolution) -> SpaceBuilder {
+        SpaceBuilder::new(Grid::for_block(resolution)).physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+    }
+
+    /// Returns a [`SpaceBuilder`] with the given grid and all default values,
+    /// which may be used to construct a new [`Space`].
+    pub fn builder(grid: Grid) -> SpaceBuilder {
+        SpaceBuilder::new(grid)
+    }
 
     /// Constructs a [`Space`] that is entirely filled with [`AIR`].
+    ///
+    /// Equivalent to `Space::builder(grid).build_empty()`
     pub fn empty(grid: Grid) -> Space {
-        // TODO: Might actually be worth checking for memory allocation failure here...?
+        Space::builder(grid).build_empty()
+    }
+
+    /// Implementation of [`SpaceBuilder`]'s terminal methods.
+    fn new_from_builder(builder: SpaceBuilder) -> Self {
+        let SpaceBuilder {
+            grid,
+            spawn,
+            physics,
+        } = builder;
+
         let volume = grid.volume();
-        let physics = SpacePhysics::default();
 
         Space {
             grid,
@@ -162,7 +189,7 @@ impl Space {
 
             physics,
             behaviors: BehaviorSet::new(),
-            spawn: Spawn::default_for_new_space(grid),
+            spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(grid)),
             notifier: Notifier::new(),
             todo: Default::default(),
         }
@@ -862,6 +889,12 @@ pub struct SpacePhysics {
 }
 
 impl SpacePhysics {
+    pub(crate) const DEFAULT: Self = Self {
+        gravity: Vector3::new(notnan!(0.), notnan!(-20.), notnan!(0.)),
+        sky_color: palette::DAY_SKY_COLOR,
+        light: LightPhysics::DEFAULT,
+    };
+
     pub const DEFAULT_FOR_BLOCK: Self = Self {
         gravity: Vector3::new(notnan!(0.), notnan!(0.), notnan!(0.)),
         sky_color: rgb_const!(0.5, 0.5, 0.5),
@@ -887,11 +920,7 @@ impl fmt::Debug for SpacePhysics {
 
 impl Default for SpacePhysics {
     fn default() -> Self {
-        Self {
-            gravity: Vector3::new(notnan!(0.), notnan!(-20.), notnan!(0.)),
-            sky_color: palette::DAY_SKY_COLOR,
-            light: LightPhysics::default(),
-        }
+        Self::DEFAULT
     }
 }
 
@@ -913,11 +942,15 @@ pub enum LightPhysics {
     },
 }
 
+impl LightPhysics {
+    pub(crate) const DEFAULT: Self = Self::Rays {
+        maximum_distance: 30,
+    };
+}
+
 impl Default for LightPhysics {
     fn default() -> Self {
-        Self::Rays {
-            maximum_distance: 30,
-        }
+        Self::DEFAULT
     }
 }
 

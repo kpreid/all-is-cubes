@@ -311,8 +311,9 @@ where
         dbg!(top_left_2d, bottom_right_2d, drawing_grid);
     }
 
-    let mut drawing_space = Space::empty(drawing_grid);
-    drawing_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
+    let mut drawing_space = Space::builder(drawing_grid)
+        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+        .build_empty();
     object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
         [0, 0, z],
         Face::PX,

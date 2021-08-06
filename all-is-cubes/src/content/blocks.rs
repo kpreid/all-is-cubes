@@ -135,7 +135,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 .build(),
 
             Arrow => {
-                let mut space = Space::empty(Grid::for_block(resolution));
+                let mut space = Space::for_block(resolution).build_empty();
 
                 // Support legs, identifying the down / -Y direction.
                 let leg = Block::from(palette::STEEL);
@@ -228,7 +228,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 let resolution = 16;
                 let top_edge = 10;
 
-                let mut space = Space::empty(Grid::for_block(resolution));
+                let mut space = Space::for_block(resolution).build_empty();
 
                 // Sign board
                 {

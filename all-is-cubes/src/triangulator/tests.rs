@@ -12,7 +12,7 @@ use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
 use crate::math::{Face, GridRotation};
 use crate::math::{Face::*, FaceMap, FreeCoordinate, GridPoint, Rgba};
-use crate::space::{Grid, Space};
+use crate::space::{Grid, Space, SpacePhysics};
 use crate::triangulator::BlockTriangulation;
 use crate::universe::Universe;
 
@@ -423,7 +423,9 @@ fn fully_opaque_partial_block() {
     let block = Block::builder()
         .voxels_ref(8, {
             // The dimensions don't meet the PX face.
-            let mut block_space = Space::empty(Grid::new([0, 0, 0], [4, 8, 8]));
+            let mut block_space = Space::builder(Grid::new([0, 0, 0], [4, 8, 8]))
+                .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                .build_empty();
             // But the blocks are all opaque.
             block_space
                 .fill_uniform(block_space.grid(), Block::from(Rgba::WHITE))

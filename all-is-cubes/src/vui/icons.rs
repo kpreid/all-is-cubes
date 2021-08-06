@@ -9,7 +9,7 @@ use crate::block::{Block, AIR_EVALUATED};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgba};
-use crate::space::{Grid, Space, SpacePhysics};
+use crate::space::{Space, SpacePhysics};
 use crate::universe::Universe;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
@@ -99,7 +99,7 @@ impl Icons {
                         .stroke_width(1)
                         .build();
 
-                    let mut space = Space::empty(Grid::for_block(resolution));
+                    let mut space = Space::for_block(resolution).build_empty();
                     let display = &mut space.draw_target(GridMatrix::from_origin(
                         GridPoint::new(1, 1, 1) * GridCoordinate::from(resolution / 2),
                         Face::PX,

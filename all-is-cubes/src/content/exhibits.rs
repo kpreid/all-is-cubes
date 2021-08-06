@@ -86,7 +86,9 @@ const KNOT: Exhibit = Exhibit {
         let strand_radius = 4.;
         let twists = 2.5;
 
-        let mut drawing_space = Space::empty(footprint.multiply(resolution));
+        let mut drawing_space = Space::builder(footprint.multiply(resolution))
+            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+            .build_empty();
         let paint1 = Block::from(Rgba::new(0.7, 0.7, 0.7, 1.0));
         let paint2 = Block::from(Rgba::new(0.1, 0.1, 0.9, 1.0));
         let paint3 = Block::from(Rgba::new(0.9, 0.7, 0.1, 1.0));
@@ -174,8 +176,7 @@ const ANIMATION: Exhibit = Exhibit {
 
         let sweep_block = {
             let resolution = 8;
-            let mut block_space = Space::empty(Grid::for_block(resolution));
-            block_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
+            let mut block_space = Space::for_block(resolution).build_empty();
             // The length of this pattern is set so that the block will sometimes be fully opaque and sometimes be invisible.
             let fills = [
                 AIR,
@@ -212,7 +213,7 @@ const ANIMATION: Exhibit = Exhibit {
                 .light_emission(rgb_const!(1.4, 1.0, 0.8) * 8.0)
                 .voxels_ref(fire_resolution, {
                     let fire_grid = Grid::for_block(fire_resolution);
-                    let mut space = Space::empty(fire_grid);
+                    let mut space = Space::for_block(fire_resolution).build_empty();
                     space.set([0, 0, 0], Rgb::ONE)?; // placeholder for not fully transparent so first pass lighting is better
                     space.add_behavior(Fire::new(fire_grid));
                     universe.insert_anonymous(space)
@@ -434,8 +435,7 @@ const COLOR_LIGHTS: Exhibit = Exhibit {
         let wall_block = {
             let colors_as_blocks: Vec<Block> =
                 surface_colors.iter().copied().map(Block::from).collect();
-            let mut wall_block_space = Space::empty(Grid::for_block(wall_resolution));
-            wall_block_space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK); // TODO:
+            let mut wall_block_space = Space::for_block(wall_resolution).build_empty();
             wall_block_space.fill_uniform(wall_block_space.grid(), &wall_color_block)?;
             for rotation in [
                 GridRotation::IDENTITY,

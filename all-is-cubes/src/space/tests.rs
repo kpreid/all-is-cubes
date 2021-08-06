@@ -27,6 +27,13 @@ fn initial_state_consistency() {
     Space::empty_positive(1, 1, 1).consistency_check();
     Space::empty_positive(10, 20, 30).consistency_check();
     Space::empty(Grid::new([1, 2, 3], [10, 20, 30])).consistency_check();
+    Space::builder(Grid::new([1, 2, 3], [10, 20, 30]))
+        .build_empty()
+        .consistency_check();
+    Space::builder(Grid::new([1, 2, 3], [10, 20, 30]))
+        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+        .build_empty()
+        .consistency_check();
 }
 
 /// set() returns Ok when the cube was changed or already equal.
