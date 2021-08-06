@@ -139,11 +139,12 @@ impl Fire {
 
         // To ripple changes upward, we need to iterate downward
         let grid = self.fire_state.grid();
+        let y0 = grid.lower_bounds().y;
         for z in grid.z_range() {
             for y in grid.y_range().rev() {
                 for x in grid.x_range() {
                     let cube = GridPoint::new(x, y, z);
-                    self.fire_state[cube] = if y == 0 {
+                    self.fire_state[cube] = if y == y0 {
                         (self.fire_state[cube] + self.rng.gen_range(0..3))
                             .saturating_sub(1)
                             .min(self.blocks.len() as u8 - 1)
