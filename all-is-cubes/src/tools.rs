@@ -12,7 +12,7 @@ use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
-use crate::space::{SetCubeError, SpaceTransaction};
+use crate::space::SpaceTransaction;
 use crate::transactions::{
     PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
 };
@@ -157,9 +157,6 @@ pub enum ToolError {
     /// The tool requires a target cube and none was present.
     #[error("nothing is selected")]
     NothingSelected,
-    /// The cube to be modified could not be modified; see the inner error for why.
-    #[error("error placing block: {0}")]
-    SetCube(#[from] SetCubeError),
     /// The space to be operated on could not be accessed.
     #[error("error accessing space: {0}")]
     SpaceRef(#[from] RefError),
