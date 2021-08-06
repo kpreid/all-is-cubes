@@ -5,7 +5,6 @@
 //! The exhibits defined in this file are combined into [`crate::content::demo_city`].
 
 use std::f64::consts::PI;
-use std::fmt;
 
 use cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
@@ -18,20 +17,17 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::Size;
 use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::{Baseline, Text};
-use instant::Duration;
 use ordered_float::NotNan;
 
-use crate::behavior::{Behavior, BehaviorContext};
 use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, AIR};
-use crate::content::{four_walls, palette, DemoBlocks, Exhibit};
+use crate::content::{four_walls, palette, AnimatedVoxels, DemoBlocks, Exhibit};
 use crate::drawing::draw_to_blocks;
 use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
     Rgb, Rgba,
 };
-use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
-use crate::transactions::Transaction;
+use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::Universe;
 
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
@@ -214,88 +210,6 @@ const ANIMATION: Exhibit = Exhibit {
         Ok(space)
     },
 };
-
-/// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
-/// voxels.
-#[derive(Clone, Eq, PartialEq)]
-struct AnimatedVoxels<F> {
-    /// The function to compute the voxels.
-    function: F,
-    /// The frame number, periodically incremented and fed to the function.
-    frame: u64,
-    /// How much time to wait before incrementing the frame counter.
-    frame_period: Duration,
-    /// Time accumulation not yet equal to a whole frame.
-    /// Always less than `frame_period`.
-    /// TODO: Give [`Tick`] a concept of discrete time units we can reuse instead of
-    /// separate things having their own float-based clocks.
-    accumulator: Duration,
-}
-
-impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
-    fn new(function: F) -> Self {
-        let frame_period = Duration::from_nanos(1_000_000_000 / 16);
-        Self {
-            function,
-            frame: 0,
-            frame_period,
-            accumulator: frame_period,
-        }
-    }
-
-    fn paint(&self, grid: Grid) -> SpaceTransaction {
-        let mut txn = SpaceTransaction::default();
-        for cube in grid.interior_iter() {
-            let block = (self.function)(cube, self.frame);
-            // TODO: This transaction constructing and merging is neither ergonomic nor efficient.
-            // Maybe we should have a SpaceTransaction::set_cube(&mut self, cube, block) instead.
-            txn = txn
-                .merge(SpaceTransaction::set_cube(cube, None, Some(block.clone())))
-                .unwrap();
-        }
-        txn
-    }
-}
-
-impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> Behavior<Space> for AnimatedVoxels<F> {
-    fn step(
-        &self,
-        context: &BehaviorContext<'_, Space>,
-        tick: crate::apps::Tick,
-    ) -> crate::transactions::UniverseTransaction {
-        let mut mut_self: AnimatedVoxels<F> = self.clone();
-        mut_self.accumulator += tick.delta_t;
-        if mut_self.accumulator >= mut_self.frame_period {
-            mut_self.accumulator -= mut_self.frame_period;
-            mut_self.frame = mut_self.frame.wrapping_add(1);
-
-            let paint_txn = mut_self.paint(context.host.grid());
-            context
-                .replace_self(mut_self)
-                .merge(context.bind_host(paint_txn))
-                .unwrap()
-        } else {
-            context.replace_self(mut_self)
-        }
-    }
-
-    fn alive(&self, _context: &BehaviorContext<'_, Space>) -> bool {
-        true
-    }
-
-    fn ephemeral(&self) -> bool {
-        false
-    }
-}
-
-impl<F> fmt::Debug for AnimatedVoxels<F> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AnimatedVoxels")
-            .field("frame", &self.frame)
-            .field("frame_period", &self.frame_period)
-            .finish_non_exhaustive()
-    }
-}
 
 const RESOLUTIONS: Exhibit = Exhibit {
     name: "Resolutions",
