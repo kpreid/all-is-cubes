@@ -16,7 +16,7 @@ use crate::math::{GridCoordinate, GridPoint};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
     triangulate_block, triangulate_blocks, BlockTriangulation, BlockTriangulationProvider,
-    DepthOrdering, GfxVertex, SpaceTriangulation, TextureAllocator,
+    GfxVertex, SpaceTriangulation, TextureAllocator,
 };
 use crate::universe::URef;
 
@@ -275,8 +275,9 @@ where
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
         if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
-            chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>().unwrap());
-            indices_only_updater(&chunk.triangulation, &mut chunk.render_data);
+            if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>().unwrap()) {
+                indices_only_updater(&chunk.triangulation, &mut chunk.render_data);
+            }
         }
 
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
@@ -367,21 +368,15 @@ where
         chunk_todo.update_triangulation = false;
     }
 
-    /// Sort the existing indices of transparent triangles for the given view position.
+    /// Sort the existing indices of `self.transparent_range(DepthOrdering::Within)` for
+    /// the given view position.
     ///
     /// This is intended to be cheap enough to do every frame.
     ///
-    /// Returns true if the triangulation actually changed.
+    /// Returns whether anything was done, i.e. whether the new indices should be copied
+    /// to the GPU.
     pub fn depth_sort_for_view(&mut self, view_position: Point3<Vert::Coordinate>) -> bool {
-        let range = self.triangulation.transparent_range(DepthOrdering::Within);
-        if range.is_empty() {
-            // Nothing to do
-            return false;
-        }
-
-        // TODO: Add checking if the sort didn't reorder anything
-        self.triangulation.depth_sort_for_view(view_position);
-        true
+        self.triangulation.depth_sort_for_view(view_position)
     }
 
     fn stale_blocks(&self, versions: &[u32]) -> bool {
@@ -515,6 +510,7 @@ mod tests {
     use cgmath::Vector2;
 
     use super::*;
+    use crate::block::Block;
     use crate::camera::Viewport;
     use crate::math::GridCoordinate;
     use crate::triangulator::{BlockVertex, NoTextures};
@@ -695,5 +691,38 @@ mod tests {
         // There should not be a chunk where there's no Space
         assert_eq!(None, tester.cst.chunk(ChunkPos::new(1, 0, 0)));
         // TODO: Check that chunks end at the view distance.
+    }
+
+    #[test]
+    fn sort_view_every_frame_only_if_transparent() {
+        let mut tester = CstTester::new(Space::empty_positive(1, 1, 1));
+        tester.update(
+            |_, _| {},
+            |_, _| {
+                panic!("Should not have called indices_only_updater");
+            },
+        );
+        tester
+            .space
+            .borrow_mut()
+            .set([0, 0, 0], Block::from(rgba_const!(1.0, 1.0, 1.0, 0.5)))
+            .unwrap();
+        let mut did_call = false;
+        tester.update(
+            |_, _| {},
+            |_, _| {
+                did_call = true;
+            },
+        );
+        assert!(did_call, "Expected indices_only_updater");
+        did_call = false;
+        tester.update(
+            |_, _| {},
+            |_, _| {
+                did_call = true;
+            },
+        );
+        assert!(did_call, "Expected indices_only_updater #2");
+        // TODO: Change the behavior so additional frames *don't* depth sort if the view is unchanged.
     }
 }

@@ -300,8 +300,19 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
     /// the given view position.
     ///
     /// This is intended to be cheap enough to do every frame.
-    pub fn depth_sort_for_view(&mut self, view_position: Point3<V::Coordinate>) {
+    ///
+    /// Returns whether anything was done, i.e. whether the new indices should be copied
+    /// to the GPU.
+    ///
+    /// Note that in the current implementation, the return value is `true` even if no
+    /// reordering occurred, unless there is nothing to sort. This may be improved in the future.
+    pub fn depth_sort_for_view(&mut self, view_position: Point3<V::Coordinate>) -> bool {
         let range = self.transparent_range(DepthOrdering::Within);
+        if range.len() < 6 {
+            // No point in sorting unless there's at least two triangles.
+            return false;
+        }
+
         let slice: &mut [u32] = &mut self.indices[range];
         // We want to sort the triangles, so we reinterpret the slice as groups of 3 indices.
         let slice: &mut [[u32; 3]] = bytemuck::cast_slice_mut(slice);
@@ -309,6 +320,8 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
         slice.sort_unstable_by_key(|indices| {
             -OrderedFloat(view_position.distance2(Self::midpoint(vertices, *indices)))
         });
+
+        true
     }
 
     /// Compute quad midpoint from triangle vertices, for depth sorting.
