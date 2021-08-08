@@ -21,7 +21,8 @@ use crate::space::Grid;
 pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub GridPoint);
 
 impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
-    /// Construct a ChunkPos from coordinates.
+    /// Construct a ChunkPos from chunk coordinates
+    /// (i.e. successive numbers indicate adjacent chunks).
     pub const fn new(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Self {
         Self(GridPoint::new(x, y, z))
     }

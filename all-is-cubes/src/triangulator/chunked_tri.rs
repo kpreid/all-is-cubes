@@ -26,6 +26,7 @@ use crate::universe::URef;
 ///
 /// Each chunk, a [`ChunkTriangulation`], owns a data value of type `D`, which is
 /// initialized using `D::default()`.
+#[derive(Debug)]
 pub(crate) struct ChunkedSpaceTriangulation<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
     Tex: TextureAllocator,
@@ -300,6 +301,7 @@ pub struct CstUpdateInfo {
 }
 
 /// Stores a [`SpaceTriangulation`], caller-provided rendering data, and incidental.
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct ChunkTriangulation<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
     Tex: TextureAllocator,
@@ -510,8 +512,13 @@ impl ChunkTodo {
 
 #[cfg(test)]
 mod tests {
+    use cgmath::Vector2;
+
     use super::*;
+    use crate::camera::Viewport;
     use crate::math::GridCoordinate;
+    use crate::triangulator::{BlockVertex, NoTextures};
+    use crate::universe::Universe;
 
     const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -628,5 +635,65 @@ mod tests {
                 }
             ),],
         );
+    }
+
+    #[derive(Debug)]
+    struct CstTester {
+        universe: Universe,
+        space: URef<Space>,
+        camera: Camera,
+        cst: ChunkedSpaceTriangulation<(), BlockVertex, NoTextures, 16>,
+    }
+
+    impl CstTester {
+        fn new(space: Space) -> Self {
+            let mut universe = Universe::new();
+            let space_ref = universe.insert_anonymous(space);
+            let cst = ChunkedSpaceTriangulation::<(), BlockVertex, NoTextures, 16>::new(
+                space_ref.clone(),
+            );
+            let camera = Camera::new(
+                GraphicsOptions::default(),
+                Viewport {
+                    // These numbers should not end up relevant
+                    nominal_size: Vector2::new(10., 10.),
+                    framebuffer_size: Vector2::new(10, 10),
+                },
+            );
+            Self {
+                universe,
+                space: space_ref,
+                camera,
+                cst,
+            }
+        }
+
+        /// Call `cst.update_blocks_and_some_chunks()` with the tester's placeholders
+        fn update<CF, IF>(
+            &mut self,
+            chunk_render_updater: CF,
+            indices_only_updater: IF,
+        ) -> (CstUpdateInfo, ChunkPos<16>)
+        where
+            CF: FnMut(&SpaceTriangulation<BlockVertex>, &mut ()),
+            IF: FnMut(&SpaceTriangulation<BlockVertex>, &mut ()),
+        {
+            self.cst.update_blocks_and_some_chunks(
+                &self.camera,
+                &mut NoTextures,
+                chunk_render_updater,
+                indices_only_updater,
+            )
+        }
+    }
+
+    #[test]
+    fn basic_chunk_presence() {
+        let mut tester = CstTester::new(Space::empty_positive(1, 1, 1));
+        tester.update(|_, _| {}, |_, _| {});
+        assert_ne!(None, tester.cst.chunk(ChunkPos::new(0, 0, 0)));
+        // There should not be a chunk where there's no Space
+        assert_eq!(None, tester.cst.chunk(ChunkPos::new(1, 0, 0)));
+        // TODO: Check that chunks end at the view distance.
     }
 }

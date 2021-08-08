@@ -40,7 +40,7 @@ where
 /// Currently, the only benefit of this is avoiding reallocating memory.
 ///
 /// Type parameter `V` is the type of triangle vertices.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpaceTriangulation<V> {
     vertices: Vec<V>,
     indices: Vec<u32>,
