@@ -4,7 +4,7 @@
 //! Build/test operations for All is Cubes.
 //!
 //! This is an instance of the `cargo-xtask` pattern as described by
-//! https://github.com/matklad/cargo-xtask
+//! <https://github.com/matklad/cargo-xtask>.
 
 // TODO: See if we can abstract the logic to "do <action> to all packages with <features/targets>"
 // action can be "build", "test", or "lint"
