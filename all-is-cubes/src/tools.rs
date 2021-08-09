@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Means by which the player may alter or interact with the world.
+//! [`Tool`]s (items) and [`Inventory`].
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -147,6 +147,7 @@ impl ToolInput {
 
 /// Ways that a tool can fail.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum ToolError {
     // TODO: Add tests for these error messages and make them make good sense in contexts
     // they might appear ... or possibly we have a separate trait for them
@@ -166,7 +167,14 @@ pub enum ToolError {
     Internal(String),
 }
 
-/// A collection of [`Tool`]s. (Might contain other sorts of items in the future.)
+/// A collection of [`Tool`]s (items).
+///
+/// Note that unlike many other game objects in `all_is_cubes`, an `Inventory` does not
+/// deliver change notifications. Instead, this is the responsibility of the `Inventory`'s
+/// owner; its operations produce [`InventoryChange`]s (sometimes indirectly via
+/// [`InventoryTransaction`]'s output) which the owner is responsible for forwarding
+/// appropriately. This design choice allows an [`Inventory`] to be placed inside
+/// other objects directly rather than via [`URef`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct Inventory {
@@ -175,6 +183,9 @@ pub struct Inventory {
 }
 
 impl Inventory {
+    /// Construct an [`Inventory`] with the specified number of slots.
+    ///
+    /// Ordinary user actions cannot change the number of slots.
     pub fn new(size: usize) -> Self {
         Inventory {
             slots: vec![Tool::None; size],
