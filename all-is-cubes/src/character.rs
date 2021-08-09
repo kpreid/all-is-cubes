@@ -249,7 +249,7 @@ impl Character {
     /// We want to refactor click handling in general, so keep an eye on that.
     pub fn click(
         this: URef<Character>,
-        cursor: &Cursor,
+        cursor: Option<&Cursor>,
         button: usize,
     ) -> Result<UniverseTransaction, ToolError> {
         let tb = this.borrow();
@@ -261,7 +261,7 @@ impl Character {
         tb.inventory.use_tool(
             cursor,
             this,
-            if cursor.space == tb.space {
+            if cursor.map(|c| &c.space) == Some(&tb.space) {
                 // Use inventory tools on world
                 Some(slot_index)
             } else {

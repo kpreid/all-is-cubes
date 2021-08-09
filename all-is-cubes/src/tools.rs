@@ -53,23 +53,25 @@ impl Tool {
                 // TODO: We have nothing to activate yet.
                 Err(ToolError::NotUsable)
             }
-            Self::DeleteBlock => Ok((
-                self,
-                input.set_cube(input.cursor().place.cube, input.cursor().block.clone(), AIR)?,
-            )),
-            Self::PlaceBlock(ref block) => {
-                let block = block.clone();
+            Self::DeleteBlock => {
+                let cursor = input.cursor()?;
                 Ok((
                     self,
-                    input.set_cube(input.cursor().place.adjacent(), AIR, block)?,
+                    input.set_cube(cursor.place.cube, cursor.block.clone(), AIR)?,
                 ))
             }
-            Self::CopyFromSpace => Ok((
-                self,
-                input.produce_item(Tool::PlaceBlock(
-                    input.cursor().block.clone().unspecialize(),
-                ))?,
-            )),
+            Self::PlaceBlock(ref block) => {
+                let cursor = input.cursor()?;
+                let block = block.clone();
+                Ok((self, input.set_cube(cursor.place.adjacent(), AIR, block)?))
+            }
+            Self::CopyFromSpace => {
+                let cursor = input.cursor()?;
+                Ok((
+                    self,
+                    input.produce_item(Tool::PlaceBlock(cursor.block.clone().unspecialize()))?,
+                ))
+            }
         }
     }
 
@@ -98,37 +100,41 @@ impl Tool {
 /// parameter list for `Tool::use_tool`.
 #[derive(Debug)]
 pub struct ToolInput {
-    // TODO: It shouldn't be mandatory to have a valid cursor input; some tools
-    // might not need targeting.
-    cursor: Cursor,
+    cursor: Option<Cursor>,
+    /// TODO: We want to be able to express “inventory host”, not just specifically Character (but there aren't any other examples).
     character: Option<URef<Character>>,
 }
 
 impl ToolInput {
     /// Generic handler for a tool that replaces one cube.
+    ///
+    /// TODO: This should probably be replaced with a Transaction whose failure
+    /// is translated into the ToolError, since this code is basically doing
+    /// SpaceTransaction::check anyway.
     fn set_cube(
         &self,
         cube: GridPoint,
         old_block: Block,
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
-        let space = self
-            .cursor
-            .space
-            .try_borrow()
-            .map_err(ToolError::SpaceRef)?;
+        let space_ref = &self.cursor()?.space;
+        let space = space_ref.try_borrow().map_err(ToolError::SpaceRef)?;
         if space[cube] != old_block {
             return Err(ToolError::NotUsable);
         }
 
         Ok(
             SpaceTransaction::set_cube(cube, Some(old_block), Some(new_block))
-                .bind(self.cursor.space.clone()),
+                .bind(space_ref.clone()),
         )
     }
 
-    pub fn cursor(&self) -> &Cursor {
-        &self.cursor
+    /// Returns a [`Cursor`] indicating what blocks the tool should act on, if it is
+    /// a sort of tool that acts on blocks. If there is no [`Cursor`], because of aim
+    /// or because of being used in a context where there cannot be any aiming, returns
+    /// [`Err(ToolError::NotUsable)`](ToolError::NotUsable) for convenient propagation.
+    pub fn cursor(&self) -> Result<&Cursor, ToolError> {
+        self.cursor.as_ref().ok_or(ToolError::NotUsable)
     }
 
     /// Add the provided item to the inventory from which the tool was used.
@@ -198,7 +204,7 @@ impl Inventory {
         Inventory { slots: items }
     }
 
-    /// Apply a tool to the cursor location.
+    /// Use a tool stored in this inventory.
     ///
     /// If `slot_index` is [`None`], uses a [`Tool::Activate`] that does not exist in the inventory.
     /// TODO: Bad API, have a more coherent overall design.
@@ -206,7 +212,7 @@ impl Inventory {
     /// `character` must be the character containing the inventory. TODO: Bad API
     pub fn use_tool(
         &self,
-        cursor: &Cursor,
+        cursor: Option<&Cursor>,
         character: URef<Character>,
         slot_index: Option<usize>,
     ) -> Result<UniverseTransaction, ToolError> {
@@ -222,7 +228,7 @@ impl Inventory {
         };
 
         let input = ToolInput {
-            cursor: cursor.clone(),
+            cursor: cursor.cloned(),
             character: Some(character.clone()),
         };
         let (new_tool, mut transaction) = tool.clone().use_tool(&input)?;
@@ -390,7 +396,7 @@ mod tests {
                 cursor_raycast(Ray::new([0., 0.5, 0.5], [1., 0., 0.]), &self.space_ref).unwrap();
             ToolInput {
                 // TODO: define ToolInput::new
-                cursor,
+                cursor: Some(cursor),
                 character: Some(self.character_ref.clone()),
             }
         }
@@ -408,7 +414,7 @@ mod tests {
             // writing this code).
             let input = self.input();
             c.inventory()
-                .use_tool(&input.cursor, self.character_ref.clone(), Some(index))
+                .use_tool(input.cursor().ok(), self.character_ref.clone(), Some(index))
         }
 
         fn space(&self) -> UBorrow<Space> {

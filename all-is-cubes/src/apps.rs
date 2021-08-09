@@ -186,14 +186,15 @@ impl AllIsCubesAppState {
 
     /// TODO: Should have click feedback in VUI, not via return value.
     pub fn click(&mut self, button: usize) -> Result<(), ToolError> {
-        if let (Some(cursor), Some(character_ref)) = (&self.cursor_result, &self.game_character) {
-            let transaction = Character::click(character_ref.clone(), cursor, button)?;
+        if let Some(character_ref) = &self.game_character {
+            let transaction =
+                Character::click(character_ref.clone(), self.cursor_result.as_ref(), button)?;
             transaction
                 .execute(self.universe_mut())
                 .map_err(|e| ToolError::Internal(e.to_string()))?;
             Ok(())
         } else {
-            Err(ToolError::NothingSelected) // TODO: slightly wrong
+            Err(ToolError::NotUsable) // TODO: not the right variant
         }
     }
 
