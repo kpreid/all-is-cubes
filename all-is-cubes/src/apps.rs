@@ -116,13 +116,13 @@ impl AllIsCubesAppState {
                 }
                 self.frame_clock.did_step();
 
-                if let Some(character_ref) = self.game_character.clone() {
-                    character_ref
-                        .try_modify(|character| {
-                            self.input_processor
-                                .apply_input(character, &self.paused, tick);
-                        })
-                        .unwrap();
+                if let Some(character_ref) = &self.game_character {
+                    self.input_processor.apply_input(
+                        &mut self.game_universe,
+                        character_ref,
+                        &self.paused,
+                        tick,
+                    );
                 }
                 self.input_processor.step(tick);
 

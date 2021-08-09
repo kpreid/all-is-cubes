@@ -10,6 +10,7 @@ use crate::camera::Viewport;
 use crate::character::Character;
 use crate::listen::{ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
+use crate::universe::{URef, Universe};
 
 /// Parse input events, particularly key-down/up pairs, into character control and such.
 ///
@@ -249,31 +250,41 @@ impl InputProcessor {
         self.mouselook_buffer = Vector2::zero();
     }
 
-    /// Applies the current input to the given [`Character`].
+    /// Applies the accumulated input from previous events, with the given [`Character`]
+    /// being directly controlled.
     ///
     /// TODO: We need a better information flow strategy that still keeps InputProcessor not too tied to AllIsCubesAppState.
     pub fn apply_input(
         &mut self,
-        character: &mut Character,
+        // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
+        _universe: &mut Universe,
+        character: &URef<Character>,
         paused: &ListenableCell<bool>,
         tick: Tick,
     ) {
         let dt = tick.delta_t.as_secs_f64();
         let key_turning_step = 80.0 * dt;
 
-        let movement = self.movement();
-        character.set_velocity_input(movement);
+        // Direct character controls
+        character
+            .try_modify(|character| {
+                let movement = self.movement();
+                character.set_velocity_input(movement);
 
-        let turning = Vector2::new(
-            key_turning_step * self.net_movement(Key::Left, Key::Right) + self.mouselook_buffer.x,
-            key_turning_step * self.net_movement(Key::Up, Key::Down) + self.mouselook_buffer.y,
-        );
-        character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
-        character.body.pitch = (character.body.pitch + turning.y).min(90.0).max(-90.0);
+                let turning = Vector2::new(
+                    key_turning_step * self.net_movement(Key::Left, Key::Right)
+                        + self.mouselook_buffer.x,
+                    key_turning_step * self.net_movement(Key::Up, Key::Down)
+                        + self.mouselook_buffer.y,
+                );
+                character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
+                character.body.pitch = (character.body.pitch + turning.y).min(90.0).max(-90.0);
 
-        if self.keys_held.contains(&Key::Character(' ')) {
-            character.jump_if_able();
-        }
+                if self.keys_held.contains(&Key::Character(' ')) {
+                    character.jump_if_able();
+                }
+            })
+            .unwrap();
 
         for key in self.command_buffer.drain(..) {
             match key {
@@ -292,7 +303,9 @@ impl InputProcessor {
                 Key::Character(numeral) if numeral.is_digit(10) => {
                     let digit = numeral.to_digit(10).unwrap() as usize;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
-                    character.set_selected_slot(1, slot);
+                    character
+                        .try_modify(|c| c.set_selected_slot(1, slot))
+                        .unwrap();
                 }
                 _ => {}
             }
@@ -351,12 +364,17 @@ mod tests {
     use crate::space::Space;
     use crate::universe::{URef, Universe};
 
-    fn apply_input_helper(input: &mut InputProcessor, character: &URef<Character>) {
-        character
-            .try_modify(|character| {
-                input.apply_input(character, &ListenableCell::new(false), Tick::arbitrary());
-            })
-            .unwrap();
+    fn apply_input_helper(
+        input: &mut InputProcessor,
+        universe: &mut Universe,
+        character: &URef<Character>,
+    ) {
+        input.apply_input(
+            universe,
+            character,
+            &ListenableCell::new(false),
+            Tick::arbitrary(),
+        );
     }
 
     #[test]
@@ -391,20 +409,20 @@ mod tests {
     #[test]
     fn slot_selection() {
         // TODO: Awful lot of setup boilerplate...
-        let mut u = Universe::new();
+        let u = &mut Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let character = u.insert_anonymous(Character::spawn_default(space.clone()));
         let mut input = InputProcessor::new();
 
         input.key_down(Key::Character('5'));
         input.key_up(Key::Character('5'));
-        apply_input_helper(&mut input, &character);
+        apply_input_helper(&mut input, u, &character);
         assert_eq!(character.borrow().selected_slots()[1], 4);
 
         // Tenth slot
         input.key_down(Key::Character('0'));
         input.key_up(Key::Character('0'));
-        apply_input_helper(&mut input, &character);
+        apply_input_helper(&mut input, u, &character);
         assert_eq!(character.borrow().selected_slots()[1], 9);
     }
 
