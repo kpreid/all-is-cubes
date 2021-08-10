@@ -4,6 +4,8 @@
 //! [`Tool`] and related.
 
 use std::borrow::Cow;
+use std::sync::Arc;
+use std::{fmt, hash};
 
 use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
@@ -26,18 +28,42 @@ use crate::vui::Icons;
 pub enum Tool {
     /// Empty slot; does nothing.
     None,
+
     /// “Click”, or “push button”, or generally “activate the function of this”
     /// as opposed to editing it. Used for [`vui`](crate::vui) interaction.
     Activate,
+
     /// Destroy any targeted block.
     DeleteBlock,
+
     /// Place a copy of the given block in empty space.
     PlaceBlock(Block),
+
     /// Copy block from space to inventory.
     CopyFromSpace,
+
+    /// A tool which calls an arbitrary function.
+    ExternalAction {
+        // TODO: Rework this so that the external component gets to update the icon.
+        // (Perhaps that's "a block defined by an external source"?)
+        function: EphemeralOpaque<dyn Fn(&ToolInput) + Send + Sync>,
+        icon: Block,
+    },
 }
 
 impl Tool {
+    pub(crate) fn external_action<F: Fn(&ToolInput) + Send + Sync + 'static>(
+        icon: Block,
+        function: F,
+    ) -> Self {
+        Tool::ExternalAction {
+            icon,
+            function: EphemeralOpaque::from(
+                Arc::new(function) as Arc<dyn Fn(&ToolInput) + Send + Sync>
+            ),
+        }
+    }
+
     /// Computes the effect of using the tool.
     ///
     /// The effect consists of both mutations to `self` and a [`UniverseTransaction`].
@@ -49,6 +75,14 @@ impl Tool {
                 // TODO: We have nothing to activate yet.
                 // (But this error also needs work.)
                 Err(ToolError::NotUsable)
+            }
+            Self::ExternalAction { ref function, .. } => {
+                if let Some(f) = &function.0 {
+                    f(input);
+                    Ok((self, Default::default()))
+                } else {
+                    Err(ToolError::NotUsable) // TODO: communicate permanent error
+                }
             }
             Self::DeleteBlock => {
                 let cursor = input.cursor()?;
@@ -98,6 +132,7 @@ impl Tool {
         match self {
             Self::None => Cow::Borrowed(&predefined[Icons::EmptySlot]),
             Self::Activate => Cow::Borrowed(&predefined[Icons::Activate]),
+            Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
             Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             Self::PlaceBlock(block) => Cow::Borrowed(block),
@@ -186,6 +221,45 @@ pub enum ToolError {
     /// TODO: Improve this along with [`Transaction`] error types.
     #[error("unexpected error: {0}")]
     Internal(String),
+}
+
+/// A wrapper around a value which cannot be printed or serialized,
+/// used primarily to allow external functions to be called from objects
+/// within a [`Universe`](crate::universe::Universe).
+///
+/// TODO: relocate this type once we figure out where it belongs.
+/// TODO: Probably they should be their own kind of UniverseMember, so that they can
+/// be reattached in the future.
+pub struct EphemeralOpaque<T: ?Sized>(Option<Arc<T>>);
+
+impl<T: ?Sized> From<Arc<T>> for EphemeralOpaque<T> {
+    fn from(contents: Arc<T>) -> Self {
+        Self(Some(contents))
+    }
+}
+
+impl<T: ?Sized> fmt::Debug for EphemeralOpaque<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EphemeralOpaque(..)")
+    }
+}
+impl<T: ?Sized> PartialEq for EphemeralOpaque<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.as_ref().map(Arc::as_ptr) == other.0.as_ref().map(Arc::as_ptr)
+        //self.0.as_ref().zip(other.0.as_ref())
+        //Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl<T: ?Sized> Eq for EphemeralOpaque<T> {}
+impl<T: ?Sized> Clone for EphemeralOpaque<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+impl<T: ?Sized> hash::Hash for EphemeralOpaque<T> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.0.as_ref().map(Arc::as_ptr).hash(state)
+    }
 }
 
 #[cfg(test)]
@@ -428,5 +502,25 @@ mod tests {
         transaction.execute(&mut tester.universe).unwrap();
         // Space is unmodified
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
+    }
+
+    #[test]
+    fn use_external_action() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        let called = Arc::new(AtomicU32::new(0));
+        let tool = Tool::external_action(AIR, {
+            let called = called.clone();
+            move |_: &ToolInput| {
+                called.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+
+        let tester = ToolTester::new(|_space| {});
+        assert_eq!(
+            tester.equip_and_use_tool(tool),
+            Ok(UniverseTransaction::default())
+        );
+        assert_eq!(called.load(Ordering::Relaxed), 1);
     }
 }
