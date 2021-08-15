@@ -304,6 +304,7 @@ fn install_atrium_blocks(
 
     // TODO: This whole section is about having noise pick from a fixed set of pregenerated shades.
     // We should abstract it out if we like this style
+    #[allow(clippy::cast_lossless)] // warns on 32-bit but f64::from() is not an option on 64-bit
     let stone_range: Vec<Block> = (-2..=2_isize)
         .map(|x| scale_color(stone_base.clone(), 1.0 + x as f64 * 0.08, 0.02))
         .collect();

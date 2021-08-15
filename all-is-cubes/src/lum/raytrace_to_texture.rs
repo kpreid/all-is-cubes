@@ -77,6 +77,7 @@ impl RaytraceToTexture {
             if let Ok(space) = space_ref.try_borrow() {
                 let tracer = SpaceRaytracer::<Srgb8Adapter>::new(&*space, camera.options().clone());
 
+                #[allow(clippy::needless_collect)] // needed with rayon and not without
                 let this_frame_pixels: Vec<Point> = (0..self.rays_per_frame)
                     .map(|_i| self.pixel_picker.next().unwrap())
                     .collect();
