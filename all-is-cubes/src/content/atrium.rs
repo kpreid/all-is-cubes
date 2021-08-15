@@ -159,11 +159,16 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     )?;
 
     // Other space setup
-    space.spawn_mut().position = Point3::new(notnan!(0.5), notnan!(2.91), notnan!(10.0));
+    space.spawn_mut().position = Point3::new(
+        notnan!(0.5),
+        notnan!(1.91) + f64::from(ceiling_height + 2),
+        notnan!(10.0),
+    );
     space.set_physics(SpacePhysics {
         sky_color: Rgb::new(1.0, 1.0, 0.9843) * 4.0,
         ..SpacePhysics::default()
     });
+    space.fast_evaluate_light();
 
     Ok(space)
 }
