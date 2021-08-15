@@ -210,10 +210,13 @@ fn parse_record_options(
         output_path: PathBuf::from(options.value_of_os("output").unwrap()),
         image_size: display_size.unwrap_or_else(|| Vector2::new(640, 480)),
         animation: match value_t!(options, "duration", f64) {
-            Ok(duration) => Some(RecordAnimationOptions {
-                frame_count: ((duration * 60.0).round() as usize).max(1),
-                frame_period: Duration::from_nanos((1e9 / 60.0) as u64),
-            }),
+            Ok(duration) => {
+                let frame_rate = 60.0;
+                Some(RecordAnimationOptions {
+                    frame_count: ((duration * frame_rate).round() as usize).max(1),
+                    frame_period: Duration::from_nanos((1e9 / frame_rate) as u64),
+                })
+            }
             Err(clap::Error {
                 kind: ErrorKind::ArgumentNotFound,
                 ..
