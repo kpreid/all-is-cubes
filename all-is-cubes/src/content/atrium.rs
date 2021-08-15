@@ -4,12 +4,14 @@
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
 use cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
+use noise::Seedable;
 
 use crate::block::{Block, BlockCollision, AIR};
-use crate::content::four_walls;
+use crate::content::{four_walls, scale_color};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
-
-use crate::math::{FaceMap, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector, Rgb};
+use crate::math::{
+    FaceMap, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector, NoiseFnExt as _, Rgb,
+};
 use crate::raycast::Face;
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
 use crate::universe::Universe;
@@ -294,6 +296,21 @@ fn install_atrium_blocks(
     let stone_base = Block::from(rgba_const!(0.53, 0.48, 0.40, 1.0));
     let heavy_grout_base = Block::from(rgba_const!(0.1, 0.1, 0.1, 1.0));
     let grout_base = Block::from(rgba_const!(0.32, 0.30, 0.28, 1.0));
+
+    // TODO: This whole section is about having noise pick from a fixed set of pregenerated shades.
+    // We should abstract it out if we like this style
+    let stone_range: Vec<Block> = (-2..=2_isize)
+        .map(|x| scale_color(stone_base.clone(), 1.0 + x as f64 * 0.08, 0.02))
+        .collect();
+    let stone_noise_v = noise::OpenSimplex::new().set_seed(0x2e240365);
+    let stone_noise_sc =
+        noise::ScalePoint::new(&stone_noise_v).set_scale(4.0 / f64::from(resolution_g));
+    let stone_noise = noise::ScaleBias::new(&stone_noise_sc)
+        .set_bias(2.5)
+        .set_scale(8.0);
+    let stone_base_pattern =
+        |p: GridPoint| &stone_range[stone_noise.at_grid(p).round().clamp(0.0, 4.0) as usize];
+
     let brick_pattern = |mut p: GridPoint| {
         if (p.x > resolution_g / 2) ^ (p.y > resolution_g / 2) {
             // Create brick half-overlap offset
@@ -303,14 +320,14 @@ fn install_atrium_blocks(
         if bricking == 0 {
             &grout_base
         } else {
-            &stone_base
+            stone_base_pattern(p)
         }
     };
     let bottom_grout_pattern = |p: GridPoint| {
         if p.y == 0 {
             &grout_base
         } else {
-            &stone_base
+            &stone_base_pattern(p)
         }
     };
     let molding_fn = |p: GridPoint| {
