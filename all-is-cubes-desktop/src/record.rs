@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
+use std::sync::mpsc;
 use std::time::Duration;
 
 use cgmath::Vector2;
@@ -89,23 +90,48 @@ pub(crate) fn record_main(
         });
     }
 
-    // Set up image writer
-    let mut file_writer = BufWriter::new(File::create(&options.output_path)?);
-    {
-        let mut png_writer = new_png_writer(&mut file_writer, &options)?;
+    // Set up threads. Raytracing is internally parallel using Rayon, but we want to
+    // thread everything else too so we're not alternating single-threaded and parallel
+    // operations.
+    let (scene_sender, scene_receiver) =
+        mpsc::sync_channel::<(usize, Camera, SpaceRaytracer<ColorBuf>)>(1);
+    let (image_data_sender, image_data_receiver) = mpsc::sync_channel(1);
+    let (mut write_status_sender, status_receiver) = mpsc::channel();
 
+    // Raytracing thread.
+    std::thread::spawn({
+        move || {
+            while let Ok((frame_number, camera, raytracer)) = scene_receiver.recv() {
+                let (image_data, _info) = raytracer.trace_scene_to_image(&camera);
+                // TODO: Offer supersampling (multiple rays per output pixel).
+                image_data_sender.send((frame_number, image_data)).unwrap();
+            }
+        }
+    });
+
+    // Image encoding and writing thread.
+    std::thread::spawn({
+        let file = File::create(&options.output_path)?;
+        let options = options.clone();
+        move || threaded_write_frames(file, options, image_data_receiver, &mut write_status_sender)
+    });
+
+    // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
+    {
         let drawing_progress_bar = ProgressBar::new(options.frame_range().size_hint().0 as u64)
             .with_style(progress_style)
             .with_prefix("Drawing");
         drawing_progress_bar.enable_steady_tick(1000);
-        for _frame in drawing_progress_bar.wrap_iter(options.frame_range()) {
+
+        for frame_number in options.frame_range() {
             camera.set_view_matrix(character_ref.borrow().view());
-            let (image_data, _info) = SpaceRaytracer::<ColorBuf>::new(
+            let scene = SpaceRaytracer::<ColorBuf>::new(
                 &*space_ref.borrow(),
                 app.graphics_options().snapshot(),
-            )
-            .trace_scene_to_image(&camera);
-            // TODO: Offer supersampling (multiple rays per output pixel).
+            );
+            scene_sender
+                .send((frame_number, camera.clone(), scene))
+                .unwrap();
 
             // Advance time for next frame.
             if let Some(anim) = &options.animation {
@@ -114,15 +140,49 @@ pub(crate) fn record_main(
                 while app.maybe_step_universe().is_some() {}
             }
 
-            // Write image data to file
-            write_frame(&mut png_writer, &image_data)?;
+            // Update progress bar.
+            if let Ok(frame_number) = status_receiver.try_recv() {
+                drawing_progress_bar.set_position((frame_number + 1) as u64);
+            }
+        }
+        drop(scene_sender);
+
+        // We've completed sending frames; now block on their completion.
+        while let Ok(frame_number) = status_receiver.recv() {
+            drawing_progress_bar.set_position((frame_number + 1) as u64);
         }
     }
 
-    // Flush file and report completion
-    file_writer.into_inner()?.sync_all()?;
+    // Report completion
     let _ = writeln!(stderr, "\nWrote {}", options.output_path.to_string_lossy());
 
+    Ok(())
+}
+
+/// Occupy a thread with writing a sequence of frames as (A)PNG data.
+fn threaded_write_frames(
+    file: File,
+    options: RecordOptions,
+    image_data_receiver: mpsc::Receiver<(usize, Box<[Rgba]>)>,
+    write_status_sender: &mut mpsc::Sender<usize>,
+) -> Result<(), std::io::Error> {
+    let mut buf_writer = BufWriter::new(file);
+    {
+        let mut png_writer = new_png_writer(&mut buf_writer, &options)?;
+        'frame_loop: loop {
+            match image_data_receiver.recv() {
+                Ok((frame_number, image_data)) => {
+                    write_frame(&mut png_writer, &*image_data)?;
+                    let _ = write_status_sender.send(frame_number);
+                }
+                Err(mpsc::RecvError) => {
+                    break 'frame_loop;
+                }
+            }
+        }
+    }
+    let file = buf_writer.into_inner()?;
+    file.sync_all()?;
     Ok(())
 }
 
