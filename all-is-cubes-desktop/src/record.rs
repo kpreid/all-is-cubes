@@ -108,10 +108,11 @@ pub(crate) fn record_main(
             // TODO: Offer supersampling (multiple rays per output pixel).
 
             // Advance time for next frame.
-            let _ = app
-                .frame_clock
-                .request_frame(Duration::from_millis(1000 / 60));
-            app.maybe_step_universe();
+            if let Some(anim) = &options.animation {
+                let _ = app.frame_clock.request_frame(anim.frame_period);
+                // TODO: maybe_step_universe has a catch-up time cap, which we should disable for this.
+                while app.maybe_step_universe().is_some() {}
+            }
 
             // Write image data to file
             write_frame(&mut png_writer, &image_data)?;
