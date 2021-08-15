@@ -262,26 +262,28 @@ mod tests {
     #[test]
     fn behavior_set_debug() {
         use pretty_assertions::assert_eq;
+
+        #[derive(Debug)]
+        struct DebugBehavior;
+        impl Behavior<Character> for DebugBehavior {
+            fn alive(&self, _context: &BehaviorContext<'_, Character>) -> bool {
+                true
+            }
+            fn ephemeral(&self) -> bool {
+                false
+            }
+        }
+
         let mut set = BehaviorSet::<Character>::new();
         assert_eq!(format!("{:?}", set), "BehaviorSet([])");
         assert_eq!(format!("{:#?}", set), "BehaviorSet([])");
-        set.insert(AutoRotate {
-            rate: NotNan::new(1.0).unwrap(),
-        });
-        // TODO: Once we have a better behavior to use as a simple test, do so
-        assert_eq!(
-            format!("{:?}", set),
-            "BehaviorSet([AutoRotate { rate: NotNan(1.0) }])",
-        );
+        set.insert(DebugBehavior);
+        assert_eq!(format!("{:?}", set), "BehaviorSet([DebugBehavior])");
         assert_eq!(
             format!("{:#?}\n", set),
             indoc! {"
                 BehaviorSet([
-                    AutoRotate {
-                        rate: NotNan(
-                            1.0,
-                        ),
-                    },
+                    DebugBehavior,
                 ])
             "},
         );
