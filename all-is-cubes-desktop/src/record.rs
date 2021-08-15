@@ -4,7 +4,7 @@
 //! Headless image (and someday video) generation.
 
 use std::array::IntoIter;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -46,15 +46,17 @@ impl RecordOptions {
         }
     }
 
-    fn animated(&self) -> bool {
-        self.animation.is_some()
-    }
-
     fn frame_range(&self) -> RangeInclusive<usize> {
         match &self.animation {
             None => 0..=0,
             Some(animation) => 1..=animation.frame_count,
         }
+    }
+}
+
+impl RecordAnimationOptions {
+    fn total_duration(&self) -> Duration {
+        self.frame_period * u32::try_from(self.frame_count).unwrap_or(u32::MAX)
     }
 }
 
@@ -80,10 +82,10 @@ pub(crate) fn record_main(
 
     let space_ref = character_ref.borrow().space.clone();
 
-    if options.animated() {
-        // TODO: replace this with a general scripting mechanism
+    if let Some(anim) = &options.animation {
+        // TODO: replace this with a general camera scripting mechanism
         character_ref.borrow_mut().add_behavior(AutoRotate {
-            rate: NotNan::new(45.0).unwrap(),
+            rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
         });
     }
 
