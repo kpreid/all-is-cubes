@@ -59,8 +59,7 @@ pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
     texture_allocator: &mut A,
     voxels: &GridArray<Evoxel>,
 ) -> Option<A::Tile> {
-    //let grid = voxels.grid();
-    let grid = Grid::for_block(16); // TODO: Temporary for allocator refactoring
+    let grid = voxels.grid();
     texture_allocator.allocate(grid).map(|mut texture| {
         let mut tile_texels: Vec<Texel> = Vec::with_capacity(grid.volume());
         // Note that this is row-major order whereas `Grid` uses column-major order, so
