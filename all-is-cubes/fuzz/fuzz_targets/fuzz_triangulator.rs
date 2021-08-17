@@ -13,7 +13,7 @@ fuzz_target!(|input: EvaluatedBlock| {
     }
     let _ = triangulate_block::<BlockVertex, _>(
         &input,
-        &mut TestTextureAllocator::new(16),
+        &mut TestTextureAllocator::new(),
         &TransparencyOption::Volumetric,
     );
 });

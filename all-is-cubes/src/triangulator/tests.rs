@@ -6,7 +6,7 @@
 use cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 
 use super::*;
-use crate::block::{Block, BlockAttributes, Resolution, AIR};
+use crate::block::{Block, BlockAttributes, AIR};
 use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
 use crate::math::{Face, GridRotation};
@@ -42,7 +42,7 @@ fn v_t(position: [FreeCoordinate; 3], face: Face, texture: [TextureCoordinate; 3
 fn test_triangulate_block(block: Block) -> BlockTriangulation<BlockVertex, TestTextureTile> {
     triangulate_block(
         &block.evaluate().unwrap(),
-        &mut TestTextureAllocator::new(16),
+        &mut TestTextureAllocator::new(),
         &TransparencyOption::Volumetric,
     )
 }
@@ -54,7 +54,7 @@ fn test_triangulate_block_threshold(
 ) -> BlockTriangulation<BlockVertex, TestTextureTile> {
     triangulate_block(
         &block.evaluate().unwrap(),
-        &mut TestTextureAllocator::new(16),
+        &mut TestTextureAllocator::new(),
         &TransparencyOption::Threshold(notnan!(0.5)),
     )
 }
@@ -62,13 +62,12 @@ fn test_triangulate_block_threshold(
 /// Test helper to call `triangulate_blocks` followed directly by [`triangulate_space`].
 fn triangulate_blocks_and_space(
     space: &Space,
-    texture_resolution: Resolution,
 ) -> (
     TestTextureAllocator,
     BlockTriangulations<BlockVertex, TestTextureTile>,
     SpaceTriangulation<BlockVertex>,
 ) {
-    let mut tex = TestTextureAllocator::new(texture_resolution);
+    let mut tex = TestTextureAllocator::new();
     let block_triangulations = triangulate_blocks(space, &mut tex, &TransparencyOption::Volumetric);
     let space_triangulation: SpaceTriangulation<BlockVertex> = triangulate_space(
         space,
@@ -93,7 +92,7 @@ fn excludes_hidden_faces_of_blocks() {
     space
         .fill(space.grid(), |p| Some(non_uniform_fill(p)))
         .unwrap();
-    let (_, _, space_tri) = triangulate_blocks_and_space(&space, 7);
+    let (_, _, space_tri) = triangulate_blocks_and_space(&space);
 
     // The space rendering should be a 2×2×2 cube of tiles, without any hidden interior faces.
     assert_eq!(
@@ -121,7 +120,7 @@ fn no_panic_on_missing_blocks() {
     let mut space = Space::empty_positive(2, 1, 1);
     let block_triangulations: BlockTriangulations<BlockVertex, _> = triangulate_blocks(
         &space,
-        &mut TestTextureAllocator::new(43),
+        &mut TestTextureAllocator::new(),
         &TransparencyOption::Volumetric,
     );
     assert_eq!(block_triangulations.len(), 1); // check our assumption
@@ -148,22 +147,16 @@ fn trivial_voxels_equals_atom() {
         .unwrap()
         .build();
 
-    let (_, _, space_rendered_a) = triangulate_blocks_and_space(
-        &{
-            let mut space = Space::empty_positive(1, 1, 1);
-            space.set((0, 0, 0), &atom_block).unwrap();
-            space
-        },
-        1,
-    );
-    let (tex, _, space_rendered_r) = triangulate_blocks_and_space(
-        &{
-            let mut space = Space::empty_positive(1, 1, 1);
-            space.set((0, 0, 0), &trivial_recursive_block).unwrap();
-            space
-        },
-        1,
-    );
+    let (_, _, space_rendered_a) = triangulate_blocks_and_space(&{
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set((0, 0, 0), &atom_block).unwrap();
+        space
+    });
+    let (tex, _, space_rendered_r) = triangulate_blocks_and_space(&{
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set((0, 0, 0), &trivial_recursive_block).unwrap();
+        space
+    });
 
     assert_eq!(space_rendered_a, space_rendered_r);
     assert_eq!(tex.count_allocated(), 0);
@@ -186,8 +179,7 @@ fn space_tri_equals_block_tri() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &recursive_block).unwrap();
 
-    let (tex, block_triangulations, space_rendered) =
-        triangulate_blocks_and_space(&outer_space, resolution);
+    let (tex, block_triangulations, space_rendered) = triangulate_blocks_and_space(&outer_space);
 
     eprintln!("{:#?}", block_triangulations);
     eprintln!("{:#?}", space_rendered);
@@ -203,26 +195,10 @@ fn space_tri_equals_block_tri() {
     assert_eq!(tex.count_allocated(), 1); // for striped faces
 }
 
-#[test]
-fn block_resolution_less_than_tile() {
-    let block_resolution = 4;
-    let tile_resolution = 8;
-    let mut u = Universe::new();
-    let block = Block::builder()
-        .voxels_fn(&mut u, block_resolution, non_uniform_fill)
-        .unwrap()
-        .build();
-    let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set((0, 0, 0), &block).unwrap();
-
-    let (_, _, _) = triangulate_blocks_and_space(&outer_space, tile_resolution);
-    // TODO: Figure out how to make a useful assert. At least this is "it doesn't panic".
-}
-
+/// TODO: This test stops being meaningful when we finish migrating the texture allocator to use arbitrary-sized tiles
 #[test]
 fn block_resolution_greater_than_tile() {
-    let block_resolution = 8;
-    let tile_resolution = 4;
+    let block_resolution = 32;
     let mut u = Universe::new();
     let block = Block::builder()
         .voxels_fn(&mut u, block_resolution, non_uniform_fill)
@@ -231,7 +207,7 @@ fn block_resolution_greater_than_tile() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &block).unwrap();
 
-    let (_, _, _) = triangulate_blocks_and_space(&outer_space, tile_resolution);
+    let (_, _, _) = triangulate_blocks_and_space(&outer_space);
     // TODO: Figure out how to make a useful assert. At least this is "it doesn't panic".
 }
 
@@ -256,7 +232,7 @@ fn shrunken_box_has_no_extras() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
 
-    let (tex, _, space_rendered) = triangulate_blocks_and_space(&outer_space, resolution);
+    let (tex, _, space_rendered) = triangulate_blocks_and_space(&outer_space);
 
     assert_eq!(tex.count_allocated(), 1);
     assert_eq!(
@@ -318,7 +294,7 @@ fn shrunken_box_uniform_color() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
 
-    let (tex, _, space_rendered) = triangulate_blocks_and_space(&outer_space, resolution);
+    let (tex, _, space_rendered) = triangulate_blocks_and_space(&outer_space);
 
     assert_eq!(tex.count_allocated(), 0);
     assert_eq!(
@@ -481,7 +457,7 @@ fn transparency_split() {
         .set([2, 0, 0], Block::from(Rgba::new(0.0, 0.0, 1.0, 0.5)))
         .unwrap();
 
-    let (_, _, space_rendered) = triangulate_blocks_and_space(&space, 8);
+    let (_, _, space_rendered) = triangulate_blocks_and_space(&space);
     // 2 cubes...
     assert_eq!(space_rendered.vertices().len(), 6 * 4 * 2);
     // ...one of which is opaque...
@@ -516,7 +492,7 @@ fn handling_allocation_failure() {
     let mut space = Space::empty_positive(1, 1, 1);
     space.set((0, 0, 0), &complex_block).unwrap();
 
-    let mut tex = TestTextureAllocator::new(resolution);
+    let mut tex = TestTextureAllocator::new();
     // TODO: Once we support tiling for high resolution blocks, make this a partial failure.
     let capacity = 0;
     tex.set_capacity(capacity);

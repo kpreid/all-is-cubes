@@ -175,9 +175,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 fully_opaque: face != Face::Within,
             });
 
-            // If the texture tile resolution is greater, we will just not use the extra
-            // space. If it is lesser, we should use multiple texture tiles but don't for now.
-            let tile_resolution: GridCoordinate = texture_allocator.resolution();
+            // TODO: Once the texture allocator actually supports arbitrary-size tiles, stop asking for 16 in particular.
+            let tile_resolution: GridCoordinate = 16;
             let block_resolution = GridCoordinate::from(block.resolution);
             // How should we scale texels versus the standard size to get correct display?
             let voxel_scale_modifier =

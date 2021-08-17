@@ -20,7 +20,8 @@ use std::rc::{Rc, Weak};
 use crate::content::palette;
 use crate::intalloc::IntAllocator;
 use crate::lum::types::LumBlockVertex;
-use crate::math::GridCoordinate;
+use crate::math::GridVector;
+use crate::space::Grid;
 use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 use crate::util::{CustomFormat, StatusText};
 
@@ -44,6 +45,10 @@ pub struct LumAtlasAllocator {
 /// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
 pub struct LumAtlasTile {
+    /// Grid that was requested for the allocation.
+    requested_grid: Grid,
+    /// Translation of the requested grid to the actual region within the texture.
+    offset: GridVector,
     /// Actual storage and metadata about the tile; may be updated as needed by the
     /// allocator to grow the texture.
     backing: Rc<RefCell<TileBacking>>,
@@ -207,11 +212,9 @@ impl LumAtlasAllocator {
 impl TextureAllocator for LumAtlasAllocator {
     type Tile = LumAtlasTile;
 
-    fn resolution(&self) -> GridCoordinate {
-        self.layout.resolution.into()
-    }
+    fn allocate(&mut self, requested_grid: Grid) -> Option<LumAtlasTile> {
+        // TODO: actually use the grid parameter
 
-    fn allocate(&mut self) -> Option<LumAtlasTile> {
         let index_allocator = &mut self.backing.borrow_mut().index_allocator;
         let index = index_allocator.allocate().unwrap();
         if index >= self.layout.tile_count() {
@@ -220,6 +223,8 @@ impl TextureAllocator for LumAtlasAllocator {
             return None;
         }
         let result = LumAtlasTile {
+            requested_grid,
+            offset: self.layout.index_to_location(index).map(|c| c.into()),
             backing: Rc::new(RefCell::new(TileBacking {
                 index,
                 origin: self.layout.index_to_origin(index),
@@ -235,6 +240,10 @@ impl TextureAllocator for LumAtlasAllocator {
 }
 
 impl TextureTile for LumAtlasTile {
+    fn grid(&self) -> Grid {
+        todo!()
+    }
+
     fn texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
         let backing = self.backing.borrow();
         (in_tile * backing.scale) + backing.origin
