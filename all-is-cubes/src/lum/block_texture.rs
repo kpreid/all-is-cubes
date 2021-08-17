@@ -14,13 +14,14 @@ use luminance_front::texture::{
 };
 use luminance_front::Backend;
 use std::cell::RefCell;
+use std::convert::TryInto;
 use std::fmt;
 use std::rc::{Rc, Weak};
 
 use crate::content::palette;
 use crate::intalloc::IntAllocator;
 use crate::lum::types::LumBlockVertex;
-use crate::math::GridVector;
+use crate::math::{GridCoordinate, GridVector};
 use crate::space::Grid;
 use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 use crate::util::{CustomFormat, StatusText};
@@ -57,6 +58,9 @@ pub struct LumAtlasTile {
 struct TileBacking {
     /// Index in the linear ordering of the texture atlas.
     index: u32,
+    /// Region of the atlas texture which this tile owns;
+    /// `self.atlas_grid.volume() == self.data.len()`.
+    atlas_grid: Grid,
     /// Origin of the tile in the texture.
     ///
     /// Technically redundant with `index`, but precomputed.
@@ -134,10 +138,7 @@ impl LumAtlasAllocator {
             });
         }
 
-        let layout = self.layout;
-        let rg = u32::from(layout.resolution);
         let mut count_written = 0;
-
         // retain() doesn't let us exit early on error, so we track any upload errors
         // separately.
         let mut error: Option<TextureError> = None;
@@ -151,11 +152,8 @@ impl LumAtlasAllocator {
                     if let Some(data) = backing.data.as_ref() {
                         match texture.upload_part(
                             GenMipmaps::No,
-                            layout
-                                .index_to_location(backing.index)
-                                .map(|s| u32::from(s) * rg)
-                                .into(),
-                            [rg, rg, rg],
+                            backing.atlas_grid.lower_bounds().map(|c| c as u32).into(),
+                            backing.atlas_grid.size().map(|c| c as u32).into(),
                             data,
                         ) {
                             Ok(()) => {
@@ -213,7 +211,9 @@ impl TextureAllocator for LumAtlasAllocator {
     type Tile = LumAtlasTile;
 
     fn allocate(&mut self, requested_grid: Grid) -> Option<LumAtlasTile> {
-        // TODO: actually use the grid parameter
+        if !Grid::for_block(self.layout.resolution.try_into().ok()?).contains_grid(requested_grid) {
+            return None;
+        }
 
         let index_allocator = &mut self.backing.borrow_mut().index_allocator;
         let index = index_allocator.allocate().unwrap();
@@ -222,11 +222,16 @@ impl TextureAllocator for LumAtlasAllocator {
             index_allocator.free(index);
             return None;
         }
+        let offset = self
+            .layout
+            .index_to_location(index)
+            .map(|c| GridCoordinate::from(c * self.layout.resolution));
         let result = LumAtlasTile {
             requested_grid,
-            offset: self.layout.index_to_location(index).map(|c| c.into()),
+            offset,
             backing: Rc::new(RefCell::new(TileBacking {
                 index,
+                atlas_grid: requested_grid.translate(offset),
                 origin: self.layout.index_to_origin(index),
                 scale: self.layout.texcoord_scale(),
                 data: None,
