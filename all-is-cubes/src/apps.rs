@@ -175,7 +175,7 @@ impl AllIsCubesAppState {
                 .map_err(|e| ToolError::Internal(e.to_string()))?;
             Ok(())
         } else {
-            Err(ToolError::NotUsable) // TODO: not the right variant
+            Err(ToolError::NoTool)
         }
     }
 

@@ -48,9 +48,10 @@ impl Tool {
     /// If the transaction does not succeed, the original `Tool` value should be kept.
     pub fn use_tool(self, input: &ToolInput) -> Result<(Self, UniverseTransaction), ToolError> {
         match self {
-            Self::None => Err(ToolError::NotUsable),
+            Self::None => Err(ToolError::NoTool),
             Self::Activate => {
                 // TODO: We have nothing to activate yet.
+                // (But this error also needs work.)
                 Err(ToolError::NotUsable)
             }
             Self::DeleteBlock => {
@@ -158,7 +159,9 @@ impl ToolInput {
 pub enum ToolError {
     // TODO: Add tests for these error messages and make them make good sense in contexts
     // they might appear ... or possibly we have a separate trait for them
-    // TODO: This enum needs a rework given the new transaction system.
+    /// There was no tool to use (empty inventory slot, nonexistent slot, nonexistent inventory…).
+    #[error("no tool")]
+    NoTool,
     /// The tool cannot currently be used or does not apply to the target.
     #[error("does not apply")]
     NotUsable,
@@ -222,7 +225,7 @@ impl Inventory {
             if let Some(tool) = self.slots.get(slot_index) {
                 tool
             } else {
-                return Err(ToolError::NotUsable);
+                return Err(ToolError::NoTool);
             }
         } else {
             &activate
@@ -447,7 +450,7 @@ mod tests {
         });
         assert_eq!(
             tester.equip_and_use_tool(Tool::None),
-            Err(ToolError::NotUsable)
+            Err(ToolError::NoTool)
         );
         print_space(&tester.space(), (-1., 1., 1.));
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
