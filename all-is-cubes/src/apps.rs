@@ -158,8 +158,15 @@ impl AllIsCubesAppState {
         &self.cursor_result
     }
 
-    /// TODO: Should have click feedback in VUI, not via return value.
-    pub fn click(&mut self, button: usize) -> Result<(), ToolError> {
+    /// TODO: Clicks should be passed through `InputProcessor` instead of being an entirely separate path.
+    pub fn click(&mut self, button: usize) {
+        match self.click_impl(button) {
+            Ok(()) => {}
+            Err(e) => self.ui.show_tool_error(e),
+        }
+    }
+
+    fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
         if let Some(character_ref) = &self.game_character {
             let transaction =
                 Character::click(character_ref.clone(), self.cursor_result.as_ref(), button)?;

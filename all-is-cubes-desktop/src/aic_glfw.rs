@@ -144,8 +144,7 @@ pub fn glfw_main_loop(
                         .mouse_pixel_position(renderer.viewport(), None, false);
                 }
                 WindowEvent::MouseButton(button, Action::Press, _) => {
-                    // TODO: this dumping should be replaced with in-game UI feedback
-                    log::info!("click: {:?}", app.click(map_glfw_button(button)));
+                    app.click(map_glfw_button(button));
                 }
                 WindowEvent::MouseButton(_, Action::Release, _) => {}
                 WindowEvent::MouseButton(_, Action::Repeat, _) => {}

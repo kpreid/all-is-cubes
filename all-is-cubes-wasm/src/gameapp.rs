@@ -233,12 +233,7 @@ impl WebGameRoot {
                     1 => 2,
                     x => x as usize,
                 };
-                // TODO: outcome reporting should be directly in the UI, not our responsibility
-                let result = this.app.click(mapped_button);
-                console::log_1(&JsValue::from_str(&format!(
-                    "click {}: {:?}",
-                    mapped_button, result
-                )));
+                this.app.click(mapped_button);
             },
         );
 

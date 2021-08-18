@@ -26,6 +26,7 @@ use crate::listen::{ListenableSource, Listener};
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::Space;
 
+use crate::tools::ToolError;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
 mod hud;
@@ -170,6 +171,13 @@ impl Vui {
         }
 
         self.universe.step(tick)
+    }
+
+    pub fn show_tool_error(&mut self, error: ToolError) {
+        // TODO: review text formatting
+        if let Ok(mut state) = self.tooltip_state.lock() {
+            state.set_text(error.to_string().into());
+        }
     }
 }
 
