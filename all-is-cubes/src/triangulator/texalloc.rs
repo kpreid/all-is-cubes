@@ -43,10 +43,13 @@ pub trait TextureTile: Clone {
     /// Returns the [`Grid`] originally passed to the texture allocator for this tile.
     fn grid(&self) -> Grid;
 
-    /// Transform a unit-cube texture coordinate for the tile ([0..1] in each
-    /// component) into a texture coordinate for vertex attributes.
-    /// TODO: Re-explain this in terms of the new arbitrary-size allocations.
-    fn texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate>;
+    /// Transform a coordinate in the coordinate system of, and within, [`Self::grid()`]
+    /// (that is, where 1 unit = 1 texel) into texture coordinates within the entire
+    /// atlas texture (1 unit = entire texture width), suitable for vertex attributes.
+    fn grid_to_texcoord(
+        &self,
+        in_tile_grid: Vector3<TextureCoordinate>,
+    ) -> Vector3<TextureCoordinate>;
 
     /// Write texture data as RGBA color.
     ///
@@ -105,7 +108,7 @@ impl TextureTile for NoTextures {
         unimplemented!()
     }
 
-    fn texcoord(&self, _in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
+    fn grid_to_texcoord(&self, _in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
         unimplemented!()
     }
 
@@ -176,7 +179,7 @@ impl TextureTile for TestTextureTile {
         self.texel_grid
     }
 
-    fn texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
+    fn grid_to_texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
         in_tile
     }
 

@@ -21,7 +21,7 @@ use std::rc::{Rc, Weak};
 use crate::content::palette;
 use crate::intalloc::IntAllocator;
 use crate::lum::types::LumBlockVertex;
-use crate::math::{GridCoordinate, GridVector};
+use crate::math::GridCoordinate;
 use crate::space::Grid;
 use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 use crate::util::{CustomFormat, StatusText};
@@ -46,10 +46,16 @@ pub struct LumAtlasAllocator {
 /// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
 pub struct LumAtlasTile {
-    /// Grid that was requested for the allocation.
+    /// Texel grid that was requested for the allocation.
     requested_grid: Grid,
     /// Translation of the requested grid to the actual region within the texture.
-    offset: GridVector,
+    /// (This is always integer but will always be used in a float computation.)
+    offset: Vector3<TextureCoordinate>,
+    /// Scale factor to convert from texel grid coordinates (`requested_grid` and
+    /// `offset`) to GPU texture coordinates where 0.0 and 1.0 are the final size.
+    /// In other words, the reciprocal of the overall texture size. This does not
+    /// vary per-tile but is stored here for convenience of implementing [`TextureTile`].
+    scale: TextureCoordinate,
     /// Actual storage and metadata about the tile; may be updated as needed by the
     /// allocator to grow the texture.
     backing: Rc<RefCell<TileBacking>>,
@@ -61,12 +67,6 @@ struct TileBacking {
     /// Region of the atlas texture which this tile owns;
     /// `self.atlas_grid.volume() == self.data.len()`.
     atlas_grid: Grid,
-    /// Origin of the tile in the texture.
-    ///
-    /// Technically redundant with `index`, but precomputed.
-    origin: Vector3<TextureCoordinate>,
-    /// Scale factor for tile coordinates (0..1) to texture coordinates (some fraction of that).
-    scale: f32,
     data: Option<Box<[Texel]>>,
     /// Whether the data has changed so that we need to send it to the GPU on next
     /// [`LumAtlasAllocator::flush`].
@@ -228,12 +228,11 @@ impl TextureAllocator for LumAtlasAllocator {
             .map(|c| GridCoordinate::from(c * self.layout.resolution));
         let result = LumAtlasTile {
             requested_grid,
-            offset,
+            offset: offset.map(|c| c as TextureCoordinate),
+            scale: (self.layout.texel_edge_length() as TextureCoordinate).recip(),
             backing: Rc::new(RefCell::new(TileBacking {
                 index,
                 atlas_grid: requested_grid.translate(offset),
-                origin: self.layout.index_to_origin(index),
-                scale: self.layout.texcoord_scale(),
                 data: None,
                 dirty: false,
                 allocator: Rc::downgrade(&self.backing),
@@ -249,10 +248,13 @@ impl TextureTile for LumAtlasTile {
         todo!()
     }
 
-    fn texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
-        let backing = self.backing.borrow();
-        (in_tile * backing.scale) + backing.origin
+    fn grid_to_texcoord(
+        &self,
+        in_tile_grid: Vector3<TextureCoordinate>,
+    ) -> Vector3<TextureCoordinate> {
+        (in_tile_grid + self.offset) * self.scale
     }
+
     fn write(&mut self, data: &[Texel]) {
         let mut backing = self.backing.borrow_mut();
         backing.data = Some(data.into());
@@ -340,6 +342,8 @@ impl AtlasLayout {
     /// Compute location in the atlas of a tile. Units are tiles, not texels.
     ///
     /// Panics if `index >= self.tile_count()`.
+    /// TODO: Return Option instead, which the caller can handle as choosing a missing-texture
+    /// tile, so data mismatches are only graphical glitches.
     #[inline]
     fn index_to_location(&self, index: AtlasIndex) -> Vector3<AtlasCoord> {
         let row_length: AtlasIndex = self.row_length.into();
@@ -355,24 +359,6 @@ impl AtlasLayout {
         // Given the above modulos and assert, these conversions can't be lossy
         // because the bounds themselves fit in AtlasCoord.
         Vector3::new(column as AtlasCoord, row as AtlasCoord, layer as AtlasCoord)
-    }
-
-    /// Compute location in the atlas of a tile, as \[0, 1\] texture coordinates.
-    ///
-    /// Panics if `index >= self.tile_count()`.
-    /// TODO: Return Option instead, which the caller can handle as choosing a missing-texture
-    /// tile, so data mismatches are only graphical glitches.
-    #[inline]
-    fn index_to_origin(&self, index: AtlasIndex) -> Vector3<TextureCoordinate> {
-        let step = TextureCoordinate::from(self.resolution)
-            / (self.texel_edge_length() as TextureCoordinate);
-        self.index_to_location(index)
-            .map(|s| TextureCoordinate::from(s) * step)
-    }
-
-    #[inline]
-    fn texcoord_scale(&self) -> TextureCoordinate {
-        TextureCoordinate::from(self.resolution) / (self.texel_edge_length() as TextureCoordinate)
     }
 }
 

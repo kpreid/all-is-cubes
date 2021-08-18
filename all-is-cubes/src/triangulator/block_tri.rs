@@ -15,7 +15,6 @@ use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
 use crate::space::{Grid, Space};
 use crate::triangulator::{
     copy_voxels_to_texture, push_quad, BlockVertex, GreedyMesher, QuadColoring, TextureAllocator,
-    TextureCoordinate,
 };
 
 /// Describes how to draw one [`Face`] of a [`Block`].
@@ -161,6 +160,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 return BlockTriangulation::default();
             }
 
+            let block_resolution = GridCoordinate::from(block.resolution);
+
             // Construct empty output to mutate, because inside the loops we'll be
             // updating `Within` independently of other faces.
             let mut output_by_face = FaceMap::from_fn(|face| FaceTriangulation {
@@ -174,16 +175,6 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 // cube is ourself.
                 fully_opaque: face != Face::Within,
             });
-
-            // TODO: Once the texture allocator actually supports arbitrary-size tiles, stop asking for 16 in particular.
-            let tile_resolution: GridCoordinate = 16;
-            let block_resolution = GridCoordinate::from(block.resolution);
-            // How should we scale texels versus the standard size to get correct display?
-            let voxel_scale_modifier =
-                block_resolution as TextureCoordinate / tile_resolution as TextureCoordinate;
-            // Map quad vertices in voxel grid coordinates to containing block coordinates.
-            let vertex_scale = FreeCoordinate::from(block.resolution).recip();
-            let scale_vertex = |s| FreeCoordinate::from(s) * vertex_scale;
 
             let mut texture_if_needed: Option<A::Tile> = None;
 
@@ -275,8 +266,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         indices_transparent,
                         ..
                     } = &mut output_by_face[if layer == 0 { face } else { Face::Within }];
-                    let depth =
-                        FreeCoordinate::from(layer) / FreeCoordinate::from(block_resolution);
+                    let depth = FreeCoordinate::from(layer);
 
                     // Traverse `visible_image` using the "greedy meshing" algorithm for
                     // breaking an irregular shape into quads.
@@ -286,8 +276,6 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         rotated_voxel_range.y_range(),
                     )
                     .run(|mesher, low_corner, high_corner| {
-                        let low_corner = low_corner.map(scale_vertex);
-                        let high_corner = high_corner.map(scale_vertex);
                         // Generate quad.
                         let coloring = if let Some(single_color) = mesher.single_color {
                             // The quad we're going to draw has identical texels, so we might as
@@ -300,7 +288,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                     copy_voxels_to_texture(texture_allocator, voxels);
                             }
                             if let Some(ref texture) = texture_if_needed {
-                                QuadColoring::Texture(texture, voxel_scale_modifier)
+                                QuadColoring::Texture(texture)
                             } else {
                                 // Texture allocation failure.
                                 // TODO: Mark this triangulation as defective in the return value, so
@@ -321,10 +309,10 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             },
                             face,
                             depth,
-                            low_corner,
-                            high_corner,
+                            low_corner.map(FreeCoordinate::from),
+                            high_corner.map(FreeCoordinate::from),
                             coloring,
-                            tile_resolution,
+                            block_resolution,
                         );
                     });
                 }
