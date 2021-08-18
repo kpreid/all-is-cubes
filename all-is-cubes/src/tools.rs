@@ -76,6 +76,21 @@ impl Tool {
         }
     }
 
+    /// As [`Self::use_tool`], except that it does not allow the tool to modify itself.
+    ///
+    /// This operation is used for special cases where an action is expressed by a tool
+    /// but the tool is not a “game item”.
+    pub fn use_immutable_tool(&self, input: &ToolInput) -> Result<UniverseTransaction, ToolError> {
+        let (new_tool, transaction) = self.clone().use_tool(input)?;
+
+        if &new_tool != self {
+            // TODO: Define a separate error for this to report.
+            return Err(ToolError::Internal(String::from("tool is immutable")));
+        }
+
+        Ok(transaction)
+    }
+
     /// Return a block to use as an icon for this tool. For [`Tool::PlaceBlock`], has the
     /// same appearance as the block to be placed. The display name of the block should be
     /// the display name of the tool.
@@ -101,9 +116,9 @@ impl Tool {
 /// parameter list for `Tool::use_tool`.
 #[derive(Debug)]
 pub struct ToolInput {
-    cursor: Option<Cursor>,
+    pub(crate) cursor: Option<Cursor>,
     /// TODO: We want to be able to express “inventory host”, not just specifically Character (but there aren't any other examples).
-    character: Option<URef<Character>>,
+    pub(crate) character: Option<URef<Character>>,
 }
 
 impl ToolInput {
@@ -210,25 +225,17 @@ impl Inventory {
 
     /// Use a tool stored in this inventory.
     ///
-    /// If `slot_index` is [`None`], uses a [`Tool::Activate`] that does not exist in the inventory.
-    /// TODO: Bad API, have a more coherent overall design.
-    ///
     /// `character` must be the character containing the inventory. TODO: Bad API
     pub fn use_tool(
         &self,
         cursor: Option<&Cursor>,
         character: URef<Character>,
-        slot_index: Option<usize>,
+        slot_index: usize,
     ) -> Result<UniverseTransaction, ToolError> {
-        let activate = Tool::Activate;
-        let tool = if let Some(slot_index) = slot_index {
-            if let Some(tool) = self.slots.get(slot_index) {
-                tool
-            } else {
-                return Err(ToolError::NoTool);
-            }
+        let tool = if let Some(tool) = self.slots.get(slot_index) {
+            tool
         } else {
-            &activate
+            return Err(ToolError::NoTool);
         };
 
         let input = ToolInput {
@@ -238,20 +245,16 @@ impl Inventory {
         let (new_tool, mut transaction) = tool.clone().use_tool(&input)?;
 
         if &new_tool != tool {
-            if let Some(slot_index) = slot_index {
-                transaction = transaction
-                    .merge(
-                        CharacterTransaction::inventory(InventoryTransaction::replace(
-                            slot_index,
-                            tool.clone(),
-                            new_tool,
-                        ))
-                        .bind(character),
-                    )
-                    .expect("failed to merge tool self-update");
-            } else {
-                panic!("shouldn't happen: no slot but tool mutated");
-            }
+            transaction = transaction
+                .merge(
+                    CharacterTransaction::inventory(InventoryTransaction::replace(
+                        slot_index,
+                        tool.clone(),
+                        new_tool,
+                    ))
+                    .bind(character),
+                )
+                .expect("failed to merge tool self-update");
         }
 
         Ok(transaction)
@@ -416,7 +419,7 @@ mod tests {
             // writing this code).
             let input = self.input();
             c.inventory()
-                .use_tool(input.cursor().ok(), self.character_ref.clone(), Some(index))
+                .use_tool(input.cursor().ok(), self.character_ref.clone(), index)
         }
 
         fn space(&self) -> UBorrow<Space> {

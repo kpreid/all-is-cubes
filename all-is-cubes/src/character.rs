@@ -245,8 +245,7 @@ impl Character {
 
     /// Use this character's selected tool on the given cursor.
     ///
-    /// TODO: Dubious API: shouldn't this only work with the character's space?
-    /// We want to refactor click handling in general, so keep an eye on that.
+    /// TODO: Check the cursor refers to the same space as this character?
     pub fn click(
         this: URef<Character>,
         cursor: Option<&Cursor>,
@@ -258,18 +257,7 @@ impl Character {
             .get(button)
             .copied()
             .unwrap_or(tb.selected_slots[0]);
-        tb.inventory.use_tool(
-            cursor,
-            this,
-            if cursor.map(|c| &c.space) == Some(&tb.space) {
-                // Use inventory tools on world
-                Some(slot_index)
-            } else {
-                // Assuming this is the UI space, just click on it
-                // TODO: Bad design; we should perhaps not route these clicks through Character::click at all.
-                None
-            },
-        )
+        tb.inventory.use_tool(cursor, this, slot_index)
     }
 
     // TODO: this code's location is driven by colliding_cubes being here, which is probably wrong

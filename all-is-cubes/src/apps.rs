@@ -10,7 +10,7 @@ use crate::character::{cursor_raycast, Character, Cursor};
 use crate::content::UniverseTemplate;
 use crate::listen::{ListenableCell, ListenableSource};
 use crate::space::Space;
-use crate::tools::ToolError;
+use crate::tools::{Tool, ToolError, ToolInput};
 use crate::transactions::Transaction;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::{CustomFormat, StatusText};
@@ -158,6 +158,9 @@ impl AllIsCubesAppState {
         &self.cursor_result
     }
 
+    /// Handle a mouse-click event, at the position specified by the last
+    /// [`Self::update_cursor()`].
+    ///
     /// TODO: Clicks should be passed through `InputProcessor` instead of being an entirely separate path.
     pub fn click(&mut self, button: usize) {
         match self.click_impl(button) {
@@ -166,16 +169,35 @@ impl AllIsCubesAppState {
         }
     }
 
+    /// Implementation of click interpretation logic, called by [`Self::click`].
+    /// TODO: This function needs tests.
     fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
-        if let Some(character_ref) = &self.game_character {
-            let transaction =
-                Character::click(character_ref.clone(), self.cursor_result.as_ref(), button)?;
+        let cursor_space = self.cursor_result.as_ref().map(|c| &c.space);
+        if cursor_space == Some(self.ui_space()) {
+            // Clicks on UI use `Tool::Activate`.
+            // TODO: We'll probably want to distinguish buttons eventually.
+            // TODO: It should be easier to use a tool
+            let transaction = Tool::Activate.use_immutable_tool(&ToolInput {
+                cursor: self.cursor_result.clone(),
+                character: None,
+            })?;
             transaction
-                .execute(self.universe_mut())
+                .execute(self.universe_mut()) // TODO: wrong universe
                 .map_err(|e| ToolError::Internal(e.to_string()))?;
             Ok(())
         } else {
-            Err(ToolError::NoTool)
+            // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
+            // TODO: if the cursor space is not the game space this should be an error
+            if let Some(character_ref) = &self.game_character {
+                let transaction =
+                    Character::click(character_ref.clone(), self.cursor_result.as_ref(), button)?;
+                transaction
+                    .execute(self.universe_mut())
+                    .map_err(|e| ToolError::Internal(e.to_string()))?;
+                Ok(())
+            } else {
+                Err(ToolError::NoTool)
+            }
         }
     }
 
