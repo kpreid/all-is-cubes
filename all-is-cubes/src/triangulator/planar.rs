@@ -145,12 +145,12 @@ impl GreedyMesher {
 #[derive(Copy, Clone, Debug)]
 pub(super) enum QuadColoring<'a, T> {
     Solid(Rgba),
-    Texture(&'a T, TextureCoordinate),
+    Texture(&'a T),
 }
 
 /// Compute vertices for a quad and push them into the supplied vectors.
 ///
-/// `depth`, `low_corner`, and `high_corner` are in 0-1 coordinates.
+/// `depth`, `low_corner`, and `high_corner` are in units of 1 texel.
 #[inline]
 #[allow(clippy::too_many_arguments)] // TODO: Figure out how to simplify
 pub(super) fn push_quad<V: From<BlockVertex>>(
@@ -166,56 +166,63 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
     // TODO: Refactor so we don't have to do 100% of this anew for each individual quad
     // This is tricky, though, since the coloring can vary per quad (though the scale _can_ be constant).
     let transform_f = face.matrix(1).to_free();
-    let transform_t = transform_f.cast::<TextureCoordinate>().unwrap();
+    let transform_t = face
+        .matrix(resolution)
+        .to_free()
+        .cast::<TextureCoordinate>()
+        .unwrap();
     let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
-    let half_texel = 0.5 / (resolution as TextureCoordinate);
+    let half_texel = 0.5;
     let depth_fudge = Vector3::new(0., 0., half_texel);
+    let voxel_to_block_scale = FreeCoordinate::from(resolution).recip();
 
     let (clamp_min, clamp_max) = match coloring {
         QuadColoring::Solid(_) => (Vector3::zero(), Vector3::zero()),
-        QuadColoring::Texture(tile, scale) => (
-            tile.texcoord(
+        QuadColoring::Texture(tile) => (
+            tile.grid_to_texcoord(
                 transform_t
                     .transform_point(Point3 {
                         x: low_corner.x as TextureCoordinate + half_texel,
                         y: low_corner.y as TextureCoordinate + half_texel,
                         z: depth as TextureCoordinate + half_texel,
                     })
-                    .to_vec()
-                    * scale,
+                    .to_vec(),
             ),
-            tile.texcoord(
+            tile.grid_to_texcoord(
                 transform_t
                     .transform_point(Point3 {
                         x: high_corner.x as TextureCoordinate - half_texel,
                         y: high_corner.y as TextureCoordinate - half_texel,
                         z: depth as TextureCoordinate + half_texel,
                     })
-                    .to_vec()
-                    * scale,
+                    .to_vec(),
             ),
         ),
     };
 
-    for &p in QUAD_VERTICES {
+    for &unit_square_point in QUAD_VERTICES {
         // Apply bounding rectangle
-        let p = low_corner.to_vec() + p.mul_element_wise(high_corner - low_corner);
+        let voxel_grid_point =
+            low_corner.to_vec() + unit_square_point.mul_element_wise(high_corner - low_corner);
         // Apply depth
-        let p = Point3::from_vec(p.extend(depth));
+        let voxel_grid_point = Point3::from_vec(voxel_grid_point.extend(depth));
+        // Apply scaling to unit cube
+        let block_point = voxel_grid_point * voxel_to_block_scale;
 
         vertices.push(V::from(BlockVertex {
-            position: transform_f.transform_point(p),
+            position: transform_f.transform_point(block_point),
             face,
             coloring: match coloring {
                 // Note: if we're ever looking for microöptimizations, we could try
                 // converting this to a trait for static dispatch.
                 QuadColoring::Solid(color) => Coloring::Solid(color),
-                QuadColoring::Texture(tile, scale) => Coloring::Texture {
-                    pos: tile.texcoord(
+                QuadColoring::Texture(tile) => Coloring::Texture {
+                    pos: tile.grid_to_texcoord(
                         transform_t
-                            .transform_point(p.map(|s| s as TextureCoordinate) + depth_fudge)
-                            .to_vec()
-                            * scale,
+                            .transform_point(
+                                voxel_grid_point.map(|s| s as TextureCoordinate) + depth_fudge,
+                            )
+                            .to_vec(),
                     ),
                     clamp_min,
                     clamp_max,

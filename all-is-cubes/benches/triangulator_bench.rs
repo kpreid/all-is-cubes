@@ -64,7 +64,7 @@ fn checkerboard_setup() -> (Space, BlockTriangulations<BlockVertex, TestTextureT
 
     let block_triangulations = triangulate_blocks(
         &space,
-        &mut TestTextureAllocator::new(16),
+        &mut TestTextureAllocator::new(),
         &TransparencyOption::Volumetric,
     );
 
