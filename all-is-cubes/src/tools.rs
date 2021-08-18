@@ -132,9 +132,10 @@ impl ToolInput {
     /// Returns a [`Cursor`] indicating what blocks the tool should act on, if it is
     /// a sort of tool that acts on blocks. If there is no [`Cursor`], because of aim
     /// or because of being used in a context where there cannot be any aiming, returns
-    /// [`Err(ToolError::NotUsable)`](ToolError::NotUsable) for convenient propagation.
+    /// [`Err(ToolError::NothingSelected)`](ToolError::NothingSelected) for convenient
+    /// propagation.
     pub fn cursor(&self) -> Result<&Cursor, ToolError> {
-        self.cursor.as_ref().ok_or(ToolError::NotUsable)
+        self.cursor.as_ref().ok_or(ToolError::NothingSelected)
     }
 
     /// Add the provided item to the inventory from which the tool was used.
@@ -392,11 +393,9 @@ mod tests {
         }
 
         fn input(&self) -> ToolInput {
-            let cursor =
-                cursor_raycast(Ray::new([0., 0.5, 0.5], [1., 0., 0.]), &self.space_ref).unwrap();
             ToolInput {
                 // TODO: define ToolInput::new
-                cursor: Some(cursor),
+                cursor: cursor_raycast(Ray::new([0., 0.5, 0.5], [1., 0., 0.]), &self.space_ref),
                 character: Some(self.character_ref.clone()),
             }
         }
@@ -507,6 +506,15 @@ mod tests {
     }
 
     #[test]
+    fn use_delete_block_without_target() {
+        let tester = ToolTester::new(|_space| {});
+        assert_eq!(
+            tester.equip_and_use_tool(Tool::DeleteBlock),
+            Err(ToolError::NothingSelected)
+        );
+    }
+
+    #[test]
     fn icon_place_block() {
         let dummy_icons = dummy_icons();
         let [block] = make_some_blocks();
@@ -548,6 +556,16 @@ mod tests {
         print_space(&*tester.space(), (-1., 1., 1.));
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
         assert_eq!(&tester.space()[(0, 0, 0)], &obstacle);
+    }
+
+    #[test]
+    fn use_place_block_without_target() {
+        let [tool_block] = make_some_blocks();
+        let tester = ToolTester::new(|_space| {});
+        assert_eq!(
+            tester.equip_and_use_tool(Tool::PlaceBlock(tool_block)),
+            Err(ToolError::NothingSelected)
+        );
     }
 
     #[test]
