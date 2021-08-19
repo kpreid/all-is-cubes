@@ -182,10 +182,20 @@ impl Block {
             } => {
                 let block_space = space_ref.try_borrow()?;
 
-                // Ensure resolution is at least 1 to not panic on bad data.
-                // (We could eliminate this if Grid allowed a size of zero, but that
-                // might lead to division-by-zero trouble elsewhere...)
-                let resolution_g: GridCoordinate = resolution.max(1).into();
+                // Don't produce a resolution of 0, as that might cause division-by-zero messes later.
+                // TODO: Actually, should this be an EvalBlockError instead?
+                if resolution == 0 {
+                    return Ok(EvaluatedBlock {
+                        attributes: attributes.clone(),
+                        color: Rgba::TRANSPARENT,
+                        voxels: None,
+                        resolution: 1,
+                        opaque: false,
+                        visible: false,
+                    });
+                }
+
+                let resolution_g: GridCoordinate = resolution.into();
                 let full_resolution_grid =
                     Grid::new(offset, [resolution_g, resolution_g, resolution_g]);
                 let occupied_grid = full_resolution_grid

@@ -175,6 +175,30 @@ fn evaluate_voxels_partial_not_filling() {
     assert_eq!(e.visible, true);
 }
 
+/// A `Resolution` value of zero is in range for the type, but not actually useful.
+/// Check that it evaluates to something sane just in case.
+#[test]
+fn evaluate_voxels_zero_resolution() {
+    let resolution = 0;
+    let mut universe = Universe::new();
+    let mut space = Space::for_block(1).build_empty();
+    // This block should *not* appear in the result.
+    space
+        .fill_uniform(space.grid(), Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)))
+        .unwrap();
+    let space_ref = universe.insert_anonymous(space);
+    let block = Block::builder()
+        .voxels_ref(resolution as Resolution, space_ref.clone())
+        .build();
+
+    let e = block.evaluate().unwrap();
+    assert_eq!(e.color, Rgba::TRANSPARENT);
+    assert_eq!(e.voxels, None);
+    assert_eq!(e.resolution, 1);
+    assert_eq!(e.opaque, false);
+    assert_eq!(e.visible, false);
+}
+
 /// Tests that the `offset` field of `Block::Recur` is respected.
 #[test]
 fn recur_with_offset() {
