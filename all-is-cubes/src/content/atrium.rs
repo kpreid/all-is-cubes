@@ -6,7 +6,7 @@
 use cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
 use noise::Seedable;
 
-use crate::block::{Block, BlockCollision, AIR};
+use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
 use crate::content::{four_walls, palette, scale_color, Fire};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{
@@ -14,7 +14,7 @@ use crate::math::{
     NoiseFnExt as _, Rgb,
 };
 use crate::raycast::Face;
-use crate::space::{Grid, GridArray, SetCubeError, Space};
+use crate::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
 use crate::universe::Universe;
 
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
@@ -116,16 +116,16 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
         *br"########",
         *br"####.###",
         *br"########",
-        *br"########", // top floor height
-        *br"#/ \#/ \",
-        *br"|   o   ",
+        *br"aaaaaaaa", // top floor height
+        *br"aaaaaaaa",
+        *br"aa aaa a",
         *br"|   o   ",
         *br"|   o   ", 
         *br"########",
-        *br"########", // balcony floor height
-        *br"###/ \##",
-        *br"#/     \",
-        *br"G       ",
+        *br"##AAAAA#", // balcony floor height
+        *br"AAAA AAA",
+        *br"AAA   AA",
+        *br"AA     A",
         *br"G       ",
         *br"G       ", 
         *br"G       ",
@@ -171,7 +171,12 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     Ok(space)
 }
 
-fn map_text_block(ascii: u8, blocks: &BlockProvider<AtriumBlocks>, existing_block: Block) -> Block {
+fn map_text_block(
+    ascii: u8,
+    blocks: &BlockProvider<AtriumBlocks>,
+    cube: GridPoint,
+    existing_block: Block,
+) -> Block {
     match ascii {
         b' ' => existing_block,
         b'.' => AIR,
@@ -181,10 +186,75 @@ fn map_text_block(ascii: u8, blocks: &BlockProvider<AtriumBlocks>, existing_bloc
         b'G' => blocks[AtriumBlocks::GroundColumn].clone(),
         b'o' => blocks[AtriumBlocks::SmallColumn].clone(),
         b'|' => blocks[AtriumBlocks::SquareColumn].clone(),
-        b'/' => blocks[AtriumBlocks::ArchBricks].clone(),
-        b'\\' => blocks[AtriumBlocks::ArchBricks]
-            .clone()
-            .rotate(GridRotation::CLOCKWISE * GridRotation::CLOCKWISE),
+        b'A' => {
+            let start_y = 3;
+            let mirrored_half = cube.x >= 4;
+            let block = match [
+                if mirrored_half { 8 - cube.x } else { cube.x },
+                cube.y - start_y,
+            ] {
+                [0, 0] => blocks[AtriumBlocks::Arch0_0].clone(),
+                [0, 1] => blocks[AtriumBlocks::Arch0_1].clone(),
+                [0, 2] => blocks[AtriumBlocks::Arch0_2].clone(),
+                [1, 0] => blocks[AtriumBlocks::Arch1_0].clone(),
+                [1, 1] => blocks[AtriumBlocks::Arch1_1].clone(),
+                [1, 2] => blocks[AtriumBlocks::Arch1_2].clone(),
+                [2, 1] => blocks[AtriumBlocks::Arch2_1].clone(),
+                [2, 2] => blocks[AtriumBlocks::Arch2_2].clone(),
+                [2, 3] => blocks[AtriumBlocks::Arch2_3].clone(),
+                [3, 2] => blocks[AtriumBlocks::Arch3_2].clone(),
+                [3, 3] => blocks[AtriumBlocks::Arch3_3].clone(),
+                [4, 3] => blocks[AtriumBlocks::Arch4_3].clone(),
+                _ => Block::builder()
+                    .color(rgba_const!(1.0, 0.01, 0.8, 1.0))
+                    .display_name(format!("Arch error {:?}", [cube.x, cube.y - start_y]))
+                    .build(),
+            };
+            // TODO: Coordinate systems in use aren't really consistent.
+            // If we reorient the bricks so that they run along the X axis instead of the Z axis, that should help.
+            block.rotate(
+                GridRotation::CLOCKWISE
+                    * if mirrored_half {
+                        GridRotation::IDENTITY
+                    } else {
+                        GridRotation::RXYz
+                    },
+            )
+        }
+        b'a' => {
+            let start_y = 10; // TODO: should be vs. ceiling_height
+            let mut cube = cube;
+            cube.x = cube.x.rem_euclid(4);
+            let mirrored_half = cube.x >= 3;
+            let block = match [
+                if mirrored_half { 4 - cube.x } else { cube.x },
+                cube.y - start_y,
+            ] {
+                [0, 0] => blocks[AtriumBlocks::Arch0_0].clone(),
+                [0, 1] => blocks[AtriumBlocks::Arch0_1].clone(),
+                [0, 2] => blocks[AtriumBlocks::Arch0_2].clone(),
+                [1, 0] => blocks[AtriumBlocks::Arch1_0].clone(),
+                [1, 1] => blocks[AtriumBlocks::Arch1_1].clone(),
+                [1, 2] => blocks[AtriumBlocks::Arch1_2].clone(),
+                [2, 1] => blocks[AtriumBlocks::Arch2_1].clone(),
+                [2, 2] => blocks[AtriumBlocks::Arch2_2].clone(),
+                [2, 3] => blocks[AtriumBlocks::Arch2_3].clone(),
+                _ => Block::builder()
+                    .color(rgba_const!(1.0, 0.01, 0.8, 1.0))
+                    .display_name(format!("Arch error {:?}", [cube.x, cube.y - start_y]))
+                    .build(),
+            };
+            // TODO: Coordinate systems in use aren't really consistent.
+            // If we reorient the bricks so that they run along the X axis instead of the Z axis, that should help.
+            block.rotate(
+                GridRotation::CLOCKWISE
+                    * if mirrored_half {
+                        GridRotation::IDENTITY
+                    } else {
+                        GridRotation::RXYz
+                    },
+            )
+        }
         b'T' => possibly_corner_block(
             existing_block,
             &blocks[AtriumBlocks::Molding]
@@ -239,7 +309,7 @@ fn arch_row(
         let column_base = first_column_base + offset * (i + 1);
 
         fill_space_transformed(
-            |p, block| map_text_block(pattern[p], blocks, block),
+            |p, block| map_text_block(pattern[p], blocks, p, block),
             pattern.grid(),
             space,
             GridMatrix::from_translation(column_base.to_vec())
@@ -280,7 +350,18 @@ fn fill_space_transformed(
 pub enum AtriumBlocks {
     GroundFloor,
     SolidBricks,
-    ArchBricks,
+    Arch0_0,
+    Arch0_1,
+    Arch0_2,
+    Arch1_0,
+    Arch1_1,
+    Arch1_2,
+    Arch2_1,
+    Arch2_2,
+    Arch2_3,
+    Arch3_2,
+    Arch3_3,
+    Arch4_3,
     GroundColumn,
     SquareColumn,
     SmallColumn,
@@ -319,7 +400,9 @@ fn install_atrium_blocks(
         |p: GridPoint| &stone_range[stone_noise.at_grid(p).round().clamp(0.0, 4.0) as usize];
 
     let brick_pattern = |mut p: GridPoint| {
-        if (p.x > resolution_g / 2) ^ (p.y > resolution_g / 2) {
+        if (p.x.rem_euclid(resolution_g) > resolution_g / 2)
+            ^ (p.y.rem_euclid(resolution_g) > resolution_g / 2)
+        {
             // Create brick half-overlap offset
             p.z = (p.z + resolution_g / 2) % resolution_g;
         }
@@ -346,6 +429,56 @@ fn install_atrium_blocks(
         }
     };
 
+    let ground_floor_arch_blocks = space_to_blocks(
+        resolution,
+        BlockAttributes {
+            display_name: "Atrium Ground Floor Arch".into(),
+            ..BlockAttributes::default()
+        },
+        {
+            let arch_opening_width = resolution_g * 7;
+            let arch_opening_height = resolution_g * 3;
+            let arch_center_z_doubled = resolution_g * 6 /* midpoint */
+                + resolution_g * 3 /* offset by a block and a half */;
+            let mut space = Space::builder(Grid::from_lower_upper(
+                [0, 0, 0],
+                [
+                    resolution_g,
+                    arch_opening_height + resolution_g,
+                    arch_center_z_doubled + resolution_g * 3,
+                ],
+            ))
+            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+            .build_empty();
+            space.fill(space.grid(), |p| {
+                // Flip middle of first block, so that the arch to our left appears on it
+                let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 { resolution_g - 1 - p.z } else { p.z };
+                let arch_z_doubled = z_for_arch * 2 - arch_center_z_doubled;
+                let arch_y_doubled = p.y * 2;
+                let distance_from_edge = p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
+                let r = (arch_z_doubled as f32 / arch_opening_width as f32)
+                    .hypot(arch_y_doubled as f32 / (arch_opening_height as f32 * 2.));
+                if r < 1.0 {
+                    // Empty space inside arch
+                    None
+                } else if r < 1.04 {
+                    // Beveled edge
+                    if distance_from_edge < ((1. - r) * 2.0 + 0.1) { None } else { Some(&stone_range[3]) }
+                } else if r < 1.1 {
+                    // Surface
+                    Some(&stone_range[3])
+                } else if r < 1.14 {
+                    // Groove
+                    if distance_from_edge == 0. { None } else { Some(&stone_range[4]) }
+                } else {
+                    // Body
+                    Some(brick_pattern(p))
+                }
+            })?;
+            universe.insert_anonymous(space)
+        },
+    )?;
+
     // TODO: duplicated procgen code — figure out a good toolkit of math helpers
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
@@ -366,16 +499,18 @@ fn install_atrium_blocks(
                 .display_name("Atrium Wall Bricks")
                 .voxels_fn(universe, resolution, brick_pattern)?
                 .build(),
-            AtriumBlocks::ArchBricks => Block::builder()
-                .display_name("Atrium Arch Bricks")
-                .voxels_fn(universe, resolution, |p| {
-                    if p.x <= p.y {
-                        brick_pattern(p)
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build(),
+            AtriumBlocks::Arch0_0 => ground_floor_arch_blocks[[0, 0, 0]].clone(),
+            AtriumBlocks::Arch0_1 => ground_floor_arch_blocks[[0, 1, 0]].clone(),
+            AtriumBlocks::Arch0_2 => ground_floor_arch_blocks[[0, 2, 0]].clone(),
+            AtriumBlocks::Arch1_0 => ground_floor_arch_blocks[[0, 0, 1]].clone(),
+            AtriumBlocks::Arch1_1 => ground_floor_arch_blocks[[0, 1, 1]].clone(),
+            AtriumBlocks::Arch1_2 => ground_floor_arch_blocks[[0, 2, 1]].clone(),
+            AtriumBlocks::Arch2_1 => ground_floor_arch_blocks[[0, 1, 2]].clone(),
+            AtriumBlocks::Arch2_2 => ground_floor_arch_blocks[[0, 2, 2]].clone(),
+            AtriumBlocks::Arch2_3 => ground_floor_arch_blocks[[0, 3, 2]].clone(),
+            AtriumBlocks::Arch3_2 => ground_floor_arch_blocks[[0, 2, 3]].clone(),
+            AtriumBlocks::Arch3_3 => ground_floor_arch_blocks[[0, 3, 3]].clone(),
+            AtriumBlocks::Arch4_3 => ground_floor_arch_blocks[[0, 3, 4]].clone(),
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
                 .voxels_fn(universe, resolution, |p| {
