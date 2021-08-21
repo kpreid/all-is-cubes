@@ -52,7 +52,7 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
         if atrium_footprint.contains_cube(p) {
             None
         } else {
-            Some(&blocks[AtriumBlocks::SolidBricks])
+            Some(&blocks[AtriumBlocks::UpperFloor])
         }
     };
 
@@ -349,6 +349,7 @@ fn fill_space_transformed(
 #[non_exhaustive]
 pub enum AtriumBlocks {
     GroundFloor,
+    UpperFloor,
     SolidBricks,
     Arch0_0,
     Arch0_1,
@@ -383,6 +384,7 @@ fn install_atrium_blocks(
     let stone_base = Block::from(rgba_const!(0.53, 0.48, 0.40, 1.0));
     let heavy_grout_base = Block::from(rgba_const!(0.1, 0.1, 0.1, 1.0));
     let grout_base = Block::from(rgba_const!(0.32, 0.30, 0.28, 1.0));
+    let ceiling_paint = Block::from(rgba_const!(0.975, 0.975, 0.975, 1.0));
 
     // TODO: This whole section is about having noise pick from a fixed set of pregenerated shades.
     // We should abstract it out if we like this style
@@ -490,6 +492,17 @@ fn install_atrium_blocks(
                 .voxels_fn(universe, resolution, |p| {
                     if p.x == 0 {
                         &heavy_grout_base
+                    } else {
+                        brick_pattern(p)
+                    }
+                })?
+                .build(),
+            AtriumBlocks::UpperFloor => Block::builder()
+                .display_name("Atrium Upper Floor")
+                .voxels_fn(universe, resolution, |p| {
+                    // Add a white ceiling
+                    if p.y == 0 {
+                        &ceiling_paint
                     } else {
                         brick_pattern(p)
                     }
