@@ -35,6 +35,7 @@ mod chunking;
 pub mod content;
 pub mod drawing;
 mod intalloc;
+pub mod inventory;
 pub mod linking;
 pub mod listen;
 pub mod lum;
