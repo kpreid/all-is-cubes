@@ -50,6 +50,8 @@ fn main() -> Result<(), xaction::Error> {
         }
         ("lint", Some(_matches)) => {
             do_for_all_packages(TestOrCheck::Lint, features)?;
+            // Build docs to verify that there are no broken doc links.
+            cargo().arg("doc").run()?;
         }
         ("run-dev", Some(_matches)) => {
             let _pushd = xaction::pushd("all-is-cubes-wasm");
