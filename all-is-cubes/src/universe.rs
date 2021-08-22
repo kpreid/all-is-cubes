@@ -83,21 +83,20 @@ impl Universe {
 
         let mut transactions = Vec::new();
 
-        for space in self.spaces.values() {
-            let (space_info, transaction) = space
-                .try_borrow_mut()
-                .expect("space borrowed during universe.step()")
-                .step(Some(&space.downgrade()), tick);
+        for space_root in self.spaces.values() {
+            let space_ref = space_root.downgrade();
+            let (space_info, transaction) = space_ref
+                .try_modify(|space| space.step(Some(&space_ref), tick))
+                .expect("space borrowed during universe.step()");
             transactions.push(transaction);
             info.space_step += space_info;
         }
 
-        for character in self.characters.values() {
-            // TODO: Make URootRef::downgrade() non-allocating
-            let (_body_step_info, transaction) = character
-                .try_borrow_mut()
-                .expect("character borrowed during universe.step()")
-                .step(Some(&character.downgrade()), tick);
+        for character_root in self.characters.values() {
+            let character_ref = character_root.downgrade();
+            let (_body_step_info, transaction) = character_ref
+                .try_modify(|ch| ch.step(Some(&character_ref), tick))
+                .expect("character borrowed during universe.step()");
             transactions.push(transaction);
         }
 
@@ -376,6 +375,20 @@ impl<T: 'static> URef<T> {
         ))
     }
 
+    /// Apply the given function to the `&mut T` inside.
+    ///
+    /// TODO: If possible, replace this operation with transactions, to ensure change notification integrity.
+    pub fn try_modify<F, Out>(&self, function: F) -> Result<Out, RefError>
+    where
+        F: FnOnce(&mut T) -> Out,
+    {
+        let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
+        let mut borrow = strong
+            .try_borrow_mut()
+            .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
+        Ok(function(&mut borrow.data))
+    }
+
     /// Shortcut for executing a transaction.
     #[allow(dead_code)] // Currently only used in tests
     pub(crate) fn execute(
@@ -385,7 +398,7 @@ impl<T: 'static> URef<T> {
     where
         T: Transactional,
     {
-        transaction.execute(&mut *self.try_borrow_mut()?)
+        self.try_modify(|data| transaction.execute(data))?
     }
 
     fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {
@@ -546,11 +559,6 @@ impl<T> URootRef<T> {
             name: Arc::clone(&self.name),
         }
     }
-
-    /// Borrow the value mutably, in the sense of [`RefCell::try_borrow_mut`].
-    fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, RefError> {
-        self.downgrade().try_borrow_mut()
-    }
 }
 
 /// Performance data returned by [`Universe::step`]. The exact contents of this structure
@@ -587,7 +595,7 @@ mod sealed_gimmick {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::AIR;
+    use crate::block::{Block, BlockDefTransaction, AIR};
     use crate::content::make_some_blocks;
 
     #[test]
@@ -632,11 +640,13 @@ Universe {
     fn uref_try_borrow_in_use() {
         let mut u = Universe::new();
         let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.borrow_mut();
-        assert_eq!(
-            r.try_borrow().unwrap_err(),
-            RefError::InUse(Arc::new(Name::Anonym(0)))
-        );
+        r.try_modify(|_| {
+            assert_eq!(
+                r.try_borrow().unwrap_err(),
+                RefError::InUse(Arc::new(Name::Anonym(0)))
+            );
+        })
+        .unwrap();
     }
 
     #[test]
@@ -646,6 +656,17 @@ Universe {
         let _borrow_1 = r.borrow();
         assert_eq!(
             r.try_borrow_mut().unwrap_err(),
+            RefError::InUse(Arc::new(Name::Anonym(0)))
+        );
+    }
+
+    #[test]
+    fn uref_try_modify_in_use() {
+        let mut u = Universe::new();
+        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let _borrow_1 = r.borrow();
+        assert_eq!(
+            r.try_modify(|_| {}).unwrap_err(),
             RefError::InUse(Arc::new(Name::Anonym(0)))
         );
     }
@@ -685,14 +706,18 @@ Universe {
     fn insert_anonymous_makes_distinct_names() {
         let [block_0, block_1] = make_some_blocks();
         let mut u = Universe::new();
-        let ref_a = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let ref_b = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        ref_a.borrow_mut().set((0, 0, 0), &block_0).unwrap();
-        ref_b.borrow_mut().set((0, 0, 0), &block_1).unwrap();
+        let ref_a = u.insert_anonymous(BlockDef::new(AIR));
+        let ref_b = u.insert_anonymous(BlockDef::new(AIR));
+        ref_a
+            .execute(&BlockDefTransaction::overwrite(block_0))
+            .unwrap();
+        ref_b
+            .execute(&BlockDefTransaction::overwrite(block_1))
+            .unwrap();
         assert_ne!(ref_a, ref_b, "not equal");
         assert_ne!(
-            ref_a.borrow()[(0, 0, 0)],
-            ref_b.borrow()[(0, 0, 0)],
+            &**ref_a.borrow() as &Block,
+            &**ref_b.borrow(),
             "different values"
         );
     }

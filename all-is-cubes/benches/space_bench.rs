@@ -123,7 +123,7 @@ pub fn lighting_bench(c: &mut Criterion) {
             universe_for_lighting_test,
             |universe| {
                 let space: URef<Space> = universe.get(&"space".into()).unwrap();
-                space.borrow_mut().evaluate_light(0, |_| {});
+                space.try_modify(|s| s.evaluate_light(0, |_| {})).unwrap();
             },
             BatchSize::SmallInput,
         )

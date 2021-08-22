@@ -513,6 +513,7 @@ mod tests {
     use crate::block::Block;
     use crate::camera::Viewport;
     use crate::math::GridCoordinate;
+    use crate::space::SpaceTransaction;
     use crate::triangulator::{BlockVertex, NoTextures};
     use crate::universe::Universe;
 
@@ -704,8 +705,11 @@ mod tests {
         );
         tester
             .space
-            .borrow_mut()
-            .set([0, 0, 0], Block::from(rgba_const!(1.0, 1.0, 1.0, 0.5)))
+            .execute(&SpaceTransaction::set_cube(
+                [0, 0, 0],
+                None,
+                Some(Block::from(rgba_const!(1.0, 1.0, 1.0, 0.5))),
+            ))
             .unwrap();
         let mut did_call = false;
         tester.update(

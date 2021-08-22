@@ -86,12 +86,18 @@ impl Vui {
                 hud_layout.crosshair_position(),
                 input_processor.mouselook_mode(),
             )),
-            Box::new(TooltipController::new(
-                Arc::clone(&tooltip_state),
-                &mut hud_space.borrow_mut(),
-                &hud_layout,
-                &mut universe,
-            )),
+            Box::new(
+                hud_space
+                    .try_modify(|sp| {
+                        TooltipController::new(
+                            Arc::clone(&tooltip_state),
+                            sp,
+                            &hud_layout,
+                            &mut universe,
+                        )
+                    })
+                    .expect("hud space mutate"),
+            ),
         ];
 
         Self {

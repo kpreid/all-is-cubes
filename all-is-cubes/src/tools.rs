@@ -196,7 +196,7 @@ mod tests {
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
     use crate::space::Space;
-    use crate::universe::{UBorrow, UBorrowMut, URef, Universe};
+    use crate::universe::{UBorrow, URef, Universe};
 
     #[derive(Debug)]
     struct ToolTester {
@@ -232,24 +232,31 @@ mod tests {
         fn equip_and_use_tool(&self, tool: Tool) -> Result<UniverseTransaction, ToolError> {
             // Put the tool in inventory.
             let index = 0;
-            let mut c = self.character_ref.borrow_mut();
-            CharacterTransaction::inventory(InventoryTransaction::replace(0, Tool::None, tool))
-                .execute(&mut *c)
-                .unwrap();
+            self.character_ref
+                .try_modify(|c| {
+                    CharacterTransaction::inventory(InventoryTransaction::replace(
+                        0,
+                        Tool::None,
+                        tool,
+                    ))
+                    .execute(&mut *c)
+                    .unwrap();
 
-            // Invoke Inventory::use_tool, which knows how to assemble the answer into a single transaction
-            // (and the result format may change as I'm just getting started with adding transactions as of
-            // writing this code).
-            let input = self.input();
-            c.inventory()
-                .use_tool(input.cursor().ok(), self.character_ref.clone(), index)
+                    // Invoke Inventory::use_tool, which knows how to assemble the answer into a single transaction
+                    // (and the result format may change as I'm just getting started with adding transactions as of
+                    // writing this code).
+                    let input = self.input();
+                    c.inventory()
+                        .use_tool(input.cursor().ok(), self.character_ref.clone(), index)
+                })
+                .unwrap()
         }
 
         fn space(&self) -> UBorrow<Space> {
             self.space_ref.borrow()
         }
-        fn space_mut(&self) -> UBorrowMut<Space> {
-            self.space_ref.borrow_mut()
+        fn space_ref(&self) -> &URef<Space> {
+            &self.space_ref
         }
     }
 
@@ -377,7 +384,14 @@ mod tests {
             space.set((1, 0, 0), &existing).unwrap();
         });
         // Place the obstacle after the raycast
-        tester.space_mut().set((0, 0, 0), &obstacle).unwrap();
+        tester
+            .space_ref()
+            .execute(&SpaceTransaction::set_cube(
+                [0, 0, 0],
+                None,
+                Some(obstacle.clone()),
+            ))
+            .unwrap();
         assert_eq!(
             tester.equip_and_use_tool(Tool::PlaceBlock(tool_block)),
             Err(ToolError::NotUsable)

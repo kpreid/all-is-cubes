@@ -3,6 +3,7 @@
 
 //! TODO: Explain this file properly once it is stabler. Right now it is just a piece of refactoring the VUI code towards modularity.
 
+use std::error::Error;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
@@ -20,7 +21,7 @@ use crate::character::{Character, CharacterChange};
 use crate::drawing::VoxelBrush;
 use crate::listen::{DirtyFlag, FnListener, ListenableSource};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
-use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
+use crate::space::{Grid, Space, SpacePhysics};
 use crate::tools::Tool;
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
@@ -41,7 +42,8 @@ impl WidgetSpaceView<'_> {}
 /// TODO: Merge this into the Behavior trait
 pub(crate) trait WidgetController: Debug {
     /// TODO: Replace direct mutations with returning a UniverseTransaction
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Result<(), SetCubeError>;
+    /// TODO: Be more specific than Box<dyn Error>
+    fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Result<(), Box<dyn Error>>;
 }
 
 /// Shows/hides the crosshair depending on mouselook mode.
@@ -65,16 +67,18 @@ impl CrosshairController {
 }
 
 impl WidgetController for CrosshairController {
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, _tick: Tick) -> Result<(), SetCubeError> {
+    fn step(&mut self, sv: &WidgetSpaceView<'_>, _tick: Tick) -> Result<(), Box<dyn Error>> {
         if self.todo.get_and_clear() {
-            sv.space.borrow_mut().set(
-                self.position,
-                if *self.mouselook_mode.get() {
-                    &sv.hud_blocks.icons[Icons::Crosshair]
-                } else {
-                    &AIR
-                },
-            )?;
+            sv.space.try_modify(|space| {
+                space.set(
+                    self.position,
+                    if *self.mouselook_mode.get() {
+                        &sv.hud_blocks.icons[Icons::Crosshair]
+                    } else {
+                        &AIR
+                    },
+                )
+            })??;
         }
         Ok(())
     }
@@ -115,37 +119,39 @@ impl ToolbarController {
         sv: &WidgetSpaceView<'_>,
         tools: &[Tool],
         selected_slots: &[usize],
-    ) -> Result<(), SetCubeError> {
-        let mut space = sv.space.borrow_mut();
-        for (index, tool) in tools.iter().enumerate() {
-            if index >= self.slot_count {
-                // TODO: must clear nonexistent positions, eventually
-                break;
-            }
+    ) -> Result<(), Box<dyn Error>> {
+        sv.space.try_modify(|space| {
+            for (index, tool) in tools.iter().enumerate() {
+                if index >= self.slot_count {
+                    // TODO: must clear nonexistent positions, eventually
+                    break;
+                }
 
-            // TODO: refactor tool_icon_position to just be specified in ToolbarController's fields
-            let position =
-                self.first_slot_position + GridVector::unit_x() * 2 * index as GridCoordinate;
-            // Draw icon
-            space.set(position, &*tool.icon(&sv.hud_blocks.icons))?;
-            // Draw pointers.
-            // TODO: refactor to not use FLIP_Y now that it isn't a hardcoded feature
-            // TODO: draw_target isn't especially helpful here
-            let toolbar_disp = &mut space
-                .draw_target(GridMatrix::from_translation(position.to_vec()) * GridMatrix::FLIP_Y);
-            for sel in 0..2 {
-                let slot = selected_slots.get(sel).copied().unwrap_or(usize::MAX);
-                let brush: &VoxelBrush<'_> =
-                    &sv.hud_blocks.toolbar_pointer[sel][usize::from(slot == index)];
-                Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
+                // TODO: refactor tool_icon_position to just be specified in ToolbarController's fields
+                let position =
+                    self.first_slot_position + GridVector::unit_x() * 2 * index as GridCoordinate;
+                // Draw icon
+                space.set(position, &*tool.icon(&sv.hud_blocks.icons))?;
+                // Draw pointers.
+                // TODO: refactor to not use FLIP_Y now that it isn't a hardcoded feature
+                // TODO: draw_target isn't especially helpful here
+                let toolbar_disp = &mut space.draw_target(
+                    GridMatrix::from_translation(position.to_vec()) * GridMatrix::FLIP_Y,
+                );
+                for sel in 0..2 {
+                    let slot = selected_slots.get(sel).copied().unwrap_or(usize::MAX);
+                    let brush: &VoxelBrush<'_> =
+                        &sv.hud_blocks.toolbar_pointer[sel][usize::from(slot == index)];
+                    Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })?
     }
 }
 
 impl WidgetController for ToolbarController {
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, _: Tick) -> Result<(), SetCubeError> {
+    fn step(&mut self, sv: &WidgetSpaceView<'_>, _: Tick) -> Result<(), Box<dyn Error>> {
         if self.todo.get_and_clear() {
             if let Some(inventory_source) = &self.inventory_source {
                 let character = inventory_source.borrow();
@@ -314,7 +320,7 @@ impl TooltipController {
 }
 
 impl WidgetController for TooltipController {
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Result<(), SetCubeError> {
+    fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Result<(), Box<dyn Error>> {
         // None if no update is needed
         let text_update: Option<Arc<str>> = self
             .state
@@ -323,24 +329,26 @@ impl WidgetController for TooltipController {
             .and_then(|mut state| state.step(sv, tick));
 
         if let Some(text) = text_update {
-            let mut text_space = self.text_space.borrow_mut();
-            let grid = text_space.grid();
-            text_space.fill_uniform(grid, &AIR).unwrap();
+            self.text_space.try_modify(|text_space| {
+                let grid = text_space.grid();
+                text_space.fill_uniform(grid, &AIR).unwrap();
 
-            // Note on dimensions: HudFont is currently 13 pixels tall, and we're using
-            // the standard 16-voxel space resolution, and hud_blocks.text has a 1-pixel border,
-            // so we have 16 - (13 + 2) = 1 voxel of free alignment, which I've chosen to put on
-            // the top edge.
-            let text_obj = Text::with_text_style(
-                &text,
-                Point::new(grid.size().x / 2, -1),
-                MonoTextStyle::new(&HudFont, &sv.hud_blocks.text),
-                TextStyleBuilder::new()
-                    .baseline(Baseline::Bottom)
-                    .alignment(Alignment::Center)
-                    .build(),
-            );
-            text_obj.draw(&mut text_space.draw_target(GridMatrix::FLIP_Y))?;
+                // Note on dimensions: HudFont is currently 13 pixels tall, and we're using
+                // the standard 16-voxel space resolution, and hud_blocks.text has a 1-pixel border,
+                // so we have 16 - (13 + 2) = 1 voxel of free alignment, which I've chosen to put on
+                // the top edge.
+                let text_obj = Text::with_text_style(
+                    &text,
+                    Point::new(grid.size().x / 2, -1),
+                    MonoTextStyle::new(&HudFont, &sv.hud_blocks.text),
+                    TextStyleBuilder::new()
+                        .baseline(Baseline::Bottom)
+                        .alignment(Alignment::Center)
+                        .build(),
+                );
+                text_obj.draw(&mut text_space.draw_target(GridMatrix::FLIP_Y))?;
+                Ok::<(), Box<dyn Error>>(())
+            })??;
         }
         Ok(())
     }

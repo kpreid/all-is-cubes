@@ -85,9 +85,11 @@ pub(crate) fn record_main(
 
     if let Some(anim) = &options.animation {
         // TODO: replace this with a general camera scripting mechanism
-        character_ref.borrow_mut().add_behavior(AutoRotate {
-            rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
-        });
+        character_ref.try_modify(|c| {
+            c.add_behavior(AutoRotate {
+                rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
+            })
+        })?;
     }
 
     // Set up threads. Raytracing is internally parallel using Rayon, but we want to

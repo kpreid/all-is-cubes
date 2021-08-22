@@ -209,7 +209,7 @@ impl TerminalMain {
         self.camera.set_view_matrix(character.view());
 
         let color_mode = self.options.colors;
-        let space = &*character.space.borrow_mut();
+        let space = &*character.space.borrow();
 
         let (image, info) =
             SpaceRaytracer::<ColorCharacterBuf>::new(space, self.app.graphics_options().snapshot())

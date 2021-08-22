@@ -13,7 +13,7 @@ use crate::block::{
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
 use crate::math::{GridPoint, GridRotation, GridVector, Rgb, Rgba};
-use crate::space::{Grid, GridArray, Space};
+use crate::space::{Grid, GridArray, Space, SpaceTransaction};
 use crate::universe::Universe;
 
 #[test]
@@ -357,13 +357,17 @@ fn listen_recur() {
     assert_eq!(None, sink.next());
 
     // Now mutate the space and we should see a notification.
-    space_ref.borrow_mut().set((0, 0, 0), &block_0).unwrap();
+    space_ref
+        .execute(&SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)))
+        .unwrap();
     assert!(sink.next().is_some());
 
     // TODO: Also test that we don't propagate lighting changes
 
     // A mutation out of bounds should not trigger a notification
-    space_ref.borrow_mut().set((1, 0, 0), &block_1).unwrap();
+    space_ref
+        .execute(&SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)))
+        .unwrap();
     assert_eq!(sink.next(), None);
 }
 
@@ -542,8 +546,8 @@ mod txn {
         assert_eq!(None, sink.next());
 
         // Now mutate it and we should see a notification.
-        BlockDefTransaction::overwrite(b2)
-            .execute(&mut block_def_ref.borrow_mut())
+        block_def_ref
+            .execute(&BlockDefTransaction::overwrite(b2))
             .unwrap();
         assert!(sink.next().is_some());
     }

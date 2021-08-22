@@ -164,7 +164,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     if options.is_present("precompute_light") || graphics_type == GraphicsType::Record {
-        evaluate_light_with_progress(&mut app.character().unwrap().borrow().space.borrow_mut());
+        app.character()
+            .unwrap()
+            .borrow()
+            .space
+            .try_modify(evaluate_light_with_progress)
+            .unwrap();
     }
 
     match graphics_type {

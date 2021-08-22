@@ -82,14 +82,17 @@ fn set_failure_borrow() {
         .build();
     let mut outer_space = Space::empty_positive(1, 1, 1);
 
-    let borrow = inner_space_ref.borrow_mut();
-    assert_eq!(
-        Err(SetCubeError::EvalBlock(
-            RefError::InUse(Arc::new("bs".into())).into()
-        )),
-        outer_space.set((0, 0, 0), &block)
-    );
-    drop(borrow);
+    inner_space_ref
+        .try_modify(|_| {
+            // Try to use `block` while we are allegedly mutating `inner_space`.
+            assert_eq!(
+                outer_space.set((0, 0, 0), &block),
+                Err(SetCubeError::EvalBlock(
+                    RefError::InUse(Arc::new("bs".into())).into()
+                ))
+            );
+        })
+        .unwrap();
 
     outer_space.consistency_check(); // bonus testing
 }

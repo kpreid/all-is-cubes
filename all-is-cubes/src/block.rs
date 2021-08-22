@@ -296,7 +296,7 @@ impl Block {
             Block::Indirect(def_ref) => {
                 // Note: This does not pass the recursion depth because BlockDef provides
                 // its own internal listening and thus this does not recurse.
-                def_ref.try_borrow_mut()?.listen(listener)?;
+                def_ref.try_borrow()?.listen(listener)?;
             }
             Block::Atom(_, _) => {
                 // Atoms don't refer to anything external and thus cannot change other
@@ -310,23 +310,21 @@ impl Block {
                 ..
             } => {
                 let relevant_cubes = Grid::for_block(*resolution).translate(offset.to_vec());
-                space_ref
-                    .try_borrow_mut()?
-                    .listen(listener.filter(move |msg| {
-                        match msg {
-                            SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
-                                Some(BlockChange::new())
-                            }
-                            SpaceChange::Block(_) => None,
-                            SpaceChange::EveryBlock => Some(BlockChange::new()),
-
-                            // TODO: It would be nice if the space gave more precise updates such that we could conclude
-                            // e.g. "this is a new/removed block in an unaffected area" without needing to store any data.
-                            SpaceChange::BlockValue(_) => Some(BlockChange::new()),
-                            SpaceChange::Lighting(_) => None,
-                            SpaceChange::Number(_) => None,
+                space_ref.try_borrow()?.listen(listener.filter(move |msg| {
+                    match msg {
+                        SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
+                            Some(BlockChange::new())
                         }
-                    }));
+                        SpaceChange::Block(_) => None,
+                        SpaceChange::EveryBlock => Some(BlockChange::new()),
+
+                        // TODO: It would be nice if the space gave more precise updates such that we could conclude
+                        // e.g. "this is a new/removed block in an unaffected area" without needing to store any data.
+                        SpaceChange::BlockValue(_) => Some(BlockChange::new()),
+                        SpaceChange::Lighting(_) => None,
+                        SpaceChange::Number(_) => None,
+                    }
+                }));
             }
             Block::Rotated(_, base) => {
                 base.listen(listener)?;
@@ -776,10 +774,7 @@ impl BlockDef {
 
     /// Registers a listener for mutations of any data sources which may affect the
     /// [`Block::evaluate`] result from blocks defined using this block definition.
-    pub fn listen(
-        &mut self,
-        listener: impl Listener<BlockChange> + 'static,
-    ) -> Result<(), RefError> {
+    pub fn listen(&self, listener: impl Listener<BlockChange> + 'static) -> Result<(), RefError> {
         // TODO: Need to arrange listening to the contained block, and either translate
         // that here or have our own notifier generate forwardings.
         self.notifier.listen(listener);

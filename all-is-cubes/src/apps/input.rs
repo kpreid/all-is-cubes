@@ -349,7 +349,15 @@ pub enum Key {
 mod tests {
     use super::*;
     use crate::space::Space;
-    use crate::universe::Universe;
+    use crate::universe::{URef, Universe};
+
+    fn apply_input_helper(input: &mut InputProcessor, character: &URef<Character>) {
+        character
+            .try_modify(|character| {
+                input.apply_input(character, &ListenableCell::new(false), Tick::arbitrary());
+            })
+            .unwrap();
+    }
 
     #[test]
     fn movement() {
@@ -390,22 +398,14 @@ mod tests {
 
         input.key_down(Key::Character('5'));
         input.key_up(Key::Character('5'));
-        input.apply_input(
-            &mut *character.borrow_mut(),
-            &ListenableCell::new(false),
-            Tick::arbitrary(),
-        );
-        assert_eq!(character.borrow_mut().selected_slots()[1], 4);
+        apply_input_helper(&mut input, &character);
+        assert_eq!(character.borrow().selected_slots()[1], 4);
 
         // Tenth slot
         input.key_down(Key::Character('0'));
         input.key_up(Key::Character('0'));
-        input.apply_input(
-            &mut *character.borrow_mut(),
-            &ListenableCell::new(false),
-            Tick::arbitrary(),
-        );
-        assert_eq!(character.borrow_mut().selected_slots()[1], 9);
+        apply_input_helper(&mut input, &character);
+        assert_eq!(character.borrow().selected_slots()[1], 9);
     }
 
     // TODO: test jump and flying logic

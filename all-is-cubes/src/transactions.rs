@@ -203,7 +203,10 @@ where
     type Output = <O::Transaction as Transaction<O>>::Output;
 
     fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
-        let borrow = self.target.borrow_mut();
+        let borrow = self
+            .target
+            .try_borrow_mut()
+            .expect("Attempted to execute transaction with target already borrowed");
         let check = self.transaction.check(&borrow)?;
         Ok((borrow, check))
     }
