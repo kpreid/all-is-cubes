@@ -8,7 +8,7 @@ use std::borrow::Cow;
 
 use crate::block::{
     builder, AnimationHint, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef,
-    EvalBlockError, Evoxel, Resolution, AIR,
+    BlockDefTransaction, EvalBlockError, Evoxel, Resolution, AIR,
 };
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
@@ -307,7 +307,9 @@ fn listen_indirect_atom() {
     assert_eq!(None, sink.next());
 
     // Now mutate it and we should see a notification.
-    *(block_def_ref.borrow_mut().modify()) = Block::from(Rgba::BLACK);
+    block_def_ref
+        .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
+        .unwrap();
     assert!(sink.next().is_some());
 }
 
@@ -325,15 +327,21 @@ fn listen_indirect_double() {
     assert_eq!(None, sink.next());
 
     // Now mutate the original block and we should see a notification.
-    *(block_def_ref1.borrow_mut().modify()) = Block::from(Rgba::BLACK);
+    block_def_ref1
+        .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
+        .unwrap();
     assert!(sink.next().is_some());
 
     // Remove block_def_ref1 from the contents of block_def_ref2...
-    *(block_def_ref2.borrow_mut().modify()) = Block::from(Rgba::BLACK);
+    block_def_ref2
+        .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
+        .unwrap();
     assert!(sink.next().is_some());
     assert!(sink.next().is_none());
     // ...and then block_def_ref1's changes should NOT be forwarded.
-    *(block_def_ref1.borrow_mut().modify()) = Block::from(Rgba::WHITE);
+    block_def_ref1
+        .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::WHITE)))
+        .unwrap();
     assert!(sink.next().is_none());
 }
 
@@ -511,7 +519,9 @@ fn overflow_listen() {
 fn self_referential_block(universe: &mut Universe) -> Block {
     let block_def = universe.insert_anonymous(BlockDef::new(AIR));
     let indirect = Block::Indirect(block_def.clone());
-    *(block_def.borrow_mut().modify()) = indirect.clone();
+    block_def
+        .execute(&BlockDefTransaction::overwrite(indirect.clone()))
+        .unwrap();
     indirect
 }
 
