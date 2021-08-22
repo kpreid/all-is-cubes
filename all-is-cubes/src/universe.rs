@@ -6,6 +6,7 @@
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::HashMap;
+use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -21,7 +22,7 @@ use crate::apps::Tick;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
-use crate::transactions::Transaction as _;
+use crate::transactions::{Transaction, Transactional};
 use crate::util::{CustomFormat, StatusText, TypeName};
 
 /// Name/key of an object in a [`Universe`].
@@ -373,6 +374,18 @@ impl<T: 'static> URef<T> {
         Ok(UBorrowMut(
             OwningRefMut::new(OwningHandle::new_mut(strong)).map_mut(|entry| &mut entry.data),
         ))
+    }
+
+    /// Shortcut for executing a transaction.
+    #[allow(dead_code)] // Currently only used in tests
+    pub(crate) fn execute(
+        &self,
+        transaction: &<T as Transactional>::Transaction,
+    ) -> Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, Box<dyn Error>>
+    where
+        T: Transactional,
+    {
+        transaction.execute(&mut *self.try_borrow_mut()?)
     }
 
     fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {

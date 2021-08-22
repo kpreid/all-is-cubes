@@ -550,8 +550,10 @@ mod tests {
         let character_ref = universe.insert_anonymous(character);
 
         let item = Tool::PlaceBlock(AIR);
-        CharacterTransaction::inventory(InventoryTransaction::insert(item.clone()))
-            .execute(&mut character_ref.borrow_mut())
+        character_ref
+            .execute(&CharacterTransaction::inventory(
+                InventoryTransaction::insert(item.clone()),
+            ))
             .unwrap();
 
         // Check notification
