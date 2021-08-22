@@ -340,13 +340,6 @@ impl<T: 'static> URef<T> {
         self.try_borrow().unwrap()
     }
 
-    /// Borrow the value mutably, in the sense of [`RefCell::borrow_mut`], and panic
-    /// on failure.
-    #[track_caller]
-    pub fn borrow_mut(&self) -> UBorrowMut<T> {
-        self.try_borrow_mut().unwrap()
-    }
-
     /// Borrow the value, in the sense of [`RefCell::try_borrow`].
     pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
         let strong: Rc<RefCell<UEntry<T>>> = self.upgrade()?;
