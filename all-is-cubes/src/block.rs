@@ -7,7 +7,7 @@
 use std::borrow::Cow;
 use std::convert::TryFrom as _;
 use std::fmt;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::sync::Arc;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector4, Zero as _};
@@ -750,6 +750,8 @@ impl BlockChange {
 ///
 /// It is a distinct type from [`Block`] in order to ensure that change notifications
 /// will be delivered on any mutation.
+///
+/// To perform a mutation, use [`BlockDefTransaction`].
 #[derive(Debug)]
 pub struct BlockDef {
     block: Block,
@@ -763,8 +765,7 @@ impl BlockDef {
     pub fn new(block: Block) -> Self {
         let notifier = Arc::new(Notifier::new());
         let (gate, block_listener) = Notifier::forwarder(Arc::downgrade(&notifier)).gate();
-        // TODO: Log if listening fails. We can't meaningfully fail this because we want to do the
-        // parallel operation in `BlockDefMut::drop` but it does indicate trouble if it happens.
+        // TODO: Consider making it an error if listening fails. BlockDefTransaction::check will need to follow.
         let _ = block.listen(block_listener);
         BlockDef {
             block,
@@ -784,13 +785,6 @@ impl BlockDef {
         self.notifier.listen(listener);
         Ok(())
     }
-
-    /// Creates a handle by which the contained block may be mutated.
-    ///
-    /// When the handle is dropped, a change notification will be sent.
-    pub fn modify(&mut self) -> BlockDefMut<'_> {
-        BlockDefMut(self)
-    }
 }
 
 impl Deref for BlockDef {
@@ -808,37 +802,6 @@ impl AsRef<Block> for BlockDef {
 
 impl Transactional for BlockDef {
     type Transaction = BlockDefTransaction;
-}
-
-/// Mutable borrow of the [`Block`] inside a [`BlockDefMut`].
-///
-/// Provides the functionality of delivering change notifications when mutations are
-/// complete.
-pub struct BlockDefMut<'a>(&'a mut BlockDef);
-
-impl Deref for BlockDefMut<'_> {
-    type Target = Block;
-    fn deref(&self) -> &Self::Target {
-        &self.0.block
-    }
-}
-impl DerefMut for BlockDefMut<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0.block
-    }
-}
-impl Drop for BlockDefMut<'_> {
-    fn drop(&mut self) {
-        let block_def = &mut self.0;
-
-        // Swap out what we're listening to
-        let (gate, block_listener) =
-            Notifier::forwarder(Arc::downgrade(&block_def.notifier)).gate();
-        let _ = block_def.block.listen(block_listener);
-        block_def.block_listen_gate = gate; // old gate is now dropped
-
-        block_def.notifier.notify(BlockChange::new());
-    }
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
@@ -896,7 +859,16 @@ impl Transaction<BlockDef> for BlockDefTransaction {
         (): Self::CommitCheck,
     ) -> Result<Self::Output, Box<dyn std::error::Error>> {
         if let Some(new) = &self.new {
-            *target.modify() = new.clone();
+            target.block = new.clone();
+
+            // Swap out the forwarding listener to listen to the new block.
+            let (gate, block_listener) =
+                Notifier::forwarder(Arc::downgrade(&target.notifier)).gate();
+            // TODO: Instead of ignoring the error from listen() here, we can fail the transaction by preparing the listener in check().
+            let _ = target.block.listen(block_listener);
+            target.block_listen_gate = gate; // old gate is now dropped
+
+            target.notifier.notify(BlockChange::new());
         }
         Ok(())
     }
