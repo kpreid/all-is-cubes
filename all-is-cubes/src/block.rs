@@ -16,6 +16,7 @@ use crate::listen::{Gate, Listener, Notifier};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
+use crate::transactions::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
 use crate::universe::{RefError, URef};
 use crate::util::{ConciseDebug, CustomFormat};
 
@@ -805,6 +806,10 @@ impl AsRef<Block> for BlockDef {
     }
 }
 
+impl Transactional for BlockDef {
+    type Transaction = BlockDefTransaction;
+}
+
 /// Mutable borrow of the [`Block`] inside a [`BlockDefMut`].
 ///
 /// Provides the functionality of delivering change notifications when mutations are
@@ -833,6 +838,90 @@ impl Drop for BlockDefMut<'_> {
         block_def.block_listen_gate = gate; // old gate is now dropped
 
         block_def.notifier.notify(BlockChange::new());
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct BlockDefTransaction {
+    // TODO: This struct is the second occurrence (the first is space::CubeTransaction) of a "assign to a mutable location" transaction. If we figure out how to have conveniently _composable_ transactions then we should have an `impl Transaction<&mut T> for Assign<T>` transaction (targeting `&mut` to discourage use otherwise).
+    /// If `None`, no precondition.
+    old: Option<Block>,
+    /// If `None`, no change is made and this transaction is only a precondition.
+    new: Option<Block>,
+}
+
+impl BlockDefTransaction {
+    pub fn expect(old: Block) -> Self {
+        Self {
+            old: Some(old),
+            new: None,
+        }
+    }
+
+    pub fn overwrite(new: Block) -> Self {
+        Self {
+            old: None,
+            new: Some(new),
+        }
+    }
+
+    pub fn replace(old: Block, new: Block) -> Self {
+        Self {
+            old: Some(old),
+            new: Some(new),
+        }
+    }
+}
+
+impl Transaction<BlockDef> for BlockDefTransaction {
+    type MergeCheck = ();
+    type CommitCheck = ();
+    type Output = ();
+
+    fn check(
+        &self,
+        target: &BlockDef,
+    ) -> Result<Self::CommitCheck, crate::transactions::PreconditionFailed> {
+        if let Some(old) = &self.old {
+            if **target != *old {
+                return Err(PreconditionFailed {});
+            }
+        }
+        Ok(())
+    }
+
+    fn commit(
+        &self,
+        target: &mut BlockDef,
+        (): Self::CommitCheck,
+    ) -> Result<Self::Output, Box<dyn std::error::Error>> {
+        if let Some(new) = &self.new {
+            *target.modify() = new.clone();
+        }
+        Ok(())
+    }
+
+    fn check_merge(
+        &self,
+        other: &Self,
+    ) -> Result<Self::MergeCheck, crate::transactions::TransactionConflict> {
+        if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
+            return Err(TransactionConflict {});
+        }
+        if matches!((&self.new, &other.new), (Some(a), Some(b)) if a != b) {
+            return Err(TransactionConflict {});
+        }
+        Ok(())
+    }
+
+    fn commit_merge(self, other: Self, (): Self::MergeCheck) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            old: self.old.or(other.old),
+            new: self.new.or(other.new),
+        }
     }
 }
 

@@ -8,6 +8,7 @@ use std::error::Error;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 
+use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
 use crate::universe::{Name, UBorrowMut, URef, Universe};
@@ -257,7 +258,7 @@ where
 #[non_exhaustive]
 enum AnyTransaction {
     Noop,
-    // TODO: BlockDefTransaction
+    BlockDef(TransactionInUniverse<BlockDef>),
     Character(TransactionInUniverse<Character>),
     Space(TransactionInUniverse<Space>),
 }
@@ -267,6 +268,7 @@ impl AnyTransaction {
         use AnyTransaction::*;
         match self {
             Noop => None,
+            BlockDef(t) => Some(t.target.name()),
             Character(t) => Some(t.target.name()),
             Space(t) => Some(t.target.name()),
         }
@@ -277,6 +279,7 @@ impl AnyTransaction {
         use AnyTransaction::*;
         match self {
             Noop => &"AnyTransaction::Noop" as &dyn Debug,
+            BlockDef(t) => &t.transaction,
             Character(t) => &t.transaction,
             Space(t) => &t.transaction,
         }
@@ -292,6 +295,7 @@ impl Transaction<()> for AnyTransaction {
         use AnyTransaction::*;
         Ok(match self {
             Noop => Box::new(()),
+            BlockDef(t) => Box::new(t.check(&())?),
             Character(t) => Box::new(t.check(&())?),
             Space(t) => Box::new(t.check(&())?),
         })
@@ -315,6 +319,7 @@ impl Transaction<()> for AnyTransaction {
         use AnyTransaction::*;
         match self {
             Noop => Ok(()),
+            BlockDef(t) => commit_helper(t, check),
             Character(t) => commit_helper(t, check),
             Space(t) => commit_helper(t, check),
         }
@@ -325,6 +330,7 @@ impl Transaction<()> for AnyTransaction {
         match (self, other) {
             (Noop, _) => Ok(Box::new(())),
             (_, Noop) => Ok(Box::new(())),
+            (BlockDef(t1), BlockDef(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
             (Character(t1), Character(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
             (Space(t1), Space(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
             (_, _) => Err(TransactionConflict {}),
@@ -349,6 +355,7 @@ impl Transaction<()> for AnyTransaction {
         match (self, other) {
             (t1, Noop) => t1,
             (Noop, t2) => t2,
+            (BlockDef(t1), BlockDef(t2)) => merge_helper(t1, t2, BlockDef, check),
             (Character(t1), Character(t2)) => merge_helper(t1, t2, Character, check),
             (Space(t1), Space(t2)) => merge_helper(t1, t2, Space, check),
             (_, _) => panic!("Mismatched transaction target types"),
@@ -372,6 +379,14 @@ impl Debug for AnyTransaction {
 /// Each implementation of [`UTransactional`] corresponds to a variant of [`AnyTransaction`].
 mod any_transaction {
     use super::*;
+    impl UTransactional for BlockDef {
+        fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction {
+            UniverseTransaction::from(AnyTransaction::BlockDef(TransactionInUniverse {
+                target,
+                transaction,
+            }))
+        }
+    }
     impl UTransactional for Character {
         fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction {
             UniverseTransaction::from(AnyTransaction::Character(TransactionInUniverse {

@@ -514,3 +514,111 @@ fn self_referential_block(universe: &mut Universe) -> Block {
     *(block_def.borrow_mut().modify()) = indirect.clone();
     indirect
 }
+
+mod txn {
+    use super::*;
+    use crate::block::BlockDefTransaction;
+    use crate::transactions::{Transaction, TransactionTester};
+
+    #[test]
+    fn causes_notification() {
+        // We're using a Block::Indirect in addition to the BlockDef to test a more realistic scenario
+        let [b1, b2] = make_some_blocks();
+        let mut universe = Universe::new();
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(b1));
+        let indirect = Block::Indirect(block_def_ref.clone());
+        let mut sink = Sink::new();
+        indirect.listen(sink.listener()).unwrap();
+        assert_eq!(None, sink.next());
+
+        // Now mutate it and we should see a notification.
+        BlockDefTransaction::overwrite(b2)
+            .execute(&mut block_def_ref.borrow_mut())
+            .unwrap();
+        assert!(sink.next().is_some());
+    }
+
+    #[test]
+    fn merge_allows_same_new() {
+        let [new] = make_some_blocks();
+        let t1 = BlockDefTransaction::overwrite(new);
+        assert_eq!(t1.clone().merge(t1.clone()), Ok(t1));
+    }
+
+    #[test]
+    fn merge_rejects_different_new() {
+        let [new1, new2] = make_some_blocks();
+        let t1 = BlockDefTransaction::overwrite(new1);
+        let t2 = BlockDefTransaction::overwrite(new2);
+        t1.merge(t2).unwrap_err();
+    }
+
+    #[test]
+    fn merge_rejects_different_old() {
+        let [old1, old2] = make_some_blocks();
+        let t1 = BlockDefTransaction::expect(old1);
+        let t2 = BlockDefTransaction::expect(old2);
+        t1.merge(t2).unwrap_err();
+    }
+
+    #[test]
+    fn merge_allows_same_old() {
+        let [old, new] = make_some_blocks();
+        let t1 = BlockDefTransaction::replace(old.clone(), new.clone());
+        let t2 = BlockDefTransaction::replace(old.clone(), new.clone());
+        assert_eq!(t1.clone(), t1.clone().merge(t2).unwrap());
+    }
+
+    #[test]
+    fn systematic() {
+        let [b1, b2, b3] = make_some_blocks();
+        TransactionTester::new()
+            .transaction(BlockDefTransaction::default(), |_, _| Ok(()))
+            .transaction(
+                BlockDefTransaction::replace(b1.clone(), b2.clone()),
+                |before, after| {
+                    if **before != b1 {
+                        return Err("did not assert b1".into());
+                    }
+                    if **after != b2 {
+                        return Err("did not set b2".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(
+                BlockDefTransaction::replace(b1.clone(), b3.clone()),
+                |before, after| {
+                    if **before != b1 {
+                        return Err("did not assert b1".into());
+                    }
+                    if **after != b3 {
+                        return Err("did not set b3".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(BlockDefTransaction::overwrite(b2.clone()), |_, after| {
+                if **after != b2 {
+                    return Err("did not set b2".into());
+                }
+                Ok(())
+            })
+            .transaction(BlockDefTransaction::expect(b2.clone()), |before, _| {
+                if **before != b2 {
+                    return Err("did not assert b2".into());
+                }
+                Ok(())
+            })
+            .transaction(BlockDefTransaction::expect(b1.clone()), |before, _| {
+                if **before != b1 {
+                    return Err("did not assert b1".into());
+                }
+                Ok(())
+            })
+            .target(|| BlockDef::new(AIR))
+            .target(|| BlockDef::new(b1.clone()))
+            .target(|| BlockDef::new(b2.clone()))
+            .test();
+    }
+}
