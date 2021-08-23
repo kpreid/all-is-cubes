@@ -171,11 +171,15 @@ where
         let start_frame_time = Instant::now();
 
         if self.graphics_options_dirty.get_and_clear() {
-            // TODO: (asynchronously?) recompile shaders with new options
-            self.world_camera
-                .set_options(self.graphics_options.snapshot());
+            let current_options = self.graphics_options.snapshot();
+            // TODO: Recompile shaders only if shader-relevant fields changed.
+            match BlockPrograms::compile(&mut self.surface, &current_options) {
+                Ok(p) => self.block_programs = p,
+                Err(e) => log::error!("Failed to recompile shaders: {}", e),
+            }
+            self.world_camera.set_options(current_options.clone());
             self.ui_camera
-                .set_options(Vui::graphics_options(self.graphics_options.snapshot()));
+                .set_options(Vui::graphics_options(current_options));
 
             // TODO: going to need invalidation of chunks etc. here
         }
