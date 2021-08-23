@@ -138,12 +138,19 @@ impl ToolbarController {
                 let toolbar_disp = &mut space.draw_target(
                     GridMatrix::from_translation(position.to_vec()) * GridMatrix::FLIP_Y,
                 );
-                for sel in 0..2 {
-                    let slot_index = selected_slots.get(sel).copied().unwrap_or(usize::MAX);
-                    let brush: &VoxelBrush<'_> =
-                        &sv.hud_blocks.toolbar_pointer[sel][usize::from(slot_index == index)];
-                    Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
-                }
+                // TODO: magic number in how many selections we display
+                let this_slot_selected_mask: usize = (0..2_usize)
+                    .map(|sel| {
+                        (selected_slots
+                            .get(sel)
+                            .map(|&i| i == index)
+                            .unwrap_or(false) as usize)
+                            << sel
+                    })
+                    .sum();
+                let brush: &VoxelBrush<'_> =
+                    &sv.hud_blocks.toolbar_pointer[this_slot_selected_mask];
+                Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
             }
             Ok(())
         })?

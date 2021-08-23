@@ -1,10 +1,12 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::convert::TryInto;
+
 use cgmath::Vector2;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Primitive as _, Transform as _};
-use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle, Triangle};
+use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Triangle};
 use embedded_graphics::Drawable as _;
 use embedded_graphics::Pixel;
 
@@ -12,7 +14,7 @@ use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
-use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, Rgba};
+use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
 use crate::space::{Grid, Space, SpacePhysics};
 
 use crate::universe::{URef, Universe};
@@ -135,8 +137,8 @@ pub(crate) struct HudBlocks {
     toolbar_right_cap: VoxelBrush<'static>,
     toolbar_divider: VoxelBrush<'static>,
     toolbar_middle: VoxelBrush<'static>,
-    /// Outer index is "which pointer", inner index is "shown or hidden".
-    pub(crate) toolbar_pointer: [[VoxelBrush<'static>; 2]; 2],
+    /// Index is a bitmask of "selected_slots[i] == this slot"
+    pub(crate) toolbar_pointer: [VoxelBrush<'static>; 4],
 }
 
 impl HudBlocks {
@@ -155,24 +157,30 @@ impl HudBlocks {
 
         // TODO: This toolbar graphic is a "get the bugs in the drawing tools worked out"
         // placeholder for better art...
+        // The frame is drawn multiple times, with different copies having different status
+        // indicators present, so that we can have the graphics not rigidly aligned to blocks.
+        let frame_count = 4;
+        let frame_spacing_blocks = 2;
 
-        // Draw toolbar icon frame, twice so we can have start-middle-end shapes.
-        let toolbar_frame_block_grid = Grid::new((-1, -1, -1), (5, 3, 3));
+        let toolbar_frame_block_grid =
+            Grid::new([-1, -1, -1], [1 + frame_count * frame_spacing_blocks, 3, 3]);
         let toolbar_frame_voxel_grid = toolbar_frame_block_grid.multiply(resolution_g);
         let mut toolbar_drawing_space = Space::builder(toolbar_frame_voxel_grid)
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
             .build_empty();
-        // TODO: remove y flip
-        let display = &mut toolbar_drawing_space.draw_target(GridMatrix::FLIP_Y);
 
+        // Draw background for icons to “rest on”
+        let horizontal_drawing = &mut toolbar_drawing_space.draw_target(
+            GridMatrix::from_translation([0, -2, 0]) * GridRotation::RXZY.to_rotation_matrix(),
+        );
         let padding = 3;
         let stroke_width = 1;
-        let background_fill = VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, -1));
+        let background_fill = VoxelBrush::single(palette::HUD_TOOLBAR_BACK);
         let background_stroke = VoxelBrush::single(palette::HUD_TOOLBAR_FRAME);
-        let icon_background_rectangle = Rectangle::with_corners(
+        let icon_background_rectangle = Circle::new(
             // TODO: confirm these offsets are exactly right
-            Point::new(-padding - stroke_width, -padding - resolution_g),
-            Point::new(resolution_g + padding, padding + stroke_width),
+            Point::new(-padding, -padding),
+            (resolution_g + padding * 2) as u32,
         )
         .into_styled(
             PrimitiveStyleBuilder::new()
@@ -181,36 +189,49 @@ impl HudBlocks {
                 .stroke_width(stroke_width as u32)
                 .build(),
         );
-        icon_background_rectangle.draw(display).unwrap();
-        icon_background_rectangle
-            .translate(Point::new(resolution_g * 2, 0))
-            .draw(display)
-            .unwrap();
+        for i in 0..frame_count {
+            icon_background_rectangle
+                .translate(Point::new(resolution_g * frame_spacing_blocks * i, 0))
+                .draw(horizontal_drawing)
+                .unwrap();
+        }
 
-        // Draw pointers. The pointers are placed above and below the second
-        // icon frame.
-        let pointer_offset = Point::new(resolution_g * 5 / 2, 0);
+        // Draw pointers. The pointers are placed above the frames in a (none, 0, 1, 0&1) bitmask pattern.
+        // TODO: Remove Y flip
+        let vertical_drawing = &mut toolbar_drawing_space.draw_target(GridMatrix::FLIP_Y);
+        let pointer_offset = Point::new(resolution_g / 2, -resolution_g);
+        let pointer_z = resolution_g / 2;
         // TODO: use different related colors
         let pointer_fill =
-            VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, resolution_g - 1));
+            VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, pointer_z));
         let pointer_stroke =
-            VoxelBrush::single(palette::HUD_TOOLBAR_FRAME).translate((0, 0, resolution_g - 1));
+            VoxelBrush::single(palette::HUD_TOOLBAR_FRAME).translate((0, 0, pointer_z));
         let pointer_style = PrimitiveStyleBuilder::new()
             .fill_color(&pointer_fill)
             .stroke_color(&pointer_stroke)
             .stroke_width(stroke_width as u32)
             .build();
-        Triangle::new(Point::new(-5, 5), Point::new(5, 5), Point::new(0, 0))
-            .into_styled(pointer_style)
-            .translate(pointer_offset)
-            .draw(display)
-            .unwrap();
-        Triangle::new(Point::new(-5, -5), Point::new(0, 0), Point::new(5, -5))
-            .into_styled(pointer_style)
-            .translate(Point::new(0, -resolution_g)) // position point at top of block
-            .translate(pointer_offset)
-            .draw(display)
-            .unwrap();
+        for i in 0..frame_count {
+            let translation =
+                pointer_offset + Point::new(resolution_g * frame_spacing_blocks * i, 0);
+            // TODO: Replace these triangles with maybe mouse button icons?
+            if i & 1 != 0 {
+                // Selection 0/left-click icon.
+                Triangle::new(Point::new(-5, -5), Point::new(0, 0), Point::new(0, -5))
+                    .into_styled(pointer_style)
+                    .translate(translation)
+                    .draw(vertical_drawing)
+                    .unwrap();
+            }
+            if i & 2 != 0 {
+                // Selection 1/right-click icon.
+                Triangle::new(Point::new(0, -5), Point::new(0, 0), Point::new(5, -5))
+                    .into_styled(pointer_style)
+                    .translate(translation)
+                    .draw(vertical_drawing)
+                    .unwrap();
+            }
+        }
 
         // TODO: use a name for the space
         let toolbar_blocks_space = space_to_blocks(
@@ -238,20 +259,25 @@ impl HudBlocks {
                 .translate((-1, 0, 0)),
             toolbar_left_cap: slice_drawing(Grid::from_lower_upper((-1, -1, -1), (0, 2, 2)))
                 .translate((1, 0, 0)),
-            toolbar_right_cap: slice_drawing(Grid::from_lower_upper((3, -1, -1), (4, 2, 2)))
-                .translate((-3, 0, 0)),
-            toolbar_pointer: [
-                [
-                    slice_drawing(Grid::from_lower_upper((0, 1, -1), (1, 2, 2))),
-                    slice_drawing(Grid::from_lower_upper((2, 1, -1), (3, 2, 2)))
-                        .translate((-2, 0, 0)),
-                ],
-                [
-                    slice_drawing(Grid::from_lower_upper((0, -1, -1), (1, 0, 2))),
-                    slice_drawing(Grid::from_lower_upper((2, -1, -1), (3, 0, 2)))
-                        .translate((-2, 0, 0)),
-                ],
-            ],
+            // Right cap comes from the right end of the frames
+            toolbar_right_cap: slice_drawing(
+                Grid::from_lower_upper((1, -1, -1), (2, 2, 2)).translate([
+                    frame_spacing_blocks * (frame_count - 1),
+                    0,
+                    0,
+                ]),
+            )
+            .translate([-(frame_spacing_blocks * (frame_count - 1) + 1), 0, 0]),
+            toolbar_pointer: {
+                (0..frame_count)
+                    .map(|i| {
+                        slice_drawing(Grid::new([i * frame_spacing_blocks, 1, -1], [1, 1, 3]))
+                            .translate([-(i * frame_spacing_blocks), 0, 0])
+                    })
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .unwrap()
+            },
         }
     }
 }
