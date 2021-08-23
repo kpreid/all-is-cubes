@@ -2,6 +2,25 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 //! Top-level game state container.
+//!
+//! ## Thread-safety
+//!
+//! A caution: While [`Universe`], [`URef`], and their contents implement [`Send`] and
+//! [`Sync`] in a safe manner, they do not yet provide the tools that would be necessary
+//! for multiple threads to operate on a Universe. In particular, (TODO:) there are no
+//! methods to wait for a [`URef`]'s lock to be available.
+//!
+//! <!-- TODO: And once we have waiting, we have a deadlock problem:
+//!
+//! ... without causing **deadlocks.** For the
+//! time being, stick to the following usage patterns to avoid deadlock:
+//!
+//! * Mutable access should be confined to a single thread — do not have multiple threads
+//!   using [`URef::try_modify`] or [`URef::execute`]. That thread need not stay
+//!   the same (as if the whole package were [`Send`] but not [`Sync`]).
+//! * Other threads should never hold more than one [`URef`] lock at once.
+//!
+//! -->
 
 use std::borrow::Borrow;
 use std::collections::hash_map::HashMap;
@@ -51,6 +70,10 @@ impl Display for Name {
 /// future, it will enable garbage collection and inter-object invariants.
 ///
 /// See also the [`UniverseIndex`] trait for methods for adding and removing objects.
+///
+/// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
+///
+/// [avoiding deadlock]: crate::universe#thread-safety
 pub struct Universe {
     blocks: HashMap<Name, URootRef<BlockDef>>,
     characters: HashMap<Name, URootRef<Character>>,
@@ -317,6 +340,10 @@ type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
 /// or panic depending on the method).
 /// To ensure an object does not vanish while operating on it, [`URef::borrow`] it.
 /// (TODO: Should there be an operation in the style of `Weak::upgrade`?)
+///
+/// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
+///
+/// [avoiding deadlock]: crate::universe#thread-safety
 pub struct URef<T> {
     // TODO: We're going to want to either track reference counts or implement a garbage
     // collector for the graph of URefs. Reference counts would be an easy way to ensure
@@ -333,15 +360,19 @@ impl<T: 'static> URef<T> {
         &self.name
     }
 
-    // TODO: Update docs to match RwLock instead of RefCell.
-
-    /// Borrow the value, in the sense of [`RefCell::borrow`], and panic on failure.
+    /// Borrow the value, in the sense of `RefCell::borrow`, and panic on failure.
+    ///
+    /// TODO: Update docs to discuss RwLock instead of RefCell, once we have a policy
+    /// about waiting for locks.
     #[track_caller]
     pub fn borrow(&self) -> UBorrow<T> {
         self.try_borrow().unwrap()
     }
 
-    /// Borrow the value, in the sense of [`RefCell::try_borrow`].
+    /// Borrow the value, in the sense of `RefCell::try_borrow`.
+    ///
+    /// TODO: Update docs to discuss RwLock instead of RefCell, once we have a policy
+    /// about waiting for locks.
     pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
         let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
             strong
