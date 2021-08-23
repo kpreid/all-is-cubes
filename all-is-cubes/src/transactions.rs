@@ -34,7 +34,7 @@ use crate::universe::{Name, UBorrowMutImpl, URef, Universe};
 pub trait Transaction<T: ?Sized> {
     /// Type of a value passed from [`Transaction::check`] to [`Transaction::commit`].
     /// This may be used to pass precalculated values to speed up the commit phase,
-    /// or even [`UBorrowMut`]s or similar, but also makes it difficult to accidentally
+    /// or even lock guards or similar, but also makes it slightly harder to accidentally
     /// call `commit` without `check`.
     type CommitCheck: 'static;
 
