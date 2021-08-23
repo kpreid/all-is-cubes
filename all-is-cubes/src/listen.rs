@@ -23,9 +23,6 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 /// of type `M` to a set of listeners, each of which usually holds a weak reference
 /// to allow it to be removed when the actual recipient is gone or uninterested.
 ///
-/// TODO: Modify this to be `Sync` so that things that contain one can be used from
-/// multiple threads. This will require every `Listener` to be `Sync`.
-///
 /// TODO: Currently, each message is [`Clone`]d for each recipient. This is fine for
 /// most cases, but in some cases it would be cheaper to pass a reference. We could
 /// make Notifier and Listener always take `&M`, but it's not clear how to use

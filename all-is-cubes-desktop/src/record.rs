@@ -119,6 +119,8 @@ pub(crate) fn record_main(
     });
 
     // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
+    // (We could move the universe stepping to another thread to get more precise progress updates,
+    // but that doesn't seem necessary.)
     {
         let drawing_progress_bar = ProgressBar::new(options.frame_range().size_hint().0 as u64)
             .with_style(progress_style)

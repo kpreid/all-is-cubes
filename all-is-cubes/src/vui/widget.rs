@@ -273,7 +273,6 @@ impl Default for TooltipState {
 #[derive(Debug)]
 pub(crate) struct TooltipController {
     /// Tracks what we should be displaying and serves as dirty flag.
-    // TODO: Using thread-safe operations is not actually necessary here, but I plan to make the entire notification system `Sync` and want to get in some practice here.
     state: Arc<Mutex<TooltipState>>,
     text_space: URef<Space>,
 }
