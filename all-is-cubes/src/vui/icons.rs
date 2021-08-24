@@ -108,7 +108,7 @@ impl Icons {
                     ));
 
                     // Draw X on circle
-                    Circle::new(Point::new(0, 0), (resolution / 2 - 2).into())
+                    Circle::with_center(Point::new(0, 0), (resolution - 4).into())
                         .into_styled(
                             PrimitiveStyleBuilder::new()
                                 .fill_color(&background_brush)
