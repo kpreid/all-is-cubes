@@ -26,9 +26,6 @@ use crate::vui::Icons;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Tool {
-    /// Empty slot; does nothing.
-    None,
-
     /// “Click”, or “push button”, or generally “activate the function of this”
     /// as opposed to editing it. Used for [`vui`](crate::vui) interaction.
     Activate,
@@ -70,7 +67,6 @@ impl Tool {
     /// If the transaction does not succeed, the original `Tool` value should be kept.
     pub fn use_tool(self, input: &ToolInput) -> Result<(Self, UniverseTransaction), ToolError> {
         match self {
-            Self::None => Err(ToolError::NoTool),
             Self::Activate => {
                 // TODO: We have nothing to activate yet.
                 // (But this error also needs work.)
@@ -130,7 +126,6 @@ impl Tool {
 
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
-            Self::None => Cow::Borrowed(&predefined[Icons::EmptySlot]),
             Self::Activate => Cow::Borrowed(&predefined[Icons::Activate]),
             Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
             Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
@@ -267,6 +262,7 @@ mod tests {
     use super::*;
     use crate::character::cursor_raycast;
     use crate::content::make_some_blocks;
+    use crate::inventory::Slot;
     use crate::math::FreeCoordinate;
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
@@ -315,8 +311,8 @@ mod tests {
                 .try_modify(|c| {
                     CharacterTransaction::inventory(InventoryTransaction::replace(
                         0,
-                        Tool::None,
-                        tool,
+                        Slot::Empty,
+                        tool.into(),
                     ))
                     .execute(&mut *c)
                     .unwrap();
@@ -343,29 +339,6 @@ mod tests {
         // TODO: Might be good to generate differently labeled blocks... maybe BlockProvider should have a way to do that for any enum.
         let [block] = make_some_blocks();
         BlockProvider::new(|_| Ok(block.clone())).unwrap()
-    }
-
-    #[test]
-    fn icon_none() {
-        let dummy_icons = dummy_icons();
-        assert_eq!(
-            &*Tool::None.icon(&dummy_icons),
-            &dummy_icons[Icons::EmptySlot]
-        );
-    }
-
-    #[test]
-    fn use_none() {
-        let [existing] = make_some_blocks();
-        let tester = ToolTester::new(|space| {
-            space.set((1, 0, 0), &existing).unwrap();
-        });
-        assert_eq!(
-            tester.equip_and_use_tool(Tool::None),
-            Err(ToolError::NoTool)
-        );
-        print_space(&tester.space(), (-1., 1., 1.));
-        assert_eq!(&tester.space()[(1, 0, 0)], &existing);
     }
 
     #[test]

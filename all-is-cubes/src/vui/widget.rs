@@ -19,10 +19,10 @@ use crate::apps::Tick;
 use crate::block::{space_to_blocks, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
 use crate::drawing::VoxelBrush;
+use crate::inventory::Slot;
 use crate::listen::{DirtyFlag, FnListener, ListenableSource};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, Space, SpacePhysics};
-use crate::tools::Tool;
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
 use crate::vui::Icons;
@@ -114,14 +114,14 @@ impl ToolbarController {
     }
 
     /// Helper for WidgetController impl; writes to the space without using self.character
-    fn write_tools(
+    fn write_items(
         &self,
         sv: &WidgetSpaceView<'_>,
-        tools: &[Tool],
+        slots: &[Slot],
         selected_slots: &[usize],
     ) -> Result<(), Box<dyn Error>> {
         sv.space.try_modify(|space| {
-            for (index, tool) in tools.iter().enumerate() {
+            for (index, stack) in slots.iter().enumerate() {
                 if index >= self.slot_count {
                     // TODO: must clear nonexistent positions, eventually
                     break;
@@ -131,7 +131,7 @@ impl ToolbarController {
                 let position =
                     self.first_slot_position + GridVector::unit_x() * 2 * index as GridCoordinate;
                 // Draw icon
-                space.set(position, &*tool.icon(&sv.hud_blocks.icons))?;
+                space.set(position, &*stack.icon(&sv.hud_blocks.icons))?;
                 // Draw pointers.
                 // TODO: refactor to not use FLIP_Y now that it isn't a hardcoded feature
                 // TODO: draw_target isn't especially helpful here
@@ -139,9 +139,9 @@ impl ToolbarController {
                     GridMatrix::from_translation(position.to_vec()) * GridMatrix::FLIP_Y,
                 );
                 for sel in 0..2 {
-                    let slot = selected_slots.get(sel).copied().unwrap_or(usize::MAX);
+                    let slot_index = selected_slots.get(sel).copied().unwrap_or(usize::MAX);
                     let brush: &VoxelBrush<'_> =
-                        &sv.hud_blocks.toolbar_pointer[sel][usize::from(slot == index)];
+                        &sv.hud_blocks.toolbar_pointer[sel][usize::from(slot_index == index)];
                     Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
                 }
             }
@@ -155,8 +155,8 @@ impl WidgetController for ToolbarController {
         if self.todo.get_and_clear() {
             if let Some(inventory_source) = &self.inventory_source {
                 let character = inventory_source.borrow();
-                let tools: &[Tool] = &character.inventory().slots;
-                self.write_tools(sv, tools, &character.selected_slots())?;
+                let slots: &[Slot] = &character.inventory().slots;
+                self.write_items(sv, slots, &character.selected_slots())?;
             } else {
                 // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
             }

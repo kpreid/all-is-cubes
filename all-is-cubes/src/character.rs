@@ -16,7 +16,7 @@ use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::block::{recursive_raycast, Block, EvaluatedBlock};
 use crate::camera::eye_for_look_at;
-use crate::inventory::{Inventory, InventoryChange, InventoryTransaction};
+use crate::inventory::{Inventory, InventoryChange, InventoryTransaction, Slot};
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
@@ -98,12 +98,12 @@ impl Character {
         // TODO: special inventory slots should be set up some other way.
         // The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
         // And we shouldn't have special slots anyway.
-        let mut inventory = vec![Tool::None; 12];
-        inventory[10] = Tool::DeleteBlock;
-        inventory[11] = Tool::CopyFromSpace;
+        let mut inventory = vec![Slot::Empty; 12];
+        inventory[10] = Tool::DeleteBlock.into();
+        inventory[11] = Tool::CopyFromSpace.into();
         let mut free = 0;
         'fill: for item in spawn.inventory.iter() {
-            while inventory[free] != Tool::None {
+            while inventory[free] != Slot::Empty {
                 free += 1;
                 if free >= inventory.len() {
                     break 'fill;
@@ -123,7 +123,7 @@ impl Character {
             space,
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
-            inventory: Inventory::from_items(inventory),
+            inventory: Inventory::from_slots(inventory),
             selected_slots: [10, 1, 11],
             notifier: Notifier::new(),
             behaviors: BehaviorSet::new(),
@@ -488,7 +488,7 @@ pub struct Spawn {
 
     pub flying: bool,
 
-    pub inventory: Vec<Tool>,
+    pub inventory: Vec<Slot>,
 }
 
 impl Spawn {
@@ -530,7 +530,9 @@ mod tests {
 
     #[test]
     fn spawn_inventory() {
-        let inventory_data = vec![Tool::PlaceBlock(Block::from(rgb_const!(0.1, 0.2, 0.3)))];
+        let inventory_data = vec![Slot::from(Tool::PlaceBlock(Block::from(rgb_const!(
+            0.1, 0.2, 0.3
+        ))))];
 
         let mut universe = Universe::new();
         let space = Space::empty_positive(1, 1, 1);
@@ -542,7 +544,7 @@ mod tests {
         let character = Character::spawn(&spawn, space);
 
         assert_eq!(character.inventory.slots[0], inventory_data[0]);
-        assert_eq!(character.inventory.slots[1], Tool::None);
+        assert_eq!(character.inventory.slots[1], Slot::Empty);
         // TODO: Either test the special slot contents or eliminate that mechanism
     }
 
@@ -581,9 +583,11 @@ mod tests {
         let space = Space::empty_positive(1, 1, 1);
         let space_ref = universe.insert_anonymous(space);
 
-        let old_item = Tool::PlaceBlock(Block::from(rgb_const!(1.0, 0.0, 0.0)));
-        let new_item_1 = Tool::PlaceBlock(Block::from(rgb_const!(0.0, 1.0, 0.0)));
-        let new_item_2 = Tool::PlaceBlock(Block::from(rgb_const!(0.0, 0.0, 1.0)));
+        let old_item = Slot::from(Tool::PlaceBlock(Block::from(rgb_const!(1.0, 0.0, 0.0))));
+        let new_item_1 = Slot::from(Tool::PlaceBlock(Block::from(rgb_const!(0.0, 1.0, 0.0))));
+        let new_item_2 = Slot::from(Tool::PlaceBlock(Block::from(rgb_const!(0.0, 0.0, 1.0))));
+
+        // TODO: Add tests of stack modification, emptying, merging
 
         TransactionTester::new()
             // Body transactions

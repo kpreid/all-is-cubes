@@ -3,16 +3,21 @@
 
 //! [`Inventory`] for storing items.
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::num::NonZeroU16;
 use std::sync::Arc;
 
+use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
+use crate::linking::BlockProvider;
 use crate::tools::{Tool, ToolError, ToolInput};
 use crate::transactions::{
     PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
 };
 use crate::universe::URef;
+use crate::vui::Icons;
 
 /// A collection of [`Tool`]s (items).
 ///
@@ -26,7 +31,7 @@ use crate::universe::URef;
 #[non_exhaustive]
 pub struct Inventory {
     /// TODO: This probably shouldn't be public forever.
-    pub slots: Vec<Tool>,
+    pub slots: Vec<Slot>,
 }
 
 impl Inventory {
@@ -35,12 +40,12 @@ impl Inventory {
     /// Ordinary user actions cannot change the number of slots.
     pub fn new(size: usize) -> Self {
         Inventory {
-            slots: vec![Tool::None; size],
+            slots: vec![Slot::Empty; size],
         }
     }
 
     /// TODO: temporary interface, reevaluate design
-    pub(crate) fn from_items(mut items: Vec<Tool>) -> Self {
+    pub(crate) fn from_slots(mut items: Vec<Slot>) -> Self {
         items.shrink_to_fit();
         Inventory { slots: items }
     }
@@ -54,11 +59,12 @@ impl Inventory {
         character: URef<Character>,
         slot_index: usize,
     ) -> Result<UniverseTransaction, ToolError> {
-        let tool = if let Some(tool) = self.slots.get(slot_index) {
-            tool
-        } else {
-            return Err(ToolError::NoTool);
-        };
+        let (slot, tool) =
+            if let Some(Slot::Stack(Slot::COUNT_ONE, tool)) = self.slots.get(slot_index) {
+                (Slot::Stack(Slot::COUNT_ONE, tool.clone()), tool)
+            } else {
+                return Err(ToolError::NoTool);
+            };
 
         let input = ToolInput {
             cursor: cursor.cloned(),
@@ -71,8 +77,8 @@ impl Inventory {
                 .merge(
                     CharacterTransaction::inventory(InventoryTransaction::replace(
                         slot_index,
-                        tool.clone(),
-                        new_tool,
+                        slot,
+                        new_tool.into(),
                     ))
                     .bind(character),
                 )
@@ -83,26 +89,58 @@ impl Inventory {
     }
 }
 
+/// The direct child of [`Inventory`]; a container for any number of identical [`Tool`]s.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum Slot {
+    Empty,
+    Stack(NonZeroU16, Tool),
+}
+
+impl Slot {
+    // TODO: when Option::unwrap is stably const, remove unsafe
+    const COUNT_ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
+
+    pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
+        match self {
+            Slot::Empty => Cow::Borrowed(&predefined[Icons::EmptySlot]),
+            Slot::Stack(_, tool) => tool.icon(predefined),
+        }
+    }
+}
+
+impl From<Tool> for Slot {
+    fn from(tool: Tool) -> Self {
+        Slot::Stack(NonZeroU16::new(1).unwrap(), tool)
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct InventoryTransaction {
-    replace: BTreeMap<usize, (Tool, Tool)>,
-    insert: Vec<Tool>,
+    replace: BTreeMap<usize, (Slot, Slot)>,
+    insert: Vec<Slot>,
 }
 
 impl InventoryTransaction {
-    /// Transaction to insert an item into an inventory, which will fail if there is no space.
-    pub fn insert(item: Tool) -> Self {
-        // TODO: If the item is `Tool::None`, it should become a noop.
-        InventoryTransaction {
+    /// Transaction to insert an item/stack into an inventory, which will fail if there is no
+    /// space.
+    pub fn insert(stack: impl Into<Slot>) -> Self {
+        let stack = stack.into();
+        if matches!(stack, Slot::Empty) {
+            return Self::default();
+        }
+        Self {
             replace: BTreeMap::default(),
-            insert: vec![item],
+            insert: vec![stack],
         }
     }
 
-    /// Transaction to replace an existing item in an inventory, which will fail if the existing
-    /// item is not as expected.
-    pub fn replace(slot: usize, old: Tool, new: Tool) -> Self {
-        // TODO: Should inventories store `Rc<Tool>` so callers can avoid cloning for the sake of `old`s?
+    /// Transaction to replace the contents of an existing slot in an inventory, which
+    /// will fail if the existing slot is not as expected.
+    ///
+    /// TODO: Right now, this requires an exact match. In the future, we should be able
+    /// to compose multiple modifications like "add 1 item to stack" ×2 into "add 2 items".
+    pub fn replace(slot: usize, old: Slot, new: Slot) -> Self {
         let mut replace = BTreeMap::new();
         replace.insert(slot, (old, new));
         InventoryTransaction {
@@ -131,8 +169,8 @@ impl Transaction<Inventory> for InventoryTransaction {
             .slots
             .iter()
             .enumerate()
-            .filter(|(_index, item)| **item == Tool::None)
-            .map(|(index, _item)| index)
+            .filter(|(_index, stack)| **stack == Slot::Empty)
+            .map(|(index, _stack)| index)
             .take(self.insert.len())
             .collect::<Vec<_>>();
         if empty_slots.len() < self.insert.len() {
@@ -195,16 +233,16 @@ mod tests {
 
     #[test]
     fn inventory_txn_insert_success() {
-        let mut inventory = Inventory::from_items(vec![
-            Tool::DeleteBlock,
-            Tool::DeleteBlock,
-            Tool::None,
-            Tool::DeleteBlock,
-            Tool::None,
+        let mut inventory = Inventory::from_slots(vec![
+            Tool::DeleteBlock.into(),
+            Tool::DeleteBlock.into(),
+            Slot::Empty,
+            Tool::DeleteBlock.into(),
+            Slot::Empty,
         ]);
         let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
 
-        assert_eq!(inventory.slots[2], Tool::None);
+        assert_eq!(inventory.slots[2], Slot::Empty);
         assert_eq!(
             InventoryTransaction::insert(new_item.clone())
                 .execute(&mut inventory)
@@ -213,13 +251,13 @@ mod tests {
                 slots: Arc::new([2])
             }
         );
-        assert_eq!(inventory.slots[2], new_item);
+        assert_eq!(inventory.slots[2], new_item.into());
     }
 
     #[test]
     fn inventory_txn_insert_no_space() {
-        let contents = vec![Tool::DeleteBlock, Tool::DeleteBlock];
-        let inventory = Inventory::from_items(contents.clone());
+        let contents = vec![Slot::from(Tool::DeleteBlock), Slot::from(Tool::DeleteBlock)];
+        let inventory = Inventory::from_slots(contents.clone());
         let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
 
         assert_eq!(inventory.slots, contents);
