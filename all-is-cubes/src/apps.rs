@@ -9,6 +9,7 @@ use crate::camera::{Camera, GraphicsOptions};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::content::UniverseTemplate;
 use crate::listen::{ListenableCell, ListenableSource};
+use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::tools::{Tool, ToolError, ToolInput};
 use crate::transactions::Transaction;
@@ -144,13 +145,14 @@ impl AllIsCubesAppState {
 
         self.cursor_result = ndc_pos
             .map(|p| ui_camera.project_ndc_into_world(p))
-            .and_then(|ray| cursor_raycast(ray, self.ui.current_space()));
+            .and_then(|ray| cursor_raycast(ray, self.ui.current_space(), FreeCoordinate::INFINITY));
 
         if self.cursor_result.is_none() {
             if let Some(character_ref) = &self.game_character {
+                // TODO: maximum distance should be determined by character/universe parameters instead of hardcoded
                 self.cursor_result = ndc_pos
                     .map(|p| game_camera.project_ndc_into_world(p))
-                    .and_then(|ray| cursor_raycast(ray, &character_ref.borrow().space));
+                    .and_then(|ray| cursor_raycast(ray, &character_ref.borrow().space, 6.0));
             }
         }
     }

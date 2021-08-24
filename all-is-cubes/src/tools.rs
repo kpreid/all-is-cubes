@@ -267,6 +267,7 @@ mod tests {
     use super::*;
     use crate::character::cursor_raycast;
     use crate::content::make_some_blocks;
+    use crate::math::FreeCoordinate;
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
     use crate::space::Space;
@@ -298,7 +299,11 @@ mod tests {
         fn input(&self) -> ToolInput {
             ToolInput {
                 // TODO: define ToolInput::new
-                cursor: cursor_raycast(Ray::new([0., 0.5, 0.5], [1., 0., 0.]), &self.space_ref),
+                cursor: cursor_raycast(
+                    Ray::new([0., 0.5, 0.5], [1., 0., 0.]),
+                    &self.space_ref,
+                    FreeCoordinate::INFINITY,
+                ),
                 character: Some(self.character_ref.clone()),
             }
         }

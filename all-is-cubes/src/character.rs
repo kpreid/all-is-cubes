@@ -396,12 +396,19 @@ pub enum CharacterChange {
 }
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
-/// value, or [`None`] if nothing was struck.
-pub fn cursor_raycast(mut ray: Ray, space_ref: &URef<Space>) -> Option<Cursor> {
-    // TODO: implement 'reach' radius limit
+/// value, or [`None`] if nothing was struck within the distance limit.
+pub fn cursor_raycast(
+    mut ray: Ray,
+    space_ref: &URef<Space>,
+    maximum_distance: FreeCoordinate,
+) -> Option<Cursor> {
     ray.direction = ray.direction.normalize();
     let space = space_ref.try_borrow().ok()?;
     for step in ray.cast().within_grid(space.grid()) {
+        if step.t_distance() > maximum_distance {
+            break;
+        }
+
         let cube = step.cube_ahead();
         let evaluated = space.get_evaluated(cube);
         let lighting_ahead = space.get_lighting(cube);
