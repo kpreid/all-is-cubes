@@ -97,9 +97,11 @@ impl Character {
         // TODO: special inventory slots should be set up some other way.
         // The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
         // And we shouldn't have special slots anyway.
-        let mut inventory = vec![Slot::Empty; 12];
-        inventory[10] = Tool::DeleteBlock.into();
-        inventory[11] = Tool::CopyFromSpace.into();
+        let mut inventory = vec![Slot::Empty; 11];
+        let delete_slot = 9;
+        let copy_slot = 10;
+        inventory[delete_slot] = Tool::DeleteBlock.into();
+        inventory[copy_slot] = Tool::CopyFromSpace.into();
         let mut free = 0;
         'fill: for item in spawn.inventory.iter() {
             while inventory[free] != Slot::Empty {
@@ -123,7 +125,7 @@ impl Character {
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
             inventory: Inventory::from_slots(inventory),
-            selected_slots: [10, 1, 11],
+            selected_slots: [delete_slot, 0, copy_slot],
             notifier: Notifier::new(),
             behaviors: BehaviorSet::new(),
         }
