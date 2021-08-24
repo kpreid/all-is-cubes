@@ -13,7 +13,7 @@ use crate::block::{
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
 use crate::math::{GridPoint, GridRotation, GridVector, Rgb, Rgba};
-use crate::space::{Grid, GridArray, Space, SpaceTransaction};
+use crate::space::{Grid, GridArray, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
 #[test]
@@ -428,6 +428,47 @@ fn builder_voxels_from_space() {
             space: space_ref
         },
     );
+}
+
+#[test]
+fn builder_voxels_from_fn() {
+    let mut universe = Universe::new();
+
+    let resolution = 7;
+    let block = Block::builder()
+        .display_name("hello world")
+        .voxels_fn(&mut universe, resolution, |_cube| &AIR)
+        .unwrap()
+        .build();
+
+    // Extract the implicitly constructed space reference
+    let space_ref = if let Block::Recur { ref space, .. } = block {
+        space.clone()
+    } else {
+        panic!("expected Recur, found {:?}", block);
+    };
+
+    assert_eq!(
+        block,
+        Block::Recur {
+            attributes: BlockAttributes {
+                display_name: "hello world".into(),
+                ..BlockAttributes::default()
+            },
+            offset: GridPoint::origin(),
+            resolution,
+            space: space_ref.clone()
+        },
+    );
+
+    // Check the space's characteristics
+    assert_eq!(space_ref.borrow().grid(), Grid::for_block(resolution));
+    assert_eq!(
+        space_ref.borrow().physics(),
+        &SpacePhysics::DEFAULT_FOR_BLOCK
+    );
+
+    // TODO: assert the voxels are correct
 }
 
 #[test]
