@@ -33,6 +33,10 @@ pub enum Tool {
     /// Destroy any targeted block.
     DeleteBlock,
 
+    /// Move the given block out of inventory (consuming this tool) into the targeted
+    /// empty space.
+    Block(Block),
+
     /// Places copies of the given block in targeted empty space. Infinite uses.
     InfiniteBlocks(Block),
 
@@ -94,6 +98,11 @@ impl Tool {
                     input.set_cube(cursor.place.cube, cursor.block.clone(), AIR)?,
                 ))
             }
+            Self::Block(ref block) => {
+                let cursor = input.cursor()?;
+                let block = block.clone();
+                Ok((None, input.set_cube(cursor.place.adjacent(), AIR, block)?))
+            }
             Self::InfiniteBlocks(ref block) => {
                 let cursor = input.cursor()?;
                 let block = block.clone();
@@ -141,7 +150,7 @@ impl Tool {
             Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
             Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
-            Self::InfiniteBlocks(block) => Cow::Borrowed(block),
+            Self::Block(block) | Self::InfiniteBlocks(block) => Cow::Borrowed(block),
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
         }
     }
@@ -427,57 +436,84 @@ mod tests {
     }
 
     #[test]
-    fn use_place_block() {
+    fn use_block() {
         let [existing, tool_block] = make_some_blocks();
-        let mut tester = ToolTester::new(|space| {
-            space.set((1, 0, 0), &existing).unwrap();
-        });
-        let transaction = tester
-            .equip_and_use_tool(Tool::InfiniteBlocks(tool_block.clone()))
-            .unwrap();
-        assert_eq!(
-            transaction,
-            SpaceTransaction::set_cube([0, 0, 0], Some(AIR), Some(tool_block.clone()))
-                .bind(tester.space_ref.clone())
-        );
-        transaction.execute(&mut tester.universe).unwrap();
-        print_space(&tester.space(), (-1., 1., 1.));
-        assert_eq!(&tester.space()[(1, 0, 0)], &existing);
-        assert_eq!(&tester.space()[(0, 0, 0)], &tool_block);
+        for (tool, expect_consume) in [
+            (Tool::Block(tool_block.clone()), true),
+            (Tool::InfiniteBlocks(tool_block.clone()), false),
+        ] {
+            let mut tester = ToolTester::new(|space| {
+                space.set((1, 0, 0), &existing).unwrap();
+            });
+            let transaction = tester.equip_and_use_tool(tool.clone()).unwrap();
+
+            let expected_cube_transaction =
+                SpaceTransaction::set_cube([0, 0, 0], Some(AIR), Some(tool_block.clone()))
+                    .bind(tester.space_ref.clone());
+            assert_eq!(
+                transaction,
+                if expect_consume {
+                    expected_cube_transaction
+                        .merge(
+                            CharacterTransaction::inventory(InventoryTransaction::replace(
+                                0,
+                                Slot::from(tool.clone()),
+                                Slot::Empty,
+                            ))
+                            .bind(tester.character_ref.clone()),
+                        )
+                        .unwrap()
+                } else {
+                    expected_cube_transaction
+                }
+            );
+
+            transaction.execute(&mut tester.universe).unwrap();
+            print_space(&tester.space(), (-1., 1., 1.));
+            assert_eq!(&tester.space()[(1, 0, 0)], &existing);
+            assert_eq!(&tester.space()[(0, 0, 0)], &tool_block);
+        }
     }
 
     #[test]
-    fn use_place_block_with_obstacle() {
+    fn use_block_with_obstacle() {
         let [existing, tool_block, obstacle] = make_some_blocks();
-        let tester = ToolTester::new(|space| {
-            space.set((1, 0, 0), &existing).unwrap();
-        });
-        // Place the obstacle after the raycast
-        tester
-            .space_ref()
-            .execute(&SpaceTransaction::set_cube(
-                [0, 0, 0],
-                None,
-                Some(obstacle.clone()),
-            ))
-            .unwrap();
-        assert_eq!(
-            tester.equip_and_use_tool(Tool::InfiniteBlocks(tool_block)),
-            Err(ToolError::Obstacle)
-        );
-        print_space(&*tester.space(), (-1., 1., 1.));
-        assert_eq!(&tester.space()[(1, 0, 0)], &existing);
-        assert_eq!(&tester.space()[(0, 0, 0)], &obstacle);
+        for tool in [
+            Tool::Block(tool_block.clone()),
+            Tool::InfiniteBlocks(tool_block.clone()),
+        ] {
+            let tester = ToolTester::new(|space| {
+                space.set((1, 0, 0), &existing).unwrap();
+            });
+            // Place the obstacle after the raycast
+            tester
+                .space_ref()
+                .execute(&SpaceTransaction::set_cube(
+                    [0, 0, 0],
+                    None,
+                    Some(obstacle.clone()),
+                ))
+                .unwrap();
+            assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
+            print_space(&*tester.space(), (-1., 1., 1.));
+            assert_eq!(&tester.space()[(1, 0, 0)], &existing);
+            assert_eq!(&tester.space()[(0, 0, 0)], &obstacle);
+        }
     }
 
     #[test]
-    fn use_place_block_without_target() {
+    fn use_block_without_target() {
         let [tool_block] = make_some_blocks();
-        let tester = ToolTester::new(|_space| {});
-        assert_eq!(
-            tester.equip_and_use_tool(Tool::InfiniteBlocks(tool_block)),
-            Err(ToolError::NothingSelected)
-        );
+        for tool in [
+            Tool::Block(tool_block.clone()),
+            Tool::InfiniteBlocks(tool_block.clone()),
+        ] {
+            let tester = ToolTester::new(|_space| {});
+            assert_eq!(
+                tester.equip_and_use_tool(tool),
+                Err(ToolError::NothingSelected)
+            );
+        }
     }
 
     #[test]
