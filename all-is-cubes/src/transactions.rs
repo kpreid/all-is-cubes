@@ -143,10 +143,17 @@ pub trait Transaction<T: ?Sized> {
 }
 
 /// Error type returned by [`Transaction::check`].
+///
+/// Note: This type is designed to be cheap to construct, as it is expected that game
+/// mechanics _may_ result in transactions repeatedly failing. Hence, it does not contain
+/// full details on the failure.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
-#[non_exhaustive] // We might want to add further information later
-#[error("Transaction precondition not met")]
-pub struct PreconditionFailed {}
+#[error("Transaction precondition not met: {location}: {problem}")]
+pub struct PreconditionFailed {
+    // TODO: Figure out how to have at least a little dynamic information. `Option<[i32; 3]>` ???
+    pub(crate) location: &'static str,
+    pub(crate) problem: &'static str,
+}
 
 /// Error type returned by [`Transaction::check_merge`].
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]

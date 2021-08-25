@@ -159,7 +159,10 @@ impl Transaction<Inventory> for InventoryTransaction {
         // Check replacements and notice if any slots are becoming empty
         for (&slot, (old, _new)) in self.replace.iter() {
             if inventory.slots[slot] != *old {
-                return Err(PreconditionFailed {}); // TODO: detailed errors so we can signal where the conflict was
+                return Err(PreconditionFailed {
+                    location: "Inventory",
+                    problem: "old slot not as expected",
+                }); // TODO: it would be nice to squeeze in the slot number
             }
         }
 
@@ -174,7 +177,10 @@ impl Transaction<Inventory> for InventoryTransaction {
             .take(self.insert.len())
             .collect::<Vec<_>>();
         if empty_slots.len() < self.insert.len() {
-            return Err(PreconditionFailed {});
+            return Err(PreconditionFailed {
+                location: "Inventory",
+                problem: "insufficient empty slots",
+            });
         }
 
         Ok(empty_slots)
@@ -261,10 +267,9 @@ mod tests {
         let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
 
         assert_eq!(inventory.slots, contents);
-        assert_eq!(
-            InventoryTransaction::insert(new_item.clone()).check(&inventory),
-            Err(PreconditionFailed {}),
-        );
+        InventoryTransaction::insert(new_item.clone())
+            .check(&inventory)
+            .expect_err("should have failed");
         assert_eq!(inventory.slots, contents);
     }
 }

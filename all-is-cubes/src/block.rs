@@ -845,7 +845,10 @@ impl Transaction<BlockDef> for BlockDefTransaction {
     ) -> Result<Self::CommitCheck, crate::transactions::PreconditionFailed> {
         if let Some(old) = &self.old {
             if **target != *old {
-                return Err(PreconditionFailed {});
+                return Err(PreconditionFailed {
+                    location: "BlockDef",
+                    problem: "existing block not as expected",
+                });
             }
         }
         Ok(())

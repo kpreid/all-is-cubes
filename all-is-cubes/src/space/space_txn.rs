@@ -66,7 +66,10 @@ impl Transaction<Space> for SpaceTransaction {
         for (&cube, CubeTransaction { old, new: _ }) in &self.cubes {
             if let Some(old) = old {
                 if space[cube] != *old {
-                    return Err(PreconditionFailed {});
+                    return Err(PreconditionFailed {
+                        location: "Space",
+                        problem: "existing block not as expected",
+                    });
                 }
             }
         }

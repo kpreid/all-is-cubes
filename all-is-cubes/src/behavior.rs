@@ -154,7 +154,10 @@ impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
     fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, PreconditionFailed> {
         if matches!(self.replace.keys().copied().max(), Some(index) if index >= target.items.len())
         {
-            Err(PreconditionFailed {})
+            Err(PreconditionFailed {
+                location: "BehaviorSet",
+                problem: "behavior(s) not found",
+            })
         } else {
             Ok(())
         }
