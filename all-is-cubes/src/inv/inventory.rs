@@ -253,7 +253,7 @@ mod tests {
             Tool::DeleteBlock.into(),
             Slot::Empty,
         ]);
-        let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
+        let new_item = Tool::InfiniteBlocks(Rgba::WHITE.into());
 
         assert_eq!(inventory.slots[2], Slot::Empty);
         assert_eq!(
@@ -271,7 +271,7 @@ mod tests {
     fn inventory_txn_insert_no_space() {
         let contents = vec![Slot::from(Tool::DeleteBlock), Slot::from(Tool::DeleteBlock)];
         let inventory = Inventory::from_slots(contents.clone());
-        let new_item = Tool::PlaceBlock(Rgba::WHITE.into());
+        let new_item = Tool::InfiniteBlocks(Rgba::WHITE.into());
 
         assert_eq!(inventory.slots, contents);
         InventoryTransaction::insert(new_item.clone())

@@ -33,8 +33,8 @@ pub enum Tool {
     /// Destroy any targeted block.
     DeleteBlock,
 
-    /// Place a copy of the given block in empty space.
-    PlaceBlock(Block),
+    /// Places copies of the given block in targeted empty space. Infinite uses.
+    InfiniteBlocks(Block),
 
     /// Copy block from space to inventory.
     CopyFromSpace,
@@ -88,7 +88,7 @@ impl Tool {
                     input.set_cube(cursor.place.cube, cursor.block.clone(), AIR)?,
                 ))
             }
-            Self::PlaceBlock(ref block) => {
+            Self::InfiniteBlocks(ref block) => {
                 let cursor = input.cursor()?;
                 let block = block.clone();
                 Ok((self, input.set_cube(cursor.place.adjacent(), AIR, block)?))
@@ -97,7 +97,8 @@ impl Tool {
                 let cursor = input.cursor()?;
                 Ok((
                     self,
-                    input.produce_item(Tool::PlaceBlock(cursor.block.clone().unspecialize()))?,
+                    input
+                        .produce_item(Tool::InfiniteBlocks(cursor.block.clone().unspecialize()))?,
                 ))
             }
         }
@@ -118,12 +119,12 @@ impl Tool {
         Ok(transaction)
     }
 
-    /// Return a block to use as an icon for this tool. For [`Tool::PlaceBlock`], has the
+    /// Return a block to use as an icon for this tool. For tools that place blocks, has the
     /// same appearance as the block to be placed. The display name of the block should be
     /// the display name of the tool.
     ///
-    /// TODO (API instability): Eventually we will want additional decorations like "use
-    /// count" that probably should not need to be painted into the block itself.
+    /// TODO (API instability): Eventually we will probably want additional decorations
+    /// that probably should not need to be painted into the block itself.
 
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
@@ -131,7 +132,7 @@ impl Tool {
             Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
             Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
-            Self::PlaceBlock(block) => Cow::Borrowed(block),
+            Self::InfiniteBlocks(block) => Cow::Borrowed(block),
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
         }
     }
@@ -410,7 +411,10 @@ mod tests {
     fn icon_place_block() {
         let dummy_icons = dummy_icons();
         let [block] = make_some_blocks();
-        assert_eq!(*Tool::PlaceBlock(block.clone()).icon(&dummy_icons), block);
+        assert_eq!(
+            *Tool::InfiniteBlocks(block.clone()).icon(&dummy_icons),
+            block
+        );
     }
 
     #[test]
@@ -420,7 +424,7 @@ mod tests {
             space.set((1, 0, 0), &existing).unwrap();
         });
         let transaction = tester
-            .equip_and_use_tool(Tool::PlaceBlock(tool_block.clone()))
+            .equip_and_use_tool(Tool::InfiniteBlocks(tool_block.clone()))
             .unwrap();
         assert_eq!(
             transaction,
@@ -449,7 +453,7 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(
-            tester.equip_and_use_tool(Tool::PlaceBlock(tool_block)),
+            tester.equip_and_use_tool(Tool::InfiniteBlocks(tool_block)),
             Err(ToolError::Obstacle)
         );
         print_space(&*tester.space(), (-1., 1., 1.));
@@ -462,7 +466,7 @@ mod tests {
         let [tool_block] = make_some_blocks();
         let tester = ToolTester::new(|_space| {});
         assert_eq!(
-            tester.equip_and_use_tool(Tool::PlaceBlock(tool_block)),
+            tester.equip_and_use_tool(Tool::InfiniteBlocks(tool_block)),
             Err(ToolError::NothingSelected)
         );
     }
@@ -476,7 +480,7 @@ mod tests {
         let transaction = tester.equip_and_use_tool(Tool::CopyFromSpace).unwrap();
         assert_eq!(
             transaction,
-            CharacterTransaction::inventory(InventoryTransaction::insert(Tool::PlaceBlock(
+            CharacterTransaction::inventory(InventoryTransaction::insert(Tool::InfiniteBlocks(
                 existing.clone()
             )))
             .bind(tester.character_ref.clone())

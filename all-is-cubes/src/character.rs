@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn spawn_inventory() {
-        let inventory_data = vec![Slot::from(Tool::PlaceBlock(Block::from(rgb_const!(
+        let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(
             0.1, 0.2, 0.3
         ))))];
 
@@ -559,7 +559,7 @@ mod tests {
         character.listen(sink.listener());
         let character_ref = universe.insert_anonymous(character);
 
-        let item = Tool::PlaceBlock(AIR);
+        let item = Tool::InfiniteBlocks(AIR);
         character_ref
             .execute(&CharacterTransaction::inventory(
                 InventoryTransaction::insert(item.clone()),
@@ -584,9 +584,9 @@ mod tests {
         let space = Space::empty_positive(1, 1, 1);
         let space_ref = universe.insert_anonymous(space);
 
-        let old_item = Slot::from(Tool::PlaceBlock(Block::from(rgb_const!(1.0, 0.0, 0.0))));
-        let new_item_1 = Slot::from(Tool::PlaceBlock(Block::from(rgb_const!(0.0, 1.0, 0.0))));
-        let new_item_2 = Slot::from(Tool::PlaceBlock(Block::from(rgb_const!(0.0, 0.0, 1.0))));
+        let old_item = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(1.0, 0.0, 0.0))));
+        let new_item_1 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 1.0, 0.0))));
+        let new_item_2 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 0.0, 1.0))));
 
         // TODO: Add tests of stack modification, emptying, merging
 
