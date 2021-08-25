@@ -22,6 +22,7 @@ use crate::character::Spawn;
 use crate::content::palette;
 use crate::content::{logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS};
 use crate::drawing::{draw_to_blocks, VoxelBrush};
+use crate::inv::Slot;
 use crate::inv::Tool;
 use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
@@ -91,7 +92,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             ] {
                 spawn
                     .inventory
-                    .push(Tool::InfiniteBlocks(block.clone()).into());
+                    .push(Slot::stack(100, Tool::Block(block.clone())));
             }
             spawn
         })
