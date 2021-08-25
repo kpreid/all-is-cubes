@@ -19,7 +19,7 @@ use crate::apps::Tick;
 use crate::block::{space_to_blocks, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
 use crate::drawing::VoxelBrush;
-use crate::inventory::Slot;
+use crate::inv::Slot;
 use crate::listen::{DirtyFlag, FnListener, ListenableSource};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, Space, SpacePhysics};

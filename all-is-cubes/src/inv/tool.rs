@@ -9,7 +9,7 @@ use std::{fmt, hash};
 
 use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
-use crate::inventory::InventoryTransaction;
+use crate::inv::InventoryTransaction;
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
 use crate::space::SpaceTransaction;
@@ -263,7 +263,7 @@ mod tests {
     use super::*;
     use crate::character::cursor_raycast;
     use crate::content::make_some_blocks;
-    use crate::inventory::Slot;
+    use crate::inv::Slot;
     use crate::math::FreeCoordinate;
     use crate::raycast::Ray;
     use crate::raytracer::print_space;

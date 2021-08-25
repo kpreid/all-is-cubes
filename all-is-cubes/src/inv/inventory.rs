@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
+use crate::inv::{Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
-use crate::tools::{Tool, ToolError, ToolInput};
 use crate::transactions::{
     PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
 };

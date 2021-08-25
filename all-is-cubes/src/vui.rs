@@ -22,11 +22,10 @@ use crate::camera::{FogOption, GraphicsOptions};
 use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
+use crate::inv::ToolError;
 use crate::listen::{ListenableSource, Listener};
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::Space;
-
-use crate::tools::ToolError;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
 mod hud;

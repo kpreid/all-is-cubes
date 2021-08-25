@@ -16,13 +16,12 @@ use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::block::{recursive_raycast, Block, EvaluatedBlock};
 use crate::camera::eye_for_look_at;
-use crate::inventory::{Inventory, InventoryChange, InventoryTransaction, Slot};
+use crate::inv::{Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
-use crate::tools::{Tool, ToolError};
 use crate::transactions::{
     PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
