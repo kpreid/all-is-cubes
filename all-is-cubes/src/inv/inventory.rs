@@ -59,33 +59,64 @@ impl Inventory {
         character: URef<Character>,
         slot_index: usize,
     ) -> Result<UniverseTransaction, ToolError> {
-        let (slot, tool) =
-            if let Some(Slot::Stack(Slot::COUNT_ONE, tool)) = self.slots.get(slot_index) {
-                (Slot::Stack(Slot::COUNT_ONE, tool.clone()), tool)
-            } else {
-                return Err(ToolError::NoTool);
-            };
+        let original_slot = self.slots.get(slot_index);
+        match original_slot {
+            None | Some(Slot::Empty) => Err(ToolError::NoTool),
+            Some(Slot::Stack(count, original_tool)) => {
+                let input = ToolInput {
+                    cursor: cursor.cloned(),
+                    character: Some(character.clone()),
+                };
+                let (new_tool, transaction) = original_tool.clone().use_tool(&input)?;
 
-        let input = ToolInput {
-            cursor: cursor.cloned(),
-            character: Some(character.clone()),
-        };
-        let (new_tool, mut transaction) = tool.clone().use_tool(&input)?;
+                // TODO: This is way too long. Inventory-stacking logic should be in InventoryTransaction, probably?
+                let tool_transaction = match (count, new_tool) {
+                    (_, None) => {
+                        // Tool deletes itself.
+                        Some(InventoryTransaction::replace(
+                            slot_index,
+                            original_slot.unwrap().clone(),
+                            Slot::stack(count.get() - 1, original_tool.clone()),
+                        ))
+                    }
+                    (_, Some(new_tool)) if new_tool == *original_tool => {
+                        // Tool is unaffected.
+                        None
+                    }
+                    (&Slot::COUNT_ONE, Some(new_tool)) => {
+                        // Tool modifies itself and is not stacked.
+                        Some(InventoryTransaction::replace(
+                            slot_index,
+                            original_slot.unwrap().clone(),
+                            new_tool.into(),
+                        ))
+                    }
+                    (count_greater_than_one, Some(new_tool)) => {
+                        // Tool modifies itself and is in a stack, so we have to unstack the new tool.
+                        // TODO: In some cases it might make sense to put the stack aside and keep the modified tool.
+                        Some(
+                            InventoryTransaction::replace(
+                                slot_index,
+                                original_slot.unwrap().clone(),
+                                Slot::stack(
+                                    count_greater_than_one.get() - 1,
+                                    original_tool.clone(),
+                                ),
+                            )
+                            .merge(InventoryTransaction::insert(new_tool))
+                            .unwrap(),
+                        )
+                    }
+                };
 
-        if new_tool.as_ref() != Some(tool) {
-            transaction = transaction
-                .merge(
-                    CharacterTransaction::inventory(InventoryTransaction::replace(
-                        slot_index,
-                        slot,
-                        new_tool.into(),
-                    ))
-                    .bind(character),
-                )
-                .expect("failed to merge tool self-update");
+                Ok(match tool_transaction {
+                    Some(tool_transaction) => transaction
+                        .merge(CharacterTransaction::inventory(tool_transaction).bind(character))
+                        .expect("failed to merge tool self-update"),
+                    None => transaction,
+                })
+            }
         }
-
-        Ok(transaction)
     }
 }
 
@@ -100,6 +131,13 @@ pub enum Slot {
 impl Slot {
     // TODO: when Option::unwrap is stably const, remove unsafe
     const COUNT_ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
+
+    pub fn stack(count: u16, tool: Tool) -> Self {
+        match NonZeroU16::new(count) {
+            Some(count) => Self::Stack(count, tool),
+            None => Self::Empty,
+        }
+    }
 
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
