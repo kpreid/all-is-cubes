@@ -282,6 +282,8 @@ impl<T: ?Sized> hash::Hash for EphemeralOpaque<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use super::*;
     use crate::character::cursor_raycast;
     use crate::content::make_some_blocks;
@@ -327,15 +329,18 @@ mod tests {
             }
         }
 
-        fn equip_and_use_tool(&self, tool: Tool) -> Result<UniverseTransaction, ToolError> {
+        fn equip_and_use_tool(
+            &self,
+            stack: impl Into<Slot>,
+        ) -> Result<UniverseTransaction, ToolError> {
             // Put the tool in inventory.
             let index = 0;
             self.character_ref
                 .try_modify(|c| {
                     CharacterTransaction::inventory(InventoryTransaction::replace(
-                        0,
-                        Slot::Empty,
-                        tool.into(),
+                        index,
+                        c.inventory().slots[index].clone(),
+                        stack.into(),
                     ))
                     .execute(&mut *c)
                     .unwrap();
@@ -350,11 +355,22 @@ mod tests {
                 .unwrap()
         }
 
+        /// As `equip_and_use_tool`, but also commit the transaction.
+        /// TODO: Needs a better error return type (requires Transaction to do so).
+        fn equip_use_commit(&mut self, stack: impl Into<Slot>) -> Result<(), Box<dyn Error>> {
+            let transaction = self.equip_and_use_tool(stack)?;
+            transaction.execute(&mut self.universe)?;
+            Ok(())
+        }
+
         fn space(&self) -> UBorrow<Space> {
             self.space_ref.borrow()
         }
         fn space_ref(&self) -> &URef<Space> {
             &self.space_ref
+        }
+        fn character(&self) -> UBorrow<Character> {
+            self.character_ref.borrow()
         }
     }
 
@@ -473,6 +489,24 @@ mod tests {
             assert_eq!(&tester.space()[(1, 0, 0)], &existing);
             assert_eq!(&tester.space()[(0, 0, 0)], &tool_block);
         }
+    }
+
+    /// Note: This is more of a test of [`Inventory`] and [`Slot`] stack management
+    /// than the tool.
+    #[test]
+    fn use_block_stack_decrements() {
+        let [existing, tool_block] = make_some_blocks();
+        let stack_2 = Slot::stack(2, Tool::Block(tool_block.clone()));
+        let stack_1 = Slot::stack(1, Tool::Block(tool_block.clone()));
+
+        let mut tester = ToolTester::new(|space| {
+            // This must be far enough along +X for the blocks we're placing to not run out of space.
+            space.set((4, 0, 0), &existing).unwrap();
+        });
+        tester.equip_use_commit(stack_2).expect("tool failure 1");
+        assert_eq!(tester.character().inventory().slots[0], stack_1);
+        tester.equip_use_commit(stack_1).expect("tool failure 2");
+        assert_eq!(tester.character().inventory().slots[0], Slot::Empty);
     }
 
     #[test]
