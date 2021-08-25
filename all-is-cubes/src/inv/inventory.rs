@@ -72,7 +72,7 @@ impl Inventory {
         };
         let (new_tool, mut transaction) = tool.clone().use_tool(&input)?;
 
-        if &new_tool != tool {
+        if new_tool.as_ref() != Some(tool) {
             transaction = transaction
                 .merge(
                     CharacterTransaction::inventory(InventoryTransaction::replace(
@@ -118,7 +118,16 @@ impl Slot {
 
 impl From<Tool> for Slot {
     fn from(tool: Tool) -> Self {
-        Slot::Stack(NonZeroU16::new(1).unwrap(), tool)
+        Self::Stack(Self::COUNT_ONE, tool)
+    }
+}
+
+impl From<Option<Tool>> for Slot {
+    fn from(tool: Option<Tool>) -> Self {
+        match tool {
+            Some(tool) => Self::Stack(Self::COUNT_ONE, tool),
+            None => Self::Empty,
+        }
     }
 }
 

@@ -65,8 +65,14 @@ impl Tool {
     /// Computes the effect of using the tool.
     ///
     /// The effect consists of both mutations to `self` and a [`UniverseTransaction`].
+    /// If the result is `None` then the tool is deleted.
     /// If the transaction does not succeed, the original `Tool` value should be kept.
-    pub fn use_tool(self, input: &ToolInput) -> Result<(Self, UniverseTransaction), ToolError> {
+    ///
+    /// TODO: Return type is inelegant
+    pub fn use_tool(
+        self,
+        input: &ToolInput,
+    ) -> Result<(Option<Self>, UniverseTransaction), ToolError> {
         match self {
             Self::Activate => {
                 // TODO: We have nothing to activate yet.
@@ -76,7 +82,7 @@ impl Tool {
             Self::ExternalAction { ref function, .. } => {
                 if let Some(f) = &function.0 {
                     f(input);
-                    Ok((self, Default::default()))
+                    Ok((Some(self), Default::default()))
                 } else {
                     Err(ToolError::NotUsable) // TODO: communicate permanent error
                 }
@@ -84,19 +90,22 @@ impl Tool {
             Self::DeleteBlock => {
                 let cursor = input.cursor()?;
                 Ok((
-                    self,
+                    Some(self),
                     input.set_cube(cursor.place.cube, cursor.block.clone(), AIR)?,
                 ))
             }
             Self::InfiniteBlocks(ref block) => {
                 let cursor = input.cursor()?;
                 let block = block.clone();
-                Ok((self, input.set_cube(cursor.place.adjacent(), AIR, block)?))
+                Ok((
+                    Some(self),
+                    input.set_cube(cursor.place.adjacent(), AIR, block)?,
+                ))
             }
             Self::CopyFromSpace => {
                 let cursor = input.cursor()?;
                 Ok((
-                    self,
+                    Some(self),
                     input
                         .produce_item(Tool::InfiniteBlocks(cursor.block.clone().unspecialize()))?,
                 ))
@@ -111,7 +120,7 @@ impl Tool {
     pub fn use_immutable_tool(&self, input: &ToolInput) -> Result<UniverseTransaction, ToolError> {
         let (new_tool, transaction) = self.clone().use_tool(input)?;
 
-        if &new_tool != self {
+        if new_tool.as_ref() != Some(self) {
             // TODO: Define a separate error for this to report.
             return Err(ToolError::Internal(String::from("tool is immutable")));
         }
