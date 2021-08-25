@@ -49,6 +49,7 @@ pub enum Tool {
 }
 
 impl Tool {
+    #[allow(dead_code)] // TODO: This is going to be used for UI interactions but got delayed, so hide the warning
     pub(crate) fn external_action<F: Fn(&ToolInput) + Send + Sync + 'static>(
         icon: Block,
         function: F,
