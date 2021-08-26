@@ -210,6 +210,7 @@ const ANIMATION: Exhibit = Exhibit {
         let fire_block = {
             let fire_resolution = 12;
             Block::builder()
+                .animation_hint(AnimationHint::CONTINUOUS)
                 .light_emission(rgb_const!(1.4, 1.0, 0.8) * 8.0)
                 .voxels_ref(fire_resolution, {
                     let fire_grid = Grid::for_block(fire_resolution);

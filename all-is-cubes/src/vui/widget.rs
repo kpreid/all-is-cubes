@@ -16,7 +16,7 @@ use instant::Duration;
 use once_cell::sync::Lazy;
 
 use crate::apps::Tick;
-use crate::block::{space_to_blocks, BlockAttributes, Resolution, AIR};
+use crate::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
 use crate::drawing::VoxelBrush;
 use crate::inv::Slot;
@@ -300,7 +300,18 @@ impl TooltipController {
         let text_space_ref = universe.insert_anonymous(text_space);
         let toolbar_text_blocks = space_to_blocks(
             Self::RESOLUTION,
-            BlockAttributes::default(),
+            BlockAttributes {
+                // TODO: We need an animation_hint that describes the thing that the text does:
+                // toggling visible/invisible and not wanting to get lighting artifacts that might
+                // result from that. (Though I have a notion to add fade-out, which wants CONTINUOUS
+                // anyway.)
+                //
+                // ...wait, maybe tooltip vanishing should be based on removing the blocks entirely,
+                // instead of _just_ changing the text space. That would cooperate with light
+                // more straightforwardly.
+                animation_hint: AnimationHint::CONTINUOUS,
+                ..BlockAttributes::default()
+            },
             text_space_ref.clone(),
         )
         .unwrap();
