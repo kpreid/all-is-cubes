@@ -163,7 +163,7 @@ impl ToolInput {
         let space_ref = &self.cursor()?.space;
         let space = space_ref.try_borrow().map_err(ToolError::SpaceRef)?;
         if space[cube] != old_block {
-            return Err(ToolError::NotUsable);
+            return Err(ToolError::Obstacle);
         }
 
         Ok(
@@ -207,6 +207,9 @@ pub enum ToolError {
     /// The tool cannot currently be used or does not apply to the target.
     #[error("does not apply")]
     NotUsable,
+    /// Cannot place a block or similar because there's a block occupying the space.
+    #[error("there's something in the way")]
+    Obstacle,
     /// The tool requires a target cube and none was present.
     #[error("nothing is selected")]
     NothingSelected,
@@ -447,7 +450,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             tester.equip_and_use_tool(Tool::PlaceBlock(tool_block)),
-            Err(ToolError::NotUsable)
+            Err(ToolError::Obstacle)
         );
         print_space(&*tester.space(), (-1., 1., 1.));
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
