@@ -107,6 +107,13 @@ impl Slot {
             Slot::Stack(_, tool) => tool.icon(predefined),
         }
     }
+
+    pub fn count(&self) -> u16 {
+        match self {
+            Slot::Empty => 0,
+            Slot::Stack(count, _) => count.get(),
+        }
+    }
 }
 
 impl From<Tool> for Slot {
