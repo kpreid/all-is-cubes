@@ -558,6 +558,12 @@ impl AnimationHint {
         expect_shape_update: true,
         ..Self::UNCHANGING
     };
+
+    /// Returns whether this block's value for [`EvaluatedBlock::visible`] is likely to
+    /// change from `false` to `true`.
+    fn might_become_visible(&self) -> bool {
+        self.expect_shape_update
+    }
 }
 
 impl Default for AnimationHint {
@@ -632,6 +638,7 @@ pub struct EvaluatedBlock {
     pub visible: bool,
 }
 
+// TODO: Wait, this isn't really what ConciseDebug is for... shouldn't this be a regular impl Debug?
 impl CustomFormat<ConciseDebug> for EvaluatedBlock {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         fmt.debug_struct("EvaluatedBlock")
@@ -642,6 +649,16 @@ impl CustomFormat<ConciseDebug> for EvaluatedBlock {
             .field("resolution", &self.resolution)
             .field("voxels", &"...")
             .finish()
+    }
+}
+
+impl EvaluatedBlock {
+    /// Returns whether [`Self::visible`] is true (the block has some visible color/voxels)
+    /// or [`BlockAttributes::animation_hint`] indicates that the block might _become_
+    /// visible (by change of evaluation result rather than by being replaced).
+    #[inline]
+    pub(crate) fn visible_or_animated(&self) -> bool {
+        self.visible || self.attributes.animation_hint.might_become_visible()
     }
 }
 

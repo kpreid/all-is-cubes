@@ -174,7 +174,7 @@ impl Space {
                 total_ray_weight += 1.0;
             }
         } else {
-            let adjacent_faces = if ev_origin.visible {
+            let adjacent_faces = if ev_origin.visible_or_animated() {
                 // Non-opaque blocks should work the same as blocks which have all six adjacent faces present.
                 FaceMap::repeat(1.0)
             } else {
@@ -182,7 +182,7 @@ impl Space {
                     // We want directions that either face away from visible faces, or towards light sources.
                     if self
                         .get_evaluated(cube + face.opposite().normal_vector())
-                        .visible
+                        .visible_or_animated()
                         || self
                             .get_evaluated(cube + face.normal_vector())
                             .attributes
@@ -228,7 +228,7 @@ impl Space {
                         break 'raycast;
                     }
                     let ev_hit = self.get_evaluated(hit.cube_ahead());
-                    if !ev_hit.visible {
+                    if !ev_hit.visible_or_animated() {
                         // Completely transparent block is passed through.
                         continue 'raycast;
                     }
@@ -356,9 +356,11 @@ impl Space {
                         covered = true;
                         PackedLight::OPAQUE
                     } else {
-                        if this_cube_evaluated.visible
-                            || std::array::IntoIter::new(Face::ALL_SIX)
-                                .any(|face| self.get_evaluated(cube + face.normal_vector()).visible)
+                        if this_cube_evaluated.visible_or_animated()
+                            || std::array::IntoIter::new(Face::ALL_SIX).any(|face| {
+                                self.get_evaluated(cube + face.normal_vector())
+                                    .visible_or_animated()
+                            })
                         {
                             // In this case (and only this case), we are guessing rather than being certain,
                             // so we need to schedule a proper update.
@@ -647,6 +649,37 @@ mod tests {
                 py: Rgb::new(0.16210495, 0.3242099, 0.6484198),
                 pz: Rgb::new(0.2102241, 0.4204482, 0.8408964)
             },
+        );
+    }
+
+    /// Check that an animation hint causes a block and its neighbors to be lit even if
+    /// it isn't visible, to be prepared for changes.
+    #[test]
+    fn animation_treated_as_visible() {
+        fn eval_mid_block(block: Block) -> [LightStatus; 2] {
+            let mut space = Space::empty_positive(3, 3, 3);
+            space.set([1, 1, 1], block).unwrap();
+            space.evaluate_light(0, |_| {});
+            [
+                space.get_lighting([1, 1, 1]).status(),
+                space.get_lighting([0, 1, 1]).status(),
+            ]
+        }
+        let no_block = eval_mid_block(AIR);
+        let visible_block = eval_mid_block(Block::from(rgba_const!(1.0, 1.0, 1.0, 0.5)));
+        let invisible_but_animated = eval_mid_block(
+            Block::builder()
+                .color(Rgba::TRANSPARENT)
+                .animation_hint(AnimationHint::CONTINUOUS)
+                .build(),
+        );
+        assert_eq!(
+            [no_block, visible_block, invisible_but_animated,],
+            [
+                [LightStatus::NoRays, LightStatus::NoRays],
+                [LightStatus::Visible, LightStatus::Visible],
+                [LightStatus::Visible, LightStatus::Visible],
+            ]
         );
     }
 

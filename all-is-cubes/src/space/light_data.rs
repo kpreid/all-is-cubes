@@ -95,6 +95,11 @@ impl PackedLight {
     }
 
     // TODO: Expose LightStatus once we are more confident in its API stability
+    // This call is used just for tests for now
+    #[cfg(test)]
+    pub(super) fn status(&self) -> LightStatus {
+        self.status
+    }
 
     /// Returns true if the light value is meaningful, or false if it is
     /// inside an opaque block or in empty unlit air (in which case [`Self::value`]
