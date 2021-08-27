@@ -22,6 +22,7 @@ use crate::drawing::VoxelBrush;
 use crate::inv::Slot;
 use crate::listen::{DirtyFlag, FnListener, ListenableSource};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
+use crate::raycast::Face;
 use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
@@ -106,6 +107,8 @@ pub(crate) struct ToolbarController {
 }
 
 impl ToolbarController {
+    pub(crate) const TOOLBAR_STEP: GridCoordinate = 2;
+
     pub fn new(inventory_source: Option<URef<Character>>, layout: &HudLayout) -> Self {
         let todo = DirtyFlag::new(true);
 
@@ -119,6 +122,10 @@ impl ToolbarController {
             first_slot_position: layout.tool_icon_position(0),
             slot_count: layout.toolbar_positions,
         }
+    }
+
+    fn slot_position(&self, slot_index: usize) -> GridPoint {
+        self.first_slot_position + GridVector::unit_x() * 2 * slot_index as GridCoordinate
     }
 
     /// Helper for WidgetController impl; writes to the space without using self.character
@@ -135,9 +142,7 @@ impl ToolbarController {
                     break;
                 }
 
-                // TODO: refactor tool_icon_position to just be specified in ToolbarController's fields
-                let position =
-                    self.first_slot_position + GridVector::unit_x() * 2 * index as GridCoordinate;
+                let position = self.slot_position(index);
                 // Draw icon
                 space.set(position, &*stack.icon(&sv.hud_blocks.icons))?;
                 // Draw pointers.
@@ -166,6 +171,39 @@ impl ToolbarController {
 }
 
 impl WidgetController for ToolbarController {
+    fn initialize(&mut self, sv: &WidgetSpaceView<'_>) -> Result<(), Box<dyn Error>> {
+        let hud_blocks = sv.hud_blocks;
+        sv.space.try_modify(|space| {
+            let toolbar_disp = &mut space.draw_target(GridMatrix::from_origin(
+                self.slot_position(0),
+                Face::PX,
+                Face::NY,
+                Face::PZ,
+            ));
+            Pixel(Point::new(-1, 0), &hud_blocks.toolbar_left_cap)
+                .draw(toolbar_disp)
+                .unwrap();
+            Pixel(
+                Point::new((self.slot_count as i32 - 1) * Self::TOOLBAR_STEP + 1, 0),
+                &hud_blocks.toolbar_right_cap,
+            )
+            .draw(toolbar_disp)
+            .unwrap();
+            for index in 0..self.slot_count {
+                let x = index as i32 * Self::TOOLBAR_STEP;
+                Pixel(Point::new(x, 0), &hud_blocks.toolbar_middle)
+                    .draw(toolbar_disp)
+                    .unwrap();
+                if index > 0 {
+                    Pixel(Point::new(x - 1, 0), &hud_blocks.toolbar_divider)
+                        .draw(toolbar_disp)
+                        .unwrap();
+                }
+            }
+        })?;
+        Ok(())
+    }
+
     fn step(&mut self, sv: &WidgetSpaceView<'_>, _: Tick) -> Result<(), Box<dyn Error>> {
         if self.todo.get_and_clear() {
             if let Some(inventory_source) = &self.inventory_source {

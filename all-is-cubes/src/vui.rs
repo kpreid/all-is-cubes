@@ -117,7 +117,15 @@ impl Vui {
             paused,
         };
 
+        // Initialize widgets
         new_self.for_each_widget(|wc, sv| wc.initialize(sv));
+
+        // Initialize lighting
+        new_self
+            .hud_space
+            .try_modify(|space| space.evaluate_light(10, |_| {}))
+            .unwrap();
+
         new_self
     }
 

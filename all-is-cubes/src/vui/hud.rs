@@ -8,13 +8,12 @@ use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Primitive as _, Transform as _};
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Triangle};
 use embedded_graphics::Drawable as _;
-use embedded_graphics::Pixel;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
-use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
+use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
 use crate::space::{Grid, Space, SpacePhysics};
 
 use crate::universe::{URef, Universe};
@@ -44,7 +43,6 @@ impl Default for HudLayout {
     }
 }
 
-const TOOLBAR_STEP: GridCoordinate = 2;
 impl HudLayout {
     pub(crate) fn grid(&self) -> Grid {
         Grid::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
@@ -53,7 +51,11 @@ impl HudLayout {
     // TODO: taking the entire Universe doesn't seem like the best interface
     // but we want room to set up new blocks. Figure out a route for that.
     // TODO: validate this doesn't crash on wonky sizes.
-    pub(crate) fn new_space(&self, universe: &mut Universe, hud_blocks: &HudBlocks) -> URef<Space> {
+    pub(crate) fn new_space(
+        &self,
+        universe: &mut Universe,
+        _hud_blocks: &HudBlocks,
+    ) -> URef<Space> {
         let Vector2 { x: w, y: h } = self.size;
         let grid = self.grid();
         let mut space = Space::builder(grid)
@@ -79,36 +81,6 @@ impl HudLayout {
             add_frame(grid.upper_bounds().z - 1, Rgba::new(0., 1., 1., 1.));
         }
 
-        // Draw background for toolbar.
-        let toolbar_disp = &mut space.draw_target(GridMatrix::from_origin(
-            self.tool_icon_position(0),
-            Face::PX,
-            Face::NY,
-            Face::PZ,
-        ));
-        Pixel(Point::new(-1, 0), &hud_blocks.toolbar_left_cap)
-            .draw(toolbar_disp)
-            .unwrap();
-        Pixel(
-            Point::new((self.toolbar_positions as i32 - 1) * TOOLBAR_STEP + 1, 0),
-            &hud_blocks.toolbar_right_cap,
-        )
-        .draw(toolbar_disp)
-        .unwrap();
-        for index in 0..self.toolbar_positions {
-            let x = index as i32 * TOOLBAR_STEP;
-            Pixel(Point::new(x, 0), &hud_blocks.toolbar_middle)
-                .draw(toolbar_disp)
-                .unwrap();
-            if index > 0 {
-                Pixel(Point::new(x - 1, 0), &hud_blocks.toolbar_divider)
-                    .draw(toolbar_disp)
-                    .unwrap();
-            }
-        }
-
-        space.fast_evaluate_light();
-
         universe.insert_anonymous(space)
     }
 
@@ -118,10 +90,17 @@ impl HudLayout {
     }
 
     pub(crate) fn tool_icon_position(&self, index: usize) -> GridPoint {
-        let x_start =
-            (self.size.x - (self.toolbar_positions as GridCoordinate) * TOOLBAR_STEP + 1) / 2;
+        use super::widget::ToolbarController;
+        let x_start = (self.size.x
+            - (self.toolbar_positions as GridCoordinate) * ToolbarController::TOOLBAR_STEP
+            + 1)
+            / 2;
         // TODO: set depth sensibly
-        GridPoint::new(x_start + (index as GridCoordinate) * TOOLBAR_STEP, 1, 1)
+        GridPoint::new(
+            x_start + (index as GridCoordinate) * ToolbarController::TOOLBAR_STEP,
+            1,
+            1,
+        )
     }
 
     pub(super) fn toolbar_text_frame(&self) -> Grid {
@@ -133,10 +112,10 @@ impl HudLayout {
 pub(crate) struct HudBlocks {
     pub(crate) icons: BlockProvider<Icons>,
     pub(crate) text: VoxelBrush<'static>,
-    toolbar_left_cap: VoxelBrush<'static>,
-    toolbar_right_cap: VoxelBrush<'static>,
-    toolbar_divider: VoxelBrush<'static>,
-    toolbar_middle: VoxelBrush<'static>,
+    pub(crate) toolbar_left_cap: VoxelBrush<'static>,
+    pub(crate) toolbar_right_cap: VoxelBrush<'static>,
+    pub(crate) toolbar_divider: VoxelBrush<'static>,
+    pub(crate) toolbar_middle: VoxelBrush<'static>,
     /// Index is a bitmask of "selected_slots[i] == this slot"
     pub(crate) toolbar_pointer: [VoxelBrush<'static>; 4],
 }
