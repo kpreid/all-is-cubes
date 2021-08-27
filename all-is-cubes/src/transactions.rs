@@ -161,10 +161,10 @@ pub struct PreconditionFailed {
 #[error("Conflict between transactions")]
 pub struct TransactionConflict {}
 
-/// Specifies a canonical transaction type for a target type.
+/// Specifies a canonical [`Transaction`] type for the implementing type.
 ///
-/// `Transaction<T>` may be implemented by multiple types but there can be at most one
-/// `<T as Transactional>::Transaction`.
+/// [`Transaction<T>`](Transaction) may be implemented by multiple types but there can
+/// be at most one `<T as Transactional>::Transaction`.
 pub trait Transactional {
     type Transaction: Transaction<Self>;
 }
@@ -172,7 +172,8 @@ pub trait Transactional {
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
 ///
 /// Most code should be able to call [`Transaction::bind`] rather than mentioning this
-/// trait at all.
+/// trait at all; it is an implementation detail of the conversion that unfortunately
+/// cannot be hidden.
 pub trait UTransactional: Transactional + 'static
 where
     Self: Sized,

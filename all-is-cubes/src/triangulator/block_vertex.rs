@@ -92,12 +92,16 @@ impl fmt::Debug for Coloring {
     }
 }
 
-/// A custom representation of [`BlockVertex`] suitable for the target graphics system.
+/// A custom representation of [`BlockVertex`] suitable for a specific graphics system.
 ///
-/// The life cycle of a `GfxVertex`: first, it is constructed by the triangulator for a
-/// block. Then, whenever the block appears in a [`Space`](crate::space::Space), the block
-/// vertices are copied to become the space vertices, and `instantiate` is called on each
-/// one to position it at the particular location.
+/// The life cycle of a [`GfxVertex`]:
+///
+/// * First, it is constructed by [`triangulate_block`](super::triangulate_block)
+///   for a particular block.
+/// * Then, whenever that block appears in a [`Space`](crate::space::Space) to be
+///   triangulated, the block vertices are copied to become the space vertices, and
+///   [`GfxVertex::instantiate_vertex`] is called on each one to position it at the
+///   particular block's location.
 pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
     /// Number type for the vertex position coordinates.
     type Coordinate: cgmath::BaseFloat;

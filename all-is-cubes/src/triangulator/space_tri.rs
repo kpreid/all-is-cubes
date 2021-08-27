@@ -353,6 +353,9 @@ impl<GV> Default for SpaceTriangulation<GV> {
 /// This trait allows the caller of [`SpaceTriangulation::compute`] to provide an
 /// implementation which records which blocks were actually used, for precise
 /// invalidation.
+///
+/// TODO: Is this actually a useful interface, or should we just have a separate
+/// callback for the recording?
 pub trait BlockTriangulationProvider<'a, V, T> {
     fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<V, T>>;
 }

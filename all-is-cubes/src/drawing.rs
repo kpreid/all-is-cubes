@@ -123,9 +123,14 @@ impl From<Rgb888> for Rgb {
     }
 }
 
+/// Allows “drawing” blocks onto a [`DrawingPlane`], a two-dimensional coordinate system
+/// established within a [`Space`].
+///
 /// Builds on [`PixelColor`] by defining a conversion to [`Block`]s and tracking depth.
-/// Any `VoxelColor` may be used to draw on a [`DrawingPlane`].
+/// [`PixelColor::Raw`] is ignored; the supertrait is present only because
+/// [`embedded_graphics`] requires it.
 pub trait VoxelColor<'a>: PixelColor {
+    /// Returns a corresponding [`VoxelBrush`], the most general form of blocky drawing.
     fn into_blocks(self) -> VoxelBrush<'a>;
 
     /// Returns the range of Z coordinates that the blocks painted by this color value

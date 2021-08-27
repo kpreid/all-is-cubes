@@ -114,18 +114,17 @@ impl<M> fmt::Debug for Notifier<M> {
 }
 
 /// A receiver of messages which can indicate when it is no longer interested in
-/// them (typically because the associated recipient has been dropped). Note that
-/// a Listener must use interior mutability to store the message. As a Listener
-/// may be called from various contexts, that mutability should in general be limited
-/// to setting dirty flags or inserting into message queues — not triggering any
-/// state changes of more general interest.
+/// them (typically because the associated recipient has been dropped).
 pub trait Listener<M> {
     /// Process and store a message.
     ///
-    /// As a Listener may be called from various contexts, this method should avoid
-    /// triggering further side effects, by setting dirty flags or inserting into
-    /// message queues — definitely not taking a lock that is not for the sole use
-    /// of the `Listener` and its destination.
+    /// Note that, since this method takes `&Self`, a Listener must use interior
+    /// mutability of some variety to store the message. As a `Listener` may be called
+    /// from various contexts, and in particular while the sender is still performing
+    /// its work, that mutability should in general be limited to setting dirty flags
+    /// or inserting into message queues — not attempting to directly perform further
+    /// game state changes, and particularly not taking any locks that are not solely
+    /// used by the `Listener` and its destination, as that could result in deadlock.
     fn receive(&self, message: M);
 
     /// Returns [`false`] if the [`Listener`] should not receive any further messages
@@ -342,7 +341,8 @@ impl<M> Listener<M> for DirtyFlagListener {
     }
 }
 
-/// A [`Listener`] which transforms messages before passing them on.
+/// A [`Listener`] which transforms or discards messages before passing them on.
+/// Construct this using [`Listener::filter`].
 ///
 /// This may be used to drop uninteresting messages or reduce their granularity.
 ///

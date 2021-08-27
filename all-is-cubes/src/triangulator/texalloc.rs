@@ -44,8 +44,8 @@ pub trait TextureTile: Clone {
     fn grid(&self) -> Grid;
 
     /// Transform a coordinate in the coordinate system of, and within, [`Self::grid()`]
-    /// (that is, where 1 unit = 1 texel) into texture coordinates within the entire
-    /// atlas texture (1 unit = entire texture width), suitable for vertex attributes.
+    /// (that is, where 1 unit = 1 texel) into texture coordinates suitable for the
+    /// target [`GfxVertex`](super::GfxVertex) type.
     fn grid_to_texcoord(
         &self,
         in_tile_grid: Vector3<TextureCoordinate>,

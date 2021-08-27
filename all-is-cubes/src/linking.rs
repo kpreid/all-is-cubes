@@ -26,16 +26,38 @@ fn name_in_module<E: BlockModule>(key: &E) -> Name {
     Name::from(format!("{}/{}", E::namespace(), key).as_str())
 }
 
-// TODO: document
+/// Allows the use of [`BlockProvider::default`] to construct a [`BlockProvider`]
+/// using this type as its set of keys. [`Self::default`] will be called once for
+/// each value of [`Self`].
+///
+/// See [`BlockModule`] for related expectations.
 pub trait DefaultProvision {
     fn default(self) -> Block;
 }
 
-// TODO: consider replacing Display (presumed derived by strum) with a special trait
+/// Types whose values identify blocks in a set of related blocks, which may be
+/// stored in a [`BlockProvider`] or under specific names in a [`Universe`].
+///
+/// The names of the [`Universe`]'s corresponding [`BlockDef`]s are formed by
+/// combining the [`namespace()`](Self::namespace) and `self.to_string()` (the
+/// [`Display`] trait implementation).
+///
+/// Implement this trait for a fieldless enum, then use the functions of
+/// [`BlockProvider`] to work with the described set of blocks.
+///
+/// TODO: consider replacing Display (presumed derived by `strum`) with a special trait
+///
+/// TODO: Consider replacing `strum` entirely with something that supports enums with
+/// fields, allowing handling of sub-groups of related blocks that might be identified
+/// by other data (e.g. numbers) than a single enum variant.
 pub trait BlockModule: Display + IntoEnumIterator + Eq + Hash + Clone {
+    /// A namespace for the members of this module; currently, this should be a
+    /// `/`-separated path with no trailing slash, but (TODO:) we should have a
+    /// more rigorous namespace scheme for [`Name`]s in future versions.
     fn namespace() -> &'static str;
 }
 
+// TODO: document
 #[derive(Clone, Debug)]
 pub struct BlockProvider<E> {
     /// Guaranteed to contain an entry for every variant of `E` if `E`'s

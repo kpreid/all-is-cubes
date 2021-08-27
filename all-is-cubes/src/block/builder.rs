@@ -160,6 +160,9 @@ impl<C> BlockBuilder<C> {
     /// Converts this builder into a block value and stores it as a [`BlockDef`] in
     /// the given [`Universe`] with the given name, then returns a [`Block::Indirect`]
     /// referring to it.
+    // TODO: This is not being used, because most named block definitions use BlockProvider,
+    // and complicates the builder unnecessarily. Remove it or figure out how it aligns with
+    // BlockProvider.
     pub fn into_named_definition(
         self,
         universe: &mut Universe,

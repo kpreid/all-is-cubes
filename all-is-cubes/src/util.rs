@@ -8,8 +8,15 @@ use std::fmt::{self, Debug, Display};
 use std::marker::PhantomData;
 use std::time::Duration;
 
-/// Objects for which alternate textual representations can be generated.
-/// These are analogous to [`Display`] and [`Debug`], but have additional options.
+/// Generic extension to [`std::fmt`'s set of formatting traits](std::fmt#formatting-traits).
+///
+/// This can be thought of as a mechanism to easily create a new special-purpose
+/// formatting trait, analogous to [`std::fmt::LowerHex`] or [`std::fmt::Pointer`].
+/// Instead of implementing the entire necessary wrapper and setup code, implementations
+/// need only be types representing the choice of formatting (e.g. [`ConciseDebug`]),
+/// and [`CustomFormat::custom_format`] provides a wrapper which may be used to cause
+/// a value implementing `CustomFormat<T>` to be formatted using
+/// [`CustomFormat<T>::fmt`](Self::fmt).
 pub trait CustomFormat<F: Copy> {
     /// Wrap this value so that when formatted with [`Debug`] or [`Display`] it uses
     /// the given custom format instead.
