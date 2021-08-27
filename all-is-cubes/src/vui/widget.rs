@@ -41,8 +41,16 @@ impl WidgetSpaceView<'_> {}
 ///
 /// TODO: Merge this into the Behavior trait
 pub(crate) trait WidgetController: Debug {
+    /// Write the initial state of the widget to the space.
+    ///
     /// TODO: Replace direct mutations with returning a UniverseTransaction
-    /// TODO: Be more specific than Box<dyn Error>
+    /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
+    fn initialize(&mut self, _sv: &WidgetSpaceView<'_>) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+
+    /// TODO: Replace direct mutations with returning a UniverseTransaction
+    /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
     fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Result<(), Box<dyn Error>>;
 }
 

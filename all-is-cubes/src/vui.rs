@@ -7,6 +7,7 @@
 //! GUI as well as the game.
 
 use std::cell::RefCell;
+use std::error::Error;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
 
@@ -99,7 +100,7 @@ impl Vui {
             ),
         ];
 
-        Self {
+        let mut new_self = Self {
             universe,
             current_space: hud_space.clone(),
             hud_blocks,
@@ -114,7 +115,10 @@ impl Vui {
 
             mouselook_mode: input_processor.mouselook_mode(),
             paused,
-        }
+        };
+
+        new_self.for_each_widget(|wc, sv| wc.initialize(sv));
+        new_self
     }
 
     // TODO: It'd be more encapsulating if we could provide a _read-only_ reference...
@@ -164,18 +168,28 @@ impl Vui {
     }
 
     pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
+        self.for_each_widget(|controller, sv| controller.step(sv, tick));
+
+        self.universe.step(tick)
+    }
+
+    fn for_each_widget<F>(&mut self, mut f: F)
+    where
+        F: for<'a, 'b> FnMut(
+            &mut dyn WidgetController,
+            &'a WidgetSpaceView<'b>,
+        ) -> Result<(), Box<dyn Error>>,
+    {
         let sv = WidgetSpaceView {
             hud_blocks: &self.hud_blocks,
             space: self.hud_space.clone(),
         };
         for controller in &mut self.hud_widgets {
-            if let Err(e) = controller.step(&sv, tick) {
+            if let Err(e) = f(&mut **controller, &sv) {
                 // TODO: reduce log-spam if this ever happens
                 log::error!("VUI widget error: {}\nSource:{:#?}", e, controller);
             }
         }
-
-        self.universe.step(tick)
     }
 
     pub fn show_tool_error(&mut self, error: ToolError) {
