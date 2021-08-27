@@ -60,7 +60,8 @@ impl<C> BlockBuilder<C> {
     // Doing that will also require creating non-trait-using alternate methods,
     // until const traits https://github.com/rust-lang/rust/issues/67792 is also available.
 
-    /// Sets the value for [`BlockAttributes::display_name`].
+    /// Sets the [`BlockAttributes`] the block will have.
+    /// This replaces individual attribute values set using other builder methods.
     pub fn attributes(mut self, value: BlockAttributes) -> Self {
         self.attributes = value;
         self

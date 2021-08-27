@@ -869,18 +869,25 @@ impl SpaceBlockData {
     // but might be interesting 'statistics'.
 }
 
-/// The global characteristics of a [`Space`].
+/// The global characteristics of a [`Space`], more or less independent of location within
+/// the block grid.
 ///
-/// This is a separate type so that [`Space`] does not need a large set of accessors
-/// and the state consists of just this and the blocks.
+/// This is a separate type so that [`Space`] does not need many miscellaneous accessors,
+/// and so an instance of it can be reused for similar spaces (e.g.
+/// [`DEFAULT_FOR_BLOCK`](Self::DEFAULT_FOR_BLOCK)).
 #[derive(Clone, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct SpacePhysics {
     /// Gravity vector for moving objects, in cubes/s².
+    ///
+    /// TODO: Expand this to an enum which allows non-uniform gravity patterns.
     pub gravity: Vector3<NotNan<FreeCoordinate>>,
 
     /// Color of light arriving from outside the space, used for light calculation
     /// and rendering.
+    ///
+    /// TODO: Consider replacing this with some sort of cube map, spherical harmonics,
+    /// or some such to allow for non-uniform illumination.
     pub sky_color: Rgb,
 
     /// Method used to compute the illumination of individual blocks.
@@ -895,6 +902,8 @@ impl SpacePhysics {
         light: LightPhysics::DEFAULT,
     };
 
+    /// Recommended defaults for spaces which are going to define a [`Block`]'s voxels.
+    /// In particular, disables light since it will not be used.
     pub const DEFAULT_FOR_BLOCK: Self = Self {
         gravity: Vector3::new(notnan!(0.), notnan!(0.), notnan!(0.)),
         sky_color: rgb_const!(0.5, 0.5, 0.5),

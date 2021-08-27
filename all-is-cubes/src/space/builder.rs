@@ -10,7 +10,7 @@ use crate::space::{Grid, LightPhysics, Space, SpacePhysics};
 
 /// Tool for constructing new [`Space`]s.
 ///
-/// To create one, call [`Space::builder(grid)`].
+/// To create one, call [`Space::builder(grid)`](Space::builder).
 ///
 /// TODO: Allow specifying behaviors and initial block contents.
 #[derive(Clone, Debug, Eq, PartialEq)]
