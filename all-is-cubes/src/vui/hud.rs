@@ -26,6 +26,8 @@ pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFo
 /// parameters not primarily dependent on user interaction. This split is intended to
 /// simplify the problem of adapting to size changes (though right now there is no
 /// actual such handling).
+///
+/// TODO: Since introducing widgets, HudLayout does much less work. Think about whether it should exist.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HudLayout {
     size: Vector2<GridCoordinate>,
@@ -89,15 +91,13 @@ impl HudLayout {
         GridPoint::new(self.size.x / 2, self.size.y / 2, 0)
     }
 
-    pub(crate) fn tool_icon_position(&self, index: usize) -> GridPoint {
+    pub(crate) fn first_tool_icon_position(&self) -> GridPoint {
         use super::widget::ToolbarController;
-        let x_start = (self.size.x
-            - (self.toolbar_positions as GridCoordinate) * ToolbarController::TOOLBAR_STEP
-            + 1)
-            / 2;
-        // TODO: set depth sensibly
         GridPoint::new(
-            x_start + (index as GridCoordinate) * ToolbarController::TOOLBAR_STEP,
+            (self.size.x
+                - (self.toolbar_positions as GridCoordinate) * ToolbarController::TOOLBAR_STEP
+                + 1)
+                / 2,
             1,
             1,
         )
@@ -108,6 +108,7 @@ impl HudLayout {
     }
 }
 
+// TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.
 #[derive(Debug, Clone)]
 pub(crate) struct HudBlocks {
     pub(crate) icons: BlockProvider<Icons>,

@@ -119,7 +119,7 @@ impl ToolbarController {
         Self {
             todo,
             inventory_source,
-            first_slot_position: layout.tool_icon_position(0),
+            first_slot_position: layout.first_tool_icon_position(),
             slot_count: layout.toolbar_positions,
         }
     }
