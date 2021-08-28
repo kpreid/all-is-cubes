@@ -73,9 +73,11 @@ const NN0: NotNan<f32> = notnan!(0.0);
 const NN1: NotNan<f32> = notnan!(1.0);
 
 impl Rgb {
-    /// Black.
+    /// Black; the constant equal to `Rgb::new(0., 0., 0.).unwrap()`.
     pub const ZERO: Rgb = Rgb(Vector3::new(NN0, NN0, NN0));
-    /// White (unity brightness).
+    /// Nominal white; the constant equal to `Rgb::new(1., 1., 1.).unwrap()`.
+    ///
+    /// Note that brighter values may exist; the color system “supports HDR”.
     pub const ONE: Rgb = Rgb(Vector3::new(NN1, NN1, NN1));
 
     /// Constructs a color from components. Panics if any component is NaN.
@@ -121,6 +123,12 @@ impl Rgb {
     pub const fn blue(self) -> NotNan<f32> {
         self.0.z
     }
+
+    /// Clamp each component to lie within the range 0 to 1, inclusive.
+    #[inline]
+    pub fn clamp(self) -> Self {
+        Self(self.0.map(|c| c.clamp(NN0, NN1)))
+    }
 }
 impl Rgba {
     /// Transparent black (all components zero); identical to
@@ -129,8 +137,6 @@ impl Rgba {
     /// Black; identical to `Rgba::new(0.0, 0.0, 0.0, 1.0)` except for being a constant.
     pub const BLACK: Rgba = Rgba(Vector4::new(NN0, NN0, NN0, NN1));
     /// White; identical to `Rgba::new(1.0, 1.0, 1.0, 1.0)` except for being a constant.
-    ///
-    /// Note that brighter values may exist; this is only a "nominal" white.
     pub const WHITE: Rgba = Rgba(Vector4::new(NN1, NN1, NN1, NN1));
 
     /// Constructs a color from components. Panics if any component is NaN.
@@ -248,6 +254,12 @@ impl Rgba {
             component_from_srgb_8bit(rgba[2]),
             component_from_linear_8bit(rgba[3]),
         ))
+    }
+
+    /// Clamp each component to lie within the range 0 to 1, inclusive.
+    #[inline]
+    pub fn clamp(self) -> Self {
+        Self(self.0.map(|c| c.clamp(NN0, NN1)))
     }
 }
 
