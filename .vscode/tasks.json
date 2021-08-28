@@ -2,10 +2,12 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "all-is-cubes: build all",
-			"type": "shell",
-			"command": "make",
-			"args": [],
+			"label": "all-is-cubes: lint all",
+			"type": "cargo",
+			"command": "xtask",
+			"args": [
+				"lint"
+			],
 			"problemMatcher": [
 				"$rustc"
 			],
@@ -16,8 +18,8 @@
 		},
 		{
 			"label": "all-is-cubes: test all",
-			"type": "shell",
-			"command": "make",
+			"type": "cargo",
+			"command": "xtask",
 			"args": [
 				"test"
 			],
@@ -45,8 +47,8 @@
 		},
 		{
 			"label": "all-is-cubes: run dev-server",
-			"type": "shell",
-			"command": "make",
+			"type": "cargo",
+			"command": "xtask",
 			"args": [
 				"run-dev",
 			],
