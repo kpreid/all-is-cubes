@@ -8,6 +8,7 @@ use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
 use cgmath::EuclideanSpace as _;
+use embedded_graphics::mono_font::iso_8859_1;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::Point;
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
@@ -16,8 +17,9 @@ use instant::Duration;
 use once_cell::sync::Lazy;
 
 use crate::apps::Tick;
-use crate::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
+use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
+use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::Slot;
 use crate::listen::{DirtyFlag, FnListener, ListenableSource};
@@ -102,25 +104,50 @@ pub(crate) struct ToolbarController {
     /// TODO: Generalize to noncharacters
     inventory_source: Option<URef<Character>>,
     first_slot_position: GridPoint,
-    /// TODO: replace with a range so we can have multiple things
     slot_count: usize,
+    /// Space for drawing per-slot text labels
+    slot_text_space: URef<Space>,
+    slot_text_resolution: Resolution,
 }
 
 impl ToolbarController {
     pub(crate) const TOOLBAR_STEP: GridCoordinate = 2;
 
-    pub fn new(inventory_source: Option<URef<Character>>, layout: &HudLayout) -> Self {
+    pub fn new(
+        inventory_source: Option<URef<Character>>,
+        layout: &HudLayout,
+        universe: &mut Universe,
+    ) -> Self {
+        let slot_count = layout.toolbar_positions;
+
         let todo = DirtyFlag::new(true);
 
         if let Some(character) = &inventory_source {
             character.borrow().listen(todo.listener());
         }
 
+        let slot_text_resolution: Resolution = 32;
+        let slot_text_space = universe.insert_anonymous(
+            Space::builder(Grid::new(
+                GridPoint::origin(),
+                // TODO: shrink vertical axis to fit text, once we've debugged it
+                GridVector::new(
+                    GridCoordinate::from(slot_text_resolution) * slot_count as GridCoordinate,
+                    GridCoordinate::from(slot_text_resolution),
+                    1,
+                ),
+            ))
+            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+            .build_empty(),
+        );
+
         Self {
             todo,
             inventory_source,
             first_slot_position: layout.first_tool_icon_position(),
-            slot_count: layout.toolbar_positions,
+            slot_count,
+            slot_text_space,
+            slot_text_resolution,
         }
     }
 
@@ -135,6 +162,38 @@ impl ToolbarController {
         slots: &[Slot],
         selected_slots: &[usize],
     ) -> Result<(), Box<dyn Error>> {
+        // Update stack count text.
+        self.slot_text_space.try_modify(|text_space| {
+            // Erase old text.
+            // TODO: Do this incrementally and only-if-different.
+            // Maybe we should have a text-updating abstraction for this *and* the tooltip?
+            text_space.fill_uniform(text_space.grid(), &AIR).unwrap();
+
+            let plane = &mut text_space.draw_target(GridMatrix::FLIP_Y);
+            for index in 0..self.slot_count {
+                Text::with_text_style(
+                    &match slots.get(index).unwrap_or(&Slot::Empty).count() {
+                        0 | 1 => String::default(),
+                        count => format!("{}", count),
+                    },
+                    Point::new(
+                        // index + 1 locates the right edge of the space for index
+                        (index as i32 + 1) * i32::from(self.slot_text_resolution),
+                        // baseline tweak to taste
+                        -4,
+                    ),
+                    // TODO: review font choices
+                    MonoTextStyle::new(&iso_8859_1::FONT_6X10, palette::ALMOST_BLACK),
+                    TextStyleBuilder::new()
+                        .baseline(Baseline::Bottom)
+                        .alignment(Alignment::Right)
+                        .build(),
+                )
+                .draw(plane)
+                .unwrap();
+            }
+        })?;
+
         sv.space.try_modify(|space| {
             for (index, stack) in slots.iter().enumerate() {
                 if index >= self.slot_count {
@@ -199,6 +258,27 @@ impl WidgetController for ToolbarController {
                         .draw(toolbar_disp)
                         .unwrap();
                 }
+            }
+
+            // Place stack-count text blocks. This is done separately because it's easier
+            // without getting `draw_target` involved.
+            for index in 0..self.slot_count {
+                space
+                    .set(
+                        self.slot_position(index) + GridVector::new(-1, 0, 0),
+                        Block::Recur {
+                            attributes: BlockAttributes::default(),
+                            offset: GridPoint::new(
+                                index as GridCoordinate
+                                    * GridCoordinate::from(self.slot_text_resolution),
+                                0,
+                                1 - GridCoordinate::from(self.slot_text_resolution), // align to front face
+                            ),
+                            resolution: self.slot_text_resolution,
+                            space: self.slot_text_space.clone(),
+                        },
+                    )
+                    .unwrap();
             }
         })?;
         Ok(())

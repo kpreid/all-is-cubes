@@ -81,7 +81,11 @@ impl Vui {
 
         // TODO: HudLayout should take care of this maybe
         let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
-            Box::new(ToolbarController::new(character, &hud_layout)),
+            Box::new(ToolbarController::new(
+                character,
+                &hud_layout,
+                &mut universe,
+            )),
             Box::new(CrosshairController::new(
                 hud_layout.crosshair_position(),
                 input_processor.mouselook_mode(),
