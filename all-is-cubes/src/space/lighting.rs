@@ -245,7 +245,7 @@ impl Space {
                         }
                         let stored_light = self.get_lighting(light_cube);
 
-                        let surface_color = ev_hit.color.to_rgb() * SURFACE_ABSORPTION
+                        let surface_color = ev_hit.color.clamp().to_rgb() * SURFACE_ABSORPTION
                             + Rgb::ONE * (1. - SURFACE_ABSORPTION);
                         let light_from_struck_face =
                             ev_hit.attributes.light_emission + stored_light.value() * surface_color;
@@ -681,6 +681,22 @@ mod tests {
                 [LightStatus::Visible, LightStatus::Visible],
             ]
         );
+    }
+
+    #[test]
+    fn reflectance_is_clamped() {
+        let over_unity_block = Block::from(rgba_const!(16.0, 1.0, 0.0, 1.0));
+        let sky_color = rgb_const!(0.5, 0.5, 0.5);
+        let mut space = Space::builder(Grid::new([0, 0, 0], [5, 3, 3]))
+            .sky_color(sky_color)
+            .build_empty();
+        space.set([1, 1, 1], &over_unity_block).unwrap();
+        space.set([3, 1, 1], &over_unity_block).unwrap();
+        space.evaluate_light(0, |_| {});
+
+        let light = space.get_lighting([2, 1, 1]).value();
+        dbg!(light);
+        assert!(light.red() <= sky_color.red());
     }
 
     /// Helper to construct a space with LightPhysics set to None
