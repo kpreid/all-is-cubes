@@ -30,8 +30,8 @@ pub enum Tool {
     /// as opposed to editing it. Used for [`vui`](crate::vui) interaction.
     Activate,
 
-    /// Destroy any targeted block.
-    DeleteBlock,
+    /// Destroy any targeted block. If `keep` is true, move it to inventory.
+    RemoveBlock { keep: bool },
 
     /// Move the given block out of inventory (consuming this tool) into the targeted
     /// empty space.
@@ -91,11 +91,22 @@ impl Tool {
                     Err(ToolError::NotUsable) // TODO: communicate permanent error
                 }
             }
-            Self::DeleteBlock => {
+            Self::RemoveBlock { keep } => {
                 let cursor = input.cursor()?;
+                let deletion = input.set_cube(cursor.place.cube, cursor.block.clone(), AIR)?;
                 Ok((
                     Some(self),
-                    input.set_cube(cursor.place.cube, cursor.block.clone(), AIR)?,
+                    if keep {
+                        deletion
+                            .merge(
+                                input.produce_item(Tool::Block(
+                                    cursor.block.clone().unspecialize(),
+                                ))?,
+                            )
+                            .unwrap()
+                    } else {
+                        deletion
+                    },
                 ))
             }
             Self::Block(ref block) => {
@@ -148,7 +159,8 @@ impl Tool {
         match self {
             Self::Activate => Cow::Borrowed(&predefined[Icons::Activate]),
             Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
-            Self::DeleteBlock => Cow::Borrowed(&predefined[Icons::Delete]),
+            // TODO: Give Remove different icons
+            Self::RemoveBlock { keep: _ } => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             Self::Block(block) | Self::InfiniteBlocks(block) => Cow::Borrowed(block),
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
@@ -203,6 +215,7 @@ impl ToolInput {
     /// Add the provided item to the inventory from which the tool was used.
     pub fn produce_item(&self, item: Tool) -> Result<UniverseTransaction, ToolError> {
         if let Some(ref character) = self.character {
+            // TODO: pre-check whether there's enough inventory space
             Ok(
                 CharacterTransaction::inventory(InventoryTransaction::insert(item))
                     .bind(character.clone()),
@@ -407,36 +420,55 @@ mod tests {
     }
 
     #[test]
-    fn icon_delete_block() {
+    fn icon_remove_block() {
         let dummy_icons = dummy_icons();
         assert_eq!(
-            &*Tool::DeleteBlock.icon(&dummy_icons),
+            &*Tool::RemoveBlock { keep: true }.icon(&dummy_icons),
             &dummy_icons[Icons::Delete]
         );
     }
 
     #[test]
-    fn use_delete_block() {
-        let [existing] = make_some_blocks();
-        let mut tester = ToolTester::new(|space| {
-            space.set((1, 0, 0), &existing).unwrap();
-        });
-        let transaction = tester.equip_and_use_tool(Tool::DeleteBlock).unwrap();
-        assert_eq!(
-            transaction,
-            SpaceTransaction::set_cube([1, 0, 0], Some(existing.clone()), Some(AIR))
-                .bind(tester.space_ref.clone())
-        );
-        transaction.execute(&mut tester.universe).unwrap();
-        print_space(&*tester.space(), (-1., 1., 1.));
-        assert_eq!(&tester.space()[(1, 0, 0)], &AIR);
+    fn use_remove_block() {
+        for keep in [false, true] {
+            let [existing] = make_some_blocks();
+            let mut tester = ToolTester::new(|space| {
+                space.set((1, 0, 0), &existing).unwrap();
+            });
+            let actual_transaction = tester
+                .equip_and_use_tool(Tool::RemoveBlock { keep })
+                .unwrap();
+
+            let expected_delete =
+                SpaceTransaction::set_cube([1, 0, 0], Some(existing.clone()), Some(AIR))
+                    .bind(tester.space_ref.clone());
+            assert_eq!(
+                actual_transaction,
+                if keep {
+                    expected_delete
+                        .merge(
+                            CharacterTransaction::inventory(InventoryTransaction::insert(
+                                Tool::Block(existing),
+                            ))
+                            .bind(tester.character_ref.clone()),
+                        )
+                        .unwrap()
+                } else {
+                    expected_delete
+                }
+            );
+
+            actual_transaction.execute(&mut tester.universe).unwrap();
+            print_space(&*tester.space(), (-1., 1., 1.));
+            assert_eq!(&tester.space()[(1, 0, 0)], &AIR);
+        }
     }
 
     #[test]
-    fn use_delete_block_without_target() {
+    fn use_remove_block_without_target() {
         let tester = ToolTester::new(|_space| {});
         assert_eq!(
-            tester.equip_and_use_tool(Tool::DeleteBlock),
+            tester.equip_and_use_tool(Tool::RemoveBlock { keep: true }),
             Err(ToolError::NothingSelected)
         );
     }

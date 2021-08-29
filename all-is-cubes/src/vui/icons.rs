@@ -12,6 +12,9 @@ use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgba}
 use crate::space::{Space, SpacePhysics};
 use crate::universe::Universe;
 
+#[cfg(doc)]
+use crate::inv::Tool;
+
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
@@ -22,11 +25,11 @@ pub enum Icons {
     Crosshair,
     /// Icon for an empty toolbar slot.
     EmptySlot,
-    /// Icon for `Tool::Activate`,
+    /// Icon for [`Tool::Activate`],
     Activate,
-    /// Icon for `Tool::DeleteBlock`.
+    /// Icon for [`Tool::RemoveBlock`].
     Delete,
-    /// Icon for `Tool::CopyFromSpace`.
+    /// Icon for [`Tool::CopyFromSpace`].
     CopyFromSpace,
 }
 

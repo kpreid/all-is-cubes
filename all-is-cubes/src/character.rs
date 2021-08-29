@@ -100,7 +100,7 @@ impl Character {
         let mut inventory = vec![Slot::Empty; 11];
         let delete_slot = 9;
         let copy_slot = 10;
-        inventory[delete_slot] = Tool::DeleteBlock.into();
+        inventory[delete_slot] = Tool::RemoveBlock { keep: true }.into();
         inventory[copy_slot] = Tool::CopyFromSpace.into();
         let mut free = 0;
         'fill: for item in spawn.inventory.iter() {

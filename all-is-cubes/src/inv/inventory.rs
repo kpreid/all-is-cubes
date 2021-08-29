@@ -293,11 +293,12 @@ mod tests {
 
     #[test]
     fn inventory_txn_insert_success() {
+        let occupied_slot: Slot = Tool::CopyFromSpace.into();
         let mut inventory = Inventory::from_slots(vec![
-            Tool::DeleteBlock.into(),
-            Tool::DeleteBlock.into(),
+            occupied_slot.clone(),
+            occupied_slot.clone(),
             Slot::Empty,
-            Tool::DeleteBlock.into(),
+            occupied_slot,
             Slot::Empty,
         ]);
         let new_item = Tool::InfiniteBlocks(Rgba::WHITE.into());
@@ -316,7 +317,10 @@ mod tests {
 
     #[test]
     fn inventory_txn_insert_no_space() {
-        let contents = vec![Slot::from(Tool::DeleteBlock), Slot::from(Tool::DeleteBlock)];
+        let contents = vec![
+            Slot::from(Tool::CopyFromSpace),
+            Slot::from(Tool::CopyFromSpace),
+        ];
         let inventory = Inventory::from_slots(contents.clone());
         let new_item = Tool::InfiniteBlocks(Rgba::WHITE.into());
 
