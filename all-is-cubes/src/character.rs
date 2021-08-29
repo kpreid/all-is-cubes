@@ -601,15 +601,8 @@ mod tests {
                 |_, _| Ok(()),
             )
             // Inventory transactions
-            .transaction(
-                CharacterTransaction::inventory(InventoryTransaction::insert(new_item_1.clone())),
-                |_, after| {
-                    if !after.inventory().slots.contains(&new_item_1) {
-                        return Err("missing added new_item_1".into());
-                    }
-                    Ok(())
-                },
-            )
+            // Note: Inventory transactions are tested separately from inventory.rs; these are just
+            // for checking the integration with Character.
             .transaction(
                 CharacterTransaction::inventory(InventoryTransaction::replace(
                     0,

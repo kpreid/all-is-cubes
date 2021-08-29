@@ -264,11 +264,20 @@ impl Transaction<Inventory> for InventoryTransaction {
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
         // Check replacements and notice if any slots are becoming empty
         for (&slot, (old, _new)) in self.replace.iter() {
-            if inventory.slots[slot] != *old {
-                return Err(PreconditionFailed {
-                    location: "Inventory",
-                    problem: "old slot not as expected",
-                }); // TODO: it would be nice to squeeze in the slot number
+            match inventory.slots.get(slot) {
+                None => {
+                    return Err(PreconditionFailed {
+                        location: "Inventory",
+                        problem: "slot out of bounds",
+                    });
+                }
+                Some(actual_old) if actual_old != old => {
+                    return Err(PreconditionFailed {
+                        location: "Inventory",
+                        problem: "old slot not as expected",
+                    }); // TODO: it would be nice to squeeze in the slot number
+                }
+                _ => {}
             }
         }
 
@@ -341,13 +350,14 @@ mod tests {
     use super::*;
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
+    use crate::transactions::TransactionTester;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
 
     // TODO: test for Inventory::use_tool
 
     #[test]
-    fn inventory_txn_insert_success() {
+    fn txn_insert_success() {
         let occupied_slot: Slot = Tool::CopyFromSpace.into();
         let mut inventory = Inventory::from_slots(vec![
             occupied_slot.clone(),
@@ -371,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn inventory_txn_insert_no_space() {
+    fn txn_insert_no_space() {
         let contents = vec![
             Slot::from(Tool::CopyFromSpace),
             Slot::from(Tool::CopyFromSpace),
@@ -384,6 +394,50 @@ mod tests {
             .check(&inventory)
             .expect_err("should have failed");
         assert_eq!(inventory.slots, contents);
+    }
+
+    #[test]
+    fn txn_systematic() {
+        let old_item = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(1.0, 0.0, 0.0))));
+        let new_item_1 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 1.0, 0.0))));
+        let new_item_2 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 0.0, 1.0))));
+
+        // TODO: Add tests of stack modification, emptying, merging
+
+        TransactionTester::new()
+            .transaction(
+                InventoryTransaction::insert(new_item_1.clone()),
+                |_, after| {
+                    if !after.slots.contains(&new_item_1) {
+                        return Err("missing added new_item_1".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(
+                InventoryTransaction::replace(0, old_item.clone(), new_item_1.clone()),
+                |_, after| {
+                    if after.slots[0] != new_item_1 {
+                        return Err("did not replace new_item_1".into());
+                    }
+                    Ok(())
+                },
+            )
+            .transaction(
+                // This one conflicts with the above one
+                InventoryTransaction::replace(0, old_item.clone(), new_item_2.clone()),
+                |_, after| {
+                    if after.slots[0] != new_item_2 {
+                        return Err("did not replace new_item_2".into());
+                    }
+                    Ok(())
+                },
+            )
+            .target(|| Inventory::from_slots(vec![]))
+            .target(|| Inventory::from_slots(vec![Slot::Empty]))
+            .target(|| Inventory::from_slots(vec![Slot::Empty; 10]))
+            .target(|| Inventory::from_slots(vec![old_item.clone(), Slot::Empty]))
+            .test();
     }
 
     #[test]
