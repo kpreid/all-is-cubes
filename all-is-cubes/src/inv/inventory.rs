@@ -118,6 +118,20 @@ impl Inventory {
             }
         }
     }
+
+    /// Returns the total count of the given item in this inventory.
+    ///
+    /// Note on numeric range: this can overflow if the inventory has over 65537 slots.
+    /// Let's not do that.
+    ///
+    /// TODO: Added for tests; is this generally useful?
+    #[cfg(test)]
+    pub(crate) fn count_of(&self, item: &Tool) -> u32 {
+        self.slots
+            .iter()
+            .map(|slot| u32::from(slot.count_of(item)))
+            .sum::<u32>()
+    }
 }
 
 /// The direct child of [`Inventory`]; a container for any number of identical [`Tool`]s.
@@ -150,6 +164,18 @@ impl Slot {
         match self {
             Slot::Empty => 0,
             Slot::Stack(count, _) => count.get(),
+        }
+    }
+
+    /// If the given tool is in this slot, return the count thereof.
+    ///
+    /// TODO: Added for tests; is this generally useful?
+    #[cfg(test)]
+    pub(crate) fn count_of(&self, item: &Tool) -> u16 {
+        match self {
+            Slot::Stack(count, slot_item) if slot_item == item => count.get(),
+            Slot::Stack(_, _) => 0,
+            Slot::Empty => 0,
         }
     }
 
@@ -466,37 +492,51 @@ mod tests {
 
     #[test]
     fn txn_systematic() {
-        let old_item = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(1.0, 0.0, 0.0))));
-        let new_item_1 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 1.0, 0.0))));
-        let new_item_2 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 0.0, 1.0))));
+        let old_item = Tool::InfiniteBlocks(Block::from(rgb_const!(1.0, 0.0, 0.0)));
+        let new_item_1 = Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 1.0, 0.0)));
+        let new_item_2 = Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 0.0, 1.0)));
 
         // TODO: Add tests of stack modification, emptying, merging
 
         TransactionTester::new()
             .transaction(
                 InventoryTransaction::insert(new_item_1.clone()),
-                |_, after| {
-                    if !after.slots.contains(&new_item_1) {
+                |before, after| {
+                    if after.count_of(&new_item_1) <= before.count_of(&new_item_1) {
                         return Err("missing added new_item_1".into());
                     }
                     Ok(())
                 },
             )
             .transaction(
-                InventoryTransaction::replace(0, old_item.clone(), new_item_1.clone()),
+                InventoryTransaction::replace(
+                    0,
+                    old_item.clone().into(),
+                    new_item_1.clone().into(),
+                ),
                 |_, after| {
-                    if after.slots[0] != new_item_1 {
-                        return Err("did not replace new_item_1".into());
+                    if after.slots[0].count_of(&old_item) != 0 {
+                        return Err("did not replace old_item".into());
+                    }
+                    if after.slots[0].count_of(&new_item_1) == 0 {
+                        return Err("did not insert new_item_1".into());
                     }
                     Ok(())
                 },
             )
             .transaction(
                 // This one conflicts with the above one
-                InventoryTransaction::replace(0, old_item.clone(), new_item_2.clone()),
+                InventoryTransaction::replace(
+                    0,
+                    old_item.clone().into(),
+                    new_item_2.clone().into(),
+                ),
                 |_, after| {
-                    if after.slots[0] != new_item_2 {
-                        return Err("did not replace new_item_2".into());
+                    if after.slots[0].count_of(&old_item) != 0 {
+                        return Err("did not replace old_item".into());
+                    }
+                    if after.slots[0].count_of(&new_item_2) == 0 {
+                        return Err("did not insert new_item_2".into());
                     }
                     Ok(())
                 },
@@ -504,7 +544,7 @@ mod tests {
             .target(|| Inventory::from_slots(vec![]))
             .target(|| Inventory::from_slots(vec![Slot::Empty]))
             .target(|| Inventory::from_slots(vec![Slot::Empty; 10]))
-            .target(|| Inventory::from_slots(vec![old_item.clone(), Slot::Empty]))
+            .target(|| Inventory::from_slots(vec![Slot::from(old_item.clone()), Slot::Empty]))
             .test();
     }
 
