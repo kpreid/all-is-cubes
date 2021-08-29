@@ -350,7 +350,9 @@ impl Transaction<Character> for CharacterTransaction {
             let change = self
                 .inventory
                 .commit(&mut target.inventory, inventory_check)?;
-            target.notifier.notify(CharacterChange::Inventory(change));
+            if let Some(change) = change {
+                target.notifier.notify(CharacterChange::Inventory(change));
+            }
         }
 
         self.behaviors

@@ -221,6 +221,10 @@ impl From<Option<Tool>> for Slot {
     }
 }
 
+/// Transaction type for [`Inventory`].
+///
+/// The output type is the change notification which should be passed on after commit,
+/// if any change is made.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct InventoryTransaction {
     replace: BTreeMap<usize, (Slot, Slot)>,
@@ -257,11 +261,16 @@ impl InventoryTransaction {
 }
 
 impl Transaction<Inventory> for InventoryTransaction {
-    type CommitCheck = InventoryCheck;
+    type CommitCheck = Option<InventoryCheck>;
     type MergeCheck = ();
-    type Output = InventoryChange;
+    type Output = Option<InventoryChange>;
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
+        // Don't do the expensive copy if we have one already
+        if self.replace.is_empty() && self.insert.is_empty() {
+            return Ok(None);
+        }
+
         // The simplest bulletproof algorithm to ensure we're stacking everything right
         // and not overflowing is to build the entire new inventory. The disadvantage of
         // this strategy is, of course, that we're cloning the entire inventory. If that
@@ -312,12 +321,12 @@ impl Transaction<Inventory> for InventoryTransaction {
             }
         }
 
-        Ok(InventoryCheck {
+        Ok(Some(InventoryCheck {
             new: slots,
             change: InventoryChange {
                 slots: changed.into(),
             },
-        })
+        }))
     }
 
     fn commit(
@@ -325,13 +334,13 @@ impl Transaction<Inventory> for InventoryTransaction {
         inventory: &mut Inventory,
         check: Self::CommitCheck,
     ) -> Result<Self::Output, Box<dyn Error>> {
-        let InventoryCheck {
-            new: new_slots,
-            change,
-        } = check;
-        assert_eq!(new_slots.len(), inventory.slots.len());
-        inventory.slots = new_slots;
-        Ok(change)
+        if let Some(InventoryCheck { new, change }) = check {
+            assert_eq!(new.len(), inventory.slots.len());
+            inventory.slots = new;
+            Ok(Some(change))
+        } else {
+            Ok(None)
+        }
     }
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
@@ -378,6 +387,16 @@ mod tests {
     // TODO: test for Inventory::use_tool
 
     #[test]
+    fn txn_identity_no_notification() {
+        assert_eq!(
+            InventoryTransaction::default()
+                .execute(&mut Inventory::from_slots(vec![Slot::Empty]))
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
     fn txn_insert_success() {
         let occupied_slot: Slot = Tool::CopyFromSpace.into();
         let mut inventory = Inventory::from_slots(vec![
@@ -394,9 +413,9 @@ mod tests {
             InventoryTransaction::insert(new_item.clone())
                 .execute(&mut inventory)
                 .unwrap(),
-            InventoryChange {
+            Some(InventoryChange {
                 slots: Arc::new([2])
-            }
+            })
         );
         assert_eq!(inventory.slots[2], new_item.into());
     }
