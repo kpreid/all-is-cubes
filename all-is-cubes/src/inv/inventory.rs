@@ -257,14 +257,23 @@ impl InventoryTransaction {
 }
 
 impl Transaction<Inventory> for InventoryTransaction {
-    type CommitCheck = Vec<usize>;
+    type CommitCheck = InventoryCheck;
     type MergeCheck = ();
     type Output = InventoryChange;
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
-        // Check replacements and notice if any slots are becoming empty
-        for (&slot, (old, _new)) in self.replace.iter() {
-            match inventory.slots.get(slot) {
+        // The simplest bulletproof algorithm to ensure we're stacking everything right
+        // and not overflowing is to build the entire new inventory. The disadvantage of
+        // this strategy is, of course, that we're cloning the entire inventory. If that
+        // proves to be a performance problem, we can improve things by adding per-slot
+        // copy-on-write or something like that.
+
+        let mut slots = inventory.slots.clone();
+        let mut changed = Vec::new();
+
+        // Check and apply .replace, explicit slot replacements
+        for (&index, (old, new)) in self.replace.iter() {
+            match slots.get_mut(index) {
                 None => {
                     return Err(PreconditionFailed {
                         location: "Inventory",
@@ -277,47 +286,52 @@ impl Transaction<Inventory> for InventoryTransaction {
                         problem: "old slot not as expected",
                     }); // TODO: it would be nice to squeeze in the slot number
                 }
-                _ => {}
+                Some(slot) => {
+                    *slot = new.clone();
+                    changed.push(index);
+                }
             }
         }
 
-        // Find locations for new slots
-        // TODO: We should also allow inserting into slots that are simultaneously freed up.
-        let empty_slots = inventory
-            .slots
-            .iter()
-            .enumerate()
-            .filter(|(_index, stack)| **stack == Slot::Empty)
-            .map(|(index, _stack)| index)
-            .take(self.insert.len())
-            .collect::<Vec<_>>();
-        if empty_slots.len() < self.insert.len() {
-            return Err(PreconditionFailed {
-                location: "Inventory",
-                problem: "insufficient empty slots",
-            });
+        // Find locations for .insert items
+        for new_stack in self.insert.iter() {
+            let mut new_stack = new_stack.clone();
+            for (index, slot) in slots.iter_mut().enumerate() {
+                if new_stack == Slot::Empty {
+                    break;
+                }
+                if new_stack.unload_to(slot) {
+                    changed.push(index);
+                }
+            }
+            if new_stack != Slot::Empty {
+                return Err(PreconditionFailed {
+                    location: "Inventory",
+                    problem: "insufficient empty slots",
+                });
+            }
         }
 
-        Ok(empty_slots)
+        Ok(InventoryCheck {
+            new: slots,
+            change: InventoryChange {
+                slots: changed.into(),
+            },
+        })
     }
 
     fn commit(
         &self,
         inventory: &mut Inventory,
-        empty_slots: Self::CommitCheck,
+        check: Self::CommitCheck,
     ) -> Result<Self::Output, Box<dyn Error>> {
-        let mut modified_slots = Vec::with_capacity(self.replace.len() + self.insert.len());
-        for (&slot, (_old, new)) in self.replace.iter() {
-            inventory.slots[slot] = new.clone();
-            modified_slots.push(slot);
-        }
-        for (slot, item) in empty_slots.into_iter().zip(self.insert.iter()) {
-            inventory.slots[slot] = item.clone();
-            modified_slots.push(slot);
-        }
-        Ok(InventoryChange {
-            slots: modified_slots.into(),
-        })
+        let InventoryCheck {
+            new: new_slots,
+            change,
+        } = check;
+        assert_eq!(new_slots.len(), inventory.slots.len());
+        inventory.slots = new_slots;
+        Ok(change)
     }
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
@@ -336,6 +350,13 @@ impl Transaction<Inventory> for InventoryTransaction {
         self.insert.extend(other.insert);
         self
     }
+}
+
+/// Implementation type for [`InventoryTransaction::CommitCheck`].
+#[derive(Debug)]
+pub struct InventoryCheck {
+    new: Vec<Slot>,
+    change: InventoryChange,
 }
 
 /// Description of a change to an [`Inventory`] for use in listeners.
@@ -394,6 +415,34 @@ mod tests {
             .check(&inventory)
             .expect_err("should have failed");
         assert_eq!(inventory.slots, contents);
+    }
+
+    #[test]
+    fn txn_insert_into_existing_stack() {
+        // TODO: make_some_tools to simplify this?
+        let [this, other] = make_some_blocks();
+        let this = Tool::Block(this);
+        let other = Tool::Block(other);
+        let mut inventory = Inventory::from_slots(vec![
+            Slot::stack(10, other.clone()),
+            Slot::stack(10, this.clone()),
+            Slot::stack(10, other.clone()),
+            Slot::stack(10, this.clone()),
+            Slot::Empty,
+        ]);
+        InventoryTransaction::insert(this.clone())
+            .execute(&mut inventory)
+            .unwrap();
+        assert_eq!(
+            inventory.slots,
+            vec![
+                Slot::stack(10, other.clone()),
+                Slot::stack(11, this.clone()),
+                Slot::stack(10, other.clone()),
+                Slot::stack(10, this.clone()),
+                Slot::Empty,
+            ]
+        );
     }
 
     #[test]
