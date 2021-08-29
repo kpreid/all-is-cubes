@@ -152,6 +152,58 @@ impl Slot {
             Slot::Stack(count, _) => count.get(),
         }
     }
+
+    /// Moves as many items as possible from `self` to `destination` while obeying item
+    /// stacking rules.
+    ///
+    /// Does nothing if `self` and `destination` contain different items.
+    ///
+    /// Returns whether anything was moved.
+    fn unload_to(&mut self, destination: &mut Self) -> bool {
+        // First, handle the simple cases, or decide how many to move.
+        // This has to be multiple passes to satisfy the borrow checker.
+        let count_to_move = match (&mut *self, &mut *destination) {
+            (Slot::Empty, _) => {
+                // Source is empty; nothing to do.
+                return false;
+            }
+            (source @ Slot::Stack(_, _), destination @ Slot::Empty) => {
+                // Destination is empty (and source isn't); just swap.
+                std::mem::swap(source, destination);
+                return true;
+            }
+            (Slot::Stack(s_count, source_item), Slot::Stack(d_count, destination_item)) => {
+                if source_item == destination_item {
+                    // Stacks of identical items; figure out how much to move.
+                    let max_stack = u16::MAX; // TODO: per-item limits
+                    let count_to_move = s_count.get().min(max_stack - d_count.get());
+                    if count_to_move == 0 {
+                        return false;
+                    } else if count_to_move < s_count.get() {
+                        // The source stack is not completely transferred; update counts.
+                        *s_count = NonZeroU16::new(s_count.get() - count_to_move).unwrap();
+                        *d_count = NonZeroU16::new(d_count.get() + count_to_move).unwrap();
+                        return true;
+                    } else {
+                        // The source stack is completely transferred; exit this match so that we
+                        // can reassign *self.
+                        count_to_move
+                    }
+                } else {
+                    // Stacks of different items.
+                    return false;
+                }
+            }
+        };
+        debug_assert_eq!(count_to_move, self.count());
+        if let Slot::Stack(d_count, _) = destination {
+            *self = Slot::Empty;
+            *d_count = NonZeroU16::new(d_count.get() + count_to_move).unwrap();
+        } else {
+            unreachable!();
+        }
+        true
+    }
 }
 
 impl From<Tool> for Slot {
@@ -287,7 +339,10 @@ pub struct InventoryChange {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::content::make_some_blocks;
     use crate::math::Rgba;
+    use itertools::Itertools;
+    use pretty_assertions::assert_eq;
 
     // TODO: test for Inventory::use_tool
 
@@ -329,5 +384,51 @@ mod tests {
             .check(&inventory)
             .expect_err("should have failed");
         assert_eq!(inventory.slots, contents);
+    }
+
+    #[test]
+    fn slot_unload_systematic() {
+        let [block1, block2] = make_some_blocks();
+        let tools = [Tool::Block(block1), Tool::Block(block2)];
+        const MAX: u16 = u16::MAX;
+        let gen_slots = move || {
+            IntoIterator::into_iter([
+                0,
+                1,
+                2,
+                3,
+                10,
+                MAX / 2,
+                MAX / 2 + 1,
+                MAX - 10,
+                MAX - 2,
+                MAX - 1,
+                MAX,
+            ])
+            .cartesian_product(IntoIterator::into_iter(tools.clone()))
+            .map(|(count, item)| Slot::stack(count, item))
+        };
+        for slot1_in in gen_slots() {
+            for slot2_in in gen_slots() {
+                let different = matches!((&slot1_in, &slot2_in), (Slot::Stack(_, i1), Slot::Stack(_, i2)) if i1 != i2);
+
+                let mut slot1_out = slot1_in.clone();
+                let mut slot2_out = slot2_in.clone();
+                slot1_out.unload_to(&mut slot2_out);
+
+                assert_eq!(
+                    u64::from(slot1_in.count()) + u64::from(slot2_in.count()),
+                    u64::from(slot1_out.count()) + u64::from(slot2_out.count()),
+                    "not conservative"
+                );
+                if different {
+                    assert_eq!(
+                        (&slot1_in, &slot2_in),
+                        (&slot1_out, &slot2_out),
+                        "combined different items"
+                    );
+                }
+            }
+        }
     }
 }
