@@ -118,9 +118,11 @@ impl AllIsCubesAppState {
 
                 if let Some(character_ref) = &self.game_character {
                     self.input_processor.apply_input(
-                        &mut self.game_universe,
-                        character_ref,
-                        &self.paused,
+                        InputTargets {
+                            universe: Some(&mut self.game_universe),
+                            character: Some(character_ref),
+                            paused: Some(&self.paused),
+                        },
                         tick,
                     );
                 }

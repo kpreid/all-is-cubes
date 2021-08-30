@@ -250,41 +250,41 @@ impl InputProcessor {
         self.mouselook_buffer = Vector2::zero();
     }
 
-    /// Applies the accumulated input from previous events, with the given [`Character`]
-    /// being directly controlled.
-    ///
-    /// TODO: We need a better information flow strategy that still keeps InputProcessor not too tied to AllIsCubesAppState.
-    pub fn apply_input(
-        &mut self,
-        // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
-        _universe: &mut Universe,
-        character: &URef<Character>,
-        paused: &ListenableCell<bool>,
-        tick: Tick,
-    ) {
+    /// Applies the accumulated input from previous events.
+    /// `targets` specifies the objects it should be applied to.
+    pub fn apply_input(&mut self, targets: InputTargets<'_>, tick: Tick) {
+        let InputTargets {
+            // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
+            universe: _,
+            character: character_opt,
+            paused: paused_opt,
+        } = targets;
+
         let dt = tick.delta_t.as_secs_f64();
         let key_turning_step = 80.0 * dt;
 
         // Direct character controls
-        character
-            .try_modify(|character| {
-                let movement = self.movement();
-                character.set_velocity_input(movement);
+        if let Some(character_ref) = character_opt {
+            character_ref
+                .try_modify(|character| {
+                    let movement = self.movement();
+                    character.set_velocity_input(movement);
 
-                let turning = Vector2::new(
-                    key_turning_step * self.net_movement(Key::Left, Key::Right)
-                        + self.mouselook_buffer.x,
-                    key_turning_step * self.net_movement(Key::Up, Key::Down)
-                        + self.mouselook_buffer.y,
-                );
-                character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
-                character.body.pitch = (character.body.pitch + turning.y).min(90.0).max(-90.0);
+                    let turning = Vector2::new(
+                        key_turning_step * self.net_movement(Key::Left, Key::Right)
+                            + self.mouselook_buffer.x,
+                        key_turning_step * self.net_movement(Key::Up, Key::Down)
+                            + self.mouselook_buffer.y,
+                    );
+                    character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
+                    character.body.pitch = (character.body.pitch + turning.y).min(90.0).max(-90.0);
 
-                if self.keys_held.contains(&Key::Character(' ')) {
-                    character.jump_if_able();
-                }
-            })
-            .unwrap();
+                    if self.keys_held.contains(&Key::Character(' ')) {
+                        character.jump_if_able();
+                    }
+                })
+                .unwrap();
+        }
 
         for key in self.command_buffer.drain(..) {
             match key {
@@ -298,14 +298,18 @@ impl InputProcessor {
                 }
                 Key::Character('p') => {
                     // TODO: bind escape key, focus loss, etc to pause
-                    paused.set(!*paused.get());
+                    if let Some(paused) = paused_opt {
+                        paused.set(!*paused.get());
+                    }
                 }
                 Key::Character(numeral) if numeral.is_digit(10) => {
                     let digit = numeral.to_digit(10).unwrap() as usize;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
-                    character
-                        .try_modify(|c| c.set_selected_slot(1, slot))
-                        .unwrap();
+                    if let Some(character_ref) = character_opt {
+                        character_ref
+                            .try_modify(|c| c.set_selected_slot(1, slot))
+                            .unwrap();
+                    }
                 }
                 _ => {}
             }
@@ -342,6 +346,18 @@ impl InputProcessor {
     }
 }
 
+/// Things needed to apply input.
+///
+/// Missing inputs will cause input to be ignored.
+/// TODO: Specify a warning reporting scheme.
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub struct InputTargets<'a> {
+    pub universe: Option<&'a mut Universe>,
+    pub character: Option<&'a URef<Character>>,
+    pub paused: Option<&'a ListenableCell<bool>>,
+}
+
 /// A platform-neutral representation of keyboard keys for [`InputProcessor`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -370,9 +386,11 @@ mod tests {
         character: &URef<Character>,
     ) {
         input.apply_input(
-            universe,
-            character,
-            &ListenableCell::new(false),
+            InputTargets {
+                universe: Some(universe),
+                character: Some(character),
+                paused: None,
+            },
             Tick::arbitrary(),
         );
     }
