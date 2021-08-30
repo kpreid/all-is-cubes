@@ -304,6 +304,7 @@ impl WebGameRoot {
             self.renderer
                 .set_viewport(self.gui_helpers.canvas_helper().viewport())
                 .unwrap();
+            self.renderer.update_world_camera();
             self.app
                 .update_cursor(self.renderer.ui_camera(), self.renderer.world_camera());
 

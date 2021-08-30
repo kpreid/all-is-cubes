@@ -148,6 +148,16 @@ where
         });
     }
 
+    /// Sync camera to character state. This is used so that cursor raycasts can be up-to-date
+    /// to the same frame of input.
+    #[doc(hidden)] // TODO: design better interface that doesn't need to call this
+    pub fn update_world_camera(&mut self) {
+        if let Some(character_ref) = &self.character {
+            self.world_camera
+                .set_view_matrix(character_ref.borrow().view());
+        }
+    }
+
     /// Return the camera used to render the space.
     /// TODO: This interface exists to support cursor usage and should perhaps be made more
     /// high-level by doing the raycast in here.
@@ -199,6 +209,7 @@ where
             return Ok(info);
         });
 
+        // TODO: This matrix modification is redundant if we can require update_world_camera to have been called.
         self.world_camera.set_view_matrix(character.view());
         let graphics_options = self.world_camera.options(); // arbitrary choice of borrowable source
 
