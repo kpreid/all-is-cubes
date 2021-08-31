@@ -1,7 +1,8 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use instant::{Duration, Instant}; // wasm-compatible replacement for std::time::Instant
+use instant::{Duration, Instant};
+use ordered_float::NotNan; // wasm-compatible replacement for std::time::Instant
 
 /// Algorithm for deciding how to execute simulation and rendering frames.
 /// Platform-independent; does not consult any clocks, only makes decisions
@@ -13,6 +14,8 @@ pub struct FrameClock {
     /// TODO: This might go away in favor of actual dirty-notifications.
     render_dirty: bool,
     accumulated_step_time: Duration,
+
+    draw_fps_counter: FpsCounter,
 }
 
 impl FrameClock {
@@ -33,6 +36,7 @@ impl FrameClock {
             last_absolute_time: None,
             render_dirty: true,
             accumulated_step_time: Duration::ZERO,
+            draw_fps_counter: FpsCounter::default(),
         }
     }
 
@@ -80,6 +84,7 @@ impl FrameClock {
     /// Informs the [`FrameClock`] that a frame was just drawn.
     pub fn did_draw(&mut self) {
         self.render_dirty = false;
+        self.draw_fps_counter.record_frame();
     }
 
     /// Indicates whether [`Universe::step`](crate::universe::Universe::step) should be performed,
@@ -106,6 +111,11 @@ impl FrameClock {
             delta_t: Self::STEP_LENGTH,
             paused: false,
         }
+    }
+
+    #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
+    pub fn draw_fps_counter(&self) -> &FpsCounter {
+        &self.draw_fps_counter
     }
 
     fn cap_step_time(&mut self) {
@@ -163,5 +173,54 @@ impl Tick {
     /// not doing so might lead to a stale or inconsistent view.
     pub fn paused(&self) -> bool {
         self.paused
+    }
+}
+
+/// Counts frame time / frames-per-second against real time as defined by [`Instant::now`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
+pub struct FpsCounter {
+    average_frame_time_seconds: Option<NotNan<f64>>,
+    last_frame: Option<Instant>,
+}
+
+impl FpsCounter {
+    pub fn record_frame(&mut self) {
+        let this_frame = Instant::now();
+
+        let this_seconds = self
+            .last_frame
+            .and_then(|l| {
+                if this_frame > l {
+                    // `instant` crate doesn't have `checked_duration_since`
+                    Some(this_frame.duration_since(l))
+                } else {
+                    None
+                }
+            })
+            .and_then(|duration| NotNan::new(duration.as_secs_f64()).ok());
+        if let Some(this_seconds) = this_seconds {
+            self.average_frame_time_seconds = Some(
+                if let Some(previous) = self.average_frame_time_seconds.filter(|v| v.is_finite()) {
+                    let mix = 2.0f64.powi(-3);
+                    this_seconds * mix + previous * (1. - mix)
+                } else {
+                    // recover from any weirdness or initial state
+                    this_seconds
+                },
+            );
+        }
+        self.last_frame = Some(this_frame);
+    }
+
+    pub fn period_seconds(&self) -> f64 {
+        match self.average_frame_time_seconds {
+            Some(nnt) => nnt.into_inner(),
+            None => f64::NAN,
+        }
+    }
+
+    pub fn frames_per_second(&self) -> f64 {
+        self.period_seconds().recip()
     }
 }

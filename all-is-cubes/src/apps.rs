@@ -211,6 +211,11 @@ impl AllIsCubesAppState {
     pub fn info_text<T>(&self, render: T) -> InfoText<'_, T> {
         InfoText { app: self, render }
     }
+
+    #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
+    pub fn draw_fps_counter(&self) -> &FpsCounter {
+        self.frame_clock.draw_fps_counter()
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -226,8 +231,9 @@ impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
         }
         write!(
             f,
-            "\n\n{:#?}\n\n{:#?}\n\n",
+            "\n\n{:#?}\n\nFPS: {:2.1}\n{:#?}\n\n",
             self.app.last_step_info.custom_format(StatusText),
+            self.app.frame_clock.draw_fps_counter().frames_per_second(),
             self.render.custom_format(StatusText),
         )?;
         match self.app.cursor_result() {

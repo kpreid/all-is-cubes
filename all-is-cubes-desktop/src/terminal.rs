@@ -242,8 +242,10 @@ impl TerminalMain {
         // TODO: Allocate footer space explicitly, don't wrap on small widths, clear, etc.
         write!(
             self.out,
-            "\r\nColors: {:?}    Frame: {:?}",
-            color_mode, info,
+            "\r\nColors: {:?}    Frame: {:?}  {:5.1} FPS",
+            color_mode,
+            info,
+            self.app.draw_fps_counter().frames_per_second(),
         )?;
         self.out.queue(Clear(ClearType::UntilNewLine))?;
         write!(self.out, "\r\n")?;
