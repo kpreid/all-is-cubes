@@ -11,6 +11,7 @@ edition = "2018"
 cargo-fuzz = true
 
 [dependencies]
+arbitrary = { version = "1.0.1", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
 [dependencies.all-is-cubes]
@@ -38,5 +39,11 @@ doc = false
 [[bin]]
 name = "fuzz_triangulator"
 path = "fuzz_targets/fuzz_triangulator.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_universe"
+path = "fuzz_targets/fuzz_universe.rs"
 test = false
 doc = false
