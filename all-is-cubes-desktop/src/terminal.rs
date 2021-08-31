@@ -15,13 +15,14 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::io;
 use std::io::Write as _;
+use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::math::{FreeCoordinate, Rgba};
-use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, SpaceRaytracer};
+use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, RaytraceInfo, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;
 
 /// Options for the terminal UI.
@@ -101,6 +102,24 @@ struct TerminalMain {
     /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
     /// position.
     widths: HashMap<String, usize>,
+
+    render_pipe_in: mpsc::SyncSender<FrameInput>,
+    render_pipe_out: mpsc::Receiver<FrameOutput>,
+}
+
+struct FrameInput {
+    camera: Camera,
+    options: TerminalOptions,
+    scene: SpaceRaytracer<ColorCharacterBuf>,
+}
+
+/// A frame's pixels and all the context needed to interpret it (which duplicates fields
+/// in TerminalMain, but must be carried due to the pipelined rendering).
+struct FrameOutput {
+    viewport: Viewport,
+    options: TerminalOptions,
+    image: Box<[<ColorCharacterBuf as PixelBuf>::Pixel]>,
+    info: RaytraceInfo,
 }
 
 impl TerminalMain {
@@ -108,6 +127,31 @@ impl TerminalMain {
         crossterm::terminal::enable_raw_mode()?;
 
         let terminal_size = Vector2::from(crossterm::terminal::size()?);
+
+        // Create thread for making the raytracing operation concurrent with main loop
+        // Note: this doesn't really need a thread but rayon doesn't have a
+        // "start but don't block on this" operation.
+        let (render_pipe_in, render_thread_in) = mpsc::sync_channel::<FrameInput>(1);
+        let (render_thread_out, render_pipe_out) = mpsc::sync_channel(1);
+        std::thread::spawn({
+            move || {
+                while let Ok(FrameInput {
+                    camera,
+                    options,
+                    scene,
+                }) = render_thread_in.recv()
+                {
+                    let (image, info) = scene.trace_scene_to_image(&camera);
+                    // Ignore send errors as they just mean we're shutting down or died elsewhere
+                    let _ = render_thread_out.send(FrameOutput {
+                        viewport: camera.viewport(),
+                        options,
+                        image,
+                        info,
+                    });
+                }
+            }
+        });
 
         Ok(Self {
             camera: Camera::new(
@@ -121,6 +165,8 @@ impl TerminalMain {
             terminal_state_dirty: true,
             current_color: None,
             widths: HashMap::new(),
+            render_pipe_in,
+            render_pipe_out,
         })
     }
 
@@ -184,10 +230,16 @@ impl TerminalMain {
             // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.
             self.app.frame_clock.advance_to(Instant::now());
             self.app.maybe_step_universe();
+
+            match self.render_pipe_out.try_recv() {
+                Ok(frame) => self.write_frame(frame)?,
+                Err(mpsc::TryRecvError::Empty) => {}
+                Err(mpsc::TryRecvError::Disconnected) => panic!("render thread died"),
+            }
+
             if self.app.frame_clock.should_draw() {
                 self.app.update_cursor(&self.camera, &self.camera); // TODO: wrong UI camera ...
-                self.draw()?;
-                self.app.frame_clock.did_draw();
+                self.send_frame_to_render();
             } else {
                 std::thread::yield_now();
             }
@@ -199,21 +251,45 @@ impl TerminalMain {
             .set_viewport(self.options.viewport_from_terminal_size(self.terminal_size));
     }
 
-    fn draw(&mut self) -> crossterm::Result<()> {
+    fn send_frame_to_render(&mut self) {
         let character = match self.app.character() {
             Some(character_ref) => character_ref.borrow(),
             None => {
-                return Ok(());
+                return;
             }
         };
         self.camera.set_view_matrix(character.view());
 
-        let color_mode = self.options.colors;
         let space = &*character.space.borrow();
 
-        let (image, info) =
-            SpaceRaytracer::<ColorCharacterBuf>::new(space, self.app.graphics_options().snapshot())
-                .trace_scene_to_image(&self.camera);
+        match self.render_pipe_in.try_send(FrameInput {
+            camera: self.camera.clone(),
+            options: self.options.clone(),
+            scene: SpaceRaytracer::<ColorCharacterBuf>::new(
+                space,
+                self.app.graphics_options().snapshot(),
+            ),
+        }) {
+            Ok(()) => {
+                self.app.frame_clock.did_draw();
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                // Ignore send errors as they should be detected on the receive side
+            }
+            Err(TrySendError::Full(_)) => {
+                // Skip this frame
+            }
+        }
+    }
+
+    fn write_frame(&mut self, frame: FrameOutput) -> crossterm::Result<()> {
+        let FrameOutput {
+            viewport,
+            options,
+            image,
+            info,
+        } = frame;
+        let color_mode = self.options.colors;
 
         self.out.queue(cursor::Hide)?;
         self.out.queue(SetAttribute(Attribute::Reset))?;
@@ -221,17 +297,19 @@ impl TerminalMain {
         self.current_color = None; // pessimistic about prior state
 
         // TODO: aim for less number casting
-        let character_size = self
-            .camera
-            .viewport()
+        let character_size = viewport
             .framebuffer_size
             .map(|s| s as usize)
-            .div_element_wise(self.options.rays_per_character().map(usize::from));
+            .div_element_wise(options.rays_per_character().map(usize::from));
         for y in 0..character_size.y {
             let mut x = 0;
             while x < character_size.x {
-                let (text, color) =
-                    self.image_patch_to_character(&*image, Vector2::new(x, y), character_size);
+                let (text, color) = Self::image_patch_to_character(
+                    &options,
+                    &*image,
+                    Vector2::new(x, y),
+                    character_size,
+                );
 
                 let width = self.write_with_color_and_measure(text, color, character_size.x - x)?;
                 x += width.max(1); // max(1) prevents infinite looping in edge case
@@ -264,7 +342,7 @@ impl TerminalMain {
     }
 
     fn image_patch_to_character<'i>(
-        &self,
+        options: &TerminalOptions,
         image: &'i [(String, Option<Rgba>)],
         char_pos: Vector2<usize>,
         char_size: Vector2<usize>,
@@ -272,12 +350,12 @@ impl TerminalMain {
         let row = char_size.x;
         // This condition must match TerminalOptions::rays_per_character
         // TODO: Refactor to read patches separately from picking graphic characters
-        if self.options.graphic_characters {
+        if options.graphic_characters {
             // TODO: This is a mess
             let (_, color1) = image[(char_pos.y * 2) * row + char_pos.x];
             let (_, color2) = image[(char_pos.y * 2 + 1) * row + char_pos.x];
-            let color1 = self.options.colors.convert(color1);
-            let color2 = self.options.colors.convert(color2);
+            let color1 = options.colors.convert(color1);
+            let color2 = options.colors.convert(color2);
             if color1 == color2 {
                 (
                     // TODO: Offer choice of showing character sometimes. Also use characters for dithering.
@@ -299,7 +377,7 @@ impl TerminalMain {
             }
         } else {
             let (ref text, color) = image[char_pos.y * row + char_pos.x];
-            let mapped_color = match self.options.colors.convert(color) {
+            let mapped_color = match options.colors.convert(color) {
                 Some(color) => Colors::new(Color::Black, color),
                 None => Colors::new(Color::Reset, Color::Reset),
             };
