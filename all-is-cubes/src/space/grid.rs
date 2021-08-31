@@ -625,6 +625,9 @@ impl Iterator for GridIter {
             }
         }
     }
+
+    // TODO: It might be worth implementing `Iterator::fold` for this, for the
+    // internal-iteration performance benefits. Should benchmark, of course.
 }
 
 impl ExactSizeIterator for GridIter {}
