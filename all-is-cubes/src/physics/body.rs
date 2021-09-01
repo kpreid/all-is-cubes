@@ -283,7 +283,10 @@ impl Body {
         direction: Vector3<FreeCoordinate>,
     ) -> Option<(Point3<FreeCoordinate>, NotNan<FreeCoordinate>)> {
         let ray = Ray::new(self.position, direction);
-        'raycast: for (ray_step, step_aab) in aab_raycast(self.collision_box, ray, true) {
+        'raycast: for ray_step in aab_raycast(self.collision_box, ray, true) {
+            let step_aab = self.collision_box.translate(
+                ray.origin.to_vec() + direction * (ray_step.t_distance() + POSITION_EPSILON),
+            );
             for cube in step_aab.round_up_to_grid().interior_iter() {
                 // TODO: refactor to combine this with other collision attribute tests
                 if space.get_evaluated(cube).attributes.collision == BlockCollision::Hard {

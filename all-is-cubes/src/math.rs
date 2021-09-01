@@ -258,28 +258,19 @@ impl Aab {
 
     #[inline]
     // Not public because this is an odd interface that primarily helps with collision.
-    pub(crate) fn leading_corner_trailing_box(
+    pub(crate) fn leading_corner(
         &self,
         direction: Vector3<FreeCoordinate>,
-    ) -> (Vector3<FreeCoordinate>, Aab) {
+    ) -> Vector3<FreeCoordinate> {
         let mut leading_corner = Vector3::zero();
-        let mut trailing_box_lower = Point3::origin();
-        let mut trailing_box_upper = Point3::origin();
         for axis in 0..3 {
             if direction[axis] >= 0.0 {
                 leading_corner[axis] = self.upper_bounds[axis];
-                trailing_box_lower[axis] = -self.sizes[axis];
-                trailing_box_upper[axis] = -0.;
             } else {
                 leading_corner[axis] = self.lower_bounds[axis];
-                trailing_box_lower[axis] = 0.;
-                trailing_box_upper[axis] = self.sizes[axis];
             }
         }
-        (
-            leading_corner,
-            Aab::from_lower_upper(trailing_box_lower, trailing_box_upper),
-        )
+        leading_corner
     }
 
     /// Construct the [`Grid`] containing all cubes this [`Aab`] intersects.
@@ -465,21 +456,18 @@ mod tests {
     #[test]
     fn aab_leading_corner_consistency() {
         let aab = Aab::new(-1.1, 2.2, -3.3, 4.4, -5.5, 6.6);
-        let expected_size = aab.leading_corner_trailing_box(Vector3::zero()).1.size();
         for direction in (-1..=1)
             .zip(-1..=1)
             .zip(-1..=1)
             .map(|((x, y), z)| Vector3::new(x, y, z).cast::<FreeCoordinate>().unwrap())
         {
-            let (leading_corner, trailing_box) = aab.leading_corner_trailing_box(direction);
+            let leading_corner = aab.leading_corner(direction);
 
             for axis in 0..3 {
                 // Note that this condition is not true in general, but only if the AAB
                 // contains the origin.
                 assert_eq!(leading_corner[axis].signum(), direction[axis].signum());
             }
-
-            assert_eq!(expected_size, trailing_box.size());
         }
     }
 

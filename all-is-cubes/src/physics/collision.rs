@@ -3,13 +3,13 @@
 
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
-use cgmath::{EuclideanSpace as _, Vector3, Zero as _};
+use cgmath::EuclideanSpace as _;
 use std::collections::HashSet;
 
 use super::POSITION_EPSILON;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel};
 use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _, GridPoint};
-use crate::raycast::{Ray, RaycastStep};
+use crate::raycast::{Ray, Raycaster};
 use crate::space::{GridArray, Space};
 
 /// An individual collision contact.
@@ -46,7 +46,10 @@ where
 
     // Note: no `.within_grid()` because that would not work when the leading
     // corner is not within the grid.
-    for (ray_step, step_aab) in aab_raycast(aab, ray, false) {
+    for ray_step in aab_raycast(aab, ray, false) {
+        let step_aab = aab.translate(
+            ray.origin.to_vec() + ray.direction * (ray_step.t_distance() + POSITION_EPSILON),
+        );
         if ray_step.t_distance() >= 1.0 {
             // Movement is unobstructed in this timestep.
             break;
@@ -148,32 +151,21 @@ impl CollisionSpace for GridArray<Evoxel> {
 }
 
 /// Given a ray describing movement of the origin of an AAB, perform a raycast to find
-/// the positions where the AAB moves into new cubes.
+/// the positions where the AAB moves into new cubes. The returned ray steps' `t_distance`
+/// values report how far to move the AAB to meet the edge.
 ///
 /// If `reversed` is true, find positions where it leaves cubes.
-pub(crate) fn aab_raycast(
-    aab: Aab,
-    origin_ray: Ray,
-    reversed: bool,
-) -> impl Iterator<Item = (RaycastStep, Aab)> {
-    let (leading_corner, trailing_box) = aab.leading_corner_trailing_box(if reversed {
+///
+/// Note that due to the nature of floating-point arithmetic, it is uncertain whether the
+/// resulting new AAB position will have the AAB's forward face land before, after, or
+/// exactly on the boundary. The caller must compute an appropriate nudge (using TODO:
+/// provide a function for this) to serve its needs.
+pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaster {
+    let leading_corner = aab.leading_corner(if reversed {
         -origin_ray.direction
     } else {
         origin_ray.direction
     });
     let leading_ray = origin_ray.translate(leading_corner);
-    leading_ray.cast().map(move |step| {
-        // TODO: The POSITION_EPSILON is a quick kludge to get a result that
-        // *includes* the cubes we are advancing towards. Replace it with something
-        // more precisely what we need.
-        let nudge = if step.face() != Face::Within {
-            origin_ray.direction * POSITION_EPSILON
-        } else {
-            Vector3::zero()
-        };
-        (
-            step,
-            trailing_box.translate((step.intersection_point(leading_ray) + nudge).to_vec()),
-        )
-    })
+    leading_ray.cast()
 }
