@@ -57,7 +57,12 @@ where
     // being out of bounds, so it's not worth doing unless we specifically expect to have
     // many bodies outside a space and occasionally inside.
     for ray_step in aab_raycast(aab, ray, false) {
-        let offset_segment = ray.scale_direction(ray_step.t_distance() + POSITION_EPSILON);
+        let offset_segment = nudge_on_ray(
+            aab,
+            ray.scale_direction(ray_step.t_distance()),
+            ray_step.face().opposite(),
+            false,
+        );
         let step_aab = aab.translate(offset_segment.unit_endpoint().to_vec());
         if ray_step.t_distance() >= 1.0 {
             // Movement is unobstructed in this timestep.

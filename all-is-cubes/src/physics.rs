@@ -143,7 +143,7 @@ mod tests {
         let info = body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
         dbg!(info);
 
-        assert_eq!(body.position, Point3::new(1.5, 0.5, 0.5));
+        assert_eq!(body.position, Point3::new(1.5 + POSITION_EPSILON, 0.5, 0.5));
         assert_eq!(body.velocity, Vector3::zero());
         // TODO: push out should create report contacts just like normal collision
         // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);

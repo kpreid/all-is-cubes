@@ -5,8 +5,9 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
 use std::fmt;
 
-use super::collision::{aab_raycast, collide_along_ray, find_colliding_cubes, Contact};
-use super::POSITION_EPSILON;
+use super::collision::{
+    aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
+};
 use crate::apps::Tick;
 use crate::block::BlockCollision;
 use crate::math::{Aab, CubeFace, FreeCoordinate, Geometry as _};
@@ -215,9 +216,10 @@ impl Body {
     where
         CC: FnMut(Contact),
     {
+        let movement_ignoring_collision = Ray::new(self.position, delta_position);
         let collision = collide_along_ray(
             space,
-            Ray::new(self.position, delta_position),
+            movement_ignoring_collision,
             self.collision_box,
             collision_callback,
         );
@@ -231,9 +233,13 @@ impl Body {
             // Advance however much straight-line distance is available.
             // But a little bit back from that, to avoid floating point error pushing us
             // into being already colliding next frame.
-            let unobstructed_distance_along_ray =
-                (collision.t_distance - POSITION_EPSILON / delta_position.magnitude()).max(0.0);
-            let unobstructed_delta_position = delta_position * unobstructed_distance_along_ray;
+            let motion_segment = nudge_on_ray(
+                self.collision_box,
+                movement_ignoring_collision.scale_direction(collision.t_distance),
+                collision.cube_face.face.opposite(),
+                true,
+            );
+            let unobstructed_delta_position = motion_segment.direction;
             self.position += unobstructed_delta_position;
             // Figure the distance we have have left.
             delta_position -= unobstructed_delta_position;
@@ -297,16 +303,25 @@ impl Body {
         None
     }
 
+    /// Try moving in the given direction, find an empty space, and
+    /// return the position and distance to it.
     fn attempt_push_out(
         &self,
         space: &Space,
         direction: Vector3<FreeCoordinate>,
     ) -> Option<(Point3<FreeCoordinate>, NotNan<FreeCoordinate>)> {
         let ray = Ray::new(self.position, direction);
+        // TODO: upper bound on distance to try
         'raycast: for ray_step in aab_raycast(self.collision_box, ray, true) {
-            let step_aab = self.collision_box.translate(
-                ray.origin.to_vec() + direction * (ray_step.t_distance() + POSITION_EPSILON),
+            let adjusted_segment = nudge_on_ray(
+                self.collision_box,
+                ray.scale_direction(ray_step.t_distance()),
+                ray_step.face(),
+                true,
             );
+            let step_aab = self
+                .collision_box
+                .translate(adjusted_segment.unit_endpoint().to_vec());
             for cube in step_aab.round_up_to_grid().interior_iter() {
                 // TODO: refactor to combine this with other collision attribute tests
                 if space.get_evaluated(cube).attributes.collision == BlockCollision::Hard {
@@ -316,7 +331,7 @@ impl Body {
             }
             // No collisions, so we can use this.
             return Some((
-                self.position + direction * ray_step.t_distance(),
+                adjusted_segment.unit_endpoint(),
                 NotNan::new(ray_step.t_distance() * direction.magnitude()).ok()?,
             ));
         }
