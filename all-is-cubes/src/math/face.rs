@@ -4,7 +4,7 @@
 //! [`Face`] type and related items.
 //! This module is private but reexported by its parent.
 
-use cgmath::{BaseNum, Vector3};
+use cgmath::{BaseNum, Transform, Vector3};
 pub use ordered_float::{FloatIsNan, NotNan};
 use std::convert::TryFrom;
 use std::ops::{Index, IndexMut};
@@ -478,6 +478,45 @@ impl fmt::Debug for CubeFace {
             self.cube.custom_format(ConciseDebug),
             self.face,
         )
+    }
+}
+
+// TODO: This is a quick kludge to get some debug rendering going. We should offer more controls, probably
+impl Geometry for CubeFace {
+    type Coord = GridCoordinate;
+
+    fn translate(mut self, offset: impl Into<Vector3<Self::Coord>>) -> Self {
+        self.cube += offset.into();
+        self
+    }
+
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
+    {
+        // TODO: How much to offset the lines should be a parameter of the wireframe_points process.
+        let expansion = 0.005;
+        let aab = Aab::from_cube(self.cube).enlarge(expansion);
+        aab.wireframe_points(output);
+
+        // Draw an X on the face.
+        let face_matrix = self.face.matrix(1);
+        const X_POINTS: [GridPoint; 4] = [
+            Point3::new(0, 0, 0),
+            Point3::new(1, 1, 0),
+            Point3::new(1, 0, 0),
+            Point3::new(0, 1, 0),
+        ];
+        // TODO: this is a messy kludge and really we should be stealing corner points
+        // from the AAB instead, but there isn't yet a good way to do that.
+        output.extend(IntoIterator::into_iter(X_POINTS).map(|p| {
+            (
+                (face_matrix.transform_point(p))
+                    .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)
+                    + self.cube.to_vec().map(FreeCoordinate::from),
+                None,
+            )
+        }));
     }
 }
 

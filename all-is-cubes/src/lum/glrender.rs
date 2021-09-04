@@ -241,11 +241,7 @@ where
                 );
                 // What it collided with
                 for contact in &character.colliding_cubes {
-                    wireframe_vertices(
-                        &mut v,
-                        palette::DEBUG_COLLISION_CUBES,
-                        Aab::from_cube(contact.cube).enlarge(0.005),
-                    );
+                    wireframe_vertices(&mut v, palette::DEBUG_COLLISION_CUBES, *contact);
                 }
             }
 
