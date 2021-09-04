@@ -344,6 +344,22 @@ pub struct BodyStepInfo {
     pub move_segments: [MoveSegment; 3],
 }
 
+impl CustomFormat<ConciseDebug> for BodyStepInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: ConciseDebug) -> fmt::Result {
+        fmt.debug_struct("BodyStepInfo")
+            .field("quiescent", &self.quiescent)
+            .field(
+                "push_out",
+                &self.push_out.as_ref().map(|v| v.custom_format(format_type)),
+            )
+            .field(
+                "move_segments",
+                &self.move_segments.custom_format(format_type),
+            )
+            .finish()
+    }
+}
+
 /// One of the individual straight-line movement segments of a [`BodyStepInfo`].
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
@@ -355,6 +371,31 @@ pub struct MoveSegment {
     /// contained an obstruction, as that cube may be off to the side relative to
     /// the ray.
     pub stopped_by: Option<CubeFace>,
+}
+
+impl CustomFormat<ConciseDebug> for MoveSegment {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
+        let mut nonempty = false;
+        if !self.delta_position.is_zero() {
+            nonempty = true;
+            write!(
+                fmt,
+                "move {:?}",
+                self.delta_position.custom_format(ConciseDebug)
+            )?;
+        }
+        if let Some(stopped_by) = &self.stopped_by {
+            if nonempty {
+                write!(fmt, " ")?;
+            }
+            nonempty = true;
+            write!(fmt, "stopped by {:?}", stopped_by)?;
+        }
+        if !nonempty {
+            write!(fmt, "0")?;
+        }
+        Ok(())
+    }
 }
 
 impl Default for MoveSegment {

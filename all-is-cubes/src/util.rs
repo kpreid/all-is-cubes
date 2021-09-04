@@ -61,6 +61,14 @@ impl<T> CustomFormat<TypeName> for PhantomData<T> {
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct ConciseDebug;
 
+impl<T: CustomFormat<ConciseDebug>, const N: usize> CustomFormat<ConciseDebug> for [T; N] {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: ConciseDebug) -> fmt::Result {
+        fmt.debug_list()
+            .entries(self.iter().map(|item| item.custom_format(format_type)))
+            .finish()
+    }
+}
+
 // TODO: Macro time?
 impl<S: Debug> CustomFormat<ConciseDebug> for Point3<S> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {

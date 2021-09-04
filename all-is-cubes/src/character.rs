@@ -55,6 +55,9 @@ pub struct Character {
     // TODO: Does this belong here? Or in the Space?
     pub(crate) colliding_cubes: HashSet<Contact>,
 
+    /// Last [`Character::step`] info result, for debugging.
+    pub(crate) last_step_info: Option<BodyStepInfo>,
+
     // TODO: Figure out what access is needed and add accessors
     inventory: Inventory,
 
@@ -86,6 +89,9 @@ impl fmt::Debug for Character {
 impl CustomFormat<StatusText> for Character {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         writeln!(fmt, "{}", self.body.custom_format(StatusText))?;
+        if let Some(info) = &self.last_step_info {
+            writeln!(fmt, "Last step: {:#?}", info.custom_format(ConciseDebug))?;
+        }
         write!(fmt, "Colliding: {:?}", self.colliding_cubes.len())
     }
 }
@@ -124,6 +130,7 @@ impl Character {
             space,
             velocity_input: Vector3::zero(),
             colliding_cubes: HashSet::new(),
+            last_step_info: None,
             inventory: Inventory::from_slots(inventory),
             selected_slots: [delete_slot, 0, copy_slot],
             notifier: Notifier::new(),
@@ -237,6 +244,7 @@ impl Character {
             UniverseTransaction::default()
         };
 
+        self.last_step_info = body_step_info;
         (body_step_info, transaction)
     }
 
