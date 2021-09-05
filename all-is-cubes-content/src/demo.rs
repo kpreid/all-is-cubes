@@ -46,6 +46,14 @@ pub enum UniverseTemplate {
     PhysicsLab,
     MengerSponge,
     LightingBench,
+
+    /// Use entirely random choices.
+    ///
+    /// TODO: This doesn't yet produce anything even visible — we need more sanity constraints.
+    /// Also, it should take an RNG seed once we have support for templates having parameters
+    /// at all.
+    #[cfg(feature = "arbitrary")]
+    Random,
     // TODO: add an "nothing, you get a blank editor" option once we have enough editing support.
 }
 
@@ -63,6 +71,9 @@ impl UniverseTemplate {
 
             // More testing than interesting demos.
             Blank | Fail => false,
+
+            #[cfg(feature = "arbitrary")]
+            Random => false,
         }
     }
 
@@ -92,6 +103,8 @@ impl UniverseTemplate {
             LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
                 &mut universe,
             )),
+            #[cfg(feature = "arbitrary")]
+            Random => Some(arbitrary_space(&mut universe)),
         };
 
         if let Some(p) = p {
@@ -262,6 +275,43 @@ async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InG
     spawn.set_inventory(free_editing_starter_inventory(false));
 
     Ok(space)
+}
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_space(_: &mut Universe) -> Result<Space, InGenError> {
+    use all_is_cubes::cgmath::{Vector3, Zero};
+    use arbitrary::{Arbitrary, Error, Unstructured};
+    use rand::RngCore;
+    let mut bytes = [0u8; 16384];
+    let mut attempt = 0;
+    loop {
+        attempt += 1;
+        rand::thread_rng().fill_bytes(&mut bytes);
+        let r: Result<Space, _> = Arbitrary::arbitrary(&mut Unstructured::new(&bytes));
+        match r {
+            Ok(mut space) => {
+                // Patch spawn position to be reasonable
+                let grid = space.grid();
+                space.spawn_mut().set_eye_position(grid.center());
+
+                // Patch physics to be reasonable
+                let mut p = space.physics().clone();
+                p.gravity = Vector3::zero();
+                p.sky_color = Rgb::ONE * 0.5;
+                space.set_physics(p);
+
+                // TODO: These patches are still not enough to get a good result.
+
+                return Ok(space);
+            }
+            Err(Error::IncorrectFormat) => {
+                if attempt >= 1000000 {
+                    return Err(InGenError::Other("Out of attempts".into()));
+                }
+            }
+            Err(e) => panic!("{}", e),
+        }
+    }
 }
 
 #[cfg(test)]

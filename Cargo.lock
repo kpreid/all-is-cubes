@@ -81,6 +81,7 @@ name = "all-is-cubes-content"
 version = "0.3.0"
 dependencies = [
  "all-is-cubes",
+ "arbitrary",
  "futures-core",
  "futures-executor",
  "instant",

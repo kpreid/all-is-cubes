@@ -10,12 +10,14 @@
 //! provide [`UniverseTemplate`]; other items should be assumed not particularly
 //! stable.
 
+#[cfg(feature = "arbitrary")]
+extern crate arbitrary_crate as arbitrary;
+
 use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution};
 use all_is_cubes::cgmath::Transform as _;
-use all_is_cubes::drawing::embedded_graphics::prelude::Transform;
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{iso_8859_1::FONT_9X15_BOLD, MonoTextStyle},
-    prelude::{Dimensions as _, Drawable, Point},
+    prelude::{Dimensions as _, Drawable, Point, Transform as _},
     text::{Alignment, Baseline, Text, TextStyleBuilder},
 };
 use all_is_cubes::drawing::{draw_to_blocks, VoxelBrush, VoxelColor};

@@ -14,8 +14,13 @@ categories = ["games"]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
 
+[features]
+# Enables `UniverseTemplate::Random`.
+arbitrary = ["arbitrary-crate", "all-is-cubes/arbitrary"]
+
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
+arbitrary-crate = { package = "arbitrary", version = "1.0.1", optional = true, features = ["derive"] }
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }
