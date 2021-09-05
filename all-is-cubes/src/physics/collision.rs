@@ -44,8 +44,11 @@ where
 {
     let mut already_colliding: HashSet<Contact> = HashSet::new();
 
-    // Note: no `.within_grid()` because that would not work when the leading
-    // corner is not within the grid.
+    // Note: no `.within_grid()` because that would not work when the leading corner is
+    // not within the grid. We could expand the grid slightly (while considering overflow
+    // cases), but this would be an optimization which only affects the unusual case of
+    // being out of bounds, so it's not worth doing unless we specifically expect to have
+    // many bodies outside a space and occasionally inside.
     for ray_step in aab_raycast(aab, ray, false) {
         let step_aab = aab.translate(
             ray.origin.to_vec() + ray.direction * (ray_step.t_distance() + POSITION_EPSILON),
@@ -70,6 +73,8 @@ where
 
         // Loop over all the cubes that our AAB is just now intersecting and check if
         // any of them are solid.
+        // TODO: Useful optimization for large AABs would be skipping all the interior
+        // cubes that must have been detected in the _previous_ step.
         let mut hit_something = false;
         for box_cube in find_colliding_cubes(space, step_aab) {
             let contact = Contact {
