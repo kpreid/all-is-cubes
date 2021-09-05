@@ -42,7 +42,7 @@ pub struct TriangulatorOptions {
     /// Input to TransparencyOption::limit_alpha.
     transparency: TransparencyOption,
     /// Whether to copy light from the space to the vertices (true), or substitute
-    /// [`Rgb::ONE`] (false).
+    /// [`Rgb::ONE`](crate::math::Rgb::ONE) (false).
     use_space_light: bool,
 }
 
