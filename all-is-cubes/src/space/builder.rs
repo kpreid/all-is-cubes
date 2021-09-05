@@ -85,3 +85,49 @@ impl SpaceBuilder {
         Space::new_from_builder(self)
     }
 }
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Space {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::block::AIR;
+        use crate::content::make_some_blocks;
+
+        let grid: Grid = u.arbitrary()?;
+        if grid.volume() > 32usize.pow(3) {
+            // Limit the amount of memory and setup time we require.
+            return Err(arbitrary::Error::IncorrectFormat);
+        }
+        let mut space = Space::builder(grid)
+            .physics(u.arbitrary()?)
+            .spawn(u.arbitrary()?)
+            .build_empty();
+
+        // Generate some blocks to put in the space
+        let mut blocks = Vec::from(make_some_blocks::<2>()); // TODO: generate arbitrary blocks with attributes
+        #[allow(clippy::same_item_push)]
+        for _ in 0..6 {
+            // Make it probable that blocks are AIR
+            blocks.push(AIR);
+        }
+
+        // Fill space with blocks
+        let mut failure = None;
+        space
+            .fill(space.grid(), |_| {
+                match u.choose(&blocks) {
+                    Ok(block) => Some(block),
+                    Err(e) => {
+                        // We can't abort a space.fill() early unless we resort to catch_unwind.
+                        failure = Some(e);
+                        None
+                    }
+                }
+            })
+            .unwrap();
+        if let Some(e) = failure {
+            return Err(e);
+        }
+
+        Ok(space)
+    }
+}

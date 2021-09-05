@@ -293,6 +293,27 @@ impl<T: ?Sized> hash::Hash for EphemeralOpaque<T> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaque<T> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(EphemeralOpaque(if u.arbitrary()? {
+            Some(Arc::new(u.arbitrary()?))
+        } else {
+            None
+        }))
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        use arbitrary::{size_hint, Arbitrary};
+        size_hint::recursion_guard(depth, |depth| {
+            size_hint::and(
+                <usize as Arbitrary>::size_hint(depth),
+                <T as Arbitrary>::size_hint(depth),
+            )
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::error::Error;

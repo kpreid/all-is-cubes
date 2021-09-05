@@ -529,6 +529,32 @@ impl Spawn {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Spawn {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::math::arbitrary_notnan;
+        Ok(Self {
+            position: Point3::new(
+                arbitrary_notnan(u)?,
+                arbitrary_notnan(u)?,
+                arbitrary_notnan(u)?,
+            ),
+            flying: u.arbitrary()?,
+            inventory: vec![], // TODO: need impl Arbitrary for Tool
+        })
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        use arbitrary::{size_hint::and_all, Arbitrary};
+        and_all(&[
+            <f64 as Arbitrary>::size_hint(depth),
+            <f64 as Arbitrary>::size_hint(depth),
+            <f64 as Arbitrary>::size_hint(depth),
+            <bool as Arbitrary>::size_hint(depth),
+        ])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;

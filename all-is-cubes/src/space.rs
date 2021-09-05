@@ -933,9 +933,34 @@ impl Default for SpacePhysics {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self {
+            gravity: Vector3::new(
+                arbitrary_notnan(u)?,
+                arbitrary_notnan(u)?,
+                arbitrary_notnan(u)?,
+            ),
+            sky_color: u.arbitrary()?,
+            light: u.arbitrary()?,
+        })
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        use arbitrary::{size_hint::and_all, Arbitrary};
+        and_all(&[
+            <f64 as Arbitrary>::size_hint(depth),
+            <f64 as Arbitrary>::size_hint(depth),
+            <Rgb as Arbitrary>::size_hint(depth),
+            <LightPhysics as Arbitrary>::size_hint(depth),
+        ])
+    }
+}
 /// Method used to compute the illumination of individual blocks in a [`Space`].
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum LightPhysics {
     /// No light. All surface colors are taken exactly as displayed colors. The
     /// [`SpacePhysics::sky_color`] is used solely as a background color.
