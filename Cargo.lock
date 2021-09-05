@@ -66,7 +66,7 @@ dependencies = [
  "clap",
  "crossterm",
  "directories-next",
- "glfw",
+ "glfw 0.42.0",
  "indicatif",
  "log",
  "luminance",
@@ -463,9 +463,9 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0ebde6a9dd5e331cd6c6f48253254d117642c31653baa475e394657c59c1f7d"
+checksum = "486d44227f71a1ef39554c0dc47e44b9f4139927c75043312690c3f476d1d788"
 dependencies = [
  "bitflags",
  "crossterm_winapi",
@@ -766,6 +766,20 @@ dependencies = [
  "bitflags",
  "glfw-sys",
  "log",
+ "objc",
+ "raw-window-handle",
+ "semver 0.9.0",
+ "winapi",
+]
+
+[[package]]
+name = "glfw"
+version = "0.42.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06a3f9afbfd6576fca75be1e5cfc6db259b3a9b65844d34890b0711e82953605"
+dependencies = [
+ "bitflags",
+ "glfw-sys",
  "objc",
  "raw-window-handle",
  "semver 0.9.0",
@@ -1107,7 +1121,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba8c0f17ac19a7b2b92d1465ac0859039e937e1aa65b9d1252d438575d6e65e1"
 dependencies = [
  "gl",
- "glfw",
+ "glfw 0.41.0",
  "luminance",
  "luminance-gl",
  "luminance-windowing",
