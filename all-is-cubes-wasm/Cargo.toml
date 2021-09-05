@@ -54,4 +54,7 @@ features = [
 ]
 
 [dev-dependencies]
+# wasm-pack is a command-line tool and is NOT depended on directly. 
+# However, adding it to our dependencies lets the CI know that it should be cached.
+wasm-pack = "0.10.1"
 wasm-bindgen-test = "0.3"
