@@ -212,6 +212,18 @@ impl Aab {
         })
     }
 
+    /// Returns whether this AAB, including the boundary, contains the point.
+    ///
+    /// TODO: example + tests
+    pub fn contains(&self, point: Point3<FreeCoordinate>) -> bool {
+        for axis in 0..3 {
+            if !(self.lower_bounds[axis] <= point[axis] && point[axis] <= self.upper_bounds[axis]) {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Returns a random point within this box, using inclusive ranges
     /// (`lower_bounds[axis] ≤ random_point()[axis] ≤ upper_bounds[axis]`).
     #[cfg(test)] // Only used in tests at this time
