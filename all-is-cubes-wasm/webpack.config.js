@@ -17,7 +17,9 @@ module.exports = {
     filename: "[name].js"
   },
   devServer: {
-    contentBase: dist,
+    static: {
+      directory: dist,
+    },
   },
   experiments: {
     syncWebAssembly: true,
