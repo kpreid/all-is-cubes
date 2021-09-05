@@ -13,3 +13,10 @@ updates:
       interval: "weekly"
       time: "17:00"
       timezone: "America/Los_Angeles"
+    ignore:
+      - dependency-name: "glfw"
+        # `glfw` must be updated in sync with `luminance`, and its version
+        # numbering is currently in the 0.x range, which Cargo considers major
+        # but Dependabot considers minor. So, ignore those "minor" updates which
+        # will predictably cause version skew and thus aren't useful PRs.
+        update-types: ["version-update:semver-minor"]
