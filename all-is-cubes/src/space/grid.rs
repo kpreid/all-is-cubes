@@ -233,6 +233,13 @@ impl Grid {
         self.axis_range(2)
     }
 
+    /// The range of coordinates for cubes within the grid along the given axis.
+    ///
+    /// Panics if `axis >= 3`.
+    pub fn axis_range(&self, axis: usize) -> Range<GridCoordinate> {
+        (self.lower_bounds()[axis])..(self.upper_bounds()[axis])
+    }
+
     /// The center of the enclosed volume. Returns [`FreeCoordinate`] since the center
     /// may be at a half-block position.
     ///
@@ -266,11 +273,6 @@ impl Grid {
     /// ```
     pub fn interior_iter(self) -> GridIter {
         GridIter::new(self)
-    }
-
-    // TODO: decide if this should be public
-    fn axis_range(&self, axis: usize) -> Range<GridCoordinate> {
-        (self.lower_bounds()[axis])..(self.upper_bounds()[axis])
     }
 
     /// Returns whether the grid includes the cube with the given coordinates in its

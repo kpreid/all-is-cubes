@@ -3,8 +3,9 @@
 
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _};
 use std::collections::HashSet;
+
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Zero as _};
 
 use super::POSITION_EPSILON;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel};
@@ -56,9 +57,8 @@ where
     // being out of bounds, so it's not worth doing unless we specifically expect to have
     // many bodies outside a space and occasionally inside.
     for ray_step in aab_raycast(aab, ray, false) {
-        let step_aab = aab.translate(
-            ray.origin.to_vec() + ray.direction * (ray_step.t_distance() + POSITION_EPSILON),
-        );
+        let offset_segment = ray.scale_direction(ray_step.t_distance() + POSITION_EPSILON);
+        let step_aab = aab.translate(offset_segment.unit_endpoint().to_vec());
         if ray_step.t_distance() >= 1.0 {
             // Movement is unobstructed in this timestep.
             break;
@@ -179,4 +179,140 @@ pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaste
     });
     let leading_ray = origin_ray.translate(leading_corner);
     leading_ray.cast()
+}
+
+/// Given an [`Aab`] and a [`Ray`] such that the given face of
+/// `aab.translate(segment.unit_endpoint().to_vec())`
+/// lands almost but not quite on a unit cell boundary along the `plane` axis,
+/// nudge the endpoint of the ray
+/// infinitesimally so that it lands definitely beyond (or before if `backward`)
+/// the cell boundary.
+///
+/// Note that the required `face` is the opposite of the face produced by a raycast.
+/// (This may be confusing but we feel that it would be more confusing to use a face
+/// other than the relevant face of the [`Aab`]).
+pub(crate) fn nudge_on_ray(aab: Aab, segment: Ray, face: Face, backward: bool) -> Ray {
+    if segment.direction.is_zero() || face == Face::Within {
+        return segment;
+    }
+
+    let fc = aab
+        .translate(segment.unit_endpoint().to_vec())
+        .face_coordinate(face);
+    // This is the depth by which the un-nudged face penetrates the plane, which we are going to subtract.
+    let penetration_depth = fc - fc.round();
+    debug_assert!(penetration_depth.abs() <= 0.5);
+
+    // This is the length of the direction vector projected along the face normal — thus, the reciprocal of the scale factor by which to adjust the distance.
+    let direction_projection = face.normal_vector().dot(segment.direction);
+
+    debug_assert!(direction_projection != 0.0);
+
+    // `translation` is how far we want to translate the AAB linearly along the face normal.
+    let epsilon_nudge = if backward {
+        -POSITION_EPSILON
+    } else {
+        POSITION_EPSILON
+    };
+    let translation = epsilon_nudge - penetration_depth;
+
+    if false {
+        dbg!(
+            face,
+            aab.face_coordinate(face),
+            penetration_depth,
+            translation
+        );
+    }
+    segment.scale_direction(1.0 + translation / direction_projection)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::math::GridCoordinate;
+    use crate::space::Grid;
+
+    use super::*;
+    use rand::{Rng, SeedableRng as _};
+
+    #[test]
+    fn nudge_random_test() {
+        let moving_aab = Aab::new(-0.345, 0.489, -0.118, 0.0325, -0.319, 0.2252);
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+        for case_number in 0..1000 {
+            // Prepare test data
+            let ray = Ray::new(
+                Aab::new(-2., 2., -2., 2., -2., 2.).random_point(&mut rng),
+                Aab::new(-1., 1., -1., 1., -1., 1.)
+                    .random_point(&mut rng)
+                    .to_vec(),
+            );
+            let step = aab_raycast(moving_aab, ray, false)
+                .nth(rng.gen_range(1..10))
+                .unwrap();
+            let axis = step.face().axis_number().expect("should have an axis");
+            let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?
+            let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vec());
+            let face_to_nudge = step.face().opposite();
+
+            for backward in [true, false] {
+                // Perform nudge
+                let adjusted_segment = nudge_on_ray(moving_aab, segment, face_to_nudge, backward);
+                let nudged_aab = moving_aab.translate(adjusted_segment.unit_endpoint().to_vec());
+
+                // Check that the nudge was not too big
+                let nudge_length = (adjusted_segment.direction - segment.direction).magnitude();
+                assert!(
+                    nudge_length <= 0.001,
+                    "nudge moved from {:?} to {:?}, distance of {}",
+                    segment,
+                    adjusted_segment,
+                    nudge_length
+                );
+
+                // Check that the nudge was not backwards of the ray
+                assert!(
+                    adjusted_segment.direction.dot(segment.direction) >= 0.0,
+                    "nudge went backwards to {:?} from starting position {:?}",
+                    adjusted_segment,
+                    segment,
+                );
+
+                // Check expected position properties
+                let position_on_axis = nudged_aab.face_coordinate(face_to_nudge);
+                let fraction = position_on_axis - position_on_axis.round();
+                assert!(
+                    fraction.abs() > POSITION_EPSILON / 2.,
+                    "{:?} coord {:?} shouldn't be at surface",
+                    face_to_nudge,
+                    position_on_axis,
+                );
+                assert!(
+                    fraction.abs() < POSITION_EPSILON * 2.,
+                    "{:?} coord {:?} shouldn't be so large",
+                    face_to_nudge,
+                    position_on_axis,
+                );
+
+                let enclosing = nudged_aab.round_up_to_grid();
+                if backward {
+                    let expected_enclosing = Grid::single_cube(
+                        segment.unit_endpoint().map(|p| p.floor() as GridCoordinate),
+                    );
+                    assert_eq!(
+                        enclosing.axis_range(axis),
+                        expected_enclosing.axis_range(axis),
+                        "\ncase {:?}\nface {:?}\nsegment {:?}\nunnudged_aab {:#?}\nnudged {:#?}\n",
+                        case_number,
+                        face_to_nudge,
+                        segment,
+                        unnudged_aab,
+                        nudged_aab,
+                    );
+                } else {
+                    // TODO check the forward cases
+                }
+            }
+        }
+    }
 }

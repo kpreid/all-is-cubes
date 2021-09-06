@@ -187,6 +187,25 @@ impl Aab {
         self.upper_bounds.to_vec()
     }
 
+    /// Returns the position of the identified face of the box on the axis it is
+    /// perpendicular to.
+    ///
+    /// Note that negative faces' coordinates _are_ inverted; that is, all results
+    /// will be positive if the box contains its origin.
+    ///
+    /// Returns 0 if given [`Face::Within`].
+    pub fn face_coordinate(&self, face: Face) -> FreeCoordinate {
+        match face {
+            Face::Within => 0.0,
+            Face::NX => -self.lower_bounds.x,
+            Face::NY => -self.lower_bounds.y,
+            Face::NZ => -self.lower_bounds.z,
+            Face::PX => self.upper_bounds.x,
+            Face::PY => self.upper_bounds.y,
+            Face::PZ => self.upper_bounds.z,
+        }
+    }
+
     /// Size of the box in each axis; equivalent to
     /// `self.upper_bounds() - self.lower_bounds()`.
     pub fn size(&self) -> Vector3<FreeCoordinate> {

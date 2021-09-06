@@ -16,7 +16,8 @@ use crate::space::Grid;
 /// Closely related types.
 pub use crate::math::{CubeFace, Face};
 
-/// A ray; a half-infinite line segment.
+/// A ray; a half-infinite line segment (sometimes used as finite by the length of the
+/// direction vector).
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ray {
@@ -63,11 +64,27 @@ impl Ray {
 
     /// Scale the ray's coordinates by the given factor.
     #[allow(dead_code)] // TODO: this is expected to be used by voxel collision
-    pub(crate) fn scale(self, scale: FreeCoordinate) -> Self {
+    pub(crate) fn scale_all(self, scale: FreeCoordinate) -> Self {
         Self {
             origin: self.origin * scale,
             direction: self.direction * scale,
         }
+    }
+
+    /// Scale the ray's direction vector by the given factor.
+    pub(crate) fn scale_direction(self, scale: FreeCoordinate) -> Self {
+        Self {
+            origin: self.origin,
+            direction: self.direction * scale,
+        }
+    }
+
+    /// Return `self.origin + self.direction`, the “far end” of the ray.
+    ///
+    /// This only makes sense in contexts which are specifically using the length of the
+    /// direction vector as a distance.
+    pub(crate) fn unit_endpoint(self) -> Point3<FreeCoordinate> {
+        self.origin + self.direction
     }
 
     fn advance(self, t: FreeCoordinate) -> Self {
@@ -93,7 +110,7 @@ impl Geometry for Ray {
         E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
     {
         // TODO: add an arrowhead
-        output.extend([(self.origin, None), (self.origin + self.direction, None)]);
+        output.extend([(self.origin, None), (self.unit_endpoint(), None)]);
     }
 }
 
