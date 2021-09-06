@@ -236,6 +236,48 @@ mod tests {
         }
     }
 
+    #[test]
+    fn position_nan() {
+        let space = Space::empty_positive(1, 1, 1);
+        let mut body = Body {
+            position: Point3::new(FreeCoordinate::NAN, 0., 0.),
+            velocity: Vector3::new(1., 0., 0.),
+            ..test_body()
+        };
+        body.step(Tick::from_seconds(2.0), Some(&space), collision_noop);
+        // TODO: We would like to have some recovery strategy.
+        // For now, this is just a "doesn't panic" test.
+    }
+
+    #[test]
+    fn velocity_nan() {
+        let space = Space::empty_positive(1, 1, 1);
+        let mut body = Body {
+            position: Point3::new(1., 0., 0.),
+            velocity: Vector3::new(1., FreeCoordinate::NAN, 0.),
+            ..test_body()
+        };
+        body.step(Tick::from_seconds(2.0), Some(&space), collision_noop);
+
+        // Velocity is zeroed and position is unchanged.
+        assert_eq!(body.velocity, Vector3::new(0., 0., 0.));
+        assert_eq!(body.position, Point3::new(1., 0., 0.));
+    }
+
+    #[test]
+    fn velocity_limit() {
+        let mut body = Body {
+            position: Point3::new(0., 0., 0.),
+            velocity: Vector3::new(1e7, 0., 0.),
+            ..test_body()
+        };
+        body.step(Tick::from_seconds(2.0), None, collision_noop);
+
+        // Velocity is capped and *then* applied to position
+        assert_eq!(body.velocity, Vector3::new(1e5, 0., 0.));
+        assert_eq!(body.position, Point3::new(2e5, 0., 0.));
+    }
+
     /// Takes the maximum length on all coordinate axes; all points forming a cube
     /// centered on the origin will have the same value for this norm.
     ///

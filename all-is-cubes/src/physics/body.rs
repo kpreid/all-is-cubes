@@ -18,6 +18,14 @@ use crate::util::{ConciseDebug, CustomFormat, StatusText};
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 
+/// Velocities larger than this are clamped.
+///
+/// This provides an upper limit on the collision detection computation,
+/// per body per frame.
+const VELOCITY_MAGNITUDE_LIMIT: FreeCoordinate = 1e5_f64;
+const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
+    VELOCITY_MAGNITUDE_LIMIT * VELOCITY_MAGNITUDE_LIMIT;
+
 /// An object with a position, velocity, and collision volume.
 /// What it collides with is determined externally.
 #[derive(Clone, PartialEq)]
@@ -127,7 +135,14 @@ impl Body {
         let dt = tick.delta_t.as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
 
-        // TODO: Reset any non-finite values found to allow recovery from glitches.
+        if !self.position.to_vec().magnitude2().is_finite() {
+            // If position is NaN or infinite, can't do anything, but don't panic
+            return BodyStepInfo {
+                quiescent: false,
+                push_out: None,
+                move_segments,
+            };
+        }
 
         if !self.flying && !tick.paused() {
             if let Some(space) = colliding_space {
@@ -141,12 +156,17 @@ impl Body {
             None
         };
 
-        if self.velocity.magnitude2() <= VELOCITY_EPSILON_SQUARED || tick.paused() {
+        let velocity_magnitude_squared = self.velocity.magnitude2();
+        if !velocity_magnitude_squared.is_finite() {
+            self.velocity = Vector3::zero();
+        } else if velocity_magnitude_squared <= VELOCITY_EPSILON_SQUARED || tick.paused() {
             return BodyStepInfo {
                 quiescent: true,
                 push_out: push_out_info,
                 move_segments,
             };
+        } else if velocity_magnitude_squared > VELOCITY_MAGNITUDE_LIMIT_SQUARED {
+            self.velocity *= VELOCITY_MAGNITUDE_LIMIT / velocity_magnitude_squared.sqrt();
         }
 
         // TODO: correct integration of acceleration due to gravity
