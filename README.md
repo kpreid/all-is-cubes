@@ -7,8 +7,8 @@ Or rather, that's the plan; for now, this is just my very first project written 
 
 ![](https://switchb.org/kpreid/2020/all-is-cubes-10-13-progress.png)
 
-Project organization and development
-------------------------------------
+Project organization
+--------------------
 
 This repository is divided into three Rust packages, split roughly according to different sets of dependencies:
 
@@ -17,7 +17,14 @@ This repository is divided into three Rust packages, split roughly according to 
 * `all-is-cubes-wasm/` is the game app code for the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`. In order to use this, you must use either webpack-dev-server or the web server described next.
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains a preconfigured HTTP static file server.
 
-Because of the complication of having some wasm-specific code, some commands for building, testing, and running the entire project are collected in the `xtask` build tool for convenience and to ensure all non-Rust files are built when needed:
+Building and running
+--------------------
+
+**First time setup:** Unless you don't intend to build the WebAssembly/WebGL version of all-is-cubes or run the full test suite, you will need to install `npm` (use your choice of source) and `wasm-pack` (I suggest `cargo install wasm-pack`). (If you would like to avoid this, then descend into the `all-is-cubes` or `all-is-cubes-desktop` directories as applicable and work using plain `cargo [build|test|run]` there, since those directories contain no web dependencies.)
+
+Because of the complication of having some wasm-specific code, some commands for building, testing, and running the entire project are collected in the `xtask` build tool for convenience and to ensure all non-Rust files are built when needed.
+
+(**You _must_ use `cargo xtask` to build the workspace at least once** for `all-is-cubes-server` to build correctly, as it expects to embed files that are built and copied in by previous steps.)
 
 *   Run all tests: `cargo xtask test`
 
@@ -25,7 +32,7 @@ Because of the complication of having some wasm-specific code, some commands for
 
 *   Development server: `cargo xtask run-dev`
 
-    Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-wasm/`.*
+    Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-wasm/`,* unfortunately.
 
 *   Run the desktop/console game: `cargo run --bin all-is-cubes -- <options>`
 
