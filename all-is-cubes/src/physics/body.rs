@@ -22,8 +22,8 @@ const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 ///
 /// This provides an upper limit on the collision detection computation,
 /// per body per frame.
-const VELOCITY_MAGNITUDE_LIMIT: FreeCoordinate = 1e5_f64;
-const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
+pub(crate) const VELOCITY_MAGNITUDE_LIMIT: FreeCoordinate = 1e5_f64;
+pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
     VELOCITY_MAGNITUDE_LIMIT * VELOCITY_MAGNITUDE_LIMIT;
 
 /// An object with a position, velocity, and collision volume.

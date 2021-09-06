@@ -3,7 +3,7 @@
 
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
-use cgmath::EuclideanSpace as _;
+use cgmath::{EuclideanSpace as _, InnerSpace as _};
 use std::collections::HashSet;
 
 use super::POSITION_EPSILON;
@@ -43,6 +43,12 @@ where
     CC: FnMut(Contact),
 {
     let mut already_colliding: HashSet<Contact> = HashSet::new();
+
+    debug_assert!(
+        ray.direction.magnitude2() < super::body::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,
+        "Attempting to collide_along_ray a very long distance: {:?}",
+        ray
+    );
 
     // Note: no `.within_grid()` because that would not work when the leading corner is
     // not within the grid. We could expand the grid slightly (while considering overflow
