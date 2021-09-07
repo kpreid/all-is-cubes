@@ -328,13 +328,13 @@ pub(crate) struct TooltipState {
 
     /// Whether the tool we should be displaying might have changed.
     dirty_inventory: bool,
-    /// Whether the text has changed, possibly from a non-tool source.
+    /// Whether the `current_contents` has changed and should be drawn.
     dirty_text: bool,
-    /// Which inventory slot we last displayed.
-    source_slot: usize,
-    /// Text to display. Updated from character inventory when `dirty_inventory` is true.
-    text: Arc<str>,
-    /// None if the tooltip is blanked
+    /// Text to actually show on screen.
+    current_contents: TooltipContents,
+    /// Last value of `current_contents` that was an inventory item.
+    last_inventory_message: TooltipContents,
+    /// How long ago the `current_contents` were shown. None if `Blanked`.
     age: Option<Duration>,
 }
 
@@ -361,11 +361,14 @@ impl TooltipState {
         }
     }
 
-    pub fn set_text(&mut self, text: Arc<str>) {
-        self.dirty_text = true;
+    pub fn set_message(&mut self, text: Arc<str>) {
         self.dirty_inventory = false;
-        self.source_slot = usize::MAX;
-        self.text = text;
+        self.set_contents(TooltipContents::Message(text))
+    }
+
+    fn set_contents(&mut self, contents: TooltipContents) {
+        self.dirty_text = true;
+        self.current_contents = contents;
         self.age = Some(Duration::ZERO);
     }
 
@@ -374,7 +377,7 @@ impl TooltipState {
         if let Some(ref mut age) = self.age {
             *age += tick.delta_t;
             if *age > Duration::from_secs(1) {
-                self.set_text(EMPTY_ARC_STR.clone());
+                self.set_contents(TooltipContents::Blanked);
                 self.age = None;
             }
         }
@@ -396,21 +399,29 @@ impl TooltipState {
                         .ok()
                         .map(|ev_block| ev_block.attributes.display_name.to_owned().into())
                         .unwrap_or_else(|| EMPTY_ARC_STR.clone());
+                    let new_contents = TooltipContents::InventoryItem {
+                        source_slot: selected_slot,
+                        text: new_text,
+                    };
 
-                    // Comparing source_slot ensures that if the user toggles between two
-                    // inventory slots that have the same name, this is not ignored.
-                    if new_text != self.text || selected_slot != self.source_slot {
-                        self.text = new_text;
-                        self.source_slot = selected_slot;
-                        self.age = Some(Duration::ZERO);
-                        self.dirty_text = true;
+                    // Comparison ensures that inventory changes that don't change the
+                    // displayed text are ignored, even if the text has timed out, unless
+                    // the change is to a different slot with the *same name*.
+                    if new_contents != self.last_inventory_message {
+                        // log::info!(
+                        //     "changing from {:?} to {:?}",
+                        //     self.last_inventory_message,
+                        //     new_contents
+                        // );
+                        self.last_inventory_message = new_contents.clone();
+                        self.set_contents(new_contents);
                     }
                 }
             }
         }
 
         if self.dirty_text {
-            Some(self.text.clone())
+            Some(self.current_contents.text().clone())
         } else {
             None
         }
@@ -424,9 +435,31 @@ impl Default for TooltipState {
             character_gate: Gate::default(),
             dirty_inventory: false,
             dirty_text: false,
-            source_slot: usize::MAX,
-            text: EMPTY_ARC_STR.clone(),
+            current_contents: TooltipContents::Blanked,
+            last_inventory_message: TooltipContents::Blanked,
             age: None,
+        }
+    }
+}
+
+/// Describes some content the tooltip might be showing.
+///
+/// Right now, this data structure aids distinguishing between cases where text should be
+/// shown even if it is nominally equal (e.g. two tools with the same name) but in the
+/// future it might also provide styling information.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TooltipContents {
+    Blanked,
+    Message(Arc<str>),
+    InventoryItem { source_slot: usize, text: Arc<str> },
+}
+
+impl TooltipContents {
+    fn text(&self) -> &Arc<str> {
+        match self {
+            TooltipContents::Blanked => &*EMPTY_ARC_STR,
+            TooltipContents::Message(m) => m,
+            TooltipContents::InventoryItem { text, .. } => text,
         }
     }
 }
@@ -531,6 +564,7 @@ mod tests {
 
     #[test]
     fn tooltip_timeout() {
+        // TODO: reduce boilerplate
         let mut universe = Universe::new();
         let sv = WidgetSpaceView {
             hud_blocks: &HudBlocks::new(&mut universe, 16),
@@ -539,7 +573,7 @@ mod tests {
 
         let mut t = TooltipState::default();
         assert_eq!(t.age, None);
-        t.set_text("Hello world".into());
+        t.set_message("Hello world".into());
         assert_eq!(t.age, Some(Duration::ZERO));
         t.step(&sv, Tick::from_seconds(0.5));
         assert_eq!(t.age, Some(Duration::from_millis(500)));

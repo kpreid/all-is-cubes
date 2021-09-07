@@ -216,7 +216,7 @@ impl Vui {
     pub fn show_tool_error(&mut self, error: ToolError) {
         // TODO: review text formatting
         if let Ok(mut state) = self.tooltip_state.lock() {
-            state.set_text(error.to_string().into());
+            state.set_message(error.to_string().into());
         }
     }
 }
