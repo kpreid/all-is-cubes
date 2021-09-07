@@ -252,7 +252,7 @@ where
                 wireframe_vertices(
                     &mut v,
                     Rgba::new(1.0, 1.0, 0.0, 1.0),
-                    Aab::from_cube(cube).enlarge(0.005),
+                    Aab::from_cube(cube).expand(0.005),
                 );
             }
 

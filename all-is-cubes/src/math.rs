@@ -261,18 +261,17 @@ impl Aab {
     /// Enlarges the AAB by moving each face outward by the specified distance.
     ///
     /// Panics if the distance is negative or NaN.
-    /// (Shrinking requires considering the error case of shrinking to zero, so that
-    /// will be a separate operation).
+    /// (TODO: Change that, and reconcile the incidental differences with Grid::expand.)
     ///
     /// ```
     /// use all_is_cubes::math::Aab;
     ///
     /// assert_eq!(
-    ///     Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(0.25),
+    ///     Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(0.25),
     ///     Aab::new(0.75, 2.25, 2.75, 4.25, 4.75, 6.25)
     /// );
     /// ````
-    pub fn enlarge(self, distance: FreeCoordinate) -> Self {
+    pub fn expand(self, distance: FreeCoordinate) -> Self {
         // We could imagine a non-uniform version of this, but the fully general one
         // looks a lot like generally constructing a new Aab.
         assert!(
@@ -452,21 +451,21 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn aab_enlarge_nan() {
-        Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(FreeCoordinate::NAN);
+    fn aab_expand_nan() {
+        Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(FreeCoordinate::NAN);
     }
 
     #[test]
     #[should_panic]
-    fn aab_enlarge_negative() {
-        Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(-0.1);
+    fn aab_expand_negative() {
+        Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(-0.1);
     }
 
     #[test]
-    fn aab_enlarge_inf() {
+    fn aab_expand_inf() {
         const INF: FreeCoordinate = FreeCoordinate::INFINITY;
         assert_eq!(
-            Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).enlarge(INF),
+            Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(INF),
             Aab::new(-INF, INF, -INF, INF, -INF, INF),
         );
     }

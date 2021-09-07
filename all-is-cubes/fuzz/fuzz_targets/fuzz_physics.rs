@@ -14,7 +14,7 @@ use libfuzzer_sys::fuzz_target;
 fuzz_target!(|input: ([FreeCoordinate; 3], [FreeCoordinate; 3], Space)| {
     let (position, velocity, space) = input;
 
-    let interesting_bounds_aab = Aab::from(space.grid()).enlarge(10.0);
+    let interesting_bounds_aab = Aab::from(space.grid()).expand(10.0);
 
     // TODO: write a proper Arbitrary impl on a wrapper
     let position: Point3<FreeCoordinate> = position.into();

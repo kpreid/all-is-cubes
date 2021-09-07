@@ -496,7 +496,7 @@ impl Geometry for CubeFace {
     {
         // TODO: How much to offset the lines should be a parameter of the wireframe_points process.
         let expansion = 0.005;
-        let aab = Aab::from_cube(self.cube).enlarge(expansion);
+        let aab = Aab::from_cube(self.cube).expand(expansion);
         aab.wireframe_points(output);
 
         // Draw an X on the face.

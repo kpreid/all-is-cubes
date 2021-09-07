@@ -56,7 +56,7 @@ where
         wireframe_vertices(
             &mut vertices,
             palette::CURSOR_OUTLINE,
-            Aab::from_cube(cursor.place.cube).enlarge(offset_from_surface),
+            Aab::from_cube(cursor.place.cube).expand(offset_from_surface),
         );
 
         // Frame the cursor intersection point with a diamond.

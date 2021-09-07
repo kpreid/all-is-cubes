@@ -457,7 +457,7 @@ impl Geometry for LightUpdateCubeInfo {
     {
         // Draw output cube
         Aab::from_cube(self.cube)
-            .enlarge(0.1)
+            .expand(0.1)
             .wireframe_points(output);
         // Draw rays
         for ray_info in self.rays.iter().flatten() {
@@ -486,7 +486,7 @@ impl Geometry for LightUpdateRayInfo {
         E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
     {
         Aab::from_cube(self.value_cube)
-            .enlarge(0.01)
+            .expand(0.01)
             .wireframe_points(output);
         self.ray.wireframe_points(&mut MapExtend::new(
             output,
