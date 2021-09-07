@@ -411,6 +411,10 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgb {
             arbitrary_notnan(u)?,
         ))
     }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        <[f32; 3]>::size_hint(depth)
+    }
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Rgba {
@@ -422,6 +426,10 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgba {
             arbitrary_notnan(u)?,
             arbitrary_notnan(u)?,
         ))
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        <[f32; 4]>::size_hint(depth)
     }
 }
 

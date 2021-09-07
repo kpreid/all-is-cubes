@@ -469,6 +469,10 @@ impl<'a> arbitrary::Arbitrary<'a> for TransparencyOption {
             _ => unreachable!(),
         })
     }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::and(u8::size_hint(depth), Option::<f32>::size_hint(depth))
+    }
 }
 
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.

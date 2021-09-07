@@ -488,6 +488,16 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             animation_hint: u.arbitrary()?,
         })
     }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::and_all(&[
+            String::size_hint(depth),
+            bool::size_hint(depth),
+            BlockCollision::size_hint(depth),
+            Rgb::size_hint(depth),
+            AnimationHint::size_hint(depth),
+        ])
+    }
 }
 
 /// Specifies the effect on a [`Body`](crate::physics::Body) of colliding with the

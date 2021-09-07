@@ -561,6 +561,10 @@ impl<'a> arbitrary::Arbitrary<'a> for Grid {
         )
         .map_err(|_| arbitrary::Error::IncorrectFormat)
     }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        <[GridCoordinate; 6]>::size_hint(depth)
+    }
 }
 
 /// Iterator produced by [`Grid::interior_iter`].
@@ -778,23 +782,38 @@ impl<P: Into<GridPoint>, V> std::ops::IndexMut<P> for GridArray<V> {
 }
 
 #[cfg(feature = "arbitrary")]
-use arbitrary::Arbitrary;
-#[cfg(feature = "arbitrary")]
-impl<'a, V: Arbitrary<'a>> Arbitrary<'a> for GridArray<V> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let grid: Grid = u.arbitrary()?;
+mod grid_array_arb {
+    use super::*;
+    use arbitrary::Arbitrary;
 
-        if grid.volume() > 2_usize.pow(16) {
-            // Let's not spend too much memory on generating arbitrary length arrays.
-            // This does reduce coverage...
-            return Err(arbitrary::Error::IncorrectFormat);
+    /// Let's not spend too much memory on generating arbitrary length arrays.
+    /// This does reduce coverage...
+    const MAX_VOLUME: usize = 2_usize.pow(16);
+
+    impl<'a, V: Arbitrary<'a>> Arbitrary<'a> for GridArray<V> {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            let grid: Grid = u.arbitrary()?;
+
+            if grid.volume() > MAX_VOLUME {
+                return Err(arbitrary::Error::IncorrectFormat);
+            }
+
+            let contents: Box<[V]> = u
+                .arbitrary_iter()?
+                .take(grid.volume())
+                .collect::<Result<Box<[V]>, _>>()?;
+            GridArray::from_elements(grid, contents).ok_or(arbitrary::Error::NotEnoughData)
         }
 
-        let contents: Box<[V]> = u
-            .arbitrary_iter()?
-            .take(grid.volume())
-            .collect::<Result<Box<[V]>, _>>()?;
-        GridArray::from_elements(grid, contents).ok_or(arbitrary::Error::NotEnoughData)
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            arbitrary::size_hint::recursion_guard(depth, |depth| {
+                let (lower, upper) = V::size_hint(depth);
+                (
+                    lower.saturating_mul(MAX_VOLUME),
+                    upper.map(|u| u.saturating_mul(MAX_VOLUME)),
+                )
+            })
+        }
     }
 }
 
