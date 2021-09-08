@@ -60,7 +60,6 @@ dependencies = [
  "itertools",
  "log",
  "luminance",
- "luminance-front",
  "noise",
  "num-traits",
  "once_cell",
@@ -88,7 +87,6 @@ dependencies = [
  "indicatif",
  "log",
  "luminance",
- "luminance-front",
  "luminance-glfw",
  "luminance-windowing",
  "png",
@@ -122,7 +120,6 @@ dependencies = [
  "js-sys",
  "log",
  "luminance",
- "luminance-front",
  "luminance-web-sys",
  "luminance-webgl",
  "wasm-bindgen",
@@ -1728,17 +1725,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "luminance-front"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ce549e34476b6495b2d6f993ce28c356e0d2a66c25cf39ab488a58d19688516"
-dependencies = [
- "luminance",
- "luminance-gl",
- "luminance-webgl",
 ]
 
 [[package]]
