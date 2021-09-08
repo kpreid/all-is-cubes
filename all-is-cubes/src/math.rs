@@ -46,10 +46,23 @@ macro_rules! notnan {
 pub(crate) use notnan;
 
 #[cfg(feature = "arbitrary")]
-pub(crate) fn arbitrary_notnan<'a, T: num_traits::Float + arbitrary::Arbitrary<'a>>(
+pub(crate) fn arbitrary_notnan<
+    'a,
+    T: num_traits::Float + num_traits::FromPrimitive + arbitrary::Arbitrary<'a>,
+>(
     u: &mut arbitrary::Unstructured<'a>,
 ) -> arbitrary::Result<NotNan<T>> {
-    NotNan::new(u.arbitrary()?).map_err(|_| arbitrary::Error::IncorrectFormat)
+    let float = u.arbitrary()?;
+    match NotNan::new(float) {
+        Ok(nn) => Ok(nn),
+        Err(FloatIsNan) => {
+            let (mantissa, _exponent, sign) = num_traits::Float::integer_decode(float);
+            // If our arbitrary float input was a NaN (encoded by exponent = max value),
+            // then replace it with a finite float, reusing the mantissa bits.
+            let float = T::from_i64(i64::from(sign) * mantissa as i64).unwrap();
+            Ok(NotNan::new(float).unwrap())
+        }
+    }
 }
 
 #[inline]
@@ -440,6 +453,23 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "arbitrary")]
+    #[test]
+    fn arbitrary_notnan_t() {
+        // Exhaustively search all patterns of sign and exponent bits plus a few mantissa bits.
+        for high_bytes in 0..=u16::MAX {
+            use arbitrary::Unstructured;
+            let [h1, h2] = high_bytes.to_be_bytes();
+
+            // Should not panic, and should not need more bytes than given.
+            let _: NotNan<f32> =
+                arbitrary_notnan(&mut Unstructured::new(&[h1, h2, h1, h2])).expect("f32 failure");
+            let _: NotNan<f64> =
+                arbitrary_notnan(&mut Unstructured::new(&[h1, h2, h1, h2, h1, h2, h1, h2]))
+                    .expect("f64 failure");
+        }
+    }
 
     #[test]
     fn aab_debug() {
