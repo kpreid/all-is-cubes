@@ -92,11 +92,9 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
         use crate::block::AIR;
         use crate::content::make_some_blocks;
 
-        let grid: Grid = u.arbitrary()?;
-        if grid.volume() > 32usize.pow(3) {
-            // Limit the amount of memory and setup time we require.
-            return Err(arbitrary::Error::IncorrectFormat);
-        }
+        // TODO: Should be reusing GridArray as Arbitrary for this.
+
+        let grid = Grid::arbitrary_with_max_volume(u, 2048)?;
         let mut space = Space::builder(grid)
             .physics(u.arbitrary()?)
             .spawn(u.arbitrary()?)

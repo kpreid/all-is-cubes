@@ -125,6 +125,51 @@ impl Grid {
         Grid::new([0, 0, 0], [size, size, size])
     }
 
+    /// Generate a `Grid` whose volume is as specified or smaller.
+    #[cfg(feature = "arbitrary")]
+    pub(crate) fn arbitrary_with_max_volume(
+        u: &mut arbitrary::Unstructured<'_>,
+        volume: usize,
+    ) -> arbitrary::Result<Self> {
+        use std::convert::TryInto;
+
+        // Pick sizes within the volume constraint.
+        let mut limit: GridCoordinate = volume.try_into().unwrap_or(GridCoordinate::MAX);
+        let size_1 = u.int_in_range(0..=limit)?;
+        limit /= size_1.max(1);
+        let size_2 = u.int_in_range(0..=limit)?;
+        limit /= size_2.max(1);
+        let size_3 = u.int_in_range(0..=limit)?;
+
+        // Shuffle the sizes to remove any bias.
+        let sizes = *u.choose(&[
+            Vector3::new(size_1, size_2, size_3),
+            Vector3::new(size_1, size_3, size_2),
+            Vector3::new(size_2, size_1, size_3),
+            Vector3::new(size_2, size_3, size_1),
+            Vector3::new(size_3, size_1, size_2),
+            Vector3::new(size_3, size_2, size_1),
+        ])?;
+
+        // Compute lower bounds that are valid for the sizes.
+        let lower_bounds = Point3::new(
+            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes[0])?,
+            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes[1])?,
+            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes[2])?,
+        );
+
+        Ok(Self::new(lower_bounds, sizes))
+    }
+
+    #[cfg(feature = "arbitrary")]
+    const ARBITRARY_SIZE_HINT: (usize, Option<usize>) = {
+        // 6 bounding coordinates plus one permutation selection.
+        // Depending on the volume we could *maybe* end up consuming only 1 byte each
+        // for the sizes.
+        let gc = std::mem::size_of::<GridCoordinate>();
+        ((gc + 1) * 3 + 1, Some(gc * 6 + 1))
+    };
+
     /// Compute volume with checked arithmetic. In a function solely for the convenience
     /// of the `?` operator without which this is even worse.
     fn checked_volume_helper(sizes: GridVector) -> Result<usize, ()> {
@@ -555,15 +600,11 @@ impl From<Grid> for Aab {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Grid {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Grid::checked_new(
-            GridPoint::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
-            GridVector::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
-        )
-        .map_err(|_| arbitrary::Error::IncorrectFormat)
+        Self::arbitrary_with_max_volume(u, usize::MAX)
     }
 
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        <[GridCoordinate; 6]>::size_hint(depth)
+    fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+        Grid::ARBITRARY_SIZE_HINT
     }
 }
 
@@ -792,12 +833,7 @@ mod grid_array_arb {
 
     impl<'a, V: Arbitrary<'a>> Arbitrary<'a> for GridArray<V> {
         fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-            let grid: Grid = u.arbitrary()?;
-
-            if grid.volume() > MAX_VOLUME {
-                return Err(arbitrary::Error::IncorrectFormat);
-            }
-
+            let grid = Grid::arbitrary_with_max_volume(u, MAX_VOLUME)?;
             let contents: Box<[V]> = u
                 .arbitrary_iter()?
                 .take(grid.volume())
@@ -995,5 +1031,51 @@ mod tests {
             )
             .unwrap()
         );
+    }
+
+    #[cfg(feature = "arbitrary")]
+    #[test]
+    fn arbitrary_grid_size_hint() {
+        use arbitrary::{Arbitrary, Unstructured};
+        let hint = Grid::ARBITRARY_SIZE_HINT;
+        let most_bytes_used = (0..=255)
+            .map(|byte| {
+                // TODO: sketchy coverage; would be better to generate some random/hashed data
+                let data = [byte; 1000];
+                let mut u = Unstructured::new(&data);
+                Grid::arbitrary(&mut u).unwrap();
+                let bytes_used = 1000 - u.len();
+                assert!(
+                    bytes_used >= hint.0,
+                    "used {}, less than {}",
+                    bytes_used,
+                    hint.0
+                );
+                bytes_used
+            })
+            .max();
+        assert_eq!(most_bytes_used, hint.1);
+
+        // TODO: Also look at the resulting Grids and see if they're good coverage.
+    }
+
+    #[cfg(feature = "arbitrary")]
+    #[test]
+    fn arbitrary_grid_volume() {
+        use arbitrary::Unstructured;
+        use itertools::Itertools as _;
+        let max_volume = 100;
+        let minmax = (0..=255)
+            .map(|byte| {
+                // TODO: sketchy coverage; would be better to generate some random/hashed data
+                let data = [byte; 25];
+                let mut u = Unstructured::new(&data);
+                Grid::arbitrary_with_max_volume(&mut u, max_volume)
+                    .unwrap()
+                    .volume()
+            })
+            .minmax()
+            .into_option();
+        assert_eq!(minmax, Some((0, max_volume)));
     }
 }
