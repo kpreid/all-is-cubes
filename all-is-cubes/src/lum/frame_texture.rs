@@ -13,6 +13,7 @@ use embedded_graphics::prelude::OriginDimensions;
 use embedded_graphics::prelude::RgbColor;
 use embedded_graphics::prelude::Size;
 use embedded_graphics::Pixel;
+use luminance::backend::shader::Uniformable;
 use luminance::context::GraphicsContext;
 use luminance::pipeline::{Pipeline, TextureBinding};
 use luminance::pixel::{NormRGBA8UI, NormUnsigned};
@@ -22,23 +23,30 @@ use luminance::shading_gate::ShadingGate;
 use luminance::tess::{Mode, Tess};
 use luminance::texture::{Dim2, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, Wrap};
 use luminance::UniformInterface;
-use luminance_front::Backend;
 
 use crate::camera::Viewport;
 use crate::lum::shading::map_shader_result;
+use crate::lum::types::AicLumBackend;
 use crate::lum::GraphicsResourceError;
 use crate::space::Grid;
 
 /// Resources for drawing a texture onto the entire framebuffer.
 /// This is stateless and can be shared by multiple textures,
 /// but requires a [`GraphicsContext`] to be constructed.
-pub(crate) struct FullFramePainter {
+pub(crate) struct FullFramePainter<Backend>
+where
+    Backend: AicLumBackend,
+{
     /// Using a `Program` requires `&mut`.
     program: RefCell<Program<Backend, (), (), FullFrameUniformInterface>>,
     tess: Tess<Backend, ()>,
 }
 
-impl FullFramePainter {
+impl<Backend> FullFramePainter<Backend>
+where
+    Backend: AicLumBackend,
+    TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
+{
     /// Construct a [`FullFramePainter`] with the default shader program.
     ///
     /// This program copies values to the framebuffer with no conversion, and as such,
@@ -64,7 +72,7 @@ impl FullFramePainter {
         }))
     }
 
-    pub fn new_texture(self: &Rc<Self>) -> FullFrameTexture {
+    pub fn new_texture(self: &Rc<Self>) -> FullFrameTexture<Backend> {
         FullFrameTexture {
             ff: self.clone(),
             texture: None,
@@ -99,16 +107,23 @@ impl FullFramePainter {
     }
 }
 
-pub(crate) struct FullFrameTexture {
+pub(crate) struct FullFrameTexture<Backend>
+where
+    Backend: AicLumBackend,
+{
     /// Reference to the [`Program`] and [`Tess`] we're using.
-    ff: Rc<FullFramePainter>,
+    ff: Rc<FullFramePainter<Backend>>,
     texture: Option<Texture<Backend, Dim2, NormRGBA8UI>>,
     last_size: Vector2<u32>,
     local_data: Box<[u8]>,
     texture_is_valid: bool,
 }
 
-impl FullFrameTexture {
+impl<Backend> FullFrameTexture<Backend>
+where
+    Backend: AicLumBackend,
+    TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
+{
     /// Adjusts the texture size to the given framebuffer size.
     ///
     /// The current texture data will be discarded if and only if the given size is
@@ -175,7 +190,10 @@ impl FullFrameTexture {
     }
 }
 
-impl fmt::Debug for FullFrameTexture {
+impl<Backend> fmt::Debug for FullFrameTexture<Backend>
+where
+    Backend: AicLumBackend,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FullFrameTexture")
             // Skipping .ff because it can't be usefully printed
@@ -186,7 +204,10 @@ impl fmt::Debug for FullFrameTexture {
     }
 }
 
-impl DrawTarget for FullFrameTexture {
+impl<Backend> DrawTarget for FullFrameTexture<Backend>
+where
+    Backend: AicLumBackend,
+{
     type Color = Rgb888;
     type Error = std::convert::Infallible;
 
@@ -217,7 +238,10 @@ impl DrawTarget for FullFrameTexture {
     }
 }
 
-impl OriginDimensions for FullFrameTexture {
+impl<Backend> OriginDimensions for FullFrameTexture<Backend>
+where
+    Backend: AicLumBackend,
+{
     fn size(&self) -> Size {
         if let Some(texture) = &self.texture {
             let [width, height] = texture.size();

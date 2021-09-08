@@ -12,12 +12,12 @@
 use std::error::Error;
 
 use cgmath::{Point3, Transform as _, Vector3, Zero as _};
+use luminance::backend::shader::Uniformable;
 use luminance::context::GraphicsContext;
 use luminance::framebuffer::FramebufferError;
 use luminance::pipeline::PipelineError;
 use luminance::tess::{Mode, Tess, TessError};
 use luminance::texture::TextureError;
-use luminance_front::Backend;
 
 use crate::character::Cursor;
 use crate::content::palette;
@@ -34,15 +34,21 @@ pub use glrender::*;
 mod shading;
 mod space;
 mod types;
+pub use types::AicLumBackend;
 
 /// Creates a [`Tess`] to draw a [`Cursor`] as a wireframe cube.
 /// Caller must set up the camera for the cursor's space.
 pub(crate) fn make_cursor_tess<C>(
     context: &mut C,
     cursor_result: &Option<Cursor>,
-) -> Result<Tess<Backend, LumBlockVertex>, GraphicsResourceError>
+) -> Result<Tess<C::Backend, LumBlockVertex>, GraphicsResourceError>
 where
-    C: GraphicsContext<Backend = Backend>,
+    C: GraphicsContext,
+    C::Backend: AicLumBackend,
+    f32: Uniformable<C::Backend>,
+    [i32; 3]: Uniformable<C::Backend>,
+    [f32; 3]: Uniformable<C::Backend>,
+    [[f32; 4]; 4]: Uniformable<C::Backend>,
 {
     if let Some(cursor) = cursor_result {
         // Compute an approximate offset that will prevent Z-fighting.

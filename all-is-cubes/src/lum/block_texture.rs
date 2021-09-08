@@ -12,7 +12,6 @@ use luminance::tess::{Mode, Tess};
 use luminance::texture::{
     Dim3, Dimensionable, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, TextureError, Wrap,
 };
-use luminance_front::Backend;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::fmt;
@@ -20,23 +19,26 @@ use std::rc::{Rc, Weak};
 
 use crate::content::palette;
 use crate::intalloc::IntAllocator;
-use crate::lum::types::LumBlockVertex;
+use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::math::GridCoordinate;
 use crate::space::Grid;
 use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 use crate::util::{CustomFormat, StatusText};
 
 /// Alias for the concrete type of the block texture.
-pub type BlockTexture = Texture<Backend, Dim3, NormRGBA8UI>;
+pub type BlockTexture<Backend> = Texture<Backend, Dim3, NormRGBA8UI>;
 /// Alias for the concrete type of the block texture when bound in a luminance pipeline.
-pub type BoundBlockTexture<'a> = BoundTexture<'a, Backend, Dim3, NormRGBA8UI>;
+pub type BoundBlockTexture<'a, Backend> = BoundTexture<'a, Backend, Dim3, NormRGBA8UI>;
 
 /// Implementation of [`TextureAllocator`] for [`luminance`].
 ///
 /// After any allocations, you must call [`LumAtlasAllocator::flush`] to write the
 /// updates to the actual GPU texture for drawing.
-pub struct LumAtlasAllocator {
-    pub texture: BlockTexture,
+pub struct LumAtlasAllocator<Backend>
+where
+    Backend: AicLumBackend,
+{
+    pub texture: BlockTexture<Backend>,
     layout: AtlasLayout,
     backing: Rc<RefCell<AllocatorBacking>>,
     in_use: Vec<Weak<RefCell<TileBacking>>>,
@@ -83,10 +85,11 @@ struct AllocatorBacking {
     index_allocator: IntAllocator<u32>,
 }
 
-impl LumAtlasAllocator {
+impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
     pub fn new<C>(context: &mut C) -> Result<Self, TextureError>
     where
         C: GraphicsContext<Backend = Backend>,
+        Backend: AicLumBackend,
     {
         let layout = AtlasLayout {
             resolution: 16,
@@ -207,7 +210,7 @@ impl LumAtlasAllocator {
     }
 }
 
-impl TextureAllocator for LumAtlasAllocator {
+impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
     type Tile = LumAtlasTile;
 
     fn allocate(&mut self, requested_grid: Grid) -> Option<LumAtlasTile> {

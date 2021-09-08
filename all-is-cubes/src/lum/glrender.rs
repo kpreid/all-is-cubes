@@ -3,6 +3,9 @@
 
 //! Top level of the `luminance`-based renderer.
 
+use std::fmt;
+use std::time::Duration;
+
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb888;
@@ -10,19 +13,18 @@ use embedded_graphics::prelude::{Drawable, Point};
 use embedded_graphics::text::Baseline;
 use embedded_graphics::text::Text;
 use instant::Instant; // wasm-compatible replacement for std::time::Instant
+use luminance::backend::shader::Uniformable;
 use luminance::blending::Blending;
 use luminance::blending::Equation;
 use luminance::blending::Factor;
 use luminance::context::GraphicsContext;
 use luminance::depth_test::DepthWrite;
 use luminance::framebuffer::Framebuffer;
-use luminance::pipeline::PipelineState;
+use luminance::pipeline::{PipelineState, TextureBinding};
+use luminance::pixel::NormUnsigned;
 use luminance::render_state::RenderState;
 use luminance::tess::Mode;
-use luminance::texture::Dim2;
-use luminance_front::Backend;
-use std::fmt;
-use std::time::Duration;
+use luminance::texture::{Dim2, Dim3};
 
 use crate::camera::{Camera, GraphicsOptions, Viewport};
 use crate::character::{Character, Cursor};
@@ -31,7 +33,7 @@ use crate::listen::{DirtyFlag, ListenableSource};
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::lum::shading::BlockPrograms;
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
-use crate::lum::types::LumBlockVertex;
+use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::lum::GraphicsResourceError;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
@@ -44,28 +46,36 @@ use crate::vui::Vui;
 // TODO: give this and its module a better name
 pub struct GLRenderer<C>
 where
-    C: GraphicsContext<Backend = Backend>,
+    C: GraphicsContext,
+    C::Backend: AicLumBackend + Sized,
 {
     graphics_options: ListenableSource<GraphicsOptions>,
     graphics_options_dirty: DirtyFlag,
 
     // Graphics objects
     pub surface: C,
-    back_buffer: Framebuffer<Backend, Dim2, (), ()>,
-    block_programs: BlockPrograms,
-    info_text_texture: FullFrameTexture,
+    back_buffer: Framebuffer<C::Backend, Dim2, (), ()>,
+    block_programs: BlockPrograms<C::Backend>,
+    info_text_texture: FullFrameTexture<C::Backend>,
 
     // Rendering state
     character: Option<URef<Character>>,
-    world_renderer: Option<SpaceRenderer>,
-    ui_renderer: Option<SpaceRenderer>,
+    world_renderer: Option<SpaceRenderer<C::Backend>>,
+    ui_renderer: Option<SpaceRenderer<C::Backend>>,
     world_camera: Camera,
     ui_camera: Camera,
 }
 
 impl<C> GLRenderer<C>
 where
-    C: GraphicsContext<Backend = Backend>,
+    C: GraphicsContext,
+    C::Backend: AicLumBackend,
+    f32: Uniformable<C::Backend>,
+    [i32; 3]: Uniformable<C::Backend>,
+    [f32; 3]: Uniformable<C::Backend>,
+    [[f32; 4]; 4]: Uniformable<C::Backend>,
+    TextureBinding<Dim2, NormUnsigned>: Uniformable<C::Backend>,
+    TextureBinding<Dim3, NormUnsigned>: Uniformable<C::Backend>,
 {
     /// Constructs `GLRenderer` for the given graphics context and initial viewport dimensions.
     ///

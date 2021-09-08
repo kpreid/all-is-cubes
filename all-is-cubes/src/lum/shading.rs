@@ -5,37 +5,43 @@
 
 use cgmath::Matrix4;
 use instant::Instant;
+use luminance::backend::shader::Uniformable;
 use luminance::context::GraphicsContext;
 use luminance::pipeline::TextureBinding;
 use luminance::pixel::NormUnsigned;
 use luminance::shader::{BuiltProgram, Program, ProgramError, ProgramInterface, Uniform};
-use luminance::texture::Dim3;
+use luminance::texture::{Dim2, Dim3};
 use luminance::UniformInterface;
-use luminance_front::Backend;
 
 use crate::camera::{GraphicsOptions, LightingOption, TransparencyOption};
 use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
-use crate::lum::types::VertexSemantics;
+use crate::lum::types::{AicLumBackend, VertexSemantics};
 use crate::lum::GraphicsResourceError;
 use crate::math::FreeCoordinate;
 
 /// Type of the block shader program (output of [`prepare_block_program`]).
-pub type BlockProgram = Program<Backend, VertexSemantics, (), BlockUniformInterface>;
+pub type BlockProgram<Backend> = Program<Backend, VertexSemantics, (), BlockUniformInterface>;
 
 /// Collection of shaders for rendering blocks, which all share the `BlockUniformInterface`.
-pub(crate) struct BlockPrograms {
-    pub(crate) opaque: BlockProgram,
-    pub(crate) transparent: BlockProgram,
+pub(crate) struct BlockPrograms<Backend: AicLumBackend> {
+    pub(crate) opaque: BlockProgram<Backend>,
+    pub(crate) transparent: BlockProgram<Backend>,
 }
 
-impl BlockPrograms {
+impl<Backend: AicLumBackend> BlockPrograms<Backend> {
     pub(crate) fn compile<C>(
         context: &mut C,
         options: &GraphicsOptions,
-    ) -> Result<BlockPrograms, GraphicsResourceError>
+    ) -> Result<BlockPrograms<Backend>, GraphicsResourceError>
     where
         C: GraphicsContext<Backend = Backend>,
+        f32: Uniformable<C::Backend>,
+        [i32; 3]: Uniformable<C::Backend>,
+        [f32; 3]: Uniformable<C::Backend>,
+        [[f32; 4]; 4]: Uniformable<C::Backend>,
+        TextureBinding<Dim2, NormUnsigned>: Uniformable<C::Backend>,
+        TextureBinding<Dim3, NormUnsigned>: Uniformable<C::Backend>,
     {
         let mut base_defines = Vec::new();
         if options.lighting_display != LightingOption::None {
@@ -68,9 +74,16 @@ impl BlockPrograms {
 fn prepare_block_program<'a, C>(
     context: &mut C,
     defines: impl IntoIterator<Item = (&'a str, &'a str)>,
-) -> Result<BlockProgram, GraphicsResourceError>
+) -> Result<BlockProgram<C::Backend>, GraphicsResourceError>
 where
-    C: GraphicsContext<Backend = Backend>,
+    C: GraphicsContext,
+    C::Backend: AicLumBackend,
+    f32: Uniformable<C::Backend>,
+    [i32; 3]: Uniformable<C::Backend>,
+    [f32; 3]: Uniformable<C::Backend>,
+    [[f32; 4]; 4]: Uniformable<C::Backend>,
+    TextureBinding<Dim2, NormUnsigned>: Uniformable<C::Backend>,
+    TextureBinding<Dim3, NormUnsigned>: Uniformable<C::Backend>,
 {
     let defines: String = defines
         .into_iter()
@@ -108,9 +121,12 @@ where
 }
 
 /// Unwraps [`BuiltProgram`] and logs any warnings.
-pub(crate) fn map_shader_result<Sem, Out, Uni>(
+pub(crate) fn map_shader_result<Backend, Sem, Out, Uni>(
     program_attempt: Result<BuiltProgram<Backend, Sem, Out, Uni>, ProgramError>,
-) -> Result<Program<Backend, Sem, Out, Uni>, GraphicsResourceError> {
+) -> Result<Program<Backend, Sem, Out, Uni>, GraphicsResourceError>
+where
+    Backend: luminance::backend::shader::Shader,
+{
     // TODO:
     match program_attempt {
         Err(error) => Err(GraphicsResourceError::new(error)),
@@ -157,11 +173,18 @@ pub struct BlockUniformInterface {
 
 impl BlockUniformInterface {
     /// Set all the uniforms, given necessary parameters.
-    pub(super) fn initialize(
+    pub(super) fn initialize<Backend: AicLumBackend>(
         &self,
         program_iface: &mut ProgramInterface<'_, Backend>,
-        space: &SpaceRendererBound<'_>,
-    ) {
+        space: &SpaceRendererBound<'_, Backend>,
+    ) where
+        f32: Uniformable<Backend>,
+        [i32; 3]: Uniformable<Backend>,
+        [f32; 3]: Uniformable<Backend>,
+        [[f32; 4]; 4]: Uniformable<Backend>,
+        TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
+        TextureBinding<Dim3, NormUnsigned>: Uniformable<Backend>,
+    {
         let camera = &space.data.camera;
         let options: &GraphicsOptions = camera.options();
         self.set_projection_matrix(program_iface, camera.projection());
@@ -191,11 +214,13 @@ impl BlockUniformInterface {
     }
 
     /// Type converting wrapper for [`Self::projection_matrix`].
-    pub fn set_projection_matrix(
+    pub fn set_projection_matrix<Backend: AicLumBackend>(
         &self,
         program_iface: &mut ProgramInterface<'_, Backend>,
         projection_matrix: Matrix4<FreeCoordinate>,
-    ) {
+    ) where
+        [[f32; 4]; 4]: Uniformable<Backend>,
+    {
         program_iface.set(
             &self.projection_matrix,
             projection_matrix.cast::<f32>().unwrap().into(),
@@ -203,20 +228,24 @@ impl BlockUniformInterface {
     }
 
     /// Type converting wrapper for [`Self::view_matrix`].
-    pub fn set_view_matrix(
+    pub fn set_view_matrix<Backend: AicLumBackend>(
         &self,
         program_iface: &mut ProgramInterface<'_, Backend>,
         view_matrix: Matrix4<FreeCoordinate>,
-    ) {
+    ) where
+        [[f32; 4]; 4]: Uniformable<Backend>,
+    {
         program_iface.set(&self.view_matrix, view_matrix.cast::<f32>().unwrap().into());
     }
 
     /// Type converting wrapper for [`Self::block_texture`].
-    pub fn set_block_texture(
+    pub fn set_block_texture<Backend: AicLumBackend>(
         &self,
         program_iface: &mut ProgramInterface<'_, Backend>,
-        texture: &BoundBlockTexture<'_>,
-    ) {
+        texture: &BoundBlockTexture<'_, Backend>,
+    ) where
+        TextureBinding<Dim3, NormUnsigned>: Uniformable<Backend>,
+    {
         program_iface.set(&self.block_texture, texture.binding());
     }
 }

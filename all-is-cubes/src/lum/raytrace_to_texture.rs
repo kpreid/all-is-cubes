@@ -12,8 +12,11 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::Point;
 use embedded_graphics::Pixel;
 use instant::{Duration, Instant};
+use luminance::backend::shader::Uniformable;
 use luminance::context::GraphicsContext;
-use luminance_front::Backend;
+use luminance::pipeline::TextureBinding;
+use luminance::pixel::NormUnsigned;
+use luminance::texture::Dim2;
 use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;
 #[cfg(feature = "rayon")]
@@ -24,6 +27,7 @@ use crate::camera::Camera;
 use crate::camera::Viewport;
 use crate::lum::frame_texture::FullFramePainter;
 use crate::lum::frame_texture::FullFrameTexture;
+use crate::lum::types::AicLumBackend;
 use crate::lum::GraphicsResourceError;
 use crate::raytracer::PixelBuf;
 use crate::raytracer::{ColorBuf, SpaceRaytracer};
@@ -31,17 +35,20 @@ use crate::space::Space;
 use crate::space::SpaceBlockData;
 use crate::universe::URef;
 
-pub(crate) struct RaytraceToTexture {
+pub(crate) struct RaytraceToTexture<Backend: AicLumBackend> {
     space: Option<URef<Space>>,
-    //todo: Rc<RefCell<SpaceRendererTodo>>,
     // TODO: should not be public but we want an easy way to grab it for drawing
-    pub(crate) render_target: FullFrameTexture,
+    pub(crate) render_target: FullFrameTexture<Backend>,
     pixel_picker: PixelPicker,
     rays_per_frame: usize,
 }
 
-impl RaytraceToTexture {
-    pub fn new(fp: Rc<FullFramePainter>) -> Result<Self, GraphicsResourceError> {
+impl<Backend> RaytraceToTexture<Backend>
+where
+    Backend: AicLumBackend,
+    TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
+{
+    pub fn new(fp: Rc<FullFramePainter<Backend>>) -> Result<Self, GraphicsResourceError> {
         Ok(Self {
             space: None,
             render_target: fp.new_texture(),
