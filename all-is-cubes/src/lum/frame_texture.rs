@@ -13,15 +13,15 @@ use embedded_graphics::prelude::OriginDimensions;
 use embedded_graphics::prelude::RgbColor;
 use embedded_graphics::prelude::Size;
 use embedded_graphics::Pixel;
+use luminance::context::GraphicsContext;
+use luminance::pipeline::{Pipeline, TextureBinding};
+use luminance::pixel::{NormRGBA8UI, NormUnsigned};
+use luminance::render_state::RenderState;
+use luminance::shader::{Program, Uniform};
+use luminance::shading_gate::ShadingGate;
+use luminance::tess::{Mode, Tess};
+use luminance::texture::{Dim2, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, Wrap};
 use luminance::UniformInterface;
-use luminance_front::context::GraphicsContext;
-use luminance_front::pipeline::{Pipeline, TextureBinding};
-use luminance_front::pixel::{NormRGBA8UI, NormUnsigned};
-use luminance_front::render_state::RenderState;
-use luminance_front::shader::{Program, Uniform};
-use luminance_front::shading_gate::ShadingGate;
-use luminance_front::tess::{Mode, Tess};
-use luminance_front::texture::{Dim2, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, Wrap};
 use luminance_front::Backend;
 
 use crate::camera::Viewport;
@@ -34,8 +34,8 @@ use crate::space::Grid;
 /// but requires a [`GraphicsContext`] to be constructed.
 pub(crate) struct FullFramePainter {
     /// Using a `Program` requires `&mut`.
-    program: RefCell<Program<(), (), FullFrameUniformInterface>>,
-    tess: Tess<()>,
+    program: RefCell<Program<Backend, (), (), FullFrameUniformInterface>>,
+    tess: Tess<Backend, ()>,
 }
 
 impl FullFramePainter {
@@ -80,9 +80,9 @@ impl FullFramePainter {
     pub fn render(
         &self,
         render_state: &RenderState,
-        pipeline: &Pipeline<'_>,
-        shading_gate: &mut ShadingGate<'_>,
-        texture: &mut Texture<Dim2, NormRGBA8UI>,
+        pipeline: &Pipeline<'_, Backend>,
+        shading_gate: &mut ShadingGate<'_, Backend>,
+        texture: &mut Texture<Backend, Dim2, NormRGBA8UI>,
     ) -> Result<(), GraphicsResourceError> {
         let tess = &self.tess;
         let bound_texture = pipeline.bind_texture(texture)?;
@@ -102,7 +102,7 @@ impl FullFramePainter {
 pub(crate) struct FullFrameTexture {
     /// Reference to the [`Program`] and [`Tess`] we're using.
     ff: Rc<FullFramePainter>,
-    texture: Option<Texture<Dim2, NormRGBA8UI>>,
+    texture: Option<Texture<Backend, Dim2, NormRGBA8UI>>,
     last_size: Vector2<u32>,
     local_data: Box<[u8]>,
     texture_is_valid: bool,
@@ -161,8 +161,8 @@ impl FullFrameTexture {
     pub fn render(
         &mut self,
         render_state: &RenderState,
-        pipeline: &Pipeline<'_>,
-        shading_gate: &mut ShadingGate<'_>,
+        pipeline: &Pipeline<'_, Backend>,
+        shading_gate: &mut ShadingGate<'_, Backend>,
     ) -> Result<bool, GraphicsResourceError> {
         if self.texture_is_valid {
             if let Some(texture) = &mut self.texture {

@@ -8,18 +8,18 @@ use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3, Zero as _};
+use luminance::blending::{Blending, Equation, Factor};
+use luminance::context::GraphicsContext;
+use luminance::depth_test::DepthWrite;
+use luminance::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
+use luminance::pipeline::{BoundTexture, Pipeline, PipelineError};
+use luminance::pixel::NormRGBA8UI;
+use luminance::render_state::RenderState;
+use luminance::shading_gate::ShadingGate;
 use luminance::tess::View as _;
-use luminance_front::blending::{Blending, Equation, Factor};
-use luminance_front::context::GraphicsContext;
-use luminance_front::depth_test::DepthWrite;
-use luminance_front::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
-use luminance_front::pipeline::{BoundTexture, Pipeline, PipelineError};
-use luminance_front::pixel::NormRGBA8UI;
-use luminance_front::render_state::RenderState;
-use luminance_front::shading_gate::ShadingGate;
-use luminance_front::tess::{Mode, Tess};
-use luminance_front::tess_gate::TessGate;
-use luminance_front::texture::{Dim3, GenMipmaps, Sampler, Texture, TextureError};
+use luminance::tess::{Mode, Tess};
+use luminance::tess_gate::TessGate;
+use luminance::texture::{Dim3, GenMipmaps, Sampler, Texture, TextureError};
 use luminance_front::Backend;
 
 use crate::camera::Camera;
@@ -43,6 +43,8 @@ use super::block_texture::AtlasFlushInfo;
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
+type ChunkData = Option<Tess<Backend, LumBlockVertex, u32>>;
+
 /// Manages cached data and GPU resources for drawing a single [`Space`] and
 /// following its changes.
 pub struct SpaceRenderer {
@@ -50,13 +52,8 @@ pub struct SpaceRenderer {
     todo: Arc<Mutex<SpaceRendererTodo>>,
     block_texture: Option<LumAtlasAllocator>,
     light_texture: Option<SpaceLightTexture>,
-    cst: ChunkedSpaceTriangulation<
-        Option<Tess<LumBlockVertex, u32>>,
-        LumBlockVertex,
-        LumAtlasAllocator,
-        CHUNK_SIZE,
-    >,
-    debug_chunk_boxes_tess: Option<Tess<LumBlockVertex>>,
+    cst: ChunkedSpaceTriangulation<ChunkData, LumBlockVertex, LumAtlasAllocator, CHUNK_SIZE>,
+    debug_chunk_boxes_tess: Option<Tess<Backend, LumBlockVertex>>,
 }
 
 impl SpaceRenderer {
@@ -229,13 +226,8 @@ pub(super) struct SpaceRendererOutput<'a> {
 /// The portion of [`SpaceRendererOutput`] which does not vary with the pipeline progress.
 pub(super) struct SpaceRendererOutputData<'a> {
     pub(super) camera: Camera,
-    cst: &'a ChunkedSpaceTriangulation<
-        Option<Tess<LumBlockVertex, u32>>,
-        LumBlockVertex,
-        LumAtlasAllocator,
-        CHUNK_SIZE,
-    >,
-    debug_chunk_boxes_tess: &'a Option<Tess<LumBlockVertex>>,
+    cst: &'a ChunkedSpaceTriangulation<ChunkData, LumBlockVertex, LumAtlasAllocator, CHUNK_SIZE>,
+    debug_chunk_boxes_tess: &'a Option<Tess<Backend, LumBlockVertex>>,
     view_chunk: ChunkPos<CHUNK_SIZE>,
     info: SpaceRenderInfo,
 
@@ -256,8 +248,11 @@ pub(super) struct SpaceRendererBound<'a> {
 
 impl<'a> SpaceRendererOutput<'a> {
     /// Bind texture, in preparation for using the
-    /// [`ShadingGate`](luminance_front::shading_gate::ShadingGate).
-    pub fn bind(self, pipeline: &'a Pipeline<'a>) -> Result<SpaceRendererBound<'a>, PipelineError> {
+    /// [`ShadingGate`](luminance::shading_gate::ShadingGate).
+    pub fn bind(
+        self,
+        pipeline: &'a Pipeline<'a, Backend>,
+    ) -> Result<SpaceRendererBound<'a>, PipelineError> {
         Ok(SpaceRendererBound {
             data: self.data,
             bound_block_texture: pipeline.bind_texture(self.block_texture)?,
@@ -274,7 +269,7 @@ impl<'a> SpaceRendererBound<'a> {
     /// Use a [`ShadingGate`] to actually draw the space.
     pub(crate) fn render<E>(
         &self,
-        shading_gate: &mut ShadingGate<'_>,
+        shading_gate: &mut ShadingGate<'_, Backend>,
         block_programs: &mut BlockPrograms,
     ) -> Result<SpaceRenderInfo, E> {
         let mut chunks_drawn = 0;
@@ -428,13 +423,8 @@ impl SpaceRendererPass {
 
 /// Render chunk and return the number of quads drawn.
 fn render_chunk_tess<E>(
-    chunk: &ChunkTriangulation<
-        Option<Tess<LumBlockVertex, u32>>,
-        LumBlockVertex,
-        LumAtlasAllocator,
-        CHUNK_SIZE,
-    >,
-    tess_gate: &mut TessGate<'_>,
+    chunk: &ChunkTriangulation<ChunkData, LumBlockVertex, LumAtlasAllocator, CHUNK_SIZE>,
+    tess_gate: &mut TessGate<'_, Backend>,
     pass: SpaceRendererPass,
     ordering: DepthOrdering,
 ) -> Result<usize, E> {
@@ -459,7 +449,7 @@ fn render_chunk_tess<E>(
 fn update_chunk_tess<C: GraphicsContext<Backend = Backend>>(
     context: &mut C,
     new_triangulation: &SpaceTriangulation<LumBlockVertex>,
-    tess_option: &mut Option<Tess<LumBlockVertex, u32>>,
+    tess_option: &mut ChunkData,
 ) {
     let existing_tess_size_ok = if let Some(tess) = tess_option.as_ref() {
         tess.vert_nb() == new_triangulation.vertices().len()
@@ -547,7 +537,7 @@ impl Listener<SpaceChange> for TodoListener {
 /// The alpha component is unused.
 /// TODO: Use alpha component to communicate block opacity.
 struct SpaceLightTexture {
-    texture: Texture<Dim3, NormRGBA8UI>,
+    texture: Texture<Backend, Dim3, NormRGBA8UI>,
     /// The region of cube coordinates for which there are valid texels.
     texture_grid: Grid,
 }
@@ -611,7 +601,7 @@ impl SpaceLightTexture {
 
     fn bind<'a>(
         &'a mut self,
-        pipeline: &'a Pipeline<'a>,
+        pipeline: &'a Pipeline<'a, Backend>,
     ) -> Result<SpaceLightTextureBound<'a>, PipelineError> {
         Ok(SpaceLightTextureBound {
             texture: pipeline.bind_texture(&mut self.texture)?,
@@ -621,7 +611,7 @@ impl SpaceLightTexture {
 }
 
 pub(crate) struct SpaceLightTextureBound<'a> {
-    pub(crate) texture: BoundTexture<'a, Dim3, NormRGBA8UI>,
+    pub(crate) texture: BoundTexture<'a, Backend, Dim3, NormRGBA8UI>,
     pub(crate) offset: Vector3<GridCoordinate>,
 }
 

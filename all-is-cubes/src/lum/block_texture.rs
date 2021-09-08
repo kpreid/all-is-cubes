@@ -2,14 +2,14 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 //! Block texture atlas management: provides [`LumAtlasAllocator`], the
-//! [`TextureAllocator`] implementation for use with [`luminance_front`].
+//! [`TextureAllocator`] implementation for use with [`luminance`].
 
 use cgmath::Vector3;
-use luminance_front::context::GraphicsContext;
-use luminance_front::pipeline::BoundTexture;
-use luminance_front::pixel::NormRGBA8UI;
-use luminance_front::tess::{Mode, Tess};
-use luminance_front::texture::{
+use luminance::context::GraphicsContext;
+use luminance::pipeline::BoundTexture;
+use luminance::pixel::NormRGBA8UI;
+use luminance::tess::{Mode, Tess};
+use luminance::texture::{
     Dim3, Dimensionable, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, TextureError, Wrap,
 };
 use luminance_front::Backend;
@@ -27,9 +27,9 @@ use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTil
 use crate::util::{CustomFormat, StatusText};
 
 /// Alias for the concrete type of the block texture.
-pub type BlockTexture = Texture<Dim3, NormRGBA8UI>;
+pub type BlockTexture = Texture<Backend, Dim3, NormRGBA8UI>;
 /// Alias for the concrete type of the block texture when bound in a luminance pipeline.
-pub type BoundBlockTexture<'a> = BoundTexture<'a, Dim3, NormRGBA8UI>;
+pub type BoundBlockTexture<'a> = BoundTexture<'a, Backend, Dim3, NormRGBA8UI>;
 
 /// Implementation of [`TextureAllocator`] for [`luminance`].
 ///
@@ -182,7 +182,7 @@ impl LumAtlasAllocator {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn debug_atlas_tess<C>(&self, context: &mut C) -> Tess<LumBlockVertex>
+    pub(crate) fn debug_atlas_tess<C>(&self, context: &mut C) -> Tess<Backend, LumBlockVertex>
     where
         C: GraphicsContext<Backend = Backend>,
     {

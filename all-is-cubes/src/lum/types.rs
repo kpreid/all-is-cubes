@@ -4,9 +4,9 @@
 //! Core data types for graphics code to use.
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use luminance::context::GraphicsContext;
+use luminance::tess::{Mode, Tess};
 use luminance::{Semantics, Vertex};
-use luminance_front::context::GraphicsContext;
-use luminance_front::tess::{Mode, Tess};
 use luminance_front::Backend;
 use std::convert::TryFrom as _;
 
@@ -191,7 +191,9 @@ impl GfxVertex for LumBlockVertex {
 
 /// Constructs a <code>[Tess]&lt;[LumBlockVertex]&gt;</code> that renders nothing but does
 /// not provoke a runtime error.
-pub fn empty_tess<C>(context: &mut C) -> Result<Tess<LumBlockVertex>, GraphicsResourceError>
+pub fn empty_tess<C>(
+    context: &mut C,
+) -> Result<Tess<Backend, LumBlockVertex>, GraphicsResourceError>
 where
     C: GraphicsContext<Backend = Backend>,
 {

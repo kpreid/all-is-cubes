@@ -12,7 +12,7 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::Point;
 use embedded_graphics::Pixel;
 use instant::{Duration, Instant};
-use luminance_front::context::GraphicsContext;
+use luminance::context::GraphicsContext;
 use luminance_front::Backend;
 use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;

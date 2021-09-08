@@ -1,21 +1,22 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Algorithms for rendering content using the [`luminance`] graphics library.
+//! Algorithms for rendering All is Cubes content using the [`luminance`] graphics library.
 //!
-//! These are platform-independent but use the [`luminance_front`] interface so they
-//! are always compiled against the automatically-selected luminance backend.
+//! TODO: Right now, only the top level renderer struct is public, because it is
+//! unclear what, if anything, library users might want to do with the subcomponents
+//! (that we can stably support). Revisit.
 
 #![cfg(feature = "lum")]
 
 use std::error::Error;
 
 use cgmath::{Point3, Transform as _, Vector3, Zero as _};
-use luminance_front::context::GraphicsContext;
-use luminance_front::framebuffer::FramebufferError;
-use luminance_front::pipeline::PipelineError;
-use luminance_front::tess::{Mode, Tess, TessError};
-use luminance_front::texture::TextureError;
+use luminance::context::GraphicsContext;
+use luminance::framebuffer::FramebufferError;
+use luminance::pipeline::PipelineError;
+use luminance::tess::{Mode, Tess, TessError};
+use luminance::texture::TextureError;
 use luminance_front::Backend;
 
 use crate::character::Cursor;
@@ -24,10 +25,6 @@ use crate::lum::types::{empty_tess, LumBlockVertex};
 use crate::math::{Aab, FreeCoordinate, Geometry, Rgba};
 use crate::raycast::Face;
 use crate::util::MapExtend;
-
-// TODO: Right now, only the top level renderer struct is public, because it is
-// unclear what, if anything, library users might want to do with the subcomponents
-// (that we can stably support). Revisit.
 
 mod block_texture;
 mod frame_texture;
@@ -43,7 +40,7 @@ mod types;
 pub(crate) fn make_cursor_tess<C>(
     context: &mut C,
     cursor_result: &Option<Cursor>,
-) -> Result<Tess<LumBlockVertex>, GraphicsResourceError>
+) -> Result<Tess<Backend, LumBlockVertex>, GraphicsResourceError>
 where
     C: GraphicsContext<Backend = Backend>,
 {

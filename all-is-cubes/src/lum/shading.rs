@@ -5,12 +5,12 @@
 
 use cgmath::Matrix4;
 use instant::Instant;
+use luminance::context::GraphicsContext;
+use luminance::pipeline::TextureBinding;
+use luminance::pixel::NormUnsigned;
+use luminance::shader::{BuiltProgram, Program, ProgramError, ProgramInterface, Uniform};
+use luminance::texture::Dim3;
 use luminance::UniformInterface;
-use luminance_front::context::GraphicsContext;
-use luminance_front::pipeline::TextureBinding;
-use luminance_front::pixel::NormUnsigned;
-use luminance_front::shader::{BuiltProgram, Program, ProgramError, ProgramInterface, Uniform};
-use luminance_front::texture::Dim3;
 use luminance_front::Backend;
 
 use crate::camera::{GraphicsOptions, LightingOption, TransparencyOption};
@@ -21,7 +21,7 @@ use crate::lum::GraphicsResourceError;
 use crate::math::FreeCoordinate;
 
 /// Type of the block shader program (output of [`prepare_block_program`]).
-pub type BlockProgram = Program<VertexSemantics, (), BlockUniformInterface>;
+pub type BlockProgram = Program<Backend, VertexSemantics, (), BlockUniformInterface>;
 
 /// Collection of shaders for rendering blocks, which all share the `BlockUniformInterface`.
 pub(crate) struct BlockPrograms {
@@ -109,8 +109,8 @@ where
 
 /// Unwraps [`BuiltProgram`] and logs any warnings.
 pub(crate) fn map_shader_result<Sem, Out, Uni>(
-    program_attempt: Result<BuiltProgram<Sem, Out, Uni>, ProgramError>,
-) -> Result<Program<Sem, Out, Uni>, GraphicsResourceError> {
+    program_attempt: Result<BuiltProgram<Backend, Sem, Out, Uni>, ProgramError>,
+) -> Result<Program<Backend, Sem, Out, Uni>, GraphicsResourceError> {
     // TODO:
     match program_attempt {
         Err(error) => Err(GraphicsResourceError::new(error)),
@@ -159,7 +159,7 @@ impl BlockUniformInterface {
     /// Set all the uniforms, given necessary parameters.
     pub(super) fn initialize(
         &self,
-        program_iface: &mut ProgramInterface<'_>,
+        program_iface: &mut ProgramInterface<'_, Backend>,
         space: &SpaceRendererBound<'_>,
     ) {
         let camera = &space.data.camera;
@@ -193,7 +193,7 @@ impl BlockUniformInterface {
     /// Type converting wrapper for [`Self::projection_matrix`].
     pub fn set_projection_matrix(
         &self,
-        program_iface: &mut ProgramInterface<'_>,
+        program_iface: &mut ProgramInterface<'_, Backend>,
         projection_matrix: Matrix4<FreeCoordinate>,
     ) {
         program_iface.set(
@@ -205,7 +205,7 @@ impl BlockUniformInterface {
     /// Type converting wrapper for [`Self::view_matrix`].
     pub fn set_view_matrix(
         &self,
-        program_iface: &mut ProgramInterface<'_>,
+        program_iface: &mut ProgramInterface<'_, Backend>,
         view_matrix: Matrix4<FreeCoordinate>,
     ) {
         program_iface.set(&self.view_matrix, view_matrix.cast::<f32>().unwrap().into());
@@ -214,7 +214,7 @@ impl BlockUniformInterface {
     /// Type converting wrapper for [`Self::block_texture`].
     pub fn set_block_texture(
         &self,
-        program_iface: &mut ProgramInterface<'_>,
+        program_iface: &mut ProgramInterface<'_, Backend>,
         texture: &BoundBlockTexture<'_>,
     ) {
         program_iface.set(&self.block_texture, texture.binding());

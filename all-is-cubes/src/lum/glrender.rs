@@ -13,13 +13,13 @@ use instant::Instant; // wasm-compatible replacement for std::time::Instant
 use luminance::blending::Blending;
 use luminance::blending::Equation;
 use luminance::blending::Factor;
+use luminance::context::GraphicsContext;
 use luminance::depth_test::DepthWrite;
-use luminance_front::context::GraphicsContext;
-use luminance_front::framebuffer::Framebuffer;
-use luminance_front::pipeline::PipelineState;
-use luminance_front::render_state::RenderState;
-use luminance_front::tess::Mode;
-use luminance_front::texture::Dim2;
+use luminance::framebuffer::Framebuffer;
+use luminance::pipeline::PipelineState;
+use luminance::render_state::RenderState;
+use luminance::tess::Mode;
+use luminance::texture::Dim2;
 use luminance_front::Backend;
 use std::fmt;
 use std::time::Duration;
@@ -51,7 +51,7 @@ where
 
     // Graphics objects
     pub surface: C,
-    back_buffer: Framebuffer<Dim2, (), ()>,
+    back_buffer: Framebuffer<Backend, Dim2, (), ()>,
     block_programs: BlockPrograms,
     info_text_texture: FullFrameTexture,
 
