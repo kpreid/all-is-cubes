@@ -38,6 +38,13 @@ pub enum Contact {
 }
 
 impl Contact {
+    pub fn cube(&self) -> GridPoint {
+        match *self {
+            Contact::Block(CubeFace { cube, .. }) => cube,
+            Contact::Voxel { cube, .. } => cube,
+        }
+    }
+
     /// Returns the contact normal: the direction in which the colliding box should be
     /// pushed back.
     ///
@@ -164,30 +171,46 @@ where
         }
 
         // Loop over all the cubes that our AAB is just now intersecting and check if
-        // any of them are solid.
+        // any of them are solid, and if so, how far into their volume is a hit.
         // TODO: Useful optimization for large AABs would be skipping all the interior
         // cubes that must have been detected in the _previous_ step.
         let mut something_hit = None;
-        for box_cube in find_colliding_cubes(space, step_aab) {
-            let contact = Contact::Block(CubeFace {
-                cube: box_cube,
-                face: ray_step.face(),
-            });
-            if !already_colliding.contains(&contact) {
-                something_hit = Some(contact);
-                collision_callback(contact);
+        for cube in step_aab.round_up_to_grid().interior_iter() {
+            let cell = space.get_cell(cube);
+            let full_cube_end = CollisionRayEnd {
+                t_distance: ray_step.t_distance(),
+                contact: Contact::Block(CubeFace {
+                    cube,
+                    face: ray_step.face(),
+                }),
+            };
+            match Sp::collision(cell) {
+                // Note: This match must be in sync with find_colliding_cubes, the non-in-motion version of this.
+                BlockCollision::None => {
+                    // No collision for this block
+                    continue;
+                }
+                BlockCollision::Hard => {
+                    let contact = full_cube_end.contact;
+                    if !already_colliding.contains(&contact) {
+                        collision_callback(contact);
+                        something_hit = Some(full_cube_end);
+                    }
+                }
+                BlockCollision::Recur => {
+                    if let Some(did_end) = Sp::recurse(full_cube_end, aab, ray, cell) {
+                        if !already_colliding.contains(&did_end.contact) {
+                            collision_callback(did_end.contact);
+                            something_hit = Some(did_end);
+                        }
+                    }
+                }
             }
         }
 
         // Now that we've found _all_ the contacts, report the collision.
-        if let Some(contact) = something_hit {
-            return Some(CollisionRayEnd {
-                t_distance: ray_step.t_distance(),
-                // TODO: Instead of reporting the ray step, which may not be solid at all,
-                // report one of the previously found contacts. This will become necessary
-                // for recursive collision.
-                contact,
-            });
+        if let Some(end) = something_hit {
+            return Some(end);
         }
     }
 
@@ -201,10 +224,28 @@ where
     Sp: CollisionSpace,
 {
     aab.round_up_to_grid().interior_iter().filter(move |&cube| {
-        match Sp::collision(space.get_cell(cube)) {
+        let cell = space.get_cell(cube);
+        match Sp::collision(cell) {
             BlockCollision::None => false,
             BlockCollision::Hard => true,
-            BlockCollision::Recur => unimplemented!("Recursive collision"),
+            BlockCollision::Recur => match Sp::get_voxels(cell) {
+                None => true,
+                Some((resolution, voxels)) => {
+                    let voxel_aab = aab
+                        .translate(cube.to_vec().map(|s| -FreeCoordinate::from(s)))
+                        .scale(FreeCoordinate::from(resolution));
+                    let voxel_aab_grid = voxel_aab.round_up_to_grid().intersection(voxels.grid());
+                    if let Some(g) = voxel_aab_grid {
+                        g.interior_iter()
+                            .any(|subcube| match voxels[subcube].collision {
+                                BlockCollision::None => false,
+                                BlockCollision::Hard | BlockCollision::Recur => true,
+                            })
+                    } else {
+                        false
+                    }
+                }
+            },
         }
     })
 }
@@ -220,6 +261,19 @@ pub(crate) trait CollisionSpace {
 
     /// Retrieve a cell's collision behavior option.
     fn collision(cell: &Self::Cell) -> BlockCollision;
+
+    /// TODO: document
+    fn get_voxels(cell: &Self::Cell) -> Option<(Resolution, &GridArray<Evoxel>)>;
+
+    /// TODO: document
+    ///
+    /// * `entry_end`: the endpoint we would return if the recursion stopped here — entering the given cell.
+    fn recurse(
+        entry_end: CollisionRayEnd,
+        aab: Aab,
+        ray: Ray,
+        cell: &Self::Cell,
+    ) -> Option<CollisionRayEnd>;
 }
 
 impl CollisionSpace for Space {
@@ -233,6 +287,57 @@ impl CollisionSpace for Space {
     #[inline]
     fn collision(cell: &Self::Cell) -> BlockCollision {
         cell.attributes.collision
+    }
+
+    #[inline]
+    fn get_voxels(evaluated: &EvaluatedBlock) -> Option<(Resolution, &GridArray<Evoxel>)> {
+        evaluated.voxels.as_ref().map(|v| (evaluated.resolution, v))
+    }
+
+    #[inline]
+    fn recurse(
+        entry_end: CollisionRayEnd,
+        space_aab: Aab,
+        space_ray: Ray,
+        evaluated: &EvaluatedBlock,
+    ) -> Option<CollisionRayEnd> {
+        match &evaluated.voxels {
+            // Plain non-recursive collision
+            None => Some(entry_end),
+            Some(voxels) => {
+                let cube_translation = entry_end
+                    .contact
+                    .cube()
+                    .to_vec()
+                    .map(|s| -FreeCoordinate::from(s));
+                let scale = FreeCoordinate::from(evaluated.resolution);
+                // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
+                // Note: aab is not translated since it's relative to the ray anyway.
+                let voxel_aab = space_aab.scale(scale);
+                let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
+                if let Some(hit_voxel) = collide_along_ray(voxels, voxel_ray, voxel_aab, |_| {}) {
+                    let CollisionRayEnd {
+                        t_distance: voxel_t_distance,
+                        contact,
+                    } = hit_voxel;
+
+                    match contact {
+                        Contact::Block(voxel) => Some(CollisionRayEnd {
+                            t_distance: voxel_t_distance * scale,
+                            contact: Contact::Voxel {
+                                cube: entry_end.contact.cube(),
+                                resolution: evaluated.resolution,
+                                voxel,
+                            },
+                        }),
+                        Contact::Voxel { .. } => panic!("encountered 3-level voxel recursion"),
+                    }
+                } else {
+                    // Didn't hit anything within this block.
+                    None
+                }
+            }
+        }
     }
 }
 
@@ -250,6 +355,20 @@ impl CollisionSpace for GridArray<Evoxel> {
     #[inline]
     fn collision(cell: &Self::Cell) -> BlockCollision {
         cell.collision
+    }
+
+    #[inline]
+    fn get_voxels(_cell: &Self::Cell) -> Option<(Resolution, &GridArray<Evoxel>)> {
+        None
+    }
+    #[inline(always)]
+    fn recurse(
+        entry_end: CollisionRayEnd,
+        _aab: Aab,
+        _local_ray: Ray,
+        _cell: &Self::Cell,
+    ) -> Option<CollisionRayEnd> {
+        Some(entry_end)
     }
 }
 
