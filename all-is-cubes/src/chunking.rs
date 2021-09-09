@@ -5,10 +5,10 @@
 //!
 //! For the time being, the chunk size is locked to the constant `CHUNK_SIZE`.
 
+use std::iter::FusedIterator;
+
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
-use std::convert::TryFrom;
-use std::iter::FusedIterator;
 
 use crate::math::{int_magnitude_squared, FreeCoordinate, GridCoordinate, GridPoint, GridVector};
 use crate::space::Grid;

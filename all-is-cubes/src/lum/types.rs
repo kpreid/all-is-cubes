@@ -7,7 +7,6 @@ use cgmath::{EuclideanSpace as _, Point3, Vector3};
 use luminance::context::GraphicsContext;
 use luminance::tess::{Mode, Tess};
 use luminance::{Semantics, Vertex};
-use std::convert::TryFrom as _;
 
 use crate::lum::GraphicsResourceError;
 use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};

@@ -3,12 +3,12 @@
 
 //! Triangulator's 2D plane operations (sliced voxels to texels and meshes).
 
+use std::ops::Range;
+
 use cgmath::{
     ElementWise as _, EuclideanSpace as _, Point2, Point3, Transform as _, Vector2, Vector3,
     Zero as _,
 };
-use std::convert::{TryFrom, TryInto};
-use std::ops::Range;
 
 use crate::math::{Face, FreeCoordinate, GridCoordinate, Rgba};
 use crate::triangulator::{BlockVertex, Coloring, TextureCoordinate, TextureTile};

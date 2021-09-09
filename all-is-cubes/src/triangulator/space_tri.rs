@@ -3,7 +3,6 @@
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
 use ordered_float::OrderedFloat;
-use std::convert::TryInto;
 use std::fmt::Debug;
 use std::ops::Range;
 

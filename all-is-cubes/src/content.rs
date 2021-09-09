@@ -6,6 +6,8 @@
 //! This module is private; the public interface to this stuff is the separate
 //! `all-is-cubes-content` crate.
 
+use std::borrow::Cow;
+
 use cgmath::{Vector3, Vector4};
 use embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;
@@ -14,8 +16,6 @@ use embedded_graphics::text::Alignment;
 use embedded_graphics::text::Baseline;
 use embedded_graphics::text::Text;
 use embedded_graphics::text::TextStyleBuilder;
-use std::borrow::Cow;
-use std::convert::{TryFrom, TryInto};
 
 use crate::block::{Block, BlockCollision, Resolution, AIR};
 use crate::math::{FreeCoordinate, GridCoordinate, Rgb, Rgba};

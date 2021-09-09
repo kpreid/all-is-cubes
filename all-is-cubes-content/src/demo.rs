@@ -3,8 +3,6 @@
 
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
 
-use std::convert::TryInto as _;
-
 use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::Character;

@@ -8,7 +8,6 @@
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
 
-use std::convert::TryInto;
 use std::error::Error;
 use std::fs::create_dir_all;
 use std::fs::File;

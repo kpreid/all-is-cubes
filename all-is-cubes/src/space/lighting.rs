@@ -4,7 +4,6 @@
 //! Lighting algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
-use std::convert::TryInto as _;
 use std::fmt;
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3};

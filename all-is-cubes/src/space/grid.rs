@@ -4,7 +4,6 @@
 //! Axis-aligned integer-coordinate box volumes ([`Grid`]), arrays bounded by them
 //! ([`GridArray`]), and related.
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::iter::FusedIterator;
 use std::ops::Range;
@@ -131,8 +130,6 @@ impl Grid {
         u: &mut arbitrary::Unstructured<'_>,
         volume: usize,
     ) -> arbitrary::Result<Self> {
-        use std::convert::TryInto;
-
         // Pick sizes within the volume constraint.
         let mut limit: GridCoordinate = volume.try_into().unwrap_or(GridCoordinate::MAX);
         let size_1 = u.int_in_range(0..=limit)?;

@@ -3,7 +3,6 @@
 
 //! Color data types. This module is private but reexported by its parent.
 
-use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::ops::{Add, AddAssign, Mul, Sub};
 

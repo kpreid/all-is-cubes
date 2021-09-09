@@ -11,7 +11,6 @@
 //! it is much simpler. It continues to serve as a “reference implementation” and is used
 //! by the terminal UI and in unit tests via [`print_space`].
 
-use std::convert::TryFrom as _;
 use std::fmt;
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector3};

@@ -5,7 +5,6 @@
 //! [`Space`]. See [`Block`] for details.
 
 use std::borrow::Cow;
-use std::convert::TryFrom as _;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::Arc;

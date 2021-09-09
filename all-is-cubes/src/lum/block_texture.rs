@@ -368,7 +368,6 @@ impl AtlasLayout {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::convert::TryFrom;
 
     /// This shouldn't happen, but if it does, this is how we handle it.
     #[test]

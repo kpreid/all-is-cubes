@@ -4,10 +4,10 @@
 //! [`Face`] type and related items.
 //! This module is private but reexported by its parent.
 
+use std::ops::{Index, IndexMut};
+
 use cgmath::{BaseNum, Transform, Vector3};
 pub use ordered_float::{FloatIsNan, NotNan};
-use std::convert::TryFrom;
-use std::ops::{Index, IndexMut};
 
 use crate::math::*;
 
@@ -267,7 +267,6 @@ impl TryFrom<GridVector> for Face {
     ///
     /// ```
     /// use all_is_cubes::math::{Face, GridVector};
-    /// use std::convert::TryFrom;
     ///
     /// // A Face may be converted from its normal vector.
     /// for face in Face::ALL_SEVEN {

@@ -4,11 +4,11 @@
 //! Integer-coordinate matrices.
 //! This module is private but reexported by its parent.
 
+use std::cmp::Ordering;
+use std::ops::Mul;
+
 use cgmath::{InnerSpace, Matrix4, One, Transform, Vector3, Vector4, Zero as _};
 pub use ordered_float::{FloatIsNan, NotNan};
-use std::cmp::Ordering;
-use std::convert::TryFrom as _;
-use std::ops::Mul;
 
 use crate::math::*;
 

@@ -10,7 +10,6 @@ use cgmath::{
 };
 use itertools::Itertools as _;
 use ordered_float::NotNan;
-use std::convert::TryInto as _;
 
 use crate::math::{Aab, FreeCoordinate, Rgba};
 use crate::raycast::Ray;
