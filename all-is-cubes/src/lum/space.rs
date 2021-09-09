@@ -142,7 +142,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 // https://github.com/phaazon/luminance-rs/issues/483
                 // means indices_mut() can fail and corrupt other buffers.
                 // TODO: Reenble this and also in-place chunk updating when bug is fixed
-                if !cfg!(target_arch = "wasm32") {
+                if !cfg!(target_damily = "wasm") {
                     if let Some(tess) = render_data {
                         let range = triangulation.transparent_range(DepthOrdering::Within);
                         tess.indices_mut()
@@ -482,7 +482,7 @@ fn update_chunk_tess<C>(
             && tess.idx_nb() == new_triangulation.indices().len()
             // TODO: workaround for https://github.com/phaazon/luminance-rs/issues/483
             // which makes modifying existing Tesses fail
-            && !cfg!(target_arch = "wasm32")
+            && !cfg!(target_family = "wasm")
     } else {
         false
     };
