@@ -10,7 +10,7 @@ use super::collision::{
 };
 use crate::apps::Tick;
 use crate::block::BlockCollision;
-use crate::math::{Aab, CubeFace, FreeCoordinate, Geometry as _};
+use crate::math::{Aab, FreeCoordinate, Geometry as _};
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::transactions::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
@@ -226,17 +226,19 @@ impl Body {
 
         if let Some(collision) = collision {
             let axis = collision
-                .cube_face
-                .face
+                .contact
+                .normal()
                 .axis_number()
                 .expect("Face::Within collisions should not reach here");
             // Advance however much straight-line distance is available.
             // But a little bit back from that, to avoid floating point error pushing us
             // into being already colliding next frame.
+            //
+            // TODO: When we have recursive collision, this needs to be nudged within the voxel grid.
             let motion_segment = nudge_on_ray(
                 self.collision_box,
                 movement_ignoring_collision.scale_direction(collision.t_distance),
-                collision.cube_face.face.opposite(),
+                collision.contact.normal().opposite(),
                 true,
             );
             let unobstructed_delta_position = motion_segment.direction;
@@ -253,7 +255,7 @@ impl Body {
                 delta_position,
                 MoveSegment {
                     delta_position: unobstructed_delta_position,
-                    stopped_by: Some(collision.cube_face),
+                    stopped_by: Some(collision.contact),
                 },
             )
         } else {
@@ -404,11 +406,10 @@ impl CustomFormat<ConciseDebug> for BodyStepInfo {
 pub struct MoveSegment {
     /// The change in position.
     pub delta_position: Vector3<FreeCoordinate>,
-    /// What movement stopped this segment from continuing further.
-    /// Note that `self.stopped_by.cube` is not necessarily the cube that
-    /// contained an obstruction, as that cube may be off to the side relative to
-    /// the ray.
-    pub stopped_by: Option<CubeFace>,
+    /// What solid object stopped this segment from continuing further
+    /// (there may be others, but this is one of them), or None if there
+    /// was no obstacle.
+    pub stopped_by: Option<Contact>,
 }
 
 impl CustomFormat<ConciseDebug> for MoveSegment {

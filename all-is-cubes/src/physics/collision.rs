@@ -5,24 +5,97 @@
 
 use std::collections::HashSet;
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Zero as _};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use super::POSITION_EPSILON;
-use crate::block::{BlockCollision, EvaluatedBlock, Evoxel};
-use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry as _, GridPoint};
+use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution};
+use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry, GridCoordinate, GridPoint, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{GridArray, Space};
+use crate::util::MapExtend;
 
-/// An individual collision contact.
-pub type Contact = CubeFace;
+/// An individual collision contact; something in a [`Space`] that a moving [`Aab`]
+/// collided with.
+///
+/// This type is designed to be comparable/hashable to deduplicate contacts.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
+pub enum Contact {
+    /// Contact with a fully solid block; the [`CubeFace`] specifies the block position
+    /// and the side of it that was collided with (hence also the contact normal).
+    Block(CubeFace),
+    Voxel {
+        /// The “outer” cube in the [`Space`].
+        cube: GridPoint,
+        /// The voxel resolution of the block; that is, the factor by which voxel
+        /// coordinates are smaller than `cube` coordinates.
+        resolution: Resolution,
+        /// The voxel position in the block (each coordinate lies between `0` and
+        /// `resolution - 1`) and the face of that voxel collided with, which is also
+        /// the contact normal.
+        voxel: CubeFace,
+    },
+}
+
+impl Contact {
+    /// Returns the contact normal: the direction in which the colliding box should be
+    /// pushed back.
+    ///
+    /// Note that this may be equal to [`Face::WITHIN`] in case the box was already
+    /// intersecting before any movement.
+    pub fn normal(&self) -> Face {
+        match *self {
+            Contact::Block(CubeFace { face, .. }) => face,
+            Contact::Voxel {
+                voxel: CubeFace { face, .. },
+                ..
+            } => face,
+        }
+    }
+}
+
+impl Geometry for Contact {
+    type Coord = GridCoordinate;
+
+    fn translate(mut self, offset: impl Into<Vector3<Self::Coord>>) -> Self {
+        let offset = offset.into();
+        match &mut self {
+            Contact::Block(CubeFace { mut cube, .. }) => cube += offset,
+            Contact::Voxel { mut cube, .. } => cube += offset,
+        }
+        self
+    }
+
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
+    {
+        match self {
+            Contact::Block(cube_face) => cube_face.wireframe_points(output),
+            Contact::Voxel {
+                cube,
+                resolution,
+                voxel,
+            } => {
+                let resolution: FreeCoordinate = (*resolution).into();
+                voxel.wireframe_points(&mut MapExtend::new(
+                    output,
+                    |mut vert: (Point3<FreeCoordinate>, Option<Rgba>)| {
+                        vert.0 = vert.0 / resolution + cube.to_vec().map(FreeCoordinate::from);
+                        vert
+                    },
+                ))
+            }
+        }
+    }
+}
 
 /// Result of [`collide_along_ray`] which specifies a collision point possibly inside the cube.
 #[derive(Debug)]
 pub(crate) struct CollisionRayEnd {
     /// Non-colliding length of the provided ray.
     pub t_distance: FreeCoordinate,
-    /// Cube in the provided space collided with, and the orientation of the surface collided with.
-    pub cube_face: CubeFace,
+    pub contact: Contact,
 }
 
 /// Move `aab`'s origin along the line segment from `ray.origin` to `ray.origin + ray.direction`,
@@ -73,10 +146,10 @@ where
             // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
             // maybe there's no clear direction.)
             for box_cube in find_colliding_cubes(space, step_aab) {
-                let contact = Contact {
+                let contact = Contact::Block(CubeFace {
                     cube: box_cube,
                     face: ray_step.face(),
-                };
+                });
                 already_colliding.insert(contact);
             }
             continue;
@@ -88,10 +161,10 @@ where
         // cubes that must have been detected in the _previous_ step.
         let mut hit_something = false;
         for box_cube in find_colliding_cubes(space, step_aab) {
-            let contact = Contact {
+            let contact = Contact::Block(CubeFace {
                 cube: box_cube,
                 face: ray_step.face(),
-            };
+            });
             if !already_colliding.contains(&contact) {
                 hit_something = true;
                 collision_callback(contact);
@@ -102,7 +175,10 @@ where
         if hit_something {
             return Some(CollisionRayEnd {
                 t_distance: ray_step.t_distance(),
-                cube_face: ray_step.cube_face(),
+                // TODO: Instead of reporting the ray step, which may not be solid at all,
+                // report one of the previously found contacts. This will become necessary
+                // for recursive collision.
+                contact: Contact::Block(ray_step.cube_face()),
             });
         }
     }

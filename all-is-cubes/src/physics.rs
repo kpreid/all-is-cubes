@@ -96,7 +96,10 @@ mod tests {
         assert_eq!(body.position.x, 2.0);
         assert_eq!(body.position.z, 0.0);
         assert!((body.position.y - 1.5).abs() < 1e-6, "{:?}", body.position);
-        assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);
+        assert_eq!(
+            contacts,
+            vec![Contact::Block(CubeFace::new((0, 0, 0), Face::PY))]
+        );
     }
 
     #[test]
@@ -124,7 +127,10 @@ mod tests {
         assert_eq!(body.position.x, 2.0);
         assert_eq!(body.position.z, 0.0);
         assert!((body.position.y - 1.0).abs() < 1e-6, "{:?}", body.position);
-        assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);
+        assert_eq!(
+            contacts,
+            vec![Contact::Block(CubeFace::new((0, 0, 0), Face::PY))]
+        );
     }
 
     #[test]

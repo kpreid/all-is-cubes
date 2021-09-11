@@ -286,7 +286,7 @@ impl Character {
     fn is_on_ground(&self) -> bool {
         self.colliding_cubes
             .iter()
-            .any(|contact| contact.face == Face::PY)
+            .any(|contact| contact.normal() == Face::PY)
     }
 }
 
