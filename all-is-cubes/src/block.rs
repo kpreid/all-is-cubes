@@ -507,13 +507,18 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
 #[non_exhaustive]
 pub enum BlockCollision {
     /// The block can be passed through; it is not an obstacle (though intersecting it
-    /// might cause other effects).
+    /// might cause other effects not directly part of collision response).
     None,
-    /// The block is a perfectly solid obstacle; or, if it has voxels, then those voxels'
-    /// collision behaviors are used. (TODO: Voxel collision not yet implemented.)
+    /// The block is a perfectly solid obstacle occupying its entire bounding cube.
     ///
-    /// This is the default value used for most blocks.
+    /// This is the default value used for most blocks. (Caveat: The default might be
+    /// changed to `Recur` if that proves more ergonomic.)
     Hard,
+    /// Collide with the block's component voxels individually.
+    ///
+    /// If the block does not have voxels then this is equivalent to [`Hard`](Self::Hard).
+    /// (TODO: Voxel collision not yet finished.)
+    Recur,
     // Future values might include bouncy solid, water-like resistance, force fields, etc.
 }
 

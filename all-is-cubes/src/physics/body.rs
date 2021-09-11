@@ -326,9 +326,13 @@ impl Body {
                 .translate(adjusted_segment.unit_endpoint().to_vec());
             for cube in step_aab.round_up_to_grid().interior_iter() {
                 // TODO: refactor to combine this with other collision attribute tests
-                if space.get_evaluated(cube).attributes.collision == BlockCollision::Hard {
-                    // Not a clear space
-                    continue 'raycast;
+                match space.get_evaluated(cube).attributes.collision {
+                    BlockCollision::Hard => {
+                        // Not a clear space
+                        continue 'raycast;
+                    }
+                    BlockCollision::None => {}
+                    BlockCollision::Recur => unimplemented!("Recursive collision"),
                 }
             }
             // No collisions, so we can use this.

@@ -193,8 +193,11 @@ where
     Sp: CollisionSpace,
 {
     aab.round_up_to_grid().interior_iter().filter(move |&cube| {
-        // TODO: change this from `==` to `match` to allow for expansion of the enum
-        Sp::collision(space.get_cell(cube)) == BlockCollision::Hard
+        match Sp::collision(space.get_cell(cube)) {
+            BlockCollision::None => false,
+            BlockCollision::Hard => true,
+            BlockCollision::Recur => unimplemented!("Recursive collision"),
+        }
     })
 }
 
