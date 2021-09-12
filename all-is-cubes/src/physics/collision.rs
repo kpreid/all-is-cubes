@@ -461,7 +461,7 @@ mod tests {
     #[test]
     fn collide_along_ray_with_opaque_block() {
         collide_along_ray_tester(
-            || {
+            |_u| {
                 let [block] = make_some_blocks();
                 block
             },
@@ -473,12 +473,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: enable test when recursive collision is implemented
     fn collide_along_ray_with_recursive_block() {
         collide_along_ray_tester(
-            || {
+            |u| {
                 // Construct a lower half block ▄.
-                let u = &mut Universe::new();
                 let [voxel] = make_some_blocks();
                 Block::builder()
                     .collision(BlockCollision::Recur)
@@ -490,16 +488,21 @@ mod tests {
             Some(CollisionRayEnd {
                 t_distance: 0.5,
                 contact: Contact::Voxel {
-                    cube: GridPoint::new(0, 0, 0),
+                    cube: GridPoint::new(1, 0, 0),
                     resolution: 2,
-                    voxel: CubeFace::new([0, 0, 0], Face::PY),
+                    // TODO: the voxel reported here is arbitrary, so this test is fragile
+                    voxel: CubeFace::new([0, 0, 1], Face::PY),
                 },
             }),
         );
     }
 
-    fn collide_along_ray_tester(block_gen: fn() -> Block, expected_end: Option<CollisionRayEnd>) {
-        let block = block_gen();
+    fn collide_along_ray_tester(
+        block_gen: fn(&mut Universe) -> Block,
+        expected_end: Option<CollisionRayEnd>,
+    ) {
+        let u = &mut Universe::new();
+        let block = block_gen(u);
         let mut space = Space::empty_positive(2, 1, 1);
         space.set([1, 0, 0], &block).unwrap();
         print_space(&space, [1., 1., 1.]);
