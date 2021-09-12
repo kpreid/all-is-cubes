@@ -91,7 +91,7 @@ impl Geometry for Contact {
 }
 
 /// Result of [`collide_along_ray`] which specifies a collision point possibly inside the cube.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct CollisionRayEnd {
     /// Non-colliding length of the provided ray.
     pub t_distance: FreeCoordinate,
@@ -159,26 +159,26 @@ where
         // any of them are solid.
         // TODO: Useful optimization for large AABs would be skipping all the interior
         // cubes that must have been detected in the _previous_ step.
-        let mut hit_something = false;
+        let mut something_hit = None;
         for box_cube in find_colliding_cubes(space, step_aab) {
             let contact = Contact::Block(CubeFace {
                 cube: box_cube,
                 face: ray_step.face(),
             });
             if !already_colliding.contains(&contact) {
-                hit_something = true;
+                something_hit = Some(contact);
                 collision_callback(contact);
             }
         }
 
         // Now that we've found _all_ the contacts, report the collision.
-        if hit_something {
+        if let Some(contact) = something_hit {
             return Some(CollisionRayEnd {
                 t_distance: ray_step.t_distance(),
                 // TODO: Instead of reporting the ray step, which may not be solid at all,
                 // report one of the previously found contacts. This will become necessary
                 // for recursive collision.
-                contact: Contact::Block(ray_step.cube_face()),
+                contact,
             });
         }
     }
@@ -313,11 +313,72 @@ pub(crate) fn nudge_on_ray(aab: Aab, segment: Ray, face: Face, backward: bool) -
 
 #[cfg(test)]
 mod tests {
+    use crate::block::{Block, AIR};
+    use crate::content::make_some_blocks;
     use crate::math::GridCoordinate;
+    use crate::raytracer::print_space;
     use crate::space::Grid;
+    use crate::universe::Universe;
 
     use super::*;
     use rand::{Rng, SeedableRng as _};
+    #[test]
+    fn collide_along_ray_with_opaque_block() {
+        collide_along_ray_tester(
+            || {
+                let [block] = make_some_blocks();
+                block
+            },
+            Some(CollisionRayEnd {
+                t_distance: 0.5,
+                contact: Contact::Block(CubeFace::new([1, 0, 0], Face::PY)),
+            }),
+        );
+    }
+
+    #[test]
+    #[ignore] // TODO: enable test when recursive collision is implemented
+    fn collide_along_ray_with_recursive_block() {
+        collide_along_ray_tester(
+            || {
+                // Construct a lower half block ▄.
+                let u = &mut Universe::new();
+                let [voxel] = make_some_blocks();
+                Block::builder()
+                    .collision(BlockCollision::Recur)
+                    .display_name("H")
+                    .voxels_fn(u, 2, |p| if p.y > 0 { &AIR } else { &voxel })
+                    .unwrap()
+                    .build()
+            },
+            Some(CollisionRayEnd {
+                t_distance: 0.5,
+                contact: Contact::Voxel {
+                    cube: GridPoint::new(0, 0, 0),
+                    resolution: 2,
+                    voxel: CubeFace::new([0, 0, 0], Face::PY),
+                },
+            }),
+        );
+    }
+
+    fn collide_along_ray_tester(block_gen: fn() -> Block, expected_end: Option<CollisionRayEnd>) {
+        let block = block_gen();
+        let mut space = Space::empty_positive(2, 1, 1);
+        space.set([1, 0, 0], &block).unwrap();
+        print_space(&space, [1., 1., 1.]);
+
+        // Set up to collide with the block such that the ray doesn't pass through it, to
+        // make sure the right cube is returned.
+        // The block is at [1, 0, 0] and we're "dropping" a block-shaped AAB onto it
+        // with lower corner [-0.5, 0, 0] so it should contact the "left" half of
+        // the recursive block.
+        let aab = Aab::from_cube(GridPoint::new(0, 0, 0));
+        let ray = Ray::new([0.5, 1., 0.], [0., -2., 0.]); // TODO: ray shouldn't need to be this long; debug
+
+        let result = collide_along_ray(&space, ray, aab, |_| {});
+        assert_eq!(result, expected_end);
+    }
 
     #[test]
     fn nudge_random_test() {
