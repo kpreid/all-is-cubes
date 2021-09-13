@@ -52,6 +52,13 @@ impl Contact {
             } => face,
         }
     }
+
+    pub fn resolution(&self) -> Resolution {
+        match *self {
+            Contact::Block(_) => 1,
+            Contact::Voxel { resolution, .. } => resolution,
+        }
+    }
 }
 
 impl Geometry for Contact {
@@ -134,6 +141,7 @@ where
             aab,
             ray.scale_direction(ray_step.t_distance()),
             ray_step.face().opposite(),
+            1,
             false,
         );
         let step_aab = aab.translate(offset_segment.unit_endpoint().to_vec());
@@ -275,17 +283,26 @@ pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaste
 /// Note that the required `face` is the opposite of the face produced by a raycast.
 /// (This may be confusing but we feel that it would be more confusing to use a face
 /// other than the relevant face of the [`Aab`]).
-pub(crate) fn nudge_on_ray(aab: Aab, segment: Ray, face: Face, backward: bool) -> Ray {
+pub(crate) fn nudge_on_ray(
+    aab: Aab,
+    segment: Ray,
+    face: Face,
+    subdivision: Resolution,
+    backward: bool,
+) -> Ray {
     if segment.direction.is_zero() || face == Face::Within {
         return segment;
     }
 
-    let fc = aab
-        .translate(segment.unit_endpoint().to_vec())
-        .face_coordinate(face);
     // This is the depth by which the un-nudged face penetrates the plane, which we are going to subtract.
-    let penetration_depth = fc - fc.round();
-    debug_assert!(penetration_depth.abs() <= 0.5);
+    let penetration_depth = {
+        let subdivision = FreeCoordinate::from(subdivision);
+        let fc_scaled = aab
+            .translate(segment.unit_endpoint().to_vec())
+            .face_coordinate(face)
+            * subdivision;
+        (fc_scaled - fc_scaled.round()) / subdivision
+    };
 
     // This is the length of the direction vector projected along the face normal — thus, the reciprocal of the scale factor by which to adjust the distance.
     let direction_projection = face.normal_vector().dot(segment.direction);
@@ -402,7 +419,9 @@ mod tests {
 
             for backward in [true, false] {
                 // Perform nudge
-                let adjusted_segment = nudge_on_ray(moving_aab, segment, face_to_nudge, backward);
+                // TODO: test non-1 resolution
+                let adjusted_segment =
+                    nudge_on_ray(moving_aab, segment, face_to_nudge, 1, backward);
                 let nudged_aab = moving_aab.translate(adjusted_segment.unit_endpoint().to_vec());
 
                 // Check that the nudge was not too big

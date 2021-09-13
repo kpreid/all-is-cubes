@@ -239,6 +239,7 @@ impl Body {
                 self.collision_box,
                 movement_ignoring_collision.scale_direction(collision.t_distance),
                 collision.contact.normal().opposite(),
+                collision.contact.resolution(),
                 true,
             );
             let unobstructed_delta_position = motion_segment.direction;
@@ -319,6 +320,7 @@ impl Body {
                 self.collision_box,
                 ray.scale_direction(ray_step.t_distance()),
                 ray_step.face(),
+                1,
                 true,
             );
             let step_aab = self
