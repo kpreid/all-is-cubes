@@ -336,7 +336,10 @@ impl Body {
                         continue 'raycast;
                     }
                     BlockCollision::None => {}
-                    BlockCollision::Recur => unimplemented!("Recursive collision"),
+                    BlockCollision::Recur => {
+                        // TODO: Either check collision, or continue
+                        //continue 'raycast;
+                    }
                 }
             }
             // No collisions, so we can use this.
