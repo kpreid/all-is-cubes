@@ -11,7 +11,9 @@ use std::sync::Arc;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
-use crate::transaction::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
+use crate::transaction::{
+    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+};
 use crate::universe::{Name, UBorrowMutImpl, URef, Universe};
 
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
@@ -52,7 +54,6 @@ where
         UBorrowMutImpl<O>,
         <O::Transaction as Transaction<O>>::CommitCheck,
     );
-    type MergeCheck = <O::Transaction as Transaction<O>>::MergeCheck;
     type Output = <O::Transaction as Transaction<O>>::Output;
 
     fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -71,6 +72,13 @@ where
     ) -> Result<Self::Output, Box<dyn Error>> {
         borrow.with_data_mut(|target_data| self.transaction.commit(target_data, check))
     }
+}
+
+impl<O> Merge for TransactionInUniverse<O>
+where
+    O: Transactional + 'static,
+{
+    type MergeCheck = <O::Transaction as Merge>::MergeCheck;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         if self.target != other.target {
@@ -144,7 +152,6 @@ impl AnyTransaction {
 
 impl Transaction<()> for AnyTransaction {
     type CommitCheck = Box<dyn Any>;
-    type MergeCheck = Box<dyn Any>;
     type Output = ();
 
     fn check(&self, _target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -180,6 +187,10 @@ impl Transaction<()> for AnyTransaction {
             Space(t) => commit_helper(t, check),
         }
     }
+}
+
+impl Merge for AnyTransaction {
+    type MergeCheck = Box<dyn Any>;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         use AnyTransaction::*;
@@ -265,7 +276,7 @@ mod any_transaction {
 /// simultaneously.
 ///
 /// Construct this by calling [`Transaction::bind`] on other transaction types
-/// and combine them into larger transactions with [`Transaction::merge`].
+/// and combine them into larger transactions with [`Merge::merge`].
 #[derive(Clone, Default, PartialEq)]
 #[must_use]
 pub struct UniverseTransaction {
@@ -291,7 +302,6 @@ impl From<AnyTransaction> for UniverseTransaction {
 impl Transaction<Universe> for UniverseTransaction {
     // TODO: Benchmark cheaper HashMaps / using BTreeMap here
     type CommitCheck = HashMap<Arc<Name>, Box<dyn Any>>;
-    type MergeCheck = HashMap<Arc<Name>, Box<dyn Any>>;
     type Output = ();
 
     fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -314,6 +324,10 @@ impl Transaction<Universe> for UniverseTransaction {
         }
         Ok(())
     }
+}
+
+impl Merge for UniverseTransaction {
+    type MergeCheck = HashMap<Arc<Name>, Box<dyn Any>>;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         // TODO: Enforce that other has the same universe.

@@ -32,7 +32,7 @@ pub use universe_txn::*;
 /// If a transaction implements [`Default`], then the default value should be a
 /// transaction which has no effects and always succeeds.
 #[must_use]
-pub trait Transaction<T: ?Sized> {
+pub trait Transaction<T: ?Sized>: Merge {
     /// Type of a value passed from [`Transaction::check`] to [`Transaction::commit`].
     /// This may be used to pass precalculated values to speed up the commit phase,
     /// or even lock guards or similar, but also makes it slightly harder to accidentally
@@ -91,10 +91,31 @@ pub trait Transaction<T: ?Sized> {
         self.commit(target, check)
     }
 
-    /// Type of a value passed from [`Transaction::check_merge`] to
-    /// [`Transaction::merge`].
+    /// Specify the target of this transaction as a [`URef`], and erase its type,
+    /// so that it can be combined with other transactions in the same universe.
+    ///
+    /// This is a convenience wrapper around [`UTransactional::bind`].
+    fn bind(self, target: URef<T>) -> UniverseTransaction
+    where
+        Self: Sized,
+        T: UTransactional<Transaction = Self>,
+    {
+        UTransactional::bind(target, self)
+    }
+}
+
+/// Merging two transactions (or, in principle, other values) to produce one result “with
+/// the effect of both”. Merging is a commutative, fallible operation.
+///
+/// This is a separate trait from [`Transaction`] so that a single type can implement
+/// `Transaction<Foo>` and `Transaction<Bar>` without making it ambiguous which
+/// implementation `.merge()` refers to.
+///
+/// TODO: Generalize to different RHS types for convenient combination?
+pub trait Merge {
+    /// Type of a value passed from [`Merge::check_merge`] to [`Merge::commit_merge`].
     /// This may be used to pass precalculated values to speed up the merge phase,
-    /// but also makes it difficult to accidentally call `merge` without `check_merge`.
+    /// but also makes it difficult to accidentally merge without checking.
     type MergeCheck: 'static;
 
     /// Checks whether two transactions can be merged into a single transaction.
@@ -122,24 +143,13 @@ pub trait Transaction<T: ?Sized> {
     /// Combines two transactions into one which has both effects simultaneously, if possible.
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
+    /// It should not be necessary to override the provided implementation.
     fn merge(self, other: Self) -> Result<Self, TransactionConflict>
     where
         Self: Sized,
     {
         let check = self.check_merge(&other)?;
         Ok(self.commit_merge(other, check))
-    }
-
-    /// Specify the target of this transaction as a [`URef`], and erase its type,
-    /// so that it can be combined with other transactions in the same universe.
-    ///
-    /// This is a convenience wrapper around [`UTransactional::bind`].
-    fn bind(self, target: URef<T>) -> UniverseTransaction
-    where
-        Self: Sized,
-        T: UTransactional<Transaction = Self>,
-    {
-        UTransactional::bind(target, self)
     }
 }
 
@@ -156,7 +166,7 @@ pub struct PreconditionFailed {
     pub(crate) problem: &'static str,
 }
 
-/// Error type returned by [`Transaction::check_merge`].
+/// Error type returned by [`Merge::check_merge`].
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 #[non_exhaustive] // We might want to add further information later
 #[error("Conflict between transactions")]

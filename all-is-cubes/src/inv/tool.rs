@@ -13,7 +13,7 @@ use crate::inv::InventoryTransaction;
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
 use crate::space::SpaceTransaction;
-use crate::transaction::{Transaction, UniverseTransaction};
+use crate::transaction::{Merge, Transaction, UniverseTransaction};
 use crate::universe::{RefError, URef};
 use crate::vui::Icons;
 

@@ -14,7 +14,7 @@ use crate::behavior::{Behavior, BehaviorContext};
 use crate::block::{Block, AIR};
 use crate::math::{GridPoint, GridVector};
 use crate::space::{Grid, GridArray, Space, SpaceTransaction};
-use crate::transaction::Transaction;
+use crate::transaction::Merge;
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.

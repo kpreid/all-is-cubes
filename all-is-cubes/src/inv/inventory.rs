@@ -14,7 +14,7 @@ use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
 use crate::transaction::{
-    PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
+    Merge, PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
 };
 use crate::universe::URef;
 use crate::vui::Icons;
@@ -288,7 +288,6 @@ impl InventoryTransaction {
 
 impl Transaction<Inventory> for InventoryTransaction {
     type CommitCheck = Option<InventoryCheck>;
-    type MergeCheck = ();
     type Output = Option<InventoryChange>;
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -368,6 +367,10 @@ impl Transaction<Inventory> for InventoryTransaction {
             Ok(None)
         }
     }
+}
+
+impl Merge for InventoryTransaction {
+    type MergeCheck = ();
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         if self

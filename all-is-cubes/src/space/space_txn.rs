@@ -12,7 +12,7 @@ use super::Space;
 use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
-use crate::transaction::PreconditionFailed;
+use crate::transaction::{Merge, PreconditionFailed};
 use crate::transaction::{Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat as _};
 
@@ -58,8 +58,6 @@ impl SpaceTransaction {
 impl Transaction<Space> for SpaceTransaction {
     type CommitCheck =
         <BehaviorSetTransaction<Space> as Transaction<BehaviorSet<Space>>>::CommitCheck;
-    type MergeCheck =
-        <BehaviorSetTransaction<Space> as Transaction<BehaviorSet<Space>>>::MergeCheck;
     type Output = ();
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -85,6 +83,10 @@ impl Transaction<Space> for SpaceTransaction {
         self.behaviors.commit(&mut space.behaviors, check)?;
         Ok(())
     }
+}
+
+impl Merge for SpaceTransaction {
+    type MergeCheck = <BehaviorSetTransaction<Space> as Merge>::MergeCheck;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         let mut cubes1 = &self.cubes;

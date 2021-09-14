@@ -16,7 +16,9 @@ use crate::listen::{Gate, Listener, Notifier};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
-use crate::transaction::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
+use crate::transaction::{
+    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+};
 use crate::universe::{RefError, URef};
 use crate::util::{ConciseDebug, CustomFormat};
 
@@ -867,7 +869,6 @@ impl BlockDefTransaction {
 }
 
 impl Transaction<BlockDef> for BlockDefTransaction {
-    type MergeCheck = ();
     type CommitCheck = ();
     type Output = ();
 
@@ -905,6 +906,10 @@ impl Transaction<BlockDef> for BlockDefTransaction {
         }
         Ok(())
     }
+}
+
+impl Merge for BlockDefTransaction {
+    type MergeCheck = ();
 
     fn check_merge(
         &self,

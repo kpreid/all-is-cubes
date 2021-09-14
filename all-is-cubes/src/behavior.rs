@@ -12,7 +12,7 @@ use crate::apps::Tick;
 use crate::character::{Character, CharacterTransaction};
 use crate::physics::BodyTransaction;
 use crate::transaction::{
-    PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
+    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
@@ -148,7 +148,6 @@ impl<H> BehaviorSetTransaction<H> {
 
 impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
     type CommitCheck = ();
-    type MergeCheck = ();
     type Output = ();
 
     fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -174,6 +173,10 @@ impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
         target.items.extend(self.insert.iter().cloned());
         Ok(())
     }
+}
+
+impl<H> Merge for BehaviorSetTransaction<H> {
+    type MergeCheck = ();
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         // Don't allow any touching the same slot at all.

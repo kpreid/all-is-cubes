@@ -23,7 +23,7 @@ use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
 use crate::transaction::{
-    PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
+    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
@@ -331,11 +331,6 @@ impl Transaction<Character> for CharacterTransaction {
         <InventoryTransaction as Transaction<Inventory>>::CommitCheck,
         <BehaviorSetTransaction<Character> as Transaction<BehaviorSet<Character>>>::CommitCheck,
     );
-    type MergeCheck = (
-        <BodyTransaction as Transaction<Body>>::MergeCheck,
-        <InventoryTransaction as Transaction<Inventory>>::MergeCheck,
-        <BehaviorSetTransaction<Character> as Transaction<BehaviorSet<Character>>>::MergeCheck,
-    );
     type Output = ();
 
     fn check(&self, target: &Character) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -368,6 +363,14 @@ impl Transaction<Character> for CharacterTransaction {
 
         Ok(())
     }
+}
+
+impl Merge for CharacterTransaction {
+    type MergeCheck = (
+        <BodyTransaction as Merge>::MergeCheck,
+        <InventoryTransaction as Merge>::MergeCheck,
+        <BehaviorSetTransaction<Character> as Merge>::MergeCheck,
+    );
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         Ok((
