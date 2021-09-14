@@ -6,6 +6,8 @@ use std::fmt::Debug;
 
 use crate::universe::URef;
 
+mod generic;
+
 #[cfg(test)]
 mod tester;
 #[cfg(test)]
