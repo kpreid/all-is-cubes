@@ -573,7 +573,7 @@ fn self_referential_block(universe: &mut Universe) -> Block {
 mod txn {
     use super::*;
     use crate::block::BlockDefTransaction;
-    use crate::transactions::{Transaction, TransactionTester};
+    use crate::transaction::{Transaction, TransactionTester};
 
     #[test]
     fn causes_notification() {

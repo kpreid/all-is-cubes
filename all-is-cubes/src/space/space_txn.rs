@@ -12,8 +12,8 @@ use super::Space;
 use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
-use crate::transactions::PreconditionFailed;
-use crate::transactions::{Transaction, TransactionConflict, Transactional};
+use crate::transaction::PreconditionFailed;
+use crate::transaction::{Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat as _};
 
 impl Transactional for Space {
@@ -169,7 +169,7 @@ struct CubeTransaction {
 #[cfg(test)]
 mod tests {
     use crate::content::make_some_blocks;
-    use crate::transactions::TransactionTester;
+    use crate::transaction::TransactionTester;
 
     use super::*;
 

@@ -14,7 +14,7 @@ use crate::behavior::{Behavior, BehaviorContext};
 use crate::block::{Block, AIR};
 use crate::math::{GridPoint, GridVector};
 use crate::space::{Grid, GridArray, Space, SpaceTransaction};
-use crate::transactions::Transaction;
+use crate::transaction::Transaction;
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.
@@ -66,7 +66,7 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> Behavior<Sp
         &self,
         context: &BehaviorContext<'_, Space>,
         tick: crate::apps::Tick,
-    ) -> crate::transactions::UniverseTransaction {
+    ) -> crate::transaction::UniverseTransaction {
         let mut mut_self: AnimatedVoxels<F> = self.clone();
         mut_self.accumulator += tick.delta_t;
         if mut_self.accumulator >= mut_self.frame_period {
@@ -182,7 +182,7 @@ impl Behavior<Space> for Fire {
         &self,
         context: &BehaviorContext<'_, Space>,
         tick: Tick,
-    ) -> crate::transactions::UniverseTransaction {
+    ) -> crate::transaction::UniverseTransaction {
         let mut mut_self = self.clone();
         if mut_self.tick_state(tick) {
             let paint_txn = mut_self.paint();

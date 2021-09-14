@@ -13,7 +13,7 @@ use crate::block::BlockCollision;
 use crate::math::{Aab, FreeCoordinate, Geometry as _};
 use crate::raycast::Ray;
 use crate::space::Space;
-use crate::transactions::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
+use crate::transaction::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
@@ -499,7 +499,7 @@ impl Transaction<Body> for BodyTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transactions::TransactionTester;
+    use crate::transaction::TransactionTester;
 
     fn test_body() -> Body {
         Body {

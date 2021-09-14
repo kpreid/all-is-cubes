@@ -11,163 +11,8 @@ use std::sync::Arc;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
+use crate::transaction::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
 use crate::universe::{Name, UBorrowMutImpl, URef, Universe};
-
-/// A `Transaction` is a description of a mutation to an object or collection thereof that
-/// should occur in a logically atomic fashion (all or nothing), with a set of
-/// preconditions for it to happen at all.
-///
-/// Transactions are used:
-///
-/// * to enable game objects to have effects on their containers in a way compatible
-///   with Rust's ownership rules,
-/// * to avoid “item duplication” type bugs by checking all preconditions before making
-///   any changes, and
-/// * to avoid update-order-dependent game mechanics by applying effects in batches.
-///
-/// A [`Transaction`] is not consumed by committing it; it may be used repeatedly. Future
-/// work may include building on this to provide undo/redo functionality.
-///
-/// If a transaction implements [`Default`], then the default value should be a
-/// transaction which has no effects and always succeeds.
-#[must_use]
-pub trait Transaction<T: ?Sized> {
-    /// Type of a value passed from [`Transaction::check`] to [`Transaction::commit`].
-    /// This may be used to pass precalculated values to speed up the commit phase,
-    /// or even lock guards or similar, but also makes it slightly harder to accidentally
-    /// call `commit` without `check`.
-    type CommitCheck: 'static;
-
-    /// The result of a [`Transaction::commit()`] or [`Transaction::execute()`].
-    ///
-    /// The [`Transaction`] trait imposes no requirements on this value, but it may be
-    /// a change-notification message which could be redistributed via the target's
-    /// owner's [`Notifier`](crate::listen::Notifier).
-    type Output;
-
-    /// Checks whether the target's current state meets the preconditions and returns
-    /// [`Err`] if it does not. (TODO: Informative error return type.)
-    ///
-    /// If the preconditions are met, returns [`Ok`] containing data to be passed to
-    /// [`Transaction::commit`].
-    fn check(&self, target: &T) -> Result<Self::CommitCheck, PreconditionFailed>;
-
-    /// Perform the mutations specified by this transaction. The `check` value should have
-    /// been created by a prior call to [`Transaction::commit`].
-    ///
-    /// Returns [`Ok`] if the transaction completed normally, and [`Err`] if there was a
-    /// problem which was not detected as a precondition; in this case the transaction may
-    /// have been partially applied, since that problem was detected too late, by
-    /// definition.
-    ///
-    /// The target should not be mutated between the call to [`Transaction::check`] and
-    /// [`Transaction::commit`] (including via interior mutability, however that applies
-    /// to the particular `T`). The consequences of doing so may include mutating the
-    /// wrong components, signaling an error partway through the transaction, or merely
-    /// committing the transaction while its preconditions do not hold.
-    fn commit(
-        &self,
-        target: &mut T,
-        check: Self::CommitCheck,
-    ) -> Result<Self::Output, Box<dyn Error>>;
-
-    /// Convenience method to execute a transaction in one step. Implementations should not
-    /// need to override this. Equivalent to:
-    ///
-    /// ```rust
-    /// # use all_is_cubes::universe::Universe;
-    /// # use all_is_cubes::transactions::{Transaction, UniverseTransaction};
-    /// # let transaction = UniverseTransaction::default();
-    /// # let target = &mut Universe::new();
-    /// let check = transaction.check(target)?;
-    /// # let _output: () =
-    /// transaction.commit(target, check)?
-    /// # ;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    fn execute(&self, target: &mut T) -> Result<Self::Output, Box<dyn Error>> {
-        let check = self.check(target)?;
-        self.commit(target, check)
-    }
-
-    /// Type of a value passed from [`Transaction::check_merge`] to
-    /// [`Transaction::merge`].
-    /// This may be used to pass precalculated values to speed up the merge phase,
-    /// but also makes it difficult to accidentally call `merge` without `check_merge`.
-    type MergeCheck: 'static;
-
-    /// Checks whether two transactions can be merged into a single transaction.
-    /// If so, returns [`Ok`] containing data which may be passed to [`Self::merge`].
-    ///
-    /// Generally, “can be merged” means that the two transactions do not have mutually
-    /// exclusive preconditions and are not specify conflicting mutations. However, the
-    /// definition of conflict is type-specific; for example, merging two “add 1 to
-    /// velocity” transactions may produce an “add 2 to velocity” transaction.
-    ///
-    /// This is not necessarily the same as either ordering of applying the two
-    /// transactions sequentially. See [`Self::commit_merge`] for more details.
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict>;
-
-    /// Combines two transactions into one which has both effects simultaneously.
-    /// This operation must be commutative and have `Default::default` as the identity.
-    ///
-    /// May panic if `check` is not the result of a previous call to
-    /// `self.check_merge(&other)` or if either transaction was mutated in the intervening
-    /// time.
-    fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self
-    where
-        Self: Sized;
-
-    /// Combines two transactions into one which has both effects simultaneously, if possible.
-    ///
-    /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
-    fn merge(self, other: Self) -> Result<Self, TransactionConflict>
-    where
-        Self: Sized,
-    {
-        let check = self.check_merge(&other)?;
-        Ok(self.commit_merge(other, check))
-    }
-
-    /// Specify the target of this transaction as a [`URef`], and erase its type,
-    /// so that it can be combined with other transactions in the same universe.
-    ///
-    /// This is a convenience wrapper around [`UTransactional::bind`].
-    fn bind(self, target: URef<T>) -> UniverseTransaction
-    where
-        Self: Sized,
-        T: UTransactional<Transaction = Self>,
-    {
-        UTransactional::bind(target, self)
-    }
-}
-
-/// Error type returned by [`Transaction::check`].
-///
-/// Note: This type is designed to be cheap to construct, as it is expected that game
-/// mechanics _may_ result in transactions repeatedly failing. Hence, it does not contain
-/// full details on the failure.
-#[derive(Clone, Debug, PartialEq, thiserror::Error)]
-#[error("Transaction precondition not met: {location}: {problem}")]
-pub struct PreconditionFailed {
-    // TODO: Figure out how to have at least a little dynamic information. `Option<[i32; 3]>` ???
-    pub(crate) location: &'static str,
-    pub(crate) problem: &'static str,
-}
-
-/// Error type returned by [`Transaction::check_merge`].
-#[derive(Clone, Debug, PartialEq, thiserror::Error)]
-#[non_exhaustive] // We might want to add further information later
-#[error("Conflict between transactions")]
-pub struct TransactionConflict {}
-
-/// Specifies a canonical [`Transaction`] type for the implementing type.
-///
-/// [`Transaction<T>`](Transaction) may be implemented by multiple types but there can
-/// be at most one `<T as Transactional>::Transaction`.
-pub trait Transactional {
-    type Transaction: Transaction<Self>;
-}
 
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
 ///
@@ -515,165 +360,18 @@ impl Debug for UniverseTransaction {
 }
 
 #[cfg(test)]
-pub use transaction_tester::*;
-#[cfg(test)]
-mod transaction_tester {
-    use super::*;
-    use std::error::Error;
-    use std::rc::Rc;
-
-    /// Tool for testing that a type of transaction obeys the rules:
-    ///
-    /// * `Transaction::commit` should not actually produce errors; they should instead be
-    ///   caught by `Transaction::check`.
-    /// * Two transactions, when merged, should have all the effects of both, or they should
-    ///   fail to merge.
-    ///
-    /// This test utility follows the builder pattern: call methods to add test data, then
-    /// finish with [`Self::test`].
-    #[must_use]
-    pub struct TransactionTester<'a, Tr, Ta> {
-        transactions: Vec<TransactionAndPredicate<'a, Tr, Ta>>,
-        target_factories: Vec<Box<dyn Fn() -> Ta + 'a>>,
-    }
-
-    impl<'a, Tr, Ta> TransactionTester<'a, Tr, Ta>
-    where
-        Tr: Transaction<Ta> + Clone + Debug + 'a,
-        Ta: Debug + 'a,
-    {
-        #[allow(clippy::new_without_default)]
-        pub fn new() -> Self {
-            Self {
-                transactions: Vec::new(),
-                target_factories: Vec::new(),
-            }
-        }
-
-        /// Add a transaction to be checked.
-        ///
-        /// In addition to the explicitly provided transactions, each possible merge of
-        /// two transactions will be tested.
-        ///
-        /// The `predicate` is given a copy of the target before and after executing the
-        /// transaction and should verify that the transaction had the expected effects.
-        /// There may be effects from other transactions.
-        pub fn transaction(
-            mut self,
-            transaction: Tr,
-            predicate: impl Fn(&Ta, &Ta) -> PredicateRes + 'a,
-        ) -> Self {
-            self.transactions.push(TransactionAndPredicate {
-                transaction,
-                predicate: Rc::new(predicate),
-            });
-            self
-        }
-
-        /// Add a target to apply the tested transactions to.
-        ///
-        /// To avoid requiring the targets to implement [`Clone`], a factory function is
-        /// required here.
-        pub fn target(mut self, factory: impl Fn() -> Ta + 'a) -> Self {
-            self.target_factories.push(Box::new(factory));
-            self
-        }
-
-        /// Executes the tests and panics on failure.
-        pub fn test(self) {
-            assert!(!self.transactions.is_empty());
-            assert!(!self.target_factories.is_empty());
-            for tap in self.derived_transactions() {
-                let mut succeeded_at_least_once = false;
-                for target_factory in self.target_factories.iter() {
-                    let before = target_factory();
-                    let mut target = target_factory();
-                    if let Ok(check) = tap.transaction.check(&target) {
-                        let _: Tr::Output = tap
-                            .transaction
-                            .commit(&mut target, check)
-                            .expect("Transaction failed to commit");
-                        succeeded_at_least_once = true;
-
-                        if let Err(e) = (tap.predicate)(&before, &target) {
-                            panic!(
-                                "Predicate failed: {}\nTransaction: {:#?}\nTarget before: {:#?} Target after: {:#?}",
-                                e, tap.transaction, before, target
-                            );
-                        }
-                    } // else ignore the inapplicable transaction
-                }
-                assert!(
-                    succeeded_at_least_once,
-                    "Transaction did not pass check() on any provided target: {:?}",
-                    &tap.transaction
-                );
-            }
-        }
-
-        fn derived_transactions<'b: 'a>(
-            &'b self,
-        ) -> impl Iterator<Item = TransactionAndPredicate<'a, Tr, Ta>> + 'b {
-            self.transactions.iter().flat_map(move |t1| {
-                std::iter::once(t1.clone()).chain(
-                    self.transactions
-                        .iter()
-                        .flat_map(move |t2| t1.clone().try_merge(t2.clone())),
-                )
-            })
-        }
-    }
-
-    type PredicateRes = Result<(), Box<dyn Error>>;
-
-    struct TransactionAndPredicate<'a, Tr, Ta> {
-        transaction: Tr,
-        predicate: Rc<dyn Fn(&Ta, &Ta) -> PredicateRes + 'a>,
-    }
-
-    impl<'a, Tr: Clone, Ta> Clone for TransactionAndPredicate<'a, Tr, Ta> {
-        fn clone(&self) -> Self {
-            TransactionAndPredicate {
-                transaction: self.transaction.clone(),
-                predicate: self.predicate.clone(),
-            }
-        }
-    }
-
-    impl<'a, Tr, Ta> TransactionAndPredicate<'a, Tr, Ta>
-    where
-        Tr: Transaction<Ta>,
-        Ta: 'a,
-    {
-        fn try_merge(self, other: Self) -> Option<Self> {
-            let merge_check = self.transaction.check_merge(&other.transaction).ok()?;
-            Some(TransactionAndPredicate {
-                transaction: self
-                    .transaction
-                    .commit_merge(other.transaction, merge_check),
-                predicate: {
-                    let p1 = Rc::clone(&self.predicate);
-                    let p2 = Rc::clone(&other.predicate);
-                    Rc::new(move |before, after| {
-                        p1(before, after)?;
-                        p2(before, after)?;
-                        Ok(())
-                    })
-                },
-            })
-        }
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::content::make_some_blocks;
-    use crate::space::SpaceTransaction;
+
+    use std::collections::HashMap;
+
     use indoc::indoc;
 
+    use crate::content::make_some_blocks;
+    use crate::space::SpaceTransaction;
+
     #[test]
-    fn universe_txn_has_default() {
+    fn has_default() {
         assert_eq!(
             UniverseTransaction::default(),
             UniverseTransaction {
@@ -684,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn universe_txn_debug() {
+    fn debug() {
         use pretty_assertions::assert_eq;
         let [block] = make_some_blocks();
         let mut u = Universe::new();
@@ -695,27 +393,27 @@ mod tests {
         assert_eq!(
             format!("{:#?}\n", transaction),
             indoc! {"
-                UniverseTransaction {
-                    [anonymous #0]: SpaceTransaction {
-                        (+0, +0, +0): CubeTransaction {
-                            old: None,
-                            new: Some(
-                                Atom(
-                                    BlockAttributes {
-                                        display_name: \"0\",
-                                    },
-                                    Rgba(0.5, 0.5, 0.5, 1.0),
-                                ),
+            UniverseTransaction {
+                [anonymous #0]: SpaceTransaction {
+                    (+0, +0, +0): CubeTransaction {
+                        old: None,
+                        new: Some(
+                            Atom(
+                                BlockAttributes {
+                                    display_name: \"0\",
+                                },
+                                Rgba(0.5, 0.5, 0.5, 1.0),
                             ),
-                        },
+                        ),
                     },
-                }
-            "}
+                },
+            }
+        "}
         );
     }
 
     #[test]
-    fn universe_txn_merge_unrelated() {
+    fn merge_unrelated() {
         let [block_1, block_2] = make_some_blocks();
         let mut u = Universe::new();
         let s1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
@@ -727,7 +425,7 @@ mod tests {
     }
 
     #[test]
-    fn universe_txn_merge_conflict() {
+    fn merge_conflict() {
         let [block_1, block_2] = make_some_blocks();
         let mut u = Universe::new();
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
@@ -737,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn universe_txn_merges_members() {
+    fn merges_members() {
         let [old_block, new_block] = make_some_blocks();
         let mut u = Universe::new();
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));

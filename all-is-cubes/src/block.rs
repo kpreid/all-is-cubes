@@ -16,7 +16,7 @@ use crate::listen::{Gate, Listener, Notifier};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
-use crate::transactions::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
+use crate::transaction::{PreconditionFailed, Transaction, TransactionConflict, Transactional};
 use crate::universe::{RefError, URef};
 use crate::util::{ConciseDebug, CustomFormat};
 
@@ -874,7 +874,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
     fn check(
         &self,
         target: &BlockDef,
-    ) -> Result<Self::CommitCheck, crate::transactions::PreconditionFailed> {
+    ) -> Result<Self::CommitCheck, crate::transaction::PreconditionFailed> {
         if let Some(old) = &self.old {
             if **target != *old {
                 return Err(PreconditionFailed {
@@ -909,7 +909,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
     fn check_merge(
         &self,
         other: &Self,
-    ) -> Result<Self::MergeCheck, crate::transactions::TransactionConflict> {
+    ) -> Result<Self::MergeCheck, crate::transaction::TransactionConflict> {
         if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
             return Err(TransactionConflict {});
         }

@@ -13,7 +13,7 @@ use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
-use crate::transactions::{
+use crate::transaction::{
     PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
 };
 use crate::universe::URef;
@@ -406,7 +406,7 @@ mod tests {
     use super::*;
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
-    use crate::transactions::TransactionTester;
+    use crate::transaction::TransactionTester;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
 

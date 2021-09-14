@@ -19,7 +19,7 @@ use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::*;
 use crate::space::lighting::opaque_for_light_computation;
-use crate::transactions::{Transaction as _, UniverseTransaction};
+use crate::transaction::{Transaction as _, UniverseTransaction};
 use crate::universe::URef;
 use crate::util::ConciseDebug;
 use crate::util::{CustomFormat, StatusText};

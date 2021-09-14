@@ -40,7 +40,7 @@ use crate::apps::Tick;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
-use crate::transactions::{Transaction, Transactional};
+use crate::transaction::{Transaction, Transactional};
 use crate::util::{CustomFormat, StatusText, TypeName};
 
 /// Name/key of an object in a [`Universe`].

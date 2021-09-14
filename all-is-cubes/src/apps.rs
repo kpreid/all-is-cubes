@@ -12,7 +12,7 @@ use crate::inv::{Tool, ToolError, ToolInput};
 use crate::listen::{ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
-use crate::transactions::Transaction;
+use crate::transaction::Transaction;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::{CustomFormat, StatusText};
 use crate::vui::Vui;

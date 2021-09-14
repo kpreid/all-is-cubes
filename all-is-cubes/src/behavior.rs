@@ -11,7 +11,7 @@ use std::sync::Arc;
 use crate::apps::Tick;
 use crate::character::{Character, CharacterTransaction};
 use crate::physics::BodyTransaction;
-use crate::transactions::{
+use crate::transaction::{
     PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
 

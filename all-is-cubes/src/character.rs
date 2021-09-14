@@ -22,7 +22,7 @@ use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::raycast::{CubeFace, Ray};
 use crate::space::{Grid, PackedLight, Space};
-use crate::transactions::{
+use crate::transaction::{
     PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
 use crate::universe::URef;
@@ -562,7 +562,7 @@ mod tests {
     use super::*;
     use crate::block::AIR;
     use crate::listen::Sink;
-    use crate::transactions::TransactionTester;
+    use crate::transaction::TransactionTester;
     use crate::universe::Universe;
 
     #[test]
