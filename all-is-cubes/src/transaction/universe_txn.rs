@@ -2,7 +2,6 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::any::Any;
-use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug};
@@ -331,32 +330,16 @@ impl Merge for UniverseTransaction {
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         // TODO: Enforce that other has the same universe.
-        let mut results: Self::MergeCheck = HashMap::new();
-        for (name, t2) in other.members.iter() {
-            if let Some(t1) = self.members.get(name) {
-                results.insert(name.clone(), t1.check_merge(t2)?);
-            }
-        }
-        Ok(results)
+        self.members.check_merge(&other.members)
     }
 
-    fn commit_merge(mut self, other: Self, mut check: Self::MergeCheck) -> Self
+    fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self
     where
         Self: Sized,
     {
-        for (name, t2) in other.members.into_iter() {
-            match self.members.entry(name.clone()) {
-                Occupied(mut entry) => {
-                    let subt1 = entry.get_mut();
-                    *subt1 = std::mem::take(subt1)
-                        .commit_merge(t2, check.remove(&name).expect("missing check entry"));
-                }
-                Vacant(entry) => {
-                    entry.insert(t2);
-                }
-            }
+        UniverseTransaction {
+            members: self.members.commit_merge(other.members, check),
         }
-        self
     }
 }
 
