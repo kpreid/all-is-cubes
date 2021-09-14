@@ -257,5 +257,6 @@ where
 
 #[derive(Debug, UniformInterface)]
 pub(crate) struct FullFrameUniformInterface {
+    #[uniform(unbound)] // At least one GL backend implementation has falsely reported this unused
     texture: Uniform<TextureBinding<Dim2, NormUnsigned>>,
 }
