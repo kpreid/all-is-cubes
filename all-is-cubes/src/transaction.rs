@@ -9,7 +9,7 @@ use crate::universe::{Handle, UTransactional, UniverseTransaction};
 use crate::util::ErrorIfStd;
 
 mod generic;
-pub use generic::MapConflict;
+pub use generic::*;
 
 #[cfg(test)]
 mod tester;

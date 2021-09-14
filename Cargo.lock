@@ -70,6 +70,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "ordered-float",
+ "paste",
  "png-decoder",
  "pretty_assertions",
  "rand 0.8.5",

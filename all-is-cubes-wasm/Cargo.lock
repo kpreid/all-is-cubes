@@ -48,6 +48,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "ordered-float",
+ "paste",
  "png-decoder",
  "rand 0.8.5",
  "rand_xoshiro",

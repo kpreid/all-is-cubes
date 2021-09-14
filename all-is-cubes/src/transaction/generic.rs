@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 use core::hash::Hash;
 use core::{fmt, mem};
 
-use crate::transaction::Merge;
+use crate::transaction::{Merge, NoOutput, PreconditionFailed, Transaction};
 
 /// Transaction conflict error type for transactions on map types such as [`BTreeMap`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -146,3 +146,158 @@ hashmap_merge!(std_map);
 
 use hashbrown::hash_map as hb_map;
 hashmap_merge!(hb_map);
+
+/// This recursive macro generates implementations of [`Transaction`] and [`Merge`] for
+/// tuples of various non-zero lengths.
+///
+/// It might be better as a derive macro, but that'd require a macro crate.
+macro_rules! impl_transaction_for_tuple {
+    ( $count:literal : $( $name:literal ),* ) => {
+        paste::paste! {
+            /// A tuple of transactions may act as a transaction on tuples.
+            ///
+            /// TODO: This functionality is not currently used and is of dubious value.
+            impl<$( [<Ta $name>], )* $( [<Tr $name>] ),*>
+                Transaction<($( [<Ta $name>], )*)> for ($( [<Tr $name>], )*)
+            where
+                $( [<Tr $name>]: Transaction<[<Ta $name>], Output = NoOutput>  ),*
+            {
+                type CommitCheck = (
+                    $( <[<Tr $name>] as Transaction<[<Ta $name>]>>::CommitCheck, )*
+                );
+                type Output = NoOutput;
+
+                fn check(
+                    &self,
+                    #[allow(unused_variables)] // empty tuple case
+                    target: &($( [<Ta $name>], )*),
+                ) -> Result<Self::CommitCheck, PreconditionFailed> {
+                    let ($( [<txn_ $name>], )*) = self;
+                    let ($( [<target_ $name>], )*) = target;
+                    Ok((
+                        $( [<txn_ $name>].check([<target_ $name>])?, )*
+                    ))
+                }
+
+                fn commit(
+                    &self,
+                    #[allow(unused_variables)] // empty tuple case
+                    target: &mut ($( [<Ta $name>], )*),
+                    check: Self::CommitCheck,
+                    outputs: &mut dyn FnMut(Self::Output),
+                ) -> Result<(), super::CommitError> {
+                    let ($( [<txn_ $name>], )*) = self;
+                    let ($( [<check_ $name>], )*) = check;
+                    let ($( [<target_ $name>], )*) = target;
+                    $( [<txn_ $name>].commit([<target_ $name>], [<check_ $name>], outputs)?; )*
+                    Ok(())
+                }
+            }
+
+            impl<$( [<T $name >] ),*> Merge for ($( [<T $name >], )*)
+            where
+                $( [<T $name >]: Merge  ),*
+            {
+                type MergeCheck = (
+                    $( <[<T $name >] as Merge>::MergeCheck, )*
+                );
+                type Conflict = [< TupleConflict $count >]<
+                    $( <[<T $name >] as Merge>::Conflict, )*
+                >;
+
+                fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
+                    let ($( [<txn1_ $name>], )*) = self;
+                    let ($( [<txn2_ $name>], )*) = other;
+                    Ok((
+                        $(
+                            [<txn1_ $name>].check_merge([<txn2_ $name>])
+                                .map_err([< TupleConflict $count >]::[<At $name>])?,
+                        )*
+                    ))
+                }
+
+                fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
+                    let ($( [<txn1_ $name>], )*) = self;
+                    let ($( [<txn2_ $name>], )*) = other;
+                    let ($( [<check_ $name>], )*) = check;
+                    $( [<txn1_ $name>].commit_merge([<txn2_ $name>], [<check_ $name>]); )*
+                }
+            }
+
+            #[doc = concat!("Transaction conflict error type for tuples of length ", $count, ".")]
+            #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+            #[allow(clippy::exhaustive_enums)]
+            pub enum [< TupleConflict $count >]<$( [<C $name>], )*> {
+                $(
+                    #[doc = concat!("Conflict at tuple element ", $name, ".")]
+                    [<At $name>]([<C $name>]),
+                )*
+            }
+
+            // TODO: TupleConflict should have its own message to report the position,
+            // instead of delegating.
+            crate::util::cfg_should_impl_error! {
+                impl<$( [<C $name>]: std::error::Error, )*> std::error::Error for
+                        [< TupleConflict $count >]<$( [<C $name>], )*> {
+                    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                        match *self {
+                            $( Self::[<At $name>](ref [<c $name>]) => [<c $name>].source(), )*
+                        }
+                    }
+                }
+            }
+
+            impl<$( [<C $name>]: fmt::Display, )*> fmt::Display for
+                    [< TupleConflict $count >]<$( [<C $name>], )*> {
+                fn fmt(&self, #[allow(unused)] f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    match *self {
+                        $( Self::[<At $name>](ref [<c $name>]) => [<c $name>].fmt(f), )*
+                    }
+                }
+            }
+
+        }
+    };
+}
+
+impl_transaction_for_tuple!(1: 0);
+impl_transaction_for_tuple!(2: 0, 1);
+impl_transaction_for_tuple!(3: 0, 1, 2);
+impl_transaction_for_tuple!(4: 0, 1, 2, 3);
+impl_transaction_for_tuple!(5: 0, 1, 2, 3, 4);
+impl_transaction_for_tuple!(6: 0, 1, 2, 3, 4, 5);
+
+/// Does nothing to anything.
+impl<T> Transaction<T> for () {
+    type CommitCheck = ();
+
+    type Output = core::convert::Infallible;
+
+    fn check(&self, _: &T) -> Result<Self::CommitCheck, PreconditionFailed> {
+        Ok(())
+    }
+
+    fn commit(
+        &self,
+        _: &mut T,
+        (): Self::CommitCheck,
+        _: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), super::CommitError> {
+        Ok(())
+    }
+}
+
+// The empty tuple gets a special implementation because it cannot fail to merge,
+// and this is best represented without using a custom type.
+// Other than that, this is identical to the macro-generated code.
+impl Merge for () {
+    type MergeCheck = ();
+
+    type Conflict = core::convert::Infallible;
+
+    fn check_merge(&self, (): &Self) -> Result<Self::MergeCheck, Self::Conflict> {
+        Ok(())
+    }
+
+    fn commit_merge(&mut self, (): Self, (): Self::MergeCheck) {}
+}
