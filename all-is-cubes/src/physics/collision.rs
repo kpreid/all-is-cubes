@@ -41,7 +41,7 @@ impl Contact {
     /// Returns the contact normal: the direction in which the colliding box should be
     /// pushed back.
     ///
-    /// Note that this may be equal to [`Face::WITHIN`] in case the box was already
+    /// Note that this may be equal to [`Face::Within`] in case the box was already
     /// intersecting before any movement.
     pub fn normal(&self) -> Face {
         match *self {
