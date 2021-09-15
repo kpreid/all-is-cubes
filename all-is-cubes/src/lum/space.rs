@@ -142,7 +142,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 // https://github.com/phaazon/luminance-rs/issues/483
                 // means indices_mut() can fail and corrupt other buffers.
                 // TODO: Reenble this and also in-place chunk updating when bug is fixed
-                if !cfg!(target_damily = "wasm") {
+                if !cfg!(target_family = "wasm") {
                     if let Some(tess) = render_data {
                         let range = triangulation.transparent_range(DepthOrdering::Within);
                         tess.indices_mut()
