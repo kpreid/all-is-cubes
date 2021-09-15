@@ -31,8 +31,9 @@ use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::Universe;
 
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
-    TRANSPARENCY,
     KNOT,
+    TRANSPARENCY,
+    COLLISION,
     TEXT,
     RESOLUTIONS,
     ANIMATION,
@@ -224,6 +225,37 @@ const ANIMATION: Exhibit = Exhibit {
 
         space.set([0, 0, 0], sweep_block)?;
         space.set([2, 0, 0], fire_block)?;
+
+        Ok(space)
+    },
+};
+
+const COLLISION: Exhibit = Exhibit {
+    name: "Collision WIP",
+    factory: |_this, universe| {
+        let half_block_base = Block::from(palette::PLANK);
+        let half_block = Block::builder()
+            .collision(BlockCollision::Recur)
+            .voxels_fn(
+                universe,
+                2,
+                |p| {
+                    if p.y > 0 {
+                        &AIR
+                    } else {
+                        &half_block_base
+                    }
+                },
+            )?
+            .build();
+
+        let footprint = Grid::new([0, 0, 0], [3, 2, 4]);
+        let mut space = Space::empty(footprint);
+        space.set([0, 0, 2], &half_block)?;
+        space.set([2, 0, 2], half_block.clone().rotate(GridRotation::RyXZ))?;
+        space.set([0, 0, 0], half_block.clone().rotate(GridRotation::RXZy))?;
+        space.set([1, 0, 0], half_block.clone().rotate(GridRotation::RxyZ))?;
+        space.set([2, 0, 0], &half_block)?;
 
         Ok(space)
     },
