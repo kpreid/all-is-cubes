@@ -127,7 +127,10 @@ impl Vui {
         // Initialize lighting
         new_self
             .hud_space
-            .try_modify(|space| space.evaluate_light(10, |_| {}))
+            .try_modify(|space| {
+                space.fast_evaluate_light();
+                space.evaluate_light(10, |_| {});
+            })
             .unwrap();
 
         new_self
