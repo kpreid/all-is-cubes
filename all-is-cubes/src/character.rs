@@ -594,7 +594,7 @@ mod tests {
         let space = Space::empty_positive(1, 1, 1);
         let space_ref = universe.insert_anonymous(space);
         let character = Character::spawn_default(space_ref.clone());
-        let mut sink = Sink::new();
+        let sink = Sink::new();
         character.listen(sink.listener());
         let character_ref = universe.insert_anonymous(character);
 
@@ -607,12 +607,11 @@ mod tests {
 
         // Check notification
         assert_eq!(
-            sink.next(),
-            Some(CharacterChange::Inventory(InventoryChange {
+            sink.drain(),
+            vec![CharacterChange::Inventory(InventoryChange {
                 slots: Arc::new([0])
-            })),
+            })],
         );
-        assert_eq!(sink.next(), None);
 
         // TODO: Actually assert inventory contents -- no public interface for that
     }

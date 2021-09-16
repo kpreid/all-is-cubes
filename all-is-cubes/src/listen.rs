@@ -13,9 +13,8 @@
 //! `Weak<RefCell<...>>` or similar multiply-owned mutable structure to aggregate incoming
 //! messages, which will then be read and cleared by a separate part of the game loop.
 
-use indexmap::IndexSet;
+use std::collections::VecDeque;
 use std::fmt;
-use std::hash::Hash;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock, Weak};
 
@@ -68,10 +67,10 @@ impl<M: Clone + Send> Notifier<M> {
     /// notifier_2.listen(sink.listener());
     ///
     /// notifier_1.notify("a");
-    /// assert!(sink.take_equal("a"));
+    /// assert_eq!(sink.drain(), vec!["a"]);
     /// drop(notifier_2);
     /// notifier_1.notify("a");
-    /// assert_eq!(None, sink.next());
+    /// assert!(sink.drain().is_empty());
     /// ```
     pub fn forwarder(this: Weak<Self>) -> impl Listener<M> {
         NotifierForwarder(this)
@@ -215,36 +214,33 @@ where
     }
 }
 
-/// A [`Listener`] destination which stores all the messages it receives, deduplicated.
+/// A [`Listener`] which stores all the messages it receives.
 ///
-/// TODO: This type turns out to be only useful in tests. Rework it to be more fitting.
+/// This is only intended for testing.
+#[derive(Debug)]
 pub struct Sink<M> {
-    messages: Arc<RwLock<IndexSet<M>>>,
+    messages: Arc<RwLock<VecDeque<M>>>,
 }
 struct SinkListener<M> {
-    weak_messages: Weak<RwLock<IndexSet<M>>>,
+    weak_messages: Weak<RwLock<VecDeque<M>>>,
 }
 
-impl<M> Sink<M>
-where
-    M: Eq + Hash + Clone + Send + Sync,
-{
+impl<M> Sink<M> {
     /// Constructs a new empty [`Sink`].
     pub fn new() -> Self {
         Self {
-            messages: Arc::new(RwLock::new(IndexSet::new())),
+            messages: Arc::new(RwLock::new(VecDeque::new())),
         }
     }
 
     /// Returns a [`Listener`] which records the messages it receives in this Sink.
-    #[allow(dead_code)] // TODO: only used in tests but maybe should be public
     pub fn listener(&self) -> impl Listener<M> {
         SinkListener {
             weak_messages: Arc::downgrade(&self.messages),
         }
     }
 
-    /// If the given message was received, remove it and return true.
+    /// If the given message was received, remove the first occurrence of it and return true.
     ///
     /// ```
     /// use all_is_cubes::listen::{Listener, Sink};
@@ -255,39 +251,60 @@ where
     /// assert!(sink.take_equal(2));   // Match
     /// assert!(!sink.take_equal(2));  // Now removed
     /// ```
-    pub fn take_equal(&self, message: M) -> bool {
-        self.messages.write().unwrap().swap_remove(&message)
+    ///
+    /// TODO: This is never used and therefore a candidate for removal.
+    pub fn take_equal(&self, message: M) -> bool
+    where
+        M: Eq,
+    {
+        let mut queue = self.messages.write().unwrap();
+        if let Some(index) = queue
+            .iter()
+            .enumerate()
+            .filter_map(|(i, m)| (*m == message).then(|| i))
+            .next()
+        {
+            queue.remove(index);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Remove and return all messages returned so far.
+    ///
+    /// ```
+    /// use all_is_cubes::listen::{Listener, Sink};
+    ///
+    /// let sink = Sink::new();
+    /// sink.listener().receive(1);
+    /// sink.listener().receive(2);
+    /// assert_eq!(sink.drain(), vec![1, 2]);
+    /// sink.listener().receive(3);
+    /// assert_eq!(sink.drain(), vec![3]);
+    /// ```
+    pub fn drain(&self) -> Vec<M> {
+        self.messages.write().unwrap().drain(..).collect()
     }
 }
-/// As an [`Iterator`], yields all messages currently waiting in arbitrary order.
-/// TODO: A singular Iterator is not the best way to express polling.
-/// Generate independent Iterators (that can be consumed) or use something else.
-impl<M> Iterator for Sink<M>
-where
-    M: Eq + Hash + Clone,
-{
-    type Item = M;
-    fn next(&mut self) -> Option<M> {
-        self.messages.write().unwrap().pop()
-    }
-}
-impl<M> Listener<M> for SinkListener<M>
-where
-    M: Eq + Hash + Clone + Send + Sync,
-{
+
+impl<M> Listener<M> for SinkListener<M> {
     fn receive(&self, message: M) {
         if let Some(cell) = self.weak_messages.upgrade() {
-            cell.write().unwrap().insert(message);
+            cell.write().unwrap().push_back(message);
         }
     }
     fn alive(&self) -> bool {
         self.weak_messages.strong_count() > 0
     }
 }
+
 impl<M> Default for Sink<M>
 where
-    M: Eq + Hash + Clone + Send + Sync,
+    M: Send + Sync,
 {
+    // This implementation cannot be derived because we do not want M: Default
+
     fn default() -> Self {
         Self::new()
     }
@@ -517,15 +534,13 @@ mod tests {
         assert_eq!(format!("{:?}", cn), "Notifier(0)");
         cn.notify(0);
         assert_eq!(format!("{:?}", cn), "Notifier(0)");
-        let mut sink = Sink::new();
+        let sink = Sink::new();
         cn.listen(sink.listener());
         assert_eq!(format!("{:?}", cn), "Notifier(1)");
-        assert_eq!(None, sink.next());
+        assert_eq!(sink.drain(), vec![]);
         cn.notify(1);
         cn.notify(2);
-        assert_eq!(Some(2), sink.next());
-        assert_eq!(Some(1), sink.next());
-        assert_eq!(None, sink.next());
+        assert_eq!(sink.drain(), vec![1, 2]);
         assert_eq!(format!("{:?}", cn), "Notifier(1)");
     }
 
@@ -543,13 +558,13 @@ mod tests {
         let cell = ListenableCell::new(0);
 
         let s = cell.as_source();
-        let mut sink = Sink::new();
+        let sink = Sink::new();
         s.listen(sink.listener());
 
-        assert_eq!(None, sink.next());
+        assert_eq!(sink.drain(), vec![]);
         cell.set(1);
         assert_eq!(1, *s.get());
-        assert_eq!(Some(()), sink.next());
+        assert_eq!(sink.drain(), vec![()]);
     }
 
     #[test]

@@ -208,26 +208,22 @@ fn removed_blocks_are_forgotten() {
 fn change_listener() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    let mut sink = Sink::new();
+    let sink = Sink::new();
     space.listen(sink.listener());
 
     assert_eq!(Ok(true), space.set((0, 0, 0), &block));
-    //panic!("{:?}", sink.collect::<Vec<_>>());
-    // Note: Sink currently reports things in reverse of insertion order.
     assert_eq!(
-        Some(SpaceChange::Block(GridPoint::new(0, 0, 0))),
-        sink.next()
+        sink.drain(),
+        vec![
+            SpaceChange::Number(1),
+            SpaceChange::Lighting(GridPoint::new(0, 0, 0)),
+            SpaceChange::Block(GridPoint::new(0, 0, 0)),
+        ],
     );
-    assert_eq!(
-        Some(SpaceChange::Lighting(GridPoint::new(0, 0, 0))),
-        sink.next()
-    );
-    assert_eq!(Some(SpaceChange::Number(1)), sink.next());
-    assert_eq!(None, sink.next());
 
     // No change, no notification
     assert_eq!(Ok(false), space.set((0, 0, 0), &block));
-    assert_eq!(None, sink.next());
+    assert_eq!(sink.drain(), vec![]);
 }
 
 #[test]
@@ -283,13 +279,13 @@ fn fill_uniform_entire_space() {
     let [block] = make_some_blocks();
     let grid = Grid::new((0, 3, 0), (25 * 16, 16, 2));
     let mut space = Space::empty(grid);
-    let mut sink = Sink::new();
+    let sink = Sink::new();
     space.listen(sink.listener());
 
     space.fill_uniform(grid, &block).unwrap();
 
-    assert_eq!(sink.next(), Some(SpaceChange::EveryBlock));
-    assert_eq!(sink.next(), None);
+    assert_eq!(sink.drain(), vec![SpaceChange::EveryBlock]);
+
     space.consistency_check();
     for cube in grid.interior_iter() {
         assert_eq!(&space[cube], &block);
@@ -320,9 +316,9 @@ fn listens_to_block_changes() {
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);
     space.set((0, 0, 0), indirect).unwrap();
-    let mut sink = Sink::new();
+    let sink = Sink::new();
     space.listen(sink.listener());
-    assert_eq!(None, sink.next());
+    assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the block def .
     let new_block = Block::from(Rgba::BLACK);
@@ -332,11 +328,11 @@ fn listens_to_block_changes() {
         .unwrap();
     // This does not result in an outgoing notification, because we don't want
     // computations like reevaluation to happen during the notification process.
-    assert_eq!(sink.next(), None);
+    assert_eq!(sink.drain(), vec![]);
     // Instead, it only happens the next time the space is stepped.
     let (_, _) = space.step(None, Tick::arbitrary());
     // Now we should see a notification and the evaluated block data having changed.
-    assert_eq!(sink.next(), Some(SpaceChange::BlockValue(0)));
+    assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
     assert_eq!(space.get_evaluated((0, 0, 0)), &new_evaluated);
 }
 

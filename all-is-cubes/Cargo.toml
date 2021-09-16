@@ -38,7 +38,6 @@ bitvec = { version = "0.22.3", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.7.2", default-features = false }
 cgmath = "0.18.0"
 embedded-graphics = "0.7.0"
-indexmap = { version = "1.6.1", default-features = false }
 instant = "0.1.9"
 itertools = { version = "0.10.0", default-features = false }
 log = { version = "0.4.14", default-features = false }

@@ -54,7 +54,6 @@ dependencies = [
  "cgmath",
  "criterion",
  "embedded-graphics",
- "indexmap",
  "indoc",
  "instant",
  "itertools",

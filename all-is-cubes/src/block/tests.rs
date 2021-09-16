@@ -291,9 +291,9 @@ fn rotate_rotated_consistency() {
 #[test]
 fn listen_atom() {
     let block = Block::from(Rgba::WHITE);
-    let mut sink = Sink::new();
+    let sink = Sink::new();
     block.listen(sink.listener()).unwrap();
-    assert_eq!(None, sink.next());
+    assert_eq!(sink.drain(), vec![]);
     // No notifications are possible, so nothing more to test.
 }
 
@@ -302,15 +302,15 @@ fn listen_indirect_atom() {
     let mut universe = Universe::new();
     let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
     let indirect = Block::Indirect(block_def_ref.clone());
-    let mut sink = Sink::new();
+    let sink = Sink::new();
     indirect.listen(sink.listener()).unwrap();
-    assert_eq!(None, sink.next());
+    assert_eq!(sink.drain(), vec![]);
 
     // Now mutate it and we should see a notification.
     block_def_ref
         .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
         .unwrap();
-    assert!(sink.next().is_some());
+    assert_eq!(sink.drain().len(), 1);
 }
 
 /// Testing double indirection not because it's a case we expect to use routinely,
@@ -322,27 +322,26 @@ fn listen_indirect_double() {
     let block_def_ref2 =
         universe.insert_anonymous(BlockDef::new(Block::Indirect(block_def_ref1.clone())));
     let indirect2 = Block::Indirect(block_def_ref2.clone());
-    let mut sink = Sink::new();
+    let sink = Sink::new();
     indirect2.listen(sink.listener()).unwrap();
-    assert_eq!(None, sink.next());
+    assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the original block and we should see a notification.
     block_def_ref1
         .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
         .unwrap();
-    assert!(sink.next().is_some());
+    assert_eq!(sink.drain().len(), 1);
 
     // Remove block_def_ref1 from the contents of block_def_ref2...
     block_def_ref2
         .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
         .unwrap();
-    assert!(sink.next().is_some());
-    assert!(sink.next().is_none());
+    assert_eq!(sink.drain().len(), 1);
     // ...and then block_def_ref1's changes should NOT be forwarded.
     block_def_ref1
         .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::WHITE)))
         .unwrap();
-    assert!(sink.next().is_none());
+    assert_eq!(sink.drain(), vec![]);
 }
 
 /// Test that changes to a `Space` propagate to block listeners.
@@ -352,15 +351,15 @@ fn listen_recur() {
     let [block_0, block_1] = make_some_blocks();
     let space_ref = universe.insert_anonymous(Space::empty_positive(2, 1, 1));
     let block = Block::builder().voxels_ref(1, space_ref.clone()).build();
-    let mut sink = Sink::new();
+    let sink = Sink::new();
     block.listen(sink.listener()).unwrap();
-    assert_eq!(None, sink.next());
+    assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the space and we should see a notification.
     space_ref
         .execute(&SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)))
         .unwrap();
-    assert!(sink.next().is_some());
+    assert_eq!(sink.drain().len(), 1);
 
     // TODO: Also test that we don't propagate lighting changes
 
@@ -368,7 +367,7 @@ fn listen_recur() {
     space_ref
         .execute(&SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)))
         .unwrap();
-    assert_eq!(sink.next(), None);
+    assert_eq!(sink.drain(), vec![]);
 }
 
 // TODO: test of evaluate where the block's space is the wrong size
@@ -582,15 +581,15 @@ mod txn {
         let mut universe = Universe::new();
         let block_def_ref = universe.insert_anonymous(BlockDef::new(b1));
         let indirect = Block::Indirect(block_def_ref.clone());
-        let mut sink = Sink::new();
+        let sink = Sink::new();
         indirect.listen(sink.listener()).unwrap();
-        assert_eq!(None, sink.next());
+        assert_eq!(sink.drain(), vec![]);
 
         // Now mutate it and we should see a notification.
         block_def_ref
             .execute(&BlockDefTransaction::overwrite(b2))
             .unwrap();
-        assert!(sink.next().is_some());
+        assert_eq!(sink.drain().len(), 1);
     }
 
     #[test]

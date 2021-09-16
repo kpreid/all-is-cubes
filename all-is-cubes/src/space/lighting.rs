@@ -578,7 +578,7 @@ mod tests {
     #[test]
     fn set_cube_opaque_notification() {
         let mut space = Space::empty_positive(1, 1, 1);
-        let mut sink = Sink::new();
+        let sink = Sink::new();
         space.listen(
             sink.listener()
                 .filter(|change| matches!(change, SpaceChange::Lighting(_)).then(|| change)),
@@ -590,8 +590,8 @@ mod tests {
 
         assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
         assert_eq!(
-            Some(SpaceChange::Lighting(GridPoint::new(0, 0, 0))),
-            sink.next()
+            sink.drain(),
+            vec![SpaceChange::Lighting(GridPoint::new(0, 0, 0))]
         );
     }
 
