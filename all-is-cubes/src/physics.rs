@@ -17,12 +17,12 @@ pub(crate) const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 mod tests {
     use super::*;
     use crate::apps::Tick;
-    use crate::block::{Block, BlockCollision, AIR};
+    use crate::block::{Block, BlockCollision, Resolution, AIR};
     use crate::content::make_some_blocks;
-    use crate::math::{Aab, CubeFace, Face};
+    use crate::math::{Aab, CubeFace, Face, Geometry, GridPoint};
     use crate::space::{Grid, Space, SpacePhysics};
     use crate::universe::Universe;
-    use cgmath::{InnerSpace as _, Point3, Vector3, Zero as _};
+    use cgmath::{EuclideanSpace, InnerSpace as _, Point3, Vector3, Zero as _};
     use rand::prelude::SliceRandom as _;
     use rand::{Rng as _, SeedableRng as _};
     use std::collections::VecDeque;
@@ -103,34 +103,73 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: Voxel-level collision is not yet implemented; this test will not pass
     fn falling_collision_partial_block() {
+        const RES: Resolution = 4;
+        let x_velocity = 0.2;
+
         let u = &mut Universe::new();
         let [voxel] = make_some_blocks();
         let block = Block::builder()
-            .collision(BlockCollision::Hard)
-            .voxels_fn(u, 2, |p| if p.y > 0 { &AIR } else { &voxel })
+            .collision(BlockCollision::Recur)
+            .voxels_fn(u, RES, |p| {
+                if p.y >= (RES / 2).into() {
+                    &AIR
+                } else {
+                    &voxel
+                }
+            })
             .unwrap()
             .build();
 
         let mut space = Space::empty_positive(1, 1, 1);
         space.set((0, 0, 0), &block).unwrap();
         let mut body = Body {
-            velocity: Vector3::new(2.0, 0.0, 0.0),
+            velocity: Vector3::new(x_velocity, 0.0, 0.0),
             flying: false,
             ..test_body()
         };
 
         let mut contacts = Vec::new();
-        body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
+        dbg!(body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c)));
 
-        assert_eq!(body.position.x, 2.0);
+        dbg!(body.collision_box.translate(body.position.to_vec()));
+
+        assert_eq!(body.position.x, x_velocity);
         assert_eq!(body.position.z, 0.0);
-        assert!((body.position.y - 1.0).abs() < 1e-6, "{:?}", body.position);
-        assert_eq!(
-            contacts,
-            vec![Contact::Block(CubeFace::new((0, 0, 0), Face::PY))]
+        assert!(
+            (body.position.y - 1.0).abs() < 1e-6,
+            "not touching surface on first step{:?}",
+            body.position
         );
+        assert!(
+            matches!(
+                contacts[0],
+                Contact::Voxel {
+                    cube: GridPoint { x: 0, y: 0, z: 0 },
+                    resolution: RES,
+                    voxel: CubeFace {
+                        cube: _,
+                        face: Face::PY
+                    },
+                }
+            ),
+            "contact not as expected {:?}",
+            contacts[0]
+        );
+
+        // Remove horizontal velocity, then let time proceed and see if any falling through happens.
+        body.velocity.x = 0.0;
+
+        for t in 1..=1000 {
+            eprintln!("--- step {}", t);
+            body.step(Tick::from_seconds(1.0), Some(&space), |_| {});
+            assert!(
+                (body.position.y - 1.0).abs() < 1e-6,
+                "not touching surface on step {:?}: {:?}",
+                t,
+                body.position
+            );
+        }
     }
 
     #[test]
