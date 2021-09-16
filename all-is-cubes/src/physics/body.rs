@@ -235,8 +235,6 @@ impl Body {
             // Advance however much straight-line distance is available.
             // But a little bit back from that, to avoid floating point error pushing us
             // into being already colliding next frame.
-            //
-            // TODO: When we have recursive collision, this needs to be nudged within the voxel grid.
             let motion_segment = nudge_on_ray(
                 self.collision_box,
                 movement_ignoring_collision.scale_direction(collision.t_distance),
