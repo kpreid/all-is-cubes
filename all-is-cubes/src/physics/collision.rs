@@ -323,7 +323,7 @@ impl CollisionSpace for Space {
 
                     match contact {
                         Contact::Block(voxel) => Some(CollisionRayEnd {
-                            t_distance: voxel_t_distance * scale,
+                            t_distance: voxel_t_distance,
                             contact: Contact::Voxel {
                                 cube: entry_end.contact.cube(),
                                 resolution: evaluated.resolution,
@@ -466,7 +466,7 @@ mod tests {
                 block
             },
             Some(CollisionRayEnd {
-                t_distance: 0.5,
+                t_distance: 0.25, // half of a unit cube, quarter of a ray with magnitude 2
                 contact: Contact::Block(CubeFace::new([1, 0, 0], Face::PY)),
             }),
         );
@@ -486,7 +486,7 @@ mod tests {
                     .build()
             },
             Some(CollisionRayEnd {
-                t_distance: 0.5,
+                t_distance: 0.5, // half of a ray with magnitude 2
                 contact: Contact::Voxel {
                     cube: GridPoint::new(1, 0, 0),
                     resolution: 2,
@@ -510,10 +510,11 @@ mod tests {
         // Set up to collide with the block such that the ray doesn't pass through it, to
         // make sure the right cube is returned.
         // The block is at [1, 0, 0] and we're "dropping" a block-shaped AAB onto it
-        // with lower corner [-0.5, 0, 0] so it should contact the "left" half of
-        // the recursive block.
+        // with lower corner [0.5, 1.5, 0] so it should contact the "left" half of
+        // the `block` after moving a distance of 0.5 plus whatever penetration
+        // depth into a recursive block applies.
         let aab = Aab::from_cube(GridPoint::new(0, 0, 0));
-        let ray = Ray::new([0.5, 1., 0.], [0., -2., 0.]); // TODO: ray shouldn't need to be this long; debug
+        let ray = Ray::new([0.5, 1.5, 0.], [0., -2., 0.]);
 
         let result = collide_along_ray(&space, ray, aab, |_| {});
         assert_eq!(result, expected_end);
