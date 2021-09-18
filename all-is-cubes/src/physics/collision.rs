@@ -66,6 +66,19 @@ impl Contact {
             Contact::Voxel { resolution, .. } => resolution,
         }
     }
+
+    /// Return a copy where the contact normal is replaced with [`Face::Within`].
+    fn without_normal(&self) -> Self {
+        let mut result = *self;
+        match result {
+            Contact::Block(CubeFace { ref mut face, .. }) => *face = Face::Within,
+            Contact::Voxel {
+                voxel: CubeFace { ref mut face, .. },
+                ..
+            } => *face = Face::Within,
+        }
+        result
+    }
 }
 
 impl Geometry for Contact {
@@ -193,14 +206,14 @@ where
                 }
                 BlockCollision::Hard => {
                     let contact = full_cube_end.contact;
-                    if !already_colliding.contains(&contact) {
+                    if !already_colliding.contains(&contact.without_normal()) {
                         collision_callback(contact);
                         something_hit = Some(full_cube_end);
                     }
                 }
                 BlockCollision::Recur => {
                     if let Some(did_end) = Sp::recurse(full_cube_end, aab, ray, cell) {
-                        if !already_colliding.contains(&did_end.contact) {
+                        if !already_colliding.contains(&did_end.contact.without_normal()) {
                             collision_callback(did_end.contact);
                             something_hit = Some(did_end);
                         }
@@ -519,6 +532,28 @@ mod tests {
 
         let result = collide_along_ray(&space, ray, aab, |_| {});
         assert_eq!(result, expected_end);
+    }
+
+    /// Test reporting of being already inside a block at the start of the ray,
+    /// particularly with a trailing AAB bigger than a block.
+    #[test]
+    fn already_colliding() {
+        let mut space = Space::empty_positive(2, 1, 1);
+        let [block] = make_some_blocks();
+        space.set([0, 0, 0], &block).unwrap();
+
+        let aab = Aab::from_lower_upper([-1., -1., -1.], [1., 1., 1.]);
+        let ray = Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]);
+
+        let mut contacts = Vec::new();
+        let result = collide_along_ray(&space, ray, aab, |c| contacts.push(c));
+        assert_eq!(
+            (result, contacts),
+            (
+                None,
+                vec![Contact::Block(CubeFace::new([0, 0, 0], Face::Within))]
+            )
+        )
     }
 
     #[test]
