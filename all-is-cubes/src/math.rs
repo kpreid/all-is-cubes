@@ -366,13 +366,17 @@ impl Aab {
 }
 
 impl fmt::Debug for Aab {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            fmt,
-            "Aab({:?} to {:?})",
-            self.lower_bounds.custom_format(ConciseDebug),
-            self.upper_bounds.custom_format(ConciseDebug),
-        )
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Aab {
+            lower_bounds: l,
+            upper_bounds: u,
+            ..
+        } = *self;
+        f.debug_tuple("Aab")
+            .field(&(l.x..=u.x))
+            .field(&(l.y..=u.y))
+            .field(&(l.z..=u.z))
+            .finish()
     }
 }
 
@@ -472,10 +476,22 @@ mod tests {
     }
 
     #[test]
+    /// Test `Debug` formatting. Note this should be similar to the [`Grid`] formatting.
     fn aab_debug() {
+        let aab = Aab::new(1.0000001, 2.0, 3.0, 4.0, 5.0, 6.0);
         assert_eq!(
-            format!("{:#?}", Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)),
-            "Aab((+1.000, +3.000, +5.000) to (+2.000, +4.000, +6.000))"
+            format!("{:?}", aab),
+            "Aab(1.0000001..=2.0, 3.0..=4.0, 5.0..=6.0)"
+        );
+        assert_eq!(
+            format!("{:#?}\n", aab),
+            indoc::indoc! {"
+                Aab(
+                    1.0000001..=2.0,
+                    3.0..=4.0,
+                    5.0..=6.0,
+                )
+            "}
         );
     }
 

@@ -945,6 +945,7 @@ mod tests {
 
     // TODO: test and improve transform() on matrices with skew / other non-axis-swaps
 
+    /// Test `Debug` formatting. Note this should be similar to the [`Aab`] formatting.
     #[test]
     fn debug() {
         let grid = Grid::new((1, 2, 3), (10, 20, 30));
