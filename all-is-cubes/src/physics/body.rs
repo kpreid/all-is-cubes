@@ -10,7 +10,7 @@ use super::collision::{
 };
 use crate::apps::Tick;
 use crate::block::BlockCollision;
-use crate::math::{Aab, FreeCoordinate, Geometry as _};
+use crate::math::{Aab, Face, FreeCoordinate, Geometry as _};
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::transaction::{
@@ -137,11 +137,20 @@ impl Body {
     {
         let dt = tick.delta_t.as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
+        let mut already_colliding = None;
+
+        let mut collision_callback = |contact: Contact| {
+            if contact.normal() == Face::Within {
+                already_colliding = Some(contact);
+            }
+            collision_callback(contact);
+        };
 
         if !self.position.to_vec().magnitude2().is_finite() {
             // If position is NaN or infinite, can't do anything, but don't panic
             return BodyStepInfo {
                 quiescent: false,
+                already_colliding,
                 push_out: None,
                 move_segments,
             };
@@ -165,6 +174,7 @@ impl Body {
         } else if velocity_magnitude_squared <= VELOCITY_EPSILON_SQUARED || tick.paused() {
             return BodyStepInfo {
                 quiescent: true,
+                already_colliding,
                 push_out: push_out_info,
                 move_segments,
             };
@@ -202,6 +212,7 @@ impl Body {
 
         BodyStepInfo {
             quiescent: false,
+            already_colliding,
             push_out: push_out_info,
             move_segments,
         }
@@ -388,6 +399,7 @@ pub struct BodyStepInfo {
     /// Whether movement computation was skipped due to approximately zero velocity.
     pub quiescent: bool,
     pub push_out: Option<Vector3<FreeCoordinate>>,
+    pub already_colliding: Option<Contact>,
     /// Details on movement and collision. A single frame's movement may have up to three
     /// segments as differently oriented faces are collided with.
     pub move_segments: [MoveSegment; 3],
@@ -397,6 +409,7 @@ impl CustomFormat<ConciseDebug> for BodyStepInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: ConciseDebug) -> fmt::Result {
         fmt.debug_struct("BodyStepInfo")
             .field("quiescent", &self.quiescent)
+            .field("already_colliding", &self.already_colliding)
             .field(
                 "push_out",
                 &self.push_out.as_ref().map(|v| v.custom_format(format_type)),

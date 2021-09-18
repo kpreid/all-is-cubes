@@ -166,6 +166,7 @@ where
                     face: ray_step.face(),
                 });
                 already_colliding.insert(contact);
+                collision_callback(contact);
             }
             continue;
         }
