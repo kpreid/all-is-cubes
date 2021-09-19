@@ -199,35 +199,32 @@ where
                     face: ray_step.face(),
                 }),
             };
-            match Sp::collision(cell) {
+            let found_end = match Sp::collision(cell) {
                 // Note: This match must be in sync with find_colliding_cubes, the non-in-motion version of this.
                 BlockCollision::None => {
                     // No collision for this block
                     continue;
                 }
-                BlockCollision::Hard => {
-                    let contact = full_cube_end.contact;
-                    if !already_colliding.contains(&contact.without_normal()) {
-                        collision_callback(contact);
-                        // No need to check distance as this is guaranteed to be the closest
-                        something_hit = Some(full_cube_end);
+                BlockCollision::Hard => full_cube_end,
+                BlockCollision::Recur => {
+                    if let Some(found_end) = Sp::recurse(full_cube_end, aab, ray, cell) {
+                        found_end
+                    } else {
+                        // No collision
+                        continue;
                     }
                 }
-                BlockCollision::Recur => {
-                    if let Some(did_end) = Sp::recurse(full_cube_end, aab, ray, cell) {
-                        if !already_colliding.contains(&did_end.contact.without_normal()) {
-                            // TODO: We need to buffer contacts instead of calling this callback, in case something else is closer
-                            collision_callback(did_end.contact);
+            };
+            if !already_colliding.contains(&found_end.contact.without_normal()) {
+                // TODO: We need to buffer contacts instead of calling this callback, in case something else is closer
+                collision_callback(found_end.contact);
 
-                            let nearest_so_far = match something_hit {
-                                Some(CollisionRayEnd { t_distance, .. }) => t_distance,
-                                None => FreeCoordinate::INFINITY,
-                            };
-                            if did_end.t_distance < nearest_so_far {
-                                something_hit = Some(did_end);
-                            }
-                        }
-                    }
+                let nearest_so_far = match something_hit {
+                    Some(CollisionRayEnd { t_distance, .. }) => t_distance,
+                    None => FreeCoordinate::INFINITY,
+                };
+                if found_end.t_distance < nearest_so_far {
+                    something_hit = Some(found_end);
                 }
             }
         }
@@ -508,7 +505,7 @@ mod tests {
                     cube: GridPoint::new(1, 0, 0),
                     resolution: 2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
-                    voxel: CubeFace::new([0, 0, 1], Face::PY),
+                    voxel: CubeFace::new([0, 0, 0], Face::PY),
                 },
             }),
         );
@@ -525,7 +522,7 @@ mod tests {
                     cube: GridPoint::new(1, 0, 0),
                     resolution: 2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
-                    voxel: CubeFace::new([0, 0, 1], Face::PY),
+                    voxel: CubeFace::new([0, 0, 0], Face::PY),
                 },
             }),
         );
@@ -543,7 +540,7 @@ mod tests {
                 contact: Contact::Voxel {
                     cube: GridPoint::new(1, 0, 0), // second of 2 blocks is taller
                     resolution: 2,
-                    voxel: CubeFace::new([0, 0, 1], Face::PY),
+                    voxel: CubeFace::new([0, 0, 0], Face::PY),
                 },
             }),
         );
@@ -556,7 +553,7 @@ mod tests {
                 contact: Contact::Voxel {
                     cube: GridPoint::new(0, 0, 0), // first of 2 blocks is taller
                     resolution: 2,
-                    voxel: CubeFace::new([1, 0, 1], Face::PY),
+                    voxel: CubeFace::new([1, 0, 0], Face::PY),
                 },
             }),
         );
