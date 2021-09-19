@@ -4,6 +4,7 @@
 //! Miscellanous demonstrations of capability and manual test-cases.
 //! The exhibits defined in this file are combined into [`crate::content::demo_city`].
 
+use std::convert::TryFrom;
 use std::f64::consts::PI;
 
 use cgmath::{
@@ -19,8 +20,10 @@ use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::{Baseline, Text};
 use ordered_float::NotNan;
 
-use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, AIR};
-use crate::content::{four_walls, palette, AnimatedVoxels, DemoBlocks, Exhibit, Fire};
+use crate::block::{
+    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Resolution, AIR,
+};
+use crate::content::{four_walls, make_slab, palette, AnimatedVoxels, DemoBlocks, Exhibit, Fire};
 use crate::drawing::draw_to_blocks;
 use crate::linking::{BlockProvider, InGenError};
 use crate::math::{
@@ -233,29 +236,37 @@ const ANIMATION: Exhibit = Exhibit {
 const COLLISION: Exhibit = Exhibit {
     name: "Collision WIP",
     factory: |_this, universe| {
-        let half_block_base = Block::from(palette::PLANK);
-        let half_block = Block::builder()
-            .collision(BlockCollision::Recur)
-            .voxels_fn(
-                universe,
-                2,
-                |p| {
-                    if p.y > 0 {
-                        &AIR
-                    } else {
-                        &half_block_base
-                    }
-                },
-            )?
-            .build();
+        let half_block = make_slab(universe, 2, 4);
 
-        let footprint = Grid::new([0, 0, 0], [3, 2, 4]);
+        let footprint = Grid::new([0, 0, 0], [5, 2, 4]);
         let mut space = Space::empty(footprint);
-        space.set([0, 0, 2], &half_block)?;
-        space.set([2, 0, 2], half_block.clone().rotate(GridRotation::RyXZ))?;
-        space.set([0, 0, 0], half_block.clone().rotate(GridRotation::RXZy))?;
-        space.set([1, 0, 0], half_block.clone().rotate(GridRotation::RxyZ))?;
-        space.set([2, 0, 0], &half_block)?;
+
+        for dx in -1..=1 {
+            for dz in -1..=1 {
+                let offset = GridVector::new(dx, 0, dz);
+                space.set(
+                    GridPoint::new(1, 0, 1) + offset,
+                    // Rotate block so its +Y is towards the offset vector
+                    half_block.clone().rotate(match Face::try_from(offset) {
+                        Ok(face) => GridRotation::from_to(Face::PY, face, face.cross(Face::PY))
+                            .unwrap_or(GridRotation::RXyZ),
+                        Err(_) => GridRotation::IDENTITY,
+                    }),
+                )?;
+            }
+        }
+
+        let range = footprint.z_range();
+        for i in 0..(range.len() as GridCoordinate) {
+            space.set(
+                [4, 0, range.start + i],
+                make_slab(
+                    universe,
+                    (range.end - i) as Resolution,
+                    range.len() as Resolution,
+                ),
+            )?;
+        }
 
         Ok(space)
     },

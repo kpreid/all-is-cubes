@@ -17,8 +17,8 @@ pub(crate) const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 mod tests {
     use super::*;
     use crate::apps::Tick;
-    use crate::block::{Block, BlockCollision, Resolution, AIR};
-    use crate::content::make_some_blocks;
+    use crate::block::{Resolution, AIR};
+    use crate::content::{make_slab, make_some_blocks};
     use crate::math::{Aab, CubeFace, Face, Geometry, GridPoint};
     use crate::space::{Grid, Space, SpacePhysics};
     use crate::universe::Universe;
@@ -108,18 +108,7 @@ mod tests {
         let x_velocity = 0.2;
 
         let u = &mut Universe::new();
-        let [voxel] = make_some_blocks();
-        let block = Block::builder()
-            .collision(BlockCollision::Recur)
-            .voxels_fn(u, RES, |p| {
-                if p.y >= (RES / 2).into() {
-                    &AIR
-                } else {
-                    &voxel
-                }
-            })
-            .unwrap()
-            .build();
+        let block = make_slab(u, RES / 2, RES);
 
         let mut space = Space::empty_positive(1, 1, 1);
         space.set((0, 0, 0), &block).unwrap();

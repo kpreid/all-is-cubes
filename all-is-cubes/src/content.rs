@@ -14,7 +14,7 @@ use embedded_graphics::text::TextStyleBuilder;
 use std::borrow::Cow;
 use std::convert::{TryFrom, TryInto};
 
-use crate::block::Block;
+use crate::block::{Block, BlockCollision, Resolution, AIR};
 use crate::drawing::VoxelBrush;
 use crate::math::{
     FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
@@ -177,6 +177,37 @@ fn color_sequence_for_make_blocks(n: usize) -> impl Iterator<Item = (usize, Rgba
         };
         (i, Rgba::new(luminance, luminance, luminance, 1.0))
     })
+}
+
+/// Generate a block which fills some fraction of its cube volume, from the bottom (−Y) up.
+///
+/// (This function exists because of a variety of tests of recursive blocks needing this
+/// pattern.)
+///
+/// TODO: Allow caller-provided colors/pattern.
+/// TODO: Consider writing the size on the faces.
+pub(crate) fn make_slab(
+    universe: &mut Universe,
+    numerator: Resolution,
+    denominator: Resolution,
+) -> Block {
+    let voxels = [
+        Block::from(palette::PLANK),
+        Block::from(palette::PLANK * 1.06),
+    ];
+    Block::builder()
+        .display_name(format!("Slab {}/{}", numerator, denominator))
+        .collision(BlockCollision::Recur)
+        .voxels_fn(universe, denominator, |cube| {
+            if cube.y >= numerator.into() {
+                &AIR
+            } else {
+                // Checkerboard pattern
+                &voxels[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
+            }
+        })
+        .unwrap() // no errors should be possible
+        .build()
 }
 
 /// Draw the Space's axes as lines of blocks centered on (0, 0, 0).

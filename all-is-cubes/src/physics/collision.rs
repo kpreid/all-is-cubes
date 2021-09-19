@@ -463,8 +463,8 @@ pub(crate) fn nudge_on_ray(
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{Block, AIR};
-    use crate::content::make_some_blocks;
+    use crate::block::Block;
+    use crate::content::{make_slab, make_some_blocks};
     use crate::math::GridCoordinate;
     use crate::raytracer::print_space;
     use crate::space::Grid;
@@ -489,16 +489,7 @@ mod tests {
     #[test]
     fn collide_along_ray_with_recursive_block() {
         collide_along_ray_tester(
-            |u| {
-                // Construct a lower half block ▄.
-                let [voxel] = make_some_blocks();
-                Block::builder()
-                    .collision(BlockCollision::Recur)
-                    .display_name("H")
-                    .voxels_fn(u, 2, |p| if p.y > 0 { &AIR } else { &voxel })
-                    .unwrap()
-                    .build()
-            },
+            |u| make_slab(u, 1, 2),
             Some(CollisionRayEnd {
                 t_distance: 0.5, // half of a ray with magnitude 2
                 contact: Contact::Voxel {
