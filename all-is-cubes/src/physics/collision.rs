@@ -475,6 +475,7 @@ mod tests {
     #[test]
     fn collide_along_ray_with_opaque_block() {
         collide_along_ray_tester(
+            1.5,
             |_u| {
                 let [block] = make_some_blocks();
                 block
@@ -487,8 +488,9 @@ mod tests {
     }
 
     #[test]
-    fn collide_along_ray_with_recursive_block() {
+    fn collide_along_ray_recursive_from_outside() {
         collide_along_ray_tester(
+            1.5,
             |u| make_slab(u, 1, 2),
             Some(CollisionRayEnd {
                 t_distance: 0.5, // half of a ray with magnitude 2
@@ -502,7 +504,25 @@ mod tests {
         );
     }
 
+    #[test]
+    fn collide_along_ray_recursive_from_inside() {
+        collide_along_ray_tester(
+            0.75,
+            |u| make_slab(u, 1, 2),
+            Some(CollisionRayEnd {
+                t_distance: 0.125,
+                contact: Contact::Voxel {
+                    cube: GridPoint::new(1, 0, 0),
+                    resolution: 2,
+                    // TODO: the voxel reported here is arbitrary, so this test is fragile
+                    voxel: CubeFace::new([0, 0, 1], Face::PY),
+                },
+            }),
+        );
+    }
+
     fn collide_along_ray_tester(
+        initial_y: FreeCoordinate,
         block_gen: fn(&mut Universe) -> Block,
         expected_end: Option<CollisionRayEnd>,
     ) {
@@ -519,7 +539,7 @@ mod tests {
         // the `block` after moving a distance of 0.5 plus whatever penetration
         // depth into a recursive block applies.
         let aab = Aab::from_cube(GridPoint::new(0, 0, 0));
-        let ray = Ray::new([0.5, 1.5, 0.], [0., -2., 0.]);
+        let ray = Ray::new([0.5, initial_y, 0.], [0., -2., 0.]);
 
         let result = collide_along_ray(&space, ray, aab, |_| {});
         assert_eq!(result, expected_end);
