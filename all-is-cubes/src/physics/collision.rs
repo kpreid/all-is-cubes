@@ -173,6 +173,7 @@ where
             // If we are intersecting a block, we are allowed to leave it; pretend
             // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
             // maybe there's no clear direction.)
+            // TODO: This procedure does not account for recursive block contacts.
             for box_cube in find_colliding_cubes(space, step_aab) {
                 let contact = Contact::Block(CubeFace {
                     cube: box_cube,
@@ -208,14 +209,23 @@ where
                     let contact = full_cube_end.contact;
                     if !already_colliding.contains(&contact.without_normal()) {
                         collision_callback(contact);
+                        // No need to check distance as this is guaranteed to be the closest
                         something_hit = Some(full_cube_end);
                     }
                 }
                 BlockCollision::Recur => {
                     if let Some(did_end) = Sp::recurse(full_cube_end, aab, ray, cell) {
                         if !already_colliding.contains(&did_end.contact.without_normal()) {
+                            // TODO: We need to buffer contacts instead of calling this callback, in case something else is closer
                             collision_callback(did_end.contact);
-                            something_hit = Some(did_end);
+
+                            let nearest_so_far = match something_hit {
+                                Some(CollisionRayEnd { t_distance, .. }) => t_distance,
+                                None => FreeCoordinate::INFINITY,
+                            };
+                            if did_end.t_distance < nearest_so_far {
+                                something_hit = Some(did_end);
+                            }
                         }
                     }
                 }
@@ -463,7 +473,7 @@ pub(crate) fn nudge_on_ray(
 
 #[cfg(test)]
 mod tests {
-    use crate::block::Block;
+    use crate::block::{Block, AIR};
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::GridCoordinate;
     use crate::raytracer::print_space;
@@ -478,7 +488,7 @@ mod tests {
             1.5,
             |_u| {
                 let [block] = make_some_blocks();
-                block
+                [AIR, block]
             },
             Some(CollisionRayEnd {
                 t_distance: 0.25, // half of a unit cube, quarter of a ray with magnitude 2
@@ -491,7 +501,7 @@ mod tests {
     fn collide_along_ray_recursive_from_outside() {
         collide_along_ray_tester(
             1.5,
-            |u| make_slab(u, 1, 2),
+            |u| [AIR, make_slab(u, 1, 2)],
             Some(CollisionRayEnd {
                 t_distance: 0.5, // half of a ray with magnitude 2
                 contact: Contact::Voxel {
@@ -508,7 +518,7 @@ mod tests {
     fn collide_along_ray_recursive_from_inside() {
         collide_along_ray_tester(
             0.75,
-            |u| make_slab(u, 1, 2),
+            |u| [AIR, make_slab(u, 1, 2)],
             Some(CollisionRayEnd {
                 t_distance: 0.125,
                 contact: Contact::Voxel {
@@ -521,15 +531,47 @@ mod tests {
         );
     }
 
+    /// Check that colliding against two recursive blocks correctly picks the taller one,
+    /// in either ordering.
+    #[test]
+    fn collide_along_ray_two_recursive() {
+        collide_along_ray_tester(
+            0.75,
+            |u| [make_slab(u, 1, 3), make_slab(u, 1, 2)],
+            Some(CollisionRayEnd {
+                t_distance: 0.125,
+                contact: Contact::Voxel {
+                    cube: GridPoint::new(1, 0, 0), // second of 2 blocks is taller
+                    resolution: 2,
+                    voxel: CubeFace::new([0, 0, 1], Face::PY),
+                },
+            }),
+        );
+        collide_along_ray_tester(
+            0.75,
+            // Opposite ordering of the other test
+            |u| [make_slab(u, 1, 2), make_slab(u, 1, 3)],
+            Some(CollisionRayEnd {
+                t_distance: 0.125,
+                contact: Contact::Voxel {
+                    cube: GridPoint::new(0, 0, 0), // first of 2 blocks is taller
+                    resolution: 2,
+                    voxel: CubeFace::new([1, 0, 1], Face::PY),
+                },
+            }),
+        );
+    }
+
     fn collide_along_ray_tester(
         initial_y: FreeCoordinate,
-        block_gen: fn(&mut Universe) -> Block,
+        block_gen: fn(&mut Universe) -> [Block; 2],
         expected_end: Option<CollisionRayEnd>,
     ) {
         let u = &mut Universe::new();
-        let block = block_gen(u);
+        let blocks = block_gen(u);
         let mut space = Space::empty_positive(2, 1, 1);
-        space.set([1, 0, 0], &block).unwrap();
+        space.set([0, 0, 0], &blocks[0]).unwrap();
+        space.set([1, 0, 0], &blocks[1]).unwrap();
         print_space(&space, [1., 1., 1.]);
 
         // Set up to collide with the block such that the ray doesn't pass through it, to
