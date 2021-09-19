@@ -138,6 +138,7 @@ pub(crate) fn collide_along_ray<Sp, CC>(
     ray: Ray,
     aab: Aab,
     mut collision_callback: CC,
+    ignore_already_colliding: bool,
 ) -> Option<CollisionRayEnd>
 where
     Sp: CollisionSpace,
@@ -169,21 +170,6 @@ where
             // Movement is unobstructed in this timestep.
             break;
         }
-        if ray_step.face() == Face::Within {
-            // If we are intersecting a block, we are allowed to leave it; pretend
-            // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
-            // maybe there's no clear direction.)
-            // TODO: This procedure does not account for recursive block contacts.
-            for box_cube in find_colliding_cubes(space, step_aab) {
-                let contact = Contact::Block(CubeFace {
-                    cube: box_cube,
-                    face: ray_step.face(),
-                });
-                already_colliding.insert(contact);
-                collision_callback(contact);
-            }
-            continue;
-        }
 
         // Loop over all the cubes that our AAB is just now intersecting and check if
         // any of them are solid, and if so, how far into their volume is a hit.
@@ -207,7 +193,13 @@ where
                 }
                 BlockCollision::Hard => full_cube_end,
                 BlockCollision::Recur => {
-                    if let Some(found_end) = Sp::recurse(full_cube_end, aab, ray, cell) {
+                    if let Some(found_end) = Sp::recurse(
+                        full_cube_end.clone(),
+                        aab,
+                        ray,
+                        cell,
+                        ignore_already_colliding && ray_step.face() != Face::Within,
+                    ) {
                         found_end
                     } else {
                         // No collision
@@ -215,7 +207,19 @@ where
                     }
                 }
             };
-            if !already_colliding.contains(&found_end.contact.without_normal()) {
+
+            if ignore_already_colliding && ray_step.face() == Face::Within {
+                // If we start intersecting a block, we are allowed to leave it; pretend
+                // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
+                // maybe there's no clear direction.)
+                already_colliding.insert(found_end.contact);
+                collision_callback(found_end.contact);
+                continue;
+            }
+
+            if !ignore_already_colliding
+                || !already_colliding.contains(&found_end.contact.without_normal())
+            {
                 // TODO: We need to buffer contacts instead of calling this callback, in case something else is closer
                 collision_callback(found_end.contact);
 
@@ -229,7 +233,7 @@ where
             }
         }
 
-        // Now that we've found _all_ the contacts, report the collision.
+        // Now that we've found _all_ the contacts for this step, report the collision.
         if let Some(end) = something_hit {
             return Some(end);
         }
@@ -294,6 +298,7 @@ pub(crate) trait CollisionSpace {
         aab: Aab,
         ray: Ray,
         cell: &Self::Cell,
+        ignore_already_colliding: bool,
     ) -> Option<CollisionRayEnd>;
 }
 
@@ -321,6 +326,7 @@ impl CollisionSpace for Space {
         space_aab: Aab,
         space_ray: Ray,
         evaluated: &EvaluatedBlock,
+        ignore_already_colliding: bool,
     ) -> Option<CollisionRayEnd> {
         match &evaluated.voxels {
             // Plain non-recursive collision
@@ -336,7 +342,13 @@ impl CollisionSpace for Space {
                 // Note: aab is not translated since it's relative to the ray anyway.
                 let voxel_aab = space_aab.scale(scale);
                 let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
-                if let Some(hit_voxel) = collide_along_ray(voxels, voxel_ray, voxel_aab, |_| {}) {
+                if let Some(hit_voxel) = collide_along_ray(
+                    voxels,
+                    voxel_ray,
+                    voxel_aab,
+                    |_| {},
+                    ignore_already_colliding,
+                ) {
                     let CollisionRayEnd {
                         t_distance: voxel_t_distance,
                         contact,
@@ -388,6 +400,7 @@ impl CollisionSpace for GridArray<Evoxel> {
         _aab: Aab,
         _local_ray: Ray,
         _cell: &Self::Cell,
+        _ignore_already_colliding: bool,
     ) -> Option<CollisionRayEnd> {
         Some(entry_end)
     }
@@ -580,7 +593,7 @@ mod tests {
         let aab = Aab::from_cube(GridPoint::new(0, 0, 0));
         let ray = Ray::new([0.5, initial_y, 0.], [0., -2., 0.]);
 
-        let result = collide_along_ray(&space, ray, aab, |_| {});
+        let result = collide_along_ray(&space, ray, aab, |_| {}, true);
         assert_eq!(result, expected_end);
     }
 
@@ -588,20 +601,31 @@ mod tests {
     /// particularly with a trailing AAB bigger than a block.
     #[test]
     fn already_colliding() {
+        let mut u = Universe::new();
         let mut space = Space::empty_positive(2, 1, 1);
         let [block] = make_some_blocks();
+        let half_block = make_slab(&mut u, 1, 2);
         space.set([0, 0, 0], &block).unwrap();
+        space.set([1, 0, 0], &half_block).unwrap();
 
-        let aab = Aab::from_lower_upper([-1., -1., -1.], [1., 1., 1.]);
-        let ray = Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]);
+        let aab = Aab::from_lower_upper([-1., -1., -1.], [2., 1., 1.]);
+        let ray = Ray::new([0.5, 0.0, 0.5], [1., 0., 0.]);
 
         let mut contacts = Vec::new();
-        let result = collide_along_ray(&space, ray, aab, |c| contacts.push(c));
+        let result = collide_along_ray(&space, ray, aab, |c| contacts.push(c), true);
         assert_eq!(
             (result, contacts),
             (
                 None,
-                vec![Contact::Block(CubeFace::new([0, 0, 0], Face::Within))]
+                vec![
+                    Contact::Block(CubeFace::new([0, 0, 0], Face::Within)),
+                    Contact::Voxel {
+                        cube: GridPoint::new(1, 0, 0),
+                        resolution: 2,
+                        // TODO: the voxel reported here is arbitrary, so this test is fragile
+                        voxel: CubeFace::new([0, 0, 0], Face::Within),
+                    }
+                ]
             )
         )
     }

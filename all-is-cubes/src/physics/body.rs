@@ -235,6 +235,7 @@ impl Body {
             movement_ignoring_collision,
             self.collision_box,
             collision_callback,
+            true,
         );
 
         if let Some(collision) = collision {
