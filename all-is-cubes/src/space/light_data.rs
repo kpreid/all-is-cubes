@@ -7,7 +7,7 @@ use std::collections::hash_map::Entry;
 use std::collections::BTreeSet;
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, Vector3, Vector4};
+use cgmath::{Vector3, Vector4};
 
 use crate::math::*;
 use crate::space::*;
@@ -212,7 +212,10 @@ impl LightUpdateRequest {
     /// assuming the viewpoint starts close to the origin it will see good nearby
     /// lighting sooner.)
     fn fallback_priority(&self) -> GridCoordinate {
-        self.cube.map(|s| s.abs()).dot(Vector3::new(-1, -1, -1))
+        let GridPoint { x, y, z } = self
+            .cube
+            .map(|c| if c > 0 { -c } else { c } + GridCoordinate::MAX / 3);
+        x.saturating_add(y).saturating_add(z)
     }
 }
 impl Ord for LightUpdateRequest {
