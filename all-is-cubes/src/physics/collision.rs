@@ -186,7 +186,6 @@ where
                 }),
             };
             let found_end = match Sp::collision(cell) {
-                // Note: This match must be in sync with find_colliding_cubes, the non-in-motion version of this.
                 BlockCollision::None => {
                     // No collision for this block
                     continue;
@@ -248,31 +247,19 @@ pub(crate) fn find_colliding_cubes<Sp>(space: &Sp, aab: Aab) -> impl Iterator<It
 where
     Sp: CollisionSpace,
 {
-    aab.round_up_to_grid().interior_iter().filter(move |&cube| {
-        let cell = space.get_cell(cube);
-        match Sp::collision(cell) {
-            BlockCollision::None => false,
-            BlockCollision::Hard => true,
-            BlockCollision::Recur => match Sp::get_voxels(cell) {
-                None => true,
-                Some((resolution, voxels)) => {
-                    let voxel_aab = aab
-                        .translate(cube.to_vec().map(|s| -FreeCoordinate::from(s)))
-                        .scale(FreeCoordinate::from(resolution));
-                    let voxel_aab_grid = voxel_aab.round_up_to_grid().intersection(voxels.grid());
-                    if let Some(g) = voxel_aab_grid {
-                        g.interior_iter()
-                            .any(|subcube| match voxels[subcube].collision {
-                                BlockCollision::None => false,
-                                BlockCollision::Hard | BlockCollision::Recur => true,
-                            })
-                    } else {
-                        false
-                    }
-                }
-            },
-        }
-    })
+    // TODO: rework interfaces to avoid allocating a vector
+    // TODO: don't throw out the contact details
+    let mut points = Vec::new();
+    collide_along_ray(
+        space,
+        Ray::new([0., 0., 0.], [0., 0., 0.]),
+        aab,
+        |contact| {
+            points.push(contact.cube());
+        },
+        false,
+    );
+    points.into_iter()
 }
 
 /// Abstraction over voxel arrays that the collision detection algorithm can use,
