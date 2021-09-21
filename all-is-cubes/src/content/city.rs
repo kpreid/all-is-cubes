@@ -274,7 +274,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             0..1,
             BlockAttributes {
                 display_name: format!("Exhibit name {:?}", exhibit.name).into(),
-                collision: BlockCollision::None,
+                collision: BlockCollision::Recur,
                 ..BlockAttributes::default()
             },
             &name_text.translate(Point::new(

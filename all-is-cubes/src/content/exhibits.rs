@@ -143,7 +143,7 @@ const KNOT: Exhibit = Exhibit {
             16,
             BlockAttributes {
                 display_name: this.name.into(),
-                collision: BlockCollision::None,
+                collision: BlockCollision::Recur,
                 ..BlockAttributes::default()
             },
             universe.insert_anonymous(drawing_space),
@@ -160,7 +160,10 @@ const TEXT: Exhibit = Exhibit {
             16,
             8,
             8..9,
-            BlockAttributes::default(),
+            BlockAttributes {
+                collision: BlockCollision::Recur,
+                ..Default::default()
+            },
             &Text::with_baseline(
                 "Hello block world",
                 Point::new(0, 0),
@@ -207,6 +210,7 @@ const ANIMATION: Exhibit = Exhibit {
             }));
             Block::builder()
                 .animation_hint(AnimationHint::CONTINUOUS)
+                .collision(BlockCollision::Recur)
                 .voxels_ref(resolution, universe.insert_anonymous(block_space))
                 .build()
         };
@@ -215,6 +219,7 @@ const ANIMATION: Exhibit = Exhibit {
             let fire_resolution = 12;
             Block::builder()
                 .animation_hint(AnimationHint::CONTINUOUS)
+                .collision(BlockCollision::None)
                 .light_emission(rgb_const!(1.4, 1.0, 0.8) * 8.0)
                 .voxels_ref(fire_resolution, {
                     let fire_grid = Grid::for_block(fire_resolution);
@@ -284,6 +289,7 @@ const RESOLUTIONS: Exhibit = Exhibit {
             space.set(
                 location,
                 Block::builder()
+                    .collision(BlockCollision::Recur)
                     .voxels_fn(universe, resolution, |p| {
                         if p.x + p.y + p.z >= GridCoordinate::from(resolution) {
                             return AIR.clone();

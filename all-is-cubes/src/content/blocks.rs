@@ -87,6 +87,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
             Lamp => Block::builder()
                 .display_name("Lamp")
                 .light_emission(Rgb::new(20.0, 20.0, 20.0))
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |p| {
                     if int_magnitude_squared(p * 2 + one_diagonal - center_point_doubled)
                         <= resolution_g.pow(2)
@@ -101,6 +102,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
             Lamppost => Block::builder()
                 .display_name("Lamppost")
                 .light_emission(Rgb::new(3.0, 3.0, 3.0))
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |p| {
                     if int_magnitude_squared(
                         (p * 2 + one_diagonal - center_point_doubled)
@@ -117,6 +119,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
             Sconce => Block::builder()
                 .display_name("Sconce")
                 .light_emission(Rgb::new(8.0, 7.0, 6.0))
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |p| {
                     // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
                     let r2 = int_magnitude_squared(
@@ -177,19 +180,20 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
 
                 Block::builder()
                     .display_name("Arrow")
+                    .collision(BlockCollision::Recur)
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
 
             Curb => Block::builder()
                 .display_name("Curb")
-                .collision(BlockCollision::None) // TODO: make solid when we have voxel-level collision
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, curb_fn)?
                 .build(),
 
             CurbCorner => Block::builder()
                 .display_name("Curb Corner")
-                .collision(BlockCollision::None) // TODO: make solid when we have voxel-level collision
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |cube| {
                     // TODO: rework so this isn't redoing the rotation calculations for every single voxel
                     // We should have tools for composing blocks instead...
@@ -269,6 +273,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
 
                 Block::builder()
                     .display_name("Signboard")
+                    .collision(BlockCollision::Recur)
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }

@@ -435,6 +435,7 @@ fn install_atrium_blocks(
         resolution,
         BlockAttributes {
             display_name: "Atrium Ground Floor Arch".into(),
+            collision: BlockCollision::Recur,
             ..BlockAttributes::default()
         },
         {
@@ -526,6 +527,7 @@ fn install_atrium_blocks(
             AtriumBlocks::Arch4_3 => ground_floor_arch_blocks[[0, 3, 4]].clone(),
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x + mid.z < resolution_g * 6 / 4 {
@@ -537,6 +539,7 @@ fn install_atrium_blocks(
                 .build(),
             AtriumBlocks::SquareColumn => Block::builder()
                 .display_name("Square Atrium Column")
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.max(p.z) < resolution_g * 6 / 4 {
@@ -548,6 +551,7 @@ fn install_atrium_blocks(
                 .build(),
             AtriumBlocks::SmallColumn => Block::builder()
                 .display_name("Round Atrium Column")
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.pow(2) + mid.z.pow(2) < (resolution_g * 3 / 4).pow(2) {
@@ -559,12 +563,12 @@ fn install_atrium_blocks(
                 .build(),
             AtriumBlocks::Molding => Block::builder()
                 .display_name("Atrium Top Edge Molding")
-                .collision(BlockCollision::None) // TODO: once voxel collision is implemented, remove this
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, molding_fn)?
                 .build(),
             AtriumBlocks::MoldingCorner => Block::builder()
                 .display_name("Atrium Top Edge Molding Corner")
-                .collision(BlockCollision::None) // TODO: once voxel collision is implemented, remove this
+                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |mut p| {
                     if p.x > p.z {
                         p = GridRotation::COUNTERCLOCKWISE
@@ -577,6 +581,7 @@ fn install_atrium_blocks(
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
                 // .light_emission(rgb_const!(1.4, 1.0, 0.8) * 4.0)
+                .collision(BlockCollision::Recur)
                 .voxels_ref(resolution, {
                     let mut space = Space::for_block(resolution).build_empty();
                     // Use a darker color to dampen the effect of interior light
