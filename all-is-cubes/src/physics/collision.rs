@@ -207,7 +207,7 @@ where
                 }
             };
 
-            if ignore_already_colliding && ray_step.face() == Face::Within {
+            if ignore_already_colliding && found_end.contact.normal() == Face::Within {
                 // If we start intersecting a block, we are allowed to leave it; pretend
                 // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
                 // maybe there's no clear direction.)
