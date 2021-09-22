@@ -148,6 +148,30 @@ pub(crate) struct CollisionRayEnd {
     pub contact: Contact,
 }
 
+/// Specifies the ending condition for [`collide_along_ray()`]: what type of situation
+/// it should stop prior to the end of the ray for.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum StopAt {
+    /// Stop on any collisions, including those at the starting position (already
+    /// colliding).
+    Anything,
+    /// Stop when something new is collided with (excluding the starting position).
+    NotAlreadyColliding,
+    /// Stop at the first position where nothing is being collided with.
+    #[allow(dead_code)] // TODO: write tests and use this in the implementation of push_out()
+    EmptySpace,
+}
+
+impl StopAt {
+    fn reversed(self) -> bool {
+        match self {
+            StopAt::Anything => false,
+            StopAt::NotAlreadyColliding => false,
+            StopAt::EmptySpace => true,
+        }
+    }
+}
+
 /// Move `aab`'s origin along the line segment from `ray.origin` to `ray.origin + ray.direction`,
 /// and find the first point at which it collides with `space`'s collidable blocks.
 ///
@@ -161,7 +185,7 @@ pub(crate) fn collide_along_ray<Sp, CC>(
     ray: Ray,
     aab: Aab,
     mut collision_callback: CC,
-    ignore_already_colliding: bool,
+    stop_at: StopAt,
 ) -> Option<CollisionRayEnd>
 where
     Sp: CollisionSpace,
@@ -180,13 +204,13 @@ where
     // cases), but this would be an optimization which only affects the unusual case of
     // being out of bounds, so it's not worth doing unless we specifically expect to have
     // many bodies outside a space and occasionally inside.
-    for ray_step in aab_raycast(aab, ray, false) {
+    for ray_step in aab_raycast(aab, ray, stop_at.reversed()) {
         let offset_segment = nudge_on_ray(
             aab,
             ray.scale_direction(ray_step.t_distance()),
             ray_step.face().opposite(),
             1,
-            false,
+            stop_at.reversed(),
         );
         let step_aab = aab.translate(offset_segment.unit_endpoint().to_vec());
         if ray_step.t_distance() >= 1.0 {
@@ -199,6 +223,7 @@ where
         // TODO: Useful optimization for large AABs would be skipping all the interior
         // cubes that must have been detected in the _previous_ step.
         let mut something_hit = None;
+        let mut nothing_hit = true;
         for cube in step_aab.round_up_to_grid().interior_iter() {
             let cell = space.get_cell(cube);
             let full_cube_end = CollisionRayEnd {
@@ -220,7 +245,13 @@ where
                         aab,
                         ray,
                         cell,
-                        ignore_already_colliding && ray_step.face() != Face::Within,
+                        match (stop_at, ray_step.face()) {
+                            // If we are checking the initial position (face == Face::Within),
+                            // then don't recursively ignore initial collisions, but report them
+                            // so that we can add to already_collising.
+                            (StopAt::NotAlreadyColliding, Face::Within) => StopAt::Anything,
+                            (stop_at, _) => stop_at,
+                        },
                     ) {
                         found_end
                     } else {
@@ -230,7 +261,10 @@ where
                 }
             };
 
-            if ignore_already_colliding {
+            // If we didn't continue then we hit something.
+            nothing_hit = false;
+
+            if stop_at == StopAt::NotAlreadyColliding {
                 if found_end.contact.normal() == Face::Within {
                     // If we start intersecting a block, we are allowed to leave it; pretend
                     // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
@@ -256,8 +290,22 @@ where
         }
 
         // Now that we've found _all_ the contacts for this step, report the collision.
-        if let Some(end) = something_hit {
-            return Some(end);
+        match stop_at {
+            StopAt::Anything | StopAt::NotAlreadyColliding => {
+                if let Some(end) = something_hit {
+                    return Some(end);
+                }
+            }
+            StopAt::EmptySpace => {
+                if nothing_hit {
+                    return Some(CollisionRayEnd {
+                        t_distance: ray_step.t_distance(),
+                        // TODO: incorrect result; this should arguably refer to the surface we're
+                        // just *leaving*, and in any case should use recursion
+                        contact: Contact::Block(ray_step.cube_face()),
+                    });
+                }
+            }
         }
     }
 
@@ -280,7 +328,7 @@ where
         |contact| {
             points.push(contact.cube());
         },
-        false,
+        StopAt::Anything,
     );
     points.into_iter()
 }
@@ -308,7 +356,7 @@ pub(crate) trait CollisionSpace {
         aab: Aab,
         ray: Ray,
         cell: &Self::Cell,
-        ignore_already_colliding: bool,
+        stop_at: StopAt,
     ) -> Option<CollisionRayEnd>;
 }
 
@@ -336,7 +384,7 @@ impl CollisionSpace for Space {
         space_aab: Aab,
         space_ray: Ray,
         evaluated: &EvaluatedBlock,
-        ignore_already_colliding: bool,
+        stop_at: StopAt,
     ) -> Option<CollisionRayEnd> {
         match &evaluated.voxels {
             // Plain non-recursive collision
@@ -352,13 +400,9 @@ impl CollisionSpace for Space {
                 // Note: aab is not translated since it's relative to the ray anyway.
                 let voxel_aab = space_aab.scale(scale);
                 let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
-                if let Some(hit_voxel) = collide_along_ray(
-                    voxels,
-                    voxel_ray,
-                    voxel_aab,
-                    |_| {},
-                    ignore_already_colliding,
-                ) {
+                if let Some(hit_voxel) =
+                    collide_along_ray(voxels, voxel_ray, voxel_aab, |_| {}, stop_at)
+                {
                     let CollisionRayEnd {
                         t_distance: voxel_t_distance,
                         contact,
@@ -410,7 +454,7 @@ impl CollisionSpace for GridArray<Evoxel> {
         _aab: Aab,
         _local_ray: Ray,
         _cell: &Self::Cell,
-        _ignore_already_colliding: bool,
+        _stop_at: StopAt,
     ) -> Option<CollisionRayEnd> {
         Some(entry_end)
     }
@@ -603,7 +647,7 @@ mod tests {
         let aab = Aab::from_cube(GridPoint::new(0, 0, 0));
         let ray = Ray::new([0.5, initial_y, 0.], [0., -2., 0.]);
 
-        let result = collide_along_ray(&space, ray, aab, |_| {}, true);
+        let result = collide_along_ray(&space, ray, aab, |_| {}, StopAt::NotAlreadyColliding);
         assert_eq!(result, expected_end);
     }
 
@@ -622,7 +666,13 @@ mod tests {
         let ray = Ray::new([0.5, 0.0, 0.5], [1., 0., 0.]);
 
         let mut contacts = Vec::new();
-        let result = collide_along_ray(&space, ray, aab, |c| contacts.push(c), true);
+        let result = collide_along_ray(
+            &space,
+            ray,
+            aab,
+            |c| contacts.push(c),
+            StopAt::NotAlreadyColliding,
+        );
         assert_eq!(
             (result, contacts),
             (

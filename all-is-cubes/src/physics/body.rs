@@ -11,6 +11,7 @@ use super::collision::{
 use crate::apps::Tick;
 use crate::block::BlockCollision;
 use crate::math::{Aab, Face, FreeCoordinate, Geometry as _};
+use crate::physics::StopAt;
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::transaction::{
@@ -235,7 +236,7 @@ impl Body {
             movement_ignoring_collision,
             self.collision_box,
             collision_callback,
-            true,
+            StopAt::NotAlreadyColliding,
         );
 
         if let Some(collision) = collision {
