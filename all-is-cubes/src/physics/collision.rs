@@ -230,28 +230,28 @@ where
                 }
             };
 
-            if ignore_already_colliding && found_end.contact.normal() == Face::Within {
-                // If we start intersecting a block, we are allowed to leave it; pretend
-                // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
-                // maybe there's no clear direction.)
-                already_colliding.insert(found_end.contact);
-                collision_callback(found_end.contact);
-                continue;
+            if ignore_already_colliding {
+                if found_end.contact.normal() == Face::Within {
+                    // If we start intersecting a block, we are allowed to leave it; pretend
+                    // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
+                    // maybe there's no clear direction.)
+                    already_colliding.insert(found_end.contact);
+                    collision_callback(found_end.contact);
+                    continue;
+                } else if already_colliding.contains(&found_end.contact.without_normal()) {
+                    continue;
+                }
             }
 
-            if !ignore_already_colliding
-                || !already_colliding.contains(&found_end.contact.without_normal())
-            {
-                // TODO: We need to buffer contacts instead of calling this callback, in case something else is closer
-                collision_callback(found_end.contact);
+            // TODO: We need to buffer contacts instead of calling this callback, in case something else is closer
+            collision_callback(found_end.contact);
 
-                let nearest_so_far = match something_hit {
-                    Some(CollisionRayEnd { t_distance, .. }) => t_distance,
-                    None => FreeCoordinate::INFINITY,
-                };
-                if found_end.t_distance < nearest_so_far {
-                    something_hit = Some(found_end);
-                }
+            let nearest_so_far = match something_hit {
+                Some(CollisionRayEnd { t_distance, .. }) => t_distance,
+                None => FreeCoordinate::INFINITY,
+            };
+            if found_end.t_distance < nearest_so_far {
+                something_hit = Some(found_end);
             }
         }
 
