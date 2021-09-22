@@ -21,9 +21,9 @@ fuzz_target!(|input: FuzzUniverseTemplate| {
     // TODO: add some of all kinds of universe objects
     let space = app.universe_mut().insert_anonymous(input.space);
     // TODO: arbitrary-ize character except for the ref
-    let character = app
+    let _character = app
         .universe_mut()
-        .insert_anonymous(Character::spawn_default(space.clone()));
+        .insert_anonymous(Character::spawn_default(space));
 
     // TODO: need to be able to insert a character into the app state for testing the input interactions
 
