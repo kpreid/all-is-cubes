@@ -4,6 +4,7 @@
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
 use std::collections::HashSet;
+use std::fmt;
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
@@ -12,13 +13,13 @@ use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution};
 use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry, GridCoordinate, GridPoint, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{GridArray, Space};
-use crate::util::MapExtend;
+use crate::util::{ConciseDebug, CustomFormat, MapExtend};
 
 /// An individual collision contact; something in a [`Space`] that a moving [`Aab`]
 /// collided with.
 ///
 /// This type is designed to be comparable/hashable to deduplicate contacts.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
 pub enum Contact {
     /// Contact with a fully solid block; the [`CubeFace`] specifies the block position
@@ -78,6 +79,28 @@ impl Contact {
             } => *face = Face::Within,
         }
         result
+    }
+}
+
+impl fmt::Debug for Contact {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Block(CubeFace { cube, face }) => {
+                write!(f, "{:?} of {}", face, cube.custom_format(ConciseDebug))
+            }
+            Self::Voxel {
+                cube,
+                resolution,
+                voxel: CubeFace { cube: voxel, face },
+            } => write!(
+                f,
+                "{:?} of {} {}/{}",
+                face,
+                cube.custom_format(ConciseDebug),
+                voxel.custom_format(ConciseDebug),
+                resolution
+            ),
+        }
     }
 }
 
