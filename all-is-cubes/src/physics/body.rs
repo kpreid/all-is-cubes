@@ -10,13 +10,13 @@ use super::collision::{
 };
 use crate::block::BlockCollision;
 use crate::math::{Aab, Face, FreeCoordinate, Geometry as _};
-use crate::physics::StopAt;
+use crate::physics::{StopAt, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;
+use crate::time::Tick;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
-use crate::time::Tick;
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
@@ -326,41 +326,59 @@ impl Body {
         space: &Space,
         direction: Vector3<FreeCoordinate>,
     ) -> Option<(Point3<FreeCoordinate>, NotNan<FreeCoordinate>)> {
-        let ray = Ray::new(self.position, direction);
-        // TODO: upper bound on distance to try
-        'raycast: for ray_step in aab_raycast(self.collision_box, ray, true) {
-            let adjusted_segment = nudge_on_ray(
-                self.collision_box,
-                ray.scale_direction(ray_step.t_distance()),
-                ray_step.face(),
-                1,
-                true,
-            );
-            let step_aab = self
-                .collision_box
-                .translate(adjusted_segment.unit_endpoint().to_vec());
-            for cube in step_aab.round_up_to_grid().interior_iter() {
-                // TODO: refactor to combine this with other collision attribute tests
-                match space.get_evaluated(cube).attributes.collision {
-                    BlockCollision::Hard => {
-                        // Not a clear space
-                        continue 'raycast;
-                    }
-                    BlockCollision::None => {}
-                    BlockCollision::Recur => {
-                        // TODO: Either check collision, or continue
-                        //continue 'raycast;
+        if false {
+            // TODO: This attempted implementation does not work, causing lots of falling into
+            // blocks. But if we can fix the bugs, it will make push-out actually work with
+            // recursive blocks. (It's why I added StopAt::EmptySpace.)
+
+            let direction = direction.normalize(); // TODO: set this to a max distance
+            let ray = Ray::new(self.position, direction);
+
+            let end =
+                collide_along_ray(space, ray, self.collision_box, |_| {}, StopAt::EmptySpace)?;
+
+            let nudged_distance = end.t_distance + POSITION_EPSILON;
+            Some((
+                ray.scale_direction(nudged_distance).unit_endpoint(),
+                NotNan::new(nudged_distance).ok()?,
+            ))
+        } else {
+            let ray = Ray::new(self.position, direction);
+            // TODO: upper bound on distance to try
+            'raycast: for ray_step in aab_raycast(self.collision_box, ray, true) {
+                let adjusted_segment = nudge_on_ray(
+                    self.collision_box,
+                    ray.scale_direction(ray_step.t_distance()),
+                    ray_step.face(),
+                    1,
+                    true,
+                );
+                let step_aab = self
+                    .collision_box
+                    .translate(adjusted_segment.unit_endpoint().to_vec());
+                for cube in step_aab.round_up_to_grid().interior_iter() {
+                    // TODO: refactor to combine this with other collision attribute tests
+                    match space.get_evaluated(cube).attributes.collision {
+                        BlockCollision::Hard => {
+                            // Not a clear space
+                            continue 'raycast;
+                        }
+                        BlockCollision::None => {}
+                        BlockCollision::Recur => {
+                            // TODO: Either check collision, or continue
+                            //continue 'raycast;
+                        }
                     }
                 }
+                // No collisions, so we can use this.
+                return Some((
+                    adjusted_segment.unit_endpoint(),
+                    NotNan::new(ray_step.t_distance() * direction.magnitude()).ok()?,
+                ));
             }
-            // No collisions, so we can use this.
-            return Some((
-                adjusted_segment.unit_endpoint(),
-                NotNan::new(ray_step.t_distance() * direction.magnitude()).ok()?,
-            ));
-        }
 
-        None
+            None
+        }
     }
 
     /// Returns the body's collision box in world coordinates
