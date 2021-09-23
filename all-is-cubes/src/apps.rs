@@ -67,8 +67,11 @@ impl AllIsCubesAppState {
         let paused = ListenableCell::new(false);
         let game_character = game_universe.get_default_character();
 
+        let mut ui = Vui::new(&input_processor, paused.as_source());
+        ui.set_character(game_character.clone());
+
         Self {
-            ui: Vui::new(&input_processor, paused.as_source(), game_character.clone()),
+            ui,
 
             frame_clock: FrameClock::new(),
             input_processor,

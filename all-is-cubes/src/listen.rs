@@ -346,6 +346,10 @@ impl DirtyFlag {
     pub fn get_and_clear(&self) -> bool {
         self.flag.swap(false, Ordering::Acquire)
     }
+
+    pub fn set(&self) {
+        self.flag.store(true, Ordering::Relaxed);
+    }
 }
 impl<M> Listener<M> for DirtyFlagListener {
     fn receive(&self, _message: M) {

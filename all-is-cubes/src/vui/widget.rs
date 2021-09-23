@@ -22,7 +22,7 @@ use crate::character::{Character, CharacterChange};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::Slot;
-use crate::listen::{DirtyFlag, FnListener, ListenableSource};
+use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::raycast::Face;
 use crate::space::{Grid, Space, SpacePhysics};
@@ -55,6 +55,12 @@ pub(crate) trait WidgetController: Debug {
     /// TODO: Replace direct mutations with returning a UniverseTransaction
     /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
     fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Result<(), Box<dyn Error>>;
+
+    /// Update which character this widget displays the state of.
+    ///
+    /// TODO: Replace this with maybe a ListenableSource<URef<Character>> or some other data binding
+    /// strategy that doesn't hardwire the Character type in quite this way
+    fn set_character(&mut self, _character: Option<&URef<Character>>) {}
 }
 
 /// Shows/hides the crosshair depending on mouselook mode.
@@ -103,6 +109,7 @@ pub(crate) struct ToolbarController {
     todo: DirtyFlag,
     /// TODO: Generalize to noncharacters
     inventory_source: Option<URef<Character>>,
+    inventory_gate: Gate,
     first_slot_position: GridPoint,
     slot_count: usize,
     /// Space for drawing per-slot text labels
@@ -122,8 +129,9 @@ impl ToolbarController {
 
         let todo = DirtyFlag::new(true);
 
+        let (gate, listener) = todo.listener().gate();
         if let Some(character) = &inventory_source {
-            character.borrow().listen(todo.listener());
+            character.borrow().listen(listener);
         }
 
         let slot_text_resolution: Resolution = 32;
@@ -144,6 +152,7 @@ impl ToolbarController {
         Self {
             todo,
             inventory_source,
+            inventory_gate: gate,
             first_slot_position: layout.first_tool_icon_position(),
             slot_count,
             slot_text_space,
@@ -296,6 +305,16 @@ impl WidgetController for ToolbarController {
         }
         Ok(())
     }
+
+    fn set_character(&mut self, character: Option<&URef<Character>>) {
+        let (gate, listener) = self.todo.listener().gate();
+        if let Some(character) = character {
+            character.borrow().listen(listener);
+        }
+        self.inventory_source = character.cloned();
+        self.inventory_gate = gate;
+        self.todo.set();
+    }
 }
 
 static EMPTY_ARC_STR: Lazy<Arc<str>> = Lazy::new(|| "".into());
@@ -304,6 +323,9 @@ static EMPTY_ARC_STR: Lazy<Arc<str>> = Lazy::new(|| "".into());
 pub(crate) struct TooltipState {
     /// Character we're reading inventory state from
     character: Option<URef<Character>>,
+    /// Listener gate to stop the listener if we change characters
+    character_gate: Gate,
+
     /// Whether the tool we should be displaying might have changed.
     dirty_inventory: bool,
     /// Whether the text has changed, possibly from a non-tool source.
@@ -317,21 +339,26 @@ pub(crate) struct TooltipState {
 }
 
 impl TooltipState {
-    pub(crate) fn bind_to_character(this: &Arc<Mutex<Self>>, character: URef<Character>) {
-        character
-            .borrow()
-            .listen(FnListener::new(
-                this,
-                move |this: &Mutex<Self>, change| match change {
-                    // TODO: Don't dirty if an unrelated inventory slot changed
-                    CharacterChange::Inventory(_) | CharacterChange::Selections => {
-                        if let Ok(mut this) = this.lock() {
-                            this.dirty_inventory = true;
-                        }
+    pub(crate) fn bind_to_character(this_ref: &Arc<Mutex<Self>>, character: URef<Character>) {
+        let (gate, listener) =
+            FnListener::new(this_ref, move |this: &Mutex<Self>, change| match change {
+                // TODO: Don't dirty if an unrelated inventory slot changed
+                CharacterChange::Inventory(_) | CharacterChange::Selections => {
+                    if let Ok(mut this) = this.lock() {
+                        this.dirty_inventory = true;
                     }
-                },
-            ));
-        this.lock().unwrap().character = Some(character);
+                }
+            })
+            .gate();
+
+        // TODO: Think about what state results if either of the locks/borrows fails
+        character.borrow().listen(listener);
+        {
+            let mut this = this_ref.lock().unwrap();
+            this.character = Some(character);
+            this.character_gate = gate;
+            this.dirty_inventory = true;
+        }
     }
 
     pub fn set_text(&mut self, text: Arc<str>) {
@@ -394,6 +421,7 @@ impl Default for TooltipState {
     fn default() -> Self {
         Self {
             character: None,
+            character_gate: Gate::default(),
             dirty_inventory: false,
             dirty_text: false,
             source_slot: usize::MAX,

@@ -63,11 +63,7 @@ impl Vui {
     /// `character` is the `Character` whose inventory is displayed. TODO: Allow for character switching
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
-    pub fn new(
-        input_processor: &InputProcessor,
-        paused: ListenableSource<bool>,
-        character: Option<URef<Character>>,
-    ) -> Self {
+    pub fn new(input_processor: &InputProcessor, paused: ListenableSource<bool>) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = HudBlocks::new(&mut universe, 16);
         let hud_layout = HudLayout::default();
@@ -75,14 +71,11 @@ impl Vui {
 
         let todo = Rc::new(RefCell::new(VuiTodo::default()));
         let tooltip_state = Arc::default();
-        if let Some(character_ref) = &character {
-            TooltipState::bind_to_character(&tooltip_state, character_ref.clone());
-        }
 
         // TODO: HudLayout should take care of this maybe
         let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
             Box::new(ToolbarController::new(
-                character,
+                None, // TODO: remove or bind
                 &hud_layout,
                 &mut universe,
             )),
@@ -134,6 +127,19 @@ impl Vui {
             .unwrap();
 
         new_self
+    }
+
+    /// Change which character's inventory and other state are displayed.
+    pub fn set_character(&mut self, c: Option<URef<Character>>) {
+        if let Some(character_ref) = &c {
+            TooltipState::bind_to_character(&self.tooltip_state, character_ref.clone());
+        }
+
+        // TODO: This a quick and dirty solution because widgets shouldn't necessarily know the _character_, we need a better general data-binding strategy
+        self.for_each_widget(|wc, _sv| {
+            wc.set_character(c.as_ref());
+            Ok(())
+        });
     }
 
     // TODO: It'd be more encapsulating if we could provide a _read-only_ reference...
@@ -269,11 +275,7 @@ mod tests {
     use super::*;
 
     fn new_vui_for_test() -> Vui {
-        Vui::new(
-            &InputProcessor::new(),
-            ListenableSource::constant(false),
-            None,
-        )
+        Vui::new(&InputProcessor::new(), ListenableSource::constant(false))
     }
 
     #[test]
