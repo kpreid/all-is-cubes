@@ -5,7 +5,6 @@ use std::time::Instant;
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::character::Character;
-use all_is_cubes::content::UniverseTemplate;
 use all_is_cubes::space::Space;
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
@@ -16,7 +15,7 @@ struct FuzzUniverseTemplate {
 }
 
 fuzz_target!(|input: FuzzUniverseTemplate| {
-    let mut app = AllIsCubesAppState::new(UniverseTemplate::Blank);
+    let mut app = AllIsCubesAppState::new();
 
     // TODO: add some of all kinds of universe objects
     let space = app.universe_mut().insert_anonymous(input.space);

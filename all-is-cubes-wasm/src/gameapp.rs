@@ -60,7 +60,8 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
             .as_bytes(),
     );
 
-    let app = AllIsCubesAppState::new(template);
+    let mut app = AllIsCubesAppState::new();
+    app.set_universe(template.build().expect("universe template error"));
     app.graphics_options_mut().set(graphics_options);
 
     let surface = WebSysWebGL2Surface::from_canvas_with_params(

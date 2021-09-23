@@ -154,7 +154,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let start_time = Instant::now();
-    let mut app = AllIsCubesAppState::new(universe_template.clone());
+    let mut app = AllIsCubesAppState::new();
+    app.set_universe(universe_template.clone().build()?);
     app.graphics_options_mut().set(graphics_options);
     let app_done_time = Instant::now();
     log::debug!(

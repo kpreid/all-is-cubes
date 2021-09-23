@@ -7,7 +7,6 @@ use std::fmt::{self, Display};
 
 use crate::camera::{Camera, GraphicsOptions};
 use crate::character::{cursor_raycast, Character, Cursor};
-use crate::content::UniverseTemplate;
 use crate::inv::{Tool, ToolError, ToolInput};
 use crate::listen::{ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
@@ -57,26 +56,19 @@ pub struct AllIsCubesAppState {
 impl AllIsCubesAppState {
     /// Construct a new `AllIsCubesAppState` with a new [`Universe`] from the given
     /// template.
-    pub fn new(template: UniverseTemplate) -> Self {
-        let game_universe = template
-            .build()
-            // TODO: better error handling
-            .expect("Failure while constructing template");
-
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        let game_universe = Universe::new();
         let input_processor = InputProcessor::new();
         let paused = ListenableCell::new(false);
-        let game_character = game_universe.get_default_character();
-
-        let mut ui = Vui::new(&input_processor, paused.as_source());
-        ui.set_character(game_character.clone());
 
         Self {
-            ui,
+            ui: Vui::new(&input_processor, paused.as_source()),
 
             frame_clock: FrameClock::new(),
             input_processor,
             graphics_options: ListenableCell::new(GraphicsOptions::default()),
-            game_character,
+            game_character: None,
             game_universe,
             paused,
             cursor_result: None,
@@ -89,7 +81,19 @@ impl AllIsCubesAppState {
         self.game_character.as_ref()
     }
 
+    /// Replace the game universe, such as on initial startup or because the player
+    /// chose to load a new one.
+    pub fn set_universe(&mut self, u: Universe) {
+        self.game_universe = u;
+        let c = self.game_universe.get_default_character();
+        self.game_character = c.clone();
+        self.ui.set_character(c);
+    }
+
     /// Returns a mutable reference to the [`Universe`].
+    ///
+    /// Note: Replacing the universe will not update the UI and character state.
+    /// Use [`Self::set_universe`] instead.
     pub fn universe_mut(&mut self) -> &mut Universe {
         &mut self.game_universe
     }
