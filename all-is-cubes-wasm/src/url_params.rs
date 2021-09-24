@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::content::UniverseTemplate;
+use all_is_cubes_content::UniverseTemplate;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct OptionsInUrl {

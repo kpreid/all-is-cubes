@@ -2,15 +2,16 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use noise::Seedable as _;
-use ordered_float::NotNan;
 
-use crate::block::{Block, BlockCollision, Resolution, AIR};
-use crate::content::blocks::scale_color;
-use crate::content::palette;
-use crate::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, Rgb};
-use crate::space::{Grid, SetCubeError, Space};
-use crate::universe::Universe;
+use all_is_cubes::block::{Block, BlockCollision, Resolution, AIR};
+use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
+use all_is_cubes::math::{
+    FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, NotNan, Rgb,
+};
+use all_is_cubes::space::{Grid, SetCubeError, Space};
+use all_is_cubes::universe::Universe;
+
+use crate::{blocks::scale_color, palette};
 
 /// Names for blocks assigned specific roles in generating outdoor landscapes.
 ///
@@ -179,8 +180,8 @@ pub fn install_landscape_blocks(
 ///
 /// ```
 /// use all_is_cubes::space::Space;
-/// use all_is_cubes::content::{LandscapeBlocks, wavy_landscape};
 /// use all_is_cubes::linking::BlockProvider;
+/// use all_is_cubes_content::{LandscapeBlocks, wavy_landscape};
 ///
 /// let mut space = Space::empty_positive(10, 10, 10);
 /// wavy_landscape(

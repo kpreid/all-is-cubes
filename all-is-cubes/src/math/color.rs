@@ -10,7 +10,7 @@ use std::ops::{Add, AddAssign, Mul, Sub};
 use cgmath::{ElementWise as _, Vector3, Vector4};
 pub use ordered_float::{FloatIsNan, NotNan};
 
-use crate::math::notnan;
+use crate::notnan;
 
 /// Allows writing a constant [`Rgb`] color value, provided that its components are float
 /// literals.
@@ -20,9 +20,9 @@ use crate::math::notnan;
 macro_rules! rgb_const {
     ($r:literal, $g:literal, $b:literal) => {
         $crate::math::Rgb::new_nn(
-            $crate::math::notnan!($r),
-            $crate::math::notnan!($g),
-            $crate::math::notnan!($b),
+            $crate::notnan!($r),
+            $crate::notnan!($g),
+            $crate::notnan!($b),
         )
     };
 }
@@ -33,10 +33,10 @@ macro_rules! rgb_const {
 macro_rules! rgba_const {
     ($r:literal, $g:literal, $b:literal, $a:literal) => {
         $crate::math::Rgba::new_nn(
-            $crate::math::notnan!($r),
-            $crate::math::notnan!($g),
-            $crate::math::notnan!($b),
-            $crate::math::notnan!($a),
+            $crate::notnan!($r),
+            $crate::notnan!($g),
+            $crate::notnan!($b),
+            $crate::notnan!($a),
         )
     };
 }

@@ -26,8 +26,8 @@ use strum::IntoEnumIterator;
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::content::UniverseTemplate;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
+use all_is_cubes_content::UniverseTemplate;
 
 use crate::record::{RecordAnimationOptions, RecordOptions};
 

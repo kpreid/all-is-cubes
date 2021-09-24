@@ -13,6 +13,7 @@ Project organization
 This repository is divided into three Rust packages, split roughly according to different sets of dependencies:
 
 * `all-is-cubes/` contains all of the fundamental data types and algorithms. It is intended to be usable as a library but also contains the non-platform-specific top-level application logic.
+* `all-is-cubes-content/` contains “game content” — procedural generation and demos — that does not need to be part of the core library but is used by all of the below binaries.
 * `all-is-cubes-desktop/` is a standalone game app which will use [GLFW](https://www.glfw.org/) for platform windowing & graphics, or ASCII-art raytracing in the terminal.
 * `all-is-cubes-wasm/` is the game app code for the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`. In order to use this, you must use either webpack-dev-server or the web server described next.
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains a preconfigured HTTP static file server.

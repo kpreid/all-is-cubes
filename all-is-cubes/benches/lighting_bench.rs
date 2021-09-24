@@ -3,27 +3,29 @@
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
-use all_is_cubes::content::UniverseTemplate;
-use all_is_cubes::space::Space;
-use all_is_cubes::universe::{URef, UniverseIndex as _};
+use all_is_cubes::content::testing::lighting_bench_space;
+use all_is_cubes::universe::Universe;
 
-pub fn template_lighting_bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("light-space");
+pub fn evaluate_light_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("evaluate");
     group.sample_size(10);
-    for template in [UniverseTemplate::LightingBench] {
-        group.bench_function(format!("{:?}", template), |b| {
-            b.iter_batched(
-                || template.clone().build().unwrap(),
-                |universe| {
-                    let space: URef<Space> = universe.get(&"space".into()).unwrap();
-                    space.try_modify(|s| s.evaluate_light(1, |_| {})).unwrap();
-                },
-                BatchSize::LargeInput,
-            )
-        });
-    }
+
+    group.bench_function("lighting_bench_space", |b| {
+        b.iter_batched(
+            || {
+                let mut u = Universe::new();
+                let space = lighting_bench_space(&mut u).unwrap();
+                (u, space)
+            },
+            |(_u, mut space)| {
+                space.evaluate_light(1, |_| {});
+            },
+            BatchSize::LargeInput,
+        )
+    });
+
     group.finish();
 }
 
-criterion_group!(benches, template_lighting_bench);
+criterion_group!(benches, evaluate_light_bench);
 criterion_main!(benches);

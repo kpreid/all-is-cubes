@@ -5,16 +5,17 @@
 
 use std::fmt;
 
+use all_is_cubes::rgba_const;
 use instant::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
-use crate::apps::Tick;
-use crate::behavior::{Behavior, BehaviorContext};
-use crate::block::{Block, AIR};
-use crate::math::{GridPoint, GridVector};
-use crate::space::{Grid, GridArray, Space, SpaceTransaction};
-use crate::transaction::Merge;
+use all_is_cubes::apps::Tick;
+use all_is_cubes::behavior::{Behavior, BehaviorContext};
+use all_is_cubes::block::{Block, AIR};
+use all_is_cubes::math::{GridPoint, GridVector};
+use all_is_cubes::space::{Grid, GridArray, Space, SpaceTransaction};
+use all_is_cubes::transaction::{Merge, UniverseTransaction};
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.
@@ -62,13 +63,9 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
 impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> Behavior<Space>
     for AnimatedVoxels<F>
 {
-    fn step(
-        &self,
-        context: &BehaviorContext<'_, Space>,
-        tick: crate::apps::Tick,
-    ) -> crate::transaction::UniverseTransaction {
+    fn step(&self, context: &BehaviorContext<'_, Space>, tick: Tick) -> UniverseTransaction {
         let mut mut_self: AnimatedVoxels<F> = self.clone();
-        mut_self.accumulator += tick.delta_t;
+        mut_self.accumulator += tick.delta_t();
         if mut_self.accumulator >= mut_self.frame_period {
             mut_self.accumulator -= mut_self.frame_period;
             mut_self.frame = mut_self.frame.wrapping_add(1);
@@ -132,7 +129,7 @@ impl Fire {
 
     fn tick_state(&mut self, tick: Tick) -> bool {
         const PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 32);
-        self.accumulator += tick.delta_t;
+        self.accumulator += tick.delta_t();
         if self.accumulator >= PERIOD {
             self.accumulator -= PERIOD;
         } else {
@@ -178,11 +175,7 @@ impl Fire {
 }
 
 impl Behavior<Space> for Fire {
-    fn step(
-        &self,
-        context: &BehaviorContext<'_, Space>,
-        tick: Tick,
-    ) -> crate::transaction::UniverseTransaction {
+    fn step(&self, context: &BehaviorContext<'_, Space>, tick: Tick) -> UniverseTransaction {
         let mut mut_self = self.clone();
         if mut_self.tick_state(tick) {
             let paint_txn = mut_self.paint();

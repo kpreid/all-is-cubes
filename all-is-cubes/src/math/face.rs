@@ -333,7 +333,8 @@ impl<V> FaceMap<V> {
     /// equal, and whose [`Face::Within`] value is the default.
     // TODO: Evaluate whether this is a good API.
     #[inline]
-    pub(crate) fn symmetric(values: impl Into<Vector3<V>>) -> Self
+    #[doc(hidden)] // used by all-is-cubes-content
+    pub fn symmetric(values: impl Into<Vector3<V>>) -> Self
     where
         V: Default + Clone,
     {

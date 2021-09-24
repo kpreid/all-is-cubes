@@ -4,35 +4,37 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
-use cgmath::{EuclideanSpace as _, One as _, Transform as _, Vector3};
-use embedded_graphics::geometry::Point;
-use embedded_graphics::mono_font::iso_8859_1::FONT_9X18_BOLD;
-use embedded_graphics::mono_font::MonoTextStyle;
-use embedded_graphics::prelude::Dimensions;
-use embedded_graphics::prelude::Transform;
-use embedded_graphics::text::Baseline;
-use embedded_graphics::text::Text;
 use instant::Instant;
 use noise::Seedable as _;
-use ordered_float::NotNan;
 
-use crate::block::Resolution;
-use crate::block::{BlockAttributes, BlockCollision, AIR};
-use crate::character::Spawn;
-use crate::content::palette;
-use crate::content::{logo_text, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS};
-use crate::drawing::{draw_to_blocks, VoxelBrush};
-use crate::inv::Slot;
-use crate::inv::Tool;
-use crate::linking::{BlockProvider, InGenError};
-use crate::math::{
+use all_is_cubes::cgmath::{EuclideanSpace as _, One as _, Transform as _, Vector3};
+use all_is_cubes::drawing::embedded_graphics::{
+    geometry::Point,
+    mono_font::{iso_8859_1::FONT_9X18_BOLD, MonoTextStyle},
+    prelude::{Dimensions, Transform},
+    text::{Baseline, Text},
+};
+use all_is_cubes::math::NotNan;
+
+use all_is_cubes::block::{Block, Resolution};
+use all_is_cubes::block::{BlockAttributes, BlockCollision, AIR};
+use all_is_cubes::character::Spawn;
+use all_is_cubes::content::palette;
+use all_is_cubes::drawing::{draw_to_blocks, VoxelBrush};
+use all_is_cubes::inv::Slot;
+use all_is_cubes::inv::Tool;
+use all_is_cubes::linking::{BlockProvider, InGenError};
+use all_is_cubes::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
     NoiseFnExt as _, Rgb,
 };
-use crate::raycast::Raycaster;
-use crate::space::LightPhysics;
-use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
-use crate::universe::Universe;
+use all_is_cubes::raycast::Raycaster;
+use all_is_cubes::space::{Grid, LightPhysics, SetCubeError, Space, SpacePhysics};
+use all_is_cubes::universe::Universe;
+
+use crate::{
+    logo_text, logo_text_extent, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
+};
 
 pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     let start_city_time = Instant::now();
@@ -324,10 +326,10 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         // A visual test of logo_text_extent().
         // TODO: Transplant this to an automated test.
         space.fill_uniform(
-            crate::content::logo_text_extent()
+            logo_text_extent()
                 .transform(GridMatrix::from_translation([0, 12, -radius_xz]))
                 .unwrap(),
-            crate::block::Block::from(Rgb::ONE),
+            Block::from(Rgb::ONE),
         )?;
     }
     logo_text(
@@ -336,9 +338,10 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
     )?;
 
     // Enable light computation
-    space.set_physics(SpacePhysics {
-        light: SpacePhysics::default().light,
-        ..space.physics().clone()
+    space.set_physics({
+        let mut p = space.physics().clone();
+        p.light = SpacePhysics::default().light;
+        p
     });
 
     Ok(space)

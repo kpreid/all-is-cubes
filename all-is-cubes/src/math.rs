@@ -36,6 +36,8 @@ pub type FreeCoordinate = f64;
 /// Allows writing a [`NotNan`] value as a constant expression.
 ///
 /// TODO: If this becomes public, write doctests confirming that it can't compile a NaN
+#[doc(hidden)]
+#[macro_export] // used by all-is-cubes-content
 macro_rules! notnan {
     ($value:literal) => {
         // Safety: Only literal values are allowed, which will either be a non-NaN
@@ -43,7 +45,6 @@ macro_rules! notnan {
         unsafe { $crate::math::NotNan::new_unchecked($value) }
     };
 }
-pub(crate) use notnan;
 
 #[cfg(feature = "arbitrary")]
 pub(crate) fn arbitrary_notnan<

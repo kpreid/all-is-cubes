@@ -4,21 +4,26 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-use cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
-use embedded_graphics::prelude::Point;
-use embedded_graphics::primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable};
+use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
+use all_is_cubes::drawing::embedded_graphics::{
+    prelude::Point,
+    primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
+};
+use all_is_cubes::rgb_const;
 use noise::Seedable as _;
 
-use crate::block::{Block, BlockCollision, AIR};
-use crate::content::landscape::install_landscape_blocks;
-use crate::content::palette;
-use crate::linking::{BlockModule, BlockProvider, GenError, InGenError};
-use crate::math::{
-    int_magnitude_squared, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
-    NoiseFnExt as _, NotNan, Rgb, Rgba,
+use all_is_cubes::block::{Block, BlockCollision, AIR};
+use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
+use all_is_cubes::math::{
+    GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector, NoiseFnExt as _, NotNan, Rgb,
+    Rgba,
 };
-use crate::space::{Grid, Space};
-use crate::universe::Universe;
+use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::universe::Universe;
+
+use crate::int_magnitude_squared;
+use crate::landscape::install_landscape_blocks;
+use crate::palette;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "kebab-case")]

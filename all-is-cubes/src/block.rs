@@ -399,7 +399,7 @@ impl From<Rgba> for Cow<'_, Block> {
 /// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
 /// blocks.
 #[derive(Clone, Eq, Hash, PartialEq)]
-#[non_exhaustive]
+// #[non_exhaustive] // TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via BlockBuilder.
 pub struct BlockAttributes {
     /// The name that should be displayed to players.
     ///

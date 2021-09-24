@@ -2,36 +2,44 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 //! Miscellanous demonstrations of capability and manual test-cases.
-//! The exhibits defined in this file are combined into [`crate::content::demo_city`].
+//! The exhibits defined in this file are combined into [`crate::demo_city`].
 
 use std::convert::TryFrom;
 use std::f64::consts::PI;
 
-use cgmath::{
+use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
     Vector2, Vector3,
 };
-use embedded_graphics::geometry::Point;
-use embedded_graphics::mono_font::iso_8859_1::{FONT_6X10, FONT_8X13_BOLD};
-use embedded_graphics::mono_font::MonoTextStyle;
-use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::prelude::Size;
-use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
-use embedded_graphics::text::{Baseline, Text};
-use ordered_float::NotNan;
+use all_is_cubes::drawing::embedded_graphics::{
+    geometry::Point,
+    mono_font::{
+        iso_8859_1::{FONT_6X10, FONT_8X13_BOLD},
+        MonoTextStyle,
+    },
+    pixelcolor::Rgb888,
+    prelude::Size,
+    primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
+    text::{Baseline, Text},
+};
 
-use crate::block::{
+use all_is_cubes::block::{
     space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Resolution, AIR,
 };
-use crate::content::{four_walls, make_slab, palette, AnimatedVoxels, DemoBlocks, Exhibit, Fire};
-use crate::drawing::draw_to_blocks;
-use crate::linking::{BlockProvider, InGenError};
-use crate::math::{
+use all_is_cubes::drawing::draw_to_blocks;
+use all_is_cubes::linking::{BlockProvider, InGenError};
+use all_is_cubes::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
-    Rgb, Rgba,
+    NotNan, Rgb, Rgba,
 };
-use crate::space::{Grid, Space, SpacePhysics};
-use crate::universe::Universe;
+use all_is_cubes::space::{Grid, Space, SpacePhysics};
+use all_is_cubes::universe::Universe;
+use all_is_cubes::{rgb_const, rgba_const};
+
+use crate::{
+    four_walls, make_slab, make_some_blocks, make_some_voxel_blocks, palette, AnimatedVoxels,
+    DemoBlocks, Exhibit, Fire,
+};
 
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     KNOT,
@@ -339,7 +347,7 @@ const ROTATIONS: Exhibit = Exhibit {
         let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
         let mut space = Space::empty(Grid::new([-2, 0, -2], [5, 5, 5]));
 
-        let [_, central_block] = crate::content::make_some_voxel_blocks(universe);
+        let [_, central_block] = make_some_voxel_blocks(universe);
         let pointing_block = &demo_blocks[DemoBlocks::Arrow];
 
         let center = GridPoint::new(0, 0, 0);
@@ -607,7 +615,7 @@ const COLOR_LIGHTS: Exhibit = Exhibit {
 const CHUNK_CHART: Exhibit = Exhibit {
     name: "Visible chunk chart",
     factory: |_this, _universe| {
-        use crate::chunking::ChunkChart;
+        use all_is_cubes::chunking::ChunkChart;
 
         // TODO: Show more than one size.
         let chart = ChunkChart::<16>::new(16. * 4.99);
@@ -618,7 +626,6 @@ const CHUNK_CHART: Exhibit = Exhibit {
 const MAKE_SOME_BLOCKS: Exhibit = Exhibit {
     name: "make_some_blocks",
     factory: |_this, mut universe| {
-        use crate::content::{make_some_blocks, make_some_voxel_blocks};
         const ROWS: GridCoordinate = 5;
         fn make_both_blocks<const N: usize>(universe: &mut Universe) -> (Vec<Block>, Vec<Block>) {
             (

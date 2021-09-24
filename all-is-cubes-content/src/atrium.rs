@@ -3,19 +3,21 @@
 
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
-use cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
+use all_is_cubes::rgba_const;
 use noise::Seedable;
 
-use crate::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
-use crate::content::{four_walls, palette, scale_color, Fire};
-use crate::linking::{BlockModule, BlockProvider, InGenError};
-use crate::math::{
-    FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
+use all_is_cubes::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
+use all_is_cubes::content::palette;
+use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
+use all_is_cubes::math::{
+    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
     NoiseFnExt as _, Rgb,
 };
-use crate::raycast::Face;
-use crate::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
-use crate::universe::Universe;
+use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
+use all_is_cubes::universe::Universe;
+
+use crate::{four_walls, scale_color, Fire};
 
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
 const WALL: GridCoordinate = 1;

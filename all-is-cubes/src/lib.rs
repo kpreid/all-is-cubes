@@ -19,10 +19,6 @@
     allow(clippy::redundant_clone), // Tests prefer regularity over efficiency
 )]
 
-// TODO: consider exporting individual symbols instead of the modules, because
-// the modules are mostly per-data-type rather than being convenient usage bundles.
-// Or have modules reexport by API consumer (world-builder versus renderer etc.)
-
 #[macro_use]
 pub mod math;
 
@@ -31,7 +27,9 @@ pub mod behavior;
 pub mod block;
 pub mod camera;
 pub mod character;
-mod chunking;
+#[doc(hidden)] // Exported only for test visualization by all_is_cubes_content
+pub mod chunking;
+#[doc(hidden)] // Exported only for use by all_is_cubes_content
 pub mod content;
 pub mod drawing;
 mod intalloc;

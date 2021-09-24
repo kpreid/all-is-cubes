@@ -733,7 +733,8 @@ impl<V> GridArray<V> {
     // TODO: Decide if this is a good public interface.
     // TODO: Reimplement this in terms of adopting the elements as a linear array, then performing an axis swap.
     // TODO: Test.
-    pub(crate) fn from_y_flipped_array<const DX: usize, const DY: usize, const DZ: usize>(
+    #[doc(hidden)] // used by all-is-cubes-content
+    pub fn from_y_flipped_array<const DX: usize, const DY: usize, const DZ: usize>(
         array: [[[V; DX]; DY]; DZ],
     ) -> Self
     where

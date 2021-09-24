@@ -491,7 +491,7 @@ impl fmt::Display for Cursor {
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
+// #[non_exhaustive] // TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via BlockBuilder.
 pub struct Spawn {
     /// Position, in cube coordinates.
     ///
@@ -506,7 +506,7 @@ pub struct Spawn {
 }
 
 impl Spawn {
-    pub(crate) fn default_for_new_space(_grid: Grid) -> Self {
+    pub fn default_for_new_space(_grid: Grid) -> Self {
         Spawn {
             position: Point3::origin(), // TODO: pick something better? For what criteria?
             flying: true,

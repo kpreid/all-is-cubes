@@ -75,6 +75,7 @@ fn main() -> Result<(), xaction::Error> {
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
             for package in [
                 "all-is-cubes",
+                "all-is-cubes-content",
                 "all-is-cubes-desktop",
                 "all-is-cubes-server",
             ] {

@@ -158,6 +158,11 @@ impl Tick {
         }
     }
 
+    /// Return the amount of time passed as a [`Duration`].
+    pub fn delta_t(self) -> Duration {
+        self.delta_t
+    }
+
     /// Set the paused flag. See [`Tick::paused`] for more information.
     #[must_use]
     pub fn pause(self) -> Self {

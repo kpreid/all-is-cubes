@@ -18,6 +18,7 @@ use crate::space::Grid;
 /// Parameter `CHUNK_SIZE` is the number of cubes along the edge of a chunk.
 /// The consequences are unspecified if it is not positive.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
 pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub GridPoint);
 
 impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
@@ -156,7 +157,8 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     }
 
     /// Convert to a `Space` so it can be directly viewed; for tests.
-    pub(crate) fn visualization(&self) -> crate::space::Space {
+    #[doc(hidden)]
+    pub fn visualization(&self) -> crate::space::Space {
         use crate::block::Block;
         use crate::math::Rgba;
 

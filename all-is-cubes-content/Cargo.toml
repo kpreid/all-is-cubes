@@ -1,0 +1,24 @@
+[package]
+name = "all-is-cubes-content"
+version = "0.2.0"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+edition = "2018"
+description = "Demo/default game content for the all-is-cubes engine."
+# TODO: add homepage = "..." when we have one
+repository = "https://github.com/kpreid/all-is-cubes"
+license = "MIT"
+categories = ["games"]
+
+[lib]
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
+
+[dependencies]
+all-is-cubes = { path = "../all-is-cubes", version = "0.2.0" }
+instant = "0.1.9"
+log = { version = "0.4.14", default-features = false }
+rand = { version = "0.8.2", default-features = false }
+rand_xoshiro = "0.6.0"
+noise = { version = "0.7.0", default-features = false }
+strum = { version = "0.21.0", features = ["derive"] }
+

@@ -6,6 +6,8 @@
 //! This module exists to be a place where we can review the different colors in use
 //! and tweak them to go well together, and avoid introducing extra slightly different
 //! hardcoded colors if possible.
+//!
+//! TODO: Split "system UI" colors and "demo content" colors.
 
 use crate::math::{Rgb, Rgba};
 

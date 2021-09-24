@@ -36,8 +36,10 @@ impl GridMatrix {
         z: Vector3::new(0, 0, 0),
         w: Vector3::new(0, 0, 0),
     };
+
     /// For Y-down drawing
-    pub(crate) const FLIP_Y: Self = Self {
+    #[doc(hidden)] // used by all-is-cubes-content - TODO: public?
+    pub const FLIP_Y: Self = Self {
         x: Vector3::new(1, 0, 0),
         y: Vector3::new(0, -1, 0),
         z: Vector3::new(0, 0, 1),

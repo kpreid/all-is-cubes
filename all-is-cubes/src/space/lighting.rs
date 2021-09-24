@@ -335,7 +335,9 @@ impl Space {
 
     /// Clear and recompute light data and update queue, in a way which gets fast approximate
     /// results suitable for flat landscapes mostly lit from above (the +Y axis).
-    pub(crate) fn fast_evaluate_light(&mut self) {
+    ///
+    /// TODO: Revisit whether this is a good public API.
+    pub fn fast_evaluate_light(&mut self) {
         self.light_update_queue.clear(); // Going to refill it
 
         if self.physics.light == LightPhysics::None {

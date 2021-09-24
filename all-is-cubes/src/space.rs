@@ -967,8 +967,9 @@ pub enum LightPhysics {
     None,
     /// Raycast-based light propagation and diffuse reflections.
     ///
-    /// TODO: Need a to provide a builder or struct type so that this can be constructed.
-    #[non_exhaustive]
+    /// TODO: Need to provide a builder so that this can be constructed
+    /// even when more parameters are added.
+    // TODO: #[non_exhaustive]
     Rays {
         /// The maximum distance a simulated light ray will travel; blocks farther than
         /// that distance apart will never have direct influence on each other.

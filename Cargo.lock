@@ -74,10 +74,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "all-is-cubes-content"
+version = "0.2.0"
+dependencies = [
+ "all-is-cubes",
+ "instant",
+ "log",
+ "noise",
+ "rand 0.8.4",
+ "rand_xoshiro",
+ "strum",
+]
+
+[[package]]
 name = "all-is-cubes-desktop"
 version = "0.2.1"
 dependencies = [
  "all-is-cubes",
+ "all-is-cubes-content",
  "cgmath",
  "clap",
  "crossterm",
@@ -111,6 +125,7 @@ name = "all-is-cubes-wasm"
 version = "0.2.0"
 dependencies = [
  "all-is-cubes",
+ "all-is-cubes-content",
  "console_error_panic_hook",
  "console_log",
  "form_urlencoded",
