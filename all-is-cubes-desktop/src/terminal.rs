@@ -3,20 +3,24 @@
 
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use cgmath::ElementWise as _;
-use crossterm::cursor::{self, MoveTo};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
-use crossterm::terminal::{Clear, ClearType};
-use crossterm::QueueableCommand as _;
-use cursor::position;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::error::Error;
 use std::io;
 use std::io::Write as _;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
+
+use cgmath::ElementWise as _;
+use crossterm::cursor::{self, MoveTo};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
+use crossterm::QueueableCommand as _;
+use tui::backend::Backend as _;
+use tui::layout::{Constraint, Direction, Layout, Rect};
+use tui::widgets::Paragraph;
+use tui::{backend::CrosstermBackend, Terminal};
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::camera::{Camera, Viewport};
@@ -43,17 +47,21 @@ pub struct TerminalOptions {
 }
 
 impl TerminalOptions {
-    /// Obtain the terminal size and adjust it such that it is suitable for a
-    /// [`Camera::set_viewport`] followed by [`TerminalMain::draw`].
+    /// Compute viewport to use for raytracing, given the size in characters of the
+    /// drawing area.
     fn viewport_from_terminal_size(&self, size: Vector2<u16>) -> Viewport {
         // max(1) is to keep the projection math from blowing up.
-        // Subtracting some height allows for info text.
-        let w = size.x.max(1);
-        let h = size.y.saturating_sub(5).max(1);
+        // TODO: Remove this and make it more robust instead.
+        let size = size.map(|c| c.max(1));
         Viewport {
-            framebuffer_size: Vector2::new(w.into(), h.into())
+            framebuffer_size: size
+                .map(u32::from)
                 .mul_element_wise(self.rays_per_character().map(u32::from)),
-            nominal_size: Vector2::new(FreeCoordinate::from(w) * 0.5, h.into()),
+
+            // Assume that characters are approximately twice as tall as they are wide.
+            nominal_size: size
+                .map(FreeCoordinate::from)
+                .mul_element_wise(Vector2::new(0.5, 1.0)),
         }
     }
 
@@ -85,23 +93,24 @@ pub fn terminal_main_loop(
     Ok(())
 }
 
-#[derive(Debug)]
 struct TerminalMain {
     app: AllIsCubesAppState,
     options: TerminalOptions,
-    out: io::Stdout,
+    tuiout: tui::Terminal<CrosstermBackend<io::Stdout>>,
     camera: Camera,
     /// True if we should clean up on drop.
     terminal_state_dirty: bool,
 
     // Tracking terminal state.
-    terminal_size: Vector2<u16>,
+    /// Regionof the terminal the scene is drawn into.
+    viewport_position: Rect,
+    /// Last color we drew to the terminal. TODO: This should be per-frame state by separating the drawing logic.
     current_color: Option<Colors>,
 
     /// The widths of "single characters" according to the terminal's interpretation
     /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
     /// position.
-    widths: HashMap<String, usize>,
+    widths: HashMap<String, u16>,
 
     render_pipe_in: mpsc::SyncSender<FrameInput>,
     render_pipe_out: mpsc::Receiver<FrameOutput>,
@@ -125,8 +134,6 @@ struct FrameOutput {
 impl TerminalMain {
     fn new(app: AllIsCubesAppState, options: TerminalOptions) -> crossterm::Result<Self> {
         crossterm::terminal::enable_raw_mode()?;
-
-        let terminal_size = Vector2::from(crossterm::terminal::size()?);
 
         // Create thread for making the raytracing operation concurrent with main loop
         // Note: this doesn't really need a thread but rayon doesn't have a
@@ -155,15 +162,16 @@ impl TerminalMain {
                 }
             })?;
 
+        let viewport_position = Rect::default();
         Ok(Self {
             camera: Camera::new(
                 app.graphics_options().snapshot(),
-                options.viewport_from_terminal_size(terminal_size),
+                options.viewport_from_terminal_size(rect_size(viewport_position)),
             ),
             app,
             options,
-            out: io::stdout(),
-            terminal_size,
+            tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
+            viewport_position,
             terminal_state_dirty: true,
             current_color: None,
             widths: HashMap::new(),
@@ -175,17 +183,17 @@ impl TerminalMain {
     /// Reset terminal state, as before exiting.
     /// This will be run on drop but errors will not be reported in that case.
     fn clean_up_terminal(&mut self) -> crossterm::Result<()> {
-        self.out.queue(SetAttribute(Attribute::Reset))?;
-        self.out
-            .queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
-        self.out.queue(cursor::Show)?;
+        let out = self.tuiout.backend_mut();
+        out.queue(SetAttribute(Attribute::Reset))?;
+        out.queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
+        out.queue(cursor::Show)?;
         crossterm::terminal::disable_raw_mode()?;
         self.terminal_state_dirty = false;
         Ok(())
     }
 
     fn run(&mut self) -> crossterm::Result<()> {
-        self.out.queue(Clear(ClearType::All))?;
+        self.tuiout.clear()?;
 
         loop {
             'input: while crossterm::event::poll(Duration::ZERO)? {
@@ -220,11 +228,7 @@ impl TerminalMain {
                         self.sync_options();
                     }
                     Event::Key(_) => {}
-                    Event::Resize(w, h) => {
-                        self.terminal_size = Vector2::new(w, h);
-                        self.sync_options();
-                        self.out.queue(Clear(ClearType::All))?;
-                    }
+                    Event::Resize(..) => { /* tui handles this */ }
                     Event::Mouse(_) => {}
                 }
             }
@@ -234,7 +238,11 @@ impl TerminalMain {
             self.app.maybe_step_universe();
 
             match self.render_pipe_out.try_recv() {
-                Ok(frame) => self.write_frame(frame)?,
+                Ok(frame) => {
+                    self.write_ui(&frame)?;
+                    self.write_frame(frame)?;
+                }
+                // TODO: Even if we don't have a frame, we might want to update the UI anyway.
                 Err(mpsc::TryRecvError::Empty) => {}
                 Err(mpsc::TryRecvError::Disconnected) => panic!("render thread died"),
             }
@@ -249,8 +257,10 @@ impl TerminalMain {
     }
 
     fn sync_options(&mut self) {
-        self.camera
-            .set_viewport(self.options.viewport_from_terminal_size(self.terminal_size));
+        self.camera.set_viewport(
+            self.options
+                .viewport_from_terminal_size(rect_size(self.viewport_position)),
+        );
     }
 
     fn send_frame_to_render(&mut self) {
@@ -284,61 +294,144 @@ impl TerminalMain {
         }
     }
 
+    /// Lay out and write the UI using [`tui`] -- everything on screen *except* for
+    /// the raytraced scene.
+    ///
+    /// This function also stores the current scene viewport for future frames.
+    fn write_ui(&mut self, frame: &FrameOutput) -> crossterm::Result<()> {
+        let FrameOutput { info, .. } = frame;
+        // TODO: In Rust 2021 we will be able to omit these extra borrows/copies
+        let color_mode = self.options.colors;
+        let app = &mut self.app;
+
+        let mut viewport_rect = None;
+        self.tuiout.draw(|f| {
+            let [viewport_rect_tmp, gfx_info_rect, cursor_rect]: [Rect; 3] = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                    Constraint::Length(2),
+                ])
+                .split(f.size())
+                .try_into()
+                .unwrap();
+
+            viewport_rect = Some(viewport_rect_tmp);
+
+            // Graphics info line
+            {
+                let [frame_info_rect, colors_info_rect, render_info_rect]: [Rect; 3] =
+                    Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints([
+                            Constraint::Percentage(30),
+                            Constraint::Percentage(30),
+                            Constraint::Percentage(30),
+                        ])
+                        .split(gfx_info_rect)
+                        .try_into()
+                        .unwrap();
+
+                f.render_widget(
+                    Paragraph::new(format!(
+                        "{:5.1} FPS",
+                        app.draw_fps_counter().frames_per_second()
+                    )),
+                    frame_info_rect,
+                );
+
+                f.render_widget(
+                    Paragraph::new(format!("Colors: {:?}", color_mode,)),
+                    colors_info_rect,
+                );
+
+                f.render_widget(Paragraph::new(format!("{:?}", info)), render_info_rect);
+            }
+
+            // Cursor info
+            f.render_widget(
+                if let Some(cursor) = app.cursor_result() {
+                    // TODO: design good formatting for cursor data
+                    Paragraph::new(format!(
+                        "{:?} : {}",
+                        cursor.place, cursor.evaluated.attributes.display_name
+                    ))
+                } else {
+                    Paragraph::new("")
+                },
+                cursor_rect,
+            );
+        })?;
+
+        // Store latest layout position so it can be used for choosing what size to render and for
+        // independent drawing.
+        let viewport_rect = viewport_rect.expect("layout failed to update");
+        if self.viewport_position != viewport_rect {
+            self.viewport_position = viewport_rect;
+            self.sync_options();
+        }
+
+        Ok(())
+    }
+
     fn write_frame(&mut self, frame: FrameOutput) -> crossterm::Result<()> {
         let FrameOutput {
             viewport,
             options,
             image,
-            info,
+            info: _,
         } = frame;
-        let color_mode = self.options.colors;
 
-        self.out.queue(cursor::Hide)?;
-        self.out.queue(SetAttribute(Attribute::Reset))?;
-        self.out.queue(MoveTo(0, 0))?;
+        // Now separately draw the frame data. This is done because we want to use a precise
+        // strategy for measuring the width of characters (draw them and read back the cursor
+        // position) whereas tui-rs assumes that `unicode_width`'s answers match the terminal.
+        // For all UI text, we run with that since it should be only minor glitches, but the
+        // scene display needs accurate horizontal alignment.
+
+        let out = self.tuiout.backend_mut();
+        out.queue(cursor::Hide)?;
+        out.queue(SetAttribute(Attribute::Reset))?;
         self.current_color = None; // pessimistic about prior state
 
         // TODO: aim for less number casting
+        // This is the size of the image patch corresponding to one character cell
         let character_size = viewport
             .framebuffer_size
             .map(|s| s as usize)
             .div_element_wise(options.rays_per_character().map(usize::from));
-        for y in 0..character_size.y {
+
+        let mut rect = self.viewport_position;
+        // Clamp rect to match the actual image data size, to avoid trying to read the
+        // image data out of bounds. (This should be only temporary while resizing.)
+        rect.width = rect.width.min(viewport.framebuffer_size.x as u16);
+        rect.height = rect.height.min(viewport.framebuffer_size.y as u16);
+
+        for y in 0..rect.height {
+            self.tuiout
+                .backend_mut()
+                .queue(MoveTo(rect.x, rect.y + y))?;
             let mut x = 0;
-            while x < character_size.x {
+            while x < rect.width {
                 let (text, color) = Self::image_patch_to_character(
                     &options,
                     &*image,
-                    Vector2::new(x, y),
+                    Vector2::new(x as usize, y as usize),
                     character_size,
                 );
 
-                let width = self.write_with_color_and_measure(text, color, character_size.x - x)?;
+                // TODO: split to make this possible to do without borrowing self
+                let width = self.write_with_color_and_measure(text, color, rect.width)?;
                 x += width.max(1); // max(1) prevents infinite looping in edge case
             }
-            self.write_with_color("\r\n", Colors::new(Color::Reset, Color::Reset))?;
         }
 
-        // TODO: Allocate footer space explicitly, don't wrap on small widths, clear, etc.
-        write!(
-            self.out,
-            "\r\nColors: {:?}    Frame: {:?}  {:5.1} FPS",
-            color_mode,
-            info,
-            self.app.draw_fps_counter().frames_per_second(),
-        )?;
-        self.out.queue(Clear(ClearType::UntilNewLine))?;
-        write!(self.out, "\r\n")?;
-        if let Some(cursor) = self.app.cursor_result() {
-            // TODO: design good formatting for cursor data
-            write!(
-                self.out,
-                "{:?} : {}",
-                cursor.place, cursor.evaluated.attributes.display_name
-            )?;
-        }
-        self.out.queue(Clear(ClearType::UntilNewLine))?;
-        self.out.flush()?;
+        // If we don't do this, the other text might become wrongly colored.
+        // TODO: Is this actually sufficient if the UI ever has colored parts — that is,
+        // are we agreeing adequately with tui's state tracking?
+        self.tuiout
+            .backend_mut()
+            .queue(SetAttribute(Attribute::Reset))?;
 
         Ok(())
     }
@@ -390,9 +483,9 @@ impl TerminalMain {
     fn write_with_color(&mut self, text: &str, color: Colors) -> crossterm::Result<()> {
         if self.current_color != Some(color) {
             self.current_color = Some(color);
-            self.out.queue(SetColors(color))?;
+            self.tuiout.backend_mut().queue(SetColors(color))?;
         }
-        write!(self.out, "{}", text)?;
+        write!(self.tuiout.backend_mut(), "{}", text)?;
         Ok(())
     }
 
@@ -400,8 +493,8 @@ impl TerminalMain {
         &mut self,
         text: &str,
         color: Colors,
-        max_width: usize,
-    ) -> crossterm::Result<usize> {
+        max_width: u16,
+    ) -> crossterm::Result<u16> {
         if let Some(&w) = self.widths.get(text) {
             if w <= max_width {
                 self.write_with_color(text, color)?;
@@ -409,10 +502,10 @@ impl TerminalMain {
             Ok(w)
         } else {
             // Measure the de-facto width of the string by measuring how far the cursor advances.
-            let before = position()?;
+            let before = self.tuiout.backend_mut().get_cursor()?;
             self.write_with_color(text, color)?;
-            let after = position()?;
-            let w = usize::from(after.0.saturating_sub(before.0));
+            let after = self.tuiout.backend_mut().get_cursor()?;
+            let w = after.0.saturating_sub(before.0);
             if after.1 == before.1 && w > 0 {
                 self.widths.insert(text.to_owned(), w);
             }
@@ -556,6 +649,10 @@ impl PixelBuf for ColorCharacterBuf {
         self.text.add(Rgba::TRANSPARENT, &Cow::Borrowed(" "));
         self.override_color = true;
     }
+}
+
+fn rect_size(rect: Rect) -> Vector2<u16> {
+    Vector2::new(rect.width, rect.height)
 }
 
 #[cfg(test)]
