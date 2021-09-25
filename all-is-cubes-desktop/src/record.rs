@@ -101,22 +101,28 @@ pub(crate) fn record_main(
     let (mut write_status_sender, status_receiver) = mpsc::channel();
 
     // Raytracing thread.
-    std::thread::spawn({
-        move || {
-            while let Ok((frame_number, camera, raytracer)) = scene_receiver.recv() {
-                let (image_data, _info) = raytracer.trace_scene_to_image(&camera);
-                // TODO: Offer supersampling (multiple rays per output pixel).
-                image_data_sender.send((frame_number, image_data)).unwrap();
+    std::thread::Builder::new()
+        .name("raytracer".to_string())
+        .spawn({
+            move || {
+                while let Ok((frame_number, camera, raytracer)) = scene_receiver.recv() {
+                    let (image_data, _info) = raytracer.trace_scene_to_image(&camera);
+                    // TODO: Offer supersampling (multiple rays per output pixel).
+                    image_data_sender.send((frame_number, image_data)).unwrap();
+                }
             }
-        }
-    });
+        })?;
 
     // Image encoding and writing thread.
-    std::thread::spawn({
-        let file = File::create(&options.output_path)?;
-        let options = options.clone();
-        move || threaded_write_frames(file, options, image_data_receiver, &mut write_status_sender)
-    });
+    std::thread::Builder::new()
+        .name("image encoder".to_string())
+        .spawn({
+            let file = File::create(&options.output_path)?;
+            let options = options.clone();
+            move || {
+                threaded_write_frames(file, options, image_data_receiver, &mut write_status_sender)
+            }
+        })?;
 
     // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
     // (We could move the universe stepping to another thread to get more precise progress updates,

@@ -133,25 +133,27 @@ impl TerminalMain {
         // "start but don't block on this" operation.
         let (render_pipe_in, render_thread_in) = mpsc::sync_channel::<FrameInput>(1);
         let (render_thread_out, render_pipe_out) = mpsc::sync_channel(1);
-        std::thread::spawn({
-            move || {
-                while let Ok(FrameInput {
-                    camera,
-                    options,
-                    scene,
-                }) = render_thread_in.recv()
-                {
-                    let (image, info) = scene.trace_scene_to_image(&camera);
-                    // Ignore send errors as they just mean we're shutting down or died elsewhere
-                    let _ = render_thread_out.send(FrameOutput {
-                        viewport: camera.viewport(),
+        std::thread::Builder::new()
+            .name("raytracer".to_string())
+            .spawn({
+                move || {
+                    while let Ok(FrameInput {
+                        camera,
                         options,
-                        image,
-                        info,
-                    });
+                        scene,
+                    }) = render_thread_in.recv()
+                    {
+                        let (image, info) = scene.trace_scene_to_image(&camera);
+                        // Ignore send errors as they just mean we're shutting down or died elsewhere
+                        let _ = render_thread_out.send(FrameOutput {
+                            viewport: camera.viewport(),
+                            options,
+                            image,
+                            info,
+                        });
+                    }
                 }
-            }
-        });
+            })?;
 
         Ok(Self {
             camera: Camera::new(
