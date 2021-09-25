@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
 use std::io;
-use std::io::Write as _;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
@@ -17,7 +16,6 @@ use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::QueueableCommand as _;
-use tui::backend::Backend as _;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::widgets::Paragraph;
 use tui::{backend::CrosstermBackend, Terminal};
@@ -480,37 +478,19 @@ impl TerminalMain {
         }
     }
 
-    fn write_with_color(&mut self, text: &str, color: Colors) -> crossterm::Result<()> {
-        if self.current_color != Some(color) {
-            self.current_color = Some(color);
-            self.tuiout.backend_mut().queue(SetColors(color))?;
-        }
-        write!(self.tuiout.backend_mut(), "{}", text)?;
-        Ok(())
-    }
-
     fn write_with_color_and_measure(
         &mut self,
         text: &str,
         color: Colors,
         max_width: u16,
     ) -> crossterm::Result<u16> {
-        if let Some(&w) = self.widths.get(text) {
-            if w <= max_width {
-                self.write_with_color(text, color)?;
-            }
-            Ok(w)
-        } else {
-            // Measure the de-facto width of the string by measuring how far the cursor advances.
-            let before = self.tuiout.backend_mut().get_cursor()?;
-            self.write_with_color(text, color)?;
-            let after = self.tuiout.backend_mut().get_cursor()?;
-            let w = after.0.saturating_sub(before.0);
-            if after.1 == before.1 && w > 0 {
-                self.widths.insert(text.to_owned(), w);
-            }
-            Ok(w)
+        // Set color
+        if self.current_color != Some(color) {
+            self.current_color = Some(color);
+            self.tuiout.backend_mut().queue(SetColors(color))?;
         }
+
+        write_and_measure(self.tuiout.backend_mut(), &mut self.widths, text, max_width)
     }
 }
 
@@ -519,6 +499,37 @@ impl Drop for TerminalMain {
         if self.terminal_state_dirty {
             let _ = self.clean_up_terminal();
         }
+    }
+}
+
+/// Write a string and report how far this advanced the cursor,
+/// unless the string was previously discovered to advance it more than `max_width`.
+///
+/// `width_table` is used to memoize the previously measured widths. Because of this,
+/// strings should be kept short enough to be repetitive (e.g. single characters).
+fn write_and_measure<B: tui::backend::Backend + io::Write>(
+    backend: &mut B,
+    width_table: &mut HashMap<String, u16>,
+    text: &str,
+    max_width: u16,
+) -> Result<u16, io::Error> {
+    if let Some(&w) = width_table.get(text) {
+        if w <= max_width {
+            backend.write_all(text.as_bytes())?;
+        }
+        Ok(w)
+    } else {
+        // Measure the de-facto width of the string by measuring how far the cursor advances.
+        let before = backend.get_cursor()?;
+        backend.write_all(text.as_bytes())?;
+        let after = backend.get_cursor()?;
+        let w = after.0.saturating_sub(before.0);
+        // Record the width, unless the character caused a line wrap so that we can't tell.
+        // TODO: Why w > 0?
+        if after.1 == before.1 && w > 0 {
+            width_table.insert(text.to_owned(), w);
+        }
+        Ok(w)
     }
 }
 
