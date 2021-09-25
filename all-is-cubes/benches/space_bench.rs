@@ -5,11 +5,8 @@ use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
 
-use all_is_cubes::content::{axes, make_some_blocks};
-use all_is_cubes::content::{install_landscape_blocks, wavy_landscape};
-use all_is_cubes::linking::BlockProvider;
+use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::space::{Grid, Space};
-use all_is_cubes::universe::{URef, Universe, UniverseIndex as _};
 
 pub fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
@@ -115,40 +112,5 @@ pub fn grid_bench(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn lighting_bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("lighting");
-    group.sample_size(20);
-    group.bench_function("light new_universe_with_stuff", |b| {
-        b.iter_batched(
-            universe_for_lighting_test,
-            |universe| {
-                let space: URef<Space> = universe.get(&"space".into()).unwrap();
-                space.try_modify(|s| s.evaluate_light(0, |_| {})).unwrap();
-            },
-            BatchSize::SmallInput,
-        )
-    });
-    group.finish();
-}
-
-fn universe_for_lighting_test() -> Universe {
-    // TODO: For a stable benchmark, replace this with entirely specified data
-    // (no "a landscape").
-
-    let mut universe = Universe::new();
-    install_landscape_blocks(&mut universe, 16).unwrap();
-    let blocks = BlockProvider::using(&universe).unwrap();
-
-    let radius = 20;
-    let diameter = radius * 2 + 1;
-    let grid = Grid::new((-radius, -radius, -radius), (diameter, diameter, diameter));
-    let mut space = Space::empty(grid);
-    wavy_landscape(grid, &mut space, &blocks, 1.0).unwrap();
-    axes(&mut space).unwrap();
-
-    universe.insert("space".into(), space).unwrap();
-    universe
-}
-
-criterion_group!(benches, space_bulk_mutation, grid_bench, lighting_bench);
+criterion_group!(benches, space_bulk_mutation, grid_bench);
 criterion_main!(benches);

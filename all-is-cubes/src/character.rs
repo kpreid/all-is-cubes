@@ -519,15 +519,14 @@ impl Spawn {
     ///
     /// `direction` gives the direction in which the character will lie relative to the
     /// center of the space.
-    #[allow(dead_code)] // TODO: Saving this in case it turns out useful e.g. for looking at blocks.
     pub(crate) fn looking_at_space(
-        space: URef<Space>,
+        space_bounds: Grid,
         direction: impl Into<Vector3<FreeCoordinate>>,
     ) -> Self {
-        let grid = space.borrow().grid();
-        let mut spawn = Self::default_for_new_space(grid);
-        spawn.position = eye_for_look_at(grid, direction.into()).map(|s| NotNan::new(s).unwrap());
-        //spawn.look_at(grid.center());  // TODO
+        let mut spawn = Self::default_for_new_space(space_bounds);
+        spawn.position =
+            eye_for_look_at(space_bounds, direction.into()).map(|s| NotNan::new(s).unwrap());
+        //spawn.look_at(space_bounds.center());  // TODO
         spawn
     }
 }

@@ -3,16 +3,19 @@
 
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
 
-use cgmath::Point3;
-use ordered_float::NotNan;
 use std::convert::TryInto as _;
 
-use crate::block::Block;
-use crate::character::Character;
+use cgmath::Point3;
+use ordered_float::NotNan;
+use rand::{Rng, SeedableRng as _};
+use rand_xoshiro::Xoshiro256Plus;
+
+use crate::block::{Block, AIR};
+use crate::character::{Character, Spawn};
 use crate::content::{atrium::atrium, demo_city, install_demo_blocks};
 use crate::linking::{GenError, InGenError};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
-use crate::space::{Grid, LightPhysics, Space};
+use crate::math::{FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
+use crate::space::{Grid, LightPhysics, Space, SpacePhysics};
 use crate::universe::{Name, Universe, UniverseIndex};
 
 /// Selection of initial content for constructing a new [`Universe`].
@@ -37,6 +40,7 @@ pub enum UniverseTemplate {
     Atrium,
     CornellBox,
     PhysicsLab,
+    LightingBench,
     // TODO: add an "nothing, you get a blank editor" option once we have enough editing support.
 }
 
@@ -49,6 +53,7 @@ impl UniverseTemplate {
             Atrium => new_universe_with_space_setup(atrium),
             CornellBox => new_universe_with_space_setup(cornell_box),
             PhysicsLab => new_universe_with_space_setup(|_| physics_lab(50, 16)),
+            LightingBench => new_universe_with_space_setup(lighting_bench_space),
         }
     }
 }
@@ -200,6 +205,119 @@ fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenErro
         .map(|s| NotNan::new(s).unwrap());
     spawn.flying = false;
 
+    Ok(space)
+}
+
+/// Test space for the `lighting_bench` benchmark.
+///
+/// This is here as one of the templates so that it can be viewed. It's separate from
+/// other demo content so there are no non-benchmark reasons to change it.
+///
+/// TODO: Once we have the ability to write save files, give the benchmark code an option
+/// to do that instead, so this can just live here.
+fn lighting_bench_space(_universe: &mut Universe) -> Result<Space, InGenError> {
+    let array_side_length = 5;
+    let section_size = 6;
+    let margin = 4;
+    let section_spacing = section_size + margin;
+    let side_length_in_blocks = section_spacing * array_side_length + margin;
+    let yup = 4;
+    let ydown = 10;
+    let space_bounds = Grid::from_lower_upper(
+        [0, -ydown - 1, 0],
+        [side_length_in_blocks, yup + 1, side_length_in_blocks],
+    );
+    let mut space = Space::builder(space_bounds)
+        .light_physics(LightPhysics::None)
+        .spawn(Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]))
+        .build_empty();
+
+    // Ground level
+    space
+        .fill_uniform(
+            space_bounds.expand(FaceMap {
+                py: -yup,
+                ..FaceMap::default()
+            }),
+            Block::from(rgb_const!(0.5, 0.5, 0.5)),
+        )
+        .unwrap();
+
+    // Individual test sections (buildings/caves)
+    for sx in 0..array_side_length {
+        for sz in 0..array_side_length {
+            // Independent RNG for each section, so that the number of values used doesn't
+            // affect the next section.
+            let mut rng = Xoshiro256Plus::seed_from_u64((sx + sz * array_side_length) as u64);
+            let section_bounds = Grid::new(
+                [
+                    margin + sx * section_spacing,
+                    -ydown + 1,
+                    margin + sz * section_spacing,
+                ],
+                [section_size, yup + ydown, section_size],
+            );
+            let color = Block::from(Rgb::new(
+                rng.gen_range(0.0..=1.0),
+                rng.gen_range(0.0..=1.0),
+                rng.gen_range(0.0..=1.0),
+            ));
+            match rng.gen_range(0..3) {
+                0 => {
+                    space.fill_uniform(section_bounds, color).unwrap();
+                }
+                1 => {
+                    space
+                        .fill_uniform(
+                            section_bounds.expand(FaceMap {
+                                within: 0,
+                                nx: 0,
+                                ny: 0,
+                                nz: 0,
+                                px: 0,
+                                py: -yup,
+                                pz: 0,
+                            }),
+                            color,
+                        )
+                        .unwrap();
+                    space
+                        .fill_uniform(
+                            section_bounds.expand(FaceMap {
+                                within: 0,
+                                nx: -1,
+                                ny: 0,
+                                nz: -1,
+                                px: -1,
+                                py: 0,
+                                pz: -1,
+                            }),
+                            &AIR,
+                        )
+                        .unwrap();
+                }
+                2 => {
+                    space
+                        .fill(section_bounds, |_| {
+                            if rng.gen_bool(0.25) {
+                                Some(&color)
+                            } else {
+                                Some(&AIR)
+                            }
+                        })
+                        .unwrap();
+                }
+                _ => unreachable!("rng range"),
+            }
+        }
+    }
+
+    space.set_physics(SpacePhysics {
+        light: LightPhysics::Rays {
+            maximum_distance: side_length_in_blocks as _,
+        },
+        ..SpacePhysics::default()
+    });
     Ok(space)
 }
 
