@@ -102,8 +102,6 @@ struct TerminalMain {
     // Tracking terminal state.
     /// Regionof the terminal the scene is drawn into.
     viewport_position: Rect,
-    /// Last color we drew to the terminal. TODO: This should be per-frame state by separating the drawing logic.
-    current_color: Option<Colors>,
 
     /// The widths of "single characters" according to the terminal's interpretation
     /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
@@ -171,7 +169,6 @@ impl TerminalMain {
             tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
             viewport_position,
             terminal_state_dirty: true,
-            current_color: None,
             widths: HashMap::new(),
             render_pipe_in,
             render_pipe_out,
@@ -387,10 +384,10 @@ impl TerminalMain {
         // For all UI text, we run with that since it should be only minor glitches, but the
         // scene display needs accurate horizontal alignment.
 
-        let out = self.tuiout.backend_mut();
-        out.queue(cursor::Hide)?;
-        out.queue(SetAttribute(Attribute::Reset))?;
-        self.current_color = None; // pessimistic about prior state
+        let backend = self.tuiout.backend_mut();
+        backend.queue(cursor::Hide)?;
+        backend.queue(SetAttribute(Attribute::Reset))?;
+        let mut current_color = None;
 
         // TODO: aim for less number casting
         // This is the size of the image patch corresponding to one character cell
@@ -406,9 +403,7 @@ impl TerminalMain {
         rect.height = rect.height.min(viewport.framebuffer_size.y as u16);
 
         for y in 0..rect.height {
-            self.tuiout
-                .backend_mut()
-                .queue(MoveTo(rect.x, rect.y + y))?;
+            backend.queue(MoveTo(rect.x, rect.y + y))?;
             let mut x = 0;
             while x < rect.width {
                 let (text, color) = Self::image_patch_to_character(
@@ -418,8 +413,14 @@ impl TerminalMain {
                     character_size,
                 );
 
-                // TODO: split to make this possible to do without borrowing self
-                let width = self.write_with_color_and_measure(text, color, rect.width)?;
+                let width = write_colored_and_measure(
+                    backend,
+                    &mut self.widths,
+                    &mut current_color,
+                    color,
+                    text,
+                    rect.width - x,
+                )?;
                 x += width.max(1); // max(1) prevents infinite looping in edge case
             }
         }
@@ -427,9 +428,7 @@ impl TerminalMain {
         // If we don't do this, the other text might become wrongly colored.
         // TODO: Is this actually sufficient if the UI ever has colored parts — that is,
         // are we agreeing adequately with tui's state tracking?
-        self.tuiout
-            .backend_mut()
-            .queue(SetAttribute(Attribute::Reset))?;
+        backend.queue(SetAttribute(Attribute::Reset))?;
 
         Ok(())
     }
@@ -477,21 +476,6 @@ impl TerminalMain {
             (text, mapped_color)
         }
     }
-
-    fn write_with_color_and_measure(
-        &mut self,
-        text: &str,
-        color: Colors,
-        max_width: u16,
-    ) -> crossterm::Result<u16> {
-        // Set color
-        if self.current_color != Some(color) {
-            self.current_color = Some(color);
-            self.tuiout.backend_mut().queue(SetColors(color))?;
-        }
-
-        write_and_measure(self.tuiout.backend_mut(), &mut self.widths, text, max_width)
-    }
 }
 
 impl Drop for TerminalMain {
@@ -500,6 +484,21 @@ impl Drop for TerminalMain {
             let _ = self.clean_up_terminal();
         }
     }
+}
+
+fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
+    backend: &mut B,
+    width_table: &mut HashMap<String, u16>,
+    current_color: &mut Option<Colors>,
+    wanted_color: Colors,
+    text: &str,
+    max_width: u16,
+) -> Result<u16, io::Error> {
+    if *current_color != Some(wanted_color) {
+        *current_color = Some(wanted_color);
+        backend.queue(SetColors(wanted_color))?;
+    }
+    write_and_measure(backend, width_table, text, max_width)
 }
 
 /// Write a string and report how far this advanced the cursor,
