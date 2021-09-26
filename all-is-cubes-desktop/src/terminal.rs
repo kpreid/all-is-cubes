@@ -11,13 +11,16 @@ use std::io;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
+use all_is_cubes::inv::Slot;
 use cgmath::ElementWise as _;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::QueueableCommand as _;
 use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::widgets::Paragraph;
+use tui::style::{Color as TuiColor, Modifier, Style};
+use tui::text::{Span, Spans};
+use tui::widgets::{Borders, Paragraph};
 use tui::{backend::CrosstermBackend, Terminal};
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
@@ -301,16 +304,93 @@ impl TerminalMain {
 
         let mut viewport_rect = None;
         self.tuiout.draw(|f| {
-            let [viewport_rect_tmp, gfx_info_rect, cursor_rect]: [Rect; 3] = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Min(1),
-                    Constraint::Length(1),
-                    Constraint::Length(2),
-                ])
-                .split(f.size())
-                .try_into()
-                .unwrap();
+            let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_rect]: [Rect; 4] =
+                Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Min(1),
+                        Constraint::Length(3),
+                        Constraint::Length(1),
+                        Constraint::Length(2),
+                    ])
+                    .split(f.size())
+                    .try_into()
+                    .unwrap();
+
+            // Toolbar
+            {
+                const SLOTS: usize = 10; // TODO: link with other UI and gameplay code
+
+                const SELECTED_BLANK: Span<'static> = Span {
+                    content: Cow::Borrowed(" "),
+                    style: STYLE_NONE,
+                };
+                const SELECTED_0: Span<'static> = Span {
+                    content: Cow::Borrowed("1"),
+                    style: Style {
+                        fg: Some(TuiColor::Black),
+                        bg: Some(TuiColor::Red),
+                        ..STYLE_NONE
+                    },
+                };
+                const SELECTED_1: Span<'static> = Span {
+                    content: Cow::Borrowed("2"),
+                    style: Style {
+                        fg: Some(TuiColor::Black),
+                        bg: Some(TuiColor::Yellow),
+                        ..STYLE_NONE
+                    },
+                };
+
+                let slot_rects = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Ratio(1, SLOTS as u32); SLOTS])
+                    .split(toolbar_rect);
+
+                if let Some(character_ref) = app.character() {
+                    let character = character_ref.borrow();
+                    let selected_slots = character.selected_slots();
+                    let slots = &character.inventory().slots;
+                    for (i, rect) in slot_rects.into_iter().enumerate() {
+                        let slot = slots.get(i).unwrap_or(&Slot::Empty);
+                        let slot_info = Spans::from(vec![
+                            if selected_slots[0] == i {
+                                SELECTED_0
+                            } else {
+                                SELECTED_BLANK
+                            },
+                            Span::from(format!(" {} ", i)),
+                            if selected_slots[1] == i {
+                                SELECTED_1
+                            } else {
+                                SELECTED_BLANK
+                            },
+                        ]);
+                        let block = tui::widgets::Block::default()
+                            .title(slot_info)
+                            .borders(Borders::ALL);
+                        f.render_widget(
+                            match slot {
+                                // TODO: Use item icon text -- we need a way to access the predefined icons from here
+                                Slot::Empty => Paragraph::new(""),
+                                Slot::Stack(count, item) if count.get() == 1 => {
+                                    Paragraph::new(format!("{:?}", item))
+                                }
+                                Slot::Stack(count, item) => {
+                                    Paragraph::new(format!("{} × {:?}", count, item))
+                                }
+
+                                // Fallback
+                                slot => Paragraph::new(format!("{:?}", slot)),
+                            }
+                            .block(block),
+                            rect,
+                        );
+                    }
+                } else {
+                    // TODO: render blank slots
+                }
+            }
 
             viewport_rect = Some(viewport_rect_tmp);
 
@@ -664,6 +744,14 @@ impl PixelBuf for ColorCharacterBuf {
 fn rect_size(rect: Rect) -> Vector2<u16> {
     Vector2::new(rect.width, rect.height)
 }
+
+/// An empty style value (which `tui` doesn't provide as a constant)
+const STYLE_NONE: Style = Style {
+    fg: None,
+    bg: None,
+    add_modifier: Modifier::empty(),
+    sub_modifier: Modifier::empty(),
+};
 
 #[cfg(test)]
 mod tests {
