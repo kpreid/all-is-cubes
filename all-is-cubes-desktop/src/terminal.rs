@@ -304,19 +304,29 @@ impl TerminalMain {
 
         let mut viewport_rect = None;
         self.tuiout.draw(|f| {
-            let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_rect]: [Rect; 4] =
+            const HELP_TEXT: &str = "\
+                Move: WS AD EC  Turn: ←→ ↑↓\n\
+                Term color: N   Term chars: M\n\
+                Quit: Esc, ^C, or ^D";
+
+            let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_and_help_rect]: [Rect; 4] =
                 Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
                         Constraint::Min(1),
                         Constraint::Length(3),
                         Constraint::Length(1),
-                        Constraint::Length(2),
+                        Constraint::Length(3),
                     ])
                     .split(f.size())
                     .try_into()
                     .unwrap();
-
+            let [cursor_rect, help_rect]: [Rect; 2] = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(0), Constraint::Length(30)])
+                .split(cursor_and_help_rect)
+                .try_into()
+                .unwrap();
             // Toolbar
             {
                 const SLOTS: usize = 10; // TODO: link with other UI and gameplay code
@@ -437,6 +447,9 @@ impl TerminalMain {
                 },
                 cursor_rect,
             );
+
+            // Help text
+            f.render_widget(Paragraph::new(HELP_TEXT), help_rect);
         })?;
 
         // Store latest layout position so it can be used for choosing what size to render and for
