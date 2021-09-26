@@ -101,7 +101,7 @@ impl Space {
                 let (difference, cube_cost, _) = self.update_lighting_now_on(cube);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
-                if cost >= 40000 {
+                if cost >= 400_000 {
                     break;
                 }
             }
