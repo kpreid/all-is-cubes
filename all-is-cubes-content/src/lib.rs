@@ -1,7 +1,14 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Built-in content: either demos or basic shapes and colors used in the UI.
+//! Demo content for All is Cubes.
+//!
+//! All is Cubes is a “voxel game” where each block is made out of smaller blocks
+//! (one level of recursion). This particular crate is the procedural generation
+//! tools and demo content that I've created to test and demonstrate the functionality.
+//! It depends on the core library crate [`all_is_cubes`] and its main purpose is to
+//! provide [`UniverseTemplate`]; other items should be assumed not particularly
+//! stable.
 
 use all_is_cubes::block::Block;
 use all_is_cubes::drawing::embedded_graphics::{
