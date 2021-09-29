@@ -5,13 +5,11 @@
 //!
 //! ## Why?
 //!
-//! The original reason this exists is that I thought “we have `all_is_cubes::raycast`,
+//! The original reason this exists is that I thought “we have [`raycast`](crate::raycast),
 //! and that's nearly all the work, so why not?” Secondarily, it was written before
-//! the mesh-based renderer `all_is_cubes::lum`, and was useful as a cross-check since
-//! it is much simpler.
-//!
-//! In the future (or currently, if I forgot to update this comment), it will be used
-//! as a means to display the state of `Space`s used for testing inline in test output.
+//! the [mesh-based renderer](crate::lum), and was useful as a cross-check since
+//! it is much simpler. It continues to serve as a “reference implementation” and is used
+//! by the terminal UI and in unit tests via [`print_space`].
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Matrix4, Point2, Vector2, Vector3, Zero as _};
 use cgmath::{Point3, Vector4};
