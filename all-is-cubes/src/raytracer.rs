@@ -29,6 +29,10 @@ use crate::space::{Grid, GridArray, PackedLight, Space};
 mod pixel_buf;
 pub use pixel_buf::*;
 
+mod surface;
+use surface::Surface;
+// TODO: pub use surface::*;
+
 mod text;
 pub use text::*;
 
@@ -86,17 +90,19 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                         }
                         // TODO: To implement TransparencyOption::Volumetric we need to peek forward to the next change of color and find the distance between them, but only if the alpha is not 0 or 1. (Same here and in the recursive block case.)
                         s.trace_through_surface(
-                            pixel_block_data,
-                            *color,
-                            match impl_fields.options.lighting_display {
-                                LightingOption::None => Rgb::ONE,
-                                LightingOption::Flat => self.get_lighting(hit.cube_behind()),
-                                LightingOption::Smooth => self.get_interpolated_light(
-                                    hit.intersection_point(ray),
-                                    hit.face(),
-                                ),
+                            Surface {
+                                block_data: pixel_block_data,
+                                diffuse_color: *color,
+                                illumination: match impl_fields.options.lighting_display {
+                                    LightingOption::None => Rgb::ONE,
+                                    LightingOption::Flat => self.get_lighting(hit.cube_behind()),
+                                    LightingOption::Smooth => self.get_interpolated_light(
+                                        hit.intersection_point(ray),
+                                        hit.face(),
+                                    ),
+                                },
+                                normal: hit.face(),
                             },
-                            hit.face(),
                             impl_fields.options,
                         );
                     }
@@ -110,23 +116,26 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                             }
                             if let Some(voxel) = array.get(subcube_hit.cube_ahead()) {
                                 s.trace_through_surface(
-                                    pixel_block_data,
-                                    voxel.color,
-                                    match impl_fields.options.lighting_display {
-                                        LightingOption::None => Rgb::ONE,
-                                        LightingOption::Flat => self.get_lighting(
-                                            hit.cube_ahead() + subcube_hit.face().normal_vector(),
-                                        ),
-                                        LightingOption::Smooth => self.get_interpolated_light(
-                                            subcube_hit.intersection_point(sub_ray) * antiscale
-                                                + hit
-                                                    .cube_ahead()
-                                                    .map(FreeCoordinate::from)
-                                                    .to_vec(),
-                                            subcube_hit.face(),
-                                        ),
+                                    Surface {
+                                        block_data: pixel_block_data,
+                                        diffuse_color: voxel.color,
+                                        illumination: match impl_fields.options.lighting_display {
+                                            LightingOption::None => Rgb::ONE,
+                                            LightingOption::Flat => self.get_lighting(
+                                                hit.cube_ahead()
+                                                    + subcube_hit.face().normal_vector(),
+                                            ),
+                                            LightingOption::Smooth => self.get_interpolated_light(
+                                                subcube_hit.intersection_point(sub_ray) * antiscale
+                                                    + hit
+                                                        .cube_ahead()
+                                                        .map(FreeCoordinate::from)
+                                                        .to_vec(),
+                                                subcube_hit.face(),
+                                            ),
+                                        },
+                                        normal: subcube_hit.face(),
                                     },
-                                    subcube_hit.face(),
                                     impl_fields.options,
                                 );
                             }
@@ -491,36 +500,16 @@ impl<P: PixelBuf> TracingState<P> {
     }
 
     /// Apply the effect of a given surface color.
-    ///
-    /// Note this is not true volumetric ray tracing: we're considering each
-    /// voxel surface to be discrete.
     #[inline]
     fn trace_through_surface(
         &mut self,
-        block_data: &P::BlockData,
-        surface: Rgba,
-        lighting: Rgb,
-        face: Face,
+        surface: Surface<'_, P::BlockData>,
         options: &GraphicsOptions,
     ) {
-        let surface = options.transparency.limit_alpha(surface);
-        if surface.fully_transparent() {
-            return;
+        if let Some(color) = surface.to_lit_color(options) {
+            self.pixel_buf.add(color, surface.block_data);
         }
-        let adjusted_rgb = surface.to_rgb() * lighting * fixed_directional_lighting(face);
-        self.pixel_buf
-            .add(adjusted_rgb.with_alpha(surface.alpha()), block_data);
     }
-}
-
-/// Simple directional lighting used to give corners extra definition.
-/// Note that this algorithm is also implemented in the fragment shader for GPU rendering.
-fn fixed_directional_lighting(face: Face) -> f32 {
-    let normal = face.normal_vector();
-    const LIGHT_1_DIRECTION: Vector3<f32> = Vector3::new(0.4, -0.1, 0.0);
-    const LIGHT_2_DIRECTION: Vector3<f32> = Vector3::new(-0.4, 0.35, 0.25);
-    (1.0 - 1.0 / 16.0)
-        + 0.25 * (LIGHT_1_DIRECTION.dot(normal).max(0.0) + LIGHT_2_DIRECTION.dot(normal).max(0.0))
 }
 
 #[cfg(feature = "rayon")]
