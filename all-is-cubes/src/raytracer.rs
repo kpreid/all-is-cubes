@@ -12,6 +12,7 @@
 //! by the terminal UI and in unit tests via [`print_space`].
 
 use std::convert::TryFrom as _;
+use std::fmt;
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector3};
 use cgmath::{Point3, Vector4};
@@ -384,6 +385,19 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
         }
 
         Ok(total_info)
+    }
+}
+
+impl<P: PixelBuf> fmt::Debug for SpaceRaytracer<P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.with(|impl_fields| {
+            f.debug_struct("SpaceRaytracer")
+                .field("blocks.len", &impl_fields.blocks.len())
+                .field("cubes.grid", &impl_fields.cubes.grid())
+                .field("options", &impl_fields.options)
+                .field("sky_color", &impl_fields.sky_color)
+                .finish_non_exhaustive()
+        })
     }
 }
 
