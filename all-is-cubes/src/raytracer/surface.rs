@@ -7,7 +7,7 @@ use crate::block::{recursive_ray, Evoxel};
 use crate::camera::LightingOption;
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
-use crate::raytracer::{PixelBuf, SpaceRaytracer, TracingBlock};
+use crate::raytracer::{PixelBuf, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::GridArray;
 
 /// Description of a surface the ray passes through (or from the volumetric perspective,
@@ -97,30 +97,31 @@ pub(crate) enum TraceStep<'a, D> {
 
 /// An [`Iterator`] which reports each visible surface a [`Raycaster`] ray passes through.
 // TODO: make public?
-// TODO: Make it unnecessary to refer to the PixelBuf type
 #[derive(Clone, Debug)]
-pub(crate) struct SurfaceIter<'a, P: PixelBuf> {
+pub(crate) struct SurfaceIter<'a, D: 'static> {
     ray: Ray,
     block_raycaster: Raycaster,
-    current_block: Option<VoxelSurfaceIter<'a, P::BlockData>>,
-    // TODO: Maybe wrap references to the internal data storage instead
-    space_data: &'a SpaceRaytracer<P>,
+    current_block: Option<VoxelSurfaceIter<'a, D>>,
+    array: &'a GridArray<TracingCubeData<'a, D>>,
 }
 
-impl<'a, P: PixelBuf> SurfaceIter<'a, P> {
+impl<'a, D: 'static> SurfaceIter<'a, D> {
     #[inline]
-    pub(crate) fn new(rt: &'a SpaceRaytracer<P>, ray: Ray) -> Self {
+    pub(crate) fn new<P>(rt: &'a SpaceRaytracer<P>, ray: Ray) -> Self
+    where
+        P: PixelBuf<BlockData = D>,
+    {
         Self {
             ray,
             block_raycaster: ray.cast().within_grid(rt.0.borrow_cubes().grid()),
             current_block: None,
-            space_data: rt,
+            array: rt.0.borrow_cubes(),
         }
     }
 }
 
-impl<'a, P: PixelBuf> Iterator for SurfaceIter<'a, P> {
-    type Item = TraceStep<'a, P::BlockData>;
+impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
+    type Item = TraceStep<'a, D>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(b) = &mut self.current_block {
@@ -133,42 +134,40 @@ impl<'a, P: PixelBuf> Iterator for SurfaceIter<'a, P> {
 
         let rc_step = self.block_raycaster.next()?;
 
-        Some(
-            match &self.space_data.0.borrow_cubes()[rc_step.cube_ahead()].block {
-                TracingBlock::Atom(block_data, color) => {
-                    if color.fully_transparent() {
-                        // The caller could generically skip transparent, but if we do it then
-                        // we can skip light lookups. (TODO: maybe light lookups should be lazy too.)
-                        TraceStep::Invisible
-                    } else {
-                        TraceStep::EnterSurface(Surface {
-                            block_data,
-                            diffuse_color: *color,
-                            cube: rc_step.cube_ahead(),
-                            intersection_point: rc_step.intersection_point(self.ray),
-                            normal: rc_step.face(),
-                        })
-                    }
-                }
-                TracingBlock::Recur(block_data, resolution, array) => {
-                    let block_cube = rc_step.cube_ahead();
-                    let resolution = *resolution;
-                    let sub_ray = recursive_ray(self.ray, block_cube, resolution);
-                    let antiscale = FreeCoordinate::from(resolution).recip();
-
-                    self.current_block = Some(VoxelSurfaceIter {
-                        voxel_ray: sub_ray,
-                        voxel_raycaster: sub_ray.cast().within_grid(array.grid()),
+        Some(match &self.array[rc_step.cube_ahead()].block {
+            TracingBlock::Atom(block_data, color) => {
+                if color.fully_transparent() {
+                    // The caller could generically skip transparent, but if we do it then
+                    // we can skip some math too.
+                    TraceStep::Invisible
+                } else {
+                    TraceStep::EnterSurface(Surface {
                         block_data,
-                        antiscale,
-                        array,
-                        block_cube,
-                    });
-
-                    TraceStep::EnterBlock
+                        diffuse_color: *color,
+                        cube: rc_step.cube_ahead(),
+                        intersection_point: rc_step.intersection_point(self.ray),
+                        normal: rc_step.face(),
+                    })
                 }
-            },
-        )
+            }
+            TracingBlock::Recur(block_data, resolution, array) => {
+                let block_cube = rc_step.cube_ahead();
+                let resolution = *resolution;
+                let sub_ray = recursive_ray(self.ray, block_cube, resolution);
+                let antiscale = FreeCoordinate::from(resolution).recip();
+
+                self.current_block = Some(VoxelSurfaceIter {
+                    voxel_ray: sub_ray,
+                    voxel_raycaster: sub_ray.cast().within_grid(array.grid()),
+                    block_data,
+                    antiscale,
+                    array,
+                    block_cube,
+                });
+
+                TraceStep::EnterBlock
+            }
+        })
     }
 
     // TODO: implement fold if it helps
@@ -199,7 +198,6 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
             return Some(TraceStep::Invisible);
         }
 
-        // TODO: Refactor this to have fewer double-indirections, at least if it's faster that way.
         Some(TraceStep::EnterSurface(Surface {
             block_data: self.block_data,
             diffuse_color: voxel.color,
