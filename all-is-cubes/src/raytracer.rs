@@ -20,18 +20,18 @@ use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
-use crate::block::{recursive_ray, Evoxel, Resolution};
-use crate::camera::{Camera, GraphicsOptions, LightingOption};
+use crate::block::{Evoxel, Resolution};
+use crate::camera::{Camera, GraphicsOptions};
 use crate::math::{smoothstep, GridCoordinate};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
-use crate::space::{Grid, GridArray, PackedLight, Space};
+use crate::space::{GridArray, PackedLight, Space};
 
 mod pixel_buf;
 pub use pixel_buf::*;
 
 mod surface;
-use surface::Surface;
+use surface::{Surface, SurfaceIter, TraceStep};
 // TODO: pub use surface::*;
 
 mod text;
@@ -77,70 +77,21 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     /// Computes a single image pixel from the given ray.
     pub fn trace_ray(&self, ray: Ray) -> (P::Pixel, RaytraceInfo) {
         self.0.with(|impl_fields| {
-            let cubes = impl_fields.cubes;
             let mut s: TracingState<P> = TracingState::default();
-            for hit in ray.cast().within_grid(cubes.grid()) {
+            for step in SurfaceIter::new(self, ray) {
                 if s.count_step_should_stop() {
                     break;
                 }
 
-                match &cubes[hit.cube_ahead()].block {
-                    TracingBlock::Atom(pixel_block_data, color) => {
-                        if color.fully_transparent() {
-                            continue;
-                        }
-                        // TODO: To implement TransparencyOption::Volumetric we need to peek forward to the next change of color and find the distance between them, but only if the alpha is not 0 or 1. (Same here and in the recursive block case.)
-                        s.trace_through_surface(
-                            Surface {
-                                block_data: pixel_block_data,
-                                diffuse_color: *color,
-                                illumination: match impl_fields.options.lighting_display {
-                                    LightingOption::None => Rgb::ONE,
-                                    LightingOption::Flat => self.get_lighting(hit.cube_behind()),
-                                    LightingOption::Smooth => self.get_interpolated_light(
-                                        hit.intersection_point(ray),
-                                        hit.face(),
-                                    ),
-                                },
-                                normal: hit.face(),
-                            },
-                            impl_fields.options,
-                        );
+                use TraceStep::*;
+                match step {
+                    Invisible | EnterBlock => {
+                        // Side effect: called count_step_should_stop.
                     }
-                    TracingBlock::Recur(pixel_block_data, resolution, array) => {
-                        let resolution = *resolution;
-                        let sub_ray = recursive_ray(ray, hit.cube_ahead(), resolution);
-                        let antiscale = FreeCoordinate::from(resolution).recip();
-                        for subcube_hit in sub_ray.cast().within_grid(Grid::for_block(resolution)) {
-                            if s.count_step_should_stop() {
-                                break;
-                            }
-                            if let Some(voxel) = array.get(subcube_hit.cube_ahead()) {
-                                s.trace_through_surface(
-                                    Surface {
-                                        block_data: pixel_block_data,
-                                        diffuse_color: voxel.color,
-                                        illumination: match impl_fields.options.lighting_display {
-                                            LightingOption::None => Rgb::ONE,
-                                            LightingOption::Flat => self.get_lighting(
-                                                hit.cube_ahead()
-                                                    + subcube_hit.face().normal_vector(),
-                                            ),
-                                            LightingOption::Smooth => self.get_interpolated_light(
-                                                subcube_hit.intersection_point(sub_ray) * antiscale
-                                                    + hit
-                                                        .cube_ahead()
-                                                        .map(FreeCoordinate::from)
-                                                        .to_vec(),
-                                                subcube_hit.face(),
-                                            ),
-                                        },
-                                        normal: subcube_hit.face(),
-                                    },
-                                    impl_fields.options,
-                                );
-                            }
-                        }
+                    EnterSurface(surface) => {
+                        debug_assert!(!surface.diffuse_color.fully_transparent());
+                        // TODO: To implement TransparencyOption::Volumetric we need to peek forward to the next change of color and find the distance between them, but only if the alpha is not 0 or 1.
+                        s.trace_through_surface(surface, impl_fields.options);
                     }
                 }
             }
