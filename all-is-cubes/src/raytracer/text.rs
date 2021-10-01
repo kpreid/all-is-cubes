@@ -127,7 +127,7 @@ mod tests {
         let mut output = String::new();
         print_space_impl(&space, (1., 1., 1.), |s| output += s);
         print!("{}", output);
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             output,
             "\
             ................................................................................\n\
@@ -197,7 +197,7 @@ mod tests {
         let mut output = String::new();
         print_space_impl(&space, (1., 1., 1.), |s| output += s);
         print!("{}", output);
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             output,
             "\
                 ................................................................................\n\
