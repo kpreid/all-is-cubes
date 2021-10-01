@@ -1,10 +1,10 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3};
 
 use crate::block::{recursive_ray, Evoxel};
-use crate::camera::{GraphicsOptions, LightingOption};
+use crate::camera::LightingOption;
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::raytracer::{PixelBuf, SpaceRaytracer, TracingBlock};
@@ -13,12 +13,15 @@ use crate::space::GridArray;
 /// Description of a surface the ray passes through (or from the volumetric perspective,
 /// a transition from one material to another).
 // TODO: make public?
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Surface<'a, D> {
     pub block_data: &'a D,
     // pub voxel_data: ...?,
     pub diffuse_color: Rgba,
-    pub illumination: Rgb,
+    /// The cube of the [`Space`] which contains the block this surface belongs to.
+    cube: GridPoint,
+    /// The point in the [`Space`]'s coordinate system where the ray intersected the surface.
+    intersection_point: Point3<FreeCoordinate>,
     pub normal: Face,
 }
 
@@ -29,14 +32,34 @@ impl<D> Surface<'_, D> {
     /// Note this is not true volumetric ray tracing: we're considering each
     /// voxel surface to be discrete.
     #[inline]
-    pub(crate) fn to_lit_color(&self, options: &GraphicsOptions) -> Option<Rgba> {
-        let diffuse_color = options.transparency.limit_alpha(self.diffuse_color);
+    pub(crate) fn to_lit_color<P>(&self, rt: &SpaceRaytracer<P>) -> Option<Rgba>
+    where
+        P: PixelBuf<BlockData = D>,
+    {
+        let diffuse_color =
+            rt.0.borrow_options()
+                .transparency
+                .limit_alpha(self.diffuse_color);
         if diffuse_color.fully_transparent() {
             return None;
         }
-        let adjusted_rgb =
-            diffuse_color.to_rgb() * self.illumination * fixed_directional_lighting(self.normal);
+        let adjusted_rgb = diffuse_color.to_rgb()
+            * self.compute_illumination(rt)
+            * fixed_directional_lighting(self.normal);
         Some(adjusted_rgb.with_alpha(diffuse_color.alpha()))
+    }
+
+    pub fn compute_illumination<P>(&self, rt: &SpaceRaytracer<P>) -> Rgb
+    where
+        P: PixelBuf<BlockData = D>,
+    {
+        match rt.0.borrow_options().lighting_display {
+            LightingOption::None => Rgb::ONE,
+            LightingOption::Flat => rt.get_lighting(self.cube + self.normal.normal_vector()),
+            LightingOption::Smooth => {
+                rt.get_interpolated_light(self.intersection_point, self.normal)
+            }
+        }
     }
 }
 
@@ -51,7 +74,7 @@ fn fixed_directional_lighting(face: Face) -> f32 {
 }
 
 /// Output of [`SurfaceIter`], describing a single step of the raytracing process.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum TraceStep<'a, D> {
     /// A block or voxel surface as described was entered.
     ///
@@ -101,7 +124,7 @@ impl<'a, P: PixelBuf> Iterator for SurfaceIter<'a, P> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(b) = &mut self.current_block {
-            if let Some(surface) = b.next(self.space_data) {
+            if let Some(surface) = b.next() {
                 return Some(surface);
             }
         }
@@ -121,17 +144,8 @@ impl<'a, P: PixelBuf> Iterator for SurfaceIter<'a, P> {
                         TraceStep::EnterSurface(Surface {
                             block_data,
                             diffuse_color: *color,
-                            illumination: match self.space_data.0.borrow_options().lighting_display
-                            {
-                                LightingOption::None => Rgb::ONE,
-                                LightingOption::Flat => {
-                                    self.space_data.get_lighting(rc_step.cube_behind())
-                                }
-                                LightingOption::Smooth => self.space_data.get_interpolated_light(
-                                    rc_step.intersection_point(self.ray),
-                                    rc_step.face(),
-                                ),
-                            },
+                            cube: rc_step.cube_ahead(),
+                            intersection_point: rc_step.intersection_point(self.ray),
                             normal: rc_step.face(),
                         })
                     }
@@ -174,10 +188,9 @@ struct VoxelSurfaceIter<'a, D: 'static> {
     block_cube: GridPoint,
 }
 impl<'a, D> VoxelSurfaceIter<'a, D> {
-    fn next<P>(&mut self, data: &SpaceRaytracer<P>) -> Option<TraceStep<'a, D>>
-    where
-        P: PixelBuf<BlockData = D>,
-    {
+    /// This is not an  implementation of `Iterator` because it doesn't need to be — it's
+    /// purely internal to [`SurfaceIter`].
+    fn next(&mut self) -> Option<TraceStep<'a, D>> {
         // Fetch data and return None if out of range.
         let rc_step = self.voxel_raycaster.next()?;
         let voxel = self.array.get(rc_step.cube_ahead())?;
@@ -190,17 +203,9 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
         Some(TraceStep::EnterSurface(Surface {
             block_data: self.block_data,
             diffuse_color: voxel.color,
-            illumination: match data.0.borrow_options().lighting_display {
-                LightingOption::None => Rgb::ONE,
-                LightingOption::Flat => {
-                    data.get_lighting(self.block_cube + rc_step.face().normal_vector())
-                }
-                LightingOption::Smooth => data.get_interpolated_light(
-                    rc_step.intersection_point(self.voxel_ray) * self.antiscale
-                        + self.block_cube.map(FreeCoordinate::from).to_vec(),
-                    rc_step.face(),
-                ),
-            },
+            cube: self.block_cube,
+            intersection_point: rc_step.intersection_point(self.voxel_ray) * self.antiscale
+                + self.block_cube.map(FreeCoordinate::from).to_vec(),
             normal: rc_step.face(),
         }))
     }
@@ -210,9 +215,10 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
 mod tests {
     use super::*;
     use crate::block::Block;
+    use crate::camera::GraphicsOptions;
     use crate::content::{make_slab, palette};
     use crate::raytracer::ColorBuf;
-    use crate::space::{Grid, LightPhysics, Space};
+    use crate::space::{Grid, Space};
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
     use TraceStep::{EnterBlock, EnterSurface, Invisible};
@@ -221,12 +227,7 @@ mod tests {
     fn surface_iter_smoke_test() {
         let universe = &mut Universe::new();
 
-        // Test space, with light disabled so we don't have to think about
-        // the effects of light.
-        let mut space = Space::builder(Grid::new([0, 0, 0], [1, 3, 1]))
-            .light_physics(LightPhysics::None)
-            .build_empty();
-        let illumination = Rgb::ONE;
+        let mut space = Space::builder(Grid::new([0, 0, 0], [1, 3, 1])).build_empty();
 
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
         space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
@@ -242,14 +243,16 @@ mod tests {
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: solid_test_color,
-                    illumination,
+                    cube: GridPoint::new(0, 1, 0),
+                    intersection_point: Point3::new(0.5, 1.0, 0.5),
                     normal: Face::NY
                 }),
                 EnterBlock,
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: palette::PLANK.with_alpha_one(),
-                    illumination,
+                    cube: GridPoint::new(0, 2, 0),
+                    intersection_point: Point3::new(0.5, 2.0, 0.5),
                     normal: Face::NY
                 }),
                 // Second layer of slab.
@@ -258,7 +261,8 @@ mod tests {
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: (palette::PLANK * 1.06).with_alpha_one(),
-                    illumination,
+                    cube: GridPoint::new(0, 2, 0),
+                    intersection_point: Point3::new(0.5, 2.25, 0.5),
                     normal: Face::NY
                 }),
                 // Two top layers of slab.

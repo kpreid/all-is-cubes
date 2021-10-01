@@ -91,7 +91,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                     EnterSurface(surface) => {
                         debug_assert!(!surface.diffuse_color.fully_transparent());
                         // TODO: To implement TransparencyOption::Volumetric we need to peek forward to the next change of color and find the distance between them, but only if the alpha is not 0 or 1.
-                        s.trace_through_surface(surface, impl_fields.options);
+                        s.trace_through_surface(surface, self);
                     }
                 }
             }
@@ -469,9 +469,9 @@ impl<P: PixelBuf> TracingState<P> {
     fn trace_through_surface(
         &mut self,
         surface: Surface<'_, P::BlockData>,
-        options: &GraphicsOptions,
+        rt: &SpaceRaytracer<P>,
     ) {
-        if let Some(color) = surface.to_lit_color(options) {
+        if let Some(color) = surface.to_lit_color(rt) {
             self.pixel_buf.add(color, surface.block_data);
         }
     }
