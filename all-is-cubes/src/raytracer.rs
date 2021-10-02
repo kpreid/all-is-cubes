@@ -456,6 +456,17 @@ impl<P: PixelBuf> TracingState<P> {
         self.pixel_buf
             .add(sky_color.with_alpha_one(), &P::sky_block_data());
 
+        // Debug visualization of number of raytracing steps.
+        // TODO: Make this togglable and less of a kludge — we'd like to be able to mix with
+        // the regular color view, but PixelBuf doesn't make that easy.
+        if false {
+            self.pixel_buf = Default::default();
+            self.pixel_buf.add(
+                (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32).with_alpha_one(),
+                &P::sky_block_data(),
+            );
+        }
+
         (
             self.pixel_buf.result(),
             RaytraceInfo {
