@@ -483,8 +483,7 @@ impl TerminalMain {
         let mut current_color = None;
 
         // TODO: aim for less number casting
-        // This is the size of the image patch corresponding to one character cell
-        let character_size = viewport
+        let image_size_in_characters = viewport
             .framebuffer_size
             .map(|s| s as usize)
             .div_element_wise(options.rays_per_character().map(usize::from));
@@ -492,8 +491,8 @@ impl TerminalMain {
         let mut rect = self.viewport_position;
         // Clamp rect to match the actual image data size, to avoid trying to read the
         // image data out of bounds. (This should be only temporary while resizing.)
-        rect.width = rect.width.min(viewport.framebuffer_size.x as u16);
-        rect.height = rect.height.min(viewport.framebuffer_size.y as u16);
+        rect.width = rect.width.min(image_size_in_characters.x as u16);
+        rect.height = rect.height.min(image_size_in_characters.y as u16);
 
         for y in 0..rect.height {
             backend.queue(MoveTo(rect.x, rect.y + y))?;
@@ -503,7 +502,7 @@ impl TerminalMain {
                     &options,
                     &*image,
                     Vector2::new(x as usize, y as usize),
-                    character_size,
+                    image_size_in_characters,
                 );
 
                 let width = write_colored_and_measure(
