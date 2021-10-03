@@ -75,6 +75,17 @@ fn fixed_directional_lighting(face: Face) -> f32 {
         + 0.25 * (LIGHT_1_DIRECTION.dot(normal).max(0.0) + LIGHT_2_DIRECTION.dot(normal).max(0.0))
 }
 
+/// Builds on [`Surface`] to report the depth (length of ray through volume)
+/// of a transparent surface.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Span<'a, D> {
+    pub surface: Surface<'a, D>,
+    /// Distance along the ray at which the ray exits this volume.
+    ///
+    /// The `surface.t_distance` is the corresponding entry point.
+    pub exit_t_distance: FreeCoordinate,
+}
+
 /// Output of [`SurfaceIter`], describing a single step of the raytracing process.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum TraceStep<'a, D> {
@@ -229,6 +240,60 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
             normal: rc_step.face(),
         }))
     }
+}
+
+/// Builds on [`SurfaceIter`] to report spans of transparency along the ray.
+pub(crate) struct DepthIter<'a, D: 'static> {
+    surface_iter: SurfaceIter<'a, D>,
+    /// Present if the last `EnterSurface` we discovered was transparent, or if
+    /// we have another surface to report.
+    last_surface: Option<Surface<'a, D>>,
+}
+
+impl<'a, D> DepthIter<'a, D> {
+    #[inline]
+    pub(crate) fn new(surface_iter: SurfaceIter<'a, D>) -> Self {
+        Self {
+            surface_iter,
+            last_surface: None,
+        }
+    }
+}
+
+impl<'a, D> Iterator for DepthIter<'a, D> {
+    type Item = DepthStep<'a, D>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        // TODO: .next()? isn't quite right; we need to flush the last input, potentially? Or, no, that should never happen, but we should assert that.
+        Some(match self.surface_iter.next()? {
+            TraceStep::EnterSurface(this_surface) => {
+                let exit_t_distance = this_surface.t_distance;
+                match std::mem::replace(&mut self.last_surface, Some(this_surface)) {
+                    Some(last_surface) => DepthStep::Span(Span {
+                        surface: last_surface,
+                        exit_t_distance,
+                    }),
+                    None => DepthStep::Invisible,
+                }
+            }
+            TraceStep::Invisible { t_distance } | TraceStep::EnterBlock { t_distance } => {
+                match self.last_surface.take() {
+                    Some(last_surface) => DepthStep::Span(Span {
+                        surface: last_surface,
+                        exit_t_distance: t_distance,
+                    }),
+                    None => DepthStep::Invisible,
+                }
+            }
+        })
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum DepthStep<'a, D> {
+    Invisible,
+    Span(Span<'a, D>),
 }
 
 #[cfg(test)]
