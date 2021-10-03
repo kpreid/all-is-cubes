@@ -128,8 +128,18 @@ impl Space {
             // TODO: compute index only once
             self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
             self.notifier.notify(SpaceChange::Lighting(cube));
-            for cube in dependencies {
-                self.light_needs_update(cube, difference_priority);
+
+            // The light algorithm, in its current form, can spend a very long time
+            // evaluating 1-unit differences and possibly even loop infinitely. As a
+            // pragmatic solution, don't bother queueing them at all. This means that
+            // there may be 1-unit random differences lying around, but then, the
+            // "reevaluate all the dependencies of the current evaluation" strategy
+            // is also not perfect at updating everything that theoretically should be,
+            // since the rays are not perfectly reciprocal.
+            if difference_priority > 1 {
+                for cube in dependencies {
+                    self.light_needs_update(cube, difference_priority);
+                }
             }
         }
         (difference_priority, cost, info)
@@ -515,6 +525,7 @@ mod tests {
     use super::*;
     use crate::listen::Sink;
     use crate::space::Space;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn initial_lighting_value() {
@@ -642,14 +653,16 @@ mod tests {
             adjacents,
             // TODO: make this test less fragile. The asymmetry isn't even wanted;
             // I think it's probably due to exactly diagonal rays.
+            // Some of the values also differ due to our current choice of discarding
+            // light updates with priority 1.
             FaceMap {
                 within: light,
                 nx: Rgb::new(0.13053422, 0.26106843, 0.52213687),
                 ny: Rgb::new(0.16210495, 0.3242099, 0.6484198),
-                nz: Rgb::new(0.2102241, 0.4204482, 0.8408964),
+                nz: Rgb::new(0.20131129, 0.40262258, 0.80524516),
                 px: Rgb::new(0.13053422, 0.26106843, 0.52213687),
                 py: Rgb::new(0.16210495, 0.3242099, 0.6484198),
-                pz: Rgb::new(0.2102241, 0.4204482, 0.8408964)
+                pz: Rgb::new(0.20131129, 0.40262258, 0.80524516),
             },
         );
     }
