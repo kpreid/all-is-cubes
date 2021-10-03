@@ -18,8 +18,8 @@ bench = false
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
 instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }
+maze_generator = "1.1.1"
+noise = { version = "0.7.0", default-features = false }
 rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
-noise = { version = "0.7.0", default-features = false }
 strum = { version = "0.22.0", default-features = false, features = ["derive"] }
-

@@ -11,7 +11,7 @@ use all_is_cubes::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, 
 use all_is_cubes::space::{Grid, LightPhysics, Space};
 use all_is_cubes::universe::{Name, Universe, UniverseIndex};
 
-use crate::{atrium::atrium, demo_city, install_demo_blocks};
+use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 
 /// Selection of initial content for constructing a new [`Universe`].
 //
@@ -34,6 +34,7 @@ pub enum UniverseTemplate {
     /// Always produces an error, for testing error-handling functionality.
     Fail,
     DemoCity,
+    Dungeon,
     Atrium,
     CornellBox,
     PhysicsLab,
@@ -51,6 +52,7 @@ impl UniverseTemplate {
                 "space".into(), // TODO: should be able to not provide a dummy name
             )),
             DemoCity => new_universe_with_space_setup(demo_city),
+            Dungeon => new_universe_with_space_setup(demo_dungeon),
             Atrium => new_universe_with_space_setup(atrium),
             CornellBox => new_universe_with_space_setup(cornell_box),
             PhysicsLab => new_universe_with_space_setup(|_| physics_lab(50, 16)),

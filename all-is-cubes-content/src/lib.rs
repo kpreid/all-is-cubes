@@ -29,6 +29,7 @@ mod city;
 pub(crate) use city::*;
 mod demo;
 pub use demo::*;
+mod dungeon;
 mod exhibits;
 pub(crate) use exhibits::*;
 mod landscape;

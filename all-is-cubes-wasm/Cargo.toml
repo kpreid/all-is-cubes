@@ -25,8 +25,10 @@ all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
 console_log = "0.2"
 console_error_panic_hook = "0.1.5"
 form_urlencoded = "1.0.1"
-# Feature enabling for indirect dependency all-is-cubes → random → getrand
+# Feature enabling for indirect dependency all-is-cubes → rand → getrandom
 getrandom = { version = "0.2.3", features = ["js"] }
+# Feature enabling for indirect dependency all-is-cubes-content → maze_generator → rand → getrandom
+getrandom_old = { package = "getrandom", version = "0.1.16", features = ["wasm-bindgen"] }
 gloo-timers = { version = "0.2.1", default-features = false, features = ["futures"] }
 # Feature enabling for indirect dependency all-is-cubes → instant
 instant = { version = "0.1.9", features = ["wasm-bindgen"] }
