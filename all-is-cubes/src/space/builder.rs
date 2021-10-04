@@ -2,7 +2,6 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use cgmath::{EuclideanSpace, InnerSpace, Point3};
-use ordered_float::NotNan;
 
 use crate::character::Spawn;
 use crate::math::{FreeCoordinate, Rgb};
@@ -68,13 +67,12 @@ impl SpaceBuilder {
             position.to_vec().magnitude2().is_finite(),
             "spawn_position must be finite"
         );
-        let position = position.map(|c| NotNan::new(c).unwrap());
 
         let grid = self.grid;
         let mut spawn = self
             .spawn
             .unwrap_or_else(|| Spawn::default_for_new_space(grid));
-        spawn.position = position;
+        spawn.set_eye_position(position);
         self.spawn = Some(spawn);
         self
     }

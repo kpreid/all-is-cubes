@@ -9,9 +9,7 @@ use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::Character;
 use all_is_cubes::linking::{GenError, InGenError};
-use all_is_cubes::math::{
-    FreeCoordinate, GridCoordinate, GridPoint, GridVector, NotNan, Rgb, Rgba,
-};
+use all_is_cubes::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use all_is_cubes::space::{Grid, LightPhysics, Space};
 use all_is_cubes::universe::{Name, Universe, UniverseIndex};
 
@@ -202,9 +200,12 @@ fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenErro
     )?;
 
     let spawn = space.spawn_mut();
-    spawn.position = Point3::new(0., FreeCoordinate::from(planet_radius) + 2., 0.)
-        .map(|s| NotNan::new(s).unwrap());
-    spawn.flying = false;
+    spawn.set_eye_position(Point3::new(
+        0.,
+        FreeCoordinate::from(planet_radius) + 2.,
+        0.,
+    ));
+    spawn.set_flying(false);
 
     Ok(space)
 }

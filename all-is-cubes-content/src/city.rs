@@ -14,7 +14,6 @@ use all_is_cubes::drawing::embedded_graphics::{
     prelude::{Dimensions, Transform},
     text::{Baseline, Text},
 };
-use all_is_cubes::math::NotNan;
 
 use all_is_cubes::block::{Block, Resolution};
 use all_is_cubes::block::{BlockAttributes, BlockCollision, AIR};
@@ -75,13 +74,11 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         .light_physics(LightPhysics::None) // disable until we are done with bulk updates
         .spawn({
             // TODO: Add incremental spawn configuration to SpaceBuilder?
-            let mut spawn = Spawn {
-                position: (grid.center() + Vector3::new(0.5, 2.91, 8.5))
-                    .map(|s| NotNan::new(s).unwrap()),
-                flying: false,
-                ..Spawn::default_for_new_space(grid)
-            };
+            let mut spawn = Spawn::default_for_new_space(grid);
+            spawn.set_eye_position(grid.center() + Vector3::new(0.5, 2.91, 8.5));
+            spawn.set_flying(false);
             // Initial inventory contents. TODO: Make a better list.
+            let mut inventory = Vec::new();
             for block in [
                 &landscape_blocks[Grass],
                 &landscape_blocks[Dirt],
@@ -92,10 +89,9 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                 &demo_blocks[Signboard],
                 &demo_blocks[Arrow],
             ] {
-                spawn
-                    .inventory
-                    .push(Slot::stack(100, Tool::Block(block.clone())));
+                inventory.push(Slot::stack(100, Tool::Block(block.clone())));
             }
+            spawn.set_inventory(inventory);
             spawn
         })
         .build_empty();

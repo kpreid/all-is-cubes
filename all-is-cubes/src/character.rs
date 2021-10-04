@@ -490,19 +490,18 @@ impl fmt::Display for Cursor {
 }
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
+///
+/// TODO: This is lacking a full set of accessor methods to be viewable+editable.
 #[derive(Clone, Debug, Eq, PartialEq)]
-// #[non_exhaustive] // TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via BlockBuilder.
 pub struct Spawn {
     /// Position, in cube coordinates.
-    ///
-    /// TODO: Replace this with something that can do noncolliding or random placement.
-    /// TODO: We do want to ensure that the data is comparable, but NotNan is inconvenient to create;
-    /// provide convenience.
-    pub position: Point3<NotNan<FreeCoordinate>>,
+    position: Point3<NotNan<FreeCoordinate>>,
 
-    pub flying: bool,
+    /// Flying (ignoring gravity, able to move in 3 dimensions).
+    flying: bool,
 
-    pub inventory: Vec<Slot>,
+    /// Initial inventory contents, created from nothing.
+    inventory: Vec<Slot>,
 }
 
 impl Spawn {
@@ -528,6 +527,28 @@ impl Spawn {
             eye_for_look_at(space_bounds, direction.into()).map(|s| NotNan::new(s).unwrap());
         //spawn.look_at(space_bounds.center());  // TODO
         spawn
+    }
+
+    /// Sets the position at which the character will appear, in terms of its viewpoint.
+    pub fn set_eye_position(&mut self, position: impl Into<Point3<FreeCoordinate>>) {
+        let position = position.into();
+        // TODO: If we're going to suppress NaN, then it makes sense to suppress infinities too; come up with a general theory of how we want all-is-cubes to handle unreasonable positions.
+        self.position = Point3 {
+            x: NotNan::new(position.x).unwrap_or(notnan!(0.)),
+            y: NotNan::new(position.y).unwrap_or(notnan!(0.)),
+            z: NotNan::new(position.z).unwrap_or(notnan!(0.)),
+        };
+    }
+
+    /// Sets the starting inventory items.
+    pub fn set_inventory(&mut self, inventory: Vec<Slot>) {
+        self.inventory = inventory;
+    }
+
+    /// Set whether the character is initially flying (not subject to gravity).
+    /// TODO: Need interface for controlling _ability_ to fly.
+    pub fn set_flying(&mut self, flying: bool) {
+        self.flying = flying;
     }
 }
 
