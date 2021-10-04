@@ -88,24 +88,43 @@ where
     f(text)
 }
 
-/// Given a room's bounding box, act on its four walls.
+/// Given a room's exterior bounding box, act on its four walls.
 ///
 /// The function is given the bottom-left (from an exterior perspective) corner cube
-/// of each wall, the rightward direction of the wall, and its length (counted such
-/// that each wall overlaps its neighbor at the corner).
+/// of each wall, the rightward direction of the wall, its length (counted such
+/// that each wall overlaps its neighbor at the corner), and its bounding box (assuming
+/// the wall is one block thick, but _excluding_ the corners).
 ///
 /// TODO: There is probably other worldgen code that should be using this now that we've invented it.
+///
+/// TODO: Change the callback value to a struct
 pub(crate) fn four_walls<F, E>(bounding_box: Grid, mut f: F) -> Result<(), E>
 where
-    F: FnMut(GridPoint, Face, GridCoordinate) -> Result<(), E>,
+    F: FnMut(GridPoint, Face, GridCoordinate, Grid) -> Result<(), E>,
 {
+    let interior = bounding_box.expand(FaceMap::symmetric([-1, 0, -1]));
     let low = bounding_box.lower_bounds();
     let high = bounding_box.upper_bounds() - GridVector::new(1, 1, 1);
     let size = bounding_box.size();
-    f(low, Face::PZ, size.z)?;
-    f(GridPoint::new(low.x, low.y, high.z), Face::PX, size.x)?;
-    f(GridPoint::new(high.x, low.y, high.z), Face::NZ, size.z)?;
-    f(GridPoint::new(high.x, low.y, low.z), Face::NX, size.x)?;
+    f(low, Face::PZ, size.z, interior.abut(Face::NX, 1).unwrap())?;
+    f(
+        GridPoint::new(low.x, low.y, high.z),
+        Face::PX,
+        size.x,
+        interior.abut(Face::PZ, 1).unwrap(),
+    )?;
+    f(
+        GridPoint::new(high.x, low.y, high.z),
+        Face::NZ,
+        size.z,
+        interior.abut(Face::PX, 1).unwrap(),
+    )?;
+    f(
+        GridPoint::new(high.x, low.y, low.z),
+        Face::NX,
+        size.x,
+        interior.abut(Face::NZ, 1).unwrap(),
+    )?;
     Ok(())
 }
 

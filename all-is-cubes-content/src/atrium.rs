@@ -30,6 +30,7 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     let between_large_arches = between_small_arches * 2 + 1;
     let balcony_radius = 4;
     let large_arch_count = Vector3::new(1, 0, 5); // x, dummy y, z
+    let floor_count = 4;
 
     let origin = Grid::new([0, 0, 0], [1, 1, 1]);
     let atrium_footprint = origin.expand(FaceMap::symmetric([
@@ -46,7 +47,7 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     let top_floor_pos = GridVector::new(0, (ceiling_height + WALL) * 2, 0);
 
     let space_grid = outer_walls_footprint.expand(FaceMap::from_fn(|f| {
-        (f == Face::PY) as GridCoordinate * ceiling_height * 4
+        (f == Face::PY) as GridCoordinate * ceiling_height * floor_count
     }));
 
     let floor_with_cutout = |mut p: GridPoint| {
@@ -69,16 +70,8 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
 
     // Outer walls
     four_walls(
-        outer_walls_footprint.translate([0, WALL, 0]),
-        |origin, direction, length| -> Result<(), InGenError> {
-            // TODO: four_walls should provide this automatically as a convenience
-            let wall_excluding_corners = Grid::single_cube(origin + direction.normal_vector())
-                .union(Grid::single_cube(
-                    origin
-                        + direction.normal_vector() * (length - 2)
-                        + GridVector::new(0, space_grid.size().y - 2, 0), // TODO: cryptic fudge
-                ))
-                .unwrap();
+        space_grid,
+        |_origin, direction, _length, wall_excluding_corners| -> Result<(), InGenError> {
             space.fill_uniform(
                 wall_excluding_corners,
                 blocks[AtriumBlocks::GroundFloor]
@@ -155,7 +148,7 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     ]]);
     four_walls(
         arches_footprint.translate([0, WALL, 0]),
-        |origin, direction, length| {
+        |origin, direction, length, _box| {
             arch_row(
                 &mut space,
                 &blocks,

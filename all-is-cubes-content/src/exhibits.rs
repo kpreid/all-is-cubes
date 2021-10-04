@@ -542,25 +542,21 @@ const COLOR_LIGHTS: Exhibit = Exhibit {
             Grid::new([0, room_height, 0], [room_width, 1, room_length]),
             &wall_block,
         )?;
-        // TODO: Make four_walls more helpful
-        four_walls(space.grid(), |origin, direction, length| {
-            space.fill_uniform(
-                Grid::new(origin + GridVector::unit_y(), [1, room_height + 1, 1]),
-                corner
-                    .clone()
-                    .rotate(GridRotation::from_to(Face::NZ, direction, Face::PY).unwrap()),
-            )?;
-            // TODO: four_walls should provide this automatically as a convenience
-            let wall_excluding_corners = Grid::single_cube(origin + direction.normal_vector())
-                .union(Grid::single_cube(
-                    origin
-                        + direction.normal_vector() * (length - 2)
-                        + GridVector::new(0, room_height + 1, 0),
-                ))
-                .unwrap();
-            space.fill_uniform(wall_excluding_corners, &wall_block)?;
-            Ok::<(), InGenError>(())
-        })?;
+        four_walls(
+            space.grid(),
+            |origin, direction, _length, wall_excluding_corners| {
+                // Corner pillar
+                space.fill_uniform(
+                    Grid::new(origin + GridVector::unit_y(), [1, room_height + 1, 1]),
+                    corner
+                        .clone()
+                        .rotate(GridRotation::from_to(Face::NZ, direction, Face::PY).unwrap()),
+                )?;
+                // Wall face
+                space.fill_uniform(wall_excluding_corners, &wall_block)?;
+                Ok::<(), InGenError>(())
+            },
+        )?;
 
         // Vertical separators
         let separator_width = 2;
