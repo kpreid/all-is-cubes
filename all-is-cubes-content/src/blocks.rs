@@ -45,7 +45,7 @@ impl BlockModule for DemoBlocks {
     }
 }
 
-/// Add to `universe` demo-content blocks, that might be used by demo worldgen or offered to the player.
+/// Add to `universe` demo-content blocks: all of [`DemoBlocks`] and [`LandscapeBlocks`].
 pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
     let resolution = 16;
     let resolution_g = GridCoordinate::from(resolution);
