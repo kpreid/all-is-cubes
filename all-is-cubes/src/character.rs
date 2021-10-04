@@ -632,15 +632,11 @@ mod tests {
         let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(
             0.1, 0.2, 0.3
         ))))];
-
-        let mut universe = Universe::new();
-        let space = Space::empty_positive(1, 1, 1);
-        let spawn = Spawn {
-            inventory: inventory_data.clone(),
-            ..Spawn::default_for_new_space(space.grid())
-        };
-        let space = universe.insert_anonymous(space);
-        let character = Character::spawn(&spawn, space);
+        let character = test_spawn(|space| {
+            let mut spawn = Spawn::default_for_new_space(space.grid());
+            spawn.set_inventory(inventory_data.clone());
+            spawn
+        });
 
         assert_eq!(character.inventory.slots[0], inventory_data[0]);
         assert_eq!(character.inventory.slots[1], Slot::Empty);
