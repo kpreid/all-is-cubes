@@ -4,7 +4,8 @@
 //! Player-character stuff.
 
 use cgmath::{
-    Deg, ElementWise as _, EuclideanSpace as _, InnerSpace as _, Matrix3, Matrix4, Point3, Vector3,
+    Angle as _, Deg, ElementWise as _, EuclideanSpace as _, InnerSpace as _, Matrix3, Matrix4,
+    Point3, Vector3,
 };
 use num_traits::identities::Zero;
 use ordered_float::NotNan;
@@ -119,9 +120,15 @@ impl Character {
             inventory[free] = item.clone();
         }
 
+        let look_direction = spawn.look_direction.map(|c| c.into_inner());
+        let yaw = Deg::atan2(look_direction.x, -look_direction.z);
+        let pitch = Deg::atan2(-look_direction.y, look_direction.z.hypot(look_direction.x));
+
         Self {
             body: Body {
                 flying: spawn.flying,
+                yaw: yaw.0,
+                pitch: pitch.0,
                 ..Body::new_minimal(
                     spawn.position.map(|s| s.into_inner()),
                     Aab::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
@@ -497,6 +504,12 @@ pub struct Spawn {
     /// Position, in cube coordinates.
     position: Point3<NotNan<FreeCoordinate>>,
 
+    /// Direction the character should be facing, or looking at.
+    ///
+    /// TODO: Should we represent a full rotation (quaternion) instead?
+    /// Or something that can't be zero? Nonzero integers, perhaps?
+    look_direction: Vector3<NotNan<FreeCoordinate>>,
+
     /// Flying (ignoring gravity, able to move in 3 dimensions).
     flying: bool,
 
@@ -509,6 +522,7 @@ impl Spawn {
         Spawn {
             position: Point3::origin(), // TODO: pick something better? For what criteria?
             flying: true,
+            look_direction: Vector3::new(notnan!(0.), notnan!(0.), notnan!(-1.)),
             inventory: vec![],
         }
     }
@@ -522,10 +536,10 @@ impl Spawn {
         space_bounds: Grid,
         direction: impl Into<Vector3<FreeCoordinate>>,
     ) -> Self {
+        let direction = direction.into();
         let mut spawn = Self::default_for_new_space(space_bounds);
-        spawn.position =
-            eye_for_look_at(space_bounds, direction.into()).map(|s| NotNan::new(s).unwrap());
-        //spawn.look_at(space_bounds.center());  // TODO
+        spawn.set_eye_position(eye_for_look_at(space_bounds, direction));
+        spawn.set_look_direction(-direction);
         spawn
     }
 
@@ -537,6 +551,18 @@ impl Spawn {
             x: NotNan::new(position.x).unwrap_or(notnan!(0.)),
             y: NotNan::new(position.y).unwrap_or(notnan!(0.)),
             z: NotNan::new(position.z).unwrap_or(notnan!(0.)),
+        };
+    }
+
+    /// Sets the direction the character should be facing, or looking at.
+    ///
+    /// The results are unspecified but harmless if the direction is zero or NaN.
+    pub fn set_look_direction(&mut self, direction: impl Into<Vector3<FreeCoordinate>>) {
+        let direction = direction.into();
+        self.look_direction = Vector3 {
+            x: NotNan::new(direction.x).unwrap_or(notnan!(0.)),
+            y: NotNan::new(direction.y).unwrap_or(notnan!(0.)),
+            z: NotNan::new(direction.z).unwrap_or(notnan!(0.)),
         };
     }
 
@@ -558,6 +584,11 @@ impl<'a> arbitrary::Arbitrary<'a> for Spawn {
         use crate::math::arbitrary_notnan;
         Ok(Self {
             position: Point3::new(
+                arbitrary_notnan(u)?,
+                arbitrary_notnan(u)?,
+                arbitrary_notnan(u)?,
+            ),
+            look_direction: Vector3::new(
                 arbitrary_notnan(u)?,
                 arbitrary_notnan(u)?,
                 arbitrary_notnan(u)?,
@@ -588,6 +619,14 @@ mod tests {
     use crate::transaction::TransactionTester;
     use crate::universe::Universe;
 
+    fn test_spawn(f: impl Fn(&mut Space) -> Spawn) -> Character {
+        let mut universe = Universe::new();
+        let mut space = Space::empty_positive(1, 1, 1);
+        let spawn = f(&mut space);
+        let space = universe.insert_anonymous(space);
+        Character::spawn(&spawn, space)
+    }
+
     #[test]
     fn spawn_inventory() {
         let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(
@@ -606,6 +645,24 @@ mod tests {
         assert_eq!(character.inventory.slots[0], inventory_data[0]);
         assert_eq!(character.inventory.slots[1], Slot::Empty);
         // TODO: Either test the special slot contents or eliminate that mechanism
+    }
+
+    #[test]
+    fn spawn_look_direction_default() {
+        let character = test_spawn(|space| space.spawn().clone());
+        assert_eq!(character.body.yaw, 0.0);
+        assert_eq!(character.body.pitch, 0.0);
+    }
+
+    #[test]
+    fn spawn_look_direction() {
+        let character = test_spawn(|space| {
+            let mut spawn = Spawn::default_for_new_space(space.grid());
+            spawn.set_look_direction(Vector3::new(1., 1., -1.));
+            spawn
+        });
+        assert_eq!(character.body.yaw, 45.0);
+        assert_eq!(character.body.pitch, Deg::atan2(-1., 2.0f64.sqrt()).0);
     }
 
     #[test]
