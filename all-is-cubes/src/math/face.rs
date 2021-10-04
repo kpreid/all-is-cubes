@@ -349,6 +349,22 @@ impl<V> FaceMap<V> {
         }
     }
 
+    /// Returns a vector containing the values for each negative face.
+    pub fn negatives(self) -> Vector3<V>
+    where
+        V: Copy,
+    {
+        Vector3::new(self.nx, self.ny, self.nz)
+    }
+
+    /// Returns a vector containing the values for each positive face.
+    pub fn positives(self) -> Vector3<V>
+    where
+        V: Copy,
+    {
+        Vector3::new(self.px, self.py, self.pz)
+    }
+
     /// Iterate over the map entries by reference.
     pub fn iter<'s>(&'s self) -> impl Iterator<Item = (Face, &V)> + 's {
         Face::ALL_SEVEN.iter().copied().map(move |f| (f, &self[f]))
