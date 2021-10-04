@@ -576,6 +576,52 @@ impl Grid {
             [u.x + deltas[PX], u.y + deltas[PY], u.z + deltas[PZ]],
         )
     }
+
+    /// Returns a [`Grid`] which is touching the given `face` rectangle of `self`,
+    /// with its size in that axis being `thickness`.
+    ///
+    /// Edge cases:
+    /// * If `face` is [`Face::Within`], returns `self`.
+    /// * If `thickness` is negative, panic.
+    ///   (This might be revised to return an intersecting volume.)
+    ///
+    /// For example, it may be used to construct the walls of a room:
+    ///
+    /// ```
+    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Face;
+    ///
+    /// let interior = Grid::from_lower_upper([10, 10, 10], [20, 20, 20]);
+    /// let left_wall = interior.abut(Face::NX, 2)?;
+    /// let right_wall = interior.abut(Face::PX, 2)?;
+    ///
+    /// assert_eq!(left_wall, Grid::from_lower_upper([8, 10, 10], [10, 20, 20]));
+    /// assert_eq!(right_wall, Grid::from_lower_upper([20, 10, 10], [22, 20, 20]));
+    /// # Ok::<(), all_is_cubes::space::GridOverflowError>(())
+    /// ```
+    #[inline]
+    pub fn abut(self, face: Face, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
+        assert!(thickness >= 0);
+        let axis = match face.axis_number() {
+            Some(axis) => axis,
+            None => return Ok(self),
+        };
+
+        let mut size = self.size();
+        size[axis] = thickness;
+
+        let mut lower_bounds = self.lower_bounds();
+        if face.is_positive() {
+            lower_bounds[axis] = self.upper_bounds()[axis];
+        } else {
+            // TODO: better error message
+            lower_bounds[axis] = lower_bounds[axis].checked_sub(thickness).ok_or_else(|| {
+                GridOverflowError("abut() overflowed available range".to_string())
+            })?;
+        }
+
+        Grid::checked_new(lower_bounds, size)
+    }
 }
 
 impl fmt::Debug for Grid {
