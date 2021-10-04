@@ -532,16 +532,10 @@ const COLOR_LIGHTS: Exhibit = Exhibit {
 
         // Construct room.
         // Floor
-        // TODO: Make this easier with an operation like "flatten a Grid to one face"
-        space.fill_uniform(
-            Grid::new([0, -1, 0], [room_width, 1, room_length]),
-            &wall_block,
-        )?;
+        space.fill_uniform(interior.abut(Face::NY, 1).unwrap(), &wall_block)?;
         // Ceiling
-        space.fill_uniform(
-            Grid::new([0, room_height, 0], [room_width, 1, room_length]),
-            &wall_block,
-        )?;
+        space.fill_uniform(interior.abut(Face::PY, 1).unwrap(), &wall_block)?;
+        // Walls
         four_walls(
             space.grid(),
             |origin, direction, _length, wall_excluding_corners| {
