@@ -72,17 +72,30 @@ where
                 let before = target_factory();
                 let mut target = target_factory();
                 if let Ok(check) = tap.transaction.check(&target) {
-                    let _: Tr::Output = tap
-                        .transaction
-                        .commit(&mut target, check)
-                        .expect("Transaction failed to commit");
+                    match tap.transaction.commit(&mut target, check) {
+                        Ok(_output) => {
+                            // Nothing to assert about the output
+                        }
+                        Err(e) => {
+                            panic!(
+                                "Commit failed after check succeeded: {}\n\
+                                Transaction: {:#?}\n\
+                                Target before: {:#?}\n\
+                                Target after: {:#?}",
+                                e, tap.transaction, before, target
+                            );
+                        }
+                    }
                     succeeded_at_least_once = true;
 
                     if let Err(e) = (tap.predicate)(&before, &target) {
                         panic!(
-                                "Predicate failed: {}\nTransaction: {:#?}\nTarget before: {:#?} Target after: {:#?}",
-                                e, tap.transaction, before, target
-                            );
+                            "Predicate failed: {}\n\
+                            Transaction: {:#?}\n\
+                            Target before: {:#?}\n\
+                            Target after: {:#?}",
+                            e, tap.transaction, before, target
+                        );
                     }
                 } // else ignore the inapplicable transaction
             }
