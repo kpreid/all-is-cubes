@@ -62,13 +62,25 @@ impl Transaction<Space> for SpaceTransaction {
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
         for (&cube, CubeTransaction { old, new: _ }) in &self.cubes {
-            if let Some(old) = old {
-                if space[cube] != *old {
-                    return Err(PreconditionFailed {
-                        location: "Space",
-                        problem: "existing block not as expected",
-                    });
+            if let Some(cube_index) = space.grid().index(cube) {
+                if let Some(old) = old {
+                    // Raw lookup because we already computed the index for a bounds check
+                    // (TODO: Put this in a function, like get_block_index)
+                    if space.block_data[space.contents[cube_index] as usize].block != *old {
+                        return Err(PreconditionFailed {
+                            location: "Space",
+                            problem: "existing block not as expected",
+                        });
+                    }
                 }
+            } else {
+                // It is an error for cubes to be out of bounds, whether old or new.
+                // TODO: Should we allow `old: Some(AIR), new: None`, since we treat
+                // outside-space as being AIR? Let's wait until a use case appears.
+                return Err(PreconditionFailed {
+                    location: "Space",
+                    problem: "cube out of space's bounds",
+                });
             }
         }
         self.behaviors.check(&space.behaviors)
@@ -171,6 +183,7 @@ struct CubeTransaction {
 #[cfg(test)]
 mod tests {
     use crate::content::make_some_blocks;
+    use crate::space::Grid;
     use crate::transaction::TransactionTester;
 
     use super::*;
@@ -284,6 +297,10 @@ mod tests {
                 let mut space = Space::empty_positive(1, 1, 1);
                 space.set([0, 0, 0], &b2).unwrap();
                 space
+            })
+            .target(|| {
+                // This space makes the test transactions at [0, 0, 0] out of bounds
+                Space::builder(Grid::new([1, 0, 0], [1, 1, 1])).build_empty()
             })
             // TODO: more spaces
             .test();
