@@ -9,7 +9,7 @@
     "test": "wasm-pack test --chrome --headless"
   },
   "devDependencies": {
-    "@wasm-tool/wasm-pack-plugin": "^1.4.0",
+    "@wasm-tool/wasm-pack-plugin": "^1.6.0",
     "copy-webpack-plugin": "^9.0.1",
     "rimraf": "^3.0.0",
     "webpack": "^5.44.0",
