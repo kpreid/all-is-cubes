@@ -577,13 +577,14 @@ impl Grid {
         )
     }
 
-    /// Returns a [`Grid`] which is touching the given `face` rectangle of `self`,
-    /// with its size in that axis being `thickness`.
+    /// Returns a [`Grid`] which includes the volume between the given `face` rectangle
+    /// of `self` and the same rectangle translated `thickness` cubes outward from it
+    /// (inward if negative).
     ///
     /// Edge cases:
     /// * If `face` is [`Face::Within`], returns `self`.
-    /// * If `thickness` is negative, panic.
-    ///   (This might be revised to return an intersecting volume.)
+    /// * If `thickness` is negative and greater than the size of the input, it is clamped
+    ///   (so that the returned `Grid` never extends beyond the opposite face of `self`).
     ///
     /// For example, it may be used to construct the walls of a room:
     ///
@@ -599,26 +600,53 @@ impl Grid {
     /// assert_eq!(right_wall, Grid::from_lower_upper([20, 10, 10], [22, 20, 20]));
     /// # Ok::<(), all_is_cubes::space::GridOverflowError>(())
     /// ```
+    ///
+    /// Example of negative thickness:
+    ///
+    /// ```
+    /// # use all_is_cubes::space::Grid;
+    /// # use all_is_cubes::math::Face;
+    ///
+    /// let grid = Grid::from_lower_upper([10, 10, 10], [20, 20, 20]);
+    /// assert_eq!(
+    ///     grid.abut(Face::PX, -3)?,
+    ///     Grid::from_lower_upper([17, 10, 10], [20, 20, 20]),
+    /// );
+    /// assert_eq!(
+    ///     // Thicker than the input, therefore clamped.
+    ///     grid.abut(Face::PX, -30)?,
+    ///     Grid::from_lower_upper([10, 10, 10], [20, 20, 20]),
+    /// );
+    /// # Ok::<(), all_is_cubes::space::GridOverflowError>(())
+    /// ```
     #[inline]
     pub fn abut(self, face: Face, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
-        assert!(thickness >= 0);
         let axis = match face.axis_number() {
             Some(axis) => axis,
             None => return Ok(self),
         };
 
         let mut size = self.size();
-        size[axis] = thickness;
+        size[axis] = thickness.max(-size[axis]).abs();
 
-        let mut lower_bounds = self.lower_bounds();
-        if face.is_positive() {
-            lower_bounds[axis] = self.upper_bounds()[axis];
+        // Coordinate on the axis that the two boxes share
+        let abutting_coordinate = if face.is_positive() {
+            self.upper_bounds()[axis]
         } else {
             // TODO: better error message
-            lower_bounds[axis] = lower_bounds[axis].checked_sub(thickness).ok_or_else(|| {
-                GridOverflowError("abut() overflowed available range".to_string())
-            })?;
-        }
+            self.lower_bounds[axis]
+                .checked_sub(thickness)
+                .ok_or_else(|| GridOverflowError("abut() overflowed available range".to_string()))?
+        };
+
+        let mut lower_bounds = self.lower_bounds();
+        let new_lower_bound = if thickness.is_positive() {
+            abutting_coordinate
+        } else {
+            // Cannot overflow because we already min()ed it.
+            abutting_coordinate - size[axis]
+        };
+        lower_bounds[axis] = new_lower_bound;
 
         Grid::checked_new(lower_bounds, size)
     }
