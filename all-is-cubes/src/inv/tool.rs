@@ -9,7 +9,7 @@ use std::{fmt, hash};
 
 use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
-use crate::inv::InventoryTransaction;
+use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
 use crate::math::GridPoint;
 use crate::space::SpaceTransaction;
@@ -162,8 +162,23 @@ impl Tool {
             // TODO: Give Remove different icons
             Self::RemoveBlock { keep: _ } => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
+            // TODO: InfiniteBlocks should have a different name and appearance
             Self::Block(block) | Self::InfiniteBlocks(block) => Cow::Borrowed(block),
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
+        }
+    }
+
+    /// Specifies a limit on the number of this item that should be combined in a single
+    /// [`Slot`].
+    pub(crate) fn stack_limit(&self) -> StackLimit {
+        use StackLimit::{One, Standard};
+        match self {
+            Tool::Activate => One,
+            Tool::RemoveBlock { .. } => One,
+            Tool::Block(_) => Standard,
+            Tool::InfiniteBlocks(_) => One,
+            Tool::CopyFromSpace => One,
+            Tool::ExternalAction { .. } => One,
         }
     }
 }

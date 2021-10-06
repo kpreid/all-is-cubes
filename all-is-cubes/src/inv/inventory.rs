@@ -201,8 +201,8 @@ impl Slot {
             (Slot::Stack(s_count, source_item), Slot::Stack(d_count, destination_item)) => {
                 if source_item == destination_item {
                     // Stacks of identical items; figure out how much to move.
-                    let max_stack = u16::MAX; // TODO: per-item limits
-                    let count_to_move = s_count.get().min(max_stack - d_count.get());
+                    let max_stack = destination_item.stack_limit().get();
+                    let count_to_move = s_count.get().min(max_stack.saturating_sub(d_count.get()));
                     if count_to_move == 0 {
                         return false;
                     } else if count_to_move < s_count.get() {
@@ -243,6 +243,31 @@ impl From<Option<Tool>> for Slot {
         match tool {
             Some(tool) => Self::Stack(Self::COUNT_ONE, tool),
             None => Self::Empty,
+        }
+    }
+}
+
+/// Specifies a limit on the number of a particular item that should be combined in a
+/// single [`Slot`].
+///
+/// Each value of this enum is currently equivalent to a particular number, but (TODO:)
+/// in the future, it may be possible for inventories or universes to specify a normal
+/// stack size and specific deviations from it.
+#[non_exhaustive]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum StackLimit {
+    One,
+    Standard,
+}
+
+impl StackLimit {
+    /// TODO: This is not public because we don't know what environment parameters it
+    /// should need yet.
+    pub(crate) fn get(self) -> u16 {
+        match self {
+            StackLimit::One => 1,
+            // TODO: This should be a per-universe (at least) configuration.
+            StackLimit::Standard => 100,
         }
     }
 }
@@ -554,7 +579,11 @@ mod tests {
     #[test]
     fn slot_unload_systematic() {
         let [block1, block2] = make_some_blocks();
-        let tools = [Tool::Block(block1), Tool::Block(block2)];
+        let tools = [
+            Tool::Block(block1),
+            Tool::Block(block2),
+            Tool::Activate, // not stackable
+        ];
         const MAX: u16 = u16::MAX;
         let gen_slots = move || {
             IntoIterator::into_iter([
