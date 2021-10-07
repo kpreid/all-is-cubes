@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
-use cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3, Zero as _};
+use cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3};
 use luminance::blending::{Blending, Equation, Factor};
 use luminance::context::GraphicsContext;
 use luminance::depth_stencil::Write;
@@ -26,8 +26,8 @@ use crate::chunking::ChunkPos;
 use crate::content::palette;
 use crate::listen::Listener;
 use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
-use crate::lum::shading::BlockPrograms;
-use crate::lum::types::{AicLumBackend, LumBlockVertex};
+use crate::lum::shading::{BlockPrograms, LinesProgram};
+use crate::lum::types::{AicLumBackend, LinesVertex, LumBlockVertex};
 use crate::lum::{wireframe_vertices, GraphicsResourceError};
 use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
 use crate::mesh::{ChunkMesh, ChunkedSpaceMesh, CstUpdateInfo, DepthOrdering, SpaceMesh};
@@ -55,7 +55,7 @@ pub struct SpaceRenderer<Backend: AicLumBackend> {
         LumAtlasAllocator<Backend>,
         CHUNK_SIZE,
     >,
-    debug_chunk_boxes_tess: Option<Tess<Backend, LumBlockVertex>>,
+    debug_chunk_boxes_tess: Option<Tess<Backend, LinesVertex>>,
 }
 
 impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
@@ -166,9 +166,8 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                     let m = face.matrix(CHUNK_SIZE);
                     for i in 1..CHUNK_SIZE {
                         let mut push = |p| {
-                            v.push(LumBlockVertex::new_colored(
+                            v.push(LinesVertex::new_basic(
                                 m.transform_point(p).map(FreeCoordinate::from),
-                                Vector3::zero(),
                                 palette::DEBUG_CHUNK_MINOR,
                             ));
                         };
@@ -233,7 +232,7 @@ pub(super) struct SpaceRendererOutputData<'a, Backend: AicLumBackend> {
         LumAtlasAllocator<Backend>,
         CHUNK_SIZE,
     >,
-    debug_chunk_boxes_tess: &'a Option<Tess<Backend, LumBlockVertex>>,
+    debug_chunk_boxes_tess: &'a Option<Tess<Backend, LinesVertex>>,
     view_chunk: ChunkPos<CHUNK_SIZE>,
     info: SpaceRenderInfo,
 
@@ -288,6 +287,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
         &self,
         shading_gate: &mut ShadingGate<'_, Backend>,
         block_programs: &mut BlockPrograms<Backend>,
+        lines_program: &mut LinesProgram<Backend>,
     ) -> Result<SpaceRenderInfo, E> {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
@@ -313,26 +313,30 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
                     }
                     Ok(())
                 })?;
+                Ok(())
+            },
+        )?;
 
-                u.set_view_matrix(
-                    program_iface,
-                    self.data.camera.view_matrix()
-                        * Matrix4::from_translation(
+        if let Some(debug_tess) = self.data.debug_chunk_boxes_tess {
+            shading_gate.shade(
+                lines_program,
+                |ref mut program_iface, u, mut render_gate| {
+                    u.initialize(
+                        program_iface,
+                        self,
+                        Matrix4::from_translation(
                             (self.data.view_chunk.0 * CHUNK_SIZE)
                                 .to_vec()
                                 .map(FreeCoordinate::from),
                         ),
-                );
-                render_gate.render(&pass.render_state(), |mut tess_gate| {
-                    if let Some(debug_tess) = self.data.debug_chunk_boxes_tess {
-                        tess_gate.render(debug_tess)?;
-                    }
+                    );
+                    render_gate.render(&RenderState::default(), |mut tess_gate| {
+                        tess_gate.render(debug_tess)
+                    })?;
                     Ok(())
-                })?;
-
-                Ok(())
-            },
-        )?;
+                },
+            )?;
+        }
 
         if self.data.camera.options().transparency.will_output_alpha() {
             shading_gate.shade(

@@ -11,7 +11,7 @@
 
 use std::error::Error;
 
-use cgmath::{Point3, Transform as _, Vector3, Zero as _};
+use cgmath::{Point3, Transform as _};
 use luminance::context::GraphicsContext;
 use luminance::framebuffer::FramebufferError;
 use luminance::pipeline::PipelineError;
@@ -20,7 +20,7 @@ use luminance::texture::TextureError;
 
 use crate::character::Cursor;
 use crate::content::palette;
-use crate::lum::types::{empty_tess, LumBlockVertex};
+use crate::lum::types::LinesVertex;
 use crate::math::{Aab, FreeCoordinate, Geometry, Rgba};
 use crate::raycast::Face;
 use crate::util::MapExtend;
@@ -40,7 +40,7 @@ pub use types::AicLumBackend;
 pub(crate) fn make_cursor_tess<C>(
     context: &mut C,
     cursor_result: &Option<Cursor>,
-) -> Result<Tess<C::Backend, LumBlockVertex>, GraphicsResourceError>
+) -> Result<Option<Tess<C::Backend, LinesVertex>>, GraphicsResourceError>
 where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
@@ -74,20 +74,18 @@ where
             let p = cursor.point
                 + cursor.place.face.normal_vector() * offset_from_surface
                 + face_frame.transform_vector(f.normal_vector() * (1.0 / 32.0));
-            vertices.push(LumBlockVertex::new_colored(
-                p,
-                Vector3::zero(),
-                palette::CURSOR_OUTLINE,
-            ));
+            vertices.push(LinesVertex::new_basic(p, palette::CURSOR_OUTLINE));
         }
 
-        Ok(context
-            .new_tess()
-            .set_vertices(vertices)
-            .set_mode(Mode::Line)
-            .build()?)
+        Ok(Some(
+            context
+                .new_tess()
+                .set_vertices(vertices)
+                .set_mode(Mode::Line)
+                .build()?,
+        ))
     } else {
-        empty_tess(context)
+        Ok(None)
     }
 }
 
@@ -95,13 +93,13 @@ where
 /// mode) with the given `color`.
 pub(crate) fn wireframe_vertices<E, G>(vertices: &mut E, color: Rgba, geometry: G)
 where
-    E: Extend<LumBlockVertex>,
+    E: Extend<LinesVertex>,
     G: Geometry,
 {
     geometry.wireframe_points(&mut MapExtend::new(
         vertices,
         |(p, vertex_color): (Point3<FreeCoordinate>, Option<Rgba>)| {
-            LumBlockVertex::new_colored(p, Vector3::zero(), vertex_color.unwrap_or(color))
+            LinesVertex::new_basic(p, vertex_color.unwrap_or(color))
         },
     ))
 }

@@ -4,11 +4,8 @@
 //! Core data types for graphics code to use.
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
-use luminance::context::GraphicsContext;
-use luminance::tess::{Mode, Tess};
 use luminance::{Semantics, Vertex};
 
-use crate::lum::GraphicsResourceError;
 use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
 use crate::mesh::{BlockVertex, Coloring, GfxVertex};
 use crate::space::PackedLight;
@@ -42,6 +39,8 @@ mod backend {
         + RenderGate
         + Shader
         + TessGate<(), (), (), Interleaved>
+        + TessGate<LinesVertex, (), (), Interleaved>
+        + TessGate<LinesVertex, u32, (), Interleaved>
         + TessGate<LumBlockVertex, (), (), Interleaved>
         + TessGate<LumBlockVertex, u32, (), Interleaved>
         + for<'a> Uniformable<'a, f32, Target = f32>
@@ -71,6 +70,8 @@ mod backend {
             + RenderGate
             + Shader
             + TessGate<(), (), (), Interleaved>
+            + TessGate<LinesVertex, (), (), Interleaved>
+            + TessGate<LinesVertex, u32, (), Interleaved>
             + TessGate<LumBlockVertex, (), (), Interleaved>
             + TessGate<LumBlockVertex, u32, (), Interleaved>
             + for<'a> Uniformable<'a, f32, Target = f32>
@@ -127,6 +128,9 @@ pub enum VertexSemantics {
 /// Vertex type sent to shader for rendering blocks (and, for the moment, other geometry,
 /// but its attributes are heavily focused on blocks).
 /// See [`VertexSemantics`] for the meaning of the fields.
+///
+/// Note: this struct must be declared `pub` because it is used in the trait bounds of
+/// [`AicLumBackend`], but it is not actually accessible outside the crate.
 #[derive(Clone, Copy, Debug, PartialEq, Vertex)]
 #[vertex(sem = "VertexSemantics")]
 pub struct LumBlockVertex {
@@ -266,20 +270,26 @@ impl GfxVertex for LumBlockVertex {
     }
 }
 
-/// Constructs a <code>[Tess]&lt;[LumBlockVertex]&gt;</code> that renders nothing but does
-/// not provoke a runtime error.
-pub fn empty_tess<C>(
-    context: &mut C,
-) -> Result<Tess<C::Backend, LumBlockVertex>, GraphicsResourceError>
-where
-    C: GraphicsContext,
-    C::Backend: AicLumBackend,
-{
-    Ok(context
-        .new_tess()
-        .set_vertices(vec![LumBlockVertex::DUMMY])
-        .set_mode(Mode::Triangle)
-        .build()?)
+/// Vertex type for drawing marker and debug shapes.
+///
+/// Note: this struct must be declared `pub` because it is used in the trait bounds of
+/// [`AicLumBackend`], but it is not actually accessible outside the crate.
+#[derive(Clone, Copy, Debug, PartialEq, Vertex)]
+#[vertex(sem = "VertexSemantics")]
+pub struct LinesVertex {
+    direct_position: VertexPosition,
+    color: VertexColorOrTexture,
+}
+
+impl LinesVertex {
+    /// Can't use name `new` because luminance::Vertex grabs it
+    #[inline]
+    pub(crate) fn new_basic(direct_position: Point3<FreeCoordinate>, color: Rgba) -> Self {
+        Self {
+            direct_position: VertexPosition::new(direct_position.cast::<f32>().unwrap().into()),
+            color: VertexColorOrTexture::new(color.into()),
+        }
+    }
 }
 
 #[cfg(test)]

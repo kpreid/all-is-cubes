@@ -14,7 +14,6 @@ use luminance::texture::Dim3;
 use luminance::UniformInterface;
 
 use crate::camera::{GraphicsOptions, LightingOption, ToneMappingOperator, TransparencyOption};
-use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::{AicLumBackend, VertexSemantics};
 use crate::lum::GraphicsResourceError;
@@ -26,6 +25,29 @@ pub(crate) struct ShaderConstants {
     lighting_display: LightingOption,
     volumetric_transparency: bool,
     tone_mapping: ToneMappingOperator,
+}
+
+impl ShaderConstants {
+    fn to_defines(&self) -> Vec<(&'static str, &'static str)> {
+        let mut defines: Vec<(&str, &str)> = Vec::with_capacity(4);
+        defines.push((
+            "TONE_MAPPING_ID",
+            match self.tone_mapping {
+                ToneMappingOperator::Clamp => "0",
+                ToneMappingOperator::Reinhard => "1",
+            },
+        ));
+        if self.lighting_display != LightingOption::None {
+            defines.push(("LIGHTING", "1"));
+        }
+        if self.lighting_display == LightingOption::Smooth {
+            defines.push(("SMOOTH_LIGHTING", "1"));
+        }
+        if self.volumetric_transparency {
+            defines.push(("VOLUMETRIC", "1"));
+        }
+        defines
+    }
 }
 
 impl From<&GraphicsOptions> for ShaderConstants {
@@ -42,7 +64,11 @@ impl From<&GraphicsOptions> for ShaderConstants {
 }
 
 /// Type of the block shader program (output of [`prepare_block_program`]).
-pub type BlockProgram<Backend> = Program<Backend, VertexSemantics, (), BlockUniformInterface>;
+pub(crate) type BlockProgram<Backend> =
+    Program<Backend, VertexSemantics, (), BlockUniformInterface>;
+
+pub(crate) type LinesProgram<Backend> =
+    Program<Backend, VertexSemantics, (), LinesUniformInterface>;
 
 /// Collection of shaders for rendering blocks, which all share the `BlockUniformInterface`.
 pub(crate) struct BlockPrograms<Backend: AicLumBackend> {
@@ -59,25 +85,7 @@ impl<Backend: AicLumBackend> BlockPrograms<Backend> {
     where
         C: GraphicsContext<Backend = Backend>,
     {
-        // base_defines is shared by both of the program variants
-        let mut base_defines: Vec<(&str, &str)> = Vec::with_capacity(4);
-        base_defines.push((
-            "TONE_MAPPING_ID",
-            match constants.tone_mapping {
-                ToneMappingOperator::Clamp => "0",
-                ToneMappingOperator::Reinhard => "1",
-            },
-        ));
-        if constants.lighting_display != LightingOption::None {
-            base_defines.push(("LIGHTING", "1"));
-        }
-        if constants.lighting_display == LightingOption::Smooth {
-            base_defines.push(("SMOOTH_LIGHTING", "1"));
-        }
-        if constants.volumetric_transparency {
-            base_defines.push(("VOLUMETRIC", "1"));
-        }
-
+        let base_defines: Vec<(&str, &str)> = constants.to_defines();
         Ok(BlockPrograms {
             constants,
             opaque: prepare_block_program(context, base_defines.iter().copied())?,
@@ -101,12 +109,9 @@ where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
 {
-    let defines: String = defines
-        .into_iter()
-        .map(|(k, v)| format!("#define {} {}\n", k, v))
-        .collect();
+    let defines_glsl = glsl_defines(defines);
 
-    let concatenated_vertex_shader: String = defines.clone()
+    let concatenated_vertex_shader: String = defines_glsl.clone()
         + "\n#line 1 0\n"
         + SHADER_COMMON
         + "\n#line 1 1\n"
@@ -114,7 +119,7 @@ where
         + "\n#line 1 2\n"
         + SHADER_VERTEX_BLOCK;
     let concatenated_fragment_shader: String =
-        defines + "\n#line 1 0\n" + SHADER_COMMON + "#line 1 1\n" + SHADER_FRAGMENT;
+        defines_glsl + "\n#line 1 0\n" + SHADER_COMMON + "#line 1 1\n" + SHADER_FRAGMENT;
 
     let start_compile_time = Instant::now();
     let result = map_shader_result(
@@ -136,6 +141,40 @@ where
     result
 }
 
+/// Compile the block shader program for the given [`GraphicsContext`].
+pub(crate) fn prepare_lines_program<C>(
+    context: &mut C,
+    constants: ShaderConstants,
+) -> Result<LinesProgram<C::Backend>, GraphicsResourceError>
+where
+    C: GraphicsContext,
+    C::Backend: AicLumBackend,
+{
+    let defines_glsl = glsl_defines(constants.to_defines());
+
+    // TODO: repeated code — write a helper for concatenating GLSL
+    let concatenated_vertex_shader: String = defines_glsl.clone()
+        + "\n#line 1 0\n"
+        + SHADER_COMMON
+        + "\n#line 1 1\n"
+        + SHADER_VERTEX_COMMON
+        + "\n#line 1 2\n"
+        + SHADER_LINES_VERTEX;
+    let concatenated_fragment_shader: String =
+        defines_glsl + "\n#line 1 0\n" + SHADER_COMMON + "#line 1 1\n" + SHADER_LINES_FRAGMENT;
+
+    map_shader_result(
+        context
+            .new_shader_program::<VertexSemantics, (), LinesUniformInterface>()
+            .from_strings(
+                &concatenated_vertex_shader,
+                None,
+                None,
+                &concatenated_fragment_shader,
+            ),
+    )
+}
+
 /// Unwraps [`BuiltProgram`] and logs any warnings.
 pub(crate) fn map_shader_result<Backend, Sem, Out, Uni>(
     program_attempt: Result<BuiltProgram<Backend, Sem, Out, Uni>, ProgramError>,
@@ -155,12 +194,14 @@ where
     }
 }
 
-const SHADER_COMMON: &str = include_str!("shaders/common.glsl");
-const SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
-const SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
-const SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
+static SHADER_COMMON: &str = include_str!("shaders/common.glsl");
+static SHADER_FRAGMENT: &str = include_str!("shaders/fragment.glsl");
+static SHADER_VERTEX_BLOCK: &str = include_str!("shaders/vertex-block.glsl");
+static SHADER_VERTEX_COMMON: &str = include_str!("shaders/vertex-common.glsl");
+static SHADER_LINES_VERTEX: &str = include_str!("shaders/lines-vertex.glsl");
+static SHADER_LINES_FRAGMENT: &str = include_str!("shaders/lines-fragment.glsl");
 
-/// Uniform interface for the block shader program.
+/// Uniform interface for [`BlockProgram`]
 #[derive(Debug, UniformInterface)]
 pub struct BlockUniformInterface {
     projection_matrix: Uniform<Mat44<f32>>,
@@ -198,13 +239,13 @@ impl BlockUniformInterface {
     ) {
         let camera = &space.data.camera;
         let options: &GraphicsOptions = camera.options();
-        self.set_projection_matrix(program_iface, camera.projection());
+        program_iface.set(&self.projection_matrix, convert_matrix(camera.projection()));
         self.set_view_matrix(program_iface, camera.view_matrix());
         program_iface.set(
             &self.view_position,
             Vec3(camera.view_position().map(|s| s as f32).into()),
         );
-        self.set_block_texture(program_iface, &space.bound_block_texture);
+        program_iface.set(&self.block_texture, space.bound_block_texture.binding());
 
         program_iface.set(
             &self.light_texture,
@@ -229,36 +270,49 @@ impl BlockUniformInterface {
         program_iface.set(&self.exposure, camera.exposure.into_inner());
     }
 
-    /// Type converting wrapper for [`Self::projection_matrix`].
-    pub fn set_projection_matrix<Backend: AicLumBackend>(
-        &self,
-        program_iface: &mut ProgramInterface<'_, Backend>,
-        projection_matrix: Matrix4<FreeCoordinate>,
-    ) {
-        program_iface.set(
-            &self.projection_matrix,
-            Mat44(projection_matrix.cast::<f32>().unwrap().into()),
-        );
-    }
-
     /// Type converting wrapper for [`Self::view_matrix`].
     pub fn set_view_matrix<Backend: AicLumBackend>(
         &self,
         program_iface: &mut ProgramInterface<'_, Backend>,
         view_matrix: Matrix4<FreeCoordinate>,
     ) {
-        program_iface.set(
-            &self.view_matrix,
-            Mat44(view_matrix.cast::<f32>().unwrap().into()),
-        );
+        program_iface.set(&self.view_matrix, convert_matrix(view_matrix));
     }
+}
 
-    /// Type converting wrapper for [`Self::block_texture`].
-    pub fn set_block_texture<Backend: AicLumBackend>(
+/// Uniform interface for [`LinesProgram`].
+#[derive(Debug, UniformInterface)]
+pub struct LinesUniformInterface {
+    projection_matrix: Uniform<Mat44<f32>>,
+    view_matrix: Uniform<Mat44<f32>>,
+}
+
+impl LinesUniformInterface {
+    /// Set all the uniforms, given necessary parameters.
+    ///
+    /// TODO: Deduplicate code between this and BlockUniformInterface
+    pub(super) fn initialize<Backend: AicLumBackend>(
         &self,
         program_iface: &mut ProgramInterface<'_, Backend>,
-        texture: &BoundBlockTexture<'_, Backend>,
+        space: &SpaceRendererBound<'_, Backend>,
+        view_modifier_matrix: Matrix4<FreeCoordinate>,
     ) {
-        program_iface.set(&self.block_texture, texture.binding());
+        let camera = &space.data.camera;
+        program_iface.set(&self.projection_matrix, convert_matrix(camera.projection()));
+        program_iface.set(
+            &self.view_matrix,
+            convert_matrix(camera.view_matrix() * view_modifier_matrix),
+        );
     }
+}
+
+fn convert_matrix(matrix: Matrix4<f64>) -> Mat44<f32> {
+    Mat44(matrix.cast::<f32>().unwrap(/* f64 to f32 is infallible */).into())
+}
+
+fn glsl_defines<'a>(defines: impl IntoIterator<Item = (&'a str, &'a str)>) -> String {
+    defines
+        .into_iter()
+        .map(|(k, v)| format!("#define {} {}\n", k, v))
+        .collect()
 }

@@ -6,6 +6,7 @@
 use std::fmt;
 use std::time::Duration;
 
+use cgmath::{Matrix4, SquareMatrix};
 use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb888;
@@ -29,9 +30,9 @@ use crate::camera::{Camera, Viewport};
 use crate::character::{Character, Cursor};
 use crate::content::palette;
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
-use crate::lum::shading::{BlockPrograms, ShaderConstants};
+use crate::lum::shading::{prepare_lines_program, BlockPrograms, LinesProgram, ShaderConstants};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
-use crate::lum::types::{AicLumBackend, LumBlockVertex};
+use crate::lum::types::{AicLumBackend, LinesVertex};
 use crate::lum::GraphicsResourceError;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
@@ -50,6 +51,7 @@ where
     pub surface: C,
     back_buffer: Framebuffer<C::Backend, Dim2, (), ()>,
     block_programs: Layers<BlockPrograms<C::Backend>>,
+    lines_program: LinesProgram<C::Backend>,
     info_text_texture: FullFrameTexture<C::Backend>,
 
     // Rendering state
@@ -67,10 +69,13 @@ where
     ///
     /// Returns any shader compilation errors or warnings.
     pub fn new(mut surface: C, cameras: StandardCameras) -> Result<Self, GraphicsResourceError> {
-        // TODO: Give Layers a `map()`/constructor that deduplicates this.
         let block_programs = cameras
             .cameras()
             .try_map_ref(|camera| BlockPrograms::compile(&mut surface, camera.options().into()))?;
+        // TODO: lines_program is not updated on changed options (and this code should be deduplicated)
+        let lines_program =
+            prepare_lines_program(&mut surface, cameras.cameras().world.options().into())?;
+
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut surface,
             cameras.viewport().framebuffer_size.into(),
@@ -96,6 +101,7 @@ where
             surface,
             back_buffer,
             block_programs,
+            lines_program,
             info_text_texture,
             world_renderer: None,
             ui_renderer: cameras.ui_space().cloned().map(SpaceRenderer::new),
@@ -201,7 +207,7 @@ where
         info.prepare_time = Instant::now().duration_since(start_prepare_time);
 
         let debug_lines_tess = {
-            let mut v: Vec<LumBlockVertex> = Vec::new();
+            let mut v: Vec<LinesVertex> = Vec::new();
 
             if graphics_options.debug_collision_boxes {
                 // Character collision box
@@ -268,19 +274,24 @@ where
                 |pipeline, mut shading_gate| {
                     let world_output_bound = world_output.bind(&pipeline)?;
                     // Space
-                    info.space =
-                        world_output_bound.render(&mut shading_gate, &mut block_programs.world)?;
+                    info.space = world_output_bound.render(
+                        &mut shading_gate,
+                        &mut block_programs.world,
+                        &mut self.lines_program,
+                    )?;
 
                     // Cursor and debug info
                     // Note: This will fall on top of transparent world content due to draw order.
                     shading_gate.shade(
-                        &mut block_programs.world.opaque,
+                        &mut self.lines_program,
                         |ref mut program_iface, u, mut render_gate| {
-                            u.initialize(program_iface, &world_output_bound);
+                            u.initialize(program_iface, &world_output_bound, Matrix4::identity());
                             render_gate.render(&RenderState::default(), |mut tess_gate| {
                                 // Draw cursor only if it's in the same space.
                                 if matches!(cursor_result, Some(c) if c.space == character.space) {
-                                    tess_gate.render(&cursor_tess)?;
+                                    if let Some(tess) = &cursor_tess {
+                                        tess_gate.render(tess)?;
+                                    }
                                 }
 
                                 if let Some(tess) = &debug_lines_tess {
@@ -306,9 +317,11 @@ where
                 |ref pipeline, ref mut shading_gate| {
                     if let Some(ui_output) = ui_output {
                         // TODO: Ignoring info
-                        ui_output
-                            .bind(pipeline)?
-                            .render(shading_gate, &mut block_programs.ui)?;
+                        ui_output.bind(pipeline)?.render(
+                            shading_gate,
+                            &mut block_programs.ui,
+                            &mut self.lines_program,
+                        )?;
                     }
                     Ok(())
                 },
