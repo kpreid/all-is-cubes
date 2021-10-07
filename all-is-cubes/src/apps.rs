@@ -4,6 +4,11 @@
 //! Components for "apps", or game clients: user interface and top-level state.
 
 use std::fmt::{self, Display};
+use std::future::Future;
+use std::task::{Context, Poll};
+
+use futures_core::future::BoxFuture;
+use futures_task::noop_waker_ref;
 
 use crate::camera::{Camera, GraphicsOptions};
 use crate::character::{cursor_raycast, Character, Cursor};
@@ -26,7 +31,6 @@ pub use time::*;
 ///
 /// Once we have multiplayer / client-server support, this will become the client-side
 /// structure.
-#[derive(Debug)]
 pub struct AllIsCubesAppState {
     /// Determines the timing of simulation and drawing. The caller must arrange
     /// to advance time in the clock.
@@ -41,6 +45,10 @@ pub struct AllIsCubesAppState {
     game_universe: Universe,
     game_character: Option<URef<Character>>,
 
+    /// If present, a future that should be polled to produce a new [`Universe`]
+    /// to replace `self.game_universe`. See [`Self::set_universe_async`].
+    game_universe_in_progress: Option<BoxFuture<'static, Result<Universe, ()>>>,
+
     paused: ListenableCell<bool>,
 
     ui: Vui,
@@ -51,6 +59,27 @@ pub struct AllIsCubesAppState {
     cursor_result: Option<Cursor>,
 
     last_step_info: UniverseStepInfo,
+    // When adding fields, remember to update the `Debug` impl.
+}
+
+impl fmt::Debug for AllIsCubesAppState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AllIsCubesAppState")
+            .field("frame_clock", &self.frame_clock)
+            .field("input_processor", &self.input_processor)
+            .field("graphics_options", &self.graphics_options)
+            .field("game_universe", &self.game_universe)
+            .field("game_character", &self.game_character)
+            .field(
+                "game_universe_in_progress",
+                &self.game_universe_in_progress.as_ref().map(|_| "..."),
+            )
+            .field("paused", &self.paused)
+            .field("ui", &self.ui)
+            .field("cursor_result", &self.cursor_result)
+            .field("last_step_info", &self.last_step_info)
+            .finish_non_exhaustive()
+    }
 }
 
 impl AllIsCubesAppState {
@@ -70,6 +99,7 @@ impl AllIsCubesAppState {
             graphics_options: ListenableCell::new(GraphicsOptions::default()),
             game_character: None,
             game_universe,
+            game_universe_in_progress: None,
             paused,
             cursor_result: None,
             last_step_info: UniverseStepInfo::default(),
@@ -84,10 +114,32 @@ impl AllIsCubesAppState {
     /// Replace the game universe, such as on initial startup or because the player
     /// chose to load a new one.
     pub fn set_universe(&mut self, u: Universe) {
+        // Clear any previous set_universe_async.
+        self.game_universe_in_progress = None;
+
         self.game_universe = u;
         let c = self.game_universe.get_default_character();
         self.game_character = c.clone();
         self.ui.set_character(c);
+    }
+
+    /// Perform [`Self::set_universe`] on the result of the provided future when it
+    /// completes.
+    ///
+    /// This is intended to be used for simultaneously initializing the UI and universe.
+    /// Later upgrades might might add a loading screen.
+    ///
+    /// The future will be cancelled if [`Self::set_universe_async`] or
+    /// [`Self::set_universe`] is called before it completes.
+    /// Currently, the future is polled once per frame unconditionally.
+    ///
+    /// If the future returns `Err`, then the current universe is not replaced. There is
+    /// not any mechanism to display an error message; that must be done separately.
+    pub fn set_universe_async<F>(&mut self, future: F)
+    where
+        F: Future<Output = Result<Universe, ()>> + Send + 'static,
+    {
+        self.game_universe_in_progress = Some(Box::pin(future));
     }
 
     /// Returns a mutable reference to the [`Universe`].
@@ -113,6 +165,29 @@ impl AllIsCubesAppState {
     /// Steps the universe if the `FrameClock` says it's time to do so.
     /// Always returns info for the last step even if multiple steps were taken.
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
+        if let Some(future) = self.game_universe_in_progress.as_mut() {
+            match future
+                .as_mut()
+                .poll(&mut Context::from_waker(noop_waker_ref()))
+            {
+                Poll::Pending => {}
+                Poll::Ready(result) => {
+                    self.game_universe_in_progress = None;
+                    match result {
+                        Ok(universe) => {
+                            self.set_universe(universe);
+                        }
+                        Err(()) => {
+                            // No error reporting, for now; let it be the caller's resposibility
+                            // (which we indicate by making the error type be ()).
+                            // There should be something, but it's not clear what; perhaps
+                            // it will become clearer as the UI gets fleshed out.
+                        }
+                    }
+                }
+            }
+        }
+
         let mut result = None;
         // TODO: Catch-up implementation should probably live in FrameClock.
         for _ in 0..FrameClock::CATCH_UP_STEPS {
@@ -248,5 +323,47 @@ impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
             None => write!(f, "No block"),
         }?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures_channel::oneshot;
+
+    use crate::apps::AllIsCubesAppState;
+    use crate::space::Space;
+    use crate::universe::{Name, Universe, UniverseIndex};
+
+    #[test]
+    fn set_universe_async() {
+        let old_marker = Name::from("old");
+        let new_marker = Name::from("new");
+        let mut app = AllIsCubesAppState::new();
+        app.universe_mut()
+            .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))
+            .unwrap();
+
+        // Set up async loading but don't deliver anything yet
+        let (send, recv) = oneshot::channel();
+        app.set_universe_async(async { recv.await.unwrap() });
+
+        // Existing universe should still be present.
+        app.maybe_step_universe();
+        assert!(UniverseIndex::<Space>::get(app.universe_mut(), &old_marker).is_some());
+
+        // Deliver new universe.
+        let mut new_universe = Universe::new();
+        new_universe
+            .insert(new_marker.clone(), Space::empty_positive(1, 1, 1))
+            .unwrap();
+        send.send(Ok(new_universe)).unwrap();
+
+        // Receive it.
+        app.maybe_step_universe();
+        assert!(UniverseIndex::<Space>::get(app.universe_mut(), &new_marker).is_some());
+        assert!(UniverseIndex::<Space>::get(app.universe_mut(), &old_marker).is_none());
+
+        // Verify cleanup (that the next step can succeed).
+        app.maybe_step_universe();
     }
 }

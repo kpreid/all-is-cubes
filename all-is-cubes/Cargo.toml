@@ -42,6 +42,10 @@ bitvec = { version = "0.22.3", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.7.2", default-features = false }
 cgmath = "0.18.0"
 embedded-graphics = "0.7.0"
+# Explanation: the re-exports of futures-* into futures are a little subtle, so I'm
+# choosing to use the individual implementing modules to be precise and minimal.
+futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+futures-task = { version = "0.3.17", default-features = false, features = [] }
 instant = "0.1.9"
 itertools = { version = "0.10.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
@@ -60,5 +64,6 @@ thiserror = "1.0.22"
 
 [dev-dependencies]
 criterion = "0.3.3"
+futures-channel = { version = "0.3.17", default-features = false, features = ["alloc"] }
 indoc = "1.0.3"
 pretty_assertions = "0.7.2"
