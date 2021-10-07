@@ -212,7 +212,7 @@ impl From<InsertError> for GenError {
 pub enum InGenError {
     /// Generic error container for unusual situations.
     #[error(transparent)]
-    Other(Box<dyn Error>),
+    Other(Box<dyn Error + Send + Sync>),
 
     /// Something else needed to be generated and that failed.
     #[error(transparent)]
@@ -235,7 +235,7 @@ pub enum InGenError {
 
 impl InGenError {
     /// Convert an arbitrary error to `InGenError`.
-    pub fn other<E: Error + 'static>(error: E) -> Self {
+    pub fn other<E: Error + Send + Sync + 'static>(error: E) -> Self {
         Self::Other(Box::new(error))
     }
 }
@@ -251,6 +251,13 @@ impl From<GenError> for InGenError {
 mod tests {
     use super::*;
     use crate::space::Grid;
+
+    fn _test_gen_error_is_sync()
+    where
+        GenError: Send + Sync,
+        InGenError: Send + Sync,
+    {
+    }
 
     #[test]
     fn gen_error_message() {

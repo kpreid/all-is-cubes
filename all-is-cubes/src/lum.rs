@@ -119,11 +119,11 @@ where
 pub struct GraphicsResourceError {
     context: Option<String>,
     #[source]
-    source: Box<dyn Error>,
+    source: Box<dyn Error + Send + Sync>,
 }
 
 impl GraphicsResourceError {
-    pub(crate) fn new<E: Error + 'static>(source: E) -> Self {
+    pub(crate) fn new<E: Error + Send + Sync + 'static>(source: E) -> Self {
         GraphicsResourceError {
             context: None,
             source: Box::new(source),
@@ -149,5 +149,16 @@ impl From<TessError> for GraphicsResourceError {
 impl From<TextureError> for GraphicsResourceError {
     fn from(source: TextureError) -> Self {
         GraphicsResourceError::new(source)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn _test_graphics_resource_error_is_sync()
+    where
+        GraphicsResourceError: Send + Sync,
+    {
     }
 }

@@ -21,7 +21,7 @@ pub fn glfw_main_loop(
     mut app: AllIsCubesAppState,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let glfw_start_time = Instant::now();
     let mut glfw = glfw::init::<()>(None)?;
 

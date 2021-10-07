@@ -64,7 +64,7 @@ impl RecordAnimationOptions {
 pub(crate) fn record_main(
     mut app: AllIsCubesAppState,
     options: RecordOptions,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
         .on_finish(ProgressFinish::AtCurrentPos);
@@ -78,7 +78,7 @@ pub(crate) fn record_main(
     // (We could instead try to render a blank scene, but that is probably not wanted.)
     let character_ref: URef<Character> = app
         .character()
-        .ok_or_else(|| Box::<dyn Error>::from("Character not found"))?
+        .ok_or_else(|| Box::<dyn Error + Send + Sync>::from("Character not found"))?
         .clone();
 
     let space_ref = character_ref.borrow().space.clone();

@@ -124,7 +124,7 @@ fn app() -> clap::App<'static, 'static> {
         )
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let options = app().get_matches();
 
     // Convert options we will consult multiple times.
