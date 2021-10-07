@@ -78,7 +78,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             spawn.set_eye_position(grid.center() + Vector3::new(0.5, 2.91, 8.5));
             spawn.set_flying(false);
             // Initial inventory contents. TODO: Make a better list.
-            let mut inventory = Vec::new();
+            let mut inventory = vec![Tool::RemoveBlock { keep: true }.into()];
             for block in [
                 &landscape_blocks[Grass],
                 &landscape_blocks[Dirt],

@@ -6,6 +6,7 @@ use rand_xoshiro::Xoshiro256Plus;
 
 use crate::block::{Block, AIR};
 use crate::character::Spawn;
+use crate::inv::Tool;
 use crate::linking::InGenError;
 use crate::math::{FaceMap, Rgb};
 use crate::space::{Grid, LightPhysics, Space, SpacePhysics};
@@ -30,7 +31,11 @@ pub fn lighting_bench_space(_universe: &mut Universe) -> Result<Space, InGenErro
     );
     let mut space = Space::builder(space_bounds)
         .light_physics(LightPhysics::None)
-        .spawn(Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]))
+        .spawn({
+            let mut spawn = Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]);
+            spawn.set_inventory(vec![Tool::RemoveBlock { keep: true }.into()]);
+            spawn
+        })
         .build_empty();
 
     // Ground level

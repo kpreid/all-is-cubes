@@ -3,6 +3,7 @@
 
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
+use all_is_cubes::inv::Tool;
 use all_is_cubes::rgba_const;
 use noise::Seedable;
 
@@ -67,6 +68,10 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
         ))
         .sky_color(Rgb::new(1.0, 1.0, 0.9843) * 4.0)
         .build_empty();
+    // TODO: builder method ... ?
+    space
+        .spawn_mut()
+        .set_inventory(vec![Tool::RemoveBlock { keep: true }.into()]);
 
     // Outer walls
     four_walls(

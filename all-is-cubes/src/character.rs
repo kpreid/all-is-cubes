@@ -102,13 +102,13 @@ impl Character {
     /// with the initial state specified by `spawn`.
     pub fn spawn(spawn: &Spawn, space: URef<Space>) -> Self {
         // TODO: special inventory slots should be set up some other way.
-        // The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
-        // And we shouldn't have special slots anyway.
+        // * The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
+        // * And we shouldn't have special slots identified solely by number.
+        // * And not every character should have a CopyFromSpace.
         let mut inventory = vec![Slot::Empty; 11];
-        let delete_slot = 9;
-        let copy_slot = 10;
-        inventory[delete_slot] = Tool::RemoveBlock { keep: true }.into();
-        inventory[copy_slot] = Tool::CopyFromSpace.into();
+        let selected_slots = [0, 1, 10];
+        let [_sel_1, _sel_2, sel_3] = selected_slots;
+        inventory[sel_3] = Tool::CopyFromSpace.into();
         let mut free = 0;
         'fill: for item in spawn.inventory.iter() {
             while inventory[free] != Slot::Empty {
@@ -139,7 +139,7 @@ impl Character {
             colliding_cubes: HashSet::new(),
             last_step_info: None,
             inventory: Inventory::from_slots(inventory),
-            selected_slots: [delete_slot, 0, copy_slot],
+            selected_slots,
             notifier: Notifier::new(),
             behaviors: BehaviorSet::new(),
         }
