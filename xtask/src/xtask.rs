@@ -35,7 +35,13 @@ fn main() -> Result<(), xaction::Error> {
         .subcommand(SubCommand::with_name("run-dev"))
         .subcommand(SubCommand::with_name("run-game-server"))
         .subcommand(SubCommand::with_name("update").help("Update dependency versions."))
-        .subcommand(SubCommand::with_name("publish-all").arg(Arg::with_name("for-real")))
+        .subcommand(
+            SubCommand::with_name("publish-all").arg(
+                Arg::with_name("for-real")
+                    .long("for-real")
+                    .help("Actually publish crates rather than dry run"),
+            ),
+        )
         .get_matches();
 
     let features = if matches.is_present("without-luminance") {
