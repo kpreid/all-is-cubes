@@ -10,12 +10,16 @@ This is a work in progress; it's my very first project written in Rust, and I am
 * Basic user interface (not yet able to edit all aspects of the data).
 * 2D drawing into the voxel space, built on top of the [embedded-graphics] library.
 
-[blocks]: https://docs.rs/all-is-cubes/0.1.2/all_is_cubes/block/enum.Block.html
-[spaces]: https://docs.rs/all-is-cubes/0.1.2/all_is_cubes/space/struct.Space.html
-[luminance]: https://github.com/phaazon/luminance-rs/
-[embedded-graphics]: https://crates.io/crates/embedded-graphics
+For more information on the capabilities, limitations, and requirements of the library,
+please consult [the crate documentation].
 
 This library is intended to be somewhat reusable for working with block/voxel data, but it does not currently have a particularly stable interface as I am still changing it as requirements are discovered.
+
+[the crate documentation]: https://docs.rs/all-is-cubes/0.2.1/all_is_cubes/
+[Blocks]: https://docs.rs/all-is-cubes/0.2.1/all_is_cubes/block/enum.Block.html
+[Spaces]: https://docs.rs/all-is-cubes/0.2.1/all_is_cubes/space/struct.Space.html
+[luminance]: https://github.com/phaazon/luminance-rs/
+[embedded-graphics]: https://crates.io/crates/embedded-graphics
 
 Related crates
 --------------
