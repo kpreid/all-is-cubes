@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0 (2021-10-09)
+
 ### Added
 
 - Demo content: Multiple scenes are now available, through the command-line option `--template`, web page URL parameter `?template=`, or in code as `all_is_cubes_content::UniverseTemplate`. The available templates include:

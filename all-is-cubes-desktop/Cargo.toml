@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes-desktop"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
 # TODO: better description
@@ -18,8 +18,8 @@ doc = false # Do not overwrite library crate's documentation
 bench = false
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.2.0" }
-all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.2.0" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
+all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
 cgmath = "0.18.0"
 clap = "2.33.3"
 crossterm = "0.21.0"

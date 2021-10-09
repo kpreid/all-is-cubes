@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
 description = "Recursive voxel game engine. Can be used for voxel raytracing."

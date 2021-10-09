@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes-server"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2018"
 description = "Game server for the web edition of the recursive voxel game All is Cubes."
@@ -21,7 +21,7 @@ bench = false
 test = false # any testable code will be in lib
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.2.0", features = ["rayon"] }
+all-is-cubes = { path = "../all-is-cubes", version = "0.3.0", features = ["rayon"] }
 static_dir = "0.2"
 tokio = { version = "1.0.0", features = ["macros", "rt-multi-thread"] }
 warp = "0.3.0"
