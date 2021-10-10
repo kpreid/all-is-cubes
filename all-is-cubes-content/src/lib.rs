@@ -33,6 +33,7 @@ mod blocks;
 pub use blocks::*;
 mod city;
 pub(crate) use city::*;
+mod clouds;
 mod demo;
 pub use demo::*;
 mod dungeon;

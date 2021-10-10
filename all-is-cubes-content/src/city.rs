@@ -32,6 +32,7 @@ use all_is_cubes::space::{Grid, LightPhysics, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
+use crate::clouds::clouds;
 use crate::{
     draw_text_in_blocks, logo_text, logo_text_extent, space_to_space_copy, wavy_landscape,
     DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
@@ -57,7 +58,7 @@ pub(crate) async fn demo_city(
     let sky_height = 30;
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
     let underground_floor_y = -5;
-    let radius_xz = 60;
+    let radius_xz = 80;
     let grid = Grid::from_lower_upper(
         (-radius_xz, -ground_depth, -radius_xz),
         (radius_xz, sky_height, radius_xz),
@@ -218,6 +219,12 @@ pub(crate) async fn demo_city(
     p.progress(0.5).await;
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
     planner.occupied_plots.push(landscape_region);
+
+    // Clouds (needs to be done after landscape to not be overwritten)
+    // TODO: Enable this once transparency rendering is better.
+    if false {
+        clouds(planner.y_range(sky_height - 2, sky_height), &mut space, 0.1)?;
+    }
 
     // TODO: Integrate logging and YieldProgress
     let landscape_time = Instant::now();
