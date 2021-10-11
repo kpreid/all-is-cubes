@@ -16,6 +16,7 @@ bench = false
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
+futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }
 maze_generator = "1.1.1"
@@ -23,3 +24,8 @@ noise = { version = "0.7.0", default-features = false }
 rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
 strum = { version = "0.22.0", default-features = false, features = ["derive"] }
+
+[dev-dependencies]
+# Note: This is a executor for tests and does not imply any more general requirement
+# for using `futures-executor` with All is Cubes.
+futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }

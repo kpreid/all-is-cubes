@@ -24,6 +24,7 @@ all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
 clap = "2.33.3"
 crossterm = "0.22.0"
 directories-next = "2.0.0"
+futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
 glfw = "0.41"
 indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }

@@ -10,6 +10,7 @@ use all_is_cubes::linking::{GenError, InGenError};
 use all_is_cubes::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use all_is_cubes::space::{Grid, LightPhysics, Space};
 use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
+use all_is_cubes::util::YieldProgress;
 
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 
@@ -43,7 +44,7 @@ pub enum UniverseTemplate {
 }
 
 impl UniverseTemplate {
-    pub fn build(self) -> Result<Universe, GenError> {
+    pub async fn build(self, _p: YieldProgress) -> Result<Universe, GenError> {
         let mut universe = Universe::new();
 
         // TODO: Later we want a "module loading" system that can lazily bring in content.
@@ -233,6 +234,7 @@ fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenErro
 mod tests {
     use super::*;
     use all_is_cubes::apps::Tick;
+    use futures_executor::block_on;
     use strum::IntoEnumIterator as _;
 
     #[test]
@@ -240,7 +242,7 @@ mod tests {
         for template in UniverseTemplate::iter() {
             eprintln!("{:?}", template);
 
-            let result = template.clone().build();
+            let result = block_on(template.clone().build(YieldProgress::noop()));
             if matches!(template, UniverseTemplate::Fail) {
                 result.unwrap_err();
                 continue;

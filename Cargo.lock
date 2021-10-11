@@ -81,6 +81,8 @@ name = "all-is-cubes-content"
 version = "0.3.0"
 dependencies = [
  "all-is-cubes",
+ "futures-core",
+ "futures-executor",
  "instant",
  "log",
  "maze_generator",
@@ -99,6 +101,7 @@ dependencies = [
  "clap",
  "crossterm 0.22.1",
  "directories-next",
+ "futures-executor",
  "glfw",
  "indicatif",
  "log",
@@ -1237,6 +1240,17 @@ checksum = "ab90cde24b3319636588d0c35fe03b1333857621051837ed769faefb4c2162e4"
 dependencies = [
  "futures 0.1.31",
  "num_cpus",
+]
+
+[[package]]
+name = "futures-executor"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45025be030969d763025784f7f355043dc6bc74093e4ecc5000ca4dc50d8745c"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
 ]
 
 [[package]]

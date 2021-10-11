@@ -16,6 +16,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use all_is_cubes::util::YieldProgress;
 use clap::{value_t, Arg, ErrorKind};
 use directories_next::ProjectDirs;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
@@ -154,7 +155,10 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let start_time = Instant::now();
     let mut app = AllIsCubesAppState::new();
-    app.set_universe(universe_template.clone().build()?);
+    // TODO: Display a progress bar for building.
+    let universe =
+        futures_executor::block_on(universe_template.clone().build(YieldProgress::noop()))?;
+    app.set_universe(universe);
     app.graphics_options_mut().set(graphics_options);
     let app_done_time = Instant::now();
     log::debug!(

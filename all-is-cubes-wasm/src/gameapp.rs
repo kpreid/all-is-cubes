@@ -19,6 +19,7 @@ use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
+use all_is_cubes::util::YieldProgress;
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl};
@@ -26,6 +27,7 @@ use crate::web_glue::{add_event_listener, get_mandatory_element};
 
 /// Yield to the event loop to ensure responsiveness while we're initializing.
 async fn yield_arbitrary() {
+    // TODO: setTimeout is a lousy way to yield because it has minimum delays. Build a better one.
     TimeoutFuture::new(1).await;
 }
 
@@ -71,7 +73,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .scene_info_text_node
         .append_data("\nConstructing universe...")?;
     yield_arbitrary().await;
-    let universe = template.build().expect("universe template error");
+        let universe = template.build(YieldProgress::new(yield_arbitrary)).await.expect("universe template error");
     
     app.set_universe(universe);
     app.graphics_options_mut().set(graphics_options);
