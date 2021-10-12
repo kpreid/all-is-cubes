@@ -26,7 +26,7 @@ mod backend {
         tess_gate::TessGate,
     };
     use luminance::pipeline::TextureBinding;
-    use luminance::pixel::{NormRGBA8UI, NormUnsigned};
+    use luminance::pixel::{NormRGBA8UI, NormUnsigned, SRGBA8UI};
     use luminance::tess::Interleaved;
     use luminance::texture::{Dim2, Dim3};
 
@@ -38,6 +38,7 @@ mod backend {
         + Pipeline<Dim2>
         + PipelineTexture<Dim2, NormRGBA8UI>
         + PipelineTexture<Dim3, NormRGBA8UI>
+        + PipelineTexture<Dim3, SRGBA8UI>
         + RenderGate
         + Shader
         + TessGate<(), (), (), Interleaved>
@@ -56,6 +57,7 @@ mod backend {
             + Pipeline<Dim2>
             + PipelineTexture<Dim2, NormRGBA8UI>
             + PipelineTexture<Dim3, NormRGBA8UI>
+            + PipelineTexture<Dim3, SRGBA8UI>
             + RenderGate
             + Shader
             + TessGate<(), (), (), Interleaved>

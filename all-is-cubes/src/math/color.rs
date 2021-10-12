@@ -203,25 +203,6 @@ impl Rgba {
         Rgb(self.0.truncate())
     }
 
-    // TODO: remove this because linear 8-bit is bad for dark colors.
-    // It is currently used in textures.
-    /// Converts this color lossily to linear 8-bits-per-component color.
-    #[inline]
-    pub(crate) fn to_linear_32bit(self) -> [u8; 4] {
-        #[inline]
-        fn convert_component(x: NotNan<f32>) -> u8 {
-            // As of Rust 1.45, `as` on float to int is saturating, which is safe and what
-            // we want.
-            (x.into_inner() * 255.0) as u8
-        }
-        [
-            convert_component(self.red()),
-            convert_component(self.green()),
-            convert_component(self.blue()),
-            convert_component(self.alpha()),
-        ]
-    }
-
     /// Converts this color to sRGB (nonlinear RGB components).
     // TODO: decide whether to make this public and what to call it -- it is rarely needed
     #[inline]
@@ -476,20 +457,6 @@ mod tests {
     use std::array::IntoIter;
 
     // TODO: Add tests of the color not-NaN mechanisms.
-
-    #[test]
-    fn rgba_to_linear_32bit() {
-        assert_eq!(
-            Rgba::new(0.125, 0.25, 0.5, 0.75).to_linear_32bit(),
-            [31, 63, 127, 191]
-        );
-
-        // Test saturation
-        assert_eq!(
-            Rgba::new(0.5, -1.0, 10.0, 1.0).to_linear_32bit(),
-            [127, 0, 255, 255]
-        );
-    }
 
     #[test]
     fn rgba_to_srgb_32bit() {

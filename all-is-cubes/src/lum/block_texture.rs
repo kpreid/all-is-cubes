@@ -7,7 +7,7 @@
 use cgmath::Vector3;
 use luminance::context::GraphicsContext;
 use luminance::pipeline::BoundTexture;
-use luminance::pixel::NormRGBA8UI;
+use luminance::pixel::SRGBA8UI;
 use luminance::tess::{Mode, Tess};
 use luminance::texture::{
     Dim3, Dimensionable, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, TextureError, Wrap,
@@ -26,9 +26,9 @@ use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTil
 use crate::util::{CustomFormat, StatusText};
 
 /// Alias for the concrete type of the block texture.
-pub type BlockTexture<Backend> = Texture<Backend, Dim3, NormRGBA8UI>;
+pub type BlockTexture<Backend> = Texture<Backend, Dim3, SRGBA8UI>;
 /// Alias for the concrete type of the block texture when bound in a luminance pipeline.
-pub type BoundBlockTexture<'a, Backend> = BoundTexture<'a, Backend, Dim3, NormRGBA8UI>;
+pub type BoundBlockTexture<'a, Backend> = BoundTexture<'a, Backend, Dim3, SRGBA8UI>;
 
 /// Implementation of [`TextureAllocator`] for [`luminance`].
 ///
@@ -113,7 +113,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
         // Mark unused area for easier debugging (error color instead of transparency)
         texture.clear(
             GenMipmaps::No,
-            palette::UNPAINTED_TEXTURE_FALLBACK.to_linear_32bit(),
+            palette::UNPAINTED_TEXTURE_FALLBACK.to_srgb_32bit(),
         )?;
 
         Ok(Self {

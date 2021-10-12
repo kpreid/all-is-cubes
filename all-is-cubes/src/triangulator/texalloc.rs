@@ -16,7 +16,8 @@ use crate::content::palette;
 use crate::space::{Grid, GridArray};
 use crate::triangulator::TextureCoordinate;
 
-/// RGBA color data accepted by [`TextureAllocator`].
+/// Color data accepted by [`TextureAllocator`].
+/// The components are sRGB `[R, G, B, A]`.
 pub type Texel = [u8; 4];
 
 /// Allocator of 3D regions ("tiles") in a texture atlas to paint block voxels into.
@@ -77,7 +78,7 @@ pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
                             .get([x, y, z])
                             .unwrap_or(&Evoxel::new(palette::MISSING_VOXEL_FALLBACK))
                             .color
-                            .to_linear_32bit(),
+                            .to_srgb_32bit(),
                     );
                 }
             }
