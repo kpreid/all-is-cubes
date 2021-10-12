@@ -59,7 +59,7 @@ rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
 rayon = { version = "1.3.1", optional = true }
 serde = { version = "1.0.126", default-features = false, features = ["derive"] }
-strum = { version = "0.21.0", features = ["derive"] }
+strum = { version = "0.22.0", default-features = false, features = ["derive"] }
 thiserror = "1.0.22"
 
 [dev-dependencies]
