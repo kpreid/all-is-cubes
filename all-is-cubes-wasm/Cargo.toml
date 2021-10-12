@@ -22,7 +22,7 @@ crate-type = ["cdylib"]
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
 console_log = "0.2"
-console_error_panic_hook = "0.1.5"
+console_error_panic_hook = "0.1.7"
 form_urlencoded = "1.0.1"
 # Feature enabling for indirect dependency all-is-cubes → random → getrand
 getrandom = { version = "0.2.3", features = ["js"] }
