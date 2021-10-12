@@ -35,6 +35,7 @@ impl<D> Surface<'_, D> {
     pub(crate) fn to_lit_color<P>(&self, rt: &SpaceRaytracer<P>) -> Option<Rgba>
     where
         P: PixelBuf<BlockData = D>,
+        D: 'static,
     {
         let diffuse_color =
             rt.0.borrow_options()
@@ -52,6 +53,7 @@ impl<D> Surface<'_, D> {
     pub fn compute_illumination<P>(&self, rt: &SpaceRaytracer<P>) -> Rgb
     where
         P: PixelBuf<BlockData = D>,
+        D: 'static,
     {
         match rt.0.borrow_options().lighting_display {
             LightingOption::None => Rgb::ONE,

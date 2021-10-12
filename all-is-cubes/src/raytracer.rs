@@ -37,18 +37,18 @@ use surface::{Surface, SurfaceIter, TraceStep};
 mod text;
 pub use text::*;
 
-/// Precomputed data for raytracing a single frame of a single Space, and bearer of the
-/// methods for actually performing raytracing.
-pub struct SpaceRaytracer<P: PixelBuf>(SpaceRaytracerImpl<P>);
+/// Precomputed data for raytracing a single frame of a single [`Space`], and bearer of
+/// the methods for actually performing raytracing.
+pub struct SpaceRaytracer<P: PixelBuf>(SpaceRaytracerImpl<P::BlockData>);
 
 /// Helper struct for [`SpaceRaytracer`] so the details of [`ouroboros::self_referencing`]
 /// aren't exposed.
 #[self_referencing]
-struct SpaceRaytracerImpl<P: PixelBuf> {
-    blocks: Box<[TracingBlock<P::BlockData>]>,
+struct SpaceRaytracerImpl<B: 'static> {
+    blocks: Box<[TracingBlock<B>]>,
     #[borrows(blocks)]
     #[covariant]
-    cubes: GridArray<TracingCubeData<'this, P::BlockData>>,
+    cubes: GridArray<TracingCubeData<'this, B>>,
 
     options: GraphicsOptions,
     sky_color: Rgb,
