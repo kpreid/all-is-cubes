@@ -2,7 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use js_sys::Error;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{AddEventListenerOptions, Document, Event, EventTarget};
 

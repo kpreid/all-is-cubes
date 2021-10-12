@@ -6,7 +6,7 @@ use luminance_web_sys::WebSysWebGL2Surface;
 use std::cell::{BorrowMutError, RefCell};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
     console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,

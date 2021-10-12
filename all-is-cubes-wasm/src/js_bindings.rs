@@ -1,8 +1,9 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-/// Bindings for our own JS code.
-use wasm_bindgen::prelude::*;
+//! Bindings for our own JS code.
+
+use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::HtmlCanvasElement;
 
 use all_is_cubes::camera::Viewport;
