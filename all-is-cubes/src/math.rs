@@ -33,16 +33,61 @@ pub type GridVector = Vector3<GridCoordinate>;
 /// Coordinates that are not locked to the cube grid.
 pub type FreeCoordinate = f64;
 
-/// Allows writing a [`NotNan`] value as a constant expression.
+/// Allows writing a [`NotNan`] value as a constant expression  (which is not currently
+/// a feature provided by the [`ordered_float`] crate itself).
 ///
-/// TODO: If this becomes public, write doctests confirming that it can't compile a NaN
+/// ```
+/// use all_is_cubes::{notnan, math::NotNan};
+///
+/// const X: NotNan<f32> = notnan!(1.234);
+/// ```
+///
+/// ```compile_fail
+/// # use all_is_cubes::{notnan, math::NotNan};
+/// // Not a literal; will not compile
+/// const X: NotNan<f32> = notnan!(f32::NAN);
+/// ```
+///
+/// ```compile_fail
+/// # use all_is_cubes::{notnan, math::NotNan};
+/// // Not a literal; will not compile
+/// const X: NotNan<f32> = notnan!(0.0 / 0.0);
+/// ```
+///
+/// ```compile_fail
+/// # use all_is_cubes::{notnan, math::NotNan};
+/// const N0N: f32 = f32::NAN;
+/// // Not a literal; will not compile
+/// const X: NotNan<f32> = notnan!(N0N);
+/// ```
+///
+/// ```compile_fail
+/// # use all_is_cubes::{notnan, math::NotNan};
+/// // Not a float; will not compile
+/// const X: NotNan<char> = notnan!('a');
+/// ```
 #[doc(hidden)]
 #[macro_export] // used by all-is-cubes-content
 macro_rules! notnan {
     ($value:literal) => {
-        // Safety: Only literal values are allowed, which will either be a non-NaN
-        // float or a type mismatch.
-        unsafe { $crate::math::NotNan::new_unchecked($value) }
+        match $value {
+            value => {
+                // Safety: Only literal values are allowed, which will either be a non-NaN
+                // float or (as checked below) a type mismatch.
+                let result = unsafe { $crate::math::NotNan::new_unchecked(value) };
+
+                // Ensure that the type is one which could have resulted from a float literal,
+                // by requiring type unification with a literal. This prohibits char, &str, etc.
+                let _ = if false {
+                    // Safety: Statically never NaN, and is also never executed.
+                    unsafe { $crate::math::NotNan::new_unchecked(0.0) }
+                } else {
+                    result
+                };
+
+                result
+            }
+        }
     };
 }
 
