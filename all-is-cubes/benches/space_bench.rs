@@ -11,8 +11,9 @@ use all_is_cubes::space::{Grid, Space};
 pub fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
 
-    for &mutation_size in &[1, 4, 16, 24, 32] {
+    for &mutation_size in &[1, 4, 64] {
         let grid = Grid::new([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
+        let bigger_grid = grid.multiply(2);
         let size_description = format!("{}×{}×{}", mutation_size, mutation_size, mutation_size);
         let mutation_volume = grid.volume();
         group.throughput(Throughput::Elements(mutation_volume as u64));
@@ -36,7 +37,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
-                    || Space::empty(grid.multiply(2)),
+                    || Space::empty(bigger_grid),
                     |mut space| {
                         space.fill(grid, |_| Some(&block)).unwrap();
                     },
@@ -64,7 +65,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
-                    || Space::empty(grid.multiply(2)),
+                    || Space::empty(bigger_grid),
                     |mut space| {
                         space.fill_uniform(grid, &block).unwrap();
                     },
