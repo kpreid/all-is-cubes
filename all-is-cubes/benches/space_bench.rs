@@ -6,7 +6,8 @@ use criterion::{
 };
 
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::space::{Grid, Space, SpaceTransaction};
+use all_is_cubes::transaction::{Merge, Transaction};
 
 pub fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
@@ -88,6 +89,34 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
                                 }
                             }
                         }
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+
+        group.bench_function(
+            BenchmarkId::new("transaction entire space", &size_description),
+            |b| {
+                let [block] = make_some_blocks();
+                b.iter_batched(
+                    || Space::empty(grid),
+                    |mut space| {
+                        let mut txn = SpaceTransaction::default();
+                        for x in 0..mutation_size {
+                            for y in 0..mutation_size {
+                                for z in 0..mutation_size {
+                                    txn = txn
+                                        .merge(SpaceTransaction::set_cube(
+                                            [x, y, z],
+                                            None,
+                                            Some(block.clone()),
+                                        ))
+                                        .unwrap();
+                                }
+                            }
+                        }
+                        txn.execute(&mut space).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
