@@ -6,7 +6,7 @@
 use std::collections::btree_map::Entry::*;
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::fmt;
+use std::{fmt, mem};
 
 use super::Space;
 use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
@@ -27,14 +27,42 @@ pub struct SpaceTransaction {
 }
 
 impl SpaceTransaction {
-    // TODO: tests
     /// Construct a [`SpaceTransaction`] for a single cube.
     ///
     /// If `old` is not [`None`], requires that the existing block is that block or the
     /// transaction will fail.
     /// If `new` is not [`None`], replaces the existing block with `new`.
+    ///
+    /// TODO: This name is a poor name now that [`Self::set`] exists.
     pub fn set_cube(cube: impl Into<GridPoint>, old: Option<Block>, new: Option<Block>) -> Self {
         Self::single(cube, CubeTransaction { old, new })
+    }
+
+    /// Expand this transaction to include modifying the given cube, or return an error if
+    /// that would conflict (by the same definition as transaction merging).
+    ///
+    /// If `old` is not [`None`], requires that the existing block is that block or the
+    /// transaction will fail.
+    /// If `new` is not [`None`], replaces the existing block with `new`.
+    pub fn set(
+        &mut self,
+        cube: impl Into<GridPoint>,
+        old: Option<Block>,
+        new: Option<Block>,
+    ) -> Result<(), TransactionConflict> {
+        let ct = CubeTransaction { old, new };
+        match self.cubes.entry(cube.into().into()) {
+            Vacant(entry) => {
+                entry.insert(ct);
+                Ok(())
+            }
+            Occupied(mut entry) => {
+                let existing_ref = entry.get_mut();
+                let check = existing_ref.check_merge(&ct)?;
+                *existing_ref = mem::take(existing_ref).commit_merge(ct, check);
+                Ok(())
+            }
+        }
     }
 
     fn single(cube: impl Into<GridPoint>, transaction: CubeTransaction) -> Self {
@@ -110,20 +138,11 @@ impl Merge for SpaceTransaction {
             // first and last of one set to iterate over a range of the other.
             // std::collections::btree_set::Intersection implements something like this,
             // but unfortunately, does not have an analogue for BTreeMap.
-            std::mem::swap(&mut cubes1, &mut cubes2);
+            mem::swap(&mut cubes1, &mut cubes2);
         }
         for (cube, t1) in cubes1.iter() {
             if let Some(t2) = cubes2.get(cube) {
-                if matches!((&t1.old, &t2.old), (Some(a), Some(b)) if a != b) {
-                    // Incompatible preconditions will always fail.
-                    return Err(TransactionConflict {});
-                }
-                if t1.new.is_some() && t2.new.is_some() {
-                    // Replacing the same cube twice is not allowed -- even if they're
-                    // equal, since doing so could violate an intended conservation law.
-                    // TODO: Might want to make that optional.
-                    return Err(TransactionConflict {});
-                }
+                let () = t1.check_merge(t2)?;
             }
         }
         self.behaviors.check_merge(&other.behaviors)
@@ -131,18 +150,13 @@ impl Merge for SpaceTransaction {
 
     fn commit_merge(mut self, mut other: Self, check: Self::MergeCheck) -> Self {
         if other.cubes.len() > self.cubes.len() {
-            std::mem::swap(&mut self, &mut other);
+            mem::swap(&mut self, &mut other);
         }
         for (cube, t2) in other.cubes {
             match self.cubes.entry(cube) {
                 Occupied(mut entry) => {
-                    let t1 = entry.get_mut();
-                    if t2.old.is_some() {
-                        t1.old = t2.old;
-                    }
-                    if t2.new.is_some() {
-                        t1.new = t2.new;
-                    }
+                    let t1_ref = entry.get_mut();
+                    *t1_ref = mem::take(t1_ref).commit_merge(t2, ());
                 }
                 Vacant(entry) => {
                     entry.insert(t2);
@@ -172,12 +186,43 @@ impl fmt::Debug for SpaceTransaction {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// Data for a single cube in a [`SpaceTransaction`]. This does not function as a
+/// transaction on its own, though it does implement [`Merge`].
+#[derive(Clone, Debug, Default, PartialEq)]
 struct CubeTransaction {
     /// If `None`, no precondition.
     old: Option<Block>,
     /// If `None`, this is only a precondition for modifying another block.
     new: Option<Block>,
+}
+
+impl Merge for CubeTransaction {
+    type MergeCheck = ();
+
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+        if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
+            // Incompatible preconditions will always fail.
+            return Err(TransactionConflict {});
+        }
+        if self.new.is_some() && other.new.is_some() {
+            // Replacing the same cube twice is not allowed -- even if they're
+            // equal, since doing so could violate an intended conservation law.
+            // TODO: Might want to make that optional.
+            return Err(TransactionConflict {});
+        }
+        Ok(())
+    }
+
+    fn commit_merge(mut self, other: Self, (): Self::MergeCheck) -> Self
+where {
+        if other.old.is_some() {
+            self.old = other.old;
+        }
+        if other.new.is_some() {
+            self.new = other.new;
+        }
+        self
+    }
 }
 
 #[cfg(test)]
@@ -187,6 +232,40 @@ mod tests {
     use crate::transaction::TransactionTester;
 
     use super::*;
+
+    #[test]
+    fn set_cube_mutate_equivalent_to_merge() {
+        let [b1, b2, b3] = make_some_blocks();
+
+        // A basic single-cube transaction is the same either way.
+        let mut t = SpaceTransaction::default();
+        t.set([0, 0, 0], Some(b1.clone()), Some(b2.clone()))
+            .unwrap();
+        assert_eq!(
+            t,
+            SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b2.clone())),
+        );
+
+        // Two-cube transaction.
+        let prev = t.clone();
+        t.set([1, 0, 0], Some(b2.clone()), Some(b3.clone()))
+            .unwrap();
+        assert_eq!(
+            t,
+            prev.merge(SpaceTransaction::set_cube(
+                [1, 0, 0],
+                Some(b2.clone()),
+                Some(b3.clone())
+            ))
+            .unwrap(),
+        );
+
+        // Conflict
+        let prev = t.clone();
+        t.set([0, 0, 0], Some(b1.clone()), Some(b3.clone()))
+            .expect_err("should have merge failure");
+        assert_eq!(t, prev,);
+    }
 
     #[test]
     fn merge_allows_independent() {

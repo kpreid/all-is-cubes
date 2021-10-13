@@ -50,11 +50,7 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
         let mut txn = SpaceTransaction::default();
         for cube in grid.interior_iter() {
             let block = (self.function)(cube, self.frame);
-            // TODO: This transaction constructing and merging is neither ergonomic nor efficient.
-            // Maybe we should have a SpaceTransaction::set_cube(&mut self, cube, block) instead.
-            txn = txn
-                .merge(SpaceTransaction::set_cube(cube, None, Some(block.clone())))
-                .unwrap();
+            txn.set(cube, None, Some(block.clone())).unwrap();
         }
         txn
     }
@@ -166,9 +162,7 @@ impl Fire {
         let mut txn = SpaceTransaction::default();
         for cube in self.fire_state.grid().interior_iter() {
             let block: &Block = &self.blocks[self.fire_state[cube] as usize];
-            txn = txn
-                .merge(SpaceTransaction::set_cube(cube, None, Some(block.clone())))
-                .unwrap();
+            txn.set(cube, None, Some(block.clone())).unwrap();
         }
         txn
     }
