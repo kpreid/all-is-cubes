@@ -62,7 +62,25 @@
 //!       tools, so that there can be entirely free editing or only actions following
 //!       gameplay rules.
 //!
-//! ### User interface, rendering, application.
+//! ### Coordinate system
+//!
+//! Currently, there are some assumptions of a specific coordinate system.
+//! All of these might be generalized in the future.
+//!
+//! * [`Space`] and [`Block`] use 3-dimensional integer coordinates with no assumptions
+//!   about axes. However, the default [`SpacePhysics`] configuration currently has a
+//!   gravity vector in the &minus;Y direction.
+//! * [`camera`] assumes OpenGL-style coordinates: +X right, +Y up, +Z towards viewer —
+//!   a “right-handed” coordinate system.
+//! * [`Character`] and [`Body`] have a look direction and corresponding transformation
+//!   matrix which use the same coordinate system as [`camera`].
+//!   Jumping is also hardcoded to work in the +Y direction.
+//!   Future versions may support arbitrary character orientation.
+//! * [`vui`] uses the same coordinate system as [`camera`] for user interface layout
+//!   and text orientation.
+//! * [`triangulator`] generates triangles with counterclockwise winding order.
+//!
+//! ### User interface, rendering, application
 //!
 //! This crate does not provide any platform bindings, but it does contain components for
 //! the platform-independent components of the complete interactive game application.
@@ -115,8 +133,10 @@
 //! [`AllIsCubesAppState::input_processor`]: crate::apps::AllIsCubesAppState::input_processor
 //! [`Behavior`]: crate::behavior::Behavior
 //! [`Block`]: crate::block::Block
+//! [`Body`]: crate::physics::Body
 //! [`Character`]: crate::character::Character
 //! [`Space`]: crate::space::Space
+//! [`SpacePhysics`]: crate::space::SpacePhysics
 //! [`Tool`]: crate::inv::Tool
 //! [`Universe`]: crate::universe::Universe
 #![cfg_attr(
