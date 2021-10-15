@@ -22,26 +22,28 @@
 //!
 //! -->
 
-use std::borrow::Borrow;
-use std::collections::hash_map::HashMap;
-use std::error::Error;
-use std::fmt::{self, Debug, Display};
-use std::hash::{Hash, Hasher};
+use std::collections::HashMap;
+use std::fmt;
 use std::marker::PhantomData;
-use std::ops::Deref;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 use std::time::Duration;
 
 use instant::Instant;
-use ouroboros::self_referencing;
-// wasm-compatible replacement for std::time::Instant
 
 use crate::apps::Tick;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
-use crate::transaction::{Transaction, Transactional};
+use crate::transaction::Transaction;
 use crate::util::{CustomFormat, StatusText, TypeName};
+
+mod members;
+use members::*;
+
+mod uref;
+pub use uref::*;
+
+#[cfg(test)]
+mod tests;
 
 /// Name/key of an object in a [`Universe`].
 #[allow(clippy::exhaustive_enums)]
@@ -57,7 +59,7 @@ impl From<&str> for Name {
         Self::Specific(value.to_string())
     }
 }
-impl Display for Name {
+impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Name::Specific(name) => write!(f, "'{}'", name),
@@ -75,9 +77,9 @@ impl Display for Name {
 ///
 /// [avoiding deadlock]: crate::universe#thread-safety
 pub struct Universe {
-    blocks: HashMap<Name, URootRef<BlockDef>>,
-    characters: HashMap<Name, URootRef<Character>>,
-    spaces: HashMap<Name, URootRef<Space>>,
+    blocks: Storage<BlockDef>,
+    characters: Storage<Character>,
+    spaces: Storage<Space>,
     next_anonym: usize,
 }
 
@@ -173,40 +175,10 @@ where
 impl sealed_gimmick::Sealed for Universe {}
 
 /// Trait implemented once for each type of object that can be stored in a [`Universe`]
-/// that internally provides the table for that type. This trait differs from
-/// [`UniverseIndex`] in that it is not public.
-trait UniverseTable<T> {
-    fn table(&self) -> &HashMap<Name, URootRef<T>>;
-    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<T>>;
-}
-impl UniverseTable<BlockDef> for Universe {
-    fn table(&self) -> &HashMap<Name, URootRef<BlockDef>> {
-        &self.blocks
-    }
-    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<BlockDef>> {
-        &mut self.blocks
-    }
-}
-impl UniverseTable<Character> for Universe {
-    fn table(&self) -> &HashMap<Name, URootRef<Character>> {
-        &self.characters
-    }
-    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Character>> {
-        &mut self.characters
-    }
-}
-impl UniverseTable<Space> for Universe {
-    fn table(&self) -> &HashMap<Name, URootRef<Space>> {
-        &self.spaces
-    }
-    fn table_mut(&mut self) -> &mut HashMap<Name, URootRef<Space>> {
-        &mut self.spaces
-    }
-}
-
-/// Trait implemented once for each type of object that can be stored in a [`Universe`]
 /// that permits lookups of that type.
 pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
+    // Internal: Implementations of this are in the [`members`] module.
+
     /// Translates a name for an object of type `T` into a [`URef`] for it, which
     /// allows borrowing the actual object.
     ///
@@ -244,65 +216,6 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
     /// ```
     fn iter_by_type(&self) -> UniverseIter<'_, T>;
 }
-impl UniverseIndex<BlockDef> for Universe {
-    fn get(&self, name: &Name) -> Option<URef<BlockDef>> {
-        index_get(self, name)
-    }
-    fn insert(&mut self, name: Name, value: BlockDef) -> Result<URef<BlockDef>, InsertError> {
-        index_insert(self, name, value)
-    }
-    fn iter_by_type(&self) -> UniverseIter<'_, BlockDef> {
-        UniverseIter(self.table().iter())
-    }
-}
-impl UniverseIndex<Character> for Universe {
-    fn get(&self, name: &Name) -> Option<URef<Character>> {
-        index_get(self, name)
-    }
-    fn insert(&mut self, name: Name, value: Character) -> Result<URef<Character>, InsertError> {
-        index_insert(self, name, value)
-    }
-    fn iter_by_type(&self) -> UniverseIter<'_, Character> {
-        UniverseIter(self.table().iter())
-    }
-}
-impl UniverseIndex<Space> for Universe {
-    fn get(&self, name: &Name) -> Option<URef<Space>> {
-        index_get(self, name)
-    }
-    fn insert(&mut self, name: Name, value: Space) -> Result<URef<Space>, InsertError> {
-        index_insert(self, name, value)
-    }
-    fn iter_by_type(&self) -> UniverseIter<'_, Space> {
-        UniverseIter(self.table().iter())
-    }
-}
-
-// Helper functions to implement UniverseIndex. Can't be trait provided methods
-// because UniverseTable is private
-fn index_get<T>(this: &Universe, name: &Name) -> Option<URef<T>>
-where
-    Universe: UniverseTable<T>,
-{
-    this.table().get(name).map(URootRef::downgrade)
-}
-fn index_insert<T>(this: &mut Universe, name: Name, value: T) -> Result<URef<T>, InsertError>
-where
-    Universe: UniverseTable<T>,
-{
-    use std::collections::hash_map::Entry::*;
-    // TODO: prohibit existing names under any type, not just the same type
-    let table = this.table_mut();
-    match table.entry(name.clone()) {
-        Occupied(_) => Err(InsertError::AlreadyExists(name)),
-        Vacant(vacant) => {
-            let root_ref = URootRef::new(name, value);
-            let returned_ref = root_ref.downgrade();
-            vacant.insert(root_ref);
-            Ok(returned_ref)
-        }
-    }
-}
 
 /// Iterator type for [`UniverseIndex::iter_by_type`].
 pub struct UniverseIter<'u, T>(std::collections::hash_map::Iter<'u, Name, URootRef<T>>);
@@ -327,247 +240,6 @@ impl Default for Universe {
 pub enum InsertError {
     #[error("an object already exists with name {0}")]
     AlreadyExists(Name),
-}
-
-/// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
-/// parameterized with this somewhat less hairy.
-type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
-
-/// A reference from an object in a [`Universe`] to another.
-///
-/// If they are held by objects outside of the [`Universe`], it is not guaranteed
-/// that they will remain valid (in which case using the `URef` will return an error
-/// or panic depending on the method).
-/// To ensure an object does not vanish while operating on it, [`URef::borrow`] it.
-/// (TODO: Should there be an operation in the style of `Weak::upgrade`?)
-///
-/// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
-///
-/// [avoiding deadlock]: crate::universe#thread-safety
-pub struct URef<T> {
-    // TODO: We're going to want to either track reference counts or implement a garbage
-    // collector for the graph of URefs. Reference counts would be an easy way to ensure
-    // nothing is deleted while it is in use from a UI perspective.
-    /// Reference to the object. Weak because we don't want to create reference cycles;
-    /// the assumption is that the overall game system will keep the [`Universe`] alive
-    /// and that [`Universe`] will ensure no entry goes away while referenced.
-    weak_ref: Weak<RwLock<UEntry<T>>>,
-    name: Arc<Name>,
-}
-
-impl<T: 'static> URef<T> {
-    pub fn name(&self) -> &Arc<Name> {
-        &self.name
-    }
-
-    /// Borrow the value, in the sense of `RefCell::borrow`, and panic on failure.
-    ///
-    /// TODO: Update docs to discuss RwLock instead of RefCell, once we have a policy
-    /// about waiting for locks.
-    #[track_caller]
-    pub fn borrow(&self) -> UBorrow<T> {
-        self.try_borrow().unwrap()
-    }
-
-    /// Borrow the value, in the sense of `RefCell::try_borrow`.
-    ///
-    /// TODO: Update docs to discuss RwLock instead of RefCell, once we have a policy
-    /// about waiting for locks.
-    pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
-        let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
-            strong
-                .try_read()
-                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))
-        })?;
-        Ok(UBorrow(inner))
-    }
-
-    /// Apply the given function to the `&mut T` inside.
-    ///
-    /// TODO: If possible, replace this operation with transactions, to ensure change notification integrity.
-    pub fn try_modify<F, Out>(&self, function: F) -> Result<Out, RefError>
-    where
-        F: FnOnce(&mut T) -> Out,
-    {
-        let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
-        let mut borrow = strong
-            .try_write()
-            .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
-        Ok(function(&mut borrow.data))
-    }
-
-    /// Gain mutable access but don't use it immediately.
-    ///
-    /// This function is not exposed publicly, but only used in transactions to allow
-    /// the check-then-commit pattern; use [`URef::try_modify`] instead for other
-    /// purposes.
-    pub(crate) fn try_borrow_mut(&self) -> Result<UBorrowMutImpl<T>, RefError> {
-        UBorrowMutImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
-            strong
-                .try_write()
-                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))
-        })
-    }
-
-    /// Shortcut for executing a transaction.
-    #[allow(dead_code)] // Currently only used in tests
-    pub(crate) fn execute(
-        &self,
-        transaction: &<T as Transactional>::Transaction,
-    ) -> Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, Box<dyn Error>>
-    where
-        T: Transactional,
-    {
-        self.try_modify(|data| transaction.execute(data))?
-    }
-
-    fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {
-        self.weak_ref
-            .upgrade()
-            .ok_or_else(|| RefError::Gone(Arc::clone(&self.name)))
-    }
-}
-
-impl<T> Debug for URef<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: Maybe print dead refs differently?
-        write!(f, "URef({})", self.name)
-    }
-}
-
-/// `URef`s are compared by pointer equality: they are equal only if they refer to
-/// the same mutable cell.
-impl<T> PartialEq for URef<T> {
-    fn eq(&self, other: &Self) -> bool {
-        Weak::ptr_eq(&self.weak_ref, &other.weak_ref)
-    }
-}
-/// `URef`s are compared by pointer equality.
-impl<T> Eq for URef<T> {}
-impl<T> Hash for URef<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-    }
-}
-
-/// Manual implementation of Clone that does not require T to be Clone.
-impl<T> Clone for URef<T> {
-    fn clone(&self) -> Self {
-        URef {
-            weak_ref: self.weak_ref.clone(),
-            name: self.name.clone(),
-        }
-    }
-}
-
-/// Errors resulting from attempting to borrow/dereference a [`URef`].
-#[allow(clippy::exhaustive_enums)] // If this has to change it will be a major semantic change
-#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
-pub enum RefError {
-    /// Target was deleted, or its entire universe was dropped.
-    #[error("object was deleted: {0}")]
-    Gone(Arc<Name>),
-    /// Target is currently incompatibly borrowed.
-    #[error("object was in use at the same time: {0}")]
-    InUse(Arc<Name>),
-}
-
-/// A wrapper type for an immutably borrowed value from an [`URef`].
-pub struct UBorrow<T: 'static>(UBorrowImpl<T>);
-
-impl<T: Debug> Debug for UBorrow<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "UBorrow({:?})", **self)
-    }
-}
-impl<T> Deref for UBorrow<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        &self.0.borrow_guard().data
-    }
-}
-impl<T> AsRef<T> for UBorrow<T> {
-    fn as_ref(&self) -> &T {
-        self.deref()
-    }
-}
-impl<T> Borrow<T> for UBorrow<T> {
-    fn borrow(&self) -> &T {
-        self.deref()
-    }
-}
-
-/// Implementation of [`UBorrow`], split out to hide all `self_referencing` details.
-#[self_referencing]
-struct UBorrowImpl<T: 'static> {
-    strong: StrongEntryRef<T>,
-    #[borrows(strong)]
-    #[covariant]
-    guard: RwLockReadGuard<'this, UEntry<T>>,
-}
-
-/// Parallel to [`UBorrowImpl`], but for mutable access.
-///
-/// This type is not exposed publicly, but only used in transactions to allow
-/// the check-then-commit pattern; use [`URef::try_modify`] instead for other
-/// purposes.
-#[self_referencing]
-#[derive(Debug)]
-pub(crate) struct UBorrowMutImpl<T: 'static> {
-    strong: StrongEntryRef<T>,
-    #[borrows(strong)]
-    #[not_covariant]
-    guard: RwLockWriteGuard<'this, UEntry<T>>,
-}
-
-impl<T> UBorrowMutImpl<T> {
-    pub(crate) fn with_data_mut<F, Out>(&mut self, function: F) -> Out
-    where
-        F: FnOnce(&mut T) -> Out,
-    {
-        self.with_guard_mut(|entry| function(&mut entry.data))
-    }
-}
-
-/// The data of an entry in a `Universe`.
-#[derive(Debug)]
-struct UEntry<T> {
-    // TODO: It might make more sense for data to be a RwLock<T> (instead of the
-    // RwLock containing UEntry), but we don't have enough examples to be certain yet.
-    data: T,
-    name: Arc<Name>,
-}
-
-/// The unique reference to an entry in a `Universe` from that `Universe`.
-/// Normal usage is via `URef` instead.
-#[derive(Debug)]
-struct URootRef<T> {
-    strong_ref: StrongEntryRef<T>,
-    name: Arc<Name>,
-}
-
-impl<T> URootRef<T> {
-    fn new(name: Name, initial_value: T) -> Self {
-        let name = Arc::new(name);
-        URootRef {
-            strong_ref: Arc::new(RwLock::new(UEntry {
-                data: initial_value,
-                name: name.clone(),
-            })),
-            name,
-        }
-    }
-
-    /// Convert to `URef`.
-    ///
-    /// TODO: As we add graph analysis features, this will need additional arguments
-    /// like where the ref is being held, and it will probably need to be renamed.
-    fn downgrade(&self) -> URef<T> {
-        URef {
-            weak_ref: Arc::downgrade(&self.strong_ref),
-            name: Arc::clone(&self.name),
-        }
-    }
 }
 
 /// Performance data returned by [`Universe::step`]. The exact contents of this structure
@@ -599,152 +271,4 @@ impl CustomFormat<StatusText> for UniverseStepInfo {
 mod sealed_gimmick {
     /// As a supertrait, this prevents a trait from being implemented outside the crate.
     pub trait Sealed {}
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::block::{Block, BlockDefTransaction, AIR};
-    use crate::content::make_some_blocks;
-
-    fn _test_thread_safety()
-    where
-        URef<Character>: Send + Sync,
-        Universe: Send + Sync,
-    {
-    }
-
-    #[test]
-    fn universe_debug_empty() {
-        assert_eq!(format!("{:?}", Universe::new()), "Universe");
-        assert_eq!(format!("{:#?}", Universe::new()), "Universe");
-    }
-
-    /// Universe does not print contents of members, on the assumption this would be too verbose.
-    #[test]
-    fn universe_debug_elements() {
-        let mut u = Universe::new();
-        u.insert("foo".into(), Space::empty_positive(1, 2, 3))
-            .unwrap();
-        u.insert_anonymous(BlockDef::new(AIR));
-        assert_eq!(
-            format!("{:?}", u),
-            "Universe { [anonymous #0]: all_is_cubes::block::BlockDef, 'foo': all_is_cubes::space::Space }"
-        );
-        assert_eq!(
-            format!("{:#?}", u),
-            "\
-Universe {
-    [anonymous #0]: all_is_cubes::block::BlockDef,
-    'foo': all_is_cubes::space::Space,
-}\
-            "
-        );
-    }
-
-    #[test]
-    fn uref_debug() {
-        let mut u = Universe::new();
-        let r = u
-            .insert("foo".into(), Space::empty_positive(1, 2, 3))
-            .unwrap();
-        assert_eq!(format!("{:?}", r), "URef('foo')");
-        assert_eq!(format!("{:#?}", r), "URef('foo')");
-    }
-
-    #[test]
-    fn uref_try_borrow_in_use() {
-        let mut u = Universe::new();
-        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        r.try_modify(|_| {
-            assert_eq!(
-                r.try_borrow().unwrap_err(),
-                RefError::InUse(Arc::new(Name::Anonym(0)))
-            );
-        })
-        .unwrap();
-    }
-
-    #[test]
-    fn uref_try_borrow_mut_in_use() {
-        let mut u = Universe::new();
-        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.borrow();
-        assert_eq!(
-            r.try_borrow_mut().unwrap_err(),
-            RefError::InUse(Arc::new(Name::Anonym(0)))
-        );
-    }
-
-    #[test]
-    fn uref_try_modify_in_use() {
-        let mut u = Universe::new();
-        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.borrow();
-        assert_eq!(
-            r.try_modify(|_| {}).unwrap_err(),
-            RefError::InUse(Arc::new(Name::Anonym(0)))
-        );
-    }
-
-    #[test]
-    fn ref_error_format() {
-        assert_eq!(
-            RefError::InUse(Arc::new("foo".into())).to_string(),
-            "object was in use at the same time: 'foo'"
-        );
-        assert_eq!(
-            RefError::Gone(Arc::new("foo".into())).to_string(),
-            "object was deleted: 'foo'"
-        );
-        assert_eq!(
-            RefError::Gone(Arc::new(Name::Anonym(123))).to_string(),
-            "object was deleted: [anonymous #123]"
-        );
-    }
-
-    #[test]
-    #[allow(clippy::eq_op)]
-    fn uref_equality_is_pointer_equality() {
-        let root_a = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
-        let root_b = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
-        let ref_a_1 = root_a.downgrade();
-        let ref_a_2 = root_a.downgrade();
-        let ref_b_1 = root_b.downgrade();
-        assert_eq!(ref_a_1, ref_a_1, "reflexive eq");
-        assert_eq!(ref_a_1, ref_a_2, "separately constructed are equal");
-        assert!(ref_a_1 != ref_b_1, "not equal");
-    }
-
-    // TODO: more tests of the hairy reference logic
-
-    #[test]
-    fn insert_anonymous_makes_distinct_names() {
-        let [block_0, block_1] = make_some_blocks();
-        let mut u = Universe::new();
-        let ref_a = u.insert_anonymous(BlockDef::new(AIR));
-        let ref_b = u.insert_anonymous(BlockDef::new(AIR));
-        ref_a
-            .execute(&BlockDefTransaction::overwrite(block_0))
-            .unwrap();
-        ref_b
-            .execute(&BlockDefTransaction::overwrite(block_1))
-            .unwrap();
-        assert_ne!(ref_a, ref_b, "not equal");
-        assert_ne!(
-            &**ref_a.borrow() as &Block,
-            &**ref_b.borrow(),
-            "different values"
-        );
-    }
-
-    #[test]
-    fn insert_duplicate_name() {
-        let mut u = Universe::new();
-        u.insert("test_block".into(), BlockDef::new(AIR)).unwrap();
-        assert_eq!(
-            u.insert("test_block".into(), BlockDef::new(AIR)),
-            Err(InsertError::AlreadyExists("test_block".into()))
-        );
-    }
 }
