@@ -212,10 +212,7 @@ impl Raycaster {
         } else {
             unimplemented!("multiple uses of .within_grid()");
         }
-        if false {
-            // Not actually faster, so disabled for now. See function doc.
-            self.fast_forward();
-        }
+        self.fast_forward();
         self
     }
 
@@ -314,12 +311,7 @@ impl Raycaster {
     }
 
     /// In the case where the current position is outside the grid but might intersect
-    /// the grid later, attempt to move the position to intersect sooner, in a fashion
-    /// we'd hope is more efficient than single stepping.
-    ///
-    /// However, benchmarks have not shown it to be of substantial benefit, so it's
-    /// not enabled currently. Future use cases might differ, so I'm keeping the code
-    /// around and compiling at least "until 1.0"...
+    /// the grid later, attempt to move the position to intersect sooner.
     #[inline(always)]
     fn fast_forward(&mut self) {
         let grid: Grid = self.grid.unwrap();
