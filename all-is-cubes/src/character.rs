@@ -19,7 +19,7 @@ use crate::space::Space;
 use crate::transaction::{
     Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
-use crate::universe::URef;
+use crate::universe::{RefVisitor, URef, VisitRefs};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 mod cursor;
@@ -296,6 +296,27 @@ impl Character {
         self.colliding_cubes
             .iter()
             .any(|contact| contact.normal() == Face::PY)
+    }
+}
+
+impl VisitRefs for Character {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        // Use pattern matching so that if we add a new field that might contain refs,
+        // we are reminded to traverse it here.
+        let Self {
+            body: _,
+            space,
+            velocity_input: _,
+            colliding_cubes: _,
+            last_step_info: _,
+            inventory,
+            selected_slots: _,
+            notifier: _,
+            behaviors,
+        } = self;
+        visitor.visit(space);
+        inventory.visit_refs(visitor);
+        behaviors.visit_refs(visitor);
     }
 }
 

@@ -19,7 +19,7 @@ use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
 use crate::transaction::{
     Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
-use crate::universe::{RefError, URef};
+use crate::universe::{RefError, RefVisitor, URef, VisitRefs};
 use crate::util::{ConciseDebug, CustomFormat};
 
 pub mod builder;
@@ -829,6 +829,23 @@ impl Deref for BlockDef {
 impl AsRef<Block> for BlockDef {
     fn as_ref(&self) -> &Block {
         &self.block
+    }
+}
+
+impl VisitRefs for BlockDef {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        self.block.visit_refs(visitor)
+    }
+}
+
+impl VisitRefs for Block {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        match self {
+            Block::Indirect(block_ref) => visitor.visit(block_ref),
+            Block::Atom(_, _) => {}
+            Block::Recur { space, .. } => visitor.visit(space),
+            Block::Rotated(_, block) => block.visit_refs(visitor),
+        }
     }
 }
 

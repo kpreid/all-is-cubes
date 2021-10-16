@@ -16,7 +16,7 @@ use crate::linking::BlockProvider;
 use crate::transaction::{
     Merge, PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
 };
-use crate::universe::URef;
+use crate::universe::{RefVisitor, URef, VisitRefs};
 use crate::vui::Icons;
 
 /// A collection of [`Tool`]s (items).
@@ -134,6 +134,13 @@ impl Inventory {
     }
 }
 
+impl VisitRefs for Inventory {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        let Self { slots } = self;
+        slots.visit_refs(visitor);
+    }
+}
+
 /// The direct child of [`Inventory`]; a container for any number of identical [`Tool`]s.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -243,6 +250,15 @@ impl From<Option<Tool>> for Slot {
         match tool {
             Some(tool) => Self::Stack(Self::COUNT_ONE, tool),
             None => Self::Empty,
+        }
+    }
+}
+
+impl VisitRefs for Slot {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        match self {
+            Slot::Empty => {}
+            Slot::Stack(_count, tool) => tool.visit_refs(visitor),
         }
     }
 }

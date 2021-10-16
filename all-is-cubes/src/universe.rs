@@ -42,6 +42,9 @@ use members::*;
 mod uref;
 pub use uref::*;
 
+mod visit;
+pub use visit::*;
+
 #[cfg(test)]
 mod tests;
 

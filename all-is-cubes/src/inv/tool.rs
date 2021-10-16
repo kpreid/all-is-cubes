@@ -14,7 +14,7 @@ use crate::linking::BlockProvider;
 use crate::math::GridPoint;
 use crate::space::SpaceTransaction;
 use crate::transaction::{Merge, Transaction, UniverseTransaction};
-use crate::universe::{RefError, URef};
+use crate::universe::{RefError, RefVisitor, URef, VisitRefs};
 use crate::vui::Icons;
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
@@ -179,6 +179,21 @@ impl Tool {
             Tool::InfiniteBlocks(_) => One,
             Tool::CopyFromSpace => One,
             Tool::ExternalAction { .. } => One,
+        }
+    }
+}
+
+impl VisitRefs for Tool {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        match self {
+            Tool::Activate => {}
+            Tool::RemoveBlock { .. } => {}
+            Tool::Block(block) => block.visit_refs(visitor),
+            Tool::InfiniteBlocks(block) => block.visit_refs(visitor),
+            Tool::CopyFromSpace => {}
+            Tool::ExternalAction { function: _, icon } => {
+                icon.visit_refs(visitor);
+            }
         }
     }
 }

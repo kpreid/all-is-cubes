@@ -6,6 +6,7 @@
 use std::fmt;
 
 use all_is_cubes::rgba_const;
+use all_is_cubes::universe::{RefVisitor, VisitRefs};
 use instant::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
@@ -92,6 +93,11 @@ impl<F> fmt::Debug for AnimatedVoxels<F> {
             .field("frame_period", &self.frame_period)
             .finish_non_exhaustive()
     }
+}
+
+impl<F> VisitRefs for AnimatedVoxels<F> {
+    // No references unless the function hides one
+    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -188,5 +194,11 @@ impl Behavior<Space> for Fire {
 
     fn ephemeral(&self) -> bool {
         false
+    }
+}
+
+impl VisitRefs for Fire {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        self.blocks.visit_refs(visitor)
     }
 }

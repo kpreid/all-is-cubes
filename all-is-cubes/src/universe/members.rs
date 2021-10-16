@@ -16,6 +16,7 @@ pub(super) type Storage<T> = HashMap<Name, URootRef<T>>;
 /// [`UniverseIndex`] in that it is not public.
 pub(super) trait UniverseTable<T> {
     fn table(&self) -> &Storage<T>;
+
     fn table_mut(&mut self) -> &mut Storage<T>;
 }
 

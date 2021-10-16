@@ -257,6 +257,19 @@ impl<T> URootRef<T> {
     }
 }
 
+/// Object-safe trait implemented for [`URef`].
+///
+/// TODO: seal this trait?
+pub trait URefErased: core::any::Any {
+    fn name(&self) -> &Arc<Name>;
+}
+
+impl<T: 'static> URefErased for URef<T> {
+    fn name(&self) -> &Arc<Name> {
+        URef::name(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

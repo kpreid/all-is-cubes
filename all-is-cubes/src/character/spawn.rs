@@ -7,6 +7,7 @@ use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
 use crate::math::{FreeCoordinate, NotNan};
 use crate::space::Grid;
+use crate::universe::{RefVisitor, VisitRefs};
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
 ///
@@ -90,6 +91,18 @@ impl Spawn {
     /// TODO: Need interface for controlling _ability_ to fly.
     pub fn set_flying(&mut self, flying: bool) {
         self.flying = flying;
+    }
+}
+
+impl VisitRefs for Spawn {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        let Self {
+            inventory,
+            position: _,
+            look_direction: _,
+            flying: _,
+        } = self;
+        inventory.visit_refs(visitor);
     }
 }
 

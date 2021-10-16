@@ -14,11 +14,12 @@ use crate::physics::BodyTransaction;
 use crate::transaction::{
     Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
+use crate::universe::{RefVisitor, VisitRefs};
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
-pub trait Behavior<H: Transactional>: Debug + Send + Sync {
+pub trait Behavior<H: Transactional>: Debug + Send + Sync + VisitRefs {
     /// Computes a transaction to apply the effects of this behavior for one timestep.
     ///
     /// TODO: Define what happens if the transaction fails.
@@ -116,6 +117,15 @@ impl<H> std::fmt::Debug for BehaviorSet<H> {
         f.debug_list().entries(&*self.items).finish()?;
         write!(f, ")")?;
         Ok(())
+    }
+}
+
+impl<H> VisitRefs for BehaviorSet<H> {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        let Self { items } = self;
+        for behavior in items {
+            behavior.visit_refs(visitor);
+        }
     }
 }
 
@@ -257,6 +267,11 @@ impl Behavior<Character> for AutoRotate {
     }
 }
 
+impl VisitRefs for AutoRotate {
+    // No references
+    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,6 +293,10 @@ mod tests {
             fn ephemeral(&self) -> bool {
                 false
             }
+        }
+        impl VisitRefs for DebugBehavior {
+            // No references
+            fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
         }
 
         let mut set = BehaviorSet::<Character>::new();
@@ -322,6 +341,11 @@ mod tests {
         fn ephemeral(&self) -> bool {
             false
         }
+    }
+
+    impl VisitRefs for SelfModifyingBehavior {
+        // No references
+        fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
     }
 
     #[test]

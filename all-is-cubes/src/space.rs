@@ -20,7 +20,7 @@ use crate::listen::{Gate, Listener, Notifier};
 use crate::math::*;
 use crate::space::lighting::opaque_for_light_computation;
 use crate::transaction::{Transaction as _, UniverseTransaction};
-use crate::universe::URef;
+use crate::universe::{RefVisitor, URef, VisitRefs};
 use crate::util::ConciseDebug;
 use crate::util::{CustomFormat, StatusText};
 
@@ -806,6 +806,31 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
         } else {
             &AIR
         }
+    }
+}
+
+impl VisitRefs for Space {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        let Space {
+            grid: _,
+            block_to_index: _,
+            block_data,
+            contents: _,
+            lighting: _,
+            light_update_queue: _,
+            last_light_updates: _,
+            physics: _,
+            packed_sky_color: _,
+            behaviors,
+            spawn,
+            notifier: _,
+            todo: _,
+        } = self;
+        for SpaceBlockData { block, .. } in block_data {
+            block.visit_refs(visitor);
+        }
+        behaviors.visit_refs(visitor);
+        spawn.visit_refs(visitor);
     }
 }
 
