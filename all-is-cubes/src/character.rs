@@ -3,31 +3,33 @@
 
 //! Player-character stuff.
 
-use cgmath::{
-    Angle as _, Deg, ElementWise as _, EuclideanSpace as _, InnerSpace as _, Matrix3, Matrix4,
-    Point3, Vector3,
-};
+use cgmath::{Angle as _, Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Matrix4, Vector3};
 use num_traits::identities::Zero;
-use ordered_float::NotNan;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 
 use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
-use crate::block::{recursive_raycast, Block, EvaluatedBlock};
-use crate::camera::eye_for_look_at;
 use crate::inv::{Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
-use crate::raycast::{CubeFace, Ray};
-use crate::space::{Grid, PackedLight, Space};
+use crate::space::Space;
 use crate::transaction::{
     Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
 };
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
+
+mod cursor;
+pub use cursor::*;
+
+mod spawn;
+pub use spawn::*;
+
+#[cfg(test)]
+mod tests;
 
 // Control characteristics.
 const WALKING_SPEED: FreeCoordinate = 4.0;
@@ -414,343 +416,4 @@ pub enum CharacterChange {
     Inventory(InventoryChange),
     /// Which inventory slots are selected.
     Selections,
-}
-
-/// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
-/// value, or [`None`] if nothing was struck within the distance limit.
-pub fn cursor_raycast(
-    mut ray: Ray,
-    space_ref: &URef<Space>,
-    maximum_distance: FreeCoordinate,
-) -> Option<Cursor> {
-    ray.direction = ray.direction.normalize();
-    let space = space_ref.try_borrow().ok()?;
-    for step in ray.cast().within_grid(space.grid()) {
-        if step.t_distance() > maximum_distance {
-            break;
-        }
-
-        let cube = step.cube_ahead();
-        let evaluated = space.get_evaluated(cube);
-        let lighting_ahead = space.get_lighting(cube);
-        let lighting_behind = space.get_lighting(step.cube_behind());
-
-        // Check intersection with recursive block
-        if let Some(voxels) = &evaluated.voxels {
-            if !recursive_raycast(ray, step.cube_ahead(), evaluated.resolution)
-                .flat_map(|voxel_step| voxels.get(voxel_step.cube_ahead()))
-                .any(|v| v.selectable)
-            {
-                continue;
-            }
-        }
-
-        if evaluated.attributes.selectable {
-            return Some(Cursor {
-                space: space_ref.clone(),
-                place: step.cube_face(),
-                point: step.intersection_point(ray),
-                distance: step.t_distance(),
-                block: space[cube].clone(),
-                evaluated: evaluated.clone(),
-                lighting_ahead,
-                lighting_behind,
-            });
-        }
-    }
-    None
-}
-/// Data collected by [`cursor_raycast`] about the blocks struck by the ray; intended to be
-/// sufficient for various player interactions with blocks.
-///
-/// TODO: Should carry information about both the struck and preceding cubes.
-#[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
-pub struct Cursor {
-    pub space: URef<Space>,
-    /// The cube the cursor is at and which face was hit.
-    pub place: CubeFace,
-    pub point: Point3<FreeCoordinate>,
-    /// Distance from viewpoint to intersection point.
-    pub distance: FreeCoordinate,
-    /// The block that was found in the given cube.
-    pub block: Block,
-    /// The EvaluatedBlock data for the block.
-    pub evaluated: EvaluatedBlock,
-    pub lighting_ahead: PackedLight,
-    pub lighting_behind: PackedLight,
-}
-
-// TODO: this probably shouldn't be Display any more, but Debug or ConciseDebug
-// — or just a regular method.
-impl fmt::Display for Cursor {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Block at {:?}\n{:#?}\nLighting within {:?}, behind {:?}",
-            self.place,
-            self.evaluated.custom_format(ConciseDebug),
-            self.lighting_ahead,
-            self.lighting_behind,
-        )
-    }
-}
-
-/// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
-///
-/// TODO: This is lacking a full set of accessor methods to be viewable+editable.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Spawn {
-    /// Position, in cube coordinates.
-    position: Point3<NotNan<FreeCoordinate>>,
-
-    /// Direction the character should be facing, or looking at.
-    ///
-    /// TODO: Should we represent a full rotation (quaternion) instead?
-    /// Or something that can't be zero? Nonzero integers, perhaps?
-    look_direction: Vector3<NotNan<FreeCoordinate>>,
-
-    /// Flying (ignoring gravity, able to move in 3 dimensions).
-    flying: bool,
-
-    /// Initial inventory contents, created from nothing.
-    inventory: Vec<Slot>,
-}
-
-impl Spawn {
-    pub fn default_for_new_space(_grid: Grid) -> Self {
-        Spawn {
-            position: Point3::origin(), // TODO: pick something better? For what criteria?
-            flying: true,
-            look_direction: Vector3::new(notnan!(0.), notnan!(0.), notnan!(-1.)),
-            inventory: vec![],
-        }
-    }
-
-    /// Constructs a [`Spawn`] point located outside the [`Space`] and with its bounds in
-    /// frame.
-    ///
-    /// `direction` gives the direction in which the character will lie relative to the
-    /// center of the space.
-    pub(crate) fn looking_at_space(
-        space_bounds: Grid,
-        direction: impl Into<Vector3<FreeCoordinate>>,
-    ) -> Self {
-        let direction = direction.into();
-        let mut spawn = Self::default_for_new_space(space_bounds);
-        spawn.set_eye_position(eye_for_look_at(space_bounds, direction));
-        spawn.set_look_direction(-direction);
-        spawn
-    }
-
-    /// Sets the position at which the character will appear, in terms of its viewpoint.
-    pub fn set_eye_position(&mut self, position: impl Into<Point3<FreeCoordinate>>) {
-        let position = position.into();
-        // TODO: If we're going to suppress NaN, then it makes sense to suppress infinities too; come up with a general theory of how we want all-is-cubes to handle unreasonable positions.
-        self.position = Point3 {
-            x: NotNan::new(position.x).unwrap_or(notnan!(0.)),
-            y: NotNan::new(position.y).unwrap_or(notnan!(0.)),
-            z: NotNan::new(position.z).unwrap_or(notnan!(0.)),
-        };
-    }
-
-    /// Sets the direction the character should be facing, or looking at.
-    ///
-    /// The results are unspecified but harmless if the direction is zero or NaN.
-    pub fn set_look_direction(&mut self, direction: impl Into<Vector3<FreeCoordinate>>) {
-        let direction = direction.into();
-        self.look_direction = Vector3 {
-            x: NotNan::new(direction.x).unwrap_or(notnan!(0.)),
-            y: NotNan::new(direction.y).unwrap_or(notnan!(0.)),
-            z: NotNan::new(direction.z).unwrap_or(notnan!(0.)),
-        };
-    }
-
-    /// Sets the starting inventory items.
-    pub fn set_inventory(&mut self, inventory: Vec<Slot>) {
-        self.inventory = inventory;
-    }
-
-    /// Set whether the character is initially flying (not subject to gravity).
-    /// TODO: Need interface for controlling _ability_ to fly.
-    pub fn set_flying(&mut self, flying: bool) {
-        self.flying = flying;
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for Spawn {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use crate::math::arbitrary_notnan;
-        Ok(Self {
-            position: Point3::new(
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-            ),
-            look_direction: Vector3::new(
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-            ),
-            flying: u.arbitrary()?,
-            inventory: vec![], // TODO: need impl Arbitrary for Tool
-        })
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{size_hint::and_all, Arbitrary};
-        and_all(&[
-            <f64 as Arbitrary>::size_hint(depth),
-            <f64 as Arbitrary>::size_hint(depth),
-            <f64 as Arbitrary>::size_hint(depth),
-            <bool as Arbitrary>::size_hint(depth),
-        ])
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use super::*;
-    use crate::block::AIR;
-    use crate::listen::Sink;
-    use crate::transaction::TransactionTester;
-    use crate::universe::Universe;
-
-    fn test_spawn(f: impl Fn(&mut Space) -> Spawn) -> Character {
-        let mut universe = Universe::new();
-        let mut space = Space::empty_positive(1, 1, 1);
-        let spawn = f(&mut space);
-        let space = universe.insert_anonymous(space);
-        Character::spawn(&spawn, space)
-    }
-
-    #[test]
-    fn spawn_inventory() {
-        let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(
-            0.1, 0.2, 0.3
-        ))))];
-        let character = test_spawn(|space| {
-            let mut spawn = Spawn::default_for_new_space(space.grid());
-            spawn.set_inventory(inventory_data.clone());
-            spawn
-        });
-
-        assert_eq!(character.inventory.slots[0], inventory_data[0]);
-        assert_eq!(character.inventory.slots[1], Slot::Empty);
-        // TODO: Either test the special slot contents or eliminate that mechanism
-    }
-
-    #[test]
-    fn spawn_look_direction_default() {
-        let character = test_spawn(|space| space.spawn().clone());
-        assert_eq!(character.body.yaw, 0.0);
-        assert_eq!(character.body.pitch, 0.0);
-    }
-
-    #[test]
-    fn spawn_look_direction() {
-        let character = test_spawn(|space| {
-            let mut spawn = Spawn::default_for_new_space(space.grid());
-            spawn.set_look_direction(Vector3::new(1., 1., -1.));
-            spawn
-        });
-        assert_eq!(character.body.yaw, 45.0);
-        assert_eq!(character.body.pitch, Deg::atan2(-1., 2.0f64.sqrt()).0);
-    }
-
-    #[test]
-    fn inventory_transaction() {
-        let mut universe = Universe::new();
-        let space = Space::empty_positive(1, 1, 1);
-        let space_ref = universe.insert_anonymous(space);
-        let character = Character::spawn_default(space_ref.clone());
-        let sink = Sink::new();
-        character.listen(sink.listener());
-        let character_ref = universe.insert_anonymous(character);
-
-        let item = Tool::InfiniteBlocks(AIR);
-        character_ref
-            .execute(&CharacterTransaction::inventory(
-                InventoryTransaction::insert(item.clone()),
-            ))
-            .unwrap();
-
-        // Check notification
-        assert_eq!(
-            sink.drain(),
-            vec![CharacterChange::Inventory(InventoryChange {
-                slots: Arc::new([0])
-            })],
-        );
-
-        // TODO: Actually assert inventory contents -- no public interface for that
-    }
-
-    #[test]
-    fn transaction_systematic() {
-        let mut universe = Universe::new();
-        let space = Space::empty_positive(1, 1, 1);
-        let space_ref = universe.insert_anonymous(space);
-
-        let old_item = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(1.0, 0.0, 0.0))));
-        let new_item_1 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 1.0, 0.0))));
-        let new_item_2 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 0.0, 1.0))));
-
-        // TODO: Add tests of stack modification, emptying, merging
-
-        TransactionTester::new()
-            // Body transactions
-            .transaction(
-                CharacterTransaction::body(BodyTransaction::default()),
-                |_, _| Ok(()),
-            )
-            .transaction(
-                CharacterTransaction::body(BodyTransaction { delta_yaw: 1.0 }),
-                |_, _| Ok(()),
-            )
-            // Inventory transactions
-            // Note: Inventory transactions are tested separately from inventory.rs; these are just
-            // for checking the integration with Character.
-            .transaction(
-                CharacterTransaction::inventory(InventoryTransaction::replace(
-                    0,
-                    old_item.clone(),
-                    new_item_1.clone(),
-                )),
-                |_, after| {
-                    if after.inventory().slots[0] != new_item_1 {
-                        return Err("did not replace new_item_1".into());
-                    }
-                    Ok(())
-                },
-            )
-            .transaction(
-                // This one conflicts with the above one
-                CharacterTransaction::inventory(InventoryTransaction::replace(
-                    0,
-                    old_item.clone(),
-                    new_item_2.clone(),
-                )),
-                |_, after| {
-                    if after.inventory().slots[0] != new_item_2 {
-                        return Err("did not replace new_item_2".into());
-                    }
-                    Ok(())
-                },
-            )
-            .target(|| Character::spawn_default(space_ref.clone()))
-            .target(|| {
-                let mut character = Character::spawn_default(space_ref.clone());
-                CharacterTransaction::inventory(InventoryTransaction::insert(old_item.clone()))
-                    .execute(&mut character)
-                    .unwrap();
-                character
-            })
-            .test();
-    }
-
-    // TODO: more tests
 }
