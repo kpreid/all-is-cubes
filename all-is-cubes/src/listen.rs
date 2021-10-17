@@ -541,7 +541,9 @@ mod tests {
         let sink = Sink::new();
         cn.listen(sink.listener());
         assert_eq!(format!("{:?}", cn), "Notifier(1)");
-        assert_eq!(sink.drain(), vec![]);
+        // type annotation to prevent spurious inference failures in the presence
+        // of other compiler errors
+        assert_eq!(sink.drain(), Vec::<u8>::new());
         cn.notify(1);
         cn.notify(2);
         assert_eq!(sink.drain(), vec![1, 2]);

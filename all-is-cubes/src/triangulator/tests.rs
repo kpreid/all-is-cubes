@@ -517,7 +517,9 @@ fn space_triangulation_empty() {
     let t = SpaceTriangulation::<BlockVertex>::new();
     assert!(t.is_empty());
     assert_eq!(t.vertices(), &[]);
-    assert_eq!(t.indices(), &[]);
+    // type annotation to prevent spurious inference failures in the presence
+    // of other compiler errors
+    assert_eq!(t.indices(), &[] as &[u32]);
 }
 
 #[test]
