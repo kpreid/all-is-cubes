@@ -15,7 +15,7 @@ bench = false
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
-instant = "0.1.9"
+instant = "0.1.12"
 log = { version = "0.4.14", default-features = false }
 rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"

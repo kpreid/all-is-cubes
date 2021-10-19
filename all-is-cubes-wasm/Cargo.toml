@@ -27,7 +27,7 @@ form_urlencoded = "1.0.1"
 # Feature enabling for indirect dependency all-is-cubes → random → getrand
 getrandom = { version = "0.2.3", features = ["js"] }
 # Feature enabling for indirect dependency all-is-cubes → instant
-instant = { version = "0.1.9", features = ["wasm-bindgen"] }
+instant = { version = "0.1.12", features = ["wasm-bindgen"] }
 js-sys = "0.3.47"
 log = { version = "0.4.14", default-features = false }
 luminance = "0.44.0"

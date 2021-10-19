@@ -46,7 +46,7 @@ embedded-graphics = "0.7.0"
 # choosing to use the individual implementing modules to be precise and minimal.
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.17", default-features = false, features = [] }
-instant = "0.1.9"
+instant = "0.1.12"
 itertools = { version = "0.10.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
 luminance = { version = "0.44.0", optional = true }
