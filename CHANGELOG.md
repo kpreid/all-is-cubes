@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+The new minimum supported Rust version is 1.56.0 (2021 edition).
+
 ## 0.3.0 (2021-10-09)
 
 ### Added

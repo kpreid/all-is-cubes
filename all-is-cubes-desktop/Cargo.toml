@@ -3,6 +3,7 @@ name = "all-is-cubes-desktop"
 version = "0.3.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
+rust-version = "1.56"
 # TODO: better description
 description = "Recursive voxel game."
 # TODO: add homepage = "..." when we have one
