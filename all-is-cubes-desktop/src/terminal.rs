@@ -298,10 +298,6 @@ impl TerminalMain {
     /// This function also stores the current scene viewport for future frames.
     fn write_ui(&mut self, frame: &FrameOutput) -> crossterm::Result<()> {
         let FrameOutput { info, .. } = frame;
-        // TODO: In Rust 2021 we will be able to omit these extra borrows/copies
-        let color_mode = self.options.colors;
-        let app = &mut self.app;
-
         let mut viewport_rect = None;
         self.tuiout.draw(|f| {
             const HELP_TEXT: &str = "\
@@ -357,7 +353,7 @@ impl TerminalMain {
                     .constraints([Constraint::Ratio(1, SLOTS as u32); SLOTS])
                     .split(toolbar_rect);
 
-                if let Some(character_ref) = app.character() {
+                if let Some(character_ref) = self.app.character() {
                     let character = character_ref.borrow();
                     let selected_slots = character.selected_slots();
                     let slots = &character.inventory().slots;
@@ -421,13 +417,13 @@ impl TerminalMain {
                 f.render_widget(
                     Paragraph::new(format!(
                         "{:5.1} FPS",
-                        app.draw_fps_counter().frames_per_second()
+                        self.app.draw_fps_counter().frames_per_second()
                     )),
                     frame_info_rect,
                 );
 
                 f.render_widget(
-                    Paragraph::new(format!("Colors: {:?}", color_mode,)),
+                    Paragraph::new(format!("Colors: {:?}", self.options.colors)),
                     colors_info_rect,
                 );
 
@@ -436,7 +432,7 @@ impl TerminalMain {
 
             // Cursor info
             f.render_widget(
-                if let Some(cursor) = app.cursor_result() {
+                if let Some(cursor) = self.app.cursor_result() {
                     // TODO: design good formatting for cursor data
                     Paragraph::new(format!(
                         "{:?} : {}",
