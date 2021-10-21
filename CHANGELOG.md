@@ -2,7 +2,17 @@
 
 ## Unreleased
 
-The new minimum supported Rust version is 1.56.0 (2021 edition).
+### Added
+
+* `all_is_cubes::universe::VisitRefs` allows traversing the `URef` graph inside a `Universe`.
+* `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
+
+### Changed
+
+* The new minimum supported Rust version is 1.56.0 (2021 edition).
+* The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
+
+### Removed
 
 ## 0.3.0 (2021-10-09)
 
