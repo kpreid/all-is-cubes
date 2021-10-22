@@ -31,6 +31,8 @@ use crate::{atrium::atrium, demo_city, install_demo_blocks};
 #[non_exhaustive]
 pub enum UniverseTemplate {
     Blank,
+    /// Always produces an error, for testing error-handling functionality.
+    Fail,
     DemoCity,
     Atrium,
     CornellBox,
@@ -44,6 +46,10 @@ impl UniverseTemplate {
         use UniverseTemplate::*;
         match self {
             Blank => Ok(Universe::new()),
+            Fail => Err(GenError::failure(
+                InGenError::Other("the Fail template always fails to generate".into()),
+                "space".into(), // TODO: should be able to not provide a dummy name
+            )),
             DemoCity => new_universe_with_space_setup(demo_city),
             Atrium => new_universe_with_space_setup(atrium),
             CornellBox => new_universe_with_space_setup(cornell_box),
@@ -217,7 +223,15 @@ mod tests {
     #[test]
     pub fn template_smoke_test() {
         for template in UniverseTemplate::iter() {
-            let mut u = template.clone().build().unwrap();
+            eprintln!("{:?}", template);
+
+            let result = template.clone().build();
+            if matches!(template, UniverseTemplate::Fail) {
+                result.unwrap_err();
+                continue;
+            }
+            let mut u = result.unwrap();
+
             if template != UniverseTemplate::Blank {
                 let _ = u.get_default_character().unwrap().borrow();
             }
