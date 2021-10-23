@@ -16,7 +16,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use cgmath::Vector2;
 use clap::{value_t, Arg, ErrorKind};
 use directories_next::ProjectDirs;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
@@ -25,6 +24,7 @@ use strum::IntoEnumIterator;
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes_content::UniverseTemplate;
 

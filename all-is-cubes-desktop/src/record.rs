@@ -12,13 +12,13 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use cgmath::Vector2;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::{chunk::ChunkType, Encoder};
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{Camera, Viewport};
+use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Character;
 use all_is_cubes::math::{FreeCoordinate, NotNan, Rgba};
 use all_is_cubes::raytracer::{ColorBuf, SpaceRaytracer};

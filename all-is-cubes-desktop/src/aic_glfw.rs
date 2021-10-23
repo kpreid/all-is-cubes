@@ -3,15 +3,16 @@
 
 //! Glue between [`all_is_cubes`] and [`glfw`] & [`luminance_glfw`].
 
-use cgmath::{Point2, Vector2};
-use glfw::{Action, Context as _, CursorMode, Window, WindowEvent};
-use luminance_glfw::GlfwSurface;
-use luminance_windowing::{WindowDim, WindowOpt};
 use std::error::Error;
 use std::time::Instant;
 
+use glfw::{Action, Context as _, CursorMode, Window, WindowEvent};
+use luminance_glfw::GlfwSurface;
+use luminance_windowing::{WindowDim, WindowOpt};
+
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::Viewport;
+use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::lum::GLRenderer;
 
 /// Run GLFW-based rendering and event loop.

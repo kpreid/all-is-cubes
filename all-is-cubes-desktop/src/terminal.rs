@@ -11,8 +11,6 @@ use std::io;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
-use all_is_cubes::inv::Slot;
-use cgmath::ElementWise as _;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
@@ -25,7 +23,9 @@ use tui::{backend::CrosstermBackend, Terminal};
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key};
 use all_is_cubes::camera::{Camera, Viewport};
+use all_is_cubes::cgmath::ElementWise as _;
 use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::inv::Slot;
 use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, RaytraceInfo, SpaceRaytracer};
 use all_is_cubes::space::SpaceBlockData;

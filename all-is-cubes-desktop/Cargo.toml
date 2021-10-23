@@ -21,7 +21,6 @@ bench = false
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
-cgmath = "0.18.0"
 clap = "2.33.3"
 crossterm = "0.21.0"
 directories-next = "2.0.0"
