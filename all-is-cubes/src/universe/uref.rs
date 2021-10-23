@@ -39,11 +39,11 @@ pub struct URef<T> {
     /// the assumption is that the overall game system will keep the [`Universe`] alive
     /// and that [`Universe`] will ensure no entry goes away while referenced.
     weak_ref: Weak<RwLock<UEntry<T>>>,
-    name: Arc<Name>,
+    name: Name,
 }
 
 impl<T: 'static> URef<T> {
-    pub fn name(&self) -> &Arc<Name> {
+    pub fn name(&self) -> &Name {
         &self.name
     }
 
@@ -64,7 +64,7 @@ impl<T: 'static> URef<T> {
         let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
             strong
                 .try_read()
-                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))
+                .map_err(|_| RefError::InUse(self.name.clone()))
         })?;
         Ok(UBorrow(inner))
     }
@@ -79,7 +79,7 @@ impl<T: 'static> URef<T> {
         let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
         let mut borrow = strong
             .try_write()
-            .map_err(|_| RefError::InUse(Arc::clone(&self.name)))?;
+            .map_err(|_| RefError::InUse(self.name.clone()))?;
         Ok(function(&mut borrow.data))
     }
 
@@ -92,7 +92,7 @@ impl<T: 'static> URef<T> {
         UBorrowMutImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
             strong
                 .try_write()
-                .map_err(|_| RefError::InUse(Arc::clone(&self.name)))
+                .map_err(|_| RefError::InUse(self.name.clone()))
         })
     }
 
@@ -111,7 +111,7 @@ impl<T: 'static> URef<T> {
     fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {
         self.weak_ref
             .upgrade()
-            .ok_or_else(|| RefError::Gone(Arc::clone(&self.name)))
+            .ok_or_else(|| RefError::Gone(self.name.clone()))
     }
 }
 
@@ -153,10 +153,10 @@ impl<T> Clone for URef<T> {
 pub enum RefError {
     /// Target was deleted, or its entire universe was dropped.
     #[error("object was deleted: {0}")]
-    Gone(Arc<Name>),
+    Gone(Name),
     /// Target is currently incompatibly borrowed.
     #[error("object was in use at the same time: {0}")]
-    InUse(Arc<Name>),
+    InUse(Name),
 }
 
 /// A wrapper type for an immutably borrowed value from an [`URef`].
@@ -222,7 +222,7 @@ struct UEntry<T> {
     // TODO: It might make more sense for data to be a RwLock<T> (instead of the
     // RwLock containing UEntry), but we don't have enough examples to be certain yet.
     data: T,
-    name: Arc<Name>,
+    name: Name,
 }
 
 /// The unique reference to an entry in a `Universe` from that `Universe`.
@@ -230,12 +230,11 @@ struct UEntry<T> {
 #[derive(Debug)]
 pub(super) struct URootRef<T> {
     strong_ref: StrongEntryRef<T>,
-    name: Arc<Name>,
+    name: Name,
 }
 
 impl<T> URootRef<T> {
     pub(super) fn new(name: Name, initial_value: T) -> Self {
-        let name = Arc::new(name);
         URootRef {
             strong_ref: Arc::new(RwLock::new(UEntry {
                 data: initial_value,
@@ -252,7 +251,7 @@ impl<T> URootRef<T> {
     pub(crate) fn downgrade(&self) -> URef<T> {
         URef {
             weak_ref: Arc::downgrade(&self.strong_ref),
-            name: Arc::clone(&self.name),
+            name: self.name.clone(),
         }
     }
 }
@@ -261,11 +260,11 @@ impl<T> URootRef<T> {
 ///
 /// TODO: seal this trait?
 pub trait URefErased: core::any::Any {
-    fn name(&self) -> &Arc<Name>;
+    fn name(&self) -> &Name;
 }
 
 impl<T: 'static> URefErased for URef<T> {
-    fn name(&self) -> &Arc<Name> {
+    fn name(&self) -> &Name {
         URef::name(self)
     }
 }
@@ -293,7 +292,7 @@ mod tests {
         r.try_modify(|_| {
             assert_eq!(
                 r.try_borrow().unwrap_err(),
-                RefError::InUse(Arc::new(Name::Anonym(0)))
+                RefError::InUse(Name::Anonym(0))
             );
         })
         .unwrap();
@@ -306,7 +305,7 @@ mod tests {
         let _borrow_1 = r.borrow();
         assert_eq!(
             r.try_borrow_mut().unwrap_err(),
-            RefError::InUse(Arc::new(Name::Anonym(0)))
+            RefError::InUse(Name::Anonym(0))
         );
     }
 
@@ -317,22 +316,22 @@ mod tests {
         let _borrow_1 = r.borrow();
         assert_eq!(
             r.try_modify(|_| {}).unwrap_err(),
-            RefError::InUse(Arc::new(Name::Anonym(0)))
+            RefError::InUse(Name::Anonym(0))
         );
     }
 
     #[test]
     fn ref_error_format() {
         assert_eq!(
-            RefError::InUse(Arc::new("foo".into())).to_string(),
+            RefError::InUse("foo".into()).to_string(),
             "object was in use at the same time: 'foo'"
         );
         assert_eq!(
-            RefError::Gone(Arc::new("foo".into())).to_string(),
+            RefError::Gone("foo".into()).to_string(),
             "object was deleted: 'foo'"
         );
         assert_eq!(
-            RefError::Gone(Arc::new(Name::Anonym(123))).to_string(),
+            RefError::Gone(Name::Anonym(123)).to_string(),
             "object was deleted: [anonymous #123]"
         );
     }

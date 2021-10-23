@@ -11,6 +11,9 @@
 
 * The new minimum supported Rust version is 1.56.0 (2021 edition).
 * The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
+* The `Name` enum is now intended to be reliably cheap to clone:
+    * `Name::Specific`'s field holds an `Arc<str>` instead of a `String`. 
+    * `Universe`-related errors now hold `Name` instead of `Arc<Name>`.
 
 ### Removed
 

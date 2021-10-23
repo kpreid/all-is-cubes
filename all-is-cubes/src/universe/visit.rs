@@ -77,7 +77,7 @@ mod testers {
 
     impl RefVisitor for ListRefs {
         fn visit(&mut self, r: &dyn URefErased) {
-            self.names.push((**r.name()).clone());
+            self.names.push(r.name().clone());
         }
     }
 }

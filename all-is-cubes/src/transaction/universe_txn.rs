@@ -5,7 +5,6 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug};
-use std::sync::Arc;
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -118,6 +117,7 @@ where
 
 /// Polymorphic container for transactions in a [`UniverseTransaction`].
 #[derive(Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 enum AnyTransaction {
     Noop,
@@ -127,7 +127,7 @@ enum AnyTransaction {
 }
 
 impl AnyTransaction {
-    fn target_name(&self) -> Option<&Arc<Name>> {
+    fn target_name(&self) -> Option<&Name> {
         use AnyTransaction::*;
         match self {
             Noop => None,
@@ -279,7 +279,7 @@ mod any_transaction {
 #[derive(Clone, Default, PartialEq)]
 #[must_use]
 pub struct UniverseTransaction {
-    members: HashMap<Arc<Name>, AnyTransaction>,
+    members: HashMap<Name, AnyTransaction>,
 }
 
 impl Transactional for Universe {
@@ -289,7 +289,7 @@ impl Transactional for Universe {
 impl From<AnyTransaction> for UniverseTransaction {
     fn from(transaction: AnyTransaction) -> Self {
         if let Some(name) = transaction.target_name() {
-            let mut members: HashMap<Arc<Name>, AnyTransaction> = HashMap::new();
+            let mut members: HashMap<Name, AnyTransaction> = HashMap::new();
             members.insert(name.clone(), transaction);
             UniverseTransaction { members }
         } else {
@@ -300,7 +300,7 @@ impl From<AnyTransaction> for UniverseTransaction {
 
 impl Transaction<Universe> for UniverseTransaction {
     // TODO: Benchmark cheaper HashMaps / using BTreeMap here
-    type CommitCheck = HashMap<Arc<Name>, Box<dyn Any>>;
+    type CommitCheck = HashMap<Name, Box<dyn Any>>;
     type Output = ();
 
     fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -326,7 +326,7 @@ impl Transaction<Universe> for UniverseTransaction {
 }
 
 impl Merge for UniverseTransaction {
-    type MergeCheck = HashMap<Arc<Name>, Box<dyn Any>>;
+    type MergeCheck = HashMap<Name, Box<dyn Any>>;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         // TODO: Enforce that other has the same universe.

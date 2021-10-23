@@ -5,8 +5,6 @@
 //!
 //! Note that some sub-modules have their own test modules.
 
-use std::sync::Arc;
-
 use cgmath::EuclideanSpace as _;
 use indoc::indoc;
 
@@ -87,9 +85,7 @@ fn set_failure_borrow() {
             // Try to use `block` while we are allegedly mutating `inner_space`.
             assert_eq!(
                 outer_space.set((0, 0, 0), &block),
-                Err(SetCubeError::EvalBlock(
-                    RefError::InUse(Arc::new("bs".into())).into()
-                ))
+                Err(SetCubeError::EvalBlock(RefError::InUse("bs".into()).into()))
             );
         })
         .unwrap();
@@ -124,10 +120,8 @@ fn set_error_format() {
         "Grid(1..2, 2..3, 3..4) is outside of the bounds Grid(0..2, 0..2, 0..2)"
     );
     assert_eq!(
-        SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone(Arc::new(
-            "foo".into()
-        ))))
-        .to_string(),
+        SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone("foo".into())))
+            .to_string(),
         // TODO: This message is a bit "revealing our exact data structure"...
         "block evaluation failed: block data inaccessible: object was deleted: 'foo'"
     );

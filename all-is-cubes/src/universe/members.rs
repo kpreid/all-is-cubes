@@ -8,7 +8,6 @@ use crate::character::Character;
 use crate::space::Space;
 use crate::universe::{InsertError, Name, URef, URootRef, Universe, UniverseIndex, UniverseIter};
 
-// TODO: make this Arc<Name>? Maybe fully intern Names?
 pub(super) type Storage<T> = HashMap<Name, URootRef<T>>;
 
 /// Trait implemented once for each type of object that can be stored in a [`Universe`]

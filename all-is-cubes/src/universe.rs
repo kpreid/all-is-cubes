@@ -25,6 +25,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Duration;
 
 use instant::Instant;
@@ -49,17 +50,19 @@ pub use visit::*;
 mod tests;
 
 /// Name/key of an object in a [`Universe`].
+///
+/// Internally uses [`Arc`] to be cheap to clone. Might be interned in future versions.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Name {
     /// An explicitly set name.
-    Specific(String),
+    Specific(Arc<str>),
     /// An automatically assigned name.
     Anonym(usize),
 }
 impl From<&str> for Name {
     fn from(value: &str) -> Self {
-        Self::Specific(value.to_string())
+        Self::Specific(value.into())
     }
 }
 impl fmt::Display for Name {
