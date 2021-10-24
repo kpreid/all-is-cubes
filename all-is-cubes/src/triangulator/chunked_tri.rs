@@ -19,6 +19,10 @@ use crate::triangulator::{
     GfxVertex, SpaceTriangulation, TextureAllocator, TriangulatorOptions,
 };
 use crate::universe::URef;
+use crate::util::{ConciseDebug, CustomFormat};
+
+/// If true, enables reporting chunk update timing at [`log::trace`] level.
+const LOG_CHUNK_UPDATES: bool = false;
 
 /// The large-scale analogue of [`SpaceTriangulation`]: subdivides
 /// a [`Space`] into [chunks](crate::chunking) and updates triangulation
@@ -349,8 +353,32 @@ where
     ) {
         let mut block_provider = TrackingBlockProvider::new(block_triangulations);
 
+        let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
         self.triangulation
             .compute(space, self.bounds, options, &mut block_provider);
+
+        // Logging
+        if let Some(start) = compute_start {
+            let duration_ms = Instant::now().duration_since(start).as_secs_f32() * 1000.0;
+
+            let chunk_origin = self.bounds.lower_bounds();
+            let vertices = self.triangulation.vertices().len();
+            if vertices == 0 {
+                log::trace!(
+                    "triangulated {:?}+ in {:.3} ms, 0",
+                    chunk_origin.custom_format(ConciseDebug),
+                    duration_ms,
+                );
+            } else {
+                log::trace!(
+                    "triangulated {:?}+ in {:.3} ms, {} in {:.3} µs/v",
+                    chunk_origin.custom_format(ConciseDebug),
+                    duration_ms,
+                    vertices,
+                    duration_ms * (1000.0 / vertices as f32),
+                );
+            }
+        }
 
         // Stash all the texture tiles so they aren't deallocated out from under us.
         // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
