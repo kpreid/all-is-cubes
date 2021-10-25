@@ -45,6 +45,8 @@ thiserror = "1.0.22"
 # Note: keep tui in sync with crossterm.
 tui = { version = "0.17.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
+# Note: Use of winit is experimental and enabling it does not yet do anything.
+winit = { version = "0.26.1", optional = true, default-features = false }
 
 [dev-dependencies]
 trycmd = "0.12.0"
