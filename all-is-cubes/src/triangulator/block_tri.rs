@@ -37,6 +37,12 @@ pub(super) struct FaceTriangulation<V> {
     pub(super) fully_opaque: bool,
 }
 
+impl<V> FaceTriangulation<V> {
+    pub fn is_empty(&self) -> bool {
+        self.vertices.is_empty()
+    }
+}
+
 impl<V> Default for FaceTriangulation<V> {
     fn default() -> Self {
         FaceTriangulation {
@@ -84,6 +90,10 @@ impl<V, T> BlockTriangulation<V, T> {
     // TODO: revisit this interface design. Maybe callers should just have an Rc<BlockTriangulation>?
     pub(crate) fn textures(&self) -> &[T] {
         &self.textures_used
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.faces.iter().all(|(_, ft)| ft.is_empty())
     }
 }
 

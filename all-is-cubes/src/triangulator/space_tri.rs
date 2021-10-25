@@ -165,6 +165,10 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 .and_then(|index| block_triangulations.get(index))
                 .unwrap_or(&empty_render);
 
+            if precomputed.is_empty() {
+                continue;
+            }
+
             let inst = V::instantiate_block(cube);
 
             let light_neighborhood = if V::WANTS_LIGHT {
@@ -182,6 +186,12 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
             };
 
             for face in Face::ALL_SEVEN {
+                let face_triangulation = &precomputed.faces[face];
+                if face_triangulation.is_empty() {
+                    // Nothing to do; skip adjacent_cube lookup.
+                    continue;
+                }
+
                 let adjacent_cube = cube + face.normal_vector();
                 if space
                     .get_block_index(adjacent_cube)
@@ -194,7 +204,6 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 }
 
                 // Copy vertices, offset to the block position and with lighting
-                let face_triangulation = &precomputed.faces[face];
                 let index_offset_usize = self.vertices.len();
                 let index_offset: u32 = index_offset_usize
                     .try_into()
