@@ -13,7 +13,7 @@ use futures_task::noop_waker_ref;
 use crate::camera::{Camera, GraphicsOptions};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
-use crate::listen::{ListenableCell, ListenableSource};
+use crate::listen::{ListenableCell, ListenableCellWithLocal, ListenableSource};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::transaction::Transaction;
@@ -43,7 +43,7 @@ pub struct AllIsCubesAppState {
     graphics_options: ListenableCell<GraphicsOptions>,
 
     game_universe: Universe,
-    game_character: Option<URef<Character>>,
+    game_character: ListenableCellWithLocal<Option<URef<Character>>>,
 
     /// If present, a future that should be polled to produce a new [`Universe`]
     /// to replace `self.game_universe`. See [`Self::set_universe_async`].
@@ -97,7 +97,7 @@ impl AllIsCubesAppState {
             frame_clock: FrameClock::new(),
             input_processor,
             graphics_options: ListenableCell::new(GraphicsOptions::default()),
-            game_character: None,
+            game_character: ListenableCellWithLocal::new(None),
             game_universe,
             game_universe_in_progress: None,
             paused,
@@ -108,7 +108,7 @@ impl AllIsCubesAppState {
 
     /// Returns a reference to the [`Character`] that should be shown to the user.
     pub fn character(&self) -> Option<&URef<Character>> {
-        self.game_character.as_ref()
+        self.game_character.borrow().as_ref()
     }
 
     /// Replace the game universe, such as on initial startup or because the player
@@ -119,7 +119,7 @@ impl AllIsCubesAppState {
 
         self.game_universe = u;
         let c = self.game_universe.get_default_character();
-        self.game_character = c.clone();
+        self.game_character.set(c.clone());
         self.ui.set_character(c);
     }
 
@@ -198,7 +198,7 @@ impl AllIsCubesAppState {
                 }
                 self.frame_clock.did_step();
 
-                if let Some(character_ref) = &self.game_character {
+                if let Some(character_ref) = self.game_character.borrow() {
                     self.input_processor.apply_input(
                         InputTargets {
                             universe: Some(&mut self.game_universe),
@@ -232,7 +232,7 @@ impl AllIsCubesAppState {
             .and_then(|ray| cursor_raycast(ray, self.ui.current_space(), FreeCoordinate::INFINITY));
 
         if self.cursor_result.is_none() {
-            if let Some(character_ref) = &self.game_character {
+            if let Some(character_ref) = self.game_character.borrow() {
                 // TODO: maximum distance should be determined by character/universe parameters instead of hardcoded
                 self.cursor_result = ndc_pos
                     .map(|p| game_camera.project_ndc_into_world(p))
@@ -275,7 +275,7 @@ impl AllIsCubesAppState {
         } else {
             // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
             // TODO: if the cursor space is not the game space this should be an error
-            if let Some(character_ref) = &self.game_character {
+            if let Some(character_ref) = self.game_character.borrow() {
                 let transaction =
                     Character::click(character_ref.clone(), self.cursor_result.as_ref(), button)?;
                 transaction
