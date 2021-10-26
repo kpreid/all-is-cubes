@@ -77,8 +77,8 @@ pub(crate) fn record_main(
     // (We could instead try to render a blank scene, but that is probably not wanted.)
     let character_ref: URef<Character> = app
         .character()
-        .ok_or_else(|| Box::<dyn Error + Send + Sync>::from("Character not found"))?
-        .clone();
+        .snapshot()
+        .ok_or_else(|| Box::<dyn Error + Send + Sync>::from("Character not found"))?;
 
     let space_ref = character_ref.borrow().space.clone();
 

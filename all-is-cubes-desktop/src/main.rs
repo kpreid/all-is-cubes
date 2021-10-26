@@ -165,7 +165,8 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     if options.is_present("precompute_light") || graphics_type == GraphicsType::Record {
         app.character()
-            .unwrap()
+            .snapshot()
+            .expect("no character to record the viewpoint of")
             .borrow()
             .space
             .try_modify(evaluate_light_with_progress)

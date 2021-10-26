@@ -106,9 +106,9 @@ impl AllIsCubesAppState {
         }
     }
 
-    /// Returns a reference to the [`Character`] that should be shown to the user.
-    pub fn character(&self) -> Option<&URef<Character>> {
-        self.game_character.borrow().as_ref()
+    /// Returns a source for the [`Character`] that should be shown to the user.
+    pub fn character(&self) -> ListenableSource<Option<URef<Character>>> {
+        self.game_character.as_source()
     }
 
     /// Replace the game universe, such as on initial startup or because the player
@@ -308,7 +308,7 @@ pub struct InfoText<'a, T> {
 
 impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(character_ref) = self.app.character() {
+        if let Some(character_ref) = self.app.game_character.borrow() {
             write!(f, "{}", character_ref.borrow().custom_format(StatusText)).unwrap();
         }
         write!(

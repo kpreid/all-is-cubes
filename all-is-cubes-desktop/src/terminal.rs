@@ -262,7 +262,7 @@ impl TerminalMain {
     }
 
     fn send_frame_to_render(&mut self) {
-        let character = match self.app.character() {
+        let character = match self.app.character().snapshot() {
             Some(character_ref) => character_ref.borrow(),
             None => {
                 return;
@@ -353,7 +353,7 @@ impl TerminalMain {
                     .constraints([Constraint::Ratio(1, SLOTS as u32); SLOTS])
                     .split(toolbar_rect);
 
-                if let Some(character_ref) = self.app.character() {
+                if let Some(character_ref) = self.app.character().snapshot() {
                     let character = character_ref.borrow();
                     let selected_slots = character.selected_slots();
                     let slots = &character.inventory().slots;

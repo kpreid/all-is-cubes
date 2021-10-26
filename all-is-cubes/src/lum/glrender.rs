@@ -49,8 +49,10 @@ where
     C: GraphicsContext,
     C::Backend: AicLumBackend + Sized,
 {
+    // External sources
     graphics_options: ListenableSource<GraphicsOptions>,
     graphics_options_dirty: DirtyFlag,
+    character: ListenableSource<Option<URef<Character>>>,
 
     // Graphics objects
     pub surface: C,
@@ -59,7 +61,6 @@ where
     info_text_texture: FullFrameTexture<C::Backend>,
 
     // Rendering state
-    character: Option<URef<Character>>,
     world_renderer: Option<SpaceRenderer<C::Backend>>,
     ui_renderer: Option<SpaceRenderer<C::Backend>>,
     world_camera: Camera,
@@ -83,6 +84,7 @@ where
     pub fn new(
         mut surface: C,
         graphics_options: ListenableSource<GraphicsOptions>,
+        character: ListenableSource<Option<URef<Character>>>,
         viewport: Viewport,
     ) -> Result<Self, GraphicsResourceError> {
         let graphics_options_dirty = DirtyFlag::new(false);
@@ -103,11 +105,11 @@ where
         Ok(Self {
             graphics_options,
             graphics_options_dirty,
+            character,
             surface,
             back_buffer,
             block_programs,
             info_text_texture,
-            character: None,
             world_renderer: None,
             ui_renderer: None,
             ui_camera: Camera::new(Vui::graphics_options(initial_options.clone()), viewport),
@@ -145,11 +147,6 @@ where
         Ok(())
     }
 
-    /// Sets the [`Character`] whose view we render.
-    pub fn set_character(&mut self, character: Option<URef<Character>>) {
-        self.character = character;
-    }
-
     pub fn set_ui_space(&mut self, space: Option<URef<Space>>) {
         self.ui_renderer = space.map(|space| {
             self.ui_camera
@@ -162,7 +159,7 @@ where
     /// to the same frame of input.
     #[doc(hidden)] // TODO: design better interface that doesn't need to call this
     pub fn update_world_camera(&mut self) {
-        if let Some(character_ref) = &self.character {
+        if let Some(character_ref) = self.character.snapshot() {
             self.world_camera
                 .set_view_matrix(character_ref.borrow().view());
         }
@@ -207,7 +204,8 @@ where
         let surface = &mut self.surface;
         let block_programs = &mut self.block_programs;
 
-        let character: &Character = &*(if let Some(character_ref) = &self.character {
+        let character_option_ref = self.character.snapshot();
+        let character: &Character = &*(if let Some(character_ref) = character_option_ref {
             character_ref.borrow()
         } else {
             // Nothing to draw; clear screen and exit
