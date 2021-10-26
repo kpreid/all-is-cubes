@@ -32,12 +32,12 @@ struct ListenableCellStorage<T> {
     notifier: Option<Notifier<()>>,
 }
 
-impl<T: Clone + Sync> ListenableCell<T> {
+impl<T: Sync> ListenableCell<T> {
     /// Creates a new [`ListenableCell`] containing the given value.
-    pub fn new(value: T) -> Self {
+    pub fn new(value: impl Into<Arc<T>>) -> Self {
         Self {
             storage: Arc::new(ListenableCellStorage {
-                cell: Mutex::new(Arc::new(value)),
+                cell: Mutex::new(value.into()),
                 notifier: Some(Notifier::new()),
             }),
         }
@@ -52,8 +52,8 @@ impl<T: Clone + Sync> ListenableCell<T> {
     ///
     /// Caution: While listeners are *expected* not to have immediate side effects on
     /// notification, this cannot be enforced.
-    pub fn set(&self, value: T) {
-        *self.storage.cell.lock().unwrap() = Arc::new(value);
+    pub fn set(&self, value: impl Into<Arc<T>>) {
+        *self.storage.cell.lock().unwrap() = value.into();
         self.storage
             .notifier
             .as_ref()
@@ -99,6 +99,40 @@ impl<T: Clone + Sync> ListenableSource<T> {
         if let Some(notifier) = &self.storage.notifier {
             notifier.listen(listener);
         }
+    }
+}
+
+/// Convenience wrapper around [`ListenableCell`] which allows borrowing the current
+/// value, at the cost of requiring `&mut` access to set it.
+#[derive(Debug)] // TODO: custom format ?
+pub(crate) struct ListenableCellWithLocal<T> {
+    cell: ListenableCell<T>,
+    value: Arc<T>,
+}
+
+impl<T: Sync> ListenableCellWithLocal<T> {
+    pub fn new(value: impl Into<Arc<T>>) -> Self {
+        let value = value.into();
+        Self {
+            value: value.clone(),
+            cell: ListenableCell::new(value),
+        }
+    }
+
+    pub fn set(&mut self, value: impl Into<Arc<T>>) {
+        let value = value.into();
+        self.cell.set(Arc::clone(&value));
+        self.value = value;
+    }
+
+    pub fn borrow(&self) -> &T {
+        &*self.value
+    }
+
+    /// Returns a [`ListenableSource`] which provides read-only access to the value
+    /// managed by this cell.
+    pub fn as_source(&self) -> ListenableSource<T> {
+        self.cell.as_source()
     }
 }
 
