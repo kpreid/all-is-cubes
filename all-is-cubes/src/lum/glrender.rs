@@ -26,10 +26,10 @@ use luminance::render_state::RenderState;
 use luminance::tess::Mode;
 use luminance::texture::{Dim2, Dim3};
 
-use crate::camera::{Camera, GraphicsOptions, Viewport};
+use crate::apps::StandardCameras;
+use crate::camera::{Camera, Viewport};
 use crate::character::{Character, Cursor};
 use crate::content::palette;
-use crate::listen::{DirtyFlag, ListenableSource};
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::lum::shading::BlockPrograms;
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
@@ -37,10 +37,7 @@ use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::lum::GraphicsResourceError;
 use crate::lum::{make_cursor_tess, wireframe_vertices};
 use crate::math::{Aab, Rgba};
-use crate::space::Space;
-use crate::universe::URef;
 use crate::util::{CustomFormat, StatusText};
-use crate::vui::Vui;
 
 /// Game world/UI renderer targeting `luminance`.
 // TODO: give this and its module a better name
@@ -49,10 +46,7 @@ where
     C: GraphicsContext,
     C::Backend: AicLumBackend + Sized,
 {
-    // External sources
-    graphics_options: ListenableSource<GraphicsOptions>,
-    graphics_options_dirty: DirtyFlag,
-    character: ListenableSource<Option<URef<Character>>>,
+    cameras: StandardCameras,
 
     // Graphics objects
     pub surface: C,
@@ -61,10 +55,9 @@ where
     info_text_texture: FullFrameTexture<C::Backend>,
 
     // Rendering state
+    // TODO: use Layers for this
     world_renderer: Option<SpaceRenderer<C::Backend>>,
     ui_renderer: Option<SpaceRenderer<C::Backend>>,
-    world_camera: Camera,
-    ui_camera: Camera,
 }
 
 impl<C> GLRenderer<C>
@@ -78,63 +71,44 @@ where
     TextureBinding<Dim2, NormUnsigned>: Uniformable<C::Backend>,
     TextureBinding<Dim3, NormUnsigned>: Uniformable<C::Backend>,
 {
-    /// Constructs `GLRenderer` for the given graphics context and initial viewport dimensions.
+    /// Constructs `GLRenderer` for the given camera configuration.
     ///
     /// Returns any shader compilation errors or warnings.
-    pub fn new(
-        mut surface: C,
-        graphics_options: ListenableSource<GraphicsOptions>,
-        character: ListenableSource<Option<URef<Character>>>,
-        viewport: Viewport,
-    ) -> Result<Self, GraphicsResourceError> {
-        let graphics_options_dirty = DirtyFlag::new(false);
-        graphics_options.listen(graphics_options_dirty.listener());
-        let initial_options = &*graphics_options.get();
+    pub fn new(mut surface: C, cameras: StandardCameras) -> Result<Self, GraphicsResourceError> {
+        let initial_options = cameras.graphics_options();
 
         let block_programs = BlockPrograms::compile(&mut surface, initial_options)?;
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut surface,
-            viewport.framebuffer_size.into(),
+            cameras.viewport().framebuffer_size.into(),
         )?;
 
         let full_frame = FullFramePainter::basic_program(&mut surface)?;
 
         let mut info_text_texture = full_frame.new_texture();
-        info_text_texture.resize(&mut surface, viewport).unwrap();
+        info_text_texture
+            .resize(&mut surface, cameras.viewport())
+            .unwrap();
 
         Ok(Self {
-            graphics_options,
-            graphics_options_dirty,
-            character,
             surface,
             back_buffer,
             block_programs,
             info_text_texture,
             world_renderer: None,
-            ui_renderer: None,
-            ui_camera: Camera::new(Vui::graphics_options(initial_options.clone()), viewport),
-            world_camera: Camera::new(initial_options.clone(), viewport),
+            ui_renderer: cameras.ui_space().cloned().map(SpaceRenderer::new),
+            cameras,
         })
     }
 
     /// Returns the last [`Viewport`] provided.
     pub fn viewport(&self) -> Viewport {
-        self.world_camera.viewport()
+        self.cameras.viewport()
     }
 
     /// Sets the expected viewport dimensions. Use in case of window resizing.
     pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), GraphicsResourceError> {
-        self.world_camera.set_viewport(viewport);
-
-        self.ui_camera.set_viewport(viewport);
-        if let Some(ui_renderer) = &self.ui_renderer {
-            // Note: Since this is conditional, we also have to set it up in
-            // set_ui_space when ui_renderer becomes Some.
-            self.ui_camera.set_view_matrix(Vui::view_matrix(
-                &*ui_renderer.space().borrow(),
-                self.ui_camera.fov_y(),
-            ));
-        }
+        self.cameras.set_viewport(viewport);
 
         self.info_text_texture
             .resize(&mut self.surface, viewport)
@@ -147,22 +121,11 @@ where
         Ok(())
     }
 
-    pub fn set_ui_space(&mut self, space: Option<URef<Space>>) {
-        self.ui_renderer = space.map(|space| {
-            self.ui_camera
-                .set_view_matrix(Vui::view_matrix(&*space.borrow(), self.ui_camera.fov_y()));
-            SpaceRenderer::new(space)
-        });
-    }
-
     /// Sync camera to character state. This is used so that cursor raycasts can be up-to-date
     /// to the same frame of input.
     #[doc(hidden)] // TODO: design better interface that doesn't need to call this
     pub fn update_world_camera(&mut self) {
-        if let Some(character_ref) = self.character.snapshot() {
-            self.world_camera
-                .set_view_matrix(character_ref.borrow().view());
-        }
+        self.cameras.update();
     }
 
     /// Return the camera used to render the space.
@@ -170,13 +133,13 @@ where
     /// high-level by doing the raycast in here.
     #[doc(hidden)] // TODO: design better interface that doesn't need to call this
     pub fn world_camera(&self) -> &Camera {
-        &self.world_camera
+        &self.cameras.cameras().world
     }
 
     /// Return the camera used to render the VUI. See comments on [`Self::world_camera`].
     #[doc(hidden)] // TODO: design better interface that doesn't need to call this
     pub fn ui_camera(&self) -> &Camera {
-        &self.ui_camera
+        &self.cameras.cameras().ui
     }
 
     /// Draw a frame, excluding info text overlay.
@@ -187,25 +150,26 @@ where
         let mut info = RenderInfo::default();
         let start_frame_time = Instant::now();
 
-        if self.graphics_options_dirty.get_and_clear() {
-            let current_options = self.graphics_options.snapshot();
-            // TODO: Recompile shaders only if shader-relevant fields changed.
-            match BlockPrograms::compile(&mut self.surface, &current_options) {
-                Ok(p) => self.block_programs = p,
-                Err(e) => log::error!("Failed to recompile shaders: {}", e),
-            }
-            self.world_camera.set_options(current_options.clone());
-            self.ui_camera
-                .set_options(Vui::graphics_options(current_options));
-
-            // TODO: going to need invalidation of chunks etc. here
-        }
+        // TODO: temporarily disabled while we refactor camera/dirty mgmt
+        //         if self.graphics_options_dirty.get_and_clear() {
+        //             let current_options = self.graphics_options.snapshot();
+        //             // TODO: Recompile shaders only if shader-relevant fields changed.
+        //             match BlockPrograms::compile(&mut self.surface, &current_options) {
+        //                 Ok(p) => self.block_programs = p,
+        //                 Err(e) => log::error!("Failed to recompile shaders: {}", e),
+        //             }
+        //
+        //             // TODO: going to need invalidation of chunks etc. here
+        //         }
 
         let surface = &mut self.surface;
         let block_programs = &mut self.block_programs;
 
-        let character_option_ref = self.character.snapshot();
-        let character: &Character = &*(if let Some(character_ref) = character_option_ref {
+        // This updates camera matrices and graphics options
+        self.cameras.update();
+        let graphics_options = self.cameras.graphics_options();
+
+        let character: &Character = &*(if let Some(character_ref) = self.cameras.character() {
             character_ref.borrow()
         } else {
             // Nothing to draw; clear screen and exit
@@ -217,20 +181,16 @@ where
             return Ok(info);
         });
 
-        // TODO: This matrix modification is redundant if we can require update_world_camera to have been called.
-        self.world_camera.set_view_matrix(character.view());
-        let graphics_options = self.world_camera.options(); // arbitrary choice of borrowable source
-
         // Prepare Tess and Texture for space.
         let start_prepare_time = Instant::now();
         if self.world_renderer.as_ref().map(|sr| sr.space()) != Some(&character.space) {
             self.world_renderer = Some(SpaceRenderer::new(character.space.clone()));
         }
         let world_renderer = self.world_renderer.as_mut().unwrap();
-        let world_output = world_renderer.prepare_frame(surface, &self.world_camera)?;
+        let world_output = world_renderer.prepare_frame(surface, &self.cameras.cameras().world)?;
 
         let ui_output = if let Some(ui_renderer) = &mut self.ui_renderer {
-            Some(ui_renderer.prepare_frame(surface, &self.ui_camera)?)
+            Some(ui_renderer.prepare_frame(surface, &self.cameras.cameras().ui)?)
         } else {
             None
         };

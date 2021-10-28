@@ -76,12 +76,9 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     let mut renderer = GLRenderer::new(
         surface,
-        app.graphics_options(),
-        app.character(),
-        gui_helpers.canvas_helper().viewport(),
+        StandardCameras::from_app_state(&app, gui_helpers.canvas_helper().viewport())?,
     )
     .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
-    renderer.set_ui_space(Some(app.ui_space().clone()));
 
     static_dom.scene_info_text_node.append_data("\nGL ready.")?;
 

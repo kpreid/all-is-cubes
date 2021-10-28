@@ -10,7 +10,7 @@ use glfw::{Action, Context as _, CursorMode, Window, WindowEvent};
 use luminance_glfw::GlfwSurface;
 use luminance_windowing::{WindowDim, WindowOpt};
 
-use all_is_cubes::apps::AllIsCubesAppState;
+use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::lum::GLRenderer;
@@ -52,11 +52,7 @@ pub fn glfw_main_loop(
         context, events_rx, ..
     } = GlfwSurface::new_gl33(window_title, WindowOpt::default().set_dim(dim))?;
     let viewport = map_glfw_viewport(&context.window);
-    // TODO: this is duplicated code with the wasm version; use a logging system to remove it
-    let mut renderer = GLRenderer::new(context, app.graphics_options(), app.character(), viewport)?;
-
-    // TODO: this is unlike other renderer initialization
-    renderer.set_ui_space(Some(app.ui_space().clone()));
+    let mut renderer = GLRenderer::new(context, StandardCameras::from_app_state(&app, viewport)?)?;
 
     let ready_time = Instant::now();
     log::debug!(

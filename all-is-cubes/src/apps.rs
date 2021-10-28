@@ -5,15 +5,17 @@
 
 use std::fmt::{self, Display};
 use std::future::Future;
+use std::mem;
 use std::task::{Context, Poll};
 
+use cgmath::{Matrix4, SquareMatrix};
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
-use crate::camera::{Camera, GraphicsOptions};
+use crate::camera::{Camera, GraphicsOptions, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
-use crate::listen::{ListenableCell, ListenableCellWithLocal, ListenableSource};
+use crate::listen::{DirtyFlag, ListenableCell, ListenableCellWithLocal, ListenableSource};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::transaction::Transaction;
@@ -297,6 +299,144 @@ impl AllIsCubesAppState {
     #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
     pub fn draw_fps_counter(&self) -> &FpsCounter {
         self.frame_clock.draw_fps_counter()
+    }
+}
+
+/// A collection of values associated with each of the layers of graphics that
+/// is normally drawn (HUD on top of world, currently).
+// Exhaustive: Changing this will probably be breaking anyway, until we make it a
+// more thorough abstraction.
+#[allow(clippy::exhaustive_structs)]
+pub struct Layers<T> {
+    pub world: T,
+    pub ui: T,
+}
+
+pub struct StandardCameras {
+    /// Cameras are synced with this
+    graphics_options: ListenableSource<GraphicsOptions>,
+    graphics_options_dirty: DirtyFlag,
+
+    character_source: ListenableSource<Option<URef<Character>>>,
+    /// Tracks whether the character was replaced (not whether its view changed).
+    character_dirty: DirtyFlag,
+    character: Option<URef<Character>>,
+
+    ui_space: Option<URef<Space>>,
+    viewport_dirty: bool,
+
+    cameras: Layers<Camera>,
+}
+
+impl StandardCameras {
+    pub fn from_app_state(
+        app_state: &AllIsCubesAppState,
+        viewport: Viewport,
+    ) -> Result<Self, std::convert::Infallible> {
+        let graphics_options = app_state.graphics_options();
+        let graphics_options_dirty = DirtyFlag::new(false);
+        graphics_options.listen(graphics_options_dirty.listener());
+        let initial_options = &*graphics_options.get();
+
+        let character_source = app_state.character();
+        let character_dirty = DirtyFlag::new(true);
+        character_source.listen(character_dirty.listener());
+
+        let mut this = Self {
+            graphics_options,
+            graphics_options_dirty,
+
+            character_source,
+            character_dirty,
+            character: None, // update() will fix this up
+            ui_space: Some(app_state.ui_space().clone()),
+
+            viewport_dirty: true,
+
+            cameras: Layers {
+                ui: Camera::new(Vui::graphics_options(initial_options.clone()), viewport),
+                world: Camera::new(initial_options.clone(), viewport),
+            },
+        };
+
+        this.update();
+        Ok(this)
+    }
+
+    /// Updates camera state from data sources.
+    ///
+    /// This should be called at the beginning of each frame or as needed when the
+    /// cameras are to be used.
+    pub fn update(&mut self) {
+        let options_dirty = self.graphics_options_dirty.get_and_clear();
+        if options_dirty {
+            let current_options = self.graphics_options.snapshot();
+            self.cameras.world.set_options(current_options.clone());
+            self.cameras
+                .ui
+                .set_options(Vui::graphics_options(current_options));
+        }
+
+        // Update UI view if the FOV changed or the viewport did
+        let viewport_dirty = mem::take(&mut self.viewport_dirty);
+        if options_dirty || viewport_dirty {
+            if let Some(space_ref) = &self.ui_space {
+                // TODO: try_borrow()
+                // TODO: ...or just skip the whole idea
+                self.cameras.ui.set_view_matrix(Vui::view_matrix(
+                    &*space_ref.borrow(),
+                    self.cameras.ui.fov_y(),
+                ));
+            }
+        }
+
+        if self.character_dirty.get_and_clear() {
+            self.character = self.character_source.snapshot();
+            if self.character.is_none() {
+                // TODO: set an error flag saying that nothing should be drawn
+                self.cameras.world.set_view_matrix(Matrix4::identity());
+            }
+        }
+
+        if let Some(character_ref) = &self.character {
+            #[allow(clippy::single_match)]
+            match character_ref.try_borrow() {
+                Ok(character) => {
+                    self.cameras.world.set_view_matrix(character.view());
+                }
+                Err(_) => {
+                    // TODO: set an error flag indicating failure to update
+                }
+            }
+        }
+    }
+
+    pub fn graphics_options(&self) -> &GraphicsOptions {
+        self.cameras.world.options()
+    }
+
+    pub fn cameras(&self) -> &Layers<Camera> {
+        &self.cameras
+    }
+
+    /// Returns the character's viewpoint to draw in the world layer.
+    /// May be [`None`] if there is no current character.
+    pub fn character(&self) -> Option<&URef<Character>> {
+        self.character.as_ref()
+    }
+
+    pub fn ui_space(&self) -> Option<&URef<Space>> {
+        self.ui_space.as_ref()
+    }
+
+    pub fn viewport(&self) -> Viewport {
+        self.cameras.world.viewport()
+    }
+
+    pub fn set_viewport(&mut self, viewport: Viewport) {
+        // TODO: this should be an iter_mut() or something
+        self.cameras.world.set_viewport(viewport);
+        self.cameras.ui.set_viewport(viewport);
     }
 }
 
