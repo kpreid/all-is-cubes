@@ -66,7 +66,7 @@ pub fn glfw_main_loop(
         app.maybe_step_universe();
         if app.frame_clock.should_draw() {
             renderer.update_world_camera();
-            app.update_cursor(renderer.ui_camera(), renderer.world_camera());
+            app.update_cursor(renderer.cameras());
             let render_info = renderer.render_frame(app.cursor_result()).unwrap();
             renderer
                 .add_info_text(&format!("{}", app.info_text(render_info)))

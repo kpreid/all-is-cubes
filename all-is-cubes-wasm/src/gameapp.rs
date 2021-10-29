@@ -13,7 +13,7 @@ use web_sys::{
     KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
 };
 
-use all_is_cubes::apps::{AllIsCubesAppState, Key};
+use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::lum::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
@@ -74,9 +74,9 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     )
     .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
 
-    let mut renderer = GLRenderer::new(
+    let renderer = GLRenderer::new(
         surface,
-        StandardCameras::from_app_state(&app, gui_helpers.canvas_helper().viewport())?,
+        StandardCameras::from_app_state(&app, gui_helpers.canvas_helper().viewport()).unwrap(),
     )
     .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
 
@@ -303,8 +303,7 @@ impl WebGameRoot {
                 .set_viewport(self.gui_helpers.canvas_helper().viewport())
                 .unwrap();
             self.renderer.update_world_camera();
-            self.app
-                .update_cursor(self.renderer.ui_camera(), self.renderer.world_camera());
+            self.app.update_cursor(self.renderer.cameras());
 
             // Do graphics
             let render_info = self

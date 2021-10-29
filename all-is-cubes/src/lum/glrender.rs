@@ -27,7 +27,7 @@ use luminance::tess::Mode;
 use luminance::texture::{Dim2, Dim3};
 
 use crate::apps::StandardCameras;
-use crate::camera::{Camera, Viewport};
+use crate::camera::Viewport;
 use crate::character::{Character, Cursor};
 use crate::content::palette;
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
@@ -128,18 +128,8 @@ where
         self.cameras.update();
     }
 
-    /// Return the camera used to render the space.
-    /// TODO: This interface exists to support cursor usage and should perhaps be made more
-    /// high-level by doing the raycast in here.
-    #[doc(hidden)] // TODO: design better interface that doesn't need to call this
-    pub fn world_camera(&self) -> &Camera {
-        &self.cameras.cameras().world
-    }
-
-    /// Return the camera used to render the VUI. See comments on [`Self::world_camera`].
-    #[doc(hidden)] // TODO: design better interface that doesn't need to call this
-    pub fn ui_camera(&self) -> &Camera {
-        &self.cameras.cameras().ui
+    pub fn cameras(&self) -> &StandardCameras {
+        &self.cameras
     }
 
     /// Draw a frame, excluding info text overlay.

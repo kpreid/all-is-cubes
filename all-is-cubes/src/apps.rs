@@ -8,7 +8,7 @@ use std::future::Future;
 use std::mem;
 use std::task::{Context, Poll};
 
-use cgmath::{Matrix4, SquareMatrix};
+use cgmath::{Matrix4, Point2, SquareMatrix};
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
@@ -226,21 +226,13 @@ impl AllIsCubesAppState {
     /// Call this once per frame to update the cursor raycast.
     ///
     /// TODO: bad API; revisit general cursor handling logic.
-    pub fn update_cursor(&mut self, ui_camera: &Camera, game_camera: &Camera) {
-        let ndc_pos = self.input_processor.cursor_ndc_position();
-
-        self.cursor_result = ndc_pos
-            .map(|p| ui_camera.project_ndc_into_world(p))
-            .and_then(|ray| cursor_raycast(ray, self.ui.current_space(), FreeCoordinate::INFINITY));
-
-        if self.cursor_result.is_none() {
-            if let Some(character_ref) = self.game_character.borrow() {
-                // TODO: maximum distance should be determined by character/universe parameters instead of hardcoded
-                self.cursor_result = ndc_pos
-                    .map(|p| game_camera.project_ndc_into_world(p))
-                    .and_then(|ray| cursor_raycast(ray, &character_ref.borrow().space, 6.0));
-            }
-        }
+    /// We'd like to not have too much dependencies on the rendering, but also
+    /// not obligate each platform/renderer layer to have too much boilerplate.
+    pub fn update_cursor(&mut self, cameras: &StandardCameras) {
+        self.cursor_result = self
+            .input_processor
+            .cursor_ndc_position()
+            .and_then(|ndc_pos| cameras.project_cursor(ndc_pos));
     }
 
     pub fn cursor_result(&self) -> &Option<Cursor> {
@@ -437,6 +429,29 @@ impl StandardCameras {
         // TODO: this should be an iter_mut() or something
         self.cameras.world.set_viewport(viewport);
         self.cameras.ui.set_viewport(viewport);
+    }
+
+    /// Perform a raycast through these cameras to find what the cursor hits.
+    ///
+    /// Make sure to call [`StandardCameras::update`] first so that the cameras are
+    /// up to date with game state.
+    pub fn project_cursor(&self, ndc_pos: Point2<FreeCoordinate>) -> Option<Cursor> {
+        if let Some(ui_space_ref) = self.ui_space.as_ref() {
+            let ray = self.cameras.ui.project_ndc_into_world(ndc_pos);
+            if let Some(cursor) = cursor_raycast(ray, ui_space_ref, FreeCoordinate::INFINITY) {
+                return Some(cursor);
+            }
+        }
+
+        if let Some(character_ref) = self.character.as_ref() {
+            let ray = self.cameras.world.project_ndc_into_world(ndc_pos);
+            // TODO: maximum distance should be determined by character/universe parameters instead of hardcoded
+            if let Some(cursor) = cursor_raycast(ray, &character_ref.borrow().space, 6.0) {
+                return Some(cursor);
+            }
+        }
+
+        None
     }
 }
 

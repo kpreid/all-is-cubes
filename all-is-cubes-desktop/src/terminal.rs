@@ -245,8 +245,7 @@ impl TerminalMain {
             }
 
             if self.app.frame_clock.should_draw() {
-                self.app
-                    .update_cursor(&self.cameras.cameras().ui, &self.cameras.cameras().world); // TODO: wrong UI camera ...
+                self.app.update_cursor(&self.cameras); // TODO: wrong UI camera ...
                 self.send_frame_to_render();
             } else {
                 std::thread::yield_now();
