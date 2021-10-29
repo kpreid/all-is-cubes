@@ -21,7 +21,7 @@ use tui::text::{Span, Spans};
 use tui::widgets::{Borders, Paragraph};
 use tui::{backend::CrosstermBackend, Terminal};
 
-use all_is_cubes::apps::{AllIsCubesAppState, Key};
+use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::ElementWise as _;
 use all_is_cubes::cgmath::Vector2;
@@ -96,9 +96,10 @@ pub fn terminal_main_loop(
 
 struct TerminalMain {
     app: AllIsCubesAppState,
+    cameras: StandardCameras,
+
     options: TerminalOptions,
     tuiout: tui::Terminal<CrosstermBackend<io::Stdout>>,
-    camera: Camera,
     /// True if we should clean up on drop.
     terminal_state_dirty: bool,
 
@@ -162,11 +163,9 @@ impl TerminalMain {
             })?;
 
         let viewport_position = Rect::default();
+        let viewport = options.viewport_from_terminal_size(rect_size(viewport_position));
         Ok(Self {
-            camera: Camera::new(
-                app.graphics_options().snapshot(),
-                options.viewport_from_terminal_size(rect_size(viewport_position)),
-            ),
+            cameras: StandardCameras::from_app_state(&app, viewport).unwrap(),
             app,
             options,
             tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
@@ -223,7 +222,7 @@ impl TerminalMain {
                         modifiers: _,
                     }) => {
                         self.options.graphic_characters = !self.options.graphic_characters;
-                        self.sync_options();
+                        self.sync_viewport();
                     }
                     Event::Key(_) => {}
                     Event::Resize(..) => { /* tui handles this */ }
@@ -246,7 +245,8 @@ impl TerminalMain {
             }
 
             if self.app.frame_clock.should_draw() {
-                self.app.update_cursor(&self.camera, &self.camera); // TODO: wrong UI camera ...
+                self.app
+                    .update_cursor(&self.cameras.cameras().ui, &self.cameras.cameras().world); // TODO: wrong UI camera ...
                 self.send_frame_to_render();
             } else {
                 std::thread::yield_now();
@@ -254,26 +254,27 @@ impl TerminalMain {
         }
     }
 
-    fn sync_options(&mut self) {
-        self.camera.set_viewport(
+    fn sync_viewport(&mut self) {
+        self.cameras.set_viewport(
             self.options
                 .viewport_from_terminal_size(rect_size(self.viewport_position)),
         );
     }
 
     fn send_frame_to_render(&mut self) {
-        let character = match self.app.character().snapshot() {
+        self.cameras.update();
+
+        // TODO: should be able to ask self.cameras for the space to render
+        let character = match self.cameras.character() {
             Some(character_ref) => character_ref.borrow(),
             None => {
                 return;
             }
         };
-        self.camera.set_view_matrix(character.view());
-
         let space = &*character.space.borrow();
 
         match self.render_pipe_in.try_send(FrameInput {
-            camera: self.camera.clone(),
+            camera: self.cameras.cameras().world.clone(),
             options: self.options.clone(),
             scene: SpaceRaytracer::<ColorCharacterBuf>::new(
                 space,
@@ -453,7 +454,7 @@ impl TerminalMain {
         let viewport_rect = viewport_rect.expect("layout failed to update");
         if self.viewport_position != viewport_rect {
             self.viewport_position = viewport_rect;
-            self.sync_options();
+            self.sync_viewport();
         }
 
         Ok(())
