@@ -26,12 +26,12 @@ use luminance::render_state::RenderState;
 use luminance::tess::Mode;
 use luminance::texture::{Dim2, Dim3};
 
-use crate::apps::StandardCameras;
-use crate::camera::Viewport;
+use crate::apps::{Layers, StandardCameras};
+use crate::camera::{Camera, Viewport};
 use crate::character::{Character, Cursor};
 use crate::content::palette;
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
-use crate::lum::shading::BlockPrograms;
+use crate::lum::shading::{BlockPrograms, ShaderConstants};
 use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::lum::GraphicsResourceError;
@@ -51,7 +51,7 @@ where
     // Graphics objects
     pub surface: C,
     back_buffer: Framebuffer<C::Backend, Dim2, (), ()>,
-    block_programs: BlockPrograms<C::Backend>,
+    block_programs: Layers<BlockPrograms<C::Backend>>,
     info_text_texture: FullFrameTexture<C::Backend>,
 
     // Rendering state
@@ -75,9 +75,10 @@ where
     ///
     /// Returns any shader compilation errors or warnings.
     pub fn new(mut surface: C, cameras: StandardCameras) -> Result<Self, GraphicsResourceError> {
-        let initial_options = cameras.graphics_options();
-
-        let block_programs = BlockPrograms::compile(&mut surface, initial_options)?;
+        // TODO: Give Layers a `map()`/constructor that deduplicates this.
+        let block_programs = cameras
+            .cameras()
+            .try_map_ref(|camera| BlockPrograms::compile(&mut surface, camera.options().into()))?;
         let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut surface,
             cameras.viewport().framebuffer_size.into(),
@@ -140,24 +141,30 @@ where
         let mut info = RenderInfo::default();
         let start_frame_time = Instant::now();
 
-        // TODO: temporarily disabled while we refactor camera/dirty mgmt
-        //         if self.graphics_options_dirty.get_and_clear() {
-        //             let current_options = self.graphics_options.snapshot();
-        //             // TODO: Recompile shaders only if shader-relevant fields changed.
-        //             match BlockPrograms::compile(&mut self.surface, &current_options) {
-        //                 Ok(p) => self.block_programs = p,
-        //                 Err(e) => log::error!("Failed to recompile shaders: {}", e),
-        //             }
-        //
-        //             // TODO: going to need invalidation of chunks etc. here
-        //         }
-
-        let surface = &mut self.surface;
-        let block_programs = &mut self.block_programs;
-
         // This updates camera matrices and graphics options
         self.cameras.update();
         let graphics_options = self.cameras.graphics_options();
+
+        // Recompile shaders if needed
+        // TODO: Layers should have methods to help with this
+        let mut update_program = |programs: &mut BlockPrograms<_>, camera: &Camera| {
+            let shader_constants: ShaderConstants = camera.options().into();
+            if shader_constants != programs.constants {
+                match BlockPrograms::compile(&mut self.surface, shader_constants) {
+                    Ok(p) => *programs = p,
+                    Err(e) => log::error!("Failed to recompile shaders: {}", e),
+                }
+            }
+        };
+        update_program(
+            &mut self.block_programs.world,
+            &self.cameras.cameras().world,
+        );
+        update_program(&mut self.block_programs.ui, &self.cameras.cameras().ui);
+
+        let block_programs = &mut self.block_programs;
+
+        let surface = &mut self.surface;
 
         let character: &Character = &*(if let Some(character_ref) = self.cameras.character() {
             character_ref.borrow()
@@ -255,12 +262,13 @@ where
                 |pipeline, mut shading_gate| {
                     let world_output_bound = world_output.bind(&pipeline)?;
                     // Space
-                    info.space = world_output_bound.render(&mut shading_gate, block_programs)?;
+                    info.space =
+                        world_output_bound.render(&mut shading_gate, &mut block_programs.world)?;
 
                     // Cursor and debug info
                     // Note: This will fall on top of transparent world content due to draw order.
                     shading_gate.shade(
-                        &mut block_programs.opaque,
+                        &mut block_programs.world.opaque,
                         |ref mut program_iface, u, mut render_gate| {
                             u.initialize(program_iface, &world_output_bound);
                             render_gate.render(&RenderState::default(), |mut tess_gate| {
@@ -294,7 +302,7 @@ where
                         // TODO: Ignoring info
                         ui_output
                             .bind(pipeline)?
-                            .render(shading_gate, block_programs)?;
+                            .render(shading_gate, &mut block_programs.ui)?;
                     }
                     Ok(())
                 },

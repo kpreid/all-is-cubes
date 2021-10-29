@@ -20,11 +20,31 @@ use crate::lum::types::{AicLumBackend, VertexSemantics};
 use crate::lum::GraphicsResourceError;
 use crate::math::FreeCoordinate;
 
+/// Subset of [`GraphicsOptions`] that requires shader recompilation if changed.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ShaderConstants {
+    lighting_display: LightingOption,
+    volumetric_transparency: bool,
+}
+
+impl From<&GraphicsOptions> for ShaderConstants {
+    fn from(options: &GraphicsOptions) -> Self {
+        Self {
+            lighting_display: options.lighting_display.clone(),
+            volumetric_transparency: match options.transparency {
+                TransparencyOption::Surface | TransparencyOption::Threshold(_) => false,
+                TransparencyOption::Volumetric => true,
+            },
+        }
+    }
+}
+
 /// Type of the block shader program (output of [`prepare_block_program`]).
 pub type BlockProgram<Backend> = Program<Backend, VertexSemantics, (), BlockUniformInterface>;
 
 /// Collection of shaders for rendering blocks, which all share the `BlockUniformInterface`.
 pub(crate) struct BlockPrograms<Backend: AicLumBackend> {
+    pub(crate) constants: ShaderConstants,
     pub(crate) opaque: BlockProgram<Backend>,
     pub(crate) transparent: BlockProgram<Backend>,
 }
@@ -32,7 +52,7 @@ pub(crate) struct BlockPrograms<Backend: AicLumBackend> {
 impl<Backend: AicLumBackend> BlockPrograms<Backend> {
     pub(crate) fn compile<C>(
         context: &mut C,
-        options: &GraphicsOptions,
+        constants: ShaderConstants,
     ) -> Result<BlockPrograms<Backend>, GraphicsResourceError>
     where
         C: GraphicsContext<Backend = Backend>,
@@ -44,20 +64,18 @@ impl<Backend: AicLumBackend> BlockPrograms<Backend> {
         TextureBinding<Dim3, NormUnsigned>: Uniformable<C::Backend>,
     {
         let mut base_defines = Vec::new();
-        if options.lighting_display != LightingOption::None {
+        if constants.lighting_display != LightingOption::None {
             base_defines.push(("LIGHTING", "1"));
         }
-        if options.lighting_display == LightingOption::Smooth {
+        if constants.lighting_display == LightingOption::Smooth {
             base_defines.push(("SMOOTH_LIGHTING", "1"));
         }
-        match options.transparency {
-            TransparencyOption::Surface | TransparencyOption::Threshold(_) => {}
-            TransparencyOption::Volumetric => {
-                base_defines.push(("VOLUMETRIC", "1"));
-            }
+        if constants.volumetric_transparency {
+            base_defines.push(("VOLUMETRIC", "1"));
         }
 
         Ok(BlockPrograms {
+            constants,
             opaque: prepare_block_program(context, base_defines.iter().copied())?,
             transparent: prepare_block_program(
                 context,

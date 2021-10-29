@@ -304,6 +304,18 @@ pub struct Layers<T> {
     pub ui: T,
 }
 
+impl<T> Layers<T> {
+    pub(crate) fn try_map_ref<U, E>(
+        &self,
+        mut f: impl FnMut(&T) -> Result<U, E>,
+    ) -> Result<Layers<U>, E> {
+        Ok(Layers {
+            world: f(&self.world)?,
+            ui: f(&self.ui)?,
+        })
+    }
+}
+
 pub struct StandardCameras {
     /// Cameras are synced with this
     graphics_options: ListenableSource<GraphicsOptions>,
