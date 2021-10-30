@@ -421,6 +421,7 @@ impl TooltipState {
         }
 
         if self.dirty_text {
+            self.dirty_text = false;
             Some(self.current_contents.text().clone())
         } else {
             None
@@ -563,7 +564,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tooltip_timeout() {
+    fn tooltip_timeout_and_dirty_text() {
         // TODO: reduce boilerplate
         let mut universe = Universe::new();
         let sv = WidgetSpaceView {
@@ -571,14 +572,26 @@ mod tests {
             space: universe.insert_anonymous(Space::empty_positive(1, 1, 1)),
         };
 
+        // Initial state: no update.
         let mut t = TooltipState::default();
+        assert_eq!(t.step(&sv, Tick::from_seconds(0.5)), None);
         assert_eq!(t.age, None);
+
+        // Add a message.
         t.set_message("Hello world".into());
         assert_eq!(t.age, Some(Duration::ZERO));
-        t.step(&sv, Tick::from_seconds(0.5));
+        assert_eq!(
+            t.step(&sv, Tick::from_seconds(0.25)),
+            Some("Hello world".into())
+        );
+        // Message is only emitted from step() once.
+        assert_eq!(t.step(&sv, Tick::from_seconds(0.25)), None);
         assert_eq!(t.age, Some(Duration::from_millis(500)));
-        t.step(&sv, Tick::from_seconds(0.501));
+
+        // Advance time until it should time out.
+        assert_eq!(t.step(&sv, Tick::from_seconds(0.501)), Some("".into()));
         assert_eq!(t.age, None);
-        // TODO: assert results of step()
+        // Empty string is only emitted from step() once.
+        assert_eq!(t.step(&sv, Tick::from_seconds(2.00)), None);
     }
 }
