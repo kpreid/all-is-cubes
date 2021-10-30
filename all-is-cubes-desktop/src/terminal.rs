@@ -594,6 +594,9 @@ fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
 ///
 /// `width_table` is used to memoize the previously measured widths. Because of this,
 /// strings should be kept short enough to be repetitive (e.g. single characters).
+///
+/// Returns an error if the string could not be written. If an error was encountered
+/// measuring the width, returns an estimate instead.
 fn write_and_measure<B: tui::backend::Backend + io::Write>(
     backend: &mut B,
     width_table: &mut HashMap<String, u16>,
@@ -626,25 +629,28 @@ fn write_and_measure<B: tui::backend::Backend + io::Write>(
                             // information from this.
                             // (TODO: Add a text filter that prevents reaching this case by avoiding
                             // printing control characters.)
-                            Ok(0)
+                            Ok(fallback_measure_str(text))
                         }
                     }
                 } else {
                     // The character caused moving to a new line, perhaps because we incorrectly
                     // assumed its width was not greater than 1 and it was on the right edge.
-                    // Therefore, we cannot measure its width but it is probably greater than 1.
-                    Ok(2)
+                    Ok(fallback_measure_str(text))
                 }
             }
             (_, Err(_)) | (Err(_), _) => {
                 // Ignore IO error, which might be a timeout inside get_cursor ... such as due to
                 // high response latency due to running this raytracer on a slow system.
-                // Assume the width is 1 since that's a good guess.
-                // TODO: use unicode_width instead?
-                Ok(1)
+                Ok(fallback_measure_str(text))
             }
         }
     }
+}
+
+fn fallback_measure_str(text: &str) -> u16 {
+    unicode_width::UnicodeWidthStr::width(text)
+        .try_into()
+        .unwrap_or(u16::MAX)
 }
 
 /// Converts [`Event`] to [`Key`].

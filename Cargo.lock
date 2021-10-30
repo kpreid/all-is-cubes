@@ -111,6 +111,7 @@ dependencies = [
  "strum",
  "termion",
  "tui",
+ "unicode-width",
 ]
 
 [[package]]
