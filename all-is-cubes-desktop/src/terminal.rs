@@ -601,22 +601,49 @@ fn write_and_measure<B: tui::backend::Backend + io::Write>(
     max_width: u16,
 ) -> Result<u16, io::Error> {
     if let Some(&w) = width_table.get(text) {
+        // Use and report already-computed width.
         if w <= max_width {
             backend.write_all(text.as_bytes())?;
         }
         Ok(w)
     } else {
-        // Measure the de-facto width of the string by measuring how far the cursor advances.
-        let before = backend.get_cursor()?;
+        let before = backend.get_cursor();
         backend.write_all(text.as_bytes())?;
-        let after = backend.get_cursor()?;
-        let w = after.0.saturating_sub(before.0);
-        // Record the width, unless the character caused a line wrap so that we can't tell.
-        // TODO: Why w > 0?
-        if after.1 == before.1 && w > 0 {
-            width_table.insert(text.to_owned(), w);
+        let after = backend.get_cursor();
+
+        // Compute width from cursor position, if available.
+        match (before, after) {
+            (Ok((before_x, before_y)), Ok((after_x, after_y))) => {
+                if before_y == after_y {
+                    match after_x.checked_sub(before_x) {
+                        Some(width) => {
+                            width_table.insert(text.to_owned(), width);
+                            Ok(width)
+                        }
+                        None => {
+                            // Cursor moved leftward. Did we print a backspace, perhaps? Or did we
+                            // end up on the last line and provoke scrolling? No way to recover
+                            // information from this.
+                            // (TODO: Add a text filter that prevents reaching this case by avoiding
+                            // printing control characters.)
+                            Ok(0)
+                        }
+                    }
+                } else {
+                    // The character caused moving to a new line, perhaps because we incorrectly
+                    // assumed its width was not greater than 1 and it was on the right edge.
+                    // Therefore, we cannot measure its width but it is probably greater than 1.
+                    Ok(2)
+                }
+            }
+            (_, Err(_)) | (Err(_), _) => {
+                // Ignore IO error, which might be a timeout inside get_cursor ... such as due to
+                // high response latency due to running this raytracer on a slow system.
+                // Assume the width is 1 since that's a good guess.
+                // TODO: use unicode_width instead?
+                Ok(1)
+            }
         }
-        Ok(w)
     }
 }
 
