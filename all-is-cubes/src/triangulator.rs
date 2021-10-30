@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Algorithms for converting blocks/voxels to triangle-mesh-based rendering
+//! Algorithms for converting blocks/voxels to triangle meshes for rendering
 //! (as opposed to raytracing, voxel display hardware, or whatever else).
 //!
 //! All of the algorithms here are independent of graphics API but may presume that
@@ -34,7 +34,7 @@ mod tests;
 /// (or the texture allocator, since that may need to be mutable).
 ///
 /// Creating this and comparing it against a previous instance is appropriate for
-/// determining when to invalidate previous triangulations. This type is also intended
+/// determining when to invalidate previous results. This type is also intended
 /// to make the API future-proof against additional configuration being needed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]

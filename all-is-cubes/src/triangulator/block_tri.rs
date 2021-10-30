@@ -17,13 +17,20 @@ use crate::triangulator::{
     TriangulatorOptions,
 };
 
-/// Describes how to draw one [`Face`] of a [`Block`].
+/// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
+/// by [`Face`].
 ///
-/// See [`BlockTriangulation`] for a description of how triangles are grouped into faces.
-/// The texture associated with the contained vertices' texture coordinates is also
-/// kept there.
+/// All triangles which are on the surface of the unit cube (such that they may be omitted
+/// when a [`fully_opaque`](EvaluatedBlock::fully_opaque) block is adjacent) are grouped
+/// under the corresponding face, and all other triangles are grouped under
+/// [`Face::Within`]. In future versions, the triangulator might be improved so that blocks
+/// with concavities on their faces have the surface of each concavity included in that
+/// face mesh rather than in [`Face::Within`].
+///
+/// The texture associated with the contained vertices' texture coordinates is recorded
+/// in the [`BlockMesh`] only.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct FaceTriangulation<V> {
+pub(super) struct BlockFaceMesh<V> {
     /// Vertices, as used by the indices vectors.
     pub(super) vertices: Vec<V>,
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
@@ -37,15 +44,15 @@ pub(super) struct FaceTriangulation<V> {
     pub(super) fully_opaque: bool,
 }
 
-impl<V> FaceTriangulation<V> {
+impl<V> BlockFaceMesh<V> {
     pub fn is_empty(&self) -> bool {
         self.vertices.is_empty()
     }
 }
 
-impl<V> Default for FaceTriangulation<V> {
+impl<V> Default for BlockFaceMesh<V> {
     fn default() -> Self {
-        FaceTriangulation {
+        BlockFaceMesh {
             vertices: Vec::new(),
             indices_opaque: Vec::new(),
             indices_transparent: Vec::new(),
@@ -58,7 +65,7 @@ impl<V> Default for FaceTriangulation<V> {
 ///
 /// Get it from [`triangulate_block`] or [`triangulate_blocks`].
 /// Pass it to [`triangulate_space`](super::triangulate_space) to assemble blocks into an
-/// entire scene or chunk ([`SpaceTriangulation`](super::SpaceTriangulation)).
+/// entire scene or chunk ([`SpaceMesh`](super::SpaceMesh)).
 ///
 /// The type parameters allow adaptation to the target graphics API:
 /// * `V` is the type of vertices.
@@ -66,28 +73,24 @@ impl<V> Default for FaceTriangulation<V> {
 ///
 /// TODO: Add methods so this can be read out directly if you really want to.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BlockTriangulation<V, T> {
+pub struct BlockMesh<V, T> {
     /// Vertices grouped by the face they belong to.
-    ///
-    /// All triangles which are on the surface of the cube (such that they may be omitted
-    /// when a `fully_opaque` block is adjacent) are grouped under the corresponding
-    /// face, and all other triangles are grouped under `Face::Within`.
-    pub(super) faces: FaceMap<FaceTriangulation<V>>,
+    pub(super) faces: FaceMap<BlockFaceMesh<V>>,
 
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates stay valid.
     ///
-    /// TODO: Each block triangulations used to require more than one tile, but no longer
+    /// TODO: Each block mesh used to require more than one tile, but they no longer
     /// do. Convert this to an Option, unless we decide that e.g. we want the triangulator
     /// to be responsible for optimizing opaque blocks into 6 face textures.
     pub(super) textures_used: Vec<T>,
 }
 
-impl<V, T> BlockTriangulation<V, T> {
+impl<V, T> BlockMesh<V, T> {
     /// Return the textures used for this block. This may be used to retain the textures
     /// for as long as the associated vertices are being used, rather than only as long as
-    /// the life of this triangulation.
-    // TODO: revisit this interface design. Maybe callers should just have an Rc<BlockTriangulation>?
+    /// the life of this mesh.
+    // TODO: revisit this interface design. Maybe callers should just have an Rc<BlockMesh>?
     pub(crate) fn textures(&self) -> &[T] {
         &self.textures_used
     }
@@ -97,7 +100,7 @@ impl<V, T> BlockTriangulation<V, T> {
     }
 }
 
-impl<V, T> Default for BlockTriangulation<V, T> {
+impl<V, T> Default for BlockMesh<V, T> {
     #[inline]
     fn default() -> Self {
         // This implementation can't be derived since `V` and `T` don't have defaults themselves.
@@ -108,7 +111,7 @@ impl<V, T> Default for BlockTriangulation<V, T> {
     }
 }
 
-/// Generate [`BlockTriangulation`] for a block's current appearance.
+/// Generate [`BlockMesh`] for a block's current appearance.
 ///
 /// This may then be may be used as input to [`triangulate_space`](super::triangulate_space).
 pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
@@ -117,13 +120,13 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     block: &EvaluatedBlock,
     texture_allocator: &mut A,
     options: &TriangulatorOptions,
-) -> BlockTriangulation<V, A::Tile> {
+) -> BlockMesh<V, A::Tile> {
     match &block.voxels {
         None => {
             let faces = FaceMap::from_fn(|face| {
                 if face == Face::Within {
                     // No interior detail for atom blocks.
-                    return FaceTriangulation::default();
+                    return BlockFaceMesh::default();
                 }
                 let color = options.transparency.limit_alpha(block.color);
 
@@ -149,7 +152,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         1,
                     );
                 }
-                FaceTriangulation {
+                BlockFaceMesh {
                     fully_opaque: color.fully_opaque(),
                     vertices,
                     indices_opaque,
@@ -157,7 +160,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 }
             });
 
-            BlockTriangulation {
+            BlockMesh {
                 faces,
                 textures_used: vec![],
             }
@@ -171,14 +174,14 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 .intersection(Grid::for_block(block.resolution))
                 .is_none()
             {
-                return BlockTriangulation::default();
+                return BlockMesh::default();
             }
 
             let block_resolution = GridCoordinate::from(block.resolution);
 
             // Construct empty output to mutate, because inside the loops we'll be
             // updating `Within` independently of other faces.
-            let mut output_by_face = FaceMap::from_fn(|face| FaceTriangulation {
+            let mut output_by_face = FaceMap::from_fn(|face| BlockFaceMesh {
                 vertices: Vec::new(),
                 indices_opaque: Vec::new(),
                 indices_transparent: Vec::new(),
@@ -278,7 +281,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     // Only the cube-surface faces go anywhere but `Within`.
                     // (We could generalize this to blocks with concavities that still form a
                     // light-tight seal against the cube face.)
-                    let FaceTriangulation {
+                    let BlockFaceMesh {
                         vertices,
                         indices_opaque,
                         indices_transparent,
@@ -309,7 +312,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 QuadColoring::Texture(texture)
                             } else {
                                 // Texture allocation failure.
-                                // TODO: Mark this triangulation as defective in the return value, so
+                                // TODO: Mark this mesh as defective in the return value, so
                                 // that when more space is available, it can be retried, rather than
                                 // having lingering failures.
                                 // TODO: Add other fallback strategies such as using multiple quads instead
@@ -336,7 +339,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 }
             }
 
-            BlockTriangulation {
+            BlockMesh {
                 faces: output_by_face,
                 textures_used: texture_if_needed.into_iter().collect(),
             }
@@ -344,7 +347,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     }
 }
 
-/// Precomputes [`BlockTriangulation`]s for blocks present in a space.
+/// Computes [`BlockMeshes`] for blocks present in a [`Space`].
 /// Pass the result to [`triangulate_space`](super::triangulate_space) to use it.
 ///
 /// The resulting array is indexed by the `Space`'s
@@ -353,7 +356,7 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
     options: &TriangulatorOptions,
-) -> BlockTriangulations<V, A::Tile> {
+) -> BlockMeshes<V, A::Tile> {
     space
         .block_data()
         .iter()
@@ -361,7 +364,7 @@ pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
         .collect()
 }
 
-/// Array of [`BlockTriangulation`] indexed by a [`Space`]'s block indices; a convenience
+/// Array of [`BlockMesh`] indexed by a [`Space`]'s block indices; a convenience
 /// alias for the return type of [`triangulate_blocks`].
 /// Pass it to [`triangulate_space`](super::triangulate_space) to use it.
-pub type BlockTriangulations<V, A> = Box<[BlockTriangulation<V, A>]>;
+pub type BlockMeshes<V, A> = Box<[BlockMesh<V, A>]>;

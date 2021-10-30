@@ -15,8 +15,8 @@ use crate::listen::Listener;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
-    triangulate_block, triangulate_blocks, BlockTriangulation, BlockTriangulationProvider,
-    GfxVertex, SpaceTriangulation, TextureAllocator, TriangulatorOptions,
+    triangulate_block, triangulate_blocks, BlockMesh, BlockMeshProvider, GfxVertex, SpaceMesh,
+    TextureAllocator, TriangulatorOptions,
 };
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat};
@@ -24,25 +24,25 @@ use crate::util::{ConciseDebug, CustomFormat};
 /// If true, enables reporting chunk update timing at [`log::trace`] level.
 const LOG_CHUNK_UPDATES: bool = false;
 
-/// The large-scale analogue of [`SpaceTriangulation`]: subdivides
-/// a [`Space`] into [chunks](crate::chunking) and updates triangulation
-/// as the space changes or its contained blocks do.
+/// The large-scale analogue of [`SpaceMesh`]: subdivides a [`Space`] into
+/// [chunks](crate::chunking) which are individually recomputed as the space changes or
+/// its contained blocks do.
 ///
-/// Each chunk, a [`ChunkTriangulation`], owns a data value of type `D`, which is
+/// Each chunk, a [`ChunkMesh`], owns a data value of type `D`, which is
 /// initialized using `D::default()`.
 #[derive(Debug)]
-pub(crate) struct ChunkedSpaceTriangulation<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
+pub(crate) struct ChunkedSpaceMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
     Tex: TextureAllocator,
 {
     space: URef<Space>,
 
     /// Dirty flags listening to `space`.
-    todo: Arc<Mutex<CstTodo<CHUNK_SIZE>>>,
+    todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>>,
 
-    block_triangulations: Vec<BlockTriangulation<Vert, Tex::Tile>>,
+    block_meshes: Vec<BlockMesh<Vert, Tex::Tile>>,
 
-    /// Version IDs used to track whether chunks have stale block triangulations.
+    /// Version IDs used to track whether chunks have stale block meshes.
     /// Indices are block indices and values are version numbers.
     block_versioning: Vec<u32>,
 
@@ -50,7 +50,7 @@ where
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.borrow().chunks`.
-    chunks: HashMap<ChunkPos<CHUNK_SIZE>, ChunkTriangulation<D, Vert, Tex, CHUNK_SIZE>>,
+    chunks: HashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<D, Vert, Tex, CHUNK_SIZE>>,
 
     /// Resized as needed upon each [`Self::update_blocks_and_some_chunks()`].
     chunk_chart: ChunkChart<CHUNK_SIZE>,
@@ -60,8 +60,7 @@ where
     chunks_were_missing: bool,
 }
 
-impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
-    ChunkedSpaceTriangulation<D, Vert, Tex, CHUNK_SIZE>
+impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<D, Vert, Tex, CHUNK_SIZE>
 where
     D: Default,
     Vert: GfxVertex + PartialEq,
@@ -70,14 +69,14 @@ where
 {
     pub fn new(space: URef<Space>) -> Self {
         let space_borrowed = space.borrow();
-        let todo = CstTodo::default();
+        let todo = CsmTodo::default();
         let todo_rc = Arc::new(Mutex::new(todo));
         space_borrowed.listen(TodoListener(Arc::downgrade(&todo_rc)));
 
         Self {
             space,
             todo: todo_rc,
-            block_triangulations: Vec::new(),
+            block_meshes: Vec::new(),
             block_versioning: Vec::new(),
             block_version_counter: 0,
             chunks: HashMap::new(),
@@ -97,15 +96,14 @@ where
         &self.chunk_chart
     }
 
-    /// Retrieves a [`ChunkTriangulation`] for the specified chunk position,
-    /// if one exists.
+    /// Retrieves a [`ChunkMesh`] for the specified chunk position, if one exists.
     ///
     /// Call this while drawing, after [`Self::update_blocks_and_some_chunks`]
     /// has updated/created chunks.
     pub fn chunk(
         &self,
         position: ChunkPos<CHUNK_SIZE>,
-    ) -> Option<&ChunkTriangulation<D, Vert, Tex, CHUNK_SIZE>> {
+    ) -> Option<&ChunkMesh<D, Vert, Tex, CHUNK_SIZE>> {
         self.chunks.get(&position)
     }
 
@@ -125,8 +123,8 @@ where
         mut indices_only_updater: IF,
     ) -> (CstUpdateInfo, ChunkPos<CHUNK_SIZE>)
     where
-        CF: FnMut(&SpaceTriangulation<Vert>, &mut D),
-        IF: FnMut(&SpaceTriangulation<Vert>, &mut D),
+        CF: FnMut(&SpaceMesh<Vert>, &mut D),
+        IF: FnMut(&SpaceMesh<Vert>, &mut D),
     {
         let graphics_options = camera.options();
         let tri_options = &TriangulatorOptions::new(graphics_options);
@@ -148,28 +146,27 @@ where
 
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
-            self.block_triangulations.clear();
+            self.block_meshes.clear();
             self.block_version_counter = self.block_version_counter.wrapping_add(1);
             // We don't need to clear self.chunks because they will automatically be considered
             // stale by the new block versioning value.
         }
 
         let mut block_update_count = 0;
-        if self.block_triangulations.is_empty() {
+        if self.block_meshes.is_empty() {
             // One of the following cases:
             // * It's the first run and we haven't prepared the blocks at all.
             // * The space somehow has zero blocks, in which case this is trivial anyway.
             // * The space signaled SpaceChange::EveryBlock.
             let start_triangulation_time = Instant::now();
             todo.all_blocks_and_chunks = false;
-            self.block_triangulations = Vec::from(triangulate_blocks(
+            self.block_meshes = Vec::from(triangulate_blocks(
                 space,
                 block_texture_allocator,
                 tri_options,
             ));
-            self.block_versioning =
-                vec![self.block_version_counter; self.block_triangulations.len()];
-            block_update_count = self.block_triangulations.len();
+            self.block_versioning = vec![self.block_version_counter; self.block_meshes.len()];
+            block_update_count = self.block_meshes.len();
             log::trace!(
                 "triangulate_blocks({}) took {:.3} s",
                 self.space.name(),
@@ -184,25 +181,25 @@ where
 
             // Update the vector length to match the space.
             let new_length = block_data.len();
-            let old_length = self.block_triangulations.len();
+            let old_length = self.block_meshes.len();
             match new_length.cmp(&old_length) {
                 Ordering::Less => {
-                    self.block_triangulations.truncate(new_length);
+                    self.block_meshes.truncate(new_length);
                     self.block_versioning.truncate(new_length);
                 }
                 Ordering::Greater => {
                     let added = old_length..new_length;
-                    self.block_triangulations
-                        .extend(added.clone().map(|_| BlockTriangulation::default()));
+                    self.block_meshes
+                        .extend(added.clone().map(|_| BlockMesh::default()));
                     self.block_versioning.extend(added.map(|_| 0));
                 }
                 Ordering::Equal => {}
             }
-            assert_eq!(self.block_triangulations.len(), new_length);
+            assert_eq!(self.block_meshes.len(), new_length);
 
             for index in todo.blocks.drain() {
                 let index: usize = index.into();
-                let new_triangulation = triangulate_block(
+                let new_block_mesh = triangulate_block(
                     block_data[index].evaluated(),
                     block_texture_allocator,
                     tri_options,
@@ -216,11 +213,11 @@ where
                 // never reuses textures. (If it did, we'd need to consider what we want to do
                 // about stale chunks with fresh textures, which might have geometry gaps or
                 // otherwise be obviously inconsistent.)
-                if new_triangulation != self.block_triangulations[index] {
-                    self.block_triangulations[index] = new_triangulation;
+                if new_block_mesh != self.block_meshes[index] {
+                    self.block_meshes[index] = new_block_mesh;
                     self.block_versioning[index] = self.block_version_counter;
                 } else {
-                    // The new triangulation is identical to the old one (which might happen because
+                    // The new mesh is identical to the old one (which might happen because
                     // interior voxels or non-rendered attributes were changed), so don't invalidate
                     // the chunks.
                 }
@@ -229,8 +226,8 @@ where
             }
         }
 
-        // We are now done with todo preparation, and block triangulation updates,
-        // and can start updating chunk triangulations.
+        // We are now done with todo preparation, and block mesh updates,
+        // and can start updating chunk meshes.
 
         self.chunk_chart.resize_if_needed(camera.view_distance());
 
@@ -254,7 +251,7 @@ where
             if (todo
                 .chunks
                 .get(&p)
-                .map(|ct| ct.update_triangulation)
+                .map(|ct| ct.recompute_mesh)
                 .unwrap_or(false)
                 && !self.chunks_were_missing)
                 || matches!(chunk_entry, Vacant(_))
@@ -266,16 +263,16 @@ where
                     // Remember that we want to track dirty flags.
                     todo.chunks.insert(p, ChunkTodo::CLEAN);
                     // Generate new chunk.
-                    ChunkTriangulation::new(p)
+                    ChunkMesh::new(p)
                 });
-                chunk.update_triangulation(
+                chunk.recompute_mesh(
                     todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
                     &*space,
                     tri_options,
-                    &self.block_triangulations,
+                    &self.block_meshes,
                     &self.block_versioning,
                 );
-                chunk_render_updater(&chunk.triangulation, &mut chunk.render_data);
+                chunk_render_updater(&chunk.mesh, &mut chunk.render_data);
                 chunk_update_count += 1;
             }
         }
@@ -284,7 +281,7 @@ where
         // Update the drawing order of transparent parts of the chunk the camera is in.
         if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
             if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>().unwrap()) {
-                indices_only_updater(&chunk.triangulation, &mut chunk.render_data);
+                indices_only_updater(&chunk.mesh, &mut chunk.render_data);
             }
         }
 
@@ -300,30 +297,31 @@ where
     }
 }
 
-/// Performance info from a [`ChunkedSpaceTriangulation`]'s per-frame update.
+/// Performance info from a [`ChunkedSpaceMesh`]'s per-frame update.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CstUpdateInfo {
-    /// How many chunks were recomputed this frame.
+    /// How many chunk meshes were recomputed this frame.
     pub chunk_update_count: usize,
-    /// How many block triangulations were recomputed this time.
+    /// How many block meshes were recomputed this frame.
     pub block_update_count: usize,
 }
 
-/// Stores a [`SpaceTriangulation`], caller-provided rendering data, and incidental.
+/// Stores a [`SpaceMesh`] covering one chunk of a [`Space`], caller-provided rendering
+/// data, and incidentals.
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) struct ChunkTriangulation<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
+pub(crate) struct ChunkMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
     Tex: TextureAllocator,
 {
     bounds: Grid,
-    triangulation: SpaceTriangulation<Vert>,
+    mesh: SpaceMesh<Vert>,
     pub render_data: D,
     /// Texture tiles that our vertices' texture coordinates refer to.
     tile_dependencies: Vec<Tex::Tile>,
     block_dependencies: Vec<(BlockIndex, u32)>,
 }
 
-impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkTriangulation<D, Vert, Tex, CHUNK_SIZE>
+impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkMesh<D, Vert, Tex, CHUNK_SIZE>
 where
     D: Default, // TODO: This is used for initializing `render_data`, but it might not be ideal.
     Vert: GfxVertex,
@@ -332,29 +330,29 @@ where
     fn new(chunk_pos: ChunkPos<CHUNK_SIZE>) -> Self {
         Self {
             bounds: chunk_pos.grid(),
-            triangulation: SpaceTriangulation::new(),
+            mesh: SpaceMesh::new(),
             render_data: D::default(),
             tile_dependencies: Vec::new(),
             block_dependencies: Vec::new(),
         }
     }
 
-    pub fn triangulation(&self) -> &SpaceTriangulation<Vert> {
-        &self.triangulation
+    pub fn mesh(&self) -> &SpaceMesh<Vert> {
+        &self.mesh
     }
 
-    fn update_triangulation(
+    fn recompute_mesh(
         &mut self,
         chunk_todo: &mut ChunkTodo,
         space: &Space,
         options: &TriangulatorOptions,
-        block_triangulations: &[BlockTriangulation<Vert, Tex::Tile>],
+        block_meshes: &[BlockMesh<Vert, Tex::Tile>],
         block_versioning: &[u32],
     ) {
-        let mut block_provider = TrackingBlockProvider::new(block_triangulations);
+        let mut block_provider = TrackingBlockProvider::new(block_meshes);
 
         let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
-        self.triangulation
+        self.mesh
             .compute(space, self.bounds, options, &mut block_provider);
 
         // Logging
@@ -362,7 +360,7 @@ where
             let duration_ms = Instant::now().duration_since(start).as_secs_f32() * 1000.0;
 
             let chunk_origin = self.bounds.lower_bounds();
-            let vertices = self.triangulation.vertices().len();
+            let vertices = self.mesh.vertices().len();
             if vertices == 0 {
                 log::trace!(
                     "triangulated {:?}+ in {:.3} ms, 0",
@@ -381,15 +379,15 @@ where
         }
 
         // Stash all the texture tiles so they aren't deallocated out from under us.
-        // TODO: Maybe we should have something more like a Vec<Rc<BlockTriangulation>>
+        // TODO: Maybe we should have something more like a Vec<Rc<BlockMesh>>
         self.tile_dependencies.clear();
         self.tile_dependencies.extend(
             block_provider
                 .seen()
-                .flat_map(|index| block_triangulations[index].textures().iter())
+                .flat_map(|index| block_meshes[index].textures().iter())
                 .cloned(),
         );
-        // Record the block triangulations we used.
+        // Record the block meshes we incorporated into the chunk mesh.
         self.block_dependencies.clear();
         self.block_dependencies.extend(
             block_provider
@@ -397,7 +395,7 @@ where
                 .map(|index| (index as BlockIndex, block_versioning[index])),
         );
 
-        chunk_todo.update_triangulation = false;
+        chunk_todo.recompute_mesh = false;
     }
 
     /// Sort the existing indices of `self.transparent_range(DepthOrdering::Within)` for
@@ -408,7 +406,7 @@ where
     /// Returns whether anything was done, i.e. whether the new indices should be copied
     /// to the GPU.
     pub fn depth_sort_for_view(&mut self, view_position: Point3<Vert::Coordinate>) -> bool {
-        self.triangulation.depth_sort_for_view(view_position)
+        self.mesh.depth_sort_for_view(view_position)
     }
 
     fn stale_blocks(&self, versions: &[u32]) -> bool {
@@ -419,20 +417,20 @@ where
     }
 }
 
-/// Helper for [`Chunk`]'s dependency tracking.
+/// Logs blocks used in a [`ChunkMesh`] so we know to rebuild it if the block changes.
 struct TrackingBlockProvider<'a, Vert, Tile> {
-    block_triangulations: &'a [BlockTriangulation<Vert, Tile>],
+    block_meshes: &'a [BlockMesh<Vert, Tile>],
     seen: BitVec,
 }
 impl<'a, Vert, Tile> TrackingBlockProvider<'a, Vert, Tile> {
-    fn new(block_triangulations: &'a [BlockTriangulation<Vert, Tile>]) -> Self {
+    fn new(block_meshes: &'a [BlockMesh<Vert, Tile>]) -> Self {
         Self {
-            block_triangulations,
+            block_meshes,
             seen: BitVec::with_capacity(256), // TODO: cleverer choice
         }
     }
 
-    /// Return the indices of all the block triangulations that were used.
+    /// Return the indices of all the block meshes that were used.
     ///
     /// Note: In principle, the value type should be [`BlockIndex`], but in practice it
     /// is used as an array index so this avoids writing a double conversion.
@@ -440,22 +438,22 @@ impl<'a, Vert, Tile> TrackingBlockProvider<'a, Vert, Tile> {
         self.seen.iter_ones()
     }
 }
-impl<'a, Vert, Tile> BlockTriangulationProvider<'a, Vert, Tile>
+impl<'a, Vert, Tile> BlockMeshProvider<'a, Vert, Tile>
     for &mut TrackingBlockProvider<'a, Vert, Tile>
 {
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<Vert, Tile>> {
+    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<Vert, Tile>> {
         let index = usize::from(index);
         if index >= self.seen.len() {
             self.seen.resize(index + 1, false);
         }
         self.seen.set(index, true);
-        self.block_triangulations.get(index)
+        self.block_meshes.get(index)
     }
 }
 
-/// [`ChunkedSpaceTriangulation`]'s set of things that need recomputing.
+/// [`ChunkedSpaceMesh`]'s set of things that need recomputing.
 #[derive(Debug, Default)]
-struct CstTodo<const CHUNK_SIZE: GridCoordinate> {
+struct CsmTodo<const CHUNK_SIZE: GridCoordinate> {
     all_blocks_and_chunks: bool,
     blocks: HashSet<BlockIndex>,
     /// Membership in this table indicates that the chunk *exists;* todos for chunks
@@ -463,7 +461,7 @@ struct CstTodo<const CHUNK_SIZE: GridCoordinate> {
     chunks: HashMap<ChunkPos<CHUNK_SIZE>, ChunkTodo>,
 }
 
-impl<const CHUNK_SIZE: GridCoordinate> CstTodo<CHUNK_SIZE> {
+impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
     fn modify_block_and_adjacent<F>(&mut self, cube: GridPoint, mut f: F)
     where
         F: FnMut(&mut ChunkTodo),
@@ -485,7 +483,7 @@ impl<const CHUNK_SIZE: GridCoordinate> CstTodo<CHUNK_SIZE> {
 }
 
 /// [`Listener`] adapter for [`CstTodo`].
-struct TodoListener<const CHUNK_SIZE: GridCoordinate>(Weak<Mutex<CstTodo<CHUNK_SIZE>>>);
+struct TodoListener<const CHUNK_SIZE: GridCoordinate>(Weak<Mutex<CsmTodo<CHUNK_SIZE>>>);
 
 impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CHUNK_SIZE> {
     fn receive(&self, message: SpaceChange) {
@@ -499,7 +497,7 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
                     }
                     SpaceChange::Block(p) => {
                         todo.modify_block_and_adjacent(p, |chunk_todo| {
-                            chunk_todo.update_triangulation = true;
+                            chunk_todo.recompute_mesh = true;
                         });
                     }
                     SpaceChange::Lighting(_p) => {
@@ -528,12 +526,12 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
 /// What might be dirty about a single chunk.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 struct ChunkTodo {
-    update_triangulation: bool,
+    recompute_mesh: bool,
 }
 
 impl ChunkTodo {
     const CLEAN: Self = Self {
-        update_triangulation: false,
+        recompute_mesh: false,
     };
 }
 
@@ -552,7 +550,7 @@ mod tests {
     const CHUNK_SIZE: GridCoordinate = 16;
 
     fn read_todo_chunks(
-        todo: &Mutex<CstTodo<CHUNK_SIZE>>,
+        todo: &Mutex<CsmTodo<CHUNK_SIZE>>,
     ) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
         let mut v = todo
             .lock()
@@ -569,7 +567,7 @@ mod tests {
 
     #[test]
     fn update_adjacent_chunk_positive() {
-        let todo: Arc<Mutex<CstTodo<CHUNK_SIZE>>> = Default::default();
+        let todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>> = Default::default();
         let listener = TodoListener(Arc::downgrade(&todo));
         todo.lock().unwrap().chunks.extend(vec![
             (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
@@ -588,14 +586,14 @@ mod tests {
                 (
                     ChunkPos::new(0, 0, 0),
                     ChunkTodo {
-                        update_triangulation: true,
+                        recompute_mesh: true,
                         ..ChunkTodo::CLEAN
                     }
                 ),
                 (
                     ChunkPos::new(1, 0, 0),
                     ChunkTodo {
-                        update_triangulation: true,
+                        recompute_mesh: true,
                         ..ChunkTodo::CLEAN
                     }
                 ),
@@ -605,7 +603,7 @@ mod tests {
 
     #[test]
     fn update_adjacent_chunk_negative() {
-        let todo: Arc<Mutex<CstTodo<CHUNK_SIZE>>> = Default::default();
+        let todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>> = Default::default();
         let listener = TodoListener(Arc::downgrade(&todo));
         todo.lock().unwrap().chunks.extend(vec![
             (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
@@ -623,14 +621,14 @@ mod tests {
                 (
                     ChunkPos::new(-1, 0, 0),
                     ChunkTodo {
-                        update_triangulation: true,
+                        recompute_mesh: true,
                         ..ChunkTodo::CLEAN
                     }
                 ),
                 (
                     ChunkPos::new(0, 0, 0),
                     ChunkTodo {
-                        update_triangulation: true,
+                        recompute_mesh: true,
                         ..ChunkTodo::CLEAN
                     }
                 ),
@@ -641,7 +639,7 @@ mod tests {
 
     #[test]
     fn todo_ignores_absent_chunks() {
-        let todo: Arc<Mutex<CstTodo<CHUNK_SIZE>>> = Default::default();
+        let todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>> = Default::default();
         let listener = TodoListener(Arc::downgrade(&todo));
 
         let p = GridPoint::new(1, 1, 1) * (CHUNK_SIZE / 2);
@@ -659,7 +657,7 @@ mod tests {
             vec![(
                 ChunkPos::new(0, 0, 0),
                 ChunkTodo {
-                    update_triangulation: true,
+                    recompute_mesh: true,
                     ..ChunkTodo::CLEAN
                 }
             ),],
@@ -671,16 +669,14 @@ mod tests {
         universe: Universe,
         space: URef<Space>,
         camera: Camera,
-        cst: ChunkedSpaceTriangulation<(), BlockVertex, NoTextures, 16>,
+        cst: ChunkedSpaceMesh<(), BlockVertex, NoTextures, 16>,
     }
 
     impl CstTester {
         fn new(space: Space) -> Self {
             let mut universe = Universe::new();
             let space_ref = universe.insert_anonymous(space);
-            let cst = ChunkedSpaceTriangulation::<(), BlockVertex, NoTextures, 16>::new(
-                space_ref.clone(),
-            );
+            let cst = ChunkedSpaceMesh::<(), BlockVertex, NoTextures, 16>::new(space_ref.clone());
             let camera = Camera::new(
                 GraphicsOptions::default(),
                 Viewport {
@@ -704,8 +700,8 @@ mod tests {
             indices_only_updater: IF,
         ) -> (CstUpdateInfo, ChunkPos<16>)
         where
-            CF: FnMut(&SpaceTriangulation<BlockVertex>, &mut ()),
-            IF: FnMut(&SpaceTriangulation<BlockVertex>, &mut ()),
+            CF: FnMut(&SpaceMesh<BlockVertex>, &mut ()),
+            IF: FnMut(&SpaceMesh<BlockVertex>, &mut ()),
         {
             self.cst.update_blocks_and_some_chunks(
                 &self.camera,

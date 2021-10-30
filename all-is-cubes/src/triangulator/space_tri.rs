@@ -8,38 +8,38 @@ use std::ops::Range;
 
 use crate::math::{Face, FaceMap, GridCoordinate, GridRotation};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
-use crate::triangulator::{BlockTriangulation, GfxVertex, TriangulatorOptions};
+use crate::triangulator::{BlockMesh, GfxVertex, TriangulatorOptions};
 
 /// Computes a triangle mesh of a [`Space`].
 ///
 /// Shorthand for
-/// <code>[SpaceTriangulation::new()].[compute](SpaceTriangulation::compute)(space, bounds, block_triangulations)</code>.
+/// <code>[SpaceMesh::new()].[compute](SpaceMesh::compute)(space, bounds, block_meshes)</code>.
 #[inline]
 pub fn triangulate_space<'p, V, T, P>(
     space: &Space,
     bounds: Grid,
     options: &TriangulatorOptions,
-    block_triangulations: P,
-) -> SpaceTriangulation<V>
+    block_meshes: P,
+) -> SpaceMesh<V>
 where
     V: GfxVertex + 'p,
-    P: BlockTriangulationProvider<'p, V, T>,
+    P: BlockMeshProvider<'p, V, T>,
     T: 'p,
 {
-    let mut this = SpaceTriangulation::new();
-    this.compute(space, bounds, options, block_triangulations);
+    let mut this = SpaceMesh::new();
+    this.compute(space, bounds, options, block_meshes);
     this
 }
 
 /// Container for a triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
 ///
-/// A `SpaceTriangulation` may be used multiple times as a [`Space`] is modified.
+/// A [`SpaceMesh`] may be used multiple times as a [`Space`] is modified.
 /// Currently, the only benefit of this is avoiding reallocating memory.
 ///
 /// Type parameter `V` is the type of triangle vertices.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SpaceTriangulation<V> {
+pub struct SpaceMesh<V> {
     vertices: Vec<V>,
     indices: Vec<u32>,
     /// Where in `indices` the triangles with no partial transparency are arranged.
@@ -50,8 +50,8 @@ pub struct SpaceTriangulation<V> {
     // TODO: Shouldn't this also be retaining the texture tiles? Right now the caller has to.
 }
 
-impl<V> SpaceTriangulation<V> {
-    /// Construct an empty `SpaceTriangulation` which draws nothing.
+impl<V> SpaceMesh<V> {
+    /// Construct an empty [`SpaceMesh`] which draws nothing.
     #[inline]
     pub const fn new() -> Self {
         // We need a Range constant to be able to initialize the array with copies of it.
@@ -122,17 +122,17 @@ impl<V> SpaceTriangulation<V> {
     }
 }
 
-impl<V: GfxVertex> SpaceTriangulation<V> {
+impl<V: GfxVertex> SpaceMesh<V> {
     /// Computes triangles for the contents of `space` within `bounds` and stores them
     /// in `self`.
     ///
-    /// `block_triangulations` should be the result of [`triangulate_blocks`] or equivalent,
+    /// `block_meshes` should be the result of [`triangulate_blocks`] or equivalent,
     /// and must be up-to-date with the [`Space`]'s blocks or the result will be inaccurate
     /// and may contain severe lighting errors.
     ///
     /// Note about edge case behavior: This algorithm does not use the [`Space`]'s block data
     /// at all. Thus, it always has a consistent interpretation based on
-    /// `block_triangulations` (as opposed to, for example, using face opacity data not the
+    /// `block_meshes` (as opposed to, for example, using face opacity data not the
     /// same as the meshes and thus producing a rendering with gaps in it).
     ///
     /// [`triangulate_blocks`]: super::triangulate_blocks
@@ -141,15 +141,15 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
         space: &Space,
         bounds: Grid,
         options: &TriangulatorOptions,
-        mut block_triangulations: P,
+        mut block_meshes: P,
     ) where
-        P: BlockTriangulationProvider<'p, V, T>,
+        P: BlockMeshProvider<'p, V, T>,
         V: 'p,
         T: 'p,
     {
         // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
         // If we do this, we'd make it the provider's responsibility
-        let empty_render = BlockTriangulation::<V, T>::default();
+        let empty_render = BlockMesh::<V, T>::default();
 
         // use the buffer but not the existing data
         self.vertices.clear();
@@ -162,7 +162,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
         for cube in bounds.interior_iter() {
             let precomputed = space
                 .get_block_index(cube)
-                .and_then(|index| block_triangulations.get(index))
+                .and_then(|index| block_meshes.get(index))
                 .unwrap_or(&empty_render);
 
             if precomputed.is_empty() {
@@ -186,8 +186,8 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
             };
 
             for face in Face::ALL_SEVEN {
-                let face_triangulation = &precomputed.faces[face];
-                if face_triangulation.is_empty() {
+                let face_mesh = &precomputed.faces[face];
+                if face_mesh.is_empty() {
                     // Nothing to do; skip adjacent_cube lookup.
                     continue;
                 }
@@ -195,7 +195,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 let adjacent_cube = cube + face.normal_vector();
                 if space
                     .get_block_index(adjacent_cube)
-                    .and_then(|index| block_triangulations.get(index))
+                    .and_then(|index| block_meshes.get(index))
                     .map(|bt| bt.faces[face.opposite()].fully_opaque)
                     .unwrap_or(false)
                 {
@@ -208,7 +208,7 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                 let index_offset: u32 = index_offset_usize
                     .try_into()
                     .expect("vertex index overflow");
-                self.vertices.extend(face_triangulation.vertices.iter());
+                self.vertices.extend(face_mesh.vertices.iter());
                 for vertex in &mut self.vertices[index_offset_usize..] {
                     vertex.instantiate_vertex(
                         inst,
@@ -219,14 +219,10 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
                         },
                     );
                 }
-                self.indices.extend(
-                    face_triangulation
-                        .indices_opaque
-                        .iter()
-                        .map(|i| i + index_offset),
-                );
+                self.indices
+                    .extend(face_mesh.indices_opaque.iter().map(|i| i + index_offset));
                 transparent_indices.extend(
-                    face_triangulation
+                    face_mesh
                         .indices_transparent
                         .iter()
                         .map(|i| i + index_offset),
@@ -347,26 +343,26 @@ impl<V: GfxVertex> SpaceTriangulation<V> {
     }
 }
 
-impl<GV> Default for SpaceTriangulation<GV> {
+impl<GV> Default for SpaceMesh<GV> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Source of [`BlockTriangulation`] values for [`SpaceTriangulation::compute`].
+/// Source of [`BlockMesh`] values for [`SpaceMesh::compute`].
 ///
-/// This trait allows the caller of [`SpaceTriangulation::compute`] to provide an
+/// This trait allows the caller of [`SpaceMesh::compute`] to provide an
 /// implementation which records which blocks were actually used, for precise
 /// invalidation.
 ///
 /// TODO: Is this actually a useful interface, or should we just have a separate
 /// callback for the recording?
-pub trait BlockTriangulationProvider<'a, V, T> {
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<V, T>>;
+pub trait BlockMeshProvider<'a, V, T> {
+    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>>;
 }
-impl<'a, V, T> BlockTriangulationProvider<'a, V, T> for &'a [BlockTriangulation<V, T>] {
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockTriangulation<V, T>> {
+impl<'a, V, T> BlockMeshProvider<'a, V, T> for &'a [BlockMesh<V, T>] {
+    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>> {
         <[_]>::get(self, usize::from(index))
     }
 }

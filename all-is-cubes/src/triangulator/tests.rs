@@ -13,7 +13,7 @@ use crate::content::make_some_blocks;
 use crate::math::{Face, GridRotation};
 use crate::math::{Face::*, FaceMap, FreeCoordinate, GridPoint, Rgba};
 use crate::space::{Grid, Space, SpacePhysics};
-use crate::triangulator::BlockTriangulation;
+use crate::triangulator::BlockMesh;
 use crate::universe::Universe;
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
@@ -40,7 +40,7 @@ fn v_t(position: [FreeCoordinate; 3], face: Face, texture: [TextureCoordinate; 3
 }
 
 /// Test helper to call `triangulate_block` alone without a `Space`.
-fn test_triangulate_block(block: Block) -> BlockTriangulation<BlockVertex, TestTextureTile> {
+fn test_triangulate_block(block: Block) -> BlockMesh<BlockVertex, TestTextureTile> {
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
@@ -53,9 +53,7 @@ fn test_triangulate_block(block: Block) -> BlockTriangulation<BlockVertex, TestT
 
 /// Test helper to call `triangulate_block` alone without a `Space`,
 /// and with the transparency option set to `Threshold(0.5)`.
-fn test_triangulate_block_threshold(
-    block: Block,
-) -> BlockTriangulation<BlockVertex, TestTextureTile> {
+fn test_triangulate_block_threshold(block: Block) -> BlockMesh<BlockVertex, TestTextureTile> {
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
@@ -71,15 +69,15 @@ fn triangulate_blocks_and_space(
     space: &Space,
 ) -> (
     TestTextureAllocator,
-    BlockTriangulations<BlockVertex, TestTextureTile>,
-    SpaceTriangulation<BlockVertex>,
+    BlockMeshes<BlockVertex, TestTextureTile>,
+    SpaceMesh<BlockVertex>,
 ) {
     let options = &TriangulatorOptions::new(&GraphicsOptions::default());
     let mut tex = TestTextureAllocator::new();
-    let block_triangulations = triangulate_blocks(space, &mut tex, options);
-    let space_triangulation: SpaceTriangulation<BlockVertex> =
-        triangulate_space(space, space.grid(), options, &*block_triangulations);
-    (tex, block_triangulations, space_triangulation)
+    let block_meshes = triangulate_blocks(space, &mut tex, options);
+    let space_mesh: SpaceMesh<BlockVertex> =
+        triangulate_space(space, space.grid(), options, &*block_meshes);
+    (tex, block_meshes, space_mesh)
 }
 
 fn non_uniform_fill(cube: GridPoint) -> &'static Block {
@@ -96,12 +94,12 @@ fn excludes_hidden_faces_of_blocks() {
     space
         .fill(space.grid(), |p| Some(non_uniform_fill(p)))
         .unwrap();
-    let (_, _, space_tri) = triangulate_blocks_and_space(&space);
+    let (_, _, space_mesh) = triangulate_blocks_and_space(&space);
 
     // The space rendering should be a 2×2×2 cube of tiles, without any hidden interior faces.
     assert_eq!(
         Vec::<&BlockVertex>::new(),
-        space_tri
+        space_mesh
             .vertices()
             .iter()
             .filter(|vertex| vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
@@ -109,7 +107,7 @@ fn excludes_hidden_faces_of_blocks() {
         "found an interior point"
     );
     assert_eq!(
-        space_tri.vertices().len(),
+        space_mesh.vertices().len(),
         4 /* vertices per face */
         * 4 /* block faces per exterior side of space */
         * 6, /* sides of space */
@@ -122,12 +120,12 @@ fn excludes_hidden_faces_of_blocks() {
 fn no_panic_on_missing_blocks() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    let block_triangulations: BlockTriangulations<BlockVertex, _> = triangulate_blocks(
+    let block_meshes: BlockMeshes<BlockVertex, _> = triangulate_blocks(
         &space,
         &mut TestTextureAllocator::new(),
         &TriangulatorOptions::dont_care_for_test(),
     );
-    assert_eq!(block_triangulations.len(), 1); // check our assumption
+    assert_eq!(block_meshes.len(), 1); // check our assumption
 
     // This should not panic; visual glitches are preferable to failure.
     space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
@@ -135,7 +133,7 @@ fn no_panic_on_missing_blocks() {
         &space,
         space.grid(),
         &TriangulatorOptions::dont_care_for_test(),
-        &*block_triangulations,
+        &*block_meshes,
     );
 }
 
@@ -168,7 +166,7 @@ fn trivial_voxels_equals_atom() {
 
 /// [`triangulate_space`] of a 1×1×1 space has the same geometry as the contents.
 #[test]
-fn space_tri_equals_block_tri() {
+fn space_mesh_equals_block_mesh() {
     // Construct recursive block.
     let resolution = 4;
     let mut u = Universe::new();
@@ -183,14 +181,14 @@ fn space_tri_equals_block_tri() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &recursive_block).unwrap();
 
-    let (tex, block_triangulations, space_rendered) = triangulate_blocks_and_space(&outer_space);
+    let (tex, block_meshes, space_rendered) = triangulate_blocks_and_space(&outer_space);
 
-    eprintln!("{:#?}", block_triangulations);
+    eprintln!("{:#?}", block_meshes);
     eprintln!("{:#?}", space_rendered);
 
     assert_eq!(
         space_rendered.vertices().to_vec(),
-        block_triangulations[0]
+        block_meshes[0]
             .faces
             .iter()
             .flat_map(|(_face, face_render)| face_render.vertices.clone().into_iter())
@@ -372,7 +370,7 @@ fn atom_transparency() {
 
 #[test]
 fn atom_transparency_thresholded() {
-    // Threshold means that triangulations of partial transparency should be exactly the same as 0 or 1
+    // Threshold means that partial transparency should produce exactly the same mesh as 0 or 1
     assert_eq!(
         test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.25))).faces,
         test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.0))).faces,
@@ -385,7 +383,7 @@ fn atom_transparency_thresholded() {
     // TODO: also test voxels -- including self-occlusion (thresholded voxel in front of truly opaque voxel)
 }
 
-/// Test [`BlockTriangulation::fully_opaque`] results from basic voxels.
+/// Test [`BlockMesh::fully_opaque`] results from basic voxels.
 #[test]
 fn fully_opaque_voxels() {
     let resolution = 8;
@@ -418,7 +416,7 @@ fn fully_opaque_voxels() {
     );
 }
 
-/// Test [`BlockTriangulation::fully_opaque`] when the voxels are all individually opaque,
+/// Test [`BlockMesh::fully_opaque`] when the voxels are all individually opaque,
 /// but don't fill the cube.
 #[test]
 fn fully_opaque_partial_block() {
@@ -502,19 +500,19 @@ fn handling_allocation_failure() {
     // TODO: Once we support tiling for high resolution blocks, make this a partial failure.
     let capacity = 0;
     tex.set_capacity(capacity);
-    let block_triangulations: BlockTriangulations<BlockVertex, _> =
+    let block_meshes: BlockMeshes<BlockVertex, _> =
         triangulate_blocks(&space, &mut tex, &TriangulatorOptions::dont_care_for_test());
 
     // Check results.
     assert_eq!(tex.count_allocated(), capacity);
-    assert_eq!(1, block_triangulations.len());
-    // TODO: Check that the triangulation includes the failure marker/fallback color.
-    let _complex_block_triangulation = &block_triangulations[0];
+    assert_eq!(1, block_meshes.len());
+    // TODO: Check that the mesh includes the failure marker/fallback color.
+    let _complex_block_mesh = &block_meshes[0];
 }
 
 #[test]
-fn space_triangulation_empty() {
-    let t = SpaceTriangulation::<BlockVertex>::new();
+fn space_mesh_empty() {
+    let t = SpaceMesh::<BlockVertex>::new();
     assert!(t.is_empty());
     assert_eq!(t.vertices(), &[]);
     // type annotation to prevent spurious inference failures in the presence

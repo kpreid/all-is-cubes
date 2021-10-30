@@ -12,6 +12,11 @@
 
 - `all_is_cubes` library:
     * The new minimum supported Rust version is 1.56.0 (2021 edition).
+    * Breaking: All types with `Triangulation` in the name now use `Mesh` instead.
+        * `BlockTriangulation` → `BlockMesh`
+        * `BlockTriangulations` → `BlockMeshes`
+        * `SpaceTriangulation` → `SpaceMesh`
+        * `BlockTriangulationProvider` → `BlockMeshProvider`
     * Breaking: The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
     * Breaking: `GLRenderer::new()` now expects a `StandardCameras` (instead of the components of one).
     * Breaking: `AllIsCubesAppState::update_cursor()` now expects a `&StandardCameras` instead of two `Camera`s.

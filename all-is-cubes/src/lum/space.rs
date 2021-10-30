@@ -33,9 +33,7 @@ use crate::lum::{wireframe_vertices, GraphicsResourceError};
 use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
 use crate::raycast::Face;
 use crate::space::{Grid, Space, SpaceChange};
-use crate::triangulator::{
-    ChunkTriangulation, ChunkedSpaceTriangulation, DepthOrdering, SpaceTriangulation,
-};
+use crate::triangulator::{ChunkMesh, ChunkedSpaceMesh, DepthOrdering, SpaceMesh};
 use crate::universe::URef;
 use crate::util::{CustomFormat, StatusText};
 
@@ -52,7 +50,7 @@ pub struct SpaceRenderer<Backend: AicLumBackend> {
     todo: Arc<Mutex<SpaceRendererTodo>>,
     block_texture: Option<LumAtlasAllocator<Backend>>,
     light_texture: Option<SpaceLightTexture<Backend>>,
-    cst: ChunkedSpaceTriangulation<
+    csm: ChunkedSpaceMesh<
         ChunkData<Backend>,
         LumBlockVertex,
         LumAtlasAllocator<Backend>,
@@ -78,14 +76,14 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
             todo: todo_rc,
             block_texture: None,
             light_texture: None,
-            cst: ChunkedSpaceTriangulation::new(space),
+            csm: ChunkedSpaceMesh::new(space),
             debug_chunk_boxes_tess: None,
         }
     }
 
     /// Returns a reference to the [`Space`] this draws.
     pub fn space(&self) -> &URef<Space> {
-        self.cst.space()
+        self.csm.space()
     }
 
     /// Prepare to draw a frame, performing the steps that must be done while holding a
@@ -103,7 +101,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         let mut todo = self.todo.lock().unwrap();
 
         let space = &*self
-            .cst
+            .csm
             .space()
             .try_borrow()
             .expect("TODO: return a trivial result instead of panic.");
@@ -131,23 +129,23 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         }
 
         // Update chunks
-        let (cst_info, view_chunk) = self.cst.update_blocks_and_some_chunks(
+        let (cst_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
             camera,
             block_texture_allocator,
-            |triangulation, render_data| {
-                update_chunk_tess(context, triangulation, render_data);
+            |mesh, render_data| {
+                update_chunk_tess(context, mesh, render_data);
             },
-            |triangulation, render_data| {
+            |mesh, render_data| {
                 // Disable dynamic depth sorting because luminance bug
                 // https://github.com/phaazon/luminance-rs/issues/483
                 // means indices_mut() can fail and corrupt other buffers.
                 // TODO: Reenble this and also in-place chunk updating when bug is fixed
                 if !cfg!(target_family = "wasm") {
                     if let Some(tess) = render_data {
-                        let range = triangulation.transparent_range(DepthOrdering::Within);
+                        let range = mesh.transparent_range(DepthOrdering::Within);
                         tess.indices_mut()
                             .expect("failed to map indices for depth sorting")[range.clone()]
-                        .copy_from_slice(&triangulation.indices()[range]);
+                        .copy_from_slice(&mesh.indices()[range]);
                     }
                 }
             },
@@ -160,7 +158,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         if graphics_options.debug_chunk_boxes {
             if self.debug_chunk_boxes_tess.is_none() {
                 let mut v = Vec::new();
-                for chunk in self.cst.chunk_chart().chunks(view_chunk) {
+                for chunk in self.csm.chunk_chart().chunks(view_chunk) {
                     wireframe_vertices(&mut v, palette::DEBUG_CHUNK_MAJOR, Aab::from(chunk.grid()));
                 }
 
@@ -202,7 +200,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         Ok(SpaceRendererOutput {
             data: SpaceRendererOutputData {
                 camera: camera.clone(),
-                cst: &self.cst,
+                cst: &self.csm,
                 debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
                 view_chunk,
                 info: SpaceRenderInfo {
@@ -231,7 +229,7 @@ pub(super) struct SpaceRendererOutput<'a, Backend: AicLumBackend> {
 /// The portion of [`SpaceRendererOutput`] which does not vary with the pipeline progress.
 pub(super) struct SpaceRendererOutputData<'a, Backend: AicLumBackend> {
     pub(super) camera: Camera,
-    cst: &'a ChunkedSpaceTriangulation<
+    cst: &'a ChunkedSpaceMesh<
         ChunkData<Backend>,
         LumBlockVertex,
         LumAtlasAllocator<Backend>,
@@ -381,9 +379,9 @@ where
 /// Performance info from a [`SpaceRenderer`] drawing one frame.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SpaceRenderInfo {
-    /// How many chunks were recomputed this frame.
+    /// How many chunk meshes were recomputed this frame.
     pub chunk_update_count: usize,
-    /// How many block triangulations were recomputed this time.
+    /// How many block meshes were recomputed this frame.
     pub block_update_count: usize,
     pub chunks_drawn: usize,
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
@@ -441,12 +439,7 @@ impl SpaceRendererPass {
 
 /// Render chunk and return the number of quads drawn.
 fn render_chunk_tess<Backend: AicLumBackend, E>(
-    chunk: &ChunkTriangulation<
-        ChunkData<Backend>,
-        LumBlockVertex,
-        LumAtlasAllocator<Backend>,
-        CHUNK_SIZE,
-    >,
+    chunk: &ChunkMesh<ChunkData<Backend>, LumBlockVertex, LumAtlasAllocator<Backend>, CHUNK_SIZE>,
     tess_gate: &mut TessGate<'_, Backend>,
     pass: SpaceRendererPass,
     ordering: DepthOrdering,
@@ -454,8 +447,8 @@ fn render_chunk_tess<Backend: AicLumBackend, E>(
     let mut count = 0;
     if let Some(tess) = &chunk.render_data {
         let range = match pass {
-            SpaceRendererPass::Opaque => chunk.triangulation().opaque_range(),
-            SpaceRendererPass::Transparent => chunk.triangulation().transparent_range(ordering),
+            SpaceRendererPass::Opaque => chunk.mesh().opaque_range(),
+            SpaceRendererPass::Transparent => chunk.mesh().transparent_range(ordering),
         };
         if range.is_empty() {
             return Ok(0);
@@ -471,15 +464,15 @@ fn render_chunk_tess<Backend: AicLumBackend, E>(
 
 fn update_chunk_tess<C>(
     context: &mut C,
-    new_triangulation: &SpaceTriangulation<LumBlockVertex>,
+    new_mesh: &SpaceMesh<LumBlockVertex>,
     tess_option: &mut ChunkData<C::Backend>,
 ) where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
 {
     let existing_tess_size_ok = if let Some(tess) = tess_option.as_ref() {
-        tess.vert_nb() == new_triangulation.vertices().len()
-            && tess.idx_nb() == new_triangulation.indices().len()
+        tess.vert_nb() == new_mesh.vertices().len()
+            && tess.idx_nb() == new_mesh.indices().len()
             // TODO: workaround for https://github.com/phaazon/luminance-rs/issues/483
             // which makes modifying existing Tesses fail
             && !cfg!(target_family = "wasm")
@@ -492,24 +485,24 @@ fn update_chunk_tess<C>(
     }
 
     // TODO: replace unwrap()s with an error logging/flagging mechanism that can do partial drawing
-    if new_triangulation.is_empty() {
+    if new_mesh.is_empty() {
         // Render zero vertices by not rendering anything.
         *tess_option = None;
     } else if let Some(tess) = tess_option.as_mut() {
         // We already have a buffer, and it is a matching length.
         tess.vertices_mut()
             .expect("failed to map vertices for copying")
-            .copy_from_slice(new_triangulation.vertices());
+            .copy_from_slice(new_mesh.vertices());
         tess.indices_mut()
             .expect("failed to map indices for copying")
-            .copy_from_slice(new_triangulation.indices());
+            .copy_from_slice(new_mesh.indices());
     } else {
         // Allocate and populate new buffer.
         *tess_option = Some(
             context
                 .new_tess()
-                .set_vertices(new_triangulation.vertices())
-                .set_indices(new_triangulation.indices())
+                .set_vertices(new_mesh.vertices())
+                .set_indices(new_mesh.indices())
                 .set_mode(Mode::Triangle)
                 .build()
                 .unwrap(),
