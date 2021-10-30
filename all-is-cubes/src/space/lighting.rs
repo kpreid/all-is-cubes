@@ -26,6 +26,20 @@ const RAY_DIRECTION_STEP: isize = 5;
 const RAY_CUBE_EDGE: usize = (RAY_DIRECTION_STEP as usize) * 2 + 1;
 const ALL_RAYS_COUNT: usize = RAY_CUBE_EDGE.pow(3) - (RAY_CUBE_EDGE - 2).pow(3);
 
+/// Limit on light computation per one [`Space::update_lighting_from_queue`] call.
+///
+/// The unit of measure is one raycast step; other operations are arbitrarily assigned
+/// higher cost values. (TODO: Profile to assign more consistent cost values.)
+///
+/// TODO: This should be an option configured for the Universe/Space, so that it is
+/// both adjustable and deterministic/platform-independent.
+/// For now, tweaked in a "works okay on my machine" way.
+const MAXIMUM_LIGHT_COMPUTATION_COST: usize = if cfg!(target_family = "wasm") {
+    100_000
+} else {
+    400_000
+};
+
 #[derive(Debug)]
 struct LightRayData {
     ray: Ray,
@@ -100,7 +114,7 @@ impl Space {
                 let (difference, cube_cost, _) = self.update_lighting_now_on(cube);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
-                if cost >= 400_000 {
+                if cost >= MAXIMUM_LIGHT_COMPUTATION_COST {
                     break;
                 }
             }
