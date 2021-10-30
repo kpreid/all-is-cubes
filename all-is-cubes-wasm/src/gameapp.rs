@@ -1,11 +1,13 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use js_sys::Error;
-use luminance_web_sys::WebSysWebGL2Surface;
 use std::cell::{BorrowMutError, RefCell};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
+
+use js_sys::Error;
+use gloo_timers::future::TimeoutFuture;
+use luminance_web_sys::WebSysWebGL2Surface;
 use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
@@ -22,9 +24,14 @@ use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl};
 use crate::web_glue::{add_event_listener, get_mandatory_element};
 
+/// Yield to the event loop to ensure responsiveness while we're initializing.
+async fn yield_arbitrary() {
+    TimeoutFuture::new(1).await;
+}
+
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
-pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
+pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     // Note: This used to be in a `#[wasm_bindgen(start)]` function, but that stopped working.
     // Rather than stop to figure out what went wrong even though I Didn't Change Anything,
     // I moved it here since this is our sole entry point in practice.
@@ -38,15 +45,8 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .document()
         .expect("missing `document`");
 
-    // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them.
+    // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them?
     let static_dom = StaticDom::new(&document)?;
-
-    // TODO: This progress message will never be seen more than instantaneously because
-    // the expensive actions (worldgen, shader compilation...) are done synchronously after
-    // it.
-    static_dom
-        .scene_info_text_node
-        .append_data("\nRusting...")?;
 
     let OptionsInUrl {
         template,
@@ -60,10 +60,26 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
             .as_bytes(),
     );
 
+    static_dom
+        .scene_info_text_node
+        .append_data("\nInitializing application...")?;
+    yield_arbitrary().await;
+    // The main cost of this is constructing the `Vui` instance.
     let mut app = AllIsCubesAppState::new();
-    app.set_universe(template.build().expect("universe template error"));
+
+    static_dom
+        .scene_info_text_node
+        .append_data("\nConstructing universe...")?;
+    yield_arbitrary().await;
+    let universe = template.build().expect("universe template error");
+    
+    app.set_universe(universe);
     app.graphics_options_mut().set(graphics_options);
 
+    static_dom
+        .scene_info_text_node
+        .append_data("\nInitializing WebGL...")?;
+    yield_arbitrary().await;
     let surface = WebSysWebGL2Surface::from_canvas_with_params(
         web_sys::window().unwrap(), // TODO messy
         document,
@@ -74,14 +90,18 @@ pub fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     )
     .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
 
+    static_dom
+        .scene_info_text_node
+        .append_data("\nLoading shaders...")?;
+    yield_arbitrary().await;
     let renderer = GLRenderer::new(
         surface,
         StandardCameras::from_app_state(&app, gui_helpers.canvas_helper().viewport()).unwrap(),
     )
     .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
 
-    static_dom.scene_info_text_node.append_data("\nGL ready.")?;
-
+    static_dom.scene_info_text_node.append_data("\nFinal initialization...")?;
+    yield_arbitrary().await;
     let root = WebGameRoot::new(gui_helpers, static_dom, app, renderer);
 
     root.borrow().start_loop();

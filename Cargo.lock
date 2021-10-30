@@ -134,6 +134,7 @@ dependencies = [
  "console_log",
  "form_urlencoded",
  "getrandom 0.2.3",
+ "gloo-timers",
  "instant",
  "js-sys",
  "log",
@@ -141,6 +142,7 @@ dependencies = [
  "luminance-web-sys",
  "luminance-webgl",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "wasm-pack",
  "web-sys",
@@ -1351,6 +1353,19 @@ name = "glob"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8be18de09a56b60ed0edf84bc9df007e30040691af7acd1c41874faac5895bfb"
+
+[[package]]
+name = "gloo-timers"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47204a46aaff920a1ea58b11d03dec6f704287d27561724a4631e450654a891f"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
+]
 
 [[package]]
 name = "h2"
