@@ -4,16 +4,20 @@
 
 ### Added
 
+* `all_is_cubes::apps::StandardCameras` manages the `Camera`s needed for rendering, given the necessary inputs. It is intended to reduce duplicated code and coupling in each renderer.
 * `all_is_cubes::universe::VisitRefs` allows traversing the `URef` graph inside a `Universe`.
 * `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
 
 ### Changed
 
-* The new minimum supported Rust version is 1.56.0 (2021 edition).
-* The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
-* The `Name` enum is now intended to be reliably cheap to clone:
-    * `Name::Specific`'s field holds an `Arc<str>` instead of a `String`. 
-    * `Universe`-related errors now hold `Name` instead of `Arc<Name>`.
+- `all_is_cubes` library:
+    * The new minimum supported Rust version is 1.56.0 (2021 edition).
+    * Breaking: The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
+    * Breaking: `GLRenderer::new()` now expects a `StandardCameras` (instead of the components of one).
+    * Breaking: `AllIsCubesAppState::update_cursor()` now expects a `&StandardCameras` instead of two `Camera`s.
+    * The `Name` enum is now intended to be reliably cheap to clone:
+        * `Name::Specific`'s field holds an `Arc<str>` instead of a `String`. 
+        * `Universe`-related errors now hold `Name` instead of `Arc<Name>`.
 
 ### Removed
 
