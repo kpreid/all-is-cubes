@@ -12,7 +12,7 @@ use crate::block::{
 };
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
-use crate::math::{GridPoint, GridRotation, GridVector, Rgb, Rgba};
+use crate::math::{GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba};
 use crate::space::{Grid, GridArray, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
@@ -34,6 +34,10 @@ fn evaluate_opaque_atom_and_attributes() {
     assert_eq!(e.resolution, 1);
     assert_eq!(e.opaque, true);
     assert_eq!(e.visible, true);
+    assert_eq!(
+        e.voxel_opacity_mask,
+        GridArray::from_elements(Grid::for_block(1), [OpacityCategory::Opaque])
+    )
 }
 
 #[test]
@@ -45,6 +49,10 @@ fn evaluate_transparent_atom() {
     assert!(e.voxels.is_none());
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, true);
+    assert_eq!(
+        e.voxel_opacity_mask,
+        GridArray::from_elements(Grid::for_block(1), [OpacityCategory::Partial])
+    )
 }
 
 #[test]
@@ -55,6 +63,10 @@ fn evaluate_invisible_atom() {
     assert!(e.voxels.is_none());
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, false);
+    assert_eq!(
+        e.voxel_opacity_mask,
+        GridArray::from_elements(Grid::for_block(1), [OpacityCategory::Invisible])
+    )
 }
 
 #[test]
@@ -92,6 +104,13 @@ fn evaluate_voxels_checked_individually() {
     assert_eq!(e.resolution, resolution);
     assert_eq!(e.opaque, true);
     assert_eq!(e.visible, true);
+    assert_eq!(
+        e.voxel_opacity_mask,
+        GridArray::from_elements(
+            Grid::for_block(resolution),
+            vec![OpacityCategory::Opaque; (resolution as usize).pow(3)]
+        )
+    )
 }
 
 #[test]

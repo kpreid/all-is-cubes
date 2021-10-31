@@ -12,7 +12,9 @@ use std::sync::Arc;
 use cgmath::{EuclideanSpace as _, Point3, Vector4, Zero as _};
 
 use crate::listen::{Gate, Listener, Notifier};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
+use crate::math::{
+    FreeCoordinate, GridCoordinate, GridPoint, GridRotation, OpacityCategory, Rgb, Rgba,
+};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
 use crate::transaction::{
@@ -174,6 +176,10 @@ impl Block {
                 resolution: 1,
                 opaque: color.fully_opaque(),
                 visible: !color.fully_transparent(),
+                voxel_opacity_mask: GridArray::from_elements(
+                    Grid::for_block(1),
+                    [color.opacity_category()],
+                ),
             }),
 
             &Block::Recur {
@@ -194,6 +200,7 @@ impl Block {
                         resolution: 1,
                         opaque: false,
                         visible: false,
+                        voxel_opacity_mask: None,
                     });
                 }
 
@@ -243,6 +250,9 @@ impl Block {
                         #[inline(always)]
                         |p| !voxels[p].color.fully_transparent(),
                     ),
+                    voxel_opacity_mask: Some(GridArray::from_fn(voxels.grid(), |p| {
+                        voxels[p].color.opacity_category()
+                    })),
 
                     voxels: Some(voxels),
                 })
@@ -609,6 +619,7 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     resolution: 1,
     opaque: false,
     visible: false,
+    voxel_opacity_mask: None,
 };
 
 const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
@@ -652,6 +663,10 @@ pub struct EvaluatedBlock {
     /// Whether the block has any voxels/color at all that make it visible; that is, this
     /// is false if the block is completely transparent.
     pub visible: bool,
+    /// The opacity of all voxels. This is redundant with the data  [`Self::voxels`],
+    /// and is provided as a pre-computed convenience that can be cheaply compared with
+    /// other values of the same type.
+    pub(crate) voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
 }
 
 // TODO: Wait, this isn't really what ConciseDebug is for... shouldn't this be a regular impl Debug?
@@ -664,6 +679,7 @@ impl CustomFormat<ConciseDebug> for EvaluatedBlock {
             .field("visible", &self.visible)
             .field("resolution", &self.resolution)
             .field("voxels", &"...")
+            .field("voxel_opacity_mask", &"...")
             .finish()
     }
 }
