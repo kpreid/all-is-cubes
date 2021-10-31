@@ -528,7 +528,6 @@ pub enum BlockCollision {
     /// Collide with the block's component voxels individually.
     ///
     /// If the block does not have voxels then this is equivalent to [`Hard`](Self::Hard).
-    /// (TODO: Voxel collision not yet finished.)
     Recur,
     // Future values might include bouncy solid, water-like resistance, force fields, etc.
 }
