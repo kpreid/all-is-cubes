@@ -192,6 +192,19 @@ impl Rgba {
     pub fn fully_opaque(self) -> bool {
         self.alpha() >= NN1
     }
+    /// Returns the [`OpacityCategory`] which this color's alpha fits into.
+    /// This returns the same information as [`Rgba::fully_transparent`] combined with
+    /// [`Rgba::fully_opaque`].
+    #[inline]
+    pub(crate) fn opacity_category(self) -> OpacityCategory {
+        if self.fully_transparent() {
+            OpacityCategory::Invisible
+        } else if self.fully_opaque() {
+            OpacityCategory::Opaque
+        } else {
+            OpacityCategory::Partial
+        }
+    }
 
     /// Discards the alpha component to produce an RGB color.
     ///
@@ -447,6 +460,21 @@ fn component_from_srgb_8bit(c: u8) -> NotNan<f32> {
         ((200. * c + 11.) / 211.).powf(12. / 5.)
     };
     NotNan::new(c).unwrap()
+}
+
+/// Reduces alpha/opacity values to only three possibilities, by conflating all alphas
+/// greater than zero and less than one.
+///
+/// This may be used in rendering algorithms to refer to whether something moved from
+/// one category to another, and hence might need different treatment than in the previous
+/// frame.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[repr(u8)]
+pub(crate) enum OpacityCategory {
+    Invisible = 0,
+    Partial = 1,
+    Opaque = 2,
 }
 
 #[cfg(test)]
