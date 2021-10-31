@@ -275,6 +275,16 @@ impl AllIsCubesAppState {
                 transaction
                     .execute(self.universe_mut())
                     .map_err(|e| ToolError::Internal(e.to_string()))?;
+
+                // Spend a little time doing light updates, to ensure that changes right in front of
+                // the player are clean (and not flashes of blackness).
+                if let Some(space_ref) = self.cursor_result.as_ref().map(|c| &c.space) {
+                    // TODO: Instead of ignoring error, log it
+                    let _ = space_ref.try_modify(|space| {
+                        space.update_lighting_from_queue();
+                    });
+                }
+
                 Ok(())
             } else {
                 Err(ToolError::NoTool)
