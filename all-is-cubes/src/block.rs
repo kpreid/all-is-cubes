@@ -543,13 +543,15 @@ pub struct AnimationHint {
     /// Suggestion: avoid combining it with other block meshes.
     pub(crate) expect_replace: bool,
 
-    /// Expect that the block's shape will change; some of its voxels will move between
-    /// the categories “fully opaque”, “fully transparent”, and “in between”.
+    /// Expect that the block's shape will change; some of its voxels will not be the same
+    /// [`OpacityCategory`].
+    ///
     /// Suggestion: use a rendering strategy which is shape-independent.
     pub(crate) expect_shape_update: bool,
 
     /// Expect that the block's voxels' colors (and alpha other than the special 0 and 1
     /// cases) will change.
+    ///
     /// Suggestion: prepare to update texturing without unnecesarily regenerating the mesh.
     pub(crate) expect_color_update: bool,
 }

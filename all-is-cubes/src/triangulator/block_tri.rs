@@ -156,8 +156,6 @@ impl<V, T> Default for BlockMesh<V, T> {
 ///
 /// This may then be may be used as input to [`triangulate_space`](super::triangulate_space).
 pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
-    // TODO: Arrange to pass in a buffer of old data such that we can reuse existing textures.
-    // This will allow for efficient implementation of animated blocks.
     block: &EvaluatedBlock,
     texture_allocator: &mut A,
     options: &TriangulatorOptions,
