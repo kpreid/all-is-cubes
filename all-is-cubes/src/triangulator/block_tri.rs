@@ -10,8 +10,8 @@ use std::fmt::Debug;
 
 use crate::block::{EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, Rgba};
-use crate::space::{Grid, Space};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, OpacityCategory, Rgba};
+use crate::space::{Grid, GridArray, Space};
 use crate::triangulator::{
     copy_voxels_to_texture, push_quad, BlockVertex, GreedyMesher, QuadColoring, TextureAllocator,
     TriangulatorOptions,
@@ -84,6 +84,16 @@ pub struct BlockMesh<V, T> {
     /// do. Convert this to an Option, unless we decide that e.g. we want the triangulator
     /// to be responsible for optimizing opaque blocks into 6 face textures.
     pub(super) textures_used: Vec<T>,
+
+    /// The [`EvaluatedBlock::voxel_opacity_mask`] that the mesh was constructed from;
+    /// if new block data has the same mask, then it is safe to replace the texture
+    /// without recalculating the mesh, via [`BlockMesh::try_update_texture_only`].
+    ///
+    /// If this is [`None`], then either there is no texture to update or some of the
+    /// colors have been embedded in the mesh vertices, making a mesh update required.
+    /// (TODO: We could be more precise about which voxels are so frozen -- revisit
+    /// whether that's worthwhile.)
+    pub(super) voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
 }
 
 impl<V, T> BlockMesh<V, T> {
@@ -107,6 +117,7 @@ impl<V, T> Default for BlockMesh<V, T> {
         Self {
             faces: FaceMap::default(),
             textures_used: Vec::new(),
+            voxel_opacity_mask: None,
         }
     }
 }
@@ -121,6 +132,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     texture_allocator: &mut A,
     options: &TriangulatorOptions,
 ) -> BlockMesh<V, A::Tile> {
+    // If this is true, avoid using vertex coloring even on solid rectangles.
+    let prefer_textures = block.attributes.animation_hint.expect_color_update;
+
+    let mut used_any_vertex_colors = false;
+
     match &block.voxels {
         None => {
             let faces = FaceMap::from_fn(|face| {
@@ -148,9 +164,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         /* depth= */ 0.,
                         Point2 { x: 0., y: 0. },
                         Point2 { x: 1., y: 1. },
+                        // TODO: Respect the prefer_textures option.
                         QuadColoring::<A::Tile>::Solid(color),
                         1,
                     );
+                    used_any_vertex_colors = true;
                 }
                 BlockFaceMesh {
                     fully_opaque: color.fully_opaque(),
@@ -163,6 +181,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             BlockMesh {
                 faces,
                 textures_used: vec![],
+                voxel_opacity_mask: None,
             }
         }
         Some(voxels) => {
@@ -298,7 +317,9 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     )
                     .run(|mesher, low_corner, high_corner| {
                         // Generate quad.
-                        let coloring = if let Some(single_color) = mesher.single_color {
+                        let coloring = if let Some(single_color) =
+                            mesher.single_color.filter(|_| !prefer_textures)
+                        {
                             // The quad we're going to draw has identical texels, so we might as
                             // well use a solid color and skip needing a texture.
                             QuadColoring::<A::Tile>::Solid(single_color)
@@ -317,6 +338,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 // having lingering failures.
                                 // TODO: Add other fallback strategies such as using multiple quads instead
                                 // of textures.
+                                used_any_vertex_colors = true;
                                 QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
                             }
                         };
@@ -342,6 +364,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             BlockMesh {
                 faces: output_by_face,
                 textures_used: texture_if_needed.into_iter().collect(),
+                voxel_opacity_mask: if used_any_vertex_colors {
+                    None
+                } else {
+                    block.voxel_opacity_mask.clone()
+                },
             }
         }
     }
