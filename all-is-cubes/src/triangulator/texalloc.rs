@@ -63,29 +63,36 @@ pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
     texture_allocator: &mut A,
     voxels: &GridArray<Evoxel>,
 ) -> Option<A::Tile> {
+    texture_allocator
+        .allocate(voxels.grid())
+        .map(|mut texture| {
+            copy_voxels_into_existing_texture(voxels, &mut texture);
+            texture
+        })
+}
+
+pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(
+    voxels: &GridArray<Evoxel>,
+    texture: &mut T,
+) {
     let grid = voxels.grid();
-    texture_allocator.allocate(grid).map(|mut texture| {
-        let mut tile_texels: Vec<Texel> = Vec::with_capacity(grid.volume());
-        // Note that this is row-major order whereas `Grid` uses column-major order, so
-        // expressing this with `Grid::interior_iter` would require shuffling the texture
-        // coordinates — or changing `Grid`'s choice of ordering, which might be worth
-        // doing but isn't for this one use case.
-        for z in grid.z_range() {
-            for y in grid.y_range() {
-                for x in grid.x_range() {
-                    tile_texels.push(
-                        voxels
-                            .get([x, y, z])
-                            .unwrap_or(&Evoxel::new(palette::MISSING_VOXEL_FALLBACK))
-                            .color
-                            .to_srgb_32bit(),
-                    );
-                }
+    let mut texels: Vec<Texel> = Vec::with_capacity(grid.volume());
+    // TODO: Teach GridArray about alternate array orderings so that we can express
+    // this as a map-and-shuffle operation instead of a special loop.
+    for z in grid.z_range() {
+        for y in grid.y_range() {
+            for x in grid.x_range() {
+                texels.push(
+                    voxels
+                        .get([x, y, z])
+                        .unwrap_or(&Evoxel::new(palette::MISSING_VOXEL_FALLBACK))
+                        .color
+                        .to_srgb_32bit(),
+                );
             }
         }
-        texture.write(&tile_texels);
-        texture
-    })
+    }
+    texture.write(&texels);
 }
 
 /// Null [`TextureAllocator`]; rejects all allocations.

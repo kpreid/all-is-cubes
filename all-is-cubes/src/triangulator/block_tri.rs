@@ -13,8 +13,8 @@ use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, OpacityCategory, Rgba};
 use crate::space::{Grid, GridArray, Space};
 use crate::triangulator::{
-    copy_voxels_to_texture, push_quad, BlockVertex, GreedyMesher, QuadColoring, TextureAllocator,
-    TriangulatorOptions,
+    copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
+    GreedyMesher, QuadColoring, TextureAllocator, TextureTile, TriangulatorOptions,
 };
 
 /// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
@@ -107,6 +107,36 @@ impl<V, T> BlockMesh<V, T> {
 
     pub fn is_empty(&self) -> bool {
         self.faces.iter().all(|(_, ft)| ft.is_empty())
+    }
+
+    /// Update this mesh's textures in-place to the given new block data, if this is
+    /// possible without changing the vertices.
+    // TODO: non-public while we decide whether it's a good interface
+    #[must_use]
+    pub(crate) fn try_update_texture_only(&mut self, block: &EvaluatedBlock) -> bool
+    where
+        T: TextureTile,
+    {
+        // Need to deref the Vec in self.textures_used before matching
+        match (
+            &self.voxel_opacity_mask,
+            self.textures_used.as_mut_slice(),
+            block,
+        ) {
+            (
+                Some(old_mask),
+                [existing_texture],
+                EvaluatedBlock {
+                    voxels: Some(voxels),
+                    voxel_opacity_mask: Some(new_mask),
+                    ..
+                },
+            ) if old_mask == new_mask => {
+                copy_voxels_into_existing_texture(voxels, existing_texture);
+                true
+            }
+            _ => false,
+        }
     }
 }
 
