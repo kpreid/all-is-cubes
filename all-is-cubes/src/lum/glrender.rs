@@ -85,7 +85,10 @@ where
             cameras.viewport().framebuffer_size.into(),
         )?;
 
-        let full_frame = FullFramePainter::basic_program(&mut surface)?;
+        let full_frame = FullFramePainter::new(
+            &mut surface,
+            include_str!("shaders/info-text-fragment.glsl"),
+        )?;
 
         let mut info_text_texture = full_frame.new_texture();
         info_text_texture

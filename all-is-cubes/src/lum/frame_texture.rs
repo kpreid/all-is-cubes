@@ -47,19 +47,16 @@ where
     Backend: AicLumBackend,
     TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
 {
-    /// Construct a [`FullFramePainter`] with the default shader program.
-    ///
-    /// This program copies values to the framebuffer with no conversion, and as such,
-    /// expects the texture to produce sRGB values. That is, the pixel format should
-    /// *not* be one which implicitly converts sRGB to linear.
-    pub fn basic_program<C: GraphicsContext<Backend = Backend>>(
+    /// Construct a [`FullFramePainter`] with the default vertex shader and given fragment shader.
+    pub fn new<C: GraphicsContext<Backend = Backend>>(
         context: &mut C,
+        fragment_shader: &str,
     ) -> Result<Rc<Self>, GraphicsResourceError> {
         let program = map_shader_result(context.new_shader_program().from_strings(
             include_str!("shaders/full-frame-vertex.glsl"),
             None,
             None,
-            include_str!("shaders/full-frame-fragment.glsl"),
+            fragment_shader,
         ))?;
 
         Ok(Rc::new(FullFramePainter {
