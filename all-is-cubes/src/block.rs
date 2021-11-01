@@ -176,10 +176,14 @@ impl Block {
                 resolution: 1,
                 opaque: color.fully_opaque(),
                 visible: !color.fully_transparent(),
-                voxel_opacity_mask: GridArray::from_elements(
-                    Grid::for_block(1),
-                    [color.opacity_category()],
-                ),
+                voxel_opacity_mask: if color.fully_transparent() {
+                    None
+                } else {
+                    Some(
+                        GridArray::from_elements(Grid::for_block(1), [color.opacity_category()])
+                            .unwrap(),
+                    )
+                },
             }),
 
             &Block::Recur {
@@ -667,6 +671,11 @@ pub struct EvaluatedBlock {
     /// The opacity of all voxels. This is redundant with the data  [`Self::voxels`],
     /// and is provided as a pre-computed convenience that can be cheaply compared with
     /// other values of the same type.
+    ///
+    /// May be [`None`] if the block is fully invisible. (TODO: This is a kludge to avoid
+    /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
+    /// It doesn't harm normal operation because the point of having this is to compare
+    /// block shapes, which is trivial if the block is invisible.)
     pub(crate) voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
 }
 

@@ -68,10 +68,7 @@ fn evaluate_invisible_atom() {
     assert!(e.voxels.is_none());
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, false);
-    assert_eq!(
-        e.voxel_opacity_mask,
-        GridArray::from_elements(Grid::for_block(1), [OpacityCategory::Invisible])
-    )
+    assert_eq!(e.voxel_opacity_mask, None)
 }
 
 #[test]
