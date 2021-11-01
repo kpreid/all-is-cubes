@@ -119,9 +119,13 @@ impl Grid {
     ///
     /// If you need such a grid at a position other than the origin, use
     /// [`Grid::translate`].
-    pub fn for_block(resolution: Resolution) -> Grid {
-        let size = GridCoordinate::from(resolution);
-        Grid::new([0, 0, 0], [size, size, size])
+    pub const fn for_block(resolution: Resolution) -> Grid {
+        // The limited range of Resolution lets us write this as const.
+        let size = resolution as GridCoordinate;
+        Grid {
+            lower_bounds: GridPoint::new(0, 0, 0),
+            sizes: GridVector::new(size, size, size),
+        }
     }
 
     /// Generate a `Grid` whose volume is as specified or smaller.
