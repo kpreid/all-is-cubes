@@ -8,13 +8,18 @@ use std::borrow::Cow;
 
 use crate::block::{
     builder, AnimationHint, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef,
-    BlockDefTransaction, EvalBlockError, Evoxel, Resolution, AIR,
+    BlockDefTransaction, EvalBlockError, Evoxel, Resolution, AIR, AIR_EVALUATED,
 };
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
 use crate::math::{GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba};
 use crate::space::{Grid, GridArray, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
+
+#[test]
+fn evaluate_air_consistent() {
+    assert_eq!(AIR.evaluate().unwrap(), AIR_EVALUATED);
+}
 
 #[test]
 fn evaluate_opaque_atom_and_attributes() {
