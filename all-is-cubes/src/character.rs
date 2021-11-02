@@ -55,6 +55,13 @@ pub struct Character {
     /// towards.
     velocity_input: Vector3<FreeCoordinate>,
 
+    /// Offset to be added to `body.position` to produce the drawn eye position.
+    /// Used to produce camera shifting effects when the body is stopped by an obstacle
+    /// or otherwise moves suddenly.
+    eye_displacement_pos: Vector3<FreeCoordinate>,
+    /// Velocity of the `eye_displacement_pos` point (relative to body).
+    eye_displacement_vel: Vector3<FreeCoordinate>,
+
     // TODO: Does this belong here? Or in the Space?
     pub(crate) colliding_cubes: HashSet<Contact>,
 
@@ -138,6 +145,8 @@ impl Character {
             },
             space,
             velocity_input: Vector3::zero(),
+            eye_displacement_pos: Vector3::zero(),
+            eye_displacement_vel: Vector3::zero(),
             colliding_cubes: HashSet::new(),
             last_step_info: None,
             inventory: Inventory::from_slots(inventory),
@@ -162,7 +171,7 @@ impl Character {
     pub fn view(&self) -> Matrix4<FreeCoordinate> {
         Matrix4::from_angle_x(Deg(self.body.pitch))
             * Matrix4::from_angle_y(Deg(self.body.yaw))
-            * Matrix4::from_translation(-(self.body.position.to_vec()))
+            * Matrix4::from_translation(-(self.body.position.to_vec() + self.eye_displacement_pos))
     }
 
     pub fn inventory(&self) -> &Inventory {
@@ -205,6 +214,7 @@ impl Character {
         let control_orientation: Matrix3<FreeCoordinate> =
             Matrix3::from_angle_y(-Deg(self.body.yaw));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
+        let initial_body_velocity = self.body.velocity;
 
         let speed = if self.body.flying {
             FLYING_SPEED
@@ -252,6 +262,20 @@ impl Character {
         } else {
             UniverseTransaction::default()
         };
+
+        // Apply accelerations on the body inversely to the eye displacement.
+        // This causes the eye position to be flung past the actual body position
+        // if it is stopped, producing a bit of flavor to landing from a jump and
+        // other such events.
+        // TODO: Try applying velocity_input to this positively, "leaning forward".
+        // First, update velocity.
+        let body_delta_v_this_frame = self.body.velocity - initial_body_velocity;
+        self.eye_displacement_vel -= body_delta_v_this_frame * 0.04;
+        self.eye_displacement_vel += self.eye_displacement_pos * -(0.005f64.powf(dt));
+        self.eye_displacement_vel *= 0.005f64.powf(dt);
+        // Then apply position to velocity.
+        self.eye_displacement_pos += self.eye_displacement_vel * dt;
+        // TODO: Clamp eye_displacement_pos to be within the body AAB.
 
         self.last_step_info = body_step_info;
         (body_step_info, transaction)
@@ -307,6 +331,8 @@ impl VisitRefs for Character {
             body: _,
             space,
             velocity_input: _,
+            eye_displacement_pos: _,
+            eye_displacement_vel: _,
             colliding_cubes: _,
             last_step_info: _,
             inventory,
