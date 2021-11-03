@@ -56,9 +56,19 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     COLORS,
 ];
 
-const TRANSPARENCY: Exhibit = Exhibit {
+macro_rules! exhibit {
+    (const $id:ident, name: $name_text:literal, ($this_var:pat, $uni_var:pat) $body:block) => {
+        const $id: Exhibit = Exhibit {
+            name: $name_text,
+            factory: |$this_var, $uni_var| $body,
+        };
+    };
+}
+
+exhibit! {
+    const TRANSPARENCY,
     name: "Transparency",
-    factory: |_this, _universe| {
+    (_this, _universe) {
         // TODO: Add some partial-block transparency once we're any good at implementing it
         let mut space = Space::empty(Grid::new([-3, 0, -3], [7, 5, 7]));
 
@@ -70,8 +80,7 @@ const TRANSPARENCY: Exhibit = Exhibit {
         ];
         let alphas = [0.25, 0.5, 0.75, 0.95];
         for (rot, color) in GridRotation::CLOCKWISE.iterate().zip(&colors) {
-            let windowpane =
-                Grid::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
+            let windowpane = Grid::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
             space.fill(
                 windowpane
                     .transform(rot.to_positive_octant_matrix(1))
@@ -85,12 +94,13 @@ const TRANSPARENCY: Exhibit = Exhibit {
         }
 
         Ok(space)
-    },
-};
+    }
+}
 
-const KNOT: Exhibit = Exhibit {
+exhibit! {
+    const KNOT,
     name: "Knot",
-    factory: |this, universe| {
+    (this, universe) {
         let footprint = Grid::new([-2, -2, -1], [5, 5, 3]);
         let resolution = 16;
         let toroidal_radius = 24.;
@@ -157,12 +167,13 @@ const KNOT: Exhibit = Exhibit {
             universe.insert_anonymous(drawing_space),
         )?;
         Ok(space)
-    },
-};
+    }
+}
 
-const TEXT: Exhibit = Exhibit {
+exhibit! {
+    const TEXT,
     name: "Text",
-    factory: |_, universe| {
+    (_, universe) {
         let space = draw_to_blocks(
             universe,
             16,
@@ -180,12 +191,13 @@ const TEXT: Exhibit = Exhibit {
             ),
         )?;
         Ok(space)
-    },
-};
+    }
+}
 
-const ANIMATION: Exhibit = Exhibit {
+exhibit! {
+    const ANIMATION,
     name: "Animation",
-    factory: |_this, universe| {
+    (_this, universe) {
         let footprint = Grid::new([0, 0, 0], [3, 1, 2]);
         let mut space = Space::empty(footprint);
 
@@ -243,12 +255,13 @@ const ANIMATION: Exhibit = Exhibit {
         space.set([2, 0, 0], fire_block)?;
 
         Ok(space)
-    },
-};
+    }
+}
 
-const COLLISION: Exhibit = Exhibit {
+exhibit! {
+    const COLLISION,
     name: "Collision WIP",
-    factory: |_this, universe| {
+    (_this, universe) {
         let half_block = make_slab(universe, 2, 4);
 
         let footprint = Grid::new([0, 0, 0], [5, 2, 4]);
@@ -282,12 +295,13 @@ const COLLISION: Exhibit = Exhibit {
         }
 
         Ok(space)
-    },
-};
+    }
+}
 
-const RESOLUTIONS: Exhibit = Exhibit {
+exhibit! {
+    const RESOLUTIONS,
     name: "Resolutions",
-    factory: |_this, universe| {
+    (_this, universe) {
         let footprint = Grid::new([0, 0, 0], [5, 2, 3]);
         let mut space = Space::empty(footprint);
 
@@ -338,12 +352,13 @@ const RESOLUTIONS: Exhibit = Exhibit {
         }
 
         Ok(space)
-    },
-};
+    }
+}
 
-const ROTATIONS: Exhibit = Exhibit {
+exhibit! {
+    const ROTATIONS,
     name: "Rotations",
-    factory: |_this, universe| {
+    (_this, universe) {
         let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
         let mut space = Space::empty(Grid::new([-2, 0, -2], [5, 5, 5]));
 
@@ -386,12 +401,13 @@ const ROTATIONS: Exhibit = Exhibit {
         }
 
         Ok(space)
-    },
-};
+    }
+}
 
-const COLORS: Exhibit = Exhibit {
+exhibit! {
+    const COLORS,
     name: "Colors",
-    factory: |_this, universe| {
+    (_this, universe) {
         let gradient_resolution = 5;
         let mut space = Space::empty(Grid::new(
             [0, 0, 0],
@@ -455,12 +471,13 @@ const COLORS: Exhibit = Exhibit {
         })?;
 
         Ok(space)
-    },
-};
+    }
+}
 
-const COLOR_LIGHTS: Exhibit = Exhibit {
+exhibit! {
+    const COLOR_LIGHTS,
     name: "Colored Lights",
-    factory: |_this, universe| {
+    (_this, universe) {
         let room_width = 7;
         let room_length = 12;
         let room_height = 5;
@@ -599,23 +616,25 @@ const COLOR_LIGHTS: Exhibit = Exhibit {
         // sRGB white is D65, or approximately 6500 K.
 
         Ok(space)
-    },
-};
+    }
+}
 
-const CHUNK_CHART: Exhibit = Exhibit {
+exhibit! {
+    const CHUNK_CHART,
     name: "Visible chunk chart",
-    factory: |_this, _universe| {
+    (_this, _universe) {
         use all_is_cubes::chunking::ChunkChart;
 
         // TODO: Show more than one size.
         let chart = ChunkChart::<16>::new(16. * 4.99);
         Ok(chart.visualization())
-    },
-};
+    }
+}
 
-const MAKE_SOME_BLOCKS: Exhibit = Exhibit {
+exhibit! {
+    const MAKE_SOME_BLOCKS,
     name: "make_some_blocks",
-    factory: |_this, mut universe| {
+    (_this, mut universe) {
         const ROWS: GridCoordinate = 5;
         fn make_both_blocks<const N: usize>(universe: &mut Universe) -> (Vec<Block>, Vec<Block>) {
             (
@@ -638,12 +657,13 @@ const MAKE_SOME_BLOCKS: Exhibit = Exhibit {
             }
         }
         Ok(space)
-    },
-};
+    }
+}
 
-const SWIMMING_POOL: Exhibit = Exhibit {
+exhibit! {
+    const SWIMMING_POOL,
     name: "Swimming Pool",
-    factory: |_this, _universe| {
+    (_this, _universe) {
         let width = 6;
         let depth = 6;
         let water_area = Grid::new([0, -depth, 0], [width, depth, width]);
@@ -657,5 +677,5 @@ const SWIMMING_POOL: Exhibit = Exhibit {
                 .build(),
         )?;
         Ok(space)
-    },
-};
+    }
+}
