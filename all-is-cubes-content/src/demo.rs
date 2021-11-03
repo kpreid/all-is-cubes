@@ -9,7 +9,7 @@ use all_is_cubes::character::Character;
 use all_is_cubes::linking::{GenError, InGenError};
 use all_is_cubes::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use all_is_cubes::space::{Grid, LightPhysics, Space};
-use all_is_cubes::universe::{Name, Universe, UniverseIndex};
+use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
 
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 
@@ -44,28 +44,60 @@ pub enum UniverseTemplate {
 
 impl UniverseTemplate {
     pub fn build(self) -> Result<Universe, GenError> {
+        let mut universe = Universe::new();
+
+        // TODO: Later we want a "module loading" system that can lazily bring in content.
+        // For now, unconditionally add all these blocks.
+        install_demo_blocks(&mut universe)?;
+
+        let default_space_name: Name = "space".into();
+
         use UniverseTemplate::*;
-        match self {
-            Blank => Ok(Universe::new()),
-            Fail => Err(GenError::failure(
-                InGenError::Other("the Fail template always fails to generate".into()),
-                "space".into(), // TODO: should be able to not provide a dummy name
+        let maybe_space: Option<Result<Space, InGenError>> = match self {
+            Blank => None,
+            Fail => Some(Err(InGenError::Other(
+                "the Fail template always fails to generate".into(),
+            ))),
+            DemoCity => Some(demo_city(&mut universe)),
+            Dungeon => Some(demo_dungeon(&mut universe)),
+            Atrium => Some(atrium(&mut universe)),
+            CornellBox => Some(cornell_box(&mut universe)),
+            PhysicsLab => Some(physics_lab(50, 16)),
+            LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
+                &mut universe,
             )),
-            DemoCity => new_universe_with_space_setup(demo_city),
-            Dungeon => new_universe_with_space_setup(demo_dungeon),
-            Atrium => new_universe_with_space_setup(atrium),
-            CornellBox => new_universe_with_space_setup(cornell_box),
-            PhysicsLab => new_universe_with_space_setup(|_| physics_lab(50, 16)),
-            LightingBench => {
-                new_universe_with_space_setup(all_is_cubes::content::testing::lighting_bench_space)
-            }
+        };
+
+        // Insert the space and generate the initial character.
+        if let Some(space_result) = maybe_space {
+            let space_ref =
+                insert_generated_space(&mut universe, default_space_name, space_result)?;
+
+            // TODO: "character" is a special default name used for finding the character the
+            // player actually uses, and we should replace that or handle it more formally.
+            universe.insert("character".into(), Character::spawn_default(space_ref))?;
         }
+
+        Ok(universe)
     }
 }
 
 impl Default for UniverseTemplate {
     fn default() -> Self {
         Self::DemoCity
+    }
+}
+
+/// TODO: This should be a general Universe tool for "insert a generated value or report an error"
+/// but for now was written to help out UniverseTemplate::build
+fn insert_generated_space(
+    universe: &mut Universe,
+    name: Name,
+    result: Result<Space, InGenError>,
+) -> Result<URef<Space>, GenError> {
+    match result {
+        Ok(space) => Ok(universe.insert(name, space)?),
+        Err(e) => Err(GenError::failure(e, name)),
     }
 }
 
@@ -119,25 +151,6 @@ fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
     // TODO: Explicitly define camera position (needs a means to do so).
 
     Ok(space)
-}
-
-fn new_universe_with_space_setup<F>(space_fn: F) -> Result<Universe, GenError>
-where
-    F: FnOnce(&mut Universe) -> Result<Space, InGenError>,
-{
-    let mut universe = Universe::new();
-    install_demo_blocks(&mut universe)?;
-
-    let space_name1: Name = "space".into();
-    let space_name2 = space_name1.clone();
-    let space: Space = space_fn(&mut universe).map_err(|e| GenError::failure(e, space_name1))?;
-    let space_ref = universe.insert(space_name2, space)?;
-
-    // TODO: "character" is a special default name used for finding the character the
-    // player actually uses, and we should replace that or handle it more formally.
-    universe.insert("character".into(), Character::spawn_default(space_ref))?;
-
-    Ok(universe)
 }
 
 /// Generate a space which is both completely enclosed and has a convenient flat surface
