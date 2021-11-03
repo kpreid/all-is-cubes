@@ -182,7 +182,7 @@ impl DemoTheme {
 }
 
 /// This function is called from `UniverseTemplate`.
-pub(crate) fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGenError> {
+pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGenError> {
     // TODO: reintroduce random elements separate from the maze.
     // let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(38492);
 

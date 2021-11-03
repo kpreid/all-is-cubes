@@ -44,12 +44,13 @@ pub enum UniverseTemplate {
 }
 
 impl UniverseTemplate {
-    pub async fn build(self, _p: YieldProgress) -> Result<Universe, GenError> {
+    pub async fn build(self, p: YieldProgress) -> Result<Universe, GenError> {
         let mut universe = Universe::new();
 
         // TODO: Later we want a "module loading" system that can lazily bring in content.
         // For now, unconditionally add all these blocks.
         install_demo_blocks(&mut universe)?;
+        p.progress().await;
 
         let default_space_name: Name = "space".into();
 
@@ -59,11 +60,11 @@ impl UniverseTemplate {
             Fail => Some(Err(InGenError::Other(
                 "the Fail template always fails to generate".into(),
             ))),
-            DemoCity => Some(demo_city(&mut universe)),
-            Dungeon => Some(demo_dungeon(&mut universe)),
+            DemoCity => Some(demo_city(&mut universe, p).await),
+            Dungeon => Some(demo_dungeon(&mut universe).await),
             Atrium => Some(atrium(&mut universe)),
-            CornellBox => Some(cornell_box(&mut universe)),
-            PhysicsLab => Some(physics_lab(50, 16)),
+            CornellBox => Some(cornell_box()),
+            PhysicsLab => Some(physics_lab(50, 16).await),
             LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
                 &mut universe,
             )),
@@ -103,7 +104,7 @@ fn insert_generated_space(
 }
 
 #[rustfmt::skip]
-fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
+fn cornell_box() -> Result<Space, InGenError> {
     // Coordinates are set up based on this dimension because, being blocks, we're not
     // going to *exactly* replicate the original data, but we might want to adjust the
     // scale to something else entirely.
@@ -162,7 +163,7 @@ fn cornell_box(_universe: &mut Universe) -> Result<Space, InGenError> {
 /// a good idea.
 /// TODO: Add some lights.
 /// TODO: Define exactly what the radii mean so users can build things on surfaces.
-fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenError> {
+async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenError> {
     assert!(shell_radius > planet_radius);
     let space_radius = shell_radius + 1; // TODO check off-by-one consistency
     let mut space = Space::empty(Grid::new(

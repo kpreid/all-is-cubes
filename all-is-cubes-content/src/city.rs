@@ -4,6 +4,7 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
+use all_is_cubes::util::YieldProgress;
 use instant::Instant;
 use noise::Seedable as _;
 
@@ -35,7 +36,10 @@ use crate::{
     logo_text, logo_text_extent, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
 };
 
-pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
+pub(crate) async fn demo_city(
+    universe: &mut Universe,
+    p: YieldProgress,
+) -> Result<Space, InGenError> {
     let start_city_time = Instant::now();
 
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
@@ -98,7 +102,9 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
 
     // Fill basic layers, underground and top
     space.fill_uniform(planner.y_range(-ground_depth, 0), &landscape_blocks[Stone])?;
+    p.progress().await;
     space.fill_uniform(planner.y_range(0, 1), &landscape_blocks[Grass])?;
+    p.progress().await;
 
     // Stray grass
     let grass_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
@@ -121,6 +127,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             }
         },
     )?;
+    p.progress().await;
 
     // Roads and lamps
     for &face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
@@ -192,6 +199,8 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
                 &demo_blocks[CurbCorner],
             )?;
         }
+
+        p.progress().await;
     }
 
     let blank_city_time = Instant::now();
@@ -208,20 +217,25 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         [-exhibit_front_radius, sky_height, -exhibit_front_radius],
     );
     space.fill_uniform(landscape_region, AIR)?;
+    p.progress().await;
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
     planner.occupied_plots.push(landscape_region);
 
+    // TODO: Integrate logging and YieldProgress
     let landscape_time = Instant::now();
     log::trace!(
         "Landscape took {:.3} s",
         landscape_time.duration_since(blank_city_time).as_secs_f32()
     );
+    p.progress().await;
 
     // Exhibits
     for exhibit in DEMO_CITY_EXHIBITS.iter() {
         let start_exhibit_time = Instant::now();
         let exhibit_space = (exhibit.factory)(exhibit, universe)
             .expect("exhibit generation failure. TODO: place an error marker and continue instead");
+        p.progress().await;
+
         let exhibit_footprint = exhibit_space.grid();
 
         let enclosure_footprint = exhibit_footprint.expand(FaceMap::repeat(1));
@@ -242,6 +256,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             ],
         );
         space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
+        p.progress().await;
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
 
@@ -316,6 +331,8 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
             exhibit.name,
             exhibit_time.as_secs_f32()
         );
+
+        p.progress().await;
     }
 
     if false {
@@ -332,6 +349,7 @@ pub(crate) fn demo_city(universe: &mut Universe) -> Result<Space, InGenError> {
         GridMatrix::from_translation([0, 12, -radius_xz]),
         &mut space,
     )?;
+    p.progress().await;
 
     // Enable light computation
     space.set_physics({
