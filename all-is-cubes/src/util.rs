@@ -3,10 +3,14 @@
 
 //! Tools that we could imagine being in the Rust standard library, but aren't.
 
-use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::fmt::{self, Debug, Display};
+use std::future::Future;
 use std::marker::PhantomData;
+use std::rc::Rc;
 use std::time::Duration;
+
+use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
+use futures_core::future::LocalBoxFuture;
 
 /// Generic extension to [`std::fmt`'s set of formatting traits](std::fmt#formatting-traits).
 ///
@@ -161,6 +165,44 @@ where
         I: IntoIterator<Item = A>,
     {
         self.target.extend(iter.into_iter().map(&self.function));
+    }
+}
+
+/// Allows a long-running async task to report its progress, and to yield to the
+/// scheduler if appropriate in the current environment (i.e. web).
+///
+/// * TODO: The progress reporting part is not yet implemented.
+/// * TODO: This might end up being converted to a trait to allow `Sync` depending
+///   on the executor's choice.
+/// * TODO: We should probably have a non-async interface for progress reporting
+///   once that's built.
+pub struct YieldProgress {
+    output: Rc<dyn Fn() -> LocalBoxFuture<'static, ()>>,
+}
+
+impl YieldProgress {
+    pub fn new<F, Fut>(yielder: F) -> Self
+    where
+        F: Fn() -> Fut + 'static,
+        Fut: Future<Output = ()> + 'static,
+    {
+        Self {
+            output: Rc::new(move || Box::pin(yielder())),
+        }
+    }
+
+    /// Returns a [`YieldProgress`] that does no progress reporting and no yielding.
+    pub fn noop() -> Self {
+        Self {
+            output: Rc::new(|| Box::pin(std::future::ready(()))),
+        }
+    }
+
+    /// Report a unit of progress and yield.
+    ///
+    /// TODO: This should accept a progress-fraction value
+    pub async fn progress(&self) {
+        (self.output)().await;
     }
 }
 
