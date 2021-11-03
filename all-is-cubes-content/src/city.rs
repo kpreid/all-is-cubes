@@ -4,7 +4,7 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
-use all_is_cubes::util::YieldProgress;
+use futures_core::future::LocalBoxFuture;
 use instant::Instant;
 use noise::Seedable as _;
 
@@ -31,6 +31,7 @@ use all_is_cubes::math::{
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{Grid, LightPhysics, SetCubeError, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
+use all_is_cubes::util::YieldProgress;
 
 use crate::{
     logo_text, logo_text_extent, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
@@ -233,6 +234,7 @@ pub(crate) async fn demo_city(
     for exhibit in DEMO_CITY_EXHIBITS.iter() {
         let start_exhibit_time = Instant::now();
         let exhibit_space = (exhibit.factory)(exhibit, universe)
+            .await
             .expect("exhibit generation failure. TODO: place an error marker and continue instead");
         p.progress().await;
 
@@ -385,7 +387,8 @@ fn space_to_space_copy(
 #[allow(clippy::type_complexity)]
 pub(crate) struct Exhibit {
     pub name: &'static str,
-    pub factory: fn(&Exhibit, &mut Universe) -> Result<Space, InGenError>,
+    pub factory:
+        for<'a> fn(&'a Exhibit, &'a mut Universe) -> LocalBoxFuture<'a, Result<Space, InGenError>>,
 }
 
 /// Tracks available land while the city is being generated.

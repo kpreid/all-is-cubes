@@ -60,7 +60,7 @@ macro_rules! exhibit {
     (const $id:ident, name: $name_text:literal, ($this_var:pat, $uni_var:pat) $body:block) => {
         const $id: Exhibit = Exhibit {
             name: $name_text,
-            factory: |$this_var, $uni_var| $body,
+            factory: |$this_var, $uni_var| Box::pin(async move { $body }),
         };
     };
 }
