@@ -16,8 +16,8 @@ use crate::listen::Listener;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
-    triangulate_block, triangulate_blocks, BlockMesh, BlockMeshProvider, GfxVertex, SpaceMesh,
-    TextureAllocator, TextureTile, TriangulatorOptions,
+    triangulate_block, BlockMesh, BlockMeshProvider, GfxVertex, SpaceMesh, TextureAllocator,
+    TextureTile, TriangulatorOptions,
 };
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat};
@@ -64,7 +64,7 @@ where
 {
     pub fn new(space: URef<Space>) -> Self {
         let space_borrowed = space.borrow();
-        let todo = CsmTodo::default();
+        let todo = CsmTodo::initially_dirty();
         let todo_rc = Arc::new(Mutex::new(todo));
         space_borrowed.listen(TodoListener(Arc::downgrade(&todo_rc)));
 
@@ -139,12 +139,14 @@ where
 
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
+            todo.blocks
+                .extend(0..(space.block_data().len() as BlockIndex));
             self.block_meshes.clear();
             // We don't need to clear self.chunks because they will automatically be considered
             // stale by the new block versioning value.
         }
 
-        let block_update_count = self.block_meshes.update_some_or_all(
+        let block_update_count = self.block_meshes.update(
             &mut todo.blocks,
             space,
             block_texture_allocator,
@@ -254,15 +256,21 @@ where
         }
     }
 
-    /// Discard all meshes and increment the version.
-    /// TODO: Incrementing the version is probably not necessary.
+    /// Discard all meshes.
+    /// Use this to ensure that in case of “everything changes” we don't store
+    /// extra data.
     fn clear(&mut self) {
         self.meshes.clear();
         self.versioning.clear();
-        self.last_version_counter = self.last_version_counter.wrapping_add(1);
     }
 
-    fn update_some_or_all<A>(
+    /// Update block meshes based on the given [`Space`].
+    ///
+    /// After this method returns, `self.meshes.len()` and `self.versioning.len()` will
+    /// always equal `space.block_data().len()`.
+    ///
+    /// TODO: Missing handling for tri_options changing.
+    fn update<A>(
         &mut self,
         todo: &mut HashSet<BlockIndex>,
         space: &Space,
@@ -272,86 +280,64 @@ where
     where
         A: TextureAllocator<Tile = Tile>,
     {
-        let mut block_update_count = 0;
-        if self.meshes.is_empty() {
-            // One of the following cases:
-            // * It's the first run and we haven't prepared the blocks at all.
-            // * The space somehow has zero blocks, in which case this is trivial anyway.
-            // * The space signaled SpaceChange::EveryBlock.
-            let start_triangulation_time = Instant::now();
-            self.meshes = Vec::from(triangulate_blocks(
-                space,
-                block_texture_allocator,
-                tri_options,
-            ));
-            let len = self.meshes.len();
-            // TODO: we should increment the counter here to be more consistent
-            self.versioning = vec![self.last_version_counter; len];
-            block_update_count = len;
-            // TODO: pipe the space name here or move the logging up
-            log::trace!(
-                "triangulate_blocks() took {:.3} s",
-                Instant::now()
-                    .duration_since(start_triangulation_time)
-                    .as_secs_f32()
-            );
-        } else if !todo.is_empty() {
-            // Partial update.
-            self.last_version_counter = self.last_version_counter.wrapping_add(1);
-            let block_data = space.block_data();
-
-            // Update the vector length to match the space.
-            let new_length = block_data.len();
-            let old_length = self.meshes.len();
-            match new_length.cmp(&old_length) {
-                Ordering::Less => {
-                    self.meshes.truncate(new_length);
-                    self.versioning.truncate(new_length);
-                }
-                Ordering::Greater => {
-                    let added = old_length..new_length;
-                    self.meshes
-                        .extend(added.clone().map(|_| BlockMesh::default()));
-                    self.versioning.extend(added.map(|_| 0));
-                }
-                Ordering::Equal => {}
-            }
-            assert_eq!(self.meshes.len(), new_length);
-
-            for index in todo.drain() {
-                let index: usize = index.into();
-                let new_evaluated_block: &EvaluatedBlock = block_data[index].evaluated();
-                let current_mesh: &mut BlockMesh<_, _> = &mut self.meshes[index];
-
-                if current_mesh.try_update_texture_only(new_evaluated_block) {
-                    // Updated the texture in-place. No need for mesh updates.
-                } else {
-                    let new_block_mesh = triangulate_block(
-                        new_evaluated_block,
-                        block_texture_allocator,
-                        tri_options,
-                    );
-
-                    // Only invalidate the chunks if we actually have different data.
-                    // Note: This comparison depends on such things as the definition of PartialEq
-                    // for Tex::Tile (whose particular implementation LumAtlasTile
-                    // compares by pointer).
-                    // TODO: We don't currently make use of this optimally because the triangulator
-                    // never reuses textures. (If it did, we'd need to consider what we want to do
-                    // about stale chunks with fresh textures, which might have geometry gaps or
-                    // otherwise be obviously inconsistent.)
-                    if new_block_mesh != *current_mesh {
-                        *current_mesh = new_block_mesh;
-                        self.versioning[index] = self.last_version_counter;
-                    } else {
-                        // The new mesh is identical to the old one (which might happen because
-                        // interior voxels or non-rendered attributes were changed), so don't invalidate
-                        // the chunks.
-                    }
-                }
-                block_update_count += 1;
-            }
+        if todo.is_empty() {
+            return 0;
         }
+        let mut block_update_count = 0;
+
+        self.last_version_counter = self.last_version_counter.wrapping_add(1);
+        let block_data = space.block_data();
+
+        // Update the vector length to match the space.
+        let new_length = block_data.len();
+        let old_length = self.meshes.len();
+        match new_length.cmp(&old_length) {
+            Ordering::Less => {
+                self.meshes.truncate(new_length);
+                self.versioning.truncate(new_length);
+            }
+            Ordering::Greater => {
+                let added = old_length..new_length;
+                self.meshes
+                    .extend(added.clone().map(|_| BlockMesh::default()));
+                self.versioning.extend(added.map(|_| 0));
+            }
+            Ordering::Equal => {}
+        }
+        assert_eq!(self.meshes.len(), new_length);
+
+        // Update individual meshes.
+        for index in todo.drain() {
+            let index: usize = index.into();
+            let new_evaluated_block: &EvaluatedBlock = block_data[index].evaluated();
+            let current_mesh: &mut BlockMesh<_, _> = &mut self.meshes[index];
+
+            if current_mesh.try_update_texture_only(new_evaluated_block) {
+                // Updated the texture in-place. No need for mesh updates.
+            } else {
+                let new_block_mesh =
+                    triangulate_block(new_evaluated_block, block_texture_allocator, tri_options);
+
+                // Only invalidate the chunks if we actually have different data.
+                // Note: This comparison depends on such things as the definition of PartialEq
+                // for Tex::Tile (whose particular implementation LumAtlasTile
+                // compares by pointer).
+                // TODO: We don't currently make use of this optimally because the triangulator
+                // never reuses textures. (If it did, we'd need to consider what we want to do
+                // about stale chunks with fresh textures, which might have geometry gaps or
+                // otherwise be obviously inconsistent.)
+                if new_block_mesh != *current_mesh {
+                    *current_mesh = new_block_mesh;
+                    self.versioning[index] = self.last_version_counter;
+                } else {
+                    // The new mesh is identical to the old one (which might happen because
+                    // interior voxels or non-rendered attributes were changed), so don't invalidate
+                    // the chunks.
+                }
+            }
+            block_update_count += 1;
+        }
+
         block_update_count
     }
 }
@@ -511,6 +497,14 @@ struct CsmTodo<const CHUNK_SIZE: GridCoordinate> {
 }
 
 impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
+    fn initially_dirty() -> Self {
+        Self {
+            all_blocks_and_chunks: true,
+            blocks: HashSet::new(),
+            chunks: HashMap::new(),
+        }
+    }
+
     fn modify_block_and_adjacent<F>(&mut self, cube: GridPoint, mut f: F)
     where
         F: FnMut(&mut ChunkTodo),
