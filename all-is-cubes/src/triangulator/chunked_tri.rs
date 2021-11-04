@@ -283,7 +283,6 @@ where
         if todo.is_empty() {
             return 0;
         }
-        let mut block_update_count = 0;
 
         self.last_version_counter = self.last_version_counter.wrapping_add(1);
         let block_data = space.block_data();
@@ -307,10 +306,20 @@ where
         assert_eq!(self.meshes.len(), new_length);
 
         // Update individual meshes.
-        for index in todo.drain() {
+        let mut block_update_count = 0;
+        let mut cost = 0;
+        while cost < 100000 && !todo.is_empty() {
+            let index: BlockIndex = todo.iter().next().copied().unwrap();
+            todo.remove(&index);
             let index: usize = index.into();
+
             let new_evaluated_block: &EvaluatedBlock = block_data[index].evaluated();
             let current_mesh: &mut BlockMesh<_, _> = &mut self.meshes[index];
+
+            cost += match &new_evaluated_block.voxels {
+                Some(voxels) => voxels.grid().volume(),
+                None => 1,
+            };
 
             if current_mesh.try_update_texture_only(new_evaluated_block) {
                 // Updated the texture in-place. No need for mesh updates.
@@ -490,6 +499,7 @@ impl<'a, Vert, Tile> BlockMeshProvider<'a, Vert, Tile>
 #[derive(Debug, Default)]
 struct CsmTodo<const CHUNK_SIZE: GridCoordinate> {
     all_blocks_and_chunks: bool,
+    // TODO: Benchmark using a BitVec instead.
     blocks: HashSet<BlockIndex>,
     /// Membership in this table indicates that the chunk *exists;* todos for chunks
     /// outside of the view area are not tracked.
