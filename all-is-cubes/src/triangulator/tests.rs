@@ -70,12 +70,12 @@ fn triangulate_blocks_and_space(
 ) -> (
     TestTextureAllocator,
     BlockMeshes<BlockVertex, TestTextureTile>,
-    SpaceMesh<BlockVertex>,
+    SpaceMesh<BlockVertex, TestTextureTile>,
 ) {
     let options = &TriangulatorOptions::new(&GraphicsOptions::default());
     let mut tex = TestTextureAllocator::new();
     let block_meshes = triangulate_blocks(space, &mut tex, options);
-    let space_mesh: SpaceMesh<BlockVertex> =
+    let space_mesh: SpaceMesh<BlockVertex, TestTextureTile> =
         triangulate_space(space, space.grid(), options, &*block_meshes);
     (tex, block_meshes, space_mesh)
 }
@@ -512,7 +512,7 @@ fn handling_allocation_failure() {
 
 #[test]
 fn space_mesh_empty() {
-    let t = SpaceMesh::<BlockVertex>::new();
+    let t = SpaceMesh::<BlockVertex, TestTextureTile>::new();
     assert!(t.is_empty());
     assert_eq!(t.vertices(), &[]);
     // type annotation to prevent spurious inference failures in the presence

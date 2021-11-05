@@ -26,7 +26,7 @@ use crate::camera::Camera;
 use crate::chunking::ChunkPos;
 use crate::content::palette;
 use crate::listen::Listener;
-use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator};
+use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
 use crate::lum::shading::BlockPrograms;
 use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::lum::{wireframe_vertices, GraphicsResourceError};
@@ -464,7 +464,7 @@ fn render_chunk_tess<Backend: AicLumBackend, E>(
 
 fn update_chunk_tess<C>(
     context: &mut C,
-    new_mesh: &SpaceMesh<LumBlockVertex>,
+    new_mesh: &SpaceMesh<LumBlockVertex, LumAtlasTile>,
     tess_option: &mut ChunkData<C::Backend>,
 ) where
     C: GraphicsContext,

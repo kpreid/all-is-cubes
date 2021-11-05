@@ -177,7 +177,7 @@ impl TextureAllocator for TestTextureAllocator {
 /// Tile type for [`TestTextureAllocator`].
 ///
 /// This type is public so that it may be used in benchmarks and such.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[doc(hidden)]
 pub struct TestTextureTile {
     texel_grid: Grid,

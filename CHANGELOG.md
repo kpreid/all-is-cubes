@@ -4,9 +4,13 @@
 
 ### Added
 
-* `all_is_cubes::apps::StandardCameras` manages the `Camera`s needed for rendering, given the necessary inputs. It is intended to reduce duplicated code and coupling in each renderer.
-* `all_is_cubes::universe::VisitRefs` allows traversing the `URef` graph inside a `Universe`.
-* `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
+- `all_is_cubes` library:
+    - `SpaceMesh` now remembers the `TextureAllocator::Tile`s it was constructed using, just like `BlockMesh` does, so callers no longer need to do so.
+    - `SpaceMesh::blocks_used_iter()` reports which block indices went into the mesh.
+    - `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
+    - `StandardCameras` manages the `Camera`s needed for rendering, given the necessary inputs. It is intended to reduce duplicated code and coupling in each renderer.
+      - `VisitRefs` allows traversing the `URef` graph inside a `Universe`.
+
 
 ### Changed
 
@@ -16,6 +20,7 @@
         * `BlockTriangulation` → `BlockMesh`
         * `BlockTriangulations` → `BlockMeshes`
         * `SpaceTriangulation` → `SpaceMesh`
+            * `SpaceMesh` takes an additional type parameter for the texture type.
         * `BlockTriangulationProvider` → `BlockMeshProvider`
     * Breaking: The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
     * Breaking: `GLRenderer::new()` now expects a `StandardCameras` (instead of the components of one).

@@ -5,7 +5,6 @@ use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::sync::{Arc, Mutex, Weak};
 
-use bitvec::prelude::BitVec;
 use cgmath::Point3;
 use instant::Instant;
 
@@ -16,8 +15,8 @@ use crate::listen::Listener;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::triangulator::{
-    triangulate_block, BlockMesh, BlockMeshProvider, GfxVertex, SpaceMesh, TextureAllocator,
-    TextureTile, TriangulatorOptions,
+    triangulate_block, BlockMesh, GfxVertex, SpaceMesh, TextureAllocator, TextureTile,
+    TriangulatorOptions,
 };
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat};
@@ -116,8 +115,8 @@ where
         mut indices_only_updater: IF,
     ) -> (CstUpdateInfo, ChunkPos<CHUNK_SIZE>)
     where
-        CF: FnMut(&SpaceMesh<Vert>, &mut D),
-        IF: FnMut(&SpaceMesh<Vert>, &mut D),
+        CF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
+        IF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
     {
         let graphics_options = camera.options();
         let tri_options = &TriangulatorOptions::new(graphics_options);
@@ -359,10 +358,8 @@ where
     Tex: TextureAllocator,
 {
     bounds: Grid,
-    mesh: SpaceMesh<Vert>,
+    mesh: SpaceMesh<Vert, Tex::Tile>,
     pub render_data: D,
-    /// Texture tiles that our vertices' texture coordinates refer to.
-    tile_dependencies: Vec<Tex::Tile>,
     block_dependencies: Vec<(BlockIndex, u32)>,
 }
 
@@ -377,12 +374,11 @@ where
             bounds: chunk_pos.grid(),
             mesh: SpaceMesh::new(),
             render_data: D::default(),
-            tile_dependencies: Vec::new(),
             block_dependencies: Vec::new(),
         }
     }
 
-    pub fn mesh(&self) -> &SpaceMesh<Vert> {
+    pub fn mesh(&self) -> &SpaceMesh<Vert, Tex::Tile> {
         &self.mesh
     }
 
@@ -393,11 +389,9 @@ where
         options: &TriangulatorOptions,
         block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>,
     ) {
-        let mut block_provider = TrackingBlockProvider::new(&block_meshes.meshes);
-
         let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
         self.mesh
-            .compute(space, self.bounds, options, &mut block_provider);
+            .compute(space, self.bounds, options, &*block_meshes.meshes);
 
         // Logging
         if let Some(start) = compute_start {
@@ -422,22 +416,15 @@ where
             }
         }
 
-        // Stash all the texture tiles so they aren't deallocated out from under us.
-        // TODO: Maybe we should have something more like a Vec<Rc<BlockMesh>>
-        self.tile_dependencies.clear();
-        self.tile_dependencies.extend(
-            block_provider
-                .seen()
-                .flat_map(|index| block_meshes.meshes[index].textures().iter())
-                .cloned(),
-        );
         // Record the block meshes we incorporated into the chunk mesh.
         self.block_dependencies.clear();
-        self.block_dependencies.extend(
-            block_provider
-                .seen()
-                .map(|index| (index as BlockIndex, block_meshes.versioning[index])),
-        );
+        self.block_dependencies
+            .extend(self.mesh.blocks_used_iter().map(|index| {
+                (
+                    index as BlockIndex,
+                    block_meshes.versioning[usize::from(index)],
+                )
+            }));
 
         chunk_todo.recompute_mesh = false;
     }
@@ -458,40 +445,6 @@ where
             .iter()
             .copied()
             .any(|(index, version)| block_meshes.versioning[usize::from(index)] != version)
-    }
-}
-
-/// Logs blocks used in a [`ChunkMesh`] so we know to rebuild it if the block changes.
-struct TrackingBlockProvider<'a, Vert, Tile> {
-    block_meshes: &'a [BlockMesh<Vert, Tile>],
-    seen: BitVec,
-}
-impl<'a, Vert, Tile> TrackingBlockProvider<'a, Vert, Tile> {
-    fn new(block_meshes: &'a [BlockMesh<Vert, Tile>]) -> Self {
-        Self {
-            block_meshes,
-            seen: BitVec::with_capacity(256), // TODO: cleverer choice
-        }
-    }
-
-    /// Return the indices of all the block meshes that were used.
-    ///
-    /// Note: In principle, the value type should be [`BlockIndex`], but in practice it
-    /// is used as an array index so this avoids writing a double conversion.
-    fn seen<'s: 'a>(&'s self) -> impl Iterator<Item = usize> + 's {
-        self.seen.iter_ones()
-    }
-}
-impl<'a, Vert, Tile> BlockMeshProvider<'a, Vert, Tile>
-    for &mut TrackingBlockProvider<'a, Vert, Tile>
-{
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<Vert, Tile>> {
-        let index = usize::from(index);
-        if index >= self.seen.len() {
-            self.seen.resize(index + 1, false);
-        }
-        self.seen.set(index, true);
-        self.block_meshes.get(index)
     }
 }
 
@@ -753,8 +706,8 @@ mod tests {
             indices_only_updater: IF,
         ) -> (CstUpdateInfo, ChunkPos<16>)
         where
-            CF: FnMut(&SpaceMesh<BlockVertex>, &mut ()),
-            IF: FnMut(&SpaceMesh<BlockVertex>, &mut ()),
+            CF: FnMut(&SpaceMesh<BlockVertex, NoTextures>, &mut ()),
+            IF: FnMut(&SpaceMesh<BlockVertex, NoTextures>, &mut ()),
         {
             self.cst.update_blocks_and_some_chunks(
                 &self.camera,

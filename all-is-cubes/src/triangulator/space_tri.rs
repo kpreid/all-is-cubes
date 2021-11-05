@@ -1,6 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use bitvec::vec::BitVec;
 use cgmath::{EuclideanSpace as _, InnerSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
 use ordered_float::OrderedFloat;
 use std::fmt::Debug;
@@ -8,7 +9,7 @@ use std::ops::Range;
 
 use crate::math::{Face, FaceMap, GridCoordinate, GridRotation};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
-use crate::triangulator::{BlockMesh, GfxVertex, TriangulatorOptions};
+use crate::triangulator::{BlockMesh, GfxVertex, TextureTile, TriangulatorOptions};
 
 /// Computes a triangle mesh of a [`Space`].
 ///
@@ -20,40 +21,50 @@ pub fn triangulate_space<'p, V, T, P>(
     bounds: Grid,
     options: &TriangulatorOptions,
     block_meshes: P,
-) -> SpaceMesh<V>
+) -> SpaceMesh<V, T>
 where
     V: GfxVertex + 'p,
     P: BlockMeshProvider<'p, V, T>,
-    T: 'p,
+    T: TextureTile + 'p,
 {
     let mut this = SpaceMesh::new();
     this.compute(space, bounds, options, block_meshes);
     this
 }
 
-/// Container for a triangle mesh representation of a [`Space`] (or part of it) which may
+/// A triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
 ///
 /// A [`SpaceMesh`] may be used multiple times as a [`Space`] is modified.
 /// Currently, the only benefit of this is avoiding reallocating memory.
 ///
-/// Type parameter `V` is the type of triangle vertices.
+/// The type parameters allow adaptation to the target graphics API:
+/// * `V` is the type of vertices.
+/// * `T` is the type of textures, which come from a [`TextureAllocator`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SpaceMesh<V> {
+pub struct SpaceMesh<V, T> {
     vertices: Vec<V>,
     indices: Vec<u32>,
+
     /// Where in `indices` the triangles with no partial transparency are arranged.
     opaque_range: Range<usize>,
+
     /// Ranges of `indices` for all partially-transparent triangles, sorted by depth
     /// as documented in [`Self::transparent_range`].
     transparent_ranges: [Range<usize>; DepthOrdering::COUNT],
-    // TODO: Shouldn't this also be retaining the texture tiles? Right now the caller has to.
+
+    /// Set of all [`BlockIndex`]es whose meshes were incorporated into this mesh.
+    block_indices_used: BitVec,
+
+    /// Texture tiles used by the vertices; holding these objects is intended to ensure
+    /// the texture coordinates stay valid.
+    textures_used: Vec<T>,
 }
 
-impl<V> SpaceMesh<V> {
+impl<V, T> SpaceMesh<V, T> {
     /// Construct an empty [`SpaceMesh`] which draws nothing.
     #[inline]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         // We need a Range constant to be able to initialize the array with copies of it.
         const ZERO_RANGE: Range<usize> = Range { start: 0, end: 0 };
         Self {
@@ -61,6 +72,8 @@ impl<V> SpaceMesh<V> {
             indices: Vec::new(),
             opaque_range: ZERO_RANGE,
             transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+            block_indices_used: BitVec::new(),
+            textures_used: Vec::new(),
         }
     }
 
@@ -105,6 +118,11 @@ impl<V> SpaceMesh<V> {
         self.transparent_ranges[ordering.to_index()].clone()
     }
 
+    #[inline]
+    pub fn blocks_used_iter(&self) -> impl Iterator<Item = BlockIndex> + '_ {
+        self.block_indices_used.iter_ones().map(|i| i as BlockIndex)
+    }
+
     fn consistency_check(&self) {
         assert_eq!(self.opaque_range().start, 0);
         let len_transparent = self.transparent_range(DepthOrdering::Any).len();
@@ -122,7 +140,7 @@ impl<V> SpaceMesh<V> {
     }
 }
 
-impl<V: GfxVertex> SpaceMesh<V> {
+impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// Computes triangles for the contents of `space` within `bounds` and stores them
     /// in `self`.
     ///
@@ -136,7 +154,7 @@ impl<V: GfxVertex> SpaceMesh<V> {
     /// same as the meshes and thus producing a rendering with gaps in it).
     ///
     /// [`triangulate_blocks`]: super::triangulate_blocks
-    pub fn compute<'p, T, P>(
+    pub fn compute<'p, P>(
         &mut self,
         space: &Space,
         bounds: Grid,
@@ -147,25 +165,36 @@ impl<V: GfxVertex> SpaceMesh<V> {
         V: 'p,
         T: 'p,
     {
-        // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
-        // If we do this, we'd make it the provider's responsibility
-        let empty_render = BlockMesh::<V, T>::default();
-
         // use the buffer but not the existing data
         self.vertices.clear();
         self.indices.clear();
+        self.block_indices_used.clear();
+        self.textures_used.clear();
 
         // Use temporary buffer for positioning the transparent indices
         // TODO: Consider reuse
         let mut transparent_indices = Vec::new();
 
         for cube in bounds.interior_iter() {
-            let precomputed = space
-                .get_block_index(cube)
-                .and_then(|index| block_meshes.get(index))
-                .unwrap_or(&empty_render);
+            // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
+            // Do we want to make it the caller's responsibility to specify in-bounds?
+            let index: BlockIndex = match space.get_block_index(cube) {
+                Some(index) => index,
+                None => continue,
+            };
+            let already_seen_index = bitset_set_and_get(&mut self.block_indices_used, index.into());
+            let block_mesh = match block_meshes.get(index) {
+                Some(mesh) => mesh,
+                None => continue,
+            };
 
-            if precomputed.is_empty() {
+            if !already_seen_index {
+                // Capture texture handles to ensure that our texture coordinates stay valid.
+                self.textures_used
+                    .extend(block_mesh.textures().iter().cloned());
+            }
+
+            if block_mesh.is_empty() {
                 continue;
             }
 
@@ -186,21 +215,24 @@ impl<V: GfxVertex> SpaceMesh<V> {
             };
 
             for face in Face::ALL_SEVEN {
-                let face_mesh = &precomputed.faces[face];
+                let face_mesh = &block_mesh.faces[face];
                 if face_mesh.is_empty() {
                     // Nothing to do; skip adjacent_cube lookup.
                     continue;
                 }
 
                 let adjacent_cube = cube + face.normal_vector();
-                if space
-                    .get_block_index(adjacent_cube)
-                    .and_then(|index| block_meshes.get(index))
-                    .map(|bt| bt.faces[face.opposite()].fully_opaque)
-                    .unwrap_or(false)
-                {
-                    // Don't draw obscured faces
-                    continue;
+                if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
+                    if block_meshes
+                        .get(adj_block_index)
+                        .map(|adj_mesh| adj_mesh.faces[face.opposite()].fully_opaque)
+                        .unwrap_or(false)
+                    {
+                        // Don't draw obscured faces
+                        // (but do record that we depended onthem)
+                        bitset_set_and_get(&mut self.block_indices_used, adj_block_index.into());
+                        continue;
+                    }
                 }
 
                 // Copy vertices, offset to the block position and with lighting
@@ -343,21 +375,32 @@ impl<V: GfxVertex> SpaceMesh<V> {
     }
 }
 
-impl<GV> Default for SpaceMesh<GV> {
+impl<V, T> Default for SpaceMesh<V, T> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
+/// Set the given element in the [`BitVec`] to `true`, and return the old
+/// value.
+fn bitset_set_and_get(v: &mut BitVec, index: usize) -> bool {
+    let previous = if index >= v.len() {
+        v.resize(index + 1, false);
+        false
+    } else {
+        v[index]
+    };
+    v.set(index, true);
+    previous
+}
+
 /// Source of [`BlockMesh`] values for [`SpaceMesh::compute`].
 ///
 /// This trait allows the caller of [`SpaceMesh::compute`] to provide an
-/// implementation which records which blocks were actually used, for precise
-/// invalidation.
+/// implementation which e.g. lazily computes meshes.
 ///
-/// TODO: Is this actually a useful interface, or should we just have a separate
-/// callback for the recording?
+/// TODO: This isn't currently used for anything.
 pub trait BlockMeshProvider<'a, V, T> {
     fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>>;
 }
