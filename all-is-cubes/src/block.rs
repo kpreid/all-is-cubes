@@ -265,20 +265,37 @@ impl Block {
             // TODO: this has no unit tests
             Block::Rotated(rotation, block) => {
                 let base = block.evaluate()?;
+                if base.voxels.is_none() && base.voxel_opacity_mask.is_none() {
+                    // Skip computation of transforms
+                    return Ok(base);
+                }
+
+                // TODO: Add a shuffle-in-place rotation operation to GridArray and try implementing this using that, which should have less arithmetic involved than these matrix ops
                 let resolution = base.resolution;
+                let inner_to_outer = rotation.to_positive_octant_matrix(resolution.into());
+                let outer_to_inner = rotation
+                    .inverse()
+                    .to_positive_octant_matrix(resolution.into());
+
                 Ok(EvaluatedBlock {
                     voxels: base.voxels.map(|voxels| {
-                        let inner_to_outer = rotation.to_positive_octant_matrix(resolution.into());
-                        let outer_to_inner = rotation
-                            .inverse()
-                            .to_positive_octant_matrix(resolution.into());
-                        // TODO: Add a shuffle-in-place rotation operation to GridArray and try implementing this using that, which should have less unnecessary arithmetic
                         GridArray::from_fn(
                             voxels.grid().transform(inner_to_outer).unwrap(),
                             |cube| voxels[outer_to_inner.transform_cube(cube)],
                         )
                     }),
-                    ..base
+                    voxel_opacity_mask: base.voxel_opacity_mask.map(|mask| {
+                        GridArray::from_fn(mask.grid().transform(inner_to_outer).unwrap(), |cube| {
+                            mask[outer_to_inner.transform_cube(cube)]
+                        })
+                    }),
+
+                    // Unaffected
+                    attributes: base.attributes,
+                    color: base.color,
+                    resolution,
+                    opaque: base.opaque,
+                    visible: base.visible,
                 })
             }
         }

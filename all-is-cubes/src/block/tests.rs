@@ -3,12 +3,14 @@
 
 #![allow(clippy::bool_assert_comparison)]
 
-use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
+
+use cgmath::EuclideanSpace as _;
+use pretty_assertions::assert_eq;
 
 use crate::block::{
     builder, AnimationHint, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef,
-    BlockDefTransaction, EvalBlockError, Evoxel, Resolution, AIR, AIR_EVALUATED,
+    BlockDefTransaction, EvalBlockError, EvaluatedBlock, Evoxel, Resolution, AIR, AIR_EVALUATED,
 };
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
@@ -218,6 +220,59 @@ fn evaluate_voxels_zero_resolution() {
     assert_eq!(e.resolution, 1);
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, false);
+}
+
+// Unlike other tests, this one asserts the entire `EvaluatedBlock` value because
+// a new field is a potential bug.
+#[test]
+fn evaluate_rotated() {
+    let resolution = 2;
+    let block_grid = Grid::for_block(resolution);
+    let rotation = GridRotation::RYXZ;
+    let mut universe = Universe::new();
+    let color_fn = |cube: GridPoint| {
+        Rgba::new(
+            cube.x as f32,
+            cube.y as f32,
+            cube.z as f32,
+            if cube.y == 0 { 1.0 } else { 0.0 },
+        )
+    };
+    let rotated_color_fn = |cube: GridPoint| {
+        color_fn(rotation.to_positive_octant_matrix(resolution.into()).transform_cube(cube))
+    };
+    let block = Block::builder()
+        .voxels_fn(&mut universe, resolution, |cube| {
+            // Construct a lower half block with all voxels distinct
+            Block::from(color_fn(cube))
+        })
+        .unwrap()
+        .build();
+    let rotated = block.clone().rotate(rotation);
+    assert_eq!(
+        rotated.evaluate().unwrap(),
+        EvaluatedBlock {
+            attributes: BlockAttributes::default(),
+            color: rgba_const!(0.5, 0.5, 0.5, 0.5),
+            voxels: Some(GridArray::from_fn(block_grid, |cube| {
+                Evoxel {
+                    color: rotated_color_fn(cube),
+                    selectable: true,
+                    collision: BlockCollision::Hard,
+                }
+            })),
+            resolution: 2,
+            opaque: false,
+            visible: true,
+            voxel_opacity_mask: Some(GridArray::from_fn(block_grid, |cube| {
+                if cube.x == 0 {
+                    OpacityCategory::Opaque
+                } else {
+                    OpacityCategory::Invisible
+                }
+            })),
+        }
+    );
 }
 
 /// Tests that the `offset` field of `Block::Recur` is respected.
@@ -594,6 +649,7 @@ mod txn {
     use super::*;
     use crate::block::BlockDefTransaction;
     use crate::transaction::{Merge, TransactionTester};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn causes_notification() {
