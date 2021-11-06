@@ -86,15 +86,11 @@ pub(crate) async fn demo_city(
             let mut inventory = vec![Tool::RemoveBlock { keep: true }.into()];
             for block in [
                 &landscape_blocks[Grass],
-                &landscape_blocks[Dirt],
                 &landscape_blocks[Stone],
                 &demo_blocks[Lamp],
-                &demo_blocks[Sconce],
-                &demo_blocks[Road],
-                &demo_blocks[Signboard],
                 &demo_blocks[Arrow],
             ] {
-                inventory.push(Slot::stack(100, Tool::Block(block.clone())));
+                inventory.push(Slot::stack(40, Tool::Block(block.clone())));
             }
             spawn.set_inventory(inventory);
             spawn
