@@ -153,18 +153,37 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         load_config().expect("Error loading configuration files")
     };
 
-    let start_time = Instant::now();
+    let start_app_time = Instant::now();
     let mut app = AllIsCubesAppState::new();
-    // TODO: Display a progress bar for building.
-    let universe =
-        futures_executor::block_on(universe_template.clone().build(YieldProgress::noop()))?;
-    app.set_universe(universe);
     app.graphics_options_mut().set(graphics_options);
     let app_done_time = Instant::now();
     log::debug!(
+        "Initialized app state ({:.3} s)",
+        app_done_time.duration_since(start_app_time).as_secs_f32()
+    );
+
+    let universe_progress_bar = ProgressBar::new(100)
+        .with_style(
+            common_progress_style().template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}%      "),
+        )
+        .with_prefix("Building");
+    let yield_progress = {
+        let universe_progress_bar = universe_progress_bar.clone();
+        YieldProgress::new(
+            || std::future::ready(()),
+            move |fraction| universe_progress_bar.set_position((fraction * 100.0) as u64),
+        )
+    };
+    let universe = futures_executor::block_on(universe_template.clone().build(yield_progress))?;
+    app.set_universe(universe);
+    universe_progress_bar.finish();
+    let universe_done_time = Instant::now();
+    log::debug!(
         "Initialized game state with {:?} ({:.3} s)",
         universe_template,
-        app_done_time.duration_since(start_time).as_secs_f32()
+        universe_done_time
+            .duration_since(app_done_time)
+            .as_secs_f32()
     );
 
     if options.is_present("precompute_light") || graphics_type == GraphicsType::Record {
