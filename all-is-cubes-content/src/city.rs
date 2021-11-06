@@ -99,9 +99,9 @@ pub(crate) async fn demo_city(
 
     // Fill basic layers, underground and top
     space.fill_uniform(planner.y_range(-ground_depth, 0), &landscape_blocks[Stone])?;
-    p.progress().await;
+    p.progress(0.1).await;
     space.fill_uniform(planner.y_range(0, 1), &landscape_blocks[Grass])?;
-    p.progress().await;
+    p.progress(0.2).await;
 
     // Stray grass
     let grass_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
@@ -124,7 +124,7 @@ pub(crate) async fn demo_city(
             }
         },
     )?;
-    p.progress().await;
+    p.progress(0.3).await;
 
     // Roads and lamps
     for &face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
@@ -196,9 +196,8 @@ pub(crate) async fn demo_city(
                 &demo_blocks[CurbCorner],
             )?;
         }
-
-        p.progress().await;
     }
+    p.progress(0.4).await;
 
     let blank_city_time = Instant::now();
     log::trace!(
@@ -214,7 +213,7 @@ pub(crate) async fn demo_city(
         [-exhibit_front_radius, sky_height, -exhibit_front_radius],
     );
     space.fill_uniform(landscape_region, AIR)?;
-    p.progress().await;
+    p.progress(0.5).await;
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
     planner.occupied_plots.push(landscape_region);
 
@@ -224,15 +223,18 @@ pub(crate) async fn demo_city(
         "Landscape took {:.3} s",
         landscape_time.duration_since(blank_city_time).as_secs_f32()
     );
-    p.progress().await;
+    let [exhibits_progress, final_progress] = p.finish_and_cut(0.6).await.split(0.8);
 
     // Exhibits
-    for exhibit in DEMO_CITY_EXHIBITS.iter() {
+    for (exhibit, exhibit_progress) in DEMO_CITY_EXHIBITS
+        .iter()
+        .zip(exhibits_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
+    {
         let start_exhibit_time = Instant::now();
         let exhibit_space = (exhibit.factory)(exhibit, universe)
             .await
             .expect("exhibit generation failure. TODO: place an error marker and continue instead");
-        p.progress().await;
+        exhibit_progress.progress(0.7).await;
 
         let exhibit_footprint = exhibit_space.grid();
 
@@ -254,7 +256,7 @@ pub(crate) async fn demo_city(
             ],
         );
         space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
-        p.progress().await;
+        exhibit_progress.progress(0.9).await;
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
 
@@ -330,7 +332,7 @@ pub(crate) async fn demo_city(
             exhibit_time.as_secs_f32()
         );
 
-        p.progress().await;
+        exhibit_progress.progress(1.0).await;
     }
 
     if false {
@@ -347,7 +349,7 @@ pub(crate) async fn demo_city(
         GridMatrix::from_translation([0, 12, -radius_xz]),
         &mut space,
     )?;
-    p.progress().await;
+    final_progress.progress(0.5).await;
 
     // Enable light computation
     space.set_physics({
@@ -355,6 +357,7 @@ pub(crate) async fn demo_city(
         p.light = SpacePhysics::default().light;
         p
     });
+    final_progress.progress(1.0).await;
 
     Ok(space)
 }

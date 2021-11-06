@@ -50,7 +50,7 @@ impl UniverseTemplate {
         // TODO: Later we want a "module loading" system that can lazily bring in content.
         // For now, unconditionally add all these blocks.
         install_demo_blocks(&mut universe)?;
-        p.progress().await;
+        let mut p = Some(p.finish_and_cut(0.1).await);
 
         let default_space_name: Name = "space".into();
 
@@ -60,7 +60,7 @@ impl UniverseTemplate {
             Fail => Some(Err(InGenError::Other(
                 "the Fail template always fails to generate".into(),
             ))),
-            DemoCity => Some(demo_city(&mut universe, p).await),
+            DemoCity => Some(demo_city(&mut universe, p.take().unwrap()).await),
             Dungeon => Some(demo_dungeon(&mut universe).await),
             Atrium => Some(atrium(&mut universe)),
             CornellBox => Some(cornell_box()),
@@ -69,6 +69,10 @@ impl UniverseTemplate {
                 &mut universe,
             )),
         };
+
+        if let Some(p) = p {
+            p.progress(1.0).await;
+        }
 
         // Insert the space and generate the initial character.
         if let Some(space_result) = maybe_space {

@@ -73,8 +73,9 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .scene_info_text_node
         .append_data("\nConstructing universe...")?;
     yield_arbitrary().await;
+    // TODO: Display progress bar
     let universe = template
-        .build(YieldProgress::new(yield_arbitrary))
+        .build(YieldProgress::new(yield_arbitrary, |_| {}))
         .await
         .expect("universe template error");
 

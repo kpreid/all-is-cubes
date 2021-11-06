@@ -184,38 +184,95 @@ where
 /// Allows a long-running async task to report its progress, and to yield to the
 /// scheduler if appropriate in the current environment (i.e. web).
 ///
-/// * TODO: The progress reporting part is not yet implemented.
 /// * TODO: This might end up being converted to a trait to allow `Sync` depending
 ///   on the executor's choice.
 /// * TODO: We should probably have a non-async interface for progress reporting
 ///   once that's built.
 pub struct YieldProgress {
-    output: Rc<dyn Fn() -> LocalBoxFuture<'static, ()>>,
+    start: f32,
+    end: f32,
+    yielder: Rc<dyn Fn() -> LocalBoxFuture<'static, ()>>,
+    progressor: Rc<dyn Fn(f32)>,
 }
 
 impl YieldProgress {
-    pub fn new<F, Fut>(yielder: F) -> Self
+    pub fn new<Y, YFut, P>(yielder: Y, progressor: P) -> Self
     where
-        F: Fn() -> Fut + 'static,
-        Fut: Future<Output = ()> + 'static,
+        Y: Fn() -> YFut + 'static,
+        YFut: Future<Output = ()> + 'static,
+        P: Fn(f32) + 'static,
     {
         Self {
-            output: Rc::new(move || Box::pin(yielder())),
+            start: 0.0,
+            end: 1.0,
+            yielder: Rc::new(move || Box::pin(yielder())),
+            progressor: Rc::new(progressor),
         }
     }
 
     /// Returns a [`YieldProgress`] that does no progress reporting and no yielding.
     pub fn noop() -> Self {
+        Self::new(|| std::future::ready(()), |_| {})
+    }
+
+    /// Map a `0..=1` value to `self.start..=self.end`.
+    #[track_caller]
+    fn point_in_range(&self, mut x: f32) -> f32 {
+        x = x.clamp(0.0, 1.0);
+        if !x.is_finite() {
+            if cfg!(debug_assertions) {
+                panic!("NaN progress value");
+            } else {
+                x = 0.5;
+            }
+        }
+        self.start + (x * (self.end - self.start))
+    }
+
+    /// Report the current amount of progress (a number from 0 to 1) and yield.
+    pub async fn progress(&self, progress_fraction: f32) {
+        (self.progressor)(self.point_in_range(progress_fraction));
+        (self.yielder)().await;
+    }
+
+    /// Report that the given amount of progress has been made, then return
+    /// a [`YieldProgress`] covering the remaining range.
+    pub async fn finish_and_cut(self, progress_fraction: f32) -> Self {
+        let [a, b] = self.split(progress_fraction);
+        a.progress(1.0).await;
+        b
+    }
+
+    fn with_new_range(&self, start: f32, end: f32) -> Self {
         Self {
-            output: Rc::new(|| Box::pin(std::future::ready(()))),
+            start,
+            end,
+            yielder: Rc::clone(&self.yielder),
+            progressor: Rc::clone(&self.progressor),
         }
     }
 
-    /// Report a unit of progress and yield.
+    /// Construct two new [`YieldProgress`] which divide the progress value into two
+    /// subranges.
     ///
-    /// TODO: This should accept a progress-fraction value
-    pub async fn progress(&self) {
-        (self.output)().await;
+    /// The returned instances should be used in sequence, but this is not enforced.
+    pub fn split(self, cut: f32) -> [Self; 2] {
+        let cut_abs = self.point_in_range(cut);
+        [
+            self.with_new_range(self.start, cut_abs),
+            self.with_new_range(cut_abs, self.end),
+        ]
+    }
+
+    /// Split into even subdivisions.
+    pub fn split_evenly(self, count: usize) -> impl Iterator<Item = YieldProgress> {
+        assert!(count < usize::MAX);
+        (0..count).map(move |index| {
+            self.with_new_range(
+                self.point_in_range(index as f32 / count as f32),
+                self.point_in_range((index + 1) as f32 / count as f32),
+            )
+        })
     }
 }
 
