@@ -603,7 +603,13 @@ fn write_and_measure<B: tui::backend::Backend + io::Write>(
     text: &str,
     max_width: u16,
 ) -> Result<u16, io::Error> {
-    if let Some(&w) = width_table.get(text) {
+    if text.len() == 1 && (b' '..=b'~').contains(&text.as_bytes()[0]) {
+        // Hardcode the ASCII case.
+        if 1 <= max_width {
+            backend.write_all(text.as_bytes())?;
+        }
+        Ok(1)
+    } else if let Some(&w) = width_table.get(text) {
         // Use and report already-computed width.
         if w <= max_width {
             backend.write_all(text.as_bytes())?;
