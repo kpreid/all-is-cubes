@@ -15,7 +15,6 @@ use std::fmt;
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector3};
 use cgmath::{Point3, Vector4};
-use ouroboros::self_referencing;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
@@ -24,7 +23,7 @@ use crate::camera::{Camera, GraphicsOptions};
 use crate::math::{smoothstep, GridCoordinate};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
-use crate::space::{GridArray, PackedLight, Space};
+use crate::space::{BlockIndex, GridArray, PackedLight, Space};
 
 mod pixel_buf;
 pub use pixel_buf::*;
@@ -38,16 +37,9 @@ pub use text::*;
 
 /// Precomputed data for raytracing a single frame of a single [`Space`], and bearer of
 /// the methods for actually performing raytracing.
-pub struct SpaceRaytracer<P: PixelBuf>(SpaceRaytracerImpl<P::BlockData>);
-
-/// Helper struct for [`SpaceRaytracer`] so the details of [`ouroboros::self_referencing`]
-/// aren't exposed.
-#[self_referencing]
-struct SpaceRaytracerImpl<B: 'static> {
-    blocks: Box<[TracingBlock<B>]>,
-    #[borrows(blocks)]
-    #[covariant]
-    cubes: GridArray<TracingCubeData<'this, B>>,
+pub struct SpaceRaytracer<P: PixelBuf> {
+    blocks: Box<[TracingBlock<P::BlockData>]>,
+    cubes: GridArray<TracingCubeData>,
 
     options: GraphicsOptions,
     sky_color: Rgb,
@@ -58,44 +50,36 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     /// Snapshots the given [`Space`] to prepare for raytracing it.
     pub fn new(space: &Space, options: GraphicsOptions) -> Self {
         let sky_color = space.physics().sky_color;
-        #[allow(clippy::borrowed_box)]
-        SpaceRaytracer(
-            SpaceRaytracerImplBuilder {
-                blocks: prepare_blocks::<P>(space),
-                cubes_builder: |blocks: &Box<[TracingBlock<P::BlockData>]>| {
-                    prepare_cubes::<P>(blocks, space)
-                },
-                options,
-                sky_color,
-                packed_sky_color: sky_color.into(),
-            }
-            .build(),
-        )
+        SpaceRaytracer {
+            blocks: prepare_blocks::<P>(space),
+            cubes: prepare_cubes(space),
+            options,
+            sky_color,
+            packed_sky_color: sky_color.into(),
+        }
     }
 
     /// Computes a single image pixel from the given ray.
     pub fn trace_ray(&self, ray: Ray) -> (P::Pixel, RaytraceInfo) {
-        self.0.with(|impl_fields| {
-            let mut s: TracingState<P> = TracingState::default();
-            for step in SurfaceIter::new(self, ray) {
-                if s.count_step_should_stop() {
-                    break;
-                }
+        let mut s: TracingState<P> = TracingState::default();
+        for step in SurfaceIter::new(self, ray) {
+            if s.count_step_should_stop() {
+                break;
+            }
 
-                use TraceStep::*;
-                match step {
-                    Invisible | EnterBlock => {
-                        // Side effect: called count_step_should_stop.
-                    }
-                    EnterSurface(surface) => {
-                        debug_assert!(!surface.diffuse_color.fully_transparent());
-                        // TODO: To implement TransparencyOption::Volumetric we need to peek forward to the next change of color and find the distance between them, but only if the alpha is not 0 or 1.
-                        s.trace_through_surface(surface, self);
-                    }
+            use TraceStep::*;
+            match step {
+                Invisible | EnterBlock => {
+                    // Side effect: called count_step_should_stop.
+                }
+                EnterSurface(surface) => {
+                    debug_assert!(!surface.diffuse_color.fully_transparent());
+                    // TODO: To implement TransparencyOption::Volumetric we need to peek forward to the next change of color and find the distance between them, but only if the alpha is not 0 or 1.
+                    s.trace_through_surface(surface, self);
                 }
             }
-            s.finish(*impl_fields.sky_color)
-        })
+        }
+        s.finish(self.sky_color)
     }
 
     /// Compute a full image.
@@ -156,24 +140,18 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
 
     #[inline]
     fn get_packed_light(&self, cube: GridPoint) -> PackedLight {
-        self.0.with(|impl_fields| {
-            impl_fields
-                .cubes
-                .get(cube)
-                .map(|b| b.lighting)
-                .unwrap_or(*impl_fields.packed_sky_color)
-        })
+        self.cubes
+            .get(cube)
+            .map(|b| b.lighting)
+            .unwrap_or(self.packed_sky_color)
     }
 
     #[inline]
     fn get_lighting(&self, cube: GridPoint) -> Rgb {
-        self.0.with(|impl_fields| {
-            impl_fields
-                .cubes
-                .get(cube)
-                .map(|b| b.lighting.value())
-                .unwrap_or(*impl_fields.sky_color)
-        })
+        self.cubes
+            .get(cube)
+            .map(|b| b.lighting.value())
+            .unwrap_or(self.sky_color)
     }
 
     fn get_interpolated_light(&self, point: Point3<FreeCoordinate>, face: Face) -> Rgb {
@@ -340,14 +318,12 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
 
 impl<P: PixelBuf> fmt::Debug for SpaceRaytracer<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.with(|impl_fields| {
-            f.debug_struct("SpaceRaytracer")
-                .field("blocks.len", &impl_fields.blocks.len())
-                .field("cubes.grid", &impl_fields.cubes.grid())
-                .field("options", &impl_fields.options)
-                .field("sky_color", &impl_fields.sky_color)
-                .finish_non_exhaustive()
-        })
+        f.debug_struct("SpaceRaytracer")
+            .field("blocks.len", &self.blocks.len())
+            .field("cubes.grid", &self.cubes.grid())
+            .field("options", &self.options)
+            .field("sky_color", &self.sky_color)
+            .finish_non_exhaustive()
     }
 }
 
@@ -400,20 +376,16 @@ fn prepare_blocks<P: PixelBuf>(space: &Space) -> Box<[TracingBlock<P::BlockData>
 /// Get cube data out of [`Space`] (which is not [`Sync`], and not specialized for our
 /// efficient use).
 #[inline]
-#[allow(clippy::ptr_arg)] // no benefit
-fn prepare_cubes<'a, P: PixelBuf>(
-    indexed_block_data: &'a [TracingBlock<P::BlockData>],
-    space: &Space,
-) -> GridArray<TracingCubeData<'a, P::BlockData>> {
+fn prepare_cubes(space: &Space) -> GridArray<TracingCubeData> {
     space.extract(space.grid(), |index, _block, lighting| TracingCubeData {
-        block: &indexed_block_data[index.unwrap() as usize],
+        block_index: index.unwrap(),
         lighting,
     })
 }
 
 #[derive(Clone, Debug)]
-struct TracingCubeData<'a, B: 'static> {
-    block: &'a TracingBlock<B>,
+struct TracingCubeData {
+    block_index: BlockIndex,
     lighting: PackedLight,
 }
 

@@ -37,10 +37,7 @@ impl<D> Surface<'_, D> {
         P: PixelBuf<BlockData = D>,
         D: 'static,
     {
-        let diffuse_color =
-            rt.0.borrow_options()
-                .transparency
-                .limit_alpha(self.diffuse_color);
+        let diffuse_color = rt.options.transparency.limit_alpha(self.diffuse_color);
         if diffuse_color.fully_transparent() {
             return None;
         }
@@ -55,7 +52,7 @@ impl<D> Surface<'_, D> {
         P: PixelBuf<BlockData = D>,
         D: 'static,
     {
-        match rt.0.borrow_options().lighting_display {
+        match rt.options.lighting_display {
             LightingOption::None => Rgb::ONE,
             LightingOption::Flat => rt.get_lighting(self.cube + self.normal.normal_vector()),
             LightingOption::Smooth => {
@@ -104,7 +101,8 @@ pub(crate) struct SurfaceIter<'a, D: 'static> {
     ray: Ray,
     block_raycaster: Raycaster,
     current_block: Option<VoxelSurfaceIter<'a, D>>,
-    array: &'a GridArray<TracingCubeData<'a, D>>,
+    blocks: &'a [TracingBlock<D>],
+    array: &'a GridArray<TracingCubeData>,
 }
 
 impl<'a, D: 'static> SurfaceIter<'a, D> {
@@ -115,9 +113,10 @@ impl<'a, D: 'static> SurfaceIter<'a, D> {
     {
         Self {
             ray,
-            block_raycaster: ray.cast().within_grid(rt.0.borrow_cubes().grid()),
+            block_raycaster: ray.cast().within_grid(rt.cubes.grid()),
             current_block: None,
-            array: rt.0.borrow_cubes(),
+            blocks: &rt.blocks,
+            array: &rt.cubes,
         }
     }
 }
@@ -136,7 +135,8 @@ impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
 
         let rc_step = self.block_raycaster.next()?;
 
-        Some(match &self.array[rc_step.cube_ahead()].block {
+        let cube_data: &TracingCubeData = &self.array[rc_step.cube_ahead()];
+        Some(match &self.blocks[cube_data.block_index as usize] {
             TracingBlock::Atom(block_data, color) => {
                 if color.fully_transparent() {
                     // The caller could generically skip transparent, but if we do it then
