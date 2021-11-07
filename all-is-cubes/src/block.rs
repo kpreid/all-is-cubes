@@ -215,17 +215,12 @@ impl Block {
                     .intersection(block_space.grid())
                     .unwrap_or_else(|| Grid::new(offset, [1, 1, 1]) /* arbitrary value */);
 
-                // TODO: The color sum actually needs to be weighted by alpha. (Too bad we're not using premultiplied alpha.)
-                // TODO: Should not be counting interior voxels for the color, only visible surfaces.
-
-                let mut color_sum: Vector4<f32> = Vector4::zero();
                 let voxels = block_space
                     .extract(
                         occupied_grid,
                         #[inline(always)]
                         |_index, sub_block_data, _lighting| {
                             let sub_evaluated = sub_block_data.evaluated();
-                            color_sum += sub_evaluated.color.into();
                             Evoxel {
                                 color: sub_evaluated.color,
                                 selectable: sub_evaluated.attributes.selectable,
@@ -235,31 +230,11 @@ impl Block {
                     )
                     .translate(-offset.to_vec());
 
-                Ok(EvaluatedBlock {
-                    attributes: attributes.clone(),
-                    // The single color is the mean of the actual block colors.
-                    color: Rgba::try_from(
-                        (color_sum.truncate() / (occupied_grid.volume() as f32))
-                            .extend(color_sum.w / (full_resolution_grid.volume() as f32)),
-                    )
-                    .expect("Recursive block color computation produced NaN"),
+                Ok(EvaluatedBlock::from_voxels(
+                    attributes.clone(),
                     resolution,
-                    // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
-                    opaque: occupied_grid == full_resolution_grid
-                        && voxels.grid().interior_iter().all(
-                            #[inline(always)]
-                            |p| voxels[p].color.fully_opaque(),
-                        ),
-                    visible: voxels.grid().interior_iter().any(
-                        #[inline(always)]
-                        |p| !voxels[p].color.fully_transparent(),
-                    ),
-                    voxel_opacity_mask: Some(GridArray::from_fn(voxels.grid(), |p| {
-                        voxels[p].color.opacity_category()
-                    })),
-
-                    voxels: Some(voxels),
-                })
+                    voxels,
+                ))
             }
 
             // TODO: this has no unit tests
@@ -712,6 +687,49 @@ impl CustomFormat<ConciseDebug> for EvaluatedBlock {
 }
 
 impl EvaluatedBlock {
+    /// Computes the derived values of a voxel block.
+    fn from_voxels(
+        attributes: BlockAttributes,
+        resolution: Resolution,
+        voxels: GridArray<Evoxel>,
+    ) -> EvaluatedBlock {
+        // Compute color sum from voxels
+        // TODO: Give GridArray an iter() or something
+        // TODO: The color sum actually needs to be weighted by alpha. (Too bad we're not using premultiplied alpha.)
+        // TODO: Should not be counting interior voxels for the color, only visible surfaces.
+        let mut color_sum: Vector4<f32> = Vector4::zero();
+        for position in voxels.grid().interior_iter() {
+            color_sum += voxels[position].color.into();
+        }
+
+        let full_block_grid = Grid::for_block(resolution);
+        EvaluatedBlock {
+            attributes,
+            // The single color is the mean of the actual block colors.
+            color: Rgba::try_from(
+                (color_sum.truncate() / (voxels.grid().volume() as f32))
+                    .extend(color_sum.w / (full_block_grid.volume() as f32)),
+            )
+            .expect("Recursive block color computation produced NaN"),
+            resolution,
+            // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
+            opaque: voxels.grid() == full_block_grid
+                && voxels.grid().interior_iter().all(
+                    #[inline(always)]
+                    |p| voxels[p].color.fully_opaque(),
+                ),
+            visible: voxels.grid().interior_iter().any(
+                #[inline(always)]
+                |p| !voxels[p].color.fully_transparent(),
+            ),
+            voxel_opacity_mask: Some(GridArray::from_fn(voxels.grid(), |p| {
+                voxels[p].color.opacity_category()
+            })),
+
+            voxels: Some(voxels),
+        }
+    }
+
     /// Returns whether [`Self::visible`] is true (the block has some visible color/voxels)
     /// or [`BlockAttributes::animation_hint`] indicates that the block might _become_
     /// visible (by change of evaluation result rather than by being replaced).
