@@ -134,6 +134,19 @@ impl Aab {
         self.sizes
     }
 
+    /// The center of the enclosed volume.
+    ///
+    /// ```
+    /// use all_is_cubes::math::Aab;
+    /// use cgmath::Point3;
+    ///
+    /// let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+    /// assert_eq!(aab.center(), Point3::new(1.5, 3.5, 5.5));
+    /// ```
+    pub fn center(&self) -> Point3<FreeCoordinate> {
+        self.lower_bounds.map(FreeCoordinate::from) + self.sizes.map(FreeCoordinate::from) / 2.0
+    }
+
     /// Iterates over the eight corner points of the box.
     /// The ordering is deterministic but not currently declared stable.
     pub(crate) fn corner_points(
