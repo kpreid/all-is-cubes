@@ -13,6 +13,7 @@ use all_is_cubes::space::{Grid, LightPhysics, Space};
 use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
 
+use crate::fractal::menger_sponge;
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 
 /// Selection of initial content for constructing a new [`Universe`].
@@ -40,6 +41,7 @@ pub enum UniverseTemplate {
     Atrium,
     CornellBox,
     PhysicsLab,
+    MengerSponge,
     LightingBench,
     // TODO: add an "nothing, you get a blank editor" option once we have enough editing support.
 }
@@ -66,6 +68,7 @@ impl UniverseTemplate {
             Atrium => Some(atrium(&mut universe)),
             CornellBox => Some(cornell_box()),
             PhysicsLab => Some(physics_lab(50, 16).await),
+            MengerSponge => Some(menger_sponge(&mut universe, 0, 4)),
             LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
                 &mut universe,
             )),

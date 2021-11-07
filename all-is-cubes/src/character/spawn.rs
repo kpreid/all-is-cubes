@@ -44,7 +44,8 @@ impl Spawn {
     ///
     /// `direction` gives the direction in which the character will lie relative to the
     /// center of the space.
-    pub(crate) fn looking_at_space(
+    #[doc(hidden)] // TODO: Unsure if good API
+    pub fn looking_at_space(
         space_bounds: Grid,
         direction: impl Into<Vector3<FreeCoordinate>>,
     ) -> Self {

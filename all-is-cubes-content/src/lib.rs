@@ -32,6 +32,7 @@ pub use demo::*;
 mod dungeon;
 mod exhibits;
 pub(crate) use exhibits::*;
+mod fractal;
 mod landscape;
 pub use landscape::*;
 
