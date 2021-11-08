@@ -27,7 +27,9 @@ use all_is_cubes::cgmath::ElementWise as _;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::inv::Slot;
 use all_is_cubes::math::{FreeCoordinate, Rgba};
-use all_is_cubes::raytracer::{CharacterBuf, ColorBuf, PixelBuf, RaytraceInfo, SpaceRaytracer};
+use all_is_cubes::raytracer::{
+    CharacterBuf, ColorBuf, PixelBuf, RaytraceInfo, UpdatingSpaceRaytracer,
+};
 use all_is_cubes::space::SpaceBlockData;
 
 /// Options for the terminal UI.
@@ -112,6 +114,7 @@ struct TerminalMain {
     /// position.
     widths: HashMap<String, u16>,
 
+    buffer_reuse_out: mpsc::Receiver<UpdatingSpaceRaytracer<ColorCharacterBuf>>,
     render_pipe_in: mpsc::SyncSender<FrameInput>,
     render_pipe_out: mpsc::Receiver<FrameOutput>,
 }
@@ -119,7 +122,7 @@ struct TerminalMain {
 struct FrameInput {
     camera: Camera,
     options: TerminalOptions,
-    scene: SpaceRaytracer<ColorCharacterBuf>,
+    scene: UpdatingSpaceRaytracer<ColorCharacterBuf>,
 }
 
 /// A frame's pixels and all the context needed to interpret it (which duplicates fields
@@ -134,6 +137,26 @@ struct FrameOutput {
 impl TerminalMain {
     fn new(app: AllIsCubesAppState, options: TerminalOptions) -> crossterm::Result<Self> {
         crossterm::terminal::enable_raw_mode()?;
+
+        let viewport_position = Rect::default();
+        let viewport = options.viewport_from_terminal_size(rect_size(viewport_position));
+        let cameras = StandardCameras::from_app_state(&app, viewport).unwrap();
+
+        // Generate reusable buffers for scene.
+        // They are recirculated through the channels so that one can be updated while another is being raytraced.
+        let number_of_scene_buffers = 3;
+        let (buffer_reuse_in, buffer_reuse_out) = mpsc::sync_channel::<
+            UpdatingSpaceRaytracer<ColorCharacterBuf>,
+        >(number_of_scene_buffers);
+        for _ in 0..number_of_scene_buffers {
+            buffer_reuse_in
+                .send(UpdatingSpaceRaytracer::new(
+                    // TODO: too many unwraps... and what if there is no character/space
+                    cameras.character().unwrap().borrow().space.clone(),
+                    app.graphics_options(),
+                ))
+                .unwrap();
+        }
 
         // Create thread for making the raytracing operation concurrent with main loop
         // Note: this doesn't really need a thread but rayon doesn't have a
@@ -150,7 +173,7 @@ impl TerminalMain {
                         scene,
                     }) = render_thread_in.recv()
                     {
-                        let (image, info) = scene.trace_scene_to_image(&camera);
+                        let (image, info) = scene.get().trace_scene_to_image(&camera);
                         // Ignore send errors as they just mean we're shutting down or died elsewhere
                         let _ = render_thread_out.send(FrameOutput {
                             viewport: camera.viewport(),
@@ -158,20 +181,20 @@ impl TerminalMain {
                             image,
                             info,
                         });
+                        let _ = buffer_reuse_in.send(scene);
                     }
                 }
             })?;
 
-        let viewport_position = Rect::default();
-        let viewport = options.viewport_from_terminal_size(rect_size(viewport_position));
         Ok(Self {
-            cameras: StandardCameras::from_app_state(&app, viewport).unwrap(),
+            cameras,
             app,
             options,
             tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
             viewport_position,
             terminal_state_dirty: true,
             widths: HashMap::new(),
+            buffer_reuse_out,
             render_pipe_in,
             render_pipe_out,
         })
@@ -262,23 +285,17 @@ impl TerminalMain {
 
     fn send_frame_to_render(&mut self) {
         self.cameras.update();
-
         // TODO: should be able to ask self.cameras for the space to render
-        let character = match self.cameras.character() {
-            Some(character_ref) => character_ref.borrow(),
-            None => {
-                return;
-            }
-        };
-        let space = &*character.space.borrow();
+
+        // Refresh space data for render
+        // TODO: Check if we need to switch spaces
+        let mut scene = self.buffer_reuse_out.recv().unwrap();
+        scene.update().unwrap();
 
         match self.render_pipe_in.try_send(FrameInput {
             camera: self.cameras.cameras().world.clone(),
             options: self.options.clone(),
-            scene: SpaceRaytracer::<ColorCharacterBuf>::new(
-                space,
-                self.app.graphics_options().snapshot(),
-            ),
+            scene,
         }) {
             Ok(()) => {
                 self.app.frame_clock.did_draw();
