@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector3};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3};
 use cgmath::{Point3, Vector4};
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
@@ -23,7 +23,7 @@ use crate::camera::{Camera, GraphicsOptions};
 use crate::math::{smoothstep, GridCoordinate};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
-use crate::space::{BlockIndex, GridArray, PackedLight, Space};
+use crate::space::{BlockIndex, GridArray, PackedLight, Space, SpaceBlockData};
 
 mod pixel_buf;
 pub use pixel_buf::*;
@@ -38,7 +38,7 @@ pub use text::*;
 /// Precomputed data for raytracing a single frame of a single [`Space`], and bearer of
 /// the methods for actually performing raytracing.
 pub struct SpaceRaytracer<P: PixelBuf> {
-    blocks: Box<[TracingBlock<P::BlockData>]>,
+    blocks: Vec<TracingBlock<P::BlockData>>,
     cubes: GridArray<TracingCubeData>,
 
     options: GraphicsOptions,
@@ -314,6 +314,18 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
 
         Ok(total_info)
     }
+
+    pub fn trace_scene_to_string(&self, camera: &Camera, line_ending: &str) -> String {
+        let mut out = String::with_capacity(
+            camera.viewport().framebuffer_size.dot(Vector2::new(1, 1)) as usize,
+        );
+        self.trace_scene_to_text(camera, line_ending, |s| {
+            out.push_str(s);
+            Ok::<(), std::convert::Infallible>(())
+        })
+        .unwrap();
+        out
+    }
 }
 
 impl<P: PixelBuf> fmt::Debug for SpaceRaytracer<P> {
@@ -354,27 +366,25 @@ impl std::iter::Sum for RaytraceInfo {
     }
 }
 
-/// Get block data out of [`Space`] (which is not [`Sync`], and not specialized for our
-/// efficient use).
+/// Copy all block data out of [`Space`].
 #[inline]
-fn prepare_blocks<P: PixelBuf>(space: &Space) -> Box<[TracingBlock<P::BlockData>]> {
-    space
-        .block_data()
-        .iter()
-        .map(|block_data| {
-            let evaluated = block_data.evaluated();
-            let pixel_block_data = P::compute_block_data(block_data);
-            if let Some(ref voxels) = evaluated.voxels {
-                TracingBlock::Recur(pixel_block_data, evaluated.resolution, voxels.clone())
-            } else {
-                TracingBlock::Atom(pixel_block_data, evaluated.color)
-            }
-        })
-        .collect()
+fn prepare_blocks<P: PixelBuf>(space: &Space) -> Vec<TracingBlock<P::BlockData>> {
+    space.block_data().iter().map(prepare_block::<P>).collect()
 }
 
-/// Get cube data out of [`Space`] (which is not [`Sync`], and not specialized for our
-/// efficient use).
+/// Copy one block's data out of [`Space`].
+#[inline]
+fn prepare_block<P: PixelBuf>(block_data: &SpaceBlockData) -> TracingBlock<P::BlockData> {
+    let evaluated = block_data.evaluated();
+    let pixel_block_data = P::compute_block_data(block_data);
+    if let Some(ref voxels) = evaluated.voxels {
+        TracingBlock::Recur(pixel_block_data, evaluated.resolution, voxels.clone())
+    } else {
+        TracingBlock::Atom(pixel_block_data, evaluated.color)
+    }
+}
+
+/// Get cube data out of [`Space`].
 #[inline]
 fn prepare_cubes(space: &Space) -> GridArray<TracingCubeData> {
     space.extract(space.grid(), |index, _block, lighting| TracingCubeData {
@@ -458,6 +468,9 @@ impl<P: PixelBuf> TracingState<P> {
         }
     }
 }
+
+pub use updating::*;
+mod updating;
 
 #[cfg(feature = "rayon")]
 mod rayon_helper {
