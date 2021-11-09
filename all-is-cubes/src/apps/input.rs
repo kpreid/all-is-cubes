@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::apps::Tick;
-use crate::camera::Viewport;
+use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::Character;
 use crate::listen::{ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
@@ -258,6 +258,7 @@ impl InputProcessor {
             universe: _,
             character: character_opt,
             paused: paused_opt,
+            graphics_options,
         } = targets;
 
         let dt = tick.delta_t.as_secs_f64();
@@ -356,6 +357,7 @@ pub struct InputTargets<'a> {
     pub universe: Option<&'a mut Universe>,
     pub character: Option<&'a URef<Character>>,
     pub paused: Option<&'a ListenableCell<bool>>,
+    pub graphics_options: Option<&'a ListenableCell<GraphicsOptions>>,
 }
 
 /// A platform-neutral representation of keyboard keys for [`InputProcessor`].
@@ -390,6 +392,7 @@ mod tests {
                 universe: Some(universe),
                 character: Some(character),
                 paused: None,
+                graphics_options: None,
             },
             Tick::arbitrary(),
         );

@@ -206,6 +206,7 @@ impl AllIsCubesAppState {
                             universe: Some(&mut self.game_universe),
                             character: Some(character_ref),
                             paused: Some(&self.paused),
+                            graphics_options: Some(&self.graphics_options),
                         },
                         tick,
                     );
