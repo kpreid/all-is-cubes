@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::apps::Tick;
-use crate::camera::{GraphicsOptions, Viewport};
+use crate::camera::{FogOption, GraphicsOptions, LightingOption, TransparencyOption, Viewport};
 use crate::character::Character;
 use crate::listen::{ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
@@ -86,8 +86,11 @@ impl InputProcessor {
             Key::Down => true,
             Key::Character(' ') => true,
             Key::Character(d) if d.is_ascii_digit() => true,
+            Key::Character('i') => true,
             Key::Character('l') => true,
+            Key::Character('o') => true,
             Key::Character('p') => true,
+            Key::Character('u') => true,
             _ => false,
         }
     }
@@ -97,8 +100,11 @@ impl InputProcessor {
         #[allow(clippy::match_like_matches_macro)]
         match key {
             Key::Character(d) if d.is_ascii_digit() => true,
+            Key::Character('i') => true,
             Key::Character('l') => true,
+            Key::Character('o') => true,
             Key::Character('p') => true,
+            Key::Character('u') => true,
             // TODO: move slot selection commands here
             _ => false,
         }
@@ -289,6 +295,17 @@ impl InputProcessor {
 
         for key in self.command_buffer.drain(..) {
             match key {
+                Key::Character('i') => {
+                    if let Some(cell) = graphics_options {
+                        cell.update_mut(|options| {
+                            options.lighting_display = match options.lighting_display {
+                                LightingOption::None => LightingOption::Flat,
+                                LightingOption::Flat => LightingOption::Smooth,
+                                LightingOption::Smooth => LightingOption::None,
+                            };
+                        });
+                    }
+                }
                 Key::Character('l') => {
                     let new_state = !*self.mouselook_mode.get();
                     self.mouselook_mode.set(new_state);
@@ -297,10 +314,35 @@ impl InputProcessor {
                         self.mouse_previous_pixel_position = None;
                     }
                 }
+                Key::Character('o') => {
+                    if let Some(cell) = graphics_options {
+                        cell.update_mut(|options| {
+                            options.transparency = match options.transparency {
+                                TransparencyOption::Surface => TransparencyOption::Volumetric,
+                                TransparencyOption::Volumetric => {
+                                    TransparencyOption::Threshold(notnan!(0.5))
+                                }
+                                TransparencyOption::Threshold(_) => TransparencyOption::Surface,
+                            };
+                        });
+                    }
+                }
                 Key::Character('p') => {
                     // TODO: bind escape key, focus loss, etc to pause
                     if let Some(paused) = paused_opt {
-                        paused.set(!*paused.get());
+                        paused.update_mut(|p| *p = !*p);
+                    }
+                }
+                Key::Character('u') => {
+                    if let Some(cell) = graphics_options {
+                        cell.update_mut(|options| {
+                            options.fog = match options.fog {
+                                FogOption::None => FogOption::Abrupt,
+                                FogOption::Abrupt => FogOption::Compromise,
+                                FogOption::Compromise => FogOption::Physical,
+                                FogOption::Physical => FogOption::None,
+                            };
+                        });
                     }
                 }
                 Key::Character(numeral) if numeral.is_digit(10) => {

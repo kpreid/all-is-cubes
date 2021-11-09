@@ -61,6 +61,21 @@ impl<T: Sync> ListenableCell<T> {
             .notify(());
     }
 
+    /// Sets the contained value by modifying a clone of the old value using the provided
+    /// function.
+    ///
+    /// Note: this function is not atomic, in that other modifications can be made between
+    /// the time this function reads the current value and writes the new one.
+    pub fn update_mut<F>(&self, f: F)
+    where
+        T: Clone,
+        F: FnOnce(&mut T),
+    {
+        let mut arc = self.get();
+        f(Arc::make_mut(&mut arc));
+        self.set(arc);
+    }
+
     /// Returns a [`ListenableSource`] which provides read-only access to the value
     /// managed by this cell.
     pub fn as_source(&self) -> ListenableSource<T> {
