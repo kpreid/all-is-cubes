@@ -34,6 +34,10 @@ pub trait CustomFormat<F: Copy> {
 
 /// You can use [`CustomFormat::custom_format`] to construct this.
 /// See its documentation.
+///
+/// To enable using the wrapper inside [`assert_eq`], it implements [`PartialEq`]
+/// (comparing both value and format).
+#[derive(Eq, PartialEq)]
 pub struct CustomFormatWrapper<'a, F: Copy, T: CustomFormat<F> + ?Sized>(F, &'a T);
 impl<'a, F: Copy, T: CustomFormat<F>> Debug for CustomFormatWrapper<'a, F, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -43,6 +47,15 @@ impl<'a, F: Copy, T: CustomFormat<F>> Debug for CustomFormatWrapper<'a, F, T> {
 impl<'a, F: Copy, T: CustomFormat<F>> Display for CustomFormatWrapper<'a, F, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         <T as CustomFormat<F>>::fmt(self.1, fmt, self.0)
+    }
+}
+
+/// Format type for [`CustomFormat`] which forces a string to be unquoted when [`Display`]ed.
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub(crate) struct Unquote;
+impl CustomFormat<Unquote> for String {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: Unquote) -> fmt::Result {
+        write!(fmt, "{}", self)
     }
 }
 
