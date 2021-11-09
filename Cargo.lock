@@ -1931,9 +1931,9 @@ dependencies = [
 
 [[package]]
 name = "luminance-windowing"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11704e4e6131156444a2208f38ad3bc936a183a38f6c32073db6de880a5cb488"
+checksum = "adaa37407eb4c4ee7257f95238242f06a883ab58962b5608ee2718e501c6fa11"
 dependencies = [
  "luminance",
 ]

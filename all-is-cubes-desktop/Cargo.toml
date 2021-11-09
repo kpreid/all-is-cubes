@@ -30,7 +30,7 @@ indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
 luminance = "0.44.0"
 luminance-glfw = "0.16.0"
-luminance-windowing = "0.10.0"
+luminance-windowing = "0.10.1"
 png = "0.17.0"
 serde = { version = "1.0.126", default-features = false }
 serde_json = "1.0.64"
