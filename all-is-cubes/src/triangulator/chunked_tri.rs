@@ -772,8 +772,12 @@ mod tests {
 
     #[test]
     fn graphics_options_change() {
-        let mut options = GraphicsOptions::default();
-        options.transparency = TransparencyOption::Volumetric;
+        // TODO: This test is fragile because it doesn't think about multiple chunks.
+        let mut options = GraphicsOptions {
+            view_distance: notnan!(1.0),
+            transparency: TransparencyOption::Volumetric,
+            ..Default::default()
+        };
         let mut space = Space::empty_positive(1, 1, 1);
         space
             .set([0, 0, 0], Block::from(rgba_const!(1., 1., 1., 0.25)))
