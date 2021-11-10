@@ -52,6 +52,8 @@ where
     /// Whether, on the previous frame, some chunks were unavailable.
     /// If so, then we prioritize adding new chunks over updating existing ones.
     chunks_were_missing: bool,
+
+    last_tri_options: Option<TriangulatorOptions>,
 }
 
 impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<D, Vert, Tex, CHUNK_SIZE>
@@ -74,6 +76,7 @@ where
             chunks: HashMap::new(),
             chunk_chart: ChunkChart::new(0.0),
             chunks_were_missing: true,
+            last_tri_options: None,
         }
     }
 
@@ -119,7 +122,7 @@ where
         IF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
     {
         let graphics_options = camera.options();
-        let tri_options = &TriangulatorOptions::new(graphics_options);
+        let tri_options = TriangulatorOptions::new(graphics_options);
         let max_updates = graphics_options.chunks_per_frame.into();
         let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
@@ -133,8 +136,11 @@ where
             return (CstUpdateInfo::default(), view_chunk);
         };
 
-        // TODO: If tri_options changed, invalidate all blocks and chunks
-        // (And when we work on that, make it so we aren't recomputing tri_options unconditionally)
+        if Some(&tri_options) != self.last_tri_options.as_ref() {
+            todo.all_blocks_and_chunks = true;
+            self.last_tri_options = Some(tri_options);
+        }
+        let tri_options = self.last_tri_options.as_ref().unwrap();
 
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
@@ -547,7 +553,7 @@ mod tests {
 
     use super::*;
     use crate::block::Block;
-    use crate::camera::{GraphicsOptions, Viewport};
+    use crate::camera::{GraphicsOptions, TransparencyOption, Viewport};
     use crate::math::GridCoordinate;
     use crate::space::SpaceTransaction;
     use crate::triangulator::{BlockVertex, NoTextures};
@@ -762,5 +768,30 @@ mod tests {
         );
         assert!(did_call, "Expected indices_only_updater #2");
         // TODO: Change the behavior so additional frames *don't* depth sort if the view is unchanged.
+    }
+
+    #[test]
+    fn graphics_options_change() {
+        let mut options = GraphicsOptions::default();
+        options.transparency = TransparencyOption::Volumetric;
+        let mut space = Space::empty_positive(1, 1, 1);
+        space
+            .set([0, 0, 0], Block::from(rgba_const!(1., 1., 1., 0.25)))
+            .unwrap();
+
+        let mut tester = CstTester::new(space);
+        tester.camera.set_options(options.clone());
+
+        let mut vertices = None;
+        tester.update(|mesh, _| vertices = Some(mesh.vertices().len()), |_, _| {});
+        assert_eq!(vertices, Some(24));
+
+        // Change options so that the mesh should disappear
+        options.transparency = TransparencyOption::Threshold(notnan!(0.5));
+        tester.camera.set_options(options.clone());
+
+        vertices = None;
+        tester.update(|mesh, _| vertices = Some(mesh.vertices().len()), |_, _| {});
+        assert_eq!(vertices, Some(0));
     }
 }
