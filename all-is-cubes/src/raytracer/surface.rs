@@ -136,6 +136,11 @@ impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
         let rc_step = self.block_raycaster.next()?;
 
         let cube_data: &TracingCubeData = &self.array[rc_step.cube_ahead()];
+        if cube_data.always_invisible {
+            // Early return that avoids indirecting through self.blocks
+            return Some(TraceStep::Invisible);
+        }
+
         Some(match &self.blocks[cube_data.block_index as usize] {
             TracingBlock::Atom(block_data, color) => {
                 if color.fully_transparent() {

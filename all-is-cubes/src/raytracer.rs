@@ -18,7 +18,7 @@ use cgmath::{Point3, Vector4};
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
-use crate::block::{Evoxel, Resolution};
+use crate::block::{Evoxel, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions};
 use crate::math::{smoothstep, GridCoordinate};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
@@ -387,9 +387,12 @@ fn prepare_block<P: PixelBuf>(block_data: &SpaceBlockData) -> TracingBlock<P::Bl
 /// Get cube data out of [`Space`].
 #[inline]
 fn prepare_cubes(space: &Space) -> GridArray<TracingCubeData> {
-    space.extract(space.grid(), |index, _block, lighting| TracingCubeData {
-        block_index: index.unwrap(),
-        lighting,
+    space.extract(space.grid(), |index, block_data, lighting| {
+        TracingCubeData {
+            block_index: index.unwrap(),
+            lighting,
+            always_invisible: block_data.block() == &AIR,
+        }
     })
 }
 
@@ -397,6 +400,14 @@ fn prepare_cubes(space: &Space) -> GridArray<TracingCubeData> {
 struct TracingCubeData {
     block_index: BlockIndex,
     lighting: PackedLight,
+    /// True if the block is [`AIR`].
+    ///
+    /// This special information allows us to skip an indirect memory access in this
+    /// extremely common case. We could generalize it to any block which is fully
+    /// invisible, but only if *the block is not an indirection* since if it is, the
+    /// block data could change without signaling a cube change, and currently we don't
+    /// have a mechanism to obtain that information from the Space.
+    always_invisible: bool,
 }
 
 #[derive(Clone, Debug)]

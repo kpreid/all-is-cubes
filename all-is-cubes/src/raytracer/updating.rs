@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::mem;
 use std::sync::{Arc, Mutex, Weak};
 
+use crate::block::AIR;
 use crate::listen::{ListenableSource, Listener};
 use crate::space::SpaceChange;
 use crate::universe::{RefError, URef};
@@ -76,9 +77,11 @@ impl<P: PixelBuf> UpdatingSpaceRaytracer<P> {
 
             for cube in todo.cubes.drain() {
                 // TODO: this does 2 cube index calculations instead of the 1 it needs
+                let block_index = space.get_block_index(cube).unwrap_or(0);
                 self.state.cubes[cube] = TracingCubeData {
-                    block_index: space.get_block_index(cube).unwrap_or(0),
+                    block_index,
                     lighting: space.get_lighting(cube),
+                    always_invisible: block_data_slice[block_index as usize].block() == &AIR,
                 };
             }
         }
