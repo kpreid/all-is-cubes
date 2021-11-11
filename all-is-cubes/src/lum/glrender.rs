@@ -6,6 +6,7 @@
 use std::fmt;
 use std::time::Duration;
 
+use cgmath::Vector2;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb888;
@@ -88,7 +89,7 @@ where
 
         let mut info_text_texture = full_frame.new_texture();
         info_text_texture
-            .resize(&mut surface, cameras.viewport())
+            .resize(&mut surface, cameras.viewport(), info_text_size_policy)
             .unwrap();
 
         Ok(Self {
@@ -112,7 +113,7 @@ where
         self.cameras.set_viewport(viewport);
 
         self.info_text_texture
-            .resize(&mut self.surface, viewport)
+            .resize(&mut self.surface, viewport, info_text_size_policy)
             .unwrap();
 
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
@@ -380,4 +381,8 @@ impl CustomFormat<StatusText> for RenderInfo {
         write!(fmt, "{}", self.space.custom_format(StatusText))?;
         Ok(())
     }
+}
+
+fn info_text_size_policy(viewport: Viewport) -> Vector2<u32> {
+    viewport.nominal_size.map(|c| c.round() as u32)
 }

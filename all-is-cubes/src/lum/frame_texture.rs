@@ -97,7 +97,7 @@ where
         shading_gate.shade(
             &mut self.program.borrow_mut(),
             |ref mut program_iface, uniform_iface, mut render_gate| {
-                program_iface.set(&uniform_iface.texture, bound_texture.binding());
+                program_iface.set(&uniform_iface.frame_texture, bound_texture.binding());
                 render_gate.render(
                     render_state,
                     |mut tess_gate| -> Result<(), GraphicsResourceError> { tess_gate.render(tess) },
@@ -132,11 +132,12 @@ where
         &mut self,
         context: &mut C,
         viewport: Viewport,
+        scale_policy: fn(Viewport) -> Vector2<u32>,
     ) -> Result<(), GraphicsResourceError>
     where
         C: GraphicsContext<Backend = Backend>,
     {
-        let size = viewport.framebuffer_size;
+        let size = scale_policy(viewport);
         if size == self.last_size {
             return Ok(());
         }
@@ -258,5 +259,5 @@ where
 #[derive(Debug, UniformInterface)]
 pub(crate) struct FullFrameUniformInterface {
     #[uniform(unbound)] // At least one GL backend implementation has falsely reported this unused
-    texture: Uniform<TextureBinding<Dim2, NormUnsigned>>,
+    frame_texture: Uniform<TextureBinding<Dim2, NormUnsigned>>,
 }

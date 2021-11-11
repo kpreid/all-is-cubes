@@ -74,7 +74,8 @@ where
     where
         C: GraphicsContext<Backend = Backend>,
     {
-        self.render_target.resize(context, camera.viewport())?;
+        self.render_target
+            .resize(context, camera.viewport(), |vp| vp.framebuffer_size)?;
         self.pixel_picker.resize(camera.viewport());
 
         if let Some(urt) = &mut self.raytracer {
