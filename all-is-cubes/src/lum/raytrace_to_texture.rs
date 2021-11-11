@@ -23,20 +23,18 @@ use rand::SeedableRng as _;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::rc::Rc;
 
-use crate::camera::Camera;
 use crate::camera::Viewport;
-use crate::lum::frame_texture::FullFramePainter;
-use crate::lum::frame_texture::FullFrameTexture;
+use crate::camera::{Camera, GraphicsOptions};
+use crate::listen::ListenableSource;
+use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::lum::types::AicLumBackend;
 use crate::lum::GraphicsResourceError;
-use crate::raytracer::PixelBuf;
-use crate::raytracer::{ColorBuf, SpaceRaytracer};
-use crate::space::Space;
-use crate::space::SpaceBlockData;
+use crate::raytracer::{ColorBuf, PixelBuf, UpdatingSpaceRaytracer};
+use crate::space::{Space, SpaceBlockData};
 use crate::universe::URef;
 
 pub(crate) struct RaytraceToTexture<Backend: AicLumBackend> {
-    space: Option<URef<Space>>,
+    raytracer: Option<UpdatingSpaceRaytracer<Srgb8Adapter>>,
     // TODO: should not be public but we want an easy way to grab it for drawing
     pub(crate) render_target: FullFrameTexture<Backend>,
     pixel_picker: PixelPicker,
@@ -50,7 +48,7 @@ where
 {
     pub fn new(fp: Rc<FullFramePainter<Backend>>) -> Result<Self, GraphicsResourceError> {
         Ok(Self {
-            space: None,
+            raytracer: None,
             render_target: fp.new_texture(),
             pixel_picker: PixelPicker::new(Viewport {
                 nominal_size: Vector2::new(1., 1.),
@@ -61,11 +59,10 @@ where
     }
 
     pub fn set_space(&mut self, space: Option<URef<Space>>) {
-        // let space_borrowed = space.borrow_mut();
-        self.space = space;
-        // let todo = SpaceRendererTodo::default();
-        // let todo_rc = Rc::new(RefCell::new(todo));
-        // space_borrowed.listen(TodoListener(Rc::downgrade(&todo_rc)));
+        // TODO: hook up options
+        self.raytracer = space.map(|s| {
+            UpdatingSpaceRaytracer::new(s, ListenableSource::constant(GraphicsOptions::default()))
+        });
     }
 
     /// Trace a frame's worth of rays and update the texture.
@@ -80,49 +77,47 @@ where
         self.render_target.resize(context, camera.viewport())?;
         self.pixel_picker.resize(camera.viewport());
 
-        if let Some(space_ref) = &self.space {
-            if let Ok(space) = space_ref.try_borrow() {
-                let tracer = SpaceRaytracer::<Srgb8Adapter>::new(&*space, camera.options().clone());
+        if let Some(urt) = &mut self.raytracer {
+            urt.update().unwrap(/* TODO */);
+            let tracer = urt.get();
 
-                #[allow(clippy::needless_collect)] // needed with rayon and not without
-                let this_frame_pixels: Vec<Point> = (0..self.rays_per_frame)
-                    .map(|_i| self.pixel_picker.next().unwrap())
-                    .collect();
+            #[allow(clippy::needless_collect)] // needed with rayon and not without
+            let this_frame_pixels: Vec<Point> = (0..self.rays_per_frame)
+                .map(|_i| self.pixel_picker.next().unwrap())
+                .collect();
 
-                let start_time = Instant::now();
-                let trace = |p| {
-                    Pixel(
-                        p,
-                        tracer
-                            .trace_ray(camera.project_ndc_into_world(Point2::new(
-                                camera.viewport().normalize_fb_x(p.x as usize),
-                                camera.viewport().normalize_fb_y(p.y as usize),
-                            )))
-                            .0,
-                    )
-                };
-                #[cfg(feature = "rayon")]
-                let traces: Vec<Pixel<Rgb888>> =
-                    this_frame_pixels.into_par_iter().map(trace).collect();
-                #[cfg(not(feature = "rayon"))]
-                let traces: Vec<Pixel<Rgb888>> = this_frame_pixels.into_iter().map(trace).collect();
-                let tracing_duration = Instant::now().duration_since(start_time);
+            let start_time = Instant::now();
+            let trace = |p| {
+                Pixel(
+                    p,
+                    tracer
+                        .trace_ray(camera.project_ndc_into_world(Point2::new(
+                            camera.viewport().normalize_fb_x(p.x as usize),
+                            camera.viewport().normalize_fb_y(p.y as usize),
+                        )))
+                        .0,
+                )
+            };
+            #[cfg(feature = "rayon")]
+            let traces: Vec<Pixel<Rgb888>> = this_frame_pixels.into_par_iter().map(trace).collect();
+            #[cfg(not(feature = "rayon"))]
+            let traces: Vec<Pixel<Rgb888>> = this_frame_pixels.into_iter().map(trace).collect();
+            let tracing_duration = Instant::now().duration_since(start_time);
 
-                match tracing_duration.cmp(&Duration::from_millis(10)) {
-                    std::cmp::Ordering::Greater => {
-                        self.rays_per_frame = (self.rays_per_frame - 100).max(100);
-                    }
-                    std::cmp::Ordering::Equal => {}
-                    std::cmp::Ordering::Less => {
-                        let fbs = camera.viewport().framebuffer_size;
-                        self.rays_per_frame =
-                            (self.rays_per_frame + 100).min(fbs.x as usize * fbs.y as usize);
-                    }
+            match tracing_duration.cmp(&Duration::from_millis(40)) {
+                std::cmp::Ordering::Greater => {
+                    self.rays_per_frame = (self.rays_per_frame - 100).max(100);
                 }
-
-                self.render_target.draw_iter(traces).unwrap();
-                self.render_target.upload()?;
+                std::cmp::Ordering::Equal => {}
+                std::cmp::Ordering::Less => {
+                    let fbs = camera.viewport().framebuffer_size;
+                    self.rays_per_frame =
+                        (self.rays_per_frame + 100).min(fbs.x as usize * fbs.y as usize);
+                }
             }
+
+            self.render_target.draw_iter(traces).unwrap();
+            self.render_target.upload()?;
         }
 
         Ok(())
