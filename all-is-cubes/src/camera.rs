@@ -346,6 +346,9 @@ pub struct GraphicsOptions {
     /// visible effects.
     pub use_frustum_culling: bool,
 
+    /// Draw text overlay showing debug information.
+    pub debug_info_text: bool,
+
     /// Draw boxes around chunk borders and some debug info.
     pub debug_chunk_boxes: bool,
 
@@ -381,6 +384,7 @@ impl Default for GraphicsOptions {
             transparency: TransparencyOption::Volumetric,
             chunks_per_frame: 4,
             use_frustum_culling: true,
+            debug_info_text: true,
             debug_chunk_boxes: false,
             debug_collision_boxes: false,
             debug_light_rays_at_cursor: false,

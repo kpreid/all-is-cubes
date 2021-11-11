@@ -319,6 +319,11 @@ where
     }
 
     pub fn add_info_text(&mut self, text: &str) -> Result<(), GraphicsResourceError> {
+        if !self.cameras.cameras().world.options().debug_info_text {
+            // TODO: Avoid computing the text, not just drawing it
+            return Ok(());
+        }
+
         let info_text_texture = &mut self.info_text_texture;
         info_text_texture.data().fill(0);
         Text::with_baseline(

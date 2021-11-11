@@ -334,9 +334,20 @@ impl WebGameRoot {
                 .expect("error in render_frame");
 
             // Update info text
-            self.static_dom
-                .scene_info_text_node
-                .set_data(&format!("{}", self.app.info_text(render_info)));
+            if self
+                .renderer
+                .cameras()
+                .cameras()
+                .world
+                .options()
+                .debug_info_text
+            {
+                self.static_dom
+                    .scene_info_text_node
+                    .set_data(&format!("{}", self.app.info_text(render_info)));
+            } else {
+                self.static_dom.scene_info_text_node.set_data(&"");
+            }
         }
 
         if self.app.frame_clock.should_step() && !self.step_callback_scheduled {
