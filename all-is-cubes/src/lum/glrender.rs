@@ -7,7 +7,7 @@ use std::fmt;
 use std::time::Duration;
 
 use cgmath::Vector2;
-use embedded_graphics::mono_font::iso_8859_1::FONT_10X20;
+use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::{Drawable, Point};
@@ -324,7 +324,7 @@ where
         Text::with_baseline(
             text,
             Point::new(5, 5),
-            MonoTextStyle::new(&FONT_10X20, Rgb888::new(0, 0, 0)),
+            MonoTextStyle::new(&FONT_7X13_BOLD, Rgb888::new(0, 0, 0)),
             Baseline::Top,
         )
         .draw(info_text_texture)
