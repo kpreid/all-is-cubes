@@ -12,9 +12,16 @@ use all_is_cubes::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoin
 use all_is_cubes::rgb_const;
 use all_is_cubes::space::{Grid, GridArray, Space};
 use all_is_cubes::universe::Universe;
+use rand::{Rng, SeedableRng};
 
 use crate::dungeon::{build_dungeon, d2f, maze_to_array, DungeonGrid, Theme};
 use crate::{four_walls, DemoBlocks, LandscapeBlocks};
+
+struct DemoRoom {
+    // TODO: remove dependency on maze gen entirely
+    maze_field: Field,
+    lit: bool,
+}
 
 /// Data to use to construct specific dungeon rooms.
 struct DemoTheme {
@@ -44,13 +51,6 @@ impl DemoTheme {
             },
         )?;
 
-        // A single light for each room for now
-        let top_middle = interior
-            .abut(Face::PY, -1)
-            .unwrap()
-            .center()
-            .map(|c| c as GridCoordinate);
-        space.set(top_middle, &self.lamp_block)?;
         Ok(())
     }
 
@@ -94,7 +94,7 @@ impl DemoTheme {
     }
 }
 
-impl Theme<Field> for DemoTheme {
+impl Theme<DemoRoom> for DemoTheme {
     fn grid(&self) -> &DungeonGrid {
         &self.dungeon_grid
     }
@@ -107,9 +107,9 @@ impl Theme<Field> for DemoTheme {
         &self,
         space: &mut Space,
         pass_index: usize,
-        map: &GridArray<Field>,
+        map: &GridArray<DemoRoom>,
         room_position: GridPoint,
-        value: &Field,
+        room_data: &DemoRoom,
     ) -> Result<(), InGenError> {
         // TODO: put in struct, or eliminate
         let start_wall = Block::from(rgb_const!(1.0, 0.0, 0.0));
@@ -120,7 +120,7 @@ impl Theme<Field> for DemoTheme {
         match pass_index {
             0 => {
                 self.plain_room(
-                    match value.field_type {
+                    match room_data.maze_field.field_type {
                         FieldType::Start => Some(&start_wall),
                         FieldType::Goal => Some(&goal_wall),
                         FieldType::Normal => None,
@@ -128,6 +128,15 @@ impl Theme<Field> for DemoTheme {
                     space,
                     interior,
                 )?;
+
+                if room_data.lit {
+                    let top_middle = interior
+                        .abut(Face::PY, -1)
+                        .unwrap()
+                        .center()
+                        .map(|c| c as GridCoordinate);
+                    space.set(top_middle, &self.lamp_block)?;
+                }
             }
             1 => {
                 for direction in [Direction::East, Direction::South] {
@@ -135,14 +144,16 @@ impl Theme<Field> for DemoTheme {
                     let neighbor = room_position + face.normal_vector();
                     // contains_cube() check is to work around the maze generator sometimes producing
                     // out-of-bounds passages.
-                    if value.has_passage(&direction) && map.grid().contains_cube(neighbor) {
+                    if room_data.maze_field.has_passage(&direction)
+                        && map.grid().contains_cube(neighbor)
+                    {
                         self.inside_doorway(space, room_position, face)?;
                     }
                 }
 
                 // Set spawn.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
-                if matches!(value.field_type, FieldType::Start) {
+                if matches!(room_data.maze_field.field_type, FieldType::Start) {
                     let mut spawn = Spawn::default_for_new_space(space.grid());
                     // TODO: There should be a way to express "spawn with feet in this block",
                     // independent of height.
@@ -158,7 +169,7 @@ impl Theme<Field> for DemoTheme {
 
                     // Orient towards the first room's exit.
                     for direction in Direction::all() {
-                        if value.has_passage(&direction) {
+                        if room_data.maze_field.has_passage(&direction) {
                             spawn.set_look_direction(d2f(direction).normal_vector());
                             break;
                         }
@@ -179,7 +190,7 @@ pub(crate) async fn demo_dungeon(
     progress: YieldProgress,
 ) -> Result<Space, InGenError> {
     // TODO: reintroduce random elements separate from the maze.
-    // let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(38492);
+    let mut rng = rand_xoshiro::Xoshiro256Plus::from_entropy();
 
     let dungeon_grid = DungeonGrid {
         room_box: Grid::new([0, 0, 0], [9, 5, 8]),
@@ -197,8 +208,12 @@ pub(crate) async fn demo_dungeon(
         lamp_block: demo_blocks[DemoBlocks::Lamp].clone(),
     };
 
-    let dungeon_map =
+    let maze =
         maze_to_array(&maze_generator::ellers_algorithm::EllersGenerator::new(None).generate(9, 9));
+    let dungeon_map = maze.map(|maze_field| DemoRoom {
+        maze_field,
+        lit: rng.gen_bool(0.7),
+    });
 
     let space_bounds = dungeon_grid.minimum_space_for_rooms(dungeon_map.grid());
     let mut space = Space::builder(space_bounds).build_empty();
