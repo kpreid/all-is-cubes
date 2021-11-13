@@ -16,12 +16,14 @@ void main() {
     const int radius = 2;
     for (int dx = -radius; dx <= radius; dx++)
     for (int dy = -radius; dy <= radius; dy++) {
-        ivec2 ioffset = ivec2(dx, dy);
-        shadowing += texture(frame_texture, texcoord + vec2(ioffset) * derivatives, 0).a * (0.2 / max(1.0, length(vec2(ioffset))));
+        highp vec2 offset = vec2(ivec2(dx, dy));
+        lowp float offset_alpha = texture(frame_texture, texcoord + offset * derivatives).a;
+        lowp float weight = 0.2 / max(1.0, length(offset));
+        shadowing += offset_alpha * weight;
     }
     shadowing = clamp(shadowing, 0.0, 0.5);
 
-    lowp vec4 foreground_texel = texture(frame_texture, texcoord, 0);
+    lowp vec4 foreground_texel = texture(frame_texture, texcoord);
 
     // Shadow layer
     color = mix(vec4(0.0), vec4(vec3(0.0), 1.0), shadowing);
