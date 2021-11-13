@@ -7,7 +7,7 @@
 //! TODO: This module is currently private but should be made public if these construction
 //! tools turn out reasonably generic.
 
-use maze_generator::prelude::{Direction, FieldType, Generator};
+use maze_generator::prelude::{Direction, Field, FieldType, Generator, Maze};
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, Vector3};
@@ -15,7 +15,7 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridRotation};
 use all_is_cubes::rgb_const;
-use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::space::{Grid, GridArray, Space};
 use all_is_cubes::universe::Universe;
 
 use crate::{four_walls, DemoBlocks, LandscapeBlocks};
@@ -203,10 +203,9 @@ pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGen
     };
 
     let maze = maze_generator::ellers_algorithm::EllersGenerator::new(None).generate(9, 9);
+    let maze_array = maze_to_array(&maze);
 
-    let room_grid_bounds = Grid::new([0, 0, 0], [maze.size.0, 1, maze.size.1]);
-
-    let space_bounds = dungeon_grid.minimum_space_for_rooms(room_grid_bounds);
+    let space_bounds = dungeon_grid.minimum_space_for_rooms(maze_array.grid());
     let mut space = Space::builder(space_bounds)
         .spawn({
             let mut spawn = Spawn::default_for_new_space(space_bounds);
@@ -238,7 +237,7 @@ pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGen
 
     let start_wall = Block::from(rgb_const!(1.0, 0.0, 0.0));
     let goal_wall = Block::from(rgb_const!(0.0, 0.8, 0.0));
-    for room_position in room_grid_bounds.interior_iter() {
+    for room_position in maze_array.grid().interior_iter() {
         let interior = dungeon_grid.room_box_at(room_position);
 
         theme.plain_room(
@@ -253,7 +252,7 @@ pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGen
     }
 
     // Doorways
-    for room in room_grid_bounds.interior_iter() {
+    for room in maze_array.grid().interior_iter() {
         let coord = gp2m(room);
         let field = maze.get_field(&coord).unwrap();
         for direction in [Direction::East, Direction::South] {
@@ -268,6 +267,12 @@ pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGen
     }
 
     Ok(space)
+}
+
+fn maze_to_array(maze: &Maze) -> GridArray<Field> {
+    GridArray::from_fn(Grid::new([0, 0, 0], [maze.size.0, 1, maze.size.1]), |p| {
+        maze.get_field(&gp2m(p)).unwrap()
+    })
 }
 
 fn m2gp(p: maze_generator::prelude::Coordinates) -> GridPoint {
