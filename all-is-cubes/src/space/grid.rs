@@ -568,6 +568,7 @@ impl Grid {
     /// );
     /// ```
     #[inline]
+    #[track_caller] // TODO: better error reporting
     pub fn expand(self, deltas: FaceMap<GridCoordinate>) -> Self {
         use Face::*;
         let l = self.lower_bounds();

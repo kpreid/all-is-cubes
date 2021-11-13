@@ -5,7 +5,7 @@ use all_is_cubes::util::YieldProgress;
 
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, Vector3};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Face, FaceMap, GridCoordinate, GridPoint};
+use all_is_cubes::math::{Face, FaceMap, GridCoordinate, GridPoint, GridVector};
 use all_is_cubes::space::{Grid, GridArray, Space};
 
 /// Defines the dimensions that dungeon room construction must live within.
@@ -39,6 +39,12 @@ impl DungeonGrid {
         self.room_box.size() + self.gap_between_rooms()
     }
 
+    /// Returns the translation which would be applied to move `self.room_box` to the
+    /// location of a specific room.
+    pub fn room_translation(&self, room_position: GridPoint) -> GridVector {
+        room_position.to_vec().mul_element_wise(self.room_spacing())
+    }
+
     pub fn room_box_including_walls(&self) -> Grid {
         self.room_box
             .expand(self.room_wall_thickness.map(|_, c| GridCoordinate::from(c)))
@@ -46,10 +52,11 @@ impl DungeonGrid {
 
     pub fn room_box_at(&self, room_position: GridPoint) -> Grid {
         self.room_box
-            .translate(room_position.to_vec().mul_element_wise(self.room_spacing()))
+            .translate(self.room_translation(room_position))
     }
 
     /// Returns the volume which lies between two rooms and meets their adjoining faces.
+    #[allow(dead_code)] // TODO: superseded in use by theme-specific sizes; review if should keep
     pub fn shared_wall_at(&self, room_position: GridPoint, face: Face) -> Grid {
         self.room_box_at(room_position)
             .abut(
