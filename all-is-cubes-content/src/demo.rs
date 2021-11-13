@@ -61,7 +61,7 @@ impl UniverseTemplate {
                 "the Fail template always fails to generate".into(),
             ))),
             DemoCity => Some(demo_city(&mut universe, p.take().unwrap()).await),
-            Dungeon => Some(demo_dungeon(&mut universe).await),
+            Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap()).await),
             Atrium => Some(atrium(&mut universe)),
             CornellBox => Some(cornell_box()),
             PhysicsLab => Some(physics_lab(50, 16).await),

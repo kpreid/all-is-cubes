@@ -7,6 +7,7 @@
 //! TODO: This module is currently private but should be made public if these construction
 //! tools turn out reasonably generic.
 
+use all_is_cubes::util::YieldProgress;
 use maze_generator::prelude::{Direction, Field, FieldType, Generator, Maze};
 
 use all_is_cubes::block::{Block, AIR};
@@ -276,13 +277,19 @@ impl Theme<Field> for DemoTheme {
     }
 }
 
-fn build_dungeon<Room, ThemeT: Theme<Room>>(
+async fn build_dungeon<Room, ThemeT: Theme<Room>>(
     space: &mut Space,
     theme: &ThemeT,
     map: &GridArray<Room>,
+    progress: YieldProgress,
 ) -> Result<(), InGenError> {
-    for pass in 0..theme.passes() {
-        for room_position in map.grid().interior_iter() {
+    let passes = theme.passes();
+    for (pass, progress) in (0..passes).zip(progress.split_evenly(passes)) {
+        for (room_position, progress) in map
+            .grid()
+            .interior_iter()
+            .zip(progress.split_evenly(map.grid().volume()))
+        {
             theme.place_room(
                 space,
                 pass,
@@ -290,6 +297,7 @@ fn build_dungeon<Room, ThemeT: Theme<Room>>(
                 room_position,
                 map.get(room_position).unwrap(),
             )?;
+            progress.progress(1.0).await;
         }
     }
 
@@ -297,7 +305,10 @@ fn build_dungeon<Room, ThemeT: Theme<Room>>(
 }
 
 /// This function is called from `UniverseTemplate`.
-pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGenError> {
+pub(crate) async fn demo_dungeon(
+    universe: &mut Universe,
+    progress: YieldProgress,
+) -> Result<Space, InGenError> {
     // TODO: reintroduce random elements separate from the maze.
     // let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(38492);
 
@@ -323,7 +334,7 @@ pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGen
     let space_bounds = dungeon_grid.minimum_space_for_rooms(dungeon_map.grid());
     let mut space = Space::builder(space_bounds).build_empty();
 
-    build_dungeon(&mut space, &theme, &dungeon_map)?;
+    build_dungeon(&mut space, &theme, &dungeon_map, progress).await?;
 
     Ok(space)
 }
