@@ -5,8 +5,8 @@ use std::cell::{BorrowMutError, RefCell};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 
-use js_sys::Error;
 use gloo_timers::future::TimeoutFuture;
+use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
 use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
@@ -73,8 +73,11 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .scene_info_text_node
         .append_data("\nConstructing universe...")?;
     yield_arbitrary().await;
-    let universe = template.build(YieldProgress::new(yield_arbitrary)).await.expect("universe template error");
-    
+    let universe = template
+        .build(YieldProgress::new(yield_arbitrary))
+        .await
+        .expect("universe template error");
+
     app.set_universe(universe);
     app.graphics_options_mut().set(graphics_options);
 
@@ -102,7 +105,9 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     )
     .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
 
-    static_dom.scene_info_text_node.append_data("\nFinal initialization...")?;
+    static_dom
+        .scene_info_text_node
+        .append_data("\nFinal initialization...")?;
     yield_arbitrary().await;
     let root = WebGameRoot::new(gui_helpers, static_dom, app, renderer);
 

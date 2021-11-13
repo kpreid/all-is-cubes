@@ -239,7 +239,11 @@ fn evaluate_rotated() {
         )
     };
     let rotated_color_fn = |cube: GridPoint| {
-        color_fn(rotation.to_positive_octant_matrix(resolution.into()).transform_cube(cube))
+        color_fn(
+            rotation
+                .to_positive_octant_matrix(resolution.into())
+                .transform_cube(cube),
+        )
     };
     let block = Block::builder()
         .voxels_fn(&mut universe, resolution, |cube| {
