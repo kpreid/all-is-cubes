@@ -103,6 +103,22 @@ impl DungeonGrid {
     }
 }
 
+trait Theme<R> {
+    fn grid(&self) -> &DungeonGrid;
+
+    fn passes(&self) -> usize;
+
+    // TODO: Replace `&mut Space` with transactions so we can use this post-startup?
+    fn place_room(
+        &self,
+        space: &mut Space,
+        pass_index: usize,
+        map: &GridArray<R>,
+        position: GridPoint,
+        value: &R,
+    ) -> Result<(), InGenError>;
+}
+
 /// Data to use to construct specific dungeon rooms.
 struct DemoTheme {
     dungeon_grid: DungeonGrid,
@@ -181,6 +197,105 @@ impl DemoTheme {
     }
 }
 
+impl Theme<Field> for DemoTheme {
+    fn grid(&self) -> &DungeonGrid {
+        &self.dungeon_grid
+    }
+
+    fn passes(&self) -> usize {
+        2
+    }
+
+    fn place_room(
+        &self,
+        space: &mut Space,
+        pass_index: usize,
+        map: &GridArray<Field>,
+        room_position: GridPoint,
+        value: &Field,
+    ) -> Result<(), InGenError> {
+        // TODO: put in struct, or eliminate
+        let start_wall = Block::from(rgb_const!(1.0, 0.0, 0.0));
+        let goal_wall = Block::from(rgb_const!(0.0, 0.8, 0.0));
+
+        let interior = self.dungeon_grid.room_box_at(room_position);
+
+        match pass_index {
+            0 => {
+                self.plain_room(
+                    match value.field_type {
+                        FieldType::Start => Some(&start_wall),
+                        FieldType::Goal => Some(&goal_wall),
+                        FieldType::Normal => None,
+                    },
+                    space,
+                    interior,
+                )?;
+            }
+            1 => {
+                for direction in [Direction::East, Direction::South] {
+                    let face = d2f(direction);
+                    let neighbor = room_position + face.normal_vector();
+                    // contains_cube() check is to work around the maze generator sometimes producing
+                    // out-of-bounds passages.
+                    if value.has_passage(&direction) && map.grid().contains_cube(neighbor) {
+                        self.inside_doorway(space, room_position, face)?;
+                    }
+                }
+
+                // Set spawn.
+                // TODO: Don't unconditionally override spawn; instead communicate this out.
+                if matches!(value.field_type, FieldType::Start) {
+                    let mut spawn = Spawn::default_for_new_space(space.grid());
+                    // TODO: There should be a way to express "spawn with feet in this block",
+                    // independent of height.
+                    spawn.set_eye_position(
+                        interior
+                            .abut(Face::NY, 0)
+                            .unwrap()
+                            .center()
+                            .map(FreeCoordinate::from)
+                            + Vector3::new(0., 2.0, 0.),
+                    );
+                    spawn.set_flying(false);
+
+                    // Orient towards the first room's exit.
+                    for direction in Direction::all() {
+                        if value.has_passage(&direction) {
+                            spawn.set_look_direction(d2f(direction).normal_vector());
+                            break;
+                        }
+                    }
+
+                    *space.spawn_mut() = spawn;
+                }
+            }
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+}
+
+fn build_dungeon<Room, ThemeT: Theme<Room>>(
+    space: &mut Space,
+    theme: &ThemeT,
+    map: &GridArray<Room>,
+) -> Result<(), InGenError> {
+    for pass in 0..theme.passes() {
+        for room_position in map.grid().interior_iter() {
+            theme.place_room(
+                space,
+                pass,
+                map,
+                room_position,
+                map.get(room_position).unwrap(),
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
 /// This function is called from `UniverseTemplate`.
 pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGenError> {
     // TODO: reintroduce random elements separate from the maze.
@@ -202,69 +317,13 @@ pub(crate) async fn demo_dungeon(universe: &mut Universe) -> Result<Space, InGen
         lamp_block: demo_blocks[DemoBlocks::Lamp].clone(),
     };
 
-    let maze = maze_generator::ellers_algorithm::EllersGenerator::new(None).generate(9, 9);
-    let maze_array = maze_to_array(&maze);
+    let dungeon_map =
+        maze_to_array(&maze_generator::ellers_algorithm::EllersGenerator::new(None).generate(9, 9));
 
-    let space_bounds = dungeon_grid.minimum_space_for_rooms(maze_array.grid());
-    let mut space = Space::builder(space_bounds)
-        .spawn({
-            let mut spawn = Spawn::default_for_new_space(space_bounds);
-            // TODO: There should be a way to express "spawn with feet in this block",
-            // independent of height.
-            spawn.set_eye_position(
-                dungeon_grid
-                    .room_box_at(m2gp(maze.start))
-                    .abut(Face::NY, 0)
-                    .unwrap()
-                    .center()
-                    .map(FreeCoordinate::from)
-                    + Vector3::new(0., 2.0, 0.),
-            );
-            spawn.set_flying(false);
+    let space_bounds = dungeon_grid.minimum_space_for_rooms(dungeon_map.grid());
+    let mut space = Space::builder(space_bounds).build_empty();
 
-            // Orient towards the first room's exit.
-            let start_field = maze.get_field(&maze.start).unwrap();
-            for direction in Direction::all() {
-                if start_field.has_passage(&direction) {
-                    spawn.set_look_direction(d2f(direction).normal_vector());
-                    break;
-                }
-            }
-
-            spawn
-        })
-        .build_empty();
-
-    let start_wall = Block::from(rgb_const!(1.0, 0.0, 0.0));
-    let goal_wall = Block::from(rgb_const!(0.0, 0.8, 0.0));
-    for room_position in maze_array.grid().interior_iter() {
-        let interior = dungeon_grid.room_box_at(room_position);
-
-        theme.plain_room(
-            match maze.get_field(&gp2m(room_position)).unwrap().field_type {
-                FieldType::Start => Some(&start_wall),
-                FieldType::Goal => Some(&goal_wall),
-                FieldType::Normal => None,
-            },
-            &mut space,
-            interior,
-        )?;
-    }
-
-    // Doorways
-    for room in maze_array.grid().interior_iter() {
-        let coord = gp2m(room);
-        let field = maze.get_field(&coord).unwrap();
-        for direction in [Direction::East, Direction::South] {
-            let face = d2f(direction);
-            // get_field() check is to work around the maze generator sometimes producing
-            // out-of-bounds passages.
-            if field.has_passage(&direction) && maze.get_field(&coord.next(&direction)).is_some() {
-                maze.get_field(&gp2m(room).next(&direction)).unwrap();
-                theme.inside_doorway(&mut space, room, face)?;
-            }
-        }
-    }
+    build_dungeon(&mut space, &theme, &dungeon_map)?;
 
     Ok(space)
 }
@@ -275,6 +334,7 @@ fn maze_to_array(maze: &Maze) -> GridArray<Field> {
     })
 }
 
+#[allow(dead_code)]
 fn m2gp(p: maze_generator::prelude::Coordinates) -> GridPoint {
     GridPoint::new(p.x, 0, p.y)
 }
