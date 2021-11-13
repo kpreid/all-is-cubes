@@ -351,7 +351,7 @@ impl WebGameRoot {
                     .scene_info_text_node
                     .set_data(&format!("{}", self.app.info_text(render_info)));
             } else {
-                self.static_dom.scene_info_text_node.set_data(&"");
+                self.static_dom.scene_info_text_node.set_data("");
             }
         }
 
