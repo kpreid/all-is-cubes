@@ -2,18 +2,20 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use maze_generator::prelude::{Direction, Field, FieldType, Generator};
+use rand::{Rng, SeedableRng};
 
-use all_is_cubes::block::{Block, AIR};
-use all_is_cubes::cgmath::Vector3;
+use all_is_cubes::block::{Block, BlockCollision, AIR};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::inv::Tool;
-use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridRotation};
+use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
+use all_is_cubes::math::{
+    Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb,
+};
 use all_is_cubes::rgb_const;
 use all_is_cubes::space::{Grid, GridArray, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
-use rand::{Rng, SeedableRng};
 
 use crate::dungeon::{build_dungeon, d2f, maze_to_array, DungeonGrid, Theme};
 use crate::{four_walls, DemoBlocks, LandscapeBlocks};
@@ -32,6 +34,7 @@ struct DemoTheme {
     /// Same coordinate system as `dungeon_grid.room_box`.
     /// Pick 2 out of 3 axes to define the bounds of a corridor/doorway on the third axis.
     corridor_box: Grid,
+    blocks: BlockProvider<DungeonBlocks>,
     wall_block: Block,
     floor_block: Block,
     lamp_block: Block,
@@ -145,7 +148,7 @@ impl Theme<DemoRoom> for DemoTheme {
         let start_wall = Block::from(rgb_const!(1.0, 0.0, 0.0));
         let goal_wall = Block::from(rgb_const!(0.0, 0.8, 0.0));
 
-        let interior = self.dungeon_grid.room_box_at(room_position);
+        let interior = self.actual_room_box(room_position, room_data);
         let wall_type = match room_data.maze_field.field_type {
             FieldType::Start => Some(&start_wall),
             FieldType::Goal => Some(&goal_wall),
@@ -154,11 +157,7 @@ impl Theme<DemoRoom> for DemoTheme {
 
         match pass_index {
             0 => {
-                self.plain_room(
-                    wall_type,
-                    space,
-                    self.actual_room_box(room_position, room_data),
-                )?;
+                self.plain_room(wall_type, space, interior)?;
 
                 if room_data.lit {
                     let top_middle = interior
@@ -166,7 +165,14 @@ impl Theme<DemoRoom> for DemoTheme {
                         .unwrap()
                         .center()
                         .map(|c| c as GridCoordinate);
-                    space.set(top_middle, &self.lamp_block)?;
+                    space.set(
+                        top_middle,
+                        if room_data.corridor_only {
+                            &self.blocks[DungeonBlocks::CorridorLight]
+                        } else {
+                            &self.lamp_block
+                        },
+                    )?;
                 }
             }
             1 => {
@@ -221,6 +227,8 @@ pub(crate) async fn demo_dungeon(
     universe: &mut Universe,
     progress: YieldProgress,
 ) -> Result<Space, InGenError> {
+    install_dungeon_blocks(universe)?;
+
     // TODO: reintroduce random elements separate from the maze.
     let mut rng = rand_xoshiro::Xoshiro256Plus::from_entropy();
 
@@ -235,6 +243,7 @@ pub(crate) async fn demo_dungeon(
     let theme = DemoTheme {
         dungeon_grid: dungeon_grid.clone(),
         corridor_box: Grid::new([3, 0, 3], [3, 3, 3]),
+        blocks: BlockProvider::using(universe)?,
         // TODO: use more appropriate blocks
         wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),
         floor_block: demo_blocks[DemoBlocks::Road].clone(),
@@ -256,4 +265,48 @@ pub(crate) async fn demo_dungeon(
     build_dungeon(&mut space, &theme, &dungeon_map, progress).await?;
 
     Ok(space)
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
+#[strum(serialize_all = "kebab-case")]
+#[non_exhaustive]
+pub(crate) enum DungeonBlocks {
+    CorridorLight,
+}
+impl BlockModule for DungeonBlocks {
+    fn namespace() -> &'static str {
+        "all-is-cubes/dungeon-blocks"
+    }
+}
+
+/// Add [`DungeonBlocks`] to the universe.
+pub fn install_dungeon_blocks(universe: &mut Universe) -> Result<(), GenError> {
+    let resolution = 16;
+    let resolution_g = GridCoordinate::from(resolution);
+    let one_diagonal = GridVector::new(1, 1, 1);
+    let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
+
+    let light_voxel = Block::from(Rgb::new(0.7, 0.7, 0.0));
+
+    use DungeonBlocks::*;
+    BlockProvider::<DungeonBlocks>::new(|key| {
+        Ok(match key {
+            CorridorLight => Block::builder()
+                .display_name("Corridor Light")
+                .light_emission(Rgb::new(8.0, 7.0, 0.7))
+                .collision(BlockCollision::Recur)
+                .voxels_fn(universe, resolution, |cube| {
+                    let centered = cube * 2 - center_point_doubled;
+                    if centered.y > centered.x.abs() && centered.y > centered.z.abs() {
+                        &light_voxel
+                    } else {
+                        &AIR
+                    }
+                })?
+                .build(),
+        })
+    })?
+    .install(universe)?;
+
+    Ok(())
 }
