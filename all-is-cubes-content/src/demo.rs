@@ -14,6 +14,7 @@ use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
 
 use crate::fractal::menger_sponge;
+use crate::menu::template_menu;
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 
 /// Selection of initial content for constructing a new [`Universe`].
@@ -33,6 +34,8 @@ use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_block
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum UniverseTemplate {
+    /// Provides an interactive menu of other templates.
+    Menu,
     Blank,
     /// Always produces an error, for testing error-handling functionality.
     Fail,
@@ -55,6 +58,9 @@ impl UniverseTemplate {
             DemoCity | Dungeon | Atrium | CornellBox | PhysicsLab | MengerSponge
             | LightingBench => true,
 
+            // Itself a list of templates!
+            Menu => false,
+
             // More testing than interesting demos.
             Blank | Fail => false,
         }
@@ -72,6 +78,7 @@ impl UniverseTemplate {
 
         use UniverseTemplate::*;
         let maybe_space: Option<Result<Space, InGenError>> = match self {
+            Menu => Some(template_menu(&mut universe)),
             Blank => None,
             Fail => Some(Err(InGenError::Other(
                 "the Fail template always fails to generate".into(),

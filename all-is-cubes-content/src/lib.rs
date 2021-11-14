@@ -39,6 +39,7 @@ pub(crate) use exhibits::*;
 mod fractal;
 mod landscape;
 pub use landscape::*;
+mod menu;
 
 pub use all_is_cubes::content::*;
 
