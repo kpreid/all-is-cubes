@@ -5,7 +5,7 @@ use maze_generator::prelude::{Direction, Field, FieldType, Generator};
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{Block, BlockCollision, AIR};
-use all_is_cubes::cgmath::{EuclideanSpace as _, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
@@ -36,7 +36,6 @@ struct DemoTheme {
     corridor_box: Grid,
     blocks: BlockProvider<DungeonBlocks>,
     wall_block: Block,
-    floor_block: Block,
     lamp_block: Block,
 }
 
@@ -49,7 +48,7 @@ impl DemoTheme {
     ) -> Result<(), InGenError> {
         let wall_block = wall_block.unwrap_or(&self.wall_block);
 
-        space.fill_uniform(interior.abut(Face::NY, 1).unwrap(), &self.floor_block)?;
+        space.fill_uniform(interior.abut(Face::NY, 1).unwrap(), &self.blocks[FloorTile])?;
         space.fill_uniform(interior.abut(Face::PY, 1).unwrap(), wall_block)?;
 
         four_walls(
@@ -101,7 +100,10 @@ impl DemoTheme {
         space.fill_uniform(doorway_box, &AIR)?;
 
         // Add floor and walls
-        space.fill_uniform(doorway_box.abut(Face::NY, 1).unwrap(), &self.floor_block)?;
+        space.fill_uniform(
+            doorway_box.abut(Face::NY, 1).unwrap(),
+            &self.blocks[FloorTile],
+        )?;
         space.fill_uniform(
             doorway_box.abut(wall_parallel, 1).unwrap(),
             &self.wall_block,
@@ -168,7 +170,7 @@ impl Theme<DemoRoom> for DemoTheme {
                     space.set(
                         top_middle,
                         if room_data.corridor_only {
-                            &self.blocks[DungeonBlocks::CorridorLight]
+                            &self.blocks[CorridorLight]
                         } else {
                             &self.lamp_block
                         },
@@ -246,7 +248,6 @@ pub(crate) async fn demo_dungeon(
         blocks: BlockProvider::using(universe)?,
         // TODO: use more appropriate blocks
         wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),
-        floor_block: demo_blocks[DemoBlocks::Road].clone(),
         lamp_block: demo_blocks[DemoBlocks::Lamp].clone(),
     };
 
@@ -272,12 +273,14 @@ pub(crate) async fn demo_dungeon(
 #[non_exhaustive]
 pub(crate) enum DungeonBlocks {
     CorridorLight,
+    FloorTile,
 }
 impl BlockModule for DungeonBlocks {
     fn namespace() -> &'static str {
         "all-is-cubes/dungeon-blocks"
     }
 }
+use DungeonBlocks::*;
 
 /// Add [`DungeonBlocks`] to the universe.
 pub fn install_dungeon_blocks(universe: &mut Universe) -> Result<(), GenError> {
@@ -287,6 +290,10 @@ pub fn install_dungeon_blocks(universe: &mut Universe) -> Result<(), GenError> {
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
 
     let light_voxel = Block::from(Rgb::new(0.7, 0.7, 0.0));
+    let stone_color = Rgb::new(0.5, 0.5, 0.5);
+    let stone_floor_voxel = Block::from(stone_color);
+    let stone_grout_1 = Block::from(stone_color * 0.8);
+    let stone_grout_2 = Block::from(stone_color * 0.9);
 
     use DungeonBlocks::*;
     BlockProvider::<DungeonBlocks>::new(|key| {
@@ -301,6 +308,26 @@ pub fn install_dungeon_blocks(universe: &mut Universe) -> Result<(), GenError> {
                         &light_voxel
                     } else {
                         &AIR
+                    }
+                })?
+                .build(),
+            FloorTile => Block::builder()
+                .display_name("Floor Tile")
+                .voxels_fn(universe, resolution, |cube| {
+                    let edges = cube
+                        .to_vec()
+                        .map(|c| (c == 0 || c == resolution_g - 1) as u8)
+                        .dot(Vector3::new(1, 1, 1));
+                    let bottom_edges = cube
+                        .to_vec()
+                        .map(|c| (c == 0) as u8)
+                        .dot(Vector3::new(1, 1, 1));
+                    if edges >= 2 && bottom_edges > 0 {
+                        &stone_grout_1
+                    } else if edges >= 2 {
+                        &stone_grout_2
+                    } else {
+                        &stone_floor_voxel
                     }
                 })?
                 .build(),
