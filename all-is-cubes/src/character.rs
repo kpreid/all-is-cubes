@@ -206,9 +206,17 @@ impl Character {
         self_ref: Option<&URef<Character>>,
         tick: Tick,
     ) -> (Option<BodyStepInfo>, UniverseTransaction) {
+        let mut result_transaction = UniverseTransaction::default();
         if tick.paused() {
-            return (None, UniverseTransaction::default());
+            return (None, result_transaction);
         }
+
+        // Override flying state using state of jetpack from inventory.
+        // TODO: Eliminate body.flying flag entirely, in favor of an external context?
+        // (The idea being that Body should have no more things in it than are necessary
+        // for, say, a single particle in a particle system.)
+        let flying = find_jetpacks(&self.inventory).any(|(_slot_index, active)| active);
+        self.body.flying = flying;
 
         let dt = tick.delta_t.as_secs_f64();
         let control_orientation: Matrix3<FreeCoordinate> =
@@ -216,14 +224,13 @@ impl Character {
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
         let initial_body_velocity = self.body.velocity;
 
-        let speed = if self.body.flying {
-            FLYING_SPEED
-        } else {
-            WALKING_SPEED
-        };
-        let velocity_target = control_orientation * self.velocity_input * speed;
+        let speed = if flying { FLYING_SPEED } else { WALKING_SPEED };
+        let mut velocity_target = control_orientation * self.velocity_input * speed;
+        if !flying {
+            velocity_target.y = 0.0;
+        }
         // TODO should have an on-ground condition...
-        let stiffness = if self.body.flying {
+        let stiffness = if flying {
             Vector3::new(10.8, 10.8, 10.8)
         } else {
             Vector3::new(10.8, 0., 10.8)
@@ -243,24 +250,39 @@ impl Character {
             None
         };
 
-        if velocity_target.y > 0. {
-            self.body.flying = true;
-        } else if self.is_on_ground() {
-            self.body.flying = false;
+        // Automatic flying controls
+        // TODO: lazy clone
+        if let Some(self_ref) = self_ref.cloned() {
+            if self.velocity_input.y > 0. {
+                if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next() {
+                    if let Ok(t) = self.inventory.use_tool(None, self_ref, slot_index) {
+                        result_transaction = result_transaction.merge(t).unwrap();
+                    }
+                }
+            } else if self.is_on_ground() {
+                for (slot_index, active) in find_jetpacks(&self.inventory) {
+                    if active {
+                        if let Ok(t) = self.inventory.use_tool(None, self_ref.clone(), slot_index) {
+                            result_transaction = result_transaction.merge(t).unwrap();
+                        }
+                    }
+                }
+            }
         }
 
         // TODO: Think about what order we want sequence of effects to be in. In particular,
         // combining behavior calls with step() means behaviors on different characters
         // see other characters as not having been stepped yet.
-        let transaction = if let Some(self_ref) = self_ref {
-            self.behaviors.step(
+        if let Some(self_ref) = self_ref {
+            let t = self.behaviors.step(
                 self,
                 &(|t: CharacterTransaction| t.bind(self_ref.clone())),
                 CharacterTransaction::behaviors,
                 tick,
-            )
-        } else {
-            UniverseTransaction::default()
+            );
+            result_transaction = result_transaction
+                .merge(t)
+                .expect("TODO: we should be applying these transactions separately");
         };
 
         // Apply accelerations on the body inversely to the eye displacement.
@@ -278,7 +300,7 @@ impl Character {
         // TODO: Clamp eye_displacement_pos to be within the body AAB.
 
         self.last_step_info = body_step_info;
-        (body_step_info, transaction)
+        (body_step_info, result_transaction)
     }
 
     /// Maximum range for normal keyboard input should be -1 to 1
@@ -463,4 +485,18 @@ pub enum CharacterChange {
     Inventory(InventoryChange),
     /// Which inventory slots are selected.
     Selections,
+}
+
+fn find_jetpacks(inventory: &Inventory) -> impl Iterator<Item = (usize, bool)> + '_ {
+    inventory
+        .slots
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| {
+            if let Slot::Stack(_, Tool::Jetpack { active }) = *slot {
+                Some((index, active))
+            } else {
+                None
+            }
+        })
 }
