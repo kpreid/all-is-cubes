@@ -5,7 +5,8 @@
 
 use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Point3;
-use all_is_cubes::character::Character;
+use all_is_cubes::character::{Character, Spawn};
+use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::{GenError, InGenError};
 use all_is_cubes::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
 use all_is_cubes::space::{Grid, LightPhysics, Space};
@@ -124,7 +125,12 @@ fn cornell_box() -> Result<Space, InGenError> {
         .light_physics(LightPhysics::Rays {
             maximum_distance: (box_size * 2).try_into().unwrap_or(u16::MAX),
         })
-        .spawn_position(Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into())
+        .spawn({
+            let mut spawn = Spawn::default_for_new_space(grid);
+            spawn.set_inventory(free_editing_starter_inventory(true));
+            spawn.set_eye_position(Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into());
+            spawn
+        })
         .build_empty();
 
     let white: Block = Rgba::new(1.0, 1.0, 1.0, 1.0).into();
@@ -230,7 +236,7 @@ async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InG
         FreeCoordinate::from(planet_radius) + 2.,
         0.,
     ));
-    spawn.set_flying(false);
+    spawn.set_inventory(free_editing_starter_inventory(false));
 
     Ok(space)
 }

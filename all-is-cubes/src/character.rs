@@ -135,7 +135,7 @@ impl Character {
 
         Self {
             body: Body {
-                flying: spawn.flying,
+                flying: false, // will be overriden anyway
                 yaw: yaw.0,
                 pitch: pitch.0,
                 ..Body::new_minimal(

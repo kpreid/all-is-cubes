@@ -1,13 +1,13 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use all_is_cubes::inv::Tool;
 use maze_generator::prelude::{Direction, Field, FieldType, Generator};
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
-use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb,
@@ -204,8 +204,10 @@ impl Theme<DemoRoom> for DemoTheme {
                             .map(FreeCoordinate::from)
                             + Vector3::new(0., 2.0, 0.),
                     );
-                    spawn.set_flying(false);
-                    spawn.set_inventory(vec![Tool::RemoveBlock { keep: true }.into()]);
+                    spawn.set_inventory(vec![
+                        Tool::RemoveBlock { keep: true }.into(),
+                        Tool::Jetpack { active: false }.into(),
+                    ]);
 
                     // Orient towards the first room's exit.
                     for direction in Direction::all() {

@@ -18,6 +18,7 @@ use embedded_graphics::text::Text;
 use embedded_graphics::text::TextStyleBuilder;
 
 use crate::block::{Block, BlockCollision, Resolution, AIR};
+use crate::inv::{Slot, Tool};
 use crate::math::{FreeCoordinate, GridCoordinate, Rgb, Rgba};
 use crate::raycast::{Face, Raycaster};
 use crate::space::{SetCubeError, Space};
@@ -195,6 +196,18 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
         }
     }
     Ok(())
+}
+
+/// A set of inventory items to give character free movement and modification of
+/// everything in the universe. (For the moment, actually just the current space.)
+///
+/// TODO: ideally `flying` wouldn't be an explicit parameter but determined based on
+/// the same inputs as choose the spawn position.
+pub fn free_editing_starter_inventory(flying: bool) -> Vec<Slot> {
+    vec![
+        Slot::one(Tool::RemoveBlock { keep: true }),
+        Slot::one(Tool::Jetpack { active: flying }),
+    ]
 }
 
 #[cfg(test)]

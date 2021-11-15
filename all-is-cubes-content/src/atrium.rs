@@ -3,13 +3,12 @@
 
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
-use all_is_cubes::inv::Tool;
 use all_is_cubes::rgba_const;
 use noise::Seedable;
 
 use all_is_cubes::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
-use all_is_cubes::content::palette;
+use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
@@ -71,7 +70,7 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     // TODO: builder method ... ?
     space
         .spawn_mut()
-        .set_inventory(vec![Tool::RemoveBlock { keep: true }.into()]);
+        .set_inventory(free_editing_starter_inventory(true));
 
     // Outer walls
     four_walls(

@@ -26,9 +26,6 @@ pub struct Spawn {
     /// Or something that can't be zero? Nonzero integers, perhaps?
     pub(super) look_direction: Vector3<NotNan<FreeCoordinate>>,
 
-    /// Flying (ignoring gravity, able to move in 3 dimensions).
-    pub(super) flying: bool,
-
     /// Initial inventory contents, created from nothing.
     pub(super) inventory: Vec<Slot>,
 }
@@ -37,7 +34,6 @@ impl Spawn {
     pub fn default_for_new_space(_grid: Grid) -> Self {
         Spawn {
             position: Point3::origin(), // TODO: pick something better? For what criteria?
-            flying: true,
             look_direction: Vector3::new(notnan!(0.), notnan!(0.), notnan!(-1.)),
             inventory: vec![],
         }
@@ -86,12 +82,6 @@ impl Spawn {
     pub fn set_inventory(&mut self, inventory: Vec<Slot>) {
         self.inventory = inventory;
     }
-
-    /// Set whether the character is initially flying (not subject to gravity).
-    /// TODO: Need interface for controlling _ability_ to fly.
-    pub fn set_flying(&mut self, flying: bool) {
-        self.flying = flying;
-    }
 }
 
 impl VisitRefs for Spawn {
@@ -100,7 +90,6 @@ impl VisitRefs for Spawn {
             inventory,
             position: _,
             look_direction: _,
-            flying: _,
         } = self;
         inventory.visit_refs(visitor);
     }
@@ -121,18 +110,12 @@ impl<'a> arbitrary::Arbitrary<'a> for Spawn {
                 arbitrary_notnan(u)?,
                 arbitrary_notnan(u)?,
             ),
-            flying: u.arbitrary()?,
             inventory: vec![], // TODO: need impl Arbitrary for Tool
         })
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         use arbitrary::{size_hint::and_all, Arbitrary};
-        and_all(&[
-            <f64 as Arbitrary>::size_hint(depth),
-            <f64 as Arbitrary>::size_hint(depth),
-            <f64 as Arbitrary>::size_hint(depth),
-            <bool as Arbitrary>::size_hint(depth),
-        ])
+        and_all(&[<f64 as Arbitrary>::size_hint(depth); 6])
     }
 }

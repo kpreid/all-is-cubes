@@ -160,6 +160,12 @@ impl Slot {
         }
     }
 
+    /// Temporary const version of [`<Slot as From<Tool>>::from`].
+    #[doc(hidden)]
+    pub const fn one(tool: Tool) -> Self {
+        Self::Stack(Self::COUNT_ONE, tool)
+    }
+
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
             Slot::Empty => Cow::Borrowed(&predefined[Icons::EmptySlot]),

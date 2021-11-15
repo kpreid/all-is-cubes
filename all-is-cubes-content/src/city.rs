@@ -81,9 +81,11 @@ pub(crate) async fn demo_city(
             // TODO: Add incremental spawn configuration to SpaceBuilder?
             let mut spawn = Spawn::default_for_new_space(grid);
             spawn.set_eye_position(grid.center() + Vector3::new(0.5, 2.91, 8.5));
-            spawn.set_flying(false);
             // Initial inventory contents. TODO: Make a better list.
-            let mut inventory = vec![Tool::RemoveBlock { keep: true }.into()];
+            let mut inventory = vec![
+                Tool::RemoveBlock { keep: true }.into(),
+                Tool::Jetpack { active: false }.into(),
+            ];
             for block in [
                 &landscape_blocks[Grass],
                 &landscape_blocks[Stone],
