@@ -34,5 +34,11 @@ module.exports = {
     new WasmPackPlugin({
       crateDirectory: __dirname,
     }),
+  ],
+  ignoreWarnings: [
+    // Workaround for https://github.com/rust-random/getrandom/issues/224
+    (warning) =>
+      warning.message ===
+      "Critical dependency: the request of a dependency is an expression",
   ]
 };
