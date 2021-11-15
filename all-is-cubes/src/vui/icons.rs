@@ -1,14 +1,17 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use cgmath::{ElementWise, EuclideanSpace as _, InnerSpace, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
 
-use crate::block::{Block, AIR_EVALUATED};
+use crate::block::{Block, BlockCollision, AIR, AIR_EVALUATED};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
-use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgba};
+use crate::math::{
+    Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+};
 use crate::space::{Space, SpacePhysics};
 use crate::universe::Universe;
 
@@ -31,6 +34,10 @@ pub enum Icons {
     Delete,
     /// Icon for [`Tool::CopyFromSpace`].
     CopyFromSpace,
+    /// Icon for [`Tool::Jetpack`], active.
+    JetpackOn,
+    /// Icon for [`Tool::Jetpack`], inactive.
+    JetpackOff,
 }
 
 impl BlockModule for Icons {
@@ -43,6 +50,7 @@ impl Icons {
     pub fn new(universe: &mut Universe) -> BlockProvider<Icons> {
         let resolution = 16;
         let crosshair_resolution = 29; // Odd resolution allows centering
+
         BlockProvider::new(|key| {
             Ok(match key {
                 Icons::Crosshair => {
@@ -136,11 +144,77 @@ impl Icons {
                         .voxels_ref(resolution, universe.insert_anonymous(space))
                         .build()
                 }
+
                 Icons::CopyFromSpace => Block::builder()
                     .display_name("Copy Block from Cursor")
                     // TODO: design actual icon
                     .color(Rgba::new(0., 1., 0., 1.))
                     .build(),
+
+                j @ (Icons::JetpackOff | Icons::JetpackOn) => {
+                    let active = j == Icons::JetpackOn;
+                    let shell_block = Block::from(rgb_const!(0.5, 0.5, 0.5));
+                    let stripe_block = Block::from(rgb_const!(0.9, 0.1, 0.1));
+                    let exhaust = if active {
+                        Block::from(rgba_const!(1.0, 1.0, 1.0, 0.1))
+                    } else {
+                        AIR
+                    };
+                    let active_color = if active {
+                        Block::from(Rgba::new(1.0, 1.0, 0.5, 1.))
+                    } else {
+                        Block::from(Rgba::new(0.4, 0.4, 0.4, 1.))
+                    };
+                    let shape: [(FreeCoordinate, &Block); 16] = [
+                        (4., &shell_block),
+                        (6., &shell_block),
+                        (6.5, &shell_block),
+                        (7., &shell_block),
+                        (7.25, &shell_block),
+                        (5., &active_color),
+                        (7.25, &shell_block),
+                        (5., &active_color),
+                        (7.25, &shell_block),
+                        (6.5, &shell_block),
+                        (6.0, &shell_block),
+                        (5.5, &shell_block),
+                        (5.0, &shell_block),
+                        (4.5, &shell_block),
+                        (4.5, &exhaust),
+                        (4.5, &exhaust),
+                    ];
+                    Block::builder()
+                        .display_name("Jetpack")
+                        .collision(BlockCollision::Recur)
+                        .light_emission(if active {
+                            rgb_const!(1.0, 0.8, 0.8) * 0.5
+                        } else {
+                            Rgb::ZERO
+                        })
+                        .voxels_fn(universe, resolution, |p| {
+                            let (shape_radius, block) =
+                                shape[((GridCoordinate::from(resolution) - 1) - p.y) as usize];
+                            let centered_p =
+                                p.map(|c| f64::from(c) + 0.5 - f64::from(resolution) / 2.0);
+                            let r4 = centered_p
+                                .to_vec()
+                                .mul_element_wise(Vector3::new(1., 0., 1.))
+                                .magnitude2()
+                                .powi(2);
+                            if r4 <= shape_radius.powi(4) {
+                                if block == &shell_block
+                                    && (centered_p.x.abs() <= 1.0 || centered_p.z.abs() <= 1.0)
+                                {
+                                    &stripe_block
+                                } else {
+                                    &block
+                                }
+                            } else {
+                                &AIR
+                            }
+                        })?
+                        .build()
+                }
             })
         })
         .unwrap()

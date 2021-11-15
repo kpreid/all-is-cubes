@@ -43,6 +43,12 @@ pub enum Tool {
     /// Copy block from space to inventory.
     CopyFromSpace,
 
+    /// Allows flight.
+    ///
+    /// TODO: This should probably be a feature a tool can have rather than a
+    /// single-purpose item, but we don't yet have a plan for programmable items.
+    Jetpack { active: bool },
+
     /// A tool which calls an arbitrary function.
     ExternalAction {
         // TODO: Rework this so that the external component gets to update the icon.
@@ -83,14 +89,6 @@ impl Tool {
                 // (But this error also needs work.)
                 Err(ToolError::NotUsable)
             }
-            Self::ExternalAction { ref function, .. } => {
-                if let Some(f) = &function.0 {
-                    f(input);
-                    Ok((Some(self), Default::default()))
-                } else {
-                    Err(ToolError::NotUsable) // TODO: communicate permanent error
-                }
-            }
             Self::RemoveBlock { keep } => {
                 let cursor = input.cursor()?;
                 let deletion = input.set_cube(cursor.place.cube, cursor.block.clone(), AIR)?;
@@ -130,6 +128,18 @@ impl Tool {
                         .produce_item(Tool::InfiniteBlocks(cursor.block.clone().unspecialize()))?,
                 ))
             }
+            Self::Jetpack { active } => Ok((
+                Some(Self::Jetpack { active: !active }),
+                UniverseTransaction::default(),
+            )),
+            Self::ExternalAction { ref function, .. } => {
+                if let Some(f) = &function.0 {
+                    f(input);
+                    Ok((Some(self), UniverseTransaction::default()))
+                } else {
+                    Err(ToolError::NotUsable) // TODO: communicate permanent error
+                }
+            }
         }
     }
 
@@ -158,13 +168,15 @@ impl Tool {
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
             Self::Activate => Cow::Borrowed(&predefined[Icons::Activate]),
-            Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
             // TODO: Give Remove different icons
             Self::RemoveBlock { keep: _ } => Cow::Borrowed(&predefined[Icons::Delete]),
             // TODO: Once blocks have behaviors, we need to defuse them for this use.
             // TODO: InfiniteBlocks should have a different name and appearance
             Self::Block(block) | Self::InfiniteBlocks(block) => Cow::Borrowed(block),
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
+            Self::Jetpack { active: true } => Cow::Borrowed(&predefined[Icons::JetpackOn]),
+            Self::Jetpack { active: false } => Cow::Borrowed(&predefined[Icons::JetpackOff]),
+            Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
         }
     }
 
@@ -178,6 +190,7 @@ impl Tool {
             Tool::Block(_) => Standard,
             Tool::InfiniteBlocks(_) => One,
             Tool::CopyFromSpace => One,
+            Tool::Jetpack { .. } => One,
             Tool::ExternalAction { .. } => One,
         }
     }
@@ -191,6 +204,7 @@ impl VisitRefs for Tool {
             Tool::Block(block) => block.visit_refs(visitor),
             Tool::InfiniteBlocks(block) => block.visit_refs(visitor),
             Tool::CopyFromSpace => {}
+            Tool::Jetpack { active: _ } => {}
             Tool::ExternalAction { function: _, icon } => {
                 icon.visit_refs(visitor);
             }
