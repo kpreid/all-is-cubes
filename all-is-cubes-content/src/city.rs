@@ -8,19 +8,18 @@ use futures_core::future::LocalBoxFuture;
 use instant::Instant;
 use noise::Seedable as _;
 
-use all_is_cubes::cgmath::{EuclideanSpace as _, One as _, Transform as _, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, One as _, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
     geometry::Point,
     mono_font::{iso_8859_1::FONT_9X18_BOLD, MonoTextStyle},
-    prelude::{Dimensions, Transform},
     text::{Baseline, Text},
 };
 
-use all_is_cubes::block::{Block, Resolution};
-use all_is_cubes::block::{BlockAttributes, BlockCollision, AIR};
+use all_is_cubes::block::Block;
+use all_is_cubes::block::AIR;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::{draw_to_blocks, VoxelBrush};
+use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::Slot;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
@@ -29,12 +28,13 @@ use all_is_cubes::math::{
     NoiseFnExt as _, Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
-use all_is_cubes::space::{Grid, LightPhysics, SetCubeError, Space, SpacePhysics};
+use all_is_cubes::space::{Grid, LightPhysics, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
 use crate::{
-    logo_text, logo_text_extent, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
+    draw_text_in_blocks, logo_text, logo_text_extent, space_to_space_copy, wavy_landscape,
+    DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
 };
 
 pub(crate) async fn demo_city(
@@ -268,46 +268,18 @@ pub(crate) async fn demo_city(
             0,
             exhibit_footprint.upper_bounds().z + 1,
         ]);
-        let name_block_resolution = 32;
-        let font = &FONT_9X18_BOLD;
-        let name_bottom_y =
-            (name_block_resolution - font.character_size.height as GridCoordinate) / 2;
-        let name_text = Text::with_baseline(
-            exhibit.name,
-            Point::new(0, -name_bottom_y),
-            MonoTextStyle::new(font, palette::ALMOST_BLACK),
-            Baseline::Bottom,
-        );
-        // TODO: This is an awful lot of code to benerate "text is centered on a number of whole blocks"
-        let name_width = name_text.bounding_box().size.width as GridCoordinate;
-        let name_width_in_blocks: GridCoordinate =
-            (name_width + name_block_resolution - 1) / name_block_resolution; // rounding up
-        let name_blocks = draw_to_blocks(
+        let truncated_name_grid = draw_text_in_blocks(
             universe,
-            name_block_resolution as Resolution,
-            0,
-            0..1,
-            BlockAttributes {
-                display_name: format!("Exhibit name {:?}", exhibit.name).into(),
-                collision: BlockCollision::Recur,
-                ..BlockAttributes::default()
-            },
-            &name_text.translate(Point::new(
-                ((name_width_in_blocks * name_block_resolution) - name_width) / 2,
-                0,
-            )),
-        )
-        .expect("name drawing failure");
-        // Truncate name to not overrun the exhibit itself
-        let truncated_name_grid = name_blocks
-            .grid()
-            .intersection(Grid::new([0, 0, 0], [exhibit_footprint.size().x + 3, 1, 1]))
-            .unwrap();
-        space_to_space_copy(
-            &name_blocks,
-            truncated_name_grid,
             &mut space,
+            32,
+            exhibit_footprint.size().x + 3,
             plot_transform * name_transform,
+            &Text::with_baseline(
+                exhibit.name,
+                Point::new(0, 0),
+                MonoTextStyle::new(&FONT_9X18_BOLD, palette::ALMOST_BLACK),
+                Baseline::Bottom,
+            ),
         )?; // TODO: on failure, place an error marker and continue
         space.fill_uniform(
             truncated_name_grid
@@ -362,27 +334,6 @@ pub(crate) async fn demo_city(
     final_progress.progress(1.0).await;
 
     Ok(space)
-}
-
-// TODO: move this since it is a generally useful utility
-fn space_to_space_copy(
-    src: &Space,
-    src_grid: Grid,
-    dst: &mut Space,
-    src_to_dst_transform: GridMatrix,
-) -> Result<(), SetCubeError> {
-    // TODO: don't panic
-    let dst_to_src_transform = src_to_dst_transform.inverse_transform().unwrap();
-    let (block_rotation, _) = src_to_dst_transform
-        .decompose()
-        .expect("could not decompose transform");
-    dst.fill(src_grid.transform(src_to_dst_transform).unwrap(), |p| {
-        Some(
-            src[dst_to_src_transform.transform_cube(p)]
-                .clone()
-                .rotate(block_rotation),
-        )
-    })
 }
 
 #[allow(clippy::type_complexity)]

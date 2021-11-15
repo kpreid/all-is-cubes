@@ -10,17 +10,21 @@
 //! provide [`UniverseTemplate`]; other items should be assumed not particularly
 //! stable.
 
-use all_is_cubes::block::Block;
+use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution};
+use all_is_cubes::cgmath::Transform as _;
+use all_is_cubes::drawing::embedded_graphics::prelude::Transform;
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{iso_8859_1::FONT_9X15_BOLD, MonoTextStyle},
     prelude::{Dimensions as _, Drawable, Point},
     text::{Alignment, Baseline, Text, TextStyleBuilder},
 };
-use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::drawing::{draw_to_blocks, VoxelBrush, VoxelColor};
+use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Face, FaceMap, GridCoordinate, GridMatrix, GridPoint, GridVector};
 use all_is_cubes::space::{Grid, SetCubeError, Space};
 
 mod animation;
+use all_is_cubes::universe::Universe;
 pub(crate) use animation::*;
 mod atrium;
 mod blocks;
@@ -90,6 +94,46 @@ where
     f(text)
 }
 
+/// Draw text into a [`Space`] within 1 block character height.
+///
+/// TODO: Document exact text alignment and other such concerns
+fn draw_text_in_blocks<'a, C: Clone + VoxelColor<'a>>(
+    universe: &mut Universe,
+    space: &mut Space,
+    resolution: Resolution,
+    max_length_in_blocks: GridCoordinate,
+    transform: GridMatrix,
+    text: &Text<'a, MonoTextStyle<'a, C>>,
+) -> Result<Grid, InGenError> {
+    let resolution_g: GridCoordinate = resolution.into();
+    let character_height = text.character_style.font.character_size.height as GridCoordinate;
+    let text_width_in_voxels = text.bounding_box().size.width as GridCoordinate;
+    let text_width_in_blocks: GridCoordinate =
+        (text_width_in_voxels + resolution_g - 1) / resolution_g;
+
+    let name_blocks = draw_to_blocks(
+        universe,
+        resolution,
+        0,
+        0..1,
+        BlockAttributes {
+            display_name: format!("Text {:?}", text.text).into(),
+            collision: BlockCollision::Recur,
+            ..BlockAttributes::default()
+        },
+        &text.translate(Point::new(
+            ((text_width_in_blocks * resolution_g) - text_width_in_voxels) / 2,
+            (character_height - resolution_g) / 2,
+        )),
+    )?;
+    let truncated_block_grid = name_blocks
+        .grid()
+        .intersection(Grid::new([0, 0, 0], [max_length_in_blocks, 1, 1]))
+        .unwrap();
+    space_to_space_copy(&name_blocks, truncated_block_grid, space, transform)?;
+    Ok(truncated_block_grid)
+}
+
 /// Given a room's exterior bounding box, act on its four walls.
 ///
 /// The function is given the bottom-left (from an exterior perspective) corner cube
@@ -128,6 +172,27 @@ where
         interior.abut(Face::NZ, 1).unwrap(),
     )?;
     Ok(())
+}
+
+// TODO: this should probably be in main all-is-cubes crate
+fn space_to_space_copy(
+    src: &Space,
+    src_grid: Grid,
+    dst: &mut Space,
+    src_to_dst_transform: GridMatrix,
+) -> Result<(), SetCubeError> {
+    // TODO: don't panic
+    let dst_to_src_transform = src_to_dst_transform.inverse_transform().unwrap();
+    let (block_rotation, _) = src_to_dst_transform
+        .decompose()
+        .expect("could not decompose transform");
+    dst.fill(src_grid.transform(src_to_dst_transform).unwrap(), |p| {
+        Some(
+            src[dst_to_src_transform.transform_cube(p)]
+                .clone()
+                .rotate(block_rotation),
+        )
+    })
 }
 
 /// Compute the squared magnitude of a [`GridVector`].
