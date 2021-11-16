@@ -38,7 +38,7 @@ default = ["lum"]
 lum = ["luminance"]
 
 [dependencies]
-arbitrary = { version = "1.0.1", optional = true, features = ["derive"] }
+arbitrary = { version = "1.0.3", optional = true, features = ["derive"] }
 bitvec = { version = "0.22.3", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.7.2", default-features = false }
 cgmath = "0.18.0"
