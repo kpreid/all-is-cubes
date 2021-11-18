@@ -15,11 +15,12 @@ use std::fmt;
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3};
 use cgmath::{Point3, Vector4};
+use ordered_float::NotNan;
 #[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{Evoxel, Resolution, AIR};
-use crate::camera::{Camera, GraphicsOptions};
+use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::{smoothstep, GridCoordinate};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
@@ -29,7 +30,7 @@ mod pixel_buf;
 pub use pixel_buf::*;
 
 mod surface;
-use surface::{Surface, SurfaceIter, TraceStep};
+use surface::{DepthIter, DepthStep, Span, Surface, SurfaceIter, TraceStep};
 // TODO: pub use surface::*;
 
 mod text;
@@ -61,21 +62,66 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
 
     /// Computes a single image pixel from the given ray.
     pub fn trace_ray(&self, ray: Ray) -> (P::Pixel, RaytraceInfo) {
+        let t_to_absolute_distance = ray.direction.magnitude();
         let mut s: TracingState<P> = TracingState::default();
-        for step in SurfaceIter::new(self, ray) {
-            if s.count_step_should_stop() {
-                break;
-            }
+        let surface_iter = SurfaceIter::new(self, ray);
 
-            use TraceStep::*;
-            match step {
-                Invisible { .. } | EnterBlock { .. } => {
-                    // Side effect: called count_step_should_stop.
+        // Use the more expensive volumetric tracing strategy only if we need it.
+        match self.options.transparency {
+            TransparencyOption::Volumetric => {
+                for step in DepthIter::new(surface_iter) {
+                    if s.count_step_should_stop() {
+                        break;
+                    }
+
+                    match step {
+                        DepthStep::Invisible => {
+                            // Side effect: called count_step_should_stop.
+                        }
+                        DepthStep::Span(Span {
+                            mut surface,
+                            exit_t_distance,
+                        }) => {
+                            debug_assert!(!surface.diffuse_color.fully_transparent());
+
+                            let thickness = ((exit_t_distance - surface.t_distance)
+                                * t_to_absolute_distance)
+                                as f32;
+
+                            // Convert alpha to transmittance (light transmitted / light received).
+                            let unit_transmittance =
+                                1.0 - surface.diffuse_color.alpha().into_inner();
+                            // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
+                            let depth_transmittance = unit_transmittance.powf(thickness);
+                            // Convert back to alpha.
+                            // TODO: skip NaN check ... this may require refactoring Surface usage.
+                            // We might also benefit from an "UncheckedRgba" concept.
+                            surface.diffuse_color = surface
+                                .diffuse_color
+                                .to_rgb()
+                                .with_alpha(NotNan::new(1.0 - depth_transmittance).unwrap());
+
+                            s.trace_through_surface(surface, self);
+                        }
+                    }
                 }
-                EnterSurface(surface) => {
-                    debug_assert!(!surface.diffuse_color.fully_transparent());
-                    // TODO: To implement TransparencyOption::Volumetric we need to peek forward to the next change of color and find the distance between them, but only if the alpha is not 0 or 1.
-                    s.trace_through_surface(surface, self);
+            }
+            _ => {
+                for step in surface_iter {
+                    if s.count_step_should_stop() {
+                        break;
+                    }
+
+                    use TraceStep::*;
+                    match step {
+                        Invisible { .. } | EnterBlock { .. } => {
+                            // Side effect: called count_step_should_stop.
+                        }
+                        EnterSurface(surface) => {
+                            debug_assert!(!surface.diffuse_color.fully_transparent());
+                            s.trace_through_surface(surface, self);
+                        }
+                    }
                 }
             }
         }
