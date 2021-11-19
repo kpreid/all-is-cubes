@@ -69,7 +69,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
 
             use TraceStep::*;
             match step {
-                Invisible | EnterBlock => {
+                Invisible { .. } | EnterBlock { .. } => {
                     // Side effect: called count_step_should_stop.
                 }
                 EnterSurface(surface) => {

@@ -20,6 +20,9 @@ pub(crate) struct Surface<'a, D> {
     pub diffuse_color: Rgba,
     /// The cube of the [`Space`] which contains the block this surface belongs to.
     cube: GridPoint,
+    /// The distance along the ray, in units of the ray's direction vector,
+    /// where it intersected the surface.
+    pub t_distance: FreeCoordinate,
     /// The point in the [`Space`]'s coordinate system where the ray intersected the surface.
     intersection_point: Point3<FreeCoordinate>,
     pub normal: Face,
@@ -83,15 +86,15 @@ pub(crate) enum TraceStep<'a, D> {
     /// A completely invisible surface was found.
     /// This is reported so that it may be counted in a decision to stop tracing.
     /// It is separate from [`TraceStep::EnterSurface`] to avoid computing lighting.
-    Invisible,
+    Invisible { t_distance: FreeCoordinate },
     /// A recursive block was entered.
     ///
     /// This is reported so as to keep the iteration process O(1).
     /// In particular, otherwise an unbounded number of steps could be taken if the ray
     /// passes through a large number of recursive blocks with small bounds (such that no
     /// actual voxels exist to be visible or invisible).
-    EnterBlock,
-    // TODO: Add 'exit' variants for volumetric rendering, and 'enter space' and 'exit space' possibly.
+    EnterBlock { t_distance: FreeCoordinate },
+    // TODO: Add 'enter space' and 'exit space' possibly.
 }
 
 /// An [`Iterator`] which reports each visible surface a [`Raycaster`] ray passes through.
@@ -138,7 +141,9 @@ impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
         let cube_data: &TracingCubeData = &self.array[rc_step.cube_ahead()];
         if cube_data.always_invisible {
             // Early return that avoids indirecting through self.blocks
-            return Some(TraceStep::Invisible);
+            return Some(TraceStep::Invisible {
+                t_distance: rc_step.t_distance(),
+            });
         }
 
         Some(match &self.blocks[cube_data.block_index as usize] {
@@ -146,12 +151,15 @@ impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
                 if color.fully_transparent() {
                     // The caller could generically skip transparent, but if we do it then
                     // we can skip some math too.
-                    TraceStep::Invisible
+                    TraceStep::Invisible {
+                        t_distance: rc_step.t_distance(),
+                    }
                 } else {
                     TraceStep::EnterSurface(Surface {
                         block_data,
                         diffuse_color: *color,
                         cube: rc_step.cube_ahead(),
+                        t_distance: rc_step.t_distance(),
                         intersection_point: rc_step.intersection_point(self.ray),
                         normal: rc_step.face(),
                     })
@@ -172,7 +180,9 @@ impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
                     block_cube,
                 });
 
-                TraceStep::EnterBlock
+                TraceStep::EnterBlock {
+                    t_distance: rc_step.t_distance(),
+                }
             }
         })
     }
@@ -202,13 +212,18 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
         let voxel = self.array.get(rc_step.cube_ahead())?;
 
         if voxel.color.fully_transparent() {
-            return Some(TraceStep::Invisible);
+            return Some(TraceStep::Invisible {
+                t_distance: rc_step.t_distance() * self.antiscale,
+            });
         }
 
         Some(TraceStep::EnterSurface(Surface {
             block_data: self.block_data,
             diffuse_color: voxel.color,
             cube: self.block_cube,
+            // Note: The proper scaling here depends on the direction vector scale, that
+            // recursive_ray() _doesn't_ change.
+            t_distance: rc_step.t_distance() * self.antiscale,
             intersection_point: rc_step.intersection_point(self.voxel_ray) * self.antiscale
                 + self.block_cube.map(FreeCoordinate::from).to_vec(),
             normal: rc_step.face(),
@@ -244,19 +259,21 @@ mod tests {
             SurfaceIter::new(&rt, Ray::new([0.5, -0.5, 0.5], [0., 1., 0.]))
                 .collect::<Vec<TraceStep<'_, ()>>>(),
             vec![
-                Invisible, // The within-origin-block step
+                Invisible { t_distance: 0.5 }, // The within-origin-block step
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: solid_test_color,
                     cube: GridPoint::new(0, 1, 0),
+                    t_distance: 1.5, // half-block starting point + 1 empty block
                     intersection_point: Point3::new(0.5, 1.0, 0.5),
                     normal: Face::NY
                 }),
-                EnterBlock,
+                EnterBlock { t_distance: 2.5 },
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: palette::PLANK.with_alpha_one(),
                     cube: GridPoint::new(0, 2, 0),
+                    t_distance: 2.5,
                     intersection_point: Point3::new(0.5, 2.0, 0.5),
                     normal: Face::NY
                 }),
@@ -267,12 +284,14 @@ mod tests {
                     block_data: &(),
                     diffuse_color: (palette::PLANK * 1.06).with_alpha_one(),
                     cube: GridPoint::new(0, 2, 0),
+                    t_distance: 2.75, // previous surface + 1/4 block of depth
                     intersection_point: Point3::new(0.5, 2.25, 0.5),
                     normal: Face::NY
                 }),
                 // Two top layers of slab.
-                Invisible,
-                Invisible,
+                Invisible { t_distance: 3.0 },
+                Invisible { t_distance: 3.25 },
+                // TODO: need to report exiting the block and/or space, for the sake of volumetric computation
             ]
         );
     }
