@@ -25,7 +25,7 @@ use std::rc::Rc;
 
 use crate::camera::Viewport;
 use crate::camera::{Camera, GraphicsOptions};
-use crate::listen::ListenableSource;
+use crate::listen::ListenableCellWithLocal;
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::lum::types::AicLumBackend;
 use crate::lum::GraphicsResourceError;
@@ -34,6 +34,7 @@ use crate::space::{Space, SpaceBlockData};
 use crate::universe::URef;
 
 pub(crate) struct RaytraceToTexture<Backend: AicLumBackend> {
+    graphics_options: ListenableCellWithLocal<GraphicsOptions>,
     raytracer: Option<UpdatingSpaceRaytracer<Srgb8Adapter>>,
     // TODO: should not be public but we want an easy way to grab it for drawing
     pub(crate) render_target: FullFrameTexture<Backend>,
@@ -48,6 +49,7 @@ where
 {
     pub fn new(fp: Rc<FullFramePainter<Backend>>) -> Result<Self, GraphicsResourceError> {
         Ok(Self {
+            graphics_options: ListenableCellWithLocal::new(GraphicsOptions::default()),
             raytracer: None,
             render_target: fp.new_texture(),
             pixel_picker: PixelPicker::new(Viewport {
@@ -60,9 +62,8 @@ where
 
     pub fn set_space(&mut self, space: Option<URef<Space>>) {
         // TODO: hook up options
-        self.raytracer = space.map(|s| {
-            UpdatingSpaceRaytracer::new(s, ListenableSource::constant(GraphicsOptions::default()))
-        });
+        self.raytracer =
+            space.map(|s| UpdatingSpaceRaytracer::new(s, self.graphics_options.as_source()));
     }
 
     /// Trace a frame's worth of rays and update the texture.
@@ -74,6 +75,9 @@ where
     where
         C: GraphicsContext<Backend = Backend>,
     {
+        if camera.options() != self.graphics_options.borrow() {
+            self.graphics_options.set(camera.options().clone());
+        }
         self.render_target
             .resize(context, camera.viewport(), raytracer_size_policy)?;
         let render_viewport = self.render_target.scaled_viewport().unwrap();
