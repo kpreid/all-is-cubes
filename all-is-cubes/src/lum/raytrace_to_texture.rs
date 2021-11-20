@@ -129,15 +129,15 @@ where
             let traces: Vec<Pixel<Rgb888>> = this_frame_pixels.into_iter().map(trace).collect();
             let tracing_duration = Instant::now().duration_since(start_time);
 
-            match tracing_duration.cmp(&Duration::from_millis(40)) {
+            match tracing_duration.cmp(&Duration::from_millis(10)) {
                 std::cmp::Ordering::Greater => {
-                    self.rays_per_frame = (self.rays_per_frame - 100).max(100);
+                    self.rays_per_frame = (self.rays_per_frame - 5000).max(100);
                 }
                 std::cmp::Ordering::Equal => {}
                 std::cmp::Ordering::Less => {
                     let fbs = render_viewport.framebuffer_size;
                     self.rays_per_frame =
-                        (self.rays_per_frame + 100).min(fbs.x as usize * fbs.y as usize);
+                        (self.rays_per_frame + 5000).min(fbs.x as usize * fbs.y as usize);
                 }
             }
 
