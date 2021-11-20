@@ -43,7 +43,8 @@ use crate::{
 
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     KNOT,
-    TRANSPARENCY,
+    TRANSPARENCY_LARGE,
+    TRANSPARENCY_SMALL,
     COLLISION,
     TEXT,
     RESOLUTIONS,
@@ -66,10 +67,9 @@ macro_rules! exhibit {
 }
 
 exhibit! {
-    const TRANSPARENCY,
+    const TRANSPARENCY_LARGE,
     name: "Transparency",
     (_this, _universe) {
-        // TODO: Add some partial-block transparency once we're any good at implementing it
         let mut space = Space::empty(Grid::new([-3, 0, -3], [7, 5, 7]));
 
         let colors = [
@@ -92,6 +92,93 @@ exhibit! {
                 },
             )?;
         }
+
+        Ok(space)
+    }
+}
+
+exhibit! {
+    const TRANSPARENCY_SMALL,
+    name: "Voxel Transparency WIP",
+    (_this, universe) {
+        let footprint = Grid::new([0, 0, 0], [7, 4, 7]);
+        let pool =  Grid::new([1, 0, 1], [5, 2, 5]);
+        let mut space = Space::empty(footprint);
+
+        let water_voxel = Block::builder()
+            .color(rgba_const!(0.02, 0.04, 0.9, 0.5))
+            .collision(BlockCollision::None)
+            .build();
+        let water_surface_voxel = Block::builder()
+            .color(rgba_const!(0.5, 0.5, 0.72, 0.8))
+            .collision(BlockCollision::None)
+            .build();
+
+        let water_surface_block = Block::builder()
+            .collision(BlockCollision::Recur)
+            .voxels_fn(universe, 8, |p| {
+                match p.y {
+                    0..=3 => &water_voxel,
+                    4 => &water_surface_voxel,
+                    _ => &AIR,
+                }
+            })?
+            .build();
+
+        let window_block = {
+            let window_pane_resolution = 16;
+            let depth = 3;
+            let window_frame_block = Block::from(palette::ALMOST_BLACK);
+            let window_glass_surface_block = Block::from(rgba_const!(0.5, 0.72, 0.5, 0.6));
+            let window_glass_inner_block = Block::from(rgba_const!(0.7, 0.72, 0.7, 0.05));
+            let upper = window_pane_resolution as GridCoordinate - 1;
+
+            Block::builder()
+                .collision(BlockCollision::Recur)
+                .voxels_fn(universe, window_pane_resolution, |p| {
+                    if p.z >= depth {
+                        return &AIR;
+                    }
+                    if p.x == 0 || p.y == 0 || p.x == upper || p.y == upper {
+                        return &window_frame_block;
+                    }
+                    if p.z == depth - 1 || p.z == 0 {
+                        if p.x == 1 || p.y == 1 || p.x == upper - 1 || p.y == upper - 1 {
+                            &window_frame_block
+                        } else {
+                            &window_glass_surface_block
+                        }
+                    } else {
+                        &window_glass_inner_block
+                    }
+                })?
+                .build()
+        };
+
+        four_walls(
+            pool.expand(FaceMap::symmetric([1, 0, 1])),
+            |_origin, direction, _length, wall_excluding_corners| {
+                space.fill_uniform(
+                    wall_excluding_corners,
+                    window_block.clone().rotate(
+                        GridRotation::from_to(Face::PX, direction, Face::PY).unwrap()
+                    )
+                )?;
+                Ok::<(), InGenError>(())
+            },
+        )?;
+
+        space.fill_uniform(
+            pool.abut(Face::NY, 0).unwrap().abut(Face::PY, 1).unwrap(),
+            &water_voxel,
+        )?;
+        space.fill_uniform(
+            pool.abut(Face::PY, -1).unwrap(),
+            &water_surface_block,
+        )?;
+
+        let [floater] = make_some_voxel_blocks(universe);
+        space.set([3, 1, 3], floater)?;
 
         Ok(space)
     }
