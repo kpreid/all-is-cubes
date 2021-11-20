@@ -207,13 +207,32 @@ impl Raycaster {
     /// This makes the iterator finite: [`next()`](Self::next) will return [`None`]
     /// forevermore once there are no more cubes intersecting the grid to report.
     pub fn within_grid(mut self, grid: Grid) -> Self {
+        self.set_bound(grid);
+        self
+    }
+
+    /// Like `within_grid` but not moving self.
+    ///
+    /// TODO: This function was added for the needs of the raytracer. Think about API design more.
+    pub(crate) fn set_bound(&mut self, grid: Grid) {
         if self.grid == None {
             self.grid = Some(grid);
         } else {
             unimplemented!("multiple uses of .within_grid()");
         }
         self.fast_forward();
-        self
+    }
+
+    /// Cancels a previous [`Raycaster::within_grid`], allowing the raycast to proceed
+    /// an arbitrary distance.
+    ///
+    /// Note: The effect of calling `within_grid()` and then `remove_bound()` without an
+    /// intervening `next()` is not currently guaranteed.
+    ///
+    /// TODO: This function was added for the needs of the raytracer. Think about API design more.
+
+    pub(crate) fn remove_bound(&mut self) {
+        self.grid = None;
     }
 
     #[inline(always)]

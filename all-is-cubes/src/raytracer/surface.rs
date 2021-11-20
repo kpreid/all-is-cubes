@@ -5,7 +5,7 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3};
 
 use crate::block::{recursive_ray, Evoxel};
 use crate::camera::LightingOption;
-use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
+use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::raytracer::{PixelBuf, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::GridArray;
@@ -94,10 +94,12 @@ pub(crate) enum TraceStep<'a, D> {
     /// Note that when the surface is invisible (alpha is zero or treated as zero),
     /// [`TraceStep::Invisible`] is returned.
     EnterSurface(Surface<'a, D>),
+
     /// A completely invisible surface was found.
     /// This is reported so that it may be counted in a decision to stop tracing.
     /// It is separate from [`TraceStep::EnterSurface`] to avoid computing lighting.
     Invisible { t_distance: FreeCoordinate },
+
     /// A recursive block was entered.
     ///
     /// This is reported so as to keep the iteration process O(1).
@@ -105,7 +107,6 @@ pub(crate) enum TraceStep<'a, D> {
     /// passes through a large number of recursive blocks with small bounds (such that no
     /// actual voxels exist to be visible or invisible).
     EnterBlock { t_distance: FreeCoordinate },
-    // TODO: Add 'enter space' and 'exit space' possibly.
 }
 
 /// An [`Iterator`] which reports each visible surface a [`Raycaster`] ray passes through.
@@ -114,9 +115,18 @@ pub(crate) enum TraceStep<'a, D> {
 pub(crate) struct SurfaceIter<'a, D: 'static> {
     ray: Ray,
     block_raycaster: Raycaster,
+    state: SurfaceIterState,
+    // TODO: Should `current_block` become part of the state?
     current_block: Option<VoxelSurfaceIter<'a, D>>,
     blocks: &'a [TracingBlock<D>],
     array: &'a GridArray<TracingCubeData>,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum SurfaceIterState {
+    Initial,
+    /// At least one raycast step within the space has been seen.
+    EnteredSpace,
 }
 
 impl<'a, D: 'static> SurfaceIter<'a, D> {
@@ -127,7 +137,11 @@ impl<'a, D: 'static> SurfaceIter<'a, D> {
     {
         Self {
             ray,
-            block_raycaster: ray.cast().within_grid(rt.cubes.grid()),
+            block_raycaster: ray
+                .cast()
+                // Expand volume on the far side so that we can get a final step *with* t distance
+                .within_grid(rt.cubes.grid()),
+            state: SurfaceIterState::Initial,
             current_block: None,
             blocks: &rt.blocks,
             array: &rt.cubes,
@@ -149,7 +163,31 @@ impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
 
         let rc_step = self.block_raycaster.next()?;
 
-        let cube_data: &TracingCubeData = &self.array[rc_step.cube_ahead()];
+        let cube_data: &TracingCubeData = match self.array.get(rc_step.cube_ahead()) {
+            Some(cube_data) => {
+                match &self.state {
+                    SurfaceIterState::Initial => {
+                        // If the ray entered the space, we also want to notice leaving.
+                        // Do this by expanding the raycast bounds by one cube.
+                        self.block_raycaster.remove_bound();
+                        self.block_raycaster
+                            .set_bound(self.array.grid().expand(FaceMap::repeat(1)));
+
+                        self.state = SurfaceIterState::EnteredSpace;
+                    }
+                    SurfaceIterState::EnteredSpace => {}
+                }
+
+                cube_data
+            }
+            None => {
+                // Just exiting the space — we previously set up a 1-block perimeter to ensure
+                // that the exit's t_distance is reported rather than ignored.
+                return Some(TraceStep::Invisible {
+                    t_distance: rc_step.t_distance(),
+                });
+            }
+        };
         if cube_data.always_invisible {
             // Early return that avoids indirecting through self.blocks
             return Some(TraceStep::Invisible {
@@ -324,7 +362,7 @@ mod tests {
             SurfaceIter::new(&rt, Ray::new([0.5, -0.5, 0.5], [0., 1., 0.]))
                 .collect::<Vec<TraceStep<'_, ()>>>(),
             vec![
-                Invisible { t_distance: 0.5 }, // The within-origin-block step
+                Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: solid_test_color,
@@ -356,7 +394,37 @@ mod tests {
                 // Two top layers of slab.
                 Invisible { t_distance: 3.0 },
                 Invisible { t_distance: 3.25 },
-                // TODO: need to report exiting the block and/or space, for the sake of volumetric computation
+                // "Back face" of final block, which we report so as to ensure that the
+                // t_distance of the _exit_ point is known, for the benefit of volumetric
+                // rendering.
+                Invisible { t_distance: 3.5 },
+            ]
+        );
+    }
+
+    /// Test that exiting a block at the edge of the space still reports the exit t-distance.
+    #[test]
+    fn surface_iter_exit_block_at_end_of_space() {
+        let mut space = Space::builder(Grid::new([0, 0, 0], [1, 1, 1])).build_empty();
+        let solid_test_color = rgba_const!(1., 0., 0., 1.);
+        space.set([0, 0, 0], Block::from(solid_test_color)).unwrap();
+
+        let rt = SpaceRaytracer::<ColorBuf>::new(&space, GraphicsOptions::default());
+
+        assert_eq!(
+            SurfaceIter::new(&rt, Ray::new([-0.5, 0.5, 0.5], [1., 0., 0.]))
+                .collect::<Vec<TraceStep<'_, ()>>>(),
+            vec![
+                EnterSurface(Surface {
+                    block_data: &(),
+                    diffuse_color: solid_test_color,
+                    cube: GridPoint::new(0, 0, 0),
+                    t_distance: 0.5, // half-block starting point
+                    intersection_point: Point3::new(0.0, 0.5, 0.5),
+                    normal: Face::NX
+                }),
+                // Exit block -- this is the critical step that we're checking for.
+                Invisible { t_distance: 1.5 },
             ]
         );
     }
