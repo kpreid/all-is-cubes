@@ -5,8 +5,6 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use cgmath::Vector2;
-use cgmath::Zero;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::OriginDimensions;
@@ -73,7 +71,7 @@ where
         FullFrameTexture {
             ff: self.clone(),
             texture: None,
-            last_size: Vector2::zero(),
+            scaled_viewport: None,
             local_data: Box::new([]),
             texture_is_valid: false,
         }
@@ -111,7 +109,8 @@ where
     /// Reference to the [`Program`] and [`Tess`] we're using.
     ff: Rc<FullFramePainter<Backend>>,
     texture: Option<Texture<Backend, Dim2, NormRGBA8UI>>,
-    last_size: Vector2<u32>,
+    /// Viewport whose `framebuffer_size` is the size of our texture.
+    scaled_viewport: Option<Viewport>,
     local_data: Box<[u8]>,
     texture_is_valid: bool,
 }
@@ -129,16 +128,21 @@ where
         &mut self,
         context: &mut C,
         viewport: Viewport,
-        scale_policy: fn(Viewport) -> Vector2<u32>,
+        scale_policy: fn(Viewport) -> Viewport,
     ) -> Result<(), GraphicsResourceError>
     where
         C: GraphicsContext<Backend = Backend>,
     {
-        let size = scale_policy(viewport);
-        if size == self.last_size {
+        let scaled_viewport = scale_policy(viewport);
+        if Some(scaled_viewport) == self.scaled_viewport {
             return Ok(());
         }
+        let size = scaled_viewport.framebuffer_size;
 
+        // Invalidate previous size
+        self.scaled_viewport = None;
+
+        // TODO: systematic overflow checks
         self.local_data = vec![0; (size.x as usize) * (size.y as usize) * 4].into_boxed_slice();
         self.texture_is_valid = false;
         self.texture = Some(context.new_texture_no_texels(
@@ -152,9 +156,15 @@ where
                 ..Sampler::default()
             },
         )?);
-        self.last_size = size;
 
+        self.scaled_viewport = Some(scaled_viewport);
         Ok(())
+    }
+
+    /// Returns a [`Viewport`] whose `framebuffer_size` describes this texture,
+    /// or `None` if the size is not yet set by [`Self::resize`].
+    pub fn scaled_viewport(&self) -> Option<Viewport> {
+        self.scaled_viewport
     }
 
     pub fn data(&mut self) -> &mut [u8] {
@@ -241,9 +251,11 @@ where
     Backend: AicLumBackend,
 {
     fn size(&self) -> Size {
-        if let Some(texture) = &self.texture {
-            let [width, height] = texture.size();
-            Size { width, height }
+        if let Some(v) = self.scaled_viewport {
+            Size {
+                width: v.framebuffer_size.x,
+                height: v.framebuffer_size.y,
+            }
         } else {
             Size {
                 width: 0,

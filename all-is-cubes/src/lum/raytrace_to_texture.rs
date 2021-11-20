@@ -75,8 +75,13 @@ where
         C: GraphicsContext<Backend = Backend>,
     {
         self.render_target
-            .resize(context, camera.viewport(), |vp| vp.framebuffer_size)?;
-        self.pixel_picker.resize(camera.viewport());
+            .resize(context, camera.viewport(), raytracer_size_policy)?;
+        let render_viewport = self.render_target.scaled_viewport().unwrap();
+        self.pixel_picker.resize(render_viewport);
+
+        // TODO: Instead of the whole size policy business, maybe we should just expect
+        // camera.viewport() to have a "reasonable" framebuffer size. Or, just construct
+        // a copy of the Camera with an adjusted viewport.
 
         if let Some(urt) = &mut self.raytracer {
             urt.update().unwrap(/* TODO */);
@@ -93,8 +98,8 @@ where
                     p,
                     tracer
                         .trace_ray(camera.project_ndc_into_world(Point2::new(
-                            camera.viewport().normalize_fb_x(p.x as usize),
-                            camera.viewport().normalize_fb_y(p.y as usize),
+                            render_viewport.normalize_fb_x(p.x as usize),
+                            render_viewport.normalize_fb_y(p.y as usize),
                         )))
                         .0,
                 )
@@ -111,7 +116,7 @@ where
                 }
                 std::cmp::Ordering::Equal => {}
                 std::cmp::Ordering::Less => {
-                    let fbs = camera.viewport().framebuffer_size;
+                    let fbs = render_viewport.framebuffer_size;
                     self.rays_per_frame =
                         (self.rays_per_frame + 100).min(fbs.x as usize * fbs.y as usize);
                 }
@@ -203,6 +208,12 @@ impl PixelBuf for Srgb8Adapter {
     fn add(&mut self, surface_color: crate::math::Rgba, block_data: &Self::BlockData) {
         self.0.add(surface_color, block_data)
     }
+}
+
+fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
+    // use 2x2 nominal pixels
+    viewport.framebuffer_size = viewport.nominal_size.map(|c| (c / 2.0).round() as u32);
+    viewport
 }
 
 #[cfg(test)]

@@ -6,7 +6,6 @@
 use std::fmt;
 use std::time::Duration;
 
-use cgmath::Vector2;
 use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb888;
@@ -391,6 +390,7 @@ impl CustomFormat<StatusText> for RenderInfo {
     }
 }
 
-fn info_text_size_policy(viewport: Viewport) -> Vector2<u32> {
-    viewport.nominal_size.map(|c| c.round() as u32)
+fn info_text_size_policy(mut viewport: Viewport) -> Viewport {
+    viewport.framebuffer_size = viewport.nominal_size.map(|c| c.round() as u32);
+    viewport
 }
