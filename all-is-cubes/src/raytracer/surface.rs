@@ -44,22 +44,24 @@ impl<D> Surface<'_, D> {
         if diffuse_color.fully_transparent() {
             return None;
         }
-        let adjusted_rgb = diffuse_color.to_rgb()
-            * self.compute_illumination(rt)
-            * fixed_directional_lighting(self.normal);
+        let adjusted_rgb = diffuse_color.to_rgb() * self.compute_illumination(rt);
         Some(adjusted_rgb.with_alpha(diffuse_color.alpha()))
     }
 
-    pub fn compute_illumination<P>(&self, rt: &SpaceRaytracer<P>) -> Rgb
+    fn compute_illumination<P>(&self, rt: &SpaceRaytracer<P>) -> Rgb
     where
         P: PixelBuf<BlockData = D>,
         D: 'static,
     {
         match rt.options.lighting_display {
             LightingOption::None => Rgb::ONE,
-            LightingOption::Flat => rt.get_lighting(self.cube + self.normal.normal_vector()),
+            LightingOption::Flat => {
+                rt.get_lighting(self.cube + self.normal.normal_vector())
+                    * fixed_directional_lighting(self.normal)
+            }
             LightingOption::Smooth => {
                 rt.get_interpolated_light(self.intersection_point, self.normal)
+                    * fixed_directional_lighting(self.normal)
             }
         }
     }
