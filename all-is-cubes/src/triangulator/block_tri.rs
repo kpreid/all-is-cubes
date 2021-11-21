@@ -298,15 +298,43 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                                 output_by_face[face].fully_opaque = false;
                             }
 
-                            let voxel_is_visible = !color.fully_transparent() && {
-                                // Compute whether this voxel is not hidden behind another
-                                let obscuring_cube = cube + face.normal_vector();
-                                !voxels
-                                    .get(obscuring_cube)
-                                    .map(|ev| {
-                                        options.transparency.limit_alpha(ev.color).fully_opaque()
-                                    })
-                                    .unwrap_or(false)
+                            let voxel_is_visible = {
+                                use OpacityCategory::{Invisible, Opaque, Partial};
+                                let this_cat = color.opacity_category();
+                                if this_cat == Invisible {
+                                    false
+                                } else {
+                                    // Compute whether this voxel is not hidden behind another
+                                    let obscuring_cat = voxels
+                                        .get(cube + face.normal_vector())
+                                        .map(|ev| {
+                                            options
+                                                .transparency
+                                                .limit_alpha(ev.color)
+                                                .opacity_category()
+                                        })
+                                        .unwrap_or(Invisible);
+                                    match (this_cat, obscuring_cat) {
+                                        // Nothing to draw no matter what
+                                        (Invisible, _) => false,
+                                        // Definitely obscured
+                                        (_, Opaque) => false,
+                                        // Completely visible.
+                                        (Partial | Opaque, Invisible) => true,
+                                        // Partially obscured, therefore visible.
+                                        (Opaque, Partial) => true,
+                                        // This is the weird one: we count transparency adjacent to
+                                        // transparency as if there was nothing to draw. This is
+                                        // because:
+                                        // (1) If we didn't, we would end up generating large
+                                        //     numbers (bad) of intersecting (also bad) quads
+                                        //     for any significant volume of transparency.
+                                        // (2) TODO: We intend to delegate responsibility for
+                                        //     complex transparency to the shader. Until then,
+                                        //     this is still better for the first reason.
+                                        (Partial, Partial) => false,
+                                    }
+                                }
                             };
                             if voxel_is_visible {
                                 layer_is_visible_somewhere = true;
