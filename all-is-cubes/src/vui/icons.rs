@@ -12,7 +12,7 @@ use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
     Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
 };
-use crate::space::{Space, SpacePhysics};
+use crate::space::{GridArray, Space, SpacePhysics};
 use crate::universe::Universe;
 
 #[cfg(doc)]
@@ -87,9 +87,41 @@ impl Icons {
                     .build(),
 
                 Icons::Activate => {
-                    // TODO: This doesn't appear in the UI yet. When it does, give it an
-                    // actual icon; perhaps the traditional "white gloved 👆 pointing finger" cursor.
-                    Block::from(rgb_const!(0.0, 1.0, 0.0))
+                    // TODO: Replace this 2D scribble with a 3D hand shape
+                    #[rustfmt::skip]
+                    let image = GridArray::from_y_flipped_array([[
+                        *b"                ",
+                        *b"      #         ",
+                        *b"     #.#        ",
+                        *b"     #.#        ",
+                        *b"     #.## # #   ",
+                        *b"   # #.#.#.#.#  ",
+                        *b"  #.##.#.#.#.#  ",
+                        *b"  #.##.......#  ",
+                        *b"  #..#......#   ",
+                        *b"   #........#   ",
+                        *b"    #......#    ",
+                        *b"    #......#    ",
+                        *b"    #......#    ",
+                        *b"                ",
+                    ]]);
+                    Block::builder()
+                        .display_name("Activate")
+                        .voxels_fn(universe, 16, |p| {
+                            Block::from(
+                                match image
+                                    .get(p - GridVector::new(0, 0, 8))
+                                    .copied()
+                                    .unwrap_or(b' ')
+                                {
+                                    b' ' => Rgba::TRANSPARENT,
+                                    b'.' => Rgba::WHITE,
+                                    b'#' => Rgba::BLACK,
+                                    byte => panic!("unrecognized {:?}", byte as char),
+                                },
+                            )
+                        })?
+                        .build()
                 }
 
                 Icons::Delete => {
