@@ -16,7 +16,7 @@ use luminance::backend::shader::Uniformable;
 use luminance::context::GraphicsContext;
 use luminance::pipeline::TextureBinding;
 use luminance::pixel::NormUnsigned;
-use luminance::texture::Dim2;
+use luminance::texture::{Dim2, MagFilter, MinFilter};
 use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;
 #[cfg(feature = "rayon")]
@@ -84,8 +84,12 @@ where
         if camera.options() != self.graphics_options.borrow() {
             self.graphics_options.set(camera.options().clone());
         }
-        self.render_target
-            .resize(context, camera.viewport(), raytracer_size_policy)?;
+        self.render_target.resize(
+            context,
+            camera.viewport(),
+            raytracer_size_policy,
+            (MagFilter::Linear, MinFilter::Linear),
+        )?;
         let render_viewport = self.render_target.scaled_viewport().unwrap();
         self.pixel_picker.resize(render_viewport);
 

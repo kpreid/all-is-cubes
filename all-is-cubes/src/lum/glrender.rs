@@ -24,7 +24,7 @@ use luminance::pipeline::{PipelineState, TextureBinding};
 use luminance::pixel::NormUnsigned;
 use luminance::render_state::RenderState;
 use luminance::tess::Mode;
-use luminance::texture::{Dim2, Dim3};
+use luminance::texture::{Dim2, Dim3, MagFilter, MinFilter};
 
 use crate::apps::{Layers, StandardCameras};
 use crate::camera::{Camera, Viewport};
@@ -90,8 +90,14 @@ where
         )?;
 
         let mut info_text_texture = full_frame.new_texture();
+        // TODO: this is duplicated code with set_viewport
         info_text_texture
-            .resize(&mut surface, cameras.viewport(), info_text_size_policy)
+            .resize(
+                &mut surface,
+                cameras.viewport(),
+                info_text_size_policy,
+                (MagFilter::Nearest, MinFilter::Linear),
+            )
             .unwrap();
 
         Ok(Self {
@@ -120,8 +126,12 @@ where
         )?;
 
         // TODO: If this fails, it should be "warning, not error"
-        self.info_text_texture
-            .resize(&mut self.surface, viewport, info_text_size_policy)?;
+        self.info_text_texture.resize(
+            &mut self.surface,
+            viewport,
+            info_text_size_policy,
+            (MagFilter::Nearest, MinFilter::Linear),
+        )?;
 
         Ok(())
     }

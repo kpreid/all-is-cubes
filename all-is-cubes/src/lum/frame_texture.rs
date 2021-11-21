@@ -129,6 +129,8 @@ where
         context: &mut C,
         viewport: Viewport,
         scale_policy: fn(Viewport) -> Viewport,
+        // TODO: Make filters part of scale_policy?
+        filters: (MagFilter, MinFilter),
     ) -> Result<(), GraphicsResourceError>
     where
         C: GraphicsContext<Backend = Backend>,
@@ -151,8 +153,8 @@ where
             Sampler {
                 wrap_s: Wrap::ClampToEdge,
                 wrap_t: Wrap::ClampToEdge,
-                mag_filter: MagFilter::Nearest,
-                min_filter: MinFilter::Linear,
+                mag_filter: filters.0,
+                min_filter: filters.1,
                 ..Sampler::default()
             },
         )?);
