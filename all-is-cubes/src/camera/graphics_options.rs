@@ -1,0 +1,177 @@
+// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
+// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
+
+use ordered_float::NotNan;
+
+use crate::math::{FreeCoordinate, Rgba};
+
+/// User/debug options for rendering (i.e. not affecting gameplay except informationally).
+/// Not all of these options are applicable to all renderers.
+///
+/// TODO: This may not be the best module location. Possibly it should get its own module.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+#[non_exhaustive]
+pub struct GraphicsOptions {
+    /// Whether and how to draw fog obscuring the view distance limit.
+    ///
+    /// TODO: Implement fog in raytracer.
+    pub fog: FogOption,
+
+    /// Field of view, in degrees from top to bottom edge of the viewport.
+    pub fov_y: NotNan<FreeCoordinate>,
+
+    /// Distance, in unit cubes, from the camera to the farthest visible point.
+    ///
+    /// TODO: Implement view distance limit (and fog) in raytracer.
+    pub view_distance: NotNan<FreeCoordinate>,
+
+    /// Style in which to draw the lighting of [`Space`](crate::space::Space)s.
+    /// This does not affect the *computation* of lighting.
+    pub lighting_display: LightingOption,
+
+    /// Method/fidelity to use for transparency.
+    pub transparency: TransparencyOption,
+
+    /// Number of space chunks (16³ groups of blocks) to redraw if needed, per frame.
+    ///
+    /// Does not apply to raytracing.
+    pub chunks_per_frame: u16,
+
+    /// Whether to use frustum culling for drawing only in-view chunks and objects.
+    ///
+    /// This option is for debugging and performance testing and should not have any
+    /// visible effects.
+    pub use_frustum_culling: bool,
+
+    /// Draw text overlay showing debug information.
+    pub debug_info_text: bool,
+
+    /// Draw boxes around chunk borders and some debug info.
+    pub debug_chunk_boxes: bool,
+
+    /// Draw collision boxes for some objects.
+    pub debug_collision_boxes: bool,
+
+    /// Draw the light rays that contribute to the selected block.
+    pub debug_light_rays_at_cursor: bool,
+}
+
+impl GraphicsOptions {
+    /// Constrain fields to valid/practical values.
+    pub fn repair(mut self) -> Self {
+        self.fov_y = self
+            .fov_y
+            .max(NotNan::new(1.0).unwrap())
+            .min(NotNan::new(189.0).unwrap());
+        self.view_distance = self
+            .view_distance
+            .max(NotNan::new(1.0).unwrap())
+            .min(NotNan::new(10000.0).unwrap());
+        self
+    }
+}
+
+impl Default for GraphicsOptions {
+    fn default() -> Self {
+        Self {
+            fog: FogOption::Compromise,
+            fov_y: NotNan::new(90.).unwrap(),
+            view_distance: NotNan::new(200.).unwrap(),
+            lighting_display: LightingOption::Flat,
+            transparency: TransparencyOption::Volumetric,
+            chunks_per_frame: 4,
+            use_frustum_culling: true,
+            debug_info_text: true,
+            debug_chunk_boxes: false,
+            debug_collision_boxes: false,
+            debug_light_rays_at_cursor: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+pub enum FogOption {
+    /// No fog: objects will maintain their color and disappear raggedly.
+    None,
+    /// Fog starts just before the view distance ends.
+    Abrupt,
+    /// Compromise between `Abrupt` and `Physical` options.
+    Compromise,
+    /// Almost physically realistic fog of constant density.
+    Physical,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+pub enum LightingOption {
+    /// No lighting: objects will be displayed with their original surface color.
+    None,
+    /// Light is taken from the volume immediately above a cube face.
+    /// Edges between cubes are visible.
+    Flat,
+    /// Light varies across surfaces.
+    Smooth,
+}
+
+/// How to render transparent objects; part of a [`GraphicsOptions`].
+///
+/// Note: There is not yet a consistent interpretation of alpha between the `Surface`
+/// and `Volumetric` options; this will probably be changed in the future in favor
+/// of the volumetric interpretation.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+pub enum TransparencyOption {
+    /// Conventional transparent surfaces.
+    Surface,
+    /// Accounts for the thickness of material passed through; colors' alpha values are
+    /// interpreted as the opacity of a unit thickness of the material.
+    ///
+    /// TODO: Not implemented in the raytracer.
+    /// TODO: Not implemented correctly for recursive blocks.
+    Volumetric,
+    /// Alpha above or below the given threshold value will be rounded to fully opaque
+    /// or fully transparent, respectively.
+    Threshold(NotNan<f32>),
+}
+
+impl TransparencyOption {
+    /// Replace a color's alpha value according to the requested threshold,
+    /// if any.
+    #[inline]
+    pub(crate) fn limit_alpha(&self, color: Rgba) -> Rgba {
+        match *self {
+            Self::Threshold(t) => {
+                if color.alpha() > t {
+                    color.to_rgb().with_alpha_one()
+                } else {
+                    Rgba::TRANSPARENT
+                }
+            }
+            _ => color,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn will_output_alpha(&self) -> bool {
+        !matches!(self, Self::Threshold(_))
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for TransparencyOption {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::math::arbitrary_notnan;
+        Ok(match u.choose(&[0, 1, 2])? {
+            0 => Self::Surface,
+            1 => Self::Volumetric,
+            2 => Self::Threshold(arbitrary_notnan(u)?),
+            _ => unreachable!(),
+        })
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::and(u8::size_hint(depth), Option::<f32>::size_hint(depth))
+    }
+}
