@@ -148,6 +148,8 @@ impl Default for ColorBuf {
 }
 
 impl From<ColorBuf> for Rgba {
+    /// Returns the color (image pixel) accumulated in this buffer.
+    /// Not tone mapped.
     fn from(buf: ColorBuf) -> Rgba {
         if buf.ray_alpha >= 1.0 {
             // Special case to avoid dividing by zero

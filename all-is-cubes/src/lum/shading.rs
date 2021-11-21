@@ -13,7 +13,7 @@ use luminance::shader::{BuiltProgram, Program, ProgramError, ProgramInterface, U
 use luminance::texture::{Dim2, Dim3};
 use luminance::UniformInterface;
 
-use crate::camera::{GraphicsOptions, LightingOption, TransparencyOption};
+use crate::camera::{GraphicsOptions, LightingOption, ToneMappingOperator, TransparencyOption};
 use crate::lum::block_texture::BoundBlockTexture;
 use crate::lum::space::SpaceRendererBound;
 use crate::lum::types::{AicLumBackend, VertexSemantics};
@@ -25,6 +25,7 @@ use crate::math::FreeCoordinate;
 pub(crate) struct ShaderConstants {
     lighting_display: LightingOption,
     volumetric_transparency: bool,
+    tone_mapping: ToneMappingOperator,
 }
 
 impl From<&GraphicsOptions> for ShaderConstants {
@@ -35,6 +36,7 @@ impl From<&GraphicsOptions> for ShaderConstants {
                 TransparencyOption::Surface | TransparencyOption::Threshold(_) => false,
                 TransparencyOption::Volumetric => true,
             },
+            tone_mapping: options.tone_mapping.clone(),
         }
     }
 }
@@ -63,7 +65,15 @@ impl<Backend: AicLumBackend> BlockPrograms<Backend> {
         TextureBinding<Dim2, NormUnsigned>: Uniformable<C::Backend>,
         TextureBinding<Dim3, NormUnsigned>: Uniformable<C::Backend>,
     {
-        let mut base_defines = Vec::new();
+        // base_defines is shared by both of the program variants
+        let mut base_defines: Vec<(&str, &str)> = Vec::with_capacity(4);
+        base_defines.push((
+            "TONE_MAPPING_ID",
+            match constants.tone_mapping {
+                ToneMappingOperator::Clamp => "0",
+                ToneMappingOperator::Reinhard => "1",
+            },
+        ));
         if constants.lighting_display != LightingOption::None {
             base_defines.push(("LIGHTING", "1"));
         }

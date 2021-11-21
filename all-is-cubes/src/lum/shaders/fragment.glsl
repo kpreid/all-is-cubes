@@ -24,6 +24,20 @@ in highp vec3 camera_ray_direction;
 
 out mediump vec4 fragment_color_srgb;
 
+mediump float luminance(mediump vec3 linear_rgb) {
+  return dot(linear_rgb, vec3(0.2126, 0.7152, 0.0722));
+}
+
+mediump vec3 tone_map(mediump vec3 linear_rgb) {
+  #if TONE_MAPPING_ID == 0
+    // Clamp (implicitly)
+    return linear_rgb;
+  #elif TONE_MAPPING_ID == 1
+    // Reinhard
+    // TODO: Explain exactly which Reinhard, citation, etc
+    return linear_rgb / (1.0 + luminance(linear_rgb));
+  #endif
+}
 
 // Find the smallest positive `t` such that `s + t * ds` is an integer,
 // given that `s` is in the range 0 to 1.
@@ -227,6 +241,9 @@ void main(void) {
 
   // Fog
   color.rgb = mix(color.rgb, fog_color, fog_mix);
+
+  // Tone mapping
+  color.rgb = tone_map(color.rgb);
 
   // Convert from linear to sRGB color.
   // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_forward_transformation_(CIE_XYZ_to_sRGB)> (version as of Feb 3, 2020)

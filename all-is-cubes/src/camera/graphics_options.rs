@@ -3,7 +3,7 @@
 
 use ordered_float::NotNan;
 
-use crate::math::{FreeCoordinate, Rgba};
+use crate::math::{FreeCoordinate, Rgb, Rgba};
 
 /// User/debug options for rendering (i.e. not affecting gameplay except informationally).
 /// Not all of these options are applicable to all renderers.
@@ -20,6 +20,9 @@ pub struct GraphicsOptions {
 
     /// Field of view, in degrees from top to bottom edge of the viewport.
     pub fov_y: NotNan<FreeCoordinate>,
+
+    /// Method to use to remap colors to fit within the displayable range.
+    pub tone_mapping: ToneMappingOperator,
 
     /// Distance, in unit cubes, from the camera to the farthest visible point.
     ///
@@ -77,6 +80,8 @@ impl Default for GraphicsOptions {
         Self {
             fog: FogOption::Compromise,
             fov_y: NotNan::new(90.).unwrap(),
+            // TODO: Change tone mapping default once we have a good implementation.
+            tone_mapping: ToneMappingOperator::Clamp,
             view_distance: NotNan::new(200.).unwrap(),
             lighting_display: LightingOption::Flat,
             transparency: TransparencyOption::Volumetric,
@@ -101,6 +106,35 @@ pub enum FogOption {
     Compromise,
     /// Almost physically realistic fog of constant density.
     Physical,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+pub enum ToneMappingOperator {
+    /// Limit values above the maximum (or below zero) to lie within that range.
+    ///
+    /// This is the trivial tone mapping operation, and most “correct” for
+    /// colors which do lie within the range, but will cause overly bright colors
+    /// to change hue (as the RGB components are clamped independently).
+    Clamp,
+
+    /// TODO: As currently implemented this is an inadequate placeholder which is
+    /// overly dark.
+    Reinhard,
+}
+
+impl ToneMappingOperator {
+    #[inline]
+    pub fn apply(&self, input: Rgb) -> Rgb {
+        match self {
+            ToneMappingOperator::Clamp => input.clamp(),
+            // From <https://64.github.io/tonemapping/>, this will cut brightness
+            // too much, but the better versions require a parameter of max scene brightness,
+            // or more likely for our use case, we'll hook this up to a model of eye
+            // adaptation to average brightness.
+            ToneMappingOperator::Reinhard => input * (1.0 + input.luminance()).recip(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]

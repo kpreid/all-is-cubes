@@ -245,6 +245,11 @@ impl Rgba {
         Rgb(self.0.truncate())
     }
 
+    /// Applies a function to the RGB portion of this color.
+    pub fn map_rgb(self, f: impl FnOnce(Rgb) -> Rgb) -> Self {
+        f(self.to_rgb()).with_alpha(self.alpha())
+    }
+
     /// Combines the red, green, and blue components to obtain a luminance (“grayscale”)
     /// value. This will be equal to 1 if all components are 1.
     ///
