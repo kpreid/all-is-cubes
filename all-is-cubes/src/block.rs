@@ -220,12 +220,7 @@ impl Block {
                         occupied_grid,
                         #[inline(always)]
                         |_index, sub_block_data, _lighting| {
-                            let sub_evaluated = sub_block_data.evaluated();
-                            Evoxel {
-                                color: sub_evaluated.color,
-                                selectable: sub_evaluated.attributes.selectable,
-                                collision: sub_evaluated.attributes.collision,
-                            }
+                            Evoxel::from_block(sub_block_data.evaluated())
                         },
                     )
                     .translate(-offset.to_vec());
@@ -775,9 +770,20 @@ impl Evoxel {
         collision: BlockCollision::None,
     };
 
+    /// Construct an [`Evoxel`] which represents the given evaluated block.
+    ///
+    /// This is the same operation as is used for each block/voxel in a [`Block::Recur`].
+    pub fn from_block(block: &EvaluatedBlock) -> Self {
+        Self {
+            color: block.color,
+            selectable: block.attributes.selectable,
+            collision: block.attributes.collision,
+        }
+    }
+
     /// Construct the [`Evoxel`] that would have resulted from evaluating a voxel block
     /// with the given color and default attributes.
-    pub const fn new(color: Rgba) -> Self {
+    pub const fn from_color(color: Rgba) -> Self {
         // Use the values from BlockAttributes's default for consistency.
         // Force constant promotion so that this doesn't look like a
         // feature(const_precise_live_drops) requirement

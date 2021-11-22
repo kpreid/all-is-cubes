@@ -5,12 +5,12 @@
 ### Added
 
 - `all_is_cubes` library:
+    - `Evoxel::from_block()`
     - `SpaceMesh` now remembers the `TextureAllocator::Tile`s it was constructed using, just like `BlockMesh` does, so callers no longer need to do so.
     - `SpaceMesh::blocks_used_iter()` reports which block indices went into the mesh.
     - `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
     - `StandardCameras` manages the `Camera`s needed for rendering, given the necessary inputs. It is intended to reduce duplicated code and coupling in each renderer.
-      - `VisitRefs` allows traversing the `URef` graph inside a `Universe`.
-
+    - `VisitRefs` allows traversing the `URef` graph inside a `Universe`.
 
 ### Changed
 
@@ -28,6 +28,7 @@
     * The `Name` enum is now intended to be reliably cheap to clone:
         * `Name::Specific`'s field holds an `Arc<str>` instead of a `String`. 
         * `Universe`-related errors now hold `Name` instead of `Arc<Name>`.
+    * Renamed: `Evoxel::new()` to `Evoxel::from_color()`.
 
 ### Removed
 
