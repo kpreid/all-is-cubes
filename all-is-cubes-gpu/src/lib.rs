@@ -48,6 +48,8 @@ use all_is_cubes::util::MapExtend;
 mod block_texture;
 mod frame_texture;
 mod glrender;
+#[doc(hidden)] // Exported only for use by fuzz_octree
+pub mod octree_alloc;
 mod raytrace_to_texture;
 pub use glrender::*;
 mod shading;
