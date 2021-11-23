@@ -30,7 +30,7 @@ use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocat
 use crate::lum::shading::BlockPrograms;
 use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::lum::{wireframe_vertices, GraphicsResourceError};
-use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
+use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
 use crate::mesh::{ChunkMesh, ChunkedSpaceMesh, DepthOrdering, SpaceMesh};
 use crate::raycast::Face;
 use crate::space::{Grid, Space, SpaceChange};
@@ -240,7 +240,18 @@ pub(super) struct SpaceRendererOutputData<'a, Backend: AicLumBackend> {
     info: SpaceRenderInfo,
 
     /// Space's sky color, to be used as background color (clear color / fog).
+    ///
+    /// Does not have camera exposure or tone mapping applied.
     pub(super) sky_color: Rgb,
+}
+
+impl<Backend: AicLumBackend> SpaceRendererOutputData<'_, Backend> {
+    /// Returns the space's sky color with exposure and tone mapping applied
+    /// (all the things that shaders don't get to do to the clear color).
+    pub fn clear_color(&self) -> Rgba {
+        self.camera
+            .post_process_color(self.sky_color.with_alpha_one())
+    }
 }
 
 /// As [`SpaceRendererOutput`], but past the texture-binding stage of the pipeline.

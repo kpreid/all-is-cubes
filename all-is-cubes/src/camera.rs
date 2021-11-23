@@ -10,7 +10,7 @@ use cgmath::{
 };
 use itertools::Itertools as _;
 
-use crate::math::{Aab, FreeCoordinate};
+use crate::math::{Aab, FreeCoordinate, Rgba};
 use crate::raycast::Ray;
 use crate::space::Grid;
 
@@ -33,6 +33,9 @@ pub type ViewTransform = Decomposed<Vector3<FreeCoordinate>, Basis3<FreeCoordina
 pub struct Camera {
     /// Caller-provided options. Always validated by [`GraphicsOptions::repair`].
     options: GraphicsOptions,
+
+    /// Scale factor for scene brightness.
+    pub exposure: f32,
 
     /// Caller-provided viewport.
     viewport: Viewport,
@@ -65,6 +68,7 @@ impl Camera {
     pub fn new(options: GraphicsOptions, viewport: Viewport) -> Self {
         let mut new_self = Self {
             options: options.repair(),
+            exposure: 1.0,
             viewport,
             eye_to_world_transform: ViewTransform::one(),
 
@@ -238,6 +242,15 @@ impl Camera {
             .minmax()
             .into_option()
             .unwrap()
+    }
+
+    /// Apply postprocessing steps determined by this camera to convert a HDR “scene”
+    /// color into a LDR “image” color. Specifically:
+    ///
+    /// 1. Multiply the input by this camera's exposure value.
+    /// 2. Apply the tone mapping operator specified in [`Camera::options()`].
+    pub fn post_process_color(&self, color: Rgba) -> Rgba {
+        color.map_rgb(|rgb| self.options.tone_mapping.apply(rgb * self.exposure))
     }
 
     fn compute_matrices(&mut self) {

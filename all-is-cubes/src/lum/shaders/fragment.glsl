@@ -1,6 +1,9 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+/// Scale final brightness outputs by this value
+uniform mediump float exposure;
+
 in highp vec3 v_position;
 in highp vec3 v_position_in_cube;
 in mediump vec4 v_color_or_texture;
@@ -241,6 +244,9 @@ void main(void) {
 
   // Fog
   color.rgb = mix(color.rgb, fog_color, fog_mix);
+
+  // Exposure/eye adaptation
+  color.rgb *= exposure;
 
   // Tone mapping
   color.rgb = tone_map(color.rgb);

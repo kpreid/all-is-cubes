@@ -105,12 +105,9 @@ pub(crate) fn record_main(
         .spawn({
             move || {
                 while let Ok((frame_number, camera, raytracer)) = scene_receiver.recv() {
-                    let tmo = &camera.options().tone_mapping;
-                    let (image_data, _info) =
-                        raytracer.trace_scene_to_image::<ColorBuf, _, Rgba>(&camera, |pixel_buf| {
-                            // TODO: This should be available as some kind of standard utility,
-                            // maybe as another raytracer.trace*() method.
-                            Rgba::from(pixel_buf).map_rgb(|rgb| tmo.apply(rgb))
+                    let (image_data, _info) = raytracer
+                        .trace_scene_to_image::<ColorBuf, _, Rgba>(&camera, |pixel_buf| {
+                            camera.post_process_color(Rgba::from(pixel_buf))
                         });
                     // TODO: Offer supersampling (multiple rays per output pixel).
                     image_data_sender.send((frame_number, image_data)).unwrap();

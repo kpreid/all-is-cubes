@@ -149,7 +149,10 @@ impl Default for ColorBuf {
 
 impl From<ColorBuf> for Rgba {
     /// Returns the color (image pixel) accumulated in this buffer.
-    /// Not tone mapped.
+    ///
+    /// Not tone mapped; consider using [`Camera::post_process_color()`] for that.
+    ///
+    /// [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color()
     fn from(buf: ColorBuf) -> Rgba {
         if buf.ray_alpha >= 1.0 {
             // Special case to avoid dividing by zero

@@ -24,7 +24,7 @@ use tui::widgets::{Borders, Paragraph};
 use tui::{backend::CrosstermBackend, Terminal};
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
-use all_is_cubes::camera::{Camera, ToneMappingOperator, Viewport};
+use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::cgmath::{ElementWise as _, Point2};
 use all_is_cubes::inv::Slot;
@@ -174,11 +174,10 @@ impl TerminalMain {
                         scene,
                     }) = render_thread_in.recv()
                     {
-                        let tmo = &camera.options().tone_mapping;
                         let (image, info) = scene
                             .get()
                             .trace_scene_to_image::<ColorCharacterBuf, _, _>(&camera, |b| {
-                                b.output(tmo)
+                                b.output(&camera)
                             });
                         // Ignore send errors as they just mean we're shutting down or died elsewhere
                         let _ = render_thread_out.send(FrameOutput {
@@ -830,14 +829,14 @@ struct ColorCharacterBuf {
 }
 
 impl ColorCharacterBuf {
-    fn output(self, tone_map: &ToneMappingOperator) -> TextAndColor {
+    fn output(self, camera: &Camera) -> TextAndColor {
         // TODO: override_color should be less clunky
         if self.override_color {
             (self.text.into(), None)
         } else {
             (
                 self.text.into(),
-                Some(Rgba::from(self.color).map_rgb(|rgb| tone_map.apply(rgb))),
+                Some(camera.post_process_color(Rgba::from(self.color))),
             )
         }
     }
