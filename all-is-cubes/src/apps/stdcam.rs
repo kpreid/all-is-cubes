@@ -237,6 +237,10 @@ impl StandardCameras {
                     if Option::as_ref(&*self.world_space.get()) != Some(&character.space) {
                         self.world_space.set(Some(character.space.clone()));
                     }
+
+                    self.cameras
+                        .world
+                        .set_measured_exposure(character.exposure());
                 }
                 Err(_) => {
                     // TODO: set an error flag indicating failure to update

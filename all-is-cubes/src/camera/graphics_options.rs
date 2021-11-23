@@ -160,13 +160,14 @@ impl ToneMappingOperator {
 #[non_exhaustive]
 pub enum ExposureOption {
     Fixed(NotNan<f32>),
-    // Automatic,
+    Automatic,
 }
 
 impl ExposureOption {
     pub(crate) fn initial(&self) -> NotNan<f32> {
         match *self {
             ExposureOption::Fixed(value) => value,
+            ExposureOption::Automatic => notnan!(1.0),
         }
     }
 }

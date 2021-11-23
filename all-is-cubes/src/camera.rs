@@ -300,8 +300,24 @@ impl Camera {
     }
 
     /// Returns the current exposure value for scaling luminance.
+    ///
+    /// Renderers should use this value.
     pub fn exposure(&self) -> NotNan<f32> {
         self.exposure_value
+    }
+
+    /// Set the exposure value determined by average scene brightness.
+    /// This may or may not affect [`Self::exposure()`] depending on the current
+    /// graphics options.
+    pub fn set_measured_exposure(&mut self, value: f32) {
+        if let Ok(value) = NotNan::new(value) {
+            match self.options.exposure {
+                ExposureOption::Fixed(_) => { /* nothing to do */ }
+                ExposureOption::Automatic => {
+                    self.exposure_value = value;
+                }
+            }
+        }
     }
 
     fn compute_matrices(&mut self) {

@@ -7,8 +7,8 @@ use std::collections::HashSet;
 use std::fmt;
 
 use cgmath::{
-    Angle as _, Basis3, Decomposed, Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Rotation3,
-    Vector3,
+    Angle as _, Basis3, Decomposed, Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Point3,
+    Rotation3, Transform, Vector3,
 };
 use num_traits::identities::Zero;
 use ordered_float::NotNan;
@@ -17,8 +17,9 @@ use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listener, Notifier};
-use crate::math::{Aab, Face6, Face7, FreeCoordinate};
+use crate::math::{Aab, Face6, Face7, FreeCoordinate, Rgb};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
+use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{
@@ -74,6 +75,14 @@ pub struct Character {
     /// Last [`Character::step`] info result, for debugging.
     pub(crate) last_step_info: Option<BodyStepInfo>,
 
+    /// Incrementally updated samples of neighboring light levels, used for
+    /// determining exposure / eye adaptation.
+    light_samples: [Rgb; 100],
+    /// Last written element of [`Self::light_samples`]
+    light_sample_index: usize,
+    /// Computed camera exposure value based on light samples; converted to natural logarithm.
+    exposure_log: f32,
+
     // TODO: Figure out what access is needed and add accessors
     inventory: Inventory,
 
@@ -96,6 +105,8 @@ impl fmt::Debug for Character {
                 &self.velocity_input.custom_format(ConciseDebug),
             )
             .field("colliding_cubes", &self.colliding_cubes)
+            // TODO: report light samples
+            .field("exposure", &self.exposure_log.exp())
             .field("inventory", &self.inventory)
             .field("behaviors", &self.behaviors)
             .finish()
@@ -186,6 +197,9 @@ impl Character {
             eye_displacement_vel: Vector3::zero(),
             colliding_cubes: HashSet::new(),
             last_step_info: None,
+            light_samples: [Rgb::ONE; 100],
+            light_sample_index: 0,
+            exposure_log: 0.0,
             inventory: Inventory::from_slots(inventory),
             selected_slots,
             notifier: Notifier::new(),
@@ -282,6 +296,8 @@ impl Character {
             (velocity_target - self.body.velocity).mul_element_wise(stiffness) * dt;
 
         let body_step_info = if let Ok(space) = self.space.try_borrow() {
+            self.update_exposure(&space, dt);
+
             let colliding_cubes = &mut self.colliding_cubes;
             colliding_cubes.clear();
             Some(self.body.step(tick, Some(&*space), |cube| {
@@ -345,6 +361,71 @@ impl Character {
         (body_step_info, result_transaction)
     }
 
+    pub fn exposure(&self) -> f32 {
+        self.exposure_log.exp()
+    }
+
+    fn update_exposure(&mut self, space: &Space, dt: f64) {
+        #![allow(clippy::cast_lossless)] // lossiness depends on size of usize
+
+        if dt == 0. {
+            return;
+        }
+
+        // Sample surrounding light.
+        {
+            let vt = self.view();
+            let sqrtedge = (self.light_samples.len() as FreeCoordinate).sqrt();
+            let ray_origin = vt.transform_point(Point3::origin());
+            'rays: for _ray in 0..10 {
+                // TODO: better idea for what ray count should be
+                let index = (self.light_sample_index + 1).rem_euclid(self.light_samples.len());
+                self.light_sample_index = index;
+                let indexf = index as FreeCoordinate;
+                let ray = Ray::new(
+                    ray_origin,
+                    // Fixed 90° FOV
+                    vt.transform_vector(Vector3::new(
+                        (indexf).rem_euclid(sqrtedge) * 2. - 1.,
+                        (indexf).div_euclid(sqrtedge) * 2. - 1.,
+                        -1.0,
+                    )),
+                );
+                // TODO: this should be something more like the light-propagation raycast.
+                let bounds = space.bounds();
+                for step in ray.cast().take(20) {
+                    // Require hitting a visible surface and checking behind it, because if we
+                    // just take the first valid value, then we'll trivially pick the same cube
+                    // every time if our eye is within a cube with valid light.
+                    if !bounds.contains_cube(step.cube_ahead()) {
+                        self.light_samples[self.light_sample_index] = space.physics().sky_color;
+                        continue 'rays;
+                    } else if space.get_evaluated(step.cube_ahead()).visible {
+                        let l = space.get_lighting(step.cube_behind());
+                        if l.valid() {
+                            self.light_samples[self.light_sample_index] = l.value();
+                            continue 'rays;
+                        }
+                    }
+                }
+                // If we got here, nothing was hit
+                self.light_samples[self.light_sample_index] = space.physics().sky_color;
+            }
+        }
+
+        const TARGET_LUMINANCE: f32 = 0.9;
+        const EXPOSURE_CHANGE_RATE: f32 = 2.0;
+
+        // Combine the light rays into an exposure value update.
+        let light_average: Rgb = self.light_samples.iter().copied().sum::<Rgb>()
+            * (self.light_samples.len() as f32).recip();
+        let derived_exposure = (TARGET_LUMINANCE / light_average.luminance()).clamp(0.1, 10.);
+        if derived_exposure.is_finite() {
+            let delta_log = derived_exposure.ln() - self.exposure_log;
+            self.exposure_log += delta_log * dt as f32 * EXPOSURE_CHANGE_RATE;
+        }
+    }
+
     /// Maximum range for normal keyboard input should be -1 to 1
     pub fn set_velocity_input(&mut self, velocity: Vector3<FreeCoordinate>) {
         self.velocity_input = velocity;
@@ -401,6 +482,9 @@ impl VisitRefs for Character {
             eye_displacement_vel: _,
             colliding_cubes: _,
             last_step_info: _,
+            light_samples: _,
+            light_sample_index: _,
+            exposure_log: _,
             inventory,
             selected_slots: _,
             notifier: _,
