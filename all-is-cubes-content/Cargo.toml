@@ -28,7 +28,7 @@ maze_generator = "1.1.1"
 noise = { version = "0.7.0", default-features = false }
 rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
-strum = { version = "0.22.0", default-features = false, features = ["derive"] }
+strum = { version = "0.23.0", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 # Note: This is a executor for tests and does not imply any more general requirement
