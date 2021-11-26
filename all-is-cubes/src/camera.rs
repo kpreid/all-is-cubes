@@ -356,6 +356,7 @@ pub fn eye_for_look_at(grid: Grid, direction: Vector3<FreeCoordinate>) -> Point3
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cgmath::One;
 
     const DUMMY_VIEWPORT: Viewport = Viewport {
         nominal_size: Vector2::new(2.0, 2.0),
@@ -375,11 +376,14 @@ mod tests {
 
     #[test]
     fn camera_view_position() {
+        // This test used to be less trivial when the transform was taken as a matrix
         let mut camera = Camera::new(GraphicsOptions::default(), DUMMY_VIEWPORT);
         let pos = Point3::new(1.0, 2.0, 3.0);
-        camera.set_view_matrix(
-            Matrix4::from_angle_x(Deg(45.0)) * Matrix4::from_translation(-pos.to_vec()),
-        );
+        camera.set_view_transform(Decomposed {
+            scale: 1.0,
+            rot: Basis3::one(),
+            disp: pos.to_vec(),
+        });
         assert_eq!(camera.view_position(), pos);
     }
 }

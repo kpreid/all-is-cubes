@@ -5,7 +5,7 @@
 
 use std::borrow::Cow;
 
-use cgmath::{Matrix4, Vector2, Vector3};
+use cgmath::{Decomposed, Transform, Vector2, Vector3};
 
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
 use crate::math::{FreeCoordinate, Rgba};
@@ -94,11 +94,15 @@ fn print_space_impl<F: FnMut(&str)>(
             framebuffer_size: Vector2::new(80, 40),
         },
     );
-    camera.set_view_matrix(Matrix4::look_at_rh(
-        eye_for_look_at(space.grid(), direction.into()),
-        space.grid().center(),
-        Vector3::new(0., 1., 0.),
-    ));
+    camera.set_view_transform(
+        Decomposed::look_at_rh(
+            eye_for_look_at(space.grid(), direction.into()),
+            space.grid().center(),
+            Vector3::new(0., 1., 0.),
+        )
+        .inverse_transform()
+        .unwrap(),
+    );
 
     SpaceRaytracer::<CharacterBuf>::new(space, GraphicsOptions::default())
         .trace_scene_to_text(&camera, "\n", move |s| {
