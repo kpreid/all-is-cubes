@@ -11,7 +11,7 @@ use std::error::Error;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
 
-use cgmath::{Angle as _, Deg, Matrix4, Vector3};
+use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
@@ -19,7 +19,7 @@ use ordered_float::NotNan;
 
 use crate::apps::{InputProcessor, Tick};
 use crate::block::Block;
-use crate::camera::{FogOption, GraphicsOptions};
+use crate::camera::{FogOption, GraphicsOptions, ViewTransform};
 use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
@@ -147,14 +147,13 @@ impl Vui {
         &self.current_space
     }
 
-    /// Computes an OpenGL style view matrix that should be used to display the
-    /// [`Vui::current_space`].
+    /// Computes a [`ViewTransform`] that should be used to view the [`Vui::current_space`].
     ///
     /// It does not need to be rechecked other than on aspect ratio changes.
     ///
     /// TODO: This is not a method because the code structure makes it inconvenient for
     /// renderers to get access to `Vui` itself. Add some other communication path.
-    pub fn view_matrix(space: &Space, fov_y: Deg<FreeCoordinate>) -> Matrix4<FreeCoordinate> {
+    pub fn view_transform(space: &Space, fov_y: Deg<FreeCoordinate>) -> ViewTransform {
         let grid = space.grid();
         let mut ui_center = grid.center();
 
@@ -163,11 +162,13 @@ impl Vui {
         ui_center.z = 0.0;
 
         let view_distance = FreeCoordinate::from(grid.size().y) * (fov_y / 2.).cot() / 2.;
-        Matrix4::look_at_rh(
+        Decomposed::look_at_rh(
             ui_center + Vector3::new(0., 0., view_distance),
             ui_center,
             Vector3::new(0., 1., 0.),
         )
+        .inverse_transform() // Our view transform standard is camera-to-world not world-to-camera
+        .unwrap()
     }
 
     /// Compute graphics options to render the VUI space given the user's regular options.

@@ -133,7 +133,7 @@ pub(crate) fn record_main(
         drawing_progress_bar.enable_steady_tick(1000);
 
         for frame_number in options.frame_range() {
-            camera.set_view_matrix(character_ref.borrow().view());
+            camera.set_view_transform(character_ref.borrow().view());
             let scene = SpaceRaytracer::<ColorBuf>::new(
                 &*space_ref.borrow(),
                 app.graphics_options().snapshot(),

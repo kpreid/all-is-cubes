@@ -3,7 +3,10 @@
 
 //! Player-character stuff.
 
-use cgmath::{Angle as _, Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Matrix4, Vector3};
+use cgmath::{
+    Angle as _, Basis3, Decomposed, Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Rotation3,
+    Vector3,
+};
 use num_traits::identities::Zero;
 use std::collections::HashSet;
 use std::error::Error;
@@ -11,6 +14,7 @@ use std::fmt;
 
 use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
+use crate::camera::ViewTransform;
 use crate::inv::{Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
@@ -166,12 +170,17 @@ impl Character {
     pub fn listen(&self, listener: impl Listener<CharacterChange> + Send + Sync + 'static) {
         self.notifier.listen(listener)
     }
-    /// Computes the view matrix for this character's eye; the translation and rotation from
+    /// Computes the view transform for this character's eye; the translation and rotation from
     /// the [`Space`]'s coordinate system to one where the look direction is the -Z axis.
-    pub fn view(&self) -> Matrix4<FreeCoordinate> {
-        Matrix4::from_angle_x(Deg(self.body.pitch))
-            * Matrix4::from_angle_y(Deg(self.body.yaw))
-            * Matrix4::from_translation(-(self.body.position.to_vec() + self.eye_displacement_pos))
+    ///
+    /// See the documentation for [`ViewTransform`] for the interpretation of this transform.
+    pub fn view(&self) -> ViewTransform {
+        Decomposed {
+            scale: 1.0,
+            rot: Basis3::from_angle_y(Deg(-self.body.yaw))
+                * Basis3::from_angle_x(Deg(-self.body.pitch)),
+            disp: self.body.position.to_vec() + self.eye_displacement_pos,
+        }
     }
 
     pub fn inventory(&self) -> &Inventory {

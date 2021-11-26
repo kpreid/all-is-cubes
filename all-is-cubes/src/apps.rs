@@ -8,7 +8,7 @@ use std::future::Future;
 use std::mem;
 use std::task::{Context, Poll};
 
-use cgmath::{Matrix4, Point2, SquareMatrix};
+use cgmath::{One, Point2};
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
@@ -398,7 +398,7 @@ impl StandardCameras {
             if let Some(space_ref) = &self.ui_space {
                 // TODO: try_borrow()
                 // TODO: ...or just skip the whole idea
-                self.cameras.ui.set_view_matrix(Vui::view_matrix(
+                self.cameras.ui.set_view_transform(Vui::view_transform(
                     &*space_ref.borrow(),
                     self.cameras.ui.fov_y(),
                 ));
@@ -409,7 +409,7 @@ impl StandardCameras {
             self.character = self.character_source.snapshot();
             if self.character.is_none() {
                 // TODO: set an error flag saying that nothing should be drawn
-                self.cameras.world.set_view_matrix(Matrix4::identity());
+                self.cameras.world.set_view_transform(One::one());
             }
         }
 
@@ -417,7 +417,7 @@ impl StandardCameras {
             #[allow(clippy::single_match)]
             match character_ref.try_borrow() {
                 Ok(character) => {
-                    self.cameras.world.set_view_matrix(character.view());
+                    self.cameras.world.set_view_transform(character.view());
                 }
                 Err(_) => {
                     // TODO: set an error flag indicating failure to update

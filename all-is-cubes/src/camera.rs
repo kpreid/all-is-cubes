@@ -5,8 +5,8 @@
 //! raycasting into the scene, etc.
 
 use cgmath::{
-    Deg, EuclideanSpace as _, InnerSpace as _, Matrix as _, Matrix4, Point2, Point3, SquareMatrix,
-    Transform, Vector2, Vector3,
+    Basis3, Decomposed, Deg, EuclideanSpace as _, InnerSpace as _, Matrix as _, Matrix4, Point2,
+    Point3, SquareMatrix, Transform, Vector2, Vector3,
 };
 use itertools::Itertools as _;
 
@@ -18,6 +18,14 @@ mod graphics_options;
 pub use graphics_options::*;
 
 type M = Matrix4<FreeCoordinate>;
+
+/// Representation of a camera viewpoint and orientation, using [`cgmath`] types.
+///
+/// Note that this is treated as a transform **from** the origin looking in the &minus;Z
+/// direction **to** the camera position in the world. This is done so that the
+/// [`Decomposed::disp`] vector is equal to the world position, rather than needing to
+/// be rotated by the view direction.
+pub type ViewTransform = Decomposed<Vector3<FreeCoordinate>, Basis3<FreeCoordinate>>;
 
 /// Defines a viewpoint in/of the world: a viewport (aspect ratio), projection matrix,
 /// and view matrix.
@@ -106,11 +114,33 @@ impl Camera {
     /// [`view_position`](Self::view_position) and,
     /// [`project_ndc_into_world`](Self::project_ndc_into_world).
     /// to determine what world coordinates are.
+    ///
+    /// TODO: remove this in favor of `set_view_transform`.
     pub fn set_view_matrix(&mut self, view_matrix: M) {
         if view_matrix != self.view_matrix {
             self.view_matrix = view_matrix;
             self.compute_matrices();
         }
+    }
+
+    /// Sets the view transform.
+    ///
+    /// Besides controlling rendering, this is used to determine world coordinates for purposes
+    /// of [`view_position`](Self::view_position) and
+    /// [`project_ndc_into_world`](Self::project_ndc_into_world).
+    ///
+    /// The scale currently must be 1.
+    #[track_caller]
+    #[allow(clippy::float_cmp)]
+    pub fn set_view_transform(&mut self, view_transform: ViewTransform) {
+        assert_eq!(
+            view_transform.scale, 1.0,
+            "view_transform.scale must be equal to 1"
+        );
+        self.set_view_matrix(view_transform
+            .inverse_transform()
+            .unwrap(/* Inverting cannot fail as long as scale is nonzero */)
+            .into());
     }
 
     /// Returns a projection matrix suitable for OpenGL use.
