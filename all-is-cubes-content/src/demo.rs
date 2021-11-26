@@ -47,6 +47,19 @@ pub enum UniverseTemplate {
 }
 
 impl UniverseTemplate {
+    /// Whether the template should be shown to users.
+    /// (This does not control )
+    pub fn include_in_lists(&self) -> bool {
+        use UniverseTemplate::*;
+        match self {
+            DemoCity | Dungeon | Atrium | CornellBox | PhysicsLab | MengerSponge
+            | LightingBench => true,
+
+            // More testing than interesting demos.
+            Blank | Fail => false,
+        }
+    }
+
     pub async fn build(self, p: YieldProgress) -> Result<Universe, GenError> {
         let mut universe = Universe::new();
 
