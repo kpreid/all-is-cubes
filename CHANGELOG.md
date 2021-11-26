@@ -25,6 +25,7 @@
     * Breaking: The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
     * Breaking: `GLRenderer::new()` now expects a `StandardCameras` (instead of the components of one).
     * Breaking: `AllIsCubesAppState::update_cursor()` now expects a `&StandardCameras` instead of two `Camera`s.
+    * Breaking: `Camera::set_view_matrix()` is now `Camera::set_view_transform()`, and expects a `cgmath::Decomposed` transform, inverted from the matrix version.
     * The `Name` enum is now intended to be reliably cheap to clone:
         * `Name::Specific`'s field holds an `Arc<str>` instead of a `String`. 
         * `Universe`-related errors now hold `Name` instead of `Arc<Name>`.

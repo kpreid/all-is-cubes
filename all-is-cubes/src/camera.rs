@@ -5,7 +5,7 @@
 //! raycasting into the scene, etc.
 
 use cgmath::{
-    Basis3, Decomposed, Deg, EuclideanSpace as _, InnerSpace as _, Matrix as _, Matrix4, Point2,
+    Basis3, Decomposed, Deg, EuclideanSpace as _, InnerSpace as _, Matrix4, One as _, Point2,
     Point3, SquareMatrix, Transform, Vector2, Vector3,
 };
 use itertools::Itertools as _;
@@ -37,8 +37,13 @@ pub struct Camera {
     /// Caller-provided viewport.
     viewport: Viewport,
 
-    /// Caller-provided view matrix.
-    view_matrix: M,
+    /// Caller-provided view transform.
+    eye_to_world_transform: ViewTransform,
+
+    /// Inverse of `eye_to_world_transform` as a matrix.
+    /// Might also be called "view matrix".
+    /// Calculated by [`Self::compute_matrices`].
+    world_to_eye_matrix: M,
 
     /// Projection matrix derived from viewport and options.
     /// Calculated by [`Self::compute_matrices`].
@@ -48,9 +53,10 @@ pub struct Camera {
     /// Calculated by [`Self::compute_matrices`].
     view_position: Point3<FreeCoordinate>,
 
-    /// Inverse of `projection * view_matrix`.
+    /// Inverse of `projection * world_to_eye_matrix`.
     /// Calculated by [`Self::compute_matrices`].
     inverse_projection_view: M,
+
     view_frustum_corners: [Point3<FreeCoordinate>; 8],
 }
 
@@ -60,9 +66,10 @@ impl Camera {
         let mut new_self = Self {
             options: options.repair(),
             viewport,
-            view_matrix: M::identity(),
+            eye_to_world_transform: ViewTransform::one(),
 
             // Overwritten immediately by compute_matrices
+            world_to_eye_matrix: M::identity(),
             projection: M::identity(),
             view_position: Point3::origin(),
             inverse_projection_view: M::identity(),
@@ -108,21 +115,6 @@ impl Camera {
         self.options.view_distance.into_inner()
     }
 
-    /// Sets the view matrix.
-    ///
-    /// This matrix is used to determine world coordinates for purposes of
-    /// [`view_position`](Self::view_position) and,
-    /// [`project_ndc_into_world`](Self::project_ndc_into_world).
-    /// to determine what world coordinates are.
-    ///
-    /// TODO: remove this in favor of `set_view_transform`.
-    pub fn set_view_matrix(&mut self, view_matrix: M) {
-        if view_matrix != self.view_matrix {
-            self.view_matrix = view_matrix;
-            self.compute_matrices();
-        }
-    }
-
     /// Sets the view transform.
     ///
     /// Besides controlling rendering, this is used to determine world coordinates for purposes
@@ -132,15 +124,17 @@ impl Camera {
     /// The scale currently must be 1.
     #[track_caller]
     #[allow(clippy::float_cmp)]
-    pub fn set_view_transform(&mut self, view_transform: ViewTransform) {
+    pub fn set_view_transform(&mut self, eye_to_world_transform: ViewTransform) {
+        if eye_to_world_transform == self.eye_to_world_transform {
+            return;
+        }
         assert_eq!(
-            view_transform.scale, 1.0,
-            "view_transform.scale must be equal to 1"
+            eye_to_world_transform.scale, 1.0,
+            "eye_to_world_transform.scale must be equal to 1"
         );
-        self.set_view_matrix(view_transform
-            .inverse_transform()
-            .unwrap(/* Inverting cannot fail as long as scale is nonzero */)
-            .into());
+
+        self.eye_to_world_transform = eye_to_world_transform;
+        self.compute_matrices();
     }
 
     /// Returns a projection matrix suitable for OpenGL use.
@@ -150,17 +144,17 @@ impl Camera {
 
     /// Returns a view matrix suitable for OpenGL use.
     pub fn view_matrix(&self) -> M {
-        self.view_matrix
+        self.world_to_eye_matrix
     }
 
-    /// Returns the eye position in world coordinates, as set by [`Self::set_view_matrix()`].
+    /// Returns the eye position in world coordinates, as set by [`Camera::set_view_transform()`].
     pub fn view_position(&self) -> Point3<FreeCoordinate> {
         self.view_position
     }
 
     /// Converts a screen position in normalized device coordinates (as produced by
     /// [`Viewport::normalize_nominal_point`]) into a ray in world space.
-    /// Uses the view transformation given by [`set_view_matrix`](Self::set_view_matrix).
+    /// Uses the view transformation given by [`set_view_transform`](Self::set_view_transform).
     pub fn project_ndc_into_world(&self, ndc: Point2<FreeCoordinate>) -> Ray {
         let ndc_near = ndc.to_vec().extend(-1.0).extend(1.0);
         let ndc_far = ndc.to_vec().extend(1.0).extend(1.0);
@@ -253,15 +247,15 @@ impl Camera {
             /* near: */ 1. / 32., // half a voxel at resolution=16
             /* far: */ self.view_distance(),
         );
-        self.view_position = Point3::from_vec(
-            self.view_matrix
-                .inverse_transform()
-                .expect("view matrix was not invertible")
-                .transpose()
-                .row(3)
-                .truncate(),
-        );
-        self.inverse_projection_view = (self.projection * self.view_matrix)
+
+        self.world_to_eye_matrix = self.eye_to_world_transform
+            .inverse_transform()
+            .unwrap(/* Inverting cannot fail as long as scale is nonzero */)
+            .into();
+
+        self.view_position = Point3::from_vec(self.eye_to_world_transform.disp);
+
+        self.inverse_projection_view = (self.projection * self.world_to_eye_matrix)
             .inverse_transform()
             .expect("projection and view matrix was not invertible");
 
@@ -356,7 +350,6 @@ pub fn eye_for_look_at(grid: Grid, direction: Vector3<FreeCoordinate>) -> Point3
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cgmath::One;
 
     const DUMMY_VIEWPORT: Viewport = Viewport {
         nominal_size: Vector2::new(2.0, 2.0),
