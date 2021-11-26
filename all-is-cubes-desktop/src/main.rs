@@ -8,7 +8,6 @@
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
 
-use std::error::Error;
 use std::time::Instant;
 
 use clap::value_t;
@@ -33,7 +32,7 @@ use terminal::{terminal_main_loop, TerminalOptions};
 // TODO: put version numbers in the title when used as a window title
 static TITLE: &str = "All is Cubes";
 
-fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+fn main() -> Result<(), anyhow::Error> {
     let options = command_options::app().get_matches();
 
     // Convert options we will consult multiple times.

@@ -98,6 +98,7 @@ version = "0.3.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
+ "anyhow",
  "clap",
  "crossterm 0.22.1",
  "directories-next",

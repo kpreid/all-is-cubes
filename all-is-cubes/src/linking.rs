@@ -175,9 +175,12 @@ impl GenError {
 
 impl fmt::Display for GenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.detail)?;
+        // Don't include `detail` because that's our `Error::source()`.
+        // The assumption is that the cause chain will be walked when printing an error.
         if let Some(name) = &self.for_object {
-            write!(f, "\nwhile setting up {}", name)?;
+            write!(f, "An error occurred while generating object {}", name)?;
+        } else {
+            write!(f, "An error occurred while generating an object")?;
         }
         Ok(())
     }
@@ -261,17 +264,20 @@ mod tests {
 
     #[test]
     fn gen_error_message() {
-        let e = GenError::failure(
-            SetCubeError::OutOfBounds {
-                modification: Grid::for_block(1),
-                space_bounds: Grid::for_block(3),
-            },
-            "x".into(),
-        );
+        let set_cube_error = SetCubeError::OutOfBounds {
+            modification: Grid::for_block(1),
+            space_bounds: Grid::for_block(3),
+        };
+        let e = GenError::failure(set_cube_error.clone(), "x".into());
         assert_eq!(
             e.to_string(),
-            "Grid(0..1, 0..1, 0..1) is outside of the bounds Grid(0..3, 0..3, 0..3)\nwhile setting up 'x'"
+            "An error occurred while generating object 'x'",
         );
+        let source = Error::source(&e)
+            .expect("has source")
+            .downcast_ref::<InGenError>()
+            .expect("is InGenError");
+        assert_eq!(source.to_string(), set_cube_error.to_string());
     }
 
     #[test]

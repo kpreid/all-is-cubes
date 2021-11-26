@@ -6,7 +6,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::error::Error;
 use std::io;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
@@ -91,7 +90,7 @@ impl Default for TerminalOptions {
 pub fn terminal_main_loop(
     app: AllIsCubesAppState,
     options: TerminalOptions,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     let mut main = TerminalMain::new(app, options)?;
     main.run()?;
     main.clean_up_terminal()?; // note this is _also_ run on drop

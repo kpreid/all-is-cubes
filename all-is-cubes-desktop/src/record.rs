@@ -4,7 +4,6 @@
 //! Headless image (and someday video) generation.
 
 use std::convert::{TryFrom, TryInto};
-use std::error::Error;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::ops::RangeInclusive;
@@ -12,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use anyhow::anyhow;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::{chunk::ChunkType, Encoder};
 
@@ -63,7 +63,7 @@ impl RecordAnimationOptions {
 pub(crate) fn record_main(
     mut app: AllIsCubesAppState,
     options: RecordOptions,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
         .on_finish(ProgressFinish::AtCurrentPos);
@@ -78,7 +78,7 @@ pub(crate) fn record_main(
     let character_ref: URef<Character> = app
         .character()
         .snapshot()
-        .ok_or_else(|| Box::<dyn Error + Send + Sync>::from("Character not found"))?;
+        .ok_or_else(|| anyhow!("Character not found"))?;
 
     let space_ref = character_ref.borrow().space.clone();
 
