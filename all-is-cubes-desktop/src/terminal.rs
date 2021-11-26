@@ -12,7 +12,9 @@ use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
 use crossterm::cursor::{self, MoveTo};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::QueueableCommand as _;
 use tui::layout::{Constraint, Direction, Layout, Rect};
@@ -23,8 +25,8 @@ use tui::{backend::CrosstermBackend, Terminal};
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
 use all_is_cubes::camera::{Camera, Viewport};
-use all_is_cubes::cgmath::ElementWise as _;
 use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::cgmath::{ElementWise as _, Point2};
 use all_is_cubes::inv::Slot;
 use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::raytracer::{
@@ -207,12 +209,16 @@ impl TerminalMain {
         out.queue(SetAttribute(Attribute::Reset))?;
         out.queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
         out.queue(cursor::Show)?;
+        out.queue(crossterm::event::DisableMouseCapture)?;
         crossterm::terminal::disable_raw_mode()?;
         self.terminal_state_dirty = false;
         Ok(())
     }
 
     fn run(&mut self) -> crossterm::Result<()> {
+        self.tuiout
+            .backend_mut()
+            .queue(crossterm::event::EnableMouseCapture)?;
         self.tuiout.clear()?;
 
         loop {
@@ -249,7 +255,37 @@ impl TerminalMain {
                     }
                     Event::Key(_) => {}
                     Event::Resize(..) => { /* tui handles this */ }
-                    Event::Mouse(_) => {}
+                    Event::Mouse(MouseEvent {
+                        kind,
+                        column,
+                        row,
+                        modifiers: _,
+                    }) => {
+                        // TODO: there's a scaling of nominal_size in viewport_from_terminal_size that we
+                        // need to undo here, but it would be better to directly input the right coordinate
+                        // system. Define a version of mouse_pixel_position which takes sizes directly?
+                        let position =
+                            Point2::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
+                        self.app.input_processor.mouse_pixel_position(
+                            self.cameras.viewport(),
+                            Some(position),
+                            true,
+                        );
+                        match kind {
+                            MouseEventKind::Down(button) => {
+                                self.app.click(match button {
+                                    MouseButton::Left => 0,
+                                    MouseButton::Right => 1,
+                                    MouseButton::Middle => 2,
+                                });
+                            }
+                            MouseEventKind::Up(_)
+                            | MouseEventKind::Drag(_)
+                            | MouseEventKind::Moved
+                            | MouseEventKind::ScrollDown
+                            | MouseEventKind::ScrollUp => {}
+                        }
+                    }
                 }
             }
 

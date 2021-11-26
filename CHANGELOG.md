@@ -12,6 +12,9 @@
     - `StandardCameras` manages the `Camera`s needed for rendering, given the necessary inputs. It is intended to reduce duplicated code and coupling in each renderer.
     - `VisitRefs` allows traversing the `URef` graph inside a `Universe`.
 
+- `all-is-cubes-desktop`:
+    - Terminal mode now has mouse support.
+
 ### Changed
 
 - `all_is_cubes` library:
