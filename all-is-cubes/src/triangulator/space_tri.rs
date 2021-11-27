@@ -295,37 +295,44 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     fn sort_and_store_transparent_indices(&mut self, transparent_indices: Vec<u32>) {
         self.opaque_range = 0..self.indices.len();
 
-        for (i, range) in self.transparent_ranges.iter_mut().enumerate() {
-            // Make a copy of `transparent_indices`.
-            let start = self.indices.len();
-            self.indices.extend(transparent_indices.iter());
-            *range = start..self.indices.len();
+        if transparent_indices.is_empty() {
+            // Trivial case -- nothing to sort
+            for range in self.transparent_ranges.iter_mut() {
+                *range = 0..0;
+            }
+        } else {
+            for (i, range) in self.transparent_ranges.iter_mut().enumerate() {
+                // Make a copy of `transparent_indices`.
+                let start = self.indices.len();
+                self.indices.extend(transparent_indices.iter());
+                *range = start..self.indices.len();
 
-            // Sort the copy.
-            match DepthOrdering::from_index(i) {
-                DepthOrdering::Direction(rot) => {
-                    // This inverse() is because the rotation is defined as
-                    // "rotate the view direction to a fixed orientation",
-                    // but we're doing "rotate the geometry" instead.
-                    let basis = rot.inverse().to_basis();
+                // Sort the copy.
+                match DepthOrdering::from_index(i) {
+                    DepthOrdering::Direction(rot) => {
+                        // This inverse() is because the rotation is defined as
+                        // "rotate the view direction to a fixed orientation",
+                        // but we're doing "rotate the geometry" instead.
+                        let basis = rot.inverse().to_basis();
 
-                    // Now sort the copy.
-                    let slice: &mut [u32] = &mut self.indices[range.clone()];
-                    // We want to sort the triangles, so we reinterpret the slice as groups of 3 indices.
-                    let slice: &mut [[u32; 3]] = bytemuck::cast_slice_mut(slice);
-                    let vertices = &self.vertices; // borrow for closure
-                    slice.sort_unstable_by_key(|indices| {
-                        let midpoint = Self::midpoint(vertices, *indices);
-                        let key: [OrderedFloat<V::Coordinate>; 3] = basis
-                            .map(|f| OrderedFloat(-f.normal_vector().dot(midpoint.to_vec())))
-                            .into();
-                        key
-                    });
+                        // Now sort the copy.
+                        let slice: &mut [u32] = &mut self.indices[range.clone()];
+                        // We want to sort the triangles, so we reinterpret the slice as groups of 3 indices.
+                        let slice: &mut [[u32; 3]] = bytemuck::cast_slice_mut(slice);
+                        let vertices = &self.vertices; // borrow for closure
+                        slice.sort_unstable_by_key(|indices| {
+                            let midpoint = Self::midpoint(vertices, *indices);
+                            let key: [OrderedFloat<V::Coordinate>; 3] = basis
+                                .map(|f| OrderedFloat(-f.normal_vector().dot(midpoint.to_vec())))
+                                .into();
+                            key
+                        });
+                    }
+                    DepthOrdering::Within => {
+                        // Will be sorted dynamically later.
+                    }
+                    o => panic!("unexpected ordering value {:?}", o),
                 }
-                DepthOrdering::Within => {
-                    // Will be sorted dynamically later.
-                }
-                o => panic!("unexpected ordering value {:?}", o),
             }
         }
     }
