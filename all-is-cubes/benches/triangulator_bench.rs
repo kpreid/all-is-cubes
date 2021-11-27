@@ -2,10 +2,11 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::math::Rgba;
+use all_is_cubes::rgba_const;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, AIR};
-use all_is_cubes::content::make_some_blocks;
 
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::triangulator::{
@@ -18,7 +19,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
 
     c.bench_function("triangulate_space: checkerboard, new buffer", |b| {
         b.iter_batched(
-            || checkerboard_setup(options),
+            || checkerboard_setup(options, false),
             |(space, block_meshes)| {
                 triangulate_space(&space, space.grid(), options, &*block_meshes)
             },
@@ -29,7 +30,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
     c.bench_function("triangulate_space: checkerboard, reused buffer", |b| {
         b.iter_batched(
             || {
-                let (space, block_meshes) = checkerboard_setup(options);
+                let (space, block_meshes) = checkerboard_setup(options, false);
                 let mut buffer = SpaceMesh::new();
                 buffer.compute(&space, space.grid(), options, &*block_meshes);
                 // Sanity check that we're actually rendering as much as we expect.
@@ -47,15 +48,35 @@ pub fn triangulator_bench(c: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
+
+    let mut slow_group = c.benchmark_group("slow");
+    slow_group.sample_size(10);
+
+    slow_group.bench_function("triangulate_space: transparent, new buffer", |b| {
+        b.iter_batched(
+            || checkerboard_setup(options, true),
+            |(space, block_meshes)| {
+                triangulate_space(&space, space.grid(), options, &*block_meshes)
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 fn checkerboard_setup(
     options: &TriangulatorOptions,
+    transparent: bool,
 ) -> (Space, BlockMeshes<BlockVertex, TestTextureTile>) {
     let grid = Grid::new((0, 0, 0), (16, 16, 16));
     let mut space = Space::empty(grid);
-    let mut blocks: [Block; 2] = make_some_blocks();
-    blocks[0] = AIR.clone();
+    let blocks = [
+        AIR,
+        Block::from(if transparent {
+            rgba_const!(0.5, 0.5, 0.5, 0.5)
+        } else {
+            Rgba::WHITE
+        }),
+    ];
 
     // Generate checkerboard
     space
