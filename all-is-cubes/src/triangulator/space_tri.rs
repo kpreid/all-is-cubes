@@ -301,13 +301,22 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 *range = 0..0;
             }
         } else {
-            for (i, range) in self.transparent_ranges.iter_mut().enumerate() {
-                // Make a copy of `transparent_indices`.
-                let start = self.indices.len();
-                self.indices.extend(transparent_indices.iter());
-                *range = start..self.indices.len();
+            // Precompute midpoints (as sort keys) of all of the transparent triangles.
+            struct TriWithMid<S> {
+                indices: [u32; 3],
+                midpoint: Point3<S>,
+            }
+            let triangles: &[[u32; 3]] = bytemuck::cast_slice(&*transparent_indices);
+            let mut sortable_triangles: Vec<TriWithMid<V::Coordinate>> = triangles
+                .iter()
+                .map(|&indices| TriWithMid {
+                    indices,
+                    midpoint: Self::midpoint(&self.vertices, indices),
+                })
+                .collect();
 
-                // Sort the copy.
+            for (i, range) in self.transparent_ranges.iter_mut().enumerate() {
+                // Sort the triangles by this ordering.
                 match DepthOrdering::from_index(i) {
                     DepthOrdering::Direction(rot) => {
                         // This inverse() is because the rotation is defined as
@@ -315,17 +324,12 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                         // but we're doing "rotate the geometry" instead.
                         let basis = rot.inverse().to_basis();
 
-                        // Now sort the copy.
-                        let slice: &mut [u32] = &mut self.indices[range.clone()];
-                        // We want to sort the triangles, so we reinterpret the slice as groups of 3 indices.
-                        let slice: &mut [[u32; 3]] = bytemuck::cast_slice_mut(slice);
-                        let vertices = &self.vertices; // borrow for closure
-                        slice.sort_unstable_by_key(|indices| {
-                            let midpoint = Self::midpoint(vertices, *indices);
-                            let key: [OrderedFloat<V::Coordinate>; 3] = basis
-                                .map(|f| OrderedFloat(-f.dot(midpoint.to_vec())))
-                                .into();
-                            key
+                        // Note: Benchmarks show that `sort_by_key` is fastest
+                        // (not `sort_unstable_by_key`).
+                        sortable_triangles.sort_by_key(|tri| -> [OrderedFloat<V::Coordinate>; 3] {
+                            basis
+                                .map(|f| OrderedFloat(-f.dot(tri.midpoint.to_vec())))
+                                .into()
                         });
                     }
                     DepthOrdering::Within => {
@@ -333,6 +337,12 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                     }
                     o => panic!("unexpected ordering value {:?}", o),
                 }
+
+                // Copy the sorted indices into the main array.
+                let start = self.indices.len();
+                self.indices
+                    .extend(sortable_triangles.iter().flat_map(|tri| tri.indices));
+                *range = start..self.indices.len();
             }
         }
     }
