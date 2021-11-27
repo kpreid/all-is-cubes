@@ -2,7 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use bitvec::vec::BitVec;
-use cgmath::{EuclideanSpace as _, InnerSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
+use cgmath::{EuclideanSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
 use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
@@ -323,7 +323,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                         slice.sort_unstable_by_key(|indices| {
                             let midpoint = Self::midpoint(vertices, *indices);
                             let key: [OrderedFloat<V::Coordinate>; 3] = basis
-                                .map(|f| OrderedFloat(-f.normal_vector().dot(midpoint.to_vec())))
+                                .map(|f| OrderedFloat(-f.dot(midpoint.to_vec())))
                                 .into();
                             key
                         });

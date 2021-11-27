@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::block::{recursive_ray, Evoxel};
 use crate::camera::LightingOption;
@@ -70,11 +70,10 @@ impl<D> Surface<'_, D> {
 /// Simple directional lighting used to give corners extra definition.
 /// Note that this algorithm is also implemented in the fragment shader for GPU rendering.
 fn fixed_directional_lighting(face: Face) -> f32 {
-    let normal = face.normal_vector();
     const LIGHT_1_DIRECTION: Vector3<f32> = Vector3::new(0.4, -0.1, 0.0);
     const LIGHT_2_DIRECTION: Vector3<f32> = Vector3::new(-0.4, 0.35, 0.25);
     (1.0 - 1.0 / 16.0)
-        + 0.25 * (LIGHT_1_DIRECTION.dot(normal).max(0.0) + LIGHT_2_DIRECTION.dot(normal).max(0.0))
+        + 0.25 * (face.dot(LIGHT_1_DIRECTION).max(0.0) + face.dot(LIGHT_2_DIRECTION).max(0.0))
 }
 
 /// Builds on [`Surface`] to report the depth (length of ray through volume)

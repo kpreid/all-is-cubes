@@ -199,6 +199,34 @@ impl Face {
         }
     }
 
+    /// Dot product of this face as a unit vector and the given vector,
+    /// implemented by selecting the relevant component.
+    ///
+    /// ```
+    /// use cgmath::{Vector3, InnerSpace};
+    /// use all_is_cubes::math::Face;
+    /// 
+    /// let sample_vector = Vector3::new(1.0, 2.0, 5.0_f64);
+    /// for face in Face::ALL_SEVEN {
+    ///     assert_eq!(face.dot(sample_vector), face.normal_vector().dot(sample_vector));
+    /// }
+    /// ```
+    #[inline]
+    pub fn dot<S>(self, vector: Vector3<S>) -> S
+    where
+        S: Zero + std::ops::Neg<Output = S>,
+    {
+        match self {
+            Face::Within => S::zero(),
+            Face::NX => -vector.x,
+            Face::NY => -vector.y,
+            Face::NZ => -vector.z,
+            Face::PX => vector.x,
+            Face::PY => vector.y,
+            Face::PZ => vector.z,
+        }
+    }
+
     /// Returns a homogeneous transformation matrix which, if given points on the square
     /// with x ∈ [0, scale], y ∈ [0, scale] and z = 0, converts them to points that lie
     /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].

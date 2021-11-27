@@ -468,7 +468,7 @@ pub(crate) fn nudge_on_ray(
     };
 
     // This is the length of the direction vector projected along the face normal — thus, the reciprocal of the scale factor by which to adjust the distance.
-    let direction_projection = face.normal_vector().dot(segment.direction);
+    let direction_projection = face.dot(segment.direction);
 
     debug_assert!(direction_projection != 0.0);
 

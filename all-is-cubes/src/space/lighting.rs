@@ -68,10 +68,7 @@ static LIGHT_RAYS: Lazy<[LightRayData; ALL_RAYS_COUNT]> = Lazy::new(|| {
                     rays.push(LightRayData {
                         ray: Ray { origin, direction },
                         face_cosines: FaceMap::from_fn(|face| {
-                            direction
-                                .map(|s| s as f32)
-                                .dot(face.normal_vector())
-                                .max(0.0)
+                            face.dot(direction.map(|s| s as f32)).max(0.0)
                         }),
                     });
                 }

@@ -6,6 +6,7 @@
 
 - `all_is_cubes` library:
     - `Evoxel::from_block()`
+    - `Face::dot()`, for dot product with a vector without constructing an intermediate unit vector.
     - `SpaceMesh` now remembers the `TextureAllocator::Tile`s it was constructed using, just like `BlockMesh` does, so callers no longer need to do so.
     - `SpaceMesh::blocks_used_iter()` reports which block indices went into the mesh.
     - `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
