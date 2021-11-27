@@ -212,10 +212,22 @@ fn cornell_box() -> Result<Space, InGenError> {
 async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenError> {
     assert!(shell_radius > planet_radius);
     let space_radius = shell_radius + 1; // TODO check off-by-one consistency
-    let mut space = Space::empty(Grid::new(
+    let bounds = Grid::new(
         GridPoint::new(-1, -1, -1) * space_radius.into(),
         GridVector::new(1, 1, 1) * (space_radius * 2 + 1).into(),
-    ));
+    );
+    let mut space = Space::builder(bounds)
+        .spawn({
+            let mut spawn = Spawn::default_for_new_space(bounds);
+            spawn.set_eye_position(Point3::new(
+                0.,
+                FreeCoordinate::from(planet_radius) + 2.,
+                0.,
+            ));
+            spawn.set_inventory(free_editing_starter_inventory(false));
+            spawn
+        })
+        .build_empty();
     let shell_radius: GridCoordinate = shell_radius.into();
     let planet_radius: GridCoordinate = planet_radius.into();
 
@@ -266,14 +278,6 @@ async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InG
         },
     )?;
 
-    let spawn = space.spawn_mut();
-    spawn.set_eye_position(Point3::new(
-        0.,
-        FreeCoordinate::from(planet_radius) + 2.,
-        0.,
-    ));
-    spawn.set_inventory(free_editing_starter_inventory(false));
-
     Ok(space)
 }
 
@@ -292,7 +296,9 @@ fn arbitrary_space(_: &mut Universe) -> Result<Space, InGenError> {
             Ok(mut space) => {
                 // Patch spawn position to be reasonable
                 let grid = space.grid();
-                space.spawn_mut().set_eye_position(grid.center());
+                let mut spawn = space.spawn().clone();
+                spawn.set_eye_position(grid.center());
+                space.set_spawn(spawn);
 
                 // Patch physics to be reasonable
                 let mut p = space.physics().clone();

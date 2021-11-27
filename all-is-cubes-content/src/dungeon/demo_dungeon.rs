@@ -217,7 +217,7 @@ impl Theme<DemoRoom> for DemoTheme {
                         }
                     }
 
-                    *space.spawn_mut() = spawn;
+                    space.set_spawn(spawn);
                 }
             }
             _ => unreachable!(),

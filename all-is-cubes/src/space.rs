@@ -661,8 +661,8 @@ impl Space {
         &self.spawn
     }
 
-    pub fn spawn_mut(&mut self) -> &mut Spawn {
-        &mut self.spawn
+    pub fn set_spawn(&mut self, spawn: Spawn) {
+        self.spawn = spawn;
     }
 
     pub fn add_behavior<B>(&mut self, behavior: B)

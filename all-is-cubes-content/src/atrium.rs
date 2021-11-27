@@ -3,6 +3,7 @@
 
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
+use all_is_cubes::character::Spawn;
 use all_is_cubes::rgba_const;
 use noise::Seedable;
 
@@ -60,17 +61,19 @@ pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
     };
 
     let mut space = Space::builder(space_grid)
-        .spawn_position(Point3::new(
-            0.5,
-            1.91 + FreeCoordinate::from(ceiling_height + 2),
-            10.0,
-        ))
+        .spawn({
+            // TODO: default_for_new_space isn't really doing anything for us here
+            let mut spawn = Spawn::default_for_new_space(space_grid);
+            spawn.set_eye_position(Point3::new(
+                0.5,
+                1.91 + FreeCoordinate::from(ceiling_height + 2),
+                10.0,
+            ));
+            spawn.set_inventory(free_editing_starter_inventory(true));
+            spawn
+        })
         .sky_color(Rgb::new(1.0, 1.0, 0.9843) * 4.0)
         .build_empty();
-    // TODO: builder method ... ?
-    space
-        .spawn_mut()
-        .set_inventory(free_editing_starter_inventory(true));
 
     // Outer walls
     four_walls(
