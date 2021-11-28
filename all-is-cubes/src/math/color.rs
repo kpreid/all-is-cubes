@@ -4,9 +4,10 @@
 //! Color data types. This module is private but reexported by its parent.
 
 use std::fmt;
+use std::iter::Sum;
 use std::ops::{Add, AddAssign, Mul, Sub};
 
-use cgmath::{ElementWise as _, Vector3, Vector4};
+use cgmath::{ElementWise as _, Vector3, Vector4, Zero as _};
 pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::notnan;
@@ -367,6 +368,17 @@ impl Mul<f32> for Rgb {
     /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
     fn mul(self, scalar: f32) -> Self {
         Self(self.0 * NotNan::new(scalar).unwrap())
+    }
+}
+
+/// There is no corresponding `impl Sum for Rgba` because the alpha would
+/// not have a universally reasonable interpretation.
+impl Sum for Rgb {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        // Using Vector3 as the accumulator type avoids intermediate NaN checks.
+        Rgb::try_from(iter.fold(Vector3::<f32>::zero(), |accum, rgb| {
+            accum + Vector3::<f32>::from(rgb)
+        })).unwrap(/* impossible NaN */)
     }
 }
 
