@@ -420,6 +420,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: Cow::Borrowed("<air>"),
     selectable: false,
     collision: BlockCollision::None,
+    rotation_rule: RotationPlacementRule::Never,
     light_emission: Rgb::ZERO,
     animation_hint: AnimationHint::UNCHANGING,
 };

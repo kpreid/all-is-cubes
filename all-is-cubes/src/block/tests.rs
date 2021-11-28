@@ -10,7 +10,8 @@ use pretty_assertions::assert_eq;
 
 use crate::block::{
     builder, AnimationHint, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef,
-    BlockDefTransaction, EvalBlockError, EvaluatedBlock, Evoxel, Resolution, AIR, AIR_EVALUATED,
+    BlockDefTransaction, EvalBlockError, EvaluatedBlock, Evoxel, Resolution, RotationPlacementRule,
+    AIR, AIR_EVALUATED,
 };
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
@@ -467,9 +468,10 @@ fn builder_every_field() {
     let light_emission = Rgb::new(0.1, 3.0, 0.1);
     assert_eq!(
         Block::builder()
-            .display_name("hello world")
-            .collision(BlockCollision::None) // TODO: when we have more interesting values, use one
             .color(color)
+            .display_name("hello world")
+            .collision(BlockCollision::Recur)
+            .rotation_rule(RotationPlacementRule::Never) // TODO: when we have more interesting values, use one
             .selectable(false)
             .light_emission(light_emission)
             .animation_hint(AnimationHint::TEMPORARY)
@@ -477,7 +479,8 @@ fn builder_every_field() {
         Block::Atom(
             BlockAttributes {
                 display_name: "hello world".into(),
-                collision: BlockCollision::None,
+                collision: BlockCollision::Recur,
+                rotation_rule: RotationPlacementRule::Never,
                 selectable: false,
                 light_emission,
                 animation_hint: AnimationHint::TEMPORARY,

@@ -6,7 +6,10 @@
 use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
 
-use crate::block::{AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, Resolution};
+use crate::block::{
+    AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, Resolution,
+    RotationPlacementRule,
+};
 use crate::math::{GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::universe::{Name, URef, Universe, UniverseIndex};
@@ -82,6 +85,12 @@ impl<C> BlockBuilder<C> {
     /// Sets the value for [`BlockAttributes::collision`].
     pub const fn collision(mut self, value: BlockCollision) -> Self {
         self.attributes.collision = value;
+        self
+    }
+
+    /// Sets the value for [`BlockAttributes::rotation_rule`].
+    pub const fn rotation_rule(mut self, value: RotationPlacementRule) -> Self {
+        self.attributes.rotation_rule = value;
         self
     }
 

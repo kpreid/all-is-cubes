@@ -34,6 +34,12 @@ pub struct BlockAttributes {
     /// The default value is [`BlockCollision::Hard`].
     pub collision: BlockCollision,
 
+    /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
+    /// some agent not otherwise specifying rotation.
+    ///
+    /// The default value is [`PlacementRotationRule::Never`].
+    pub rotation_rule: RotationPlacementRule,
+
     /// Light emitted by the block.
     ///
     /// The default value is [`Rgb::ZERO`].
@@ -67,6 +73,9 @@ impl fmt::Debug for BlockAttributes {
             if self.collision != Self::default().collision {
                 s.field("collision", &self.collision);
             }
+            if self.rotation_rule != Self::default().rotation_rule {
+                s.field("rotation_rule", &self.rotation_rule);
+            }
             if self.light_emission != Self::default().light_emission {
                 s.field("light_emission", &self.light_emission);
             }
@@ -88,6 +97,7 @@ impl BlockAttributes {
             display_name: Cow::Borrowed(""),
             selectable: true,
             collision: BlockCollision::Hard,
+            rotation_rule: RotationPlacementRule::Never,
             light_emission: Rgb::ZERO,
             animation_hint: AnimationHint::UNCHANGING,
         }
@@ -109,6 +119,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             display_name: Cow::Owned(u.arbitrary()?),
             selectable: u.arbitrary()?,
             collision: u.arbitrary()?,
+            rotation_rule: u.arbitrary()?,
             light_emission: u.arbitrary()?,
             animation_hint: u.arbitrary()?,
         })
@@ -119,6 +130,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             String::size_hint(depth),
             bool::size_hint(depth),
             BlockCollision::size_hint(depth),
+            RotationPlacementRule::size_hint(depth),
             Rgb::size_hint(depth),
             AnimationHint::size_hint(depth),
         ])
@@ -144,6 +156,15 @@ pub enum BlockCollision {
     /// If the block does not have voxels then this is equivalent to [`Hard`](Self::Hard).
     Recur,
     // Future values might include bouncy solid, water-like resistance, force fields, etc.
+}
+
+/// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
+/// some agent not otherwise specifying rotation.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
+pub enum RotationPlacementRule {
+    Never,
 }
 
 /// Specifies how the appearance of a [`Block`] might change, for the benefit of rendering
