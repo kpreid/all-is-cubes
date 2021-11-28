@@ -421,9 +421,15 @@ pub struct BlockAttributes {
     ///
     /// The default value is [`Rgb::ZERO`].
     pub light_emission: Rgb,
-    // TODO: add 'behavior' functionality, if we don't come up with something else
+
+    /// Advice to the renderer about how to expect this block to change, and hence
+    /// what rendering strategy to use.
     pub animation_hint: AnimationHint,
-    // Reminder: When adding new fields, add them to the Debug implementation.
+    //
+    // Reminder: When adding new fields, add them to the Debug implementation
+    // and BlockBuilder.
+    //
+    // TODO: add 'behavior' functionality, if we don't come up with something else
 }
 
 impl fmt::Debug for BlockAttributes {
