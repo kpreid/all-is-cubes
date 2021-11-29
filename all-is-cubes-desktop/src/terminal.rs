@@ -43,11 +43,7 @@ pub struct TerminalOptions {
     /// Color escapes supported by the terminal.
     colors: ColorMode,
 
-    /// Whether to use block drawing characters (e.g. “▄”) for increased resolution.
-    ///
-    /// This may cause artifacts in some terminals, and increases the CPU requirement
-    /// since more rays are used per frame.
-    graphic_characters: bool,
+    characters: CharacterMode,
 }
 
 impl TerminalOptions {
@@ -60,20 +56,12 @@ impl TerminalOptions {
         Viewport {
             framebuffer_size: size
                 .map(u32::from)
-                .mul_element_wise(self.rays_per_character().map(u32::from)),
+                .mul_element_wise(self.characters.rays_per_character().map(u32::from)),
 
             // Assume that characters are approximately twice as tall as they are wide.
             nominal_size: size
                 .map(FreeCoordinate::from)
                 .mul_element_wise(Vector2::new(0.5, 1.0)),
-        }
-    }
-
-    fn rays_per_character(&self) -> Vector2<u8> {
-        if self.graphic_characters {
-            Vector2::new(1, 2)
-        } else {
-            Vector2::new(1, 1)
         }
     }
 }
@@ -82,7 +70,7 @@ impl Default for TerminalOptions {
     fn default() -> Self {
         Self {
             colors: ColorMode::TwoFiftySix, // TODO: default to 16-color mode once we have it implemented
-            graphic_characters: false,      // TODO: default false
+            characters: CharacterMode::Split,
         }
     }
 }
@@ -269,7 +257,7 @@ impl TerminalMain {
                         code: KeyCode::Char('m'),
                         modifiers: _,
                     }) => {
-                        self.options.graphic_characters = !self.options.graphic_characters;
+                        self.options.characters = self.options.characters.cycle();
                         self.sync_viewport();
                     }
                     Event::Key(_) => {}
@@ -574,7 +562,7 @@ impl TerminalMain {
         let image_size_in_characters = viewport
             .framebuffer_size
             .map(|s| s as usize)
-            .div_element_wise(options.rays_per_character().map(usize::from));
+            .div_element_wise(options.characters.rays_per_character().map(usize::from));
 
         let mut rect = self.viewport_position;
         // Clamp rect to match the actual image data size, to avoid trying to read the
@@ -631,7 +619,10 @@ impl TerminalMain {
         let row = char_size.x;
         // This condition must match TerminalOptions::rays_per_character
         // TODO: Refactor to read patches separately from picking graphic characters
-        if options.graphic_characters {
+        if !matches!(
+            options.characters,
+            CharacterMode::Names | CharacterMode::Shades
+        ) {
             // TODO: This is a mess
             let (ref text1, color1) = image[(char_pos.y * 2) * row + char_pos.x];
             let (_, color2) = image[(char_pos.y * 2 + 1) * row + char_pos.x];
@@ -646,14 +637,33 @@ impl TerminalMain {
                 } else {
                     [0.7, 0.5]
                 };
-                let text = match (lum1 > threshold1, lum2 > threshold2) {
-                    // Assume that background is black and foreground is white (this could be an option).
-                    (true, true) => "█",  // U+2588 FULL BLOCK
-                    (true, false) => "▀", // U+2580 UPPER HALF BLOCK
-                    (false, true) => "▄", // U+2584 LOWER HALF BLOCK
-                    (false, false) if lum2 > 0.2 => text1.as_str(),
-                    (false, false) => " ", // U+0020 SPACE
+
+                let text = match &options.characters {
+                    CharacterMode::Names | CharacterMode::Shades => unreachable!(),
+                    CharacterMode::Split => match (lum1 > threshold1, lum2 > threshold2) {
+                        // Assume that background is black and foreground is white (this could be an option).
+                        (true, true) => "█",  // U+2588 FULL BLOCK
+                        (true, false) => "▀", // U+2580 UPPER HALF BLOCK
+                        (false, true) => "▄", // U+2584 LOWER HALF BLOCK
+                        (false, false) if lum2 > 0.2 => text1.as_str(),
+                        (false, false) => " ", // U+0020 SPACE
+                    },
+                    CharacterMode::Shapes => {
+                        let avg_lum = ((lum1 + lum2) / 2.0).clamp(0.0, 1.0);
+
+                        if (lum1 - lum2).abs() < 0.05 {
+                            [" ", "░", "▒", "▓", "█"][(avg_lum * 4.999) as usize]
+                            //[" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"][(avg_lum * 8.999) as usize]
+                        } else if lum1 < lum2 {
+                            [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
+                                [(avg_lum * 8.999) as usize]
+                        } else {
+                            [" ", "▔", "▘", "▘", "▀", "▀", "▛", "▛", "█"]
+                                [(avg_lum * 8.999) as usize]
+                        }
+                    }
                 };
+
                 (
                     text,
                     Colors {
@@ -686,11 +696,21 @@ impl TerminalMain {
             }
         } else {
             let (ref text, color) = image[char_pos.y * row + char_pos.x];
-            let mapped_color = match options.colors.convert(color) {
-                Some(color) => Colors::new(Color::Black, color),
-                None => Colors::new(Color::Reset, Color::Reset),
-            };
-            (text, mapped_color)
+            match options.characters {
+                CharacterMode::Names => {
+                    let mapped_color = match options.colors.convert(color) {
+                        Some(color) => Colors::new(Color::Black, color),
+                        None => Colors::new(Color::Reset, Color::Reset),
+                    };
+                    (text, mapped_color)
+                }
+                CharacterMode::Shades => (
+                    [" ", "░", "▒", "▓", "█"]
+                        [(color.unwrap_or(Rgba::TRANSPARENT).luminance() * 4.999) as usize],
+                    Colors::new(Color::Reset, Color::Reset),
+                ),
+                CharacterMode::Split | CharacterMode::Shapes => unreachable!(),
+            }
         }
     }
 }
@@ -856,6 +876,45 @@ impl ColorMode {
                 let c = Color::Rgb { r, g, b };
                 Some(c)
             }
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+enum CharacterMode {
+    /// Show the first characters of the names of the blocks.
+    Names,
+
+    /// Use the characters `  ░░▒▒▓▓██` to represent brightnesses.
+    Shades,
+
+    /// Use block drawing characters (e.g. “▄”) for double resolution and squarer pixels.
+    ///
+    /// This may cause artifacts in some terminals, and increases the CPU requirement
+    /// since more rays are used per frame.
+    Split,
+
+    /// If colors are enabled, equivalent to [`CharacterMode::Split`].
+    /// Otherwise, use block drawing characters to approximately represent brightness.
+    Shapes,
+}
+
+impl CharacterMode {
+    fn cycle(self) -> Self {
+        use CharacterMode::*;
+        match self {
+            Names => Shades,
+            Shades => Split,
+            Split => Shapes,
+            Shapes => Names,
+        }
+    }
+
+    fn rays_per_character(&self) -> Vector2<u8> {
+        use CharacterMode::*;
+        match self {
+            Names | Shades => Vector2::new(1, 1),
+            Split | Shapes => Vector2::new(1, 2),
         }
     }
 }
