@@ -31,13 +31,13 @@ fn universe_debug_elements() {
     u.insert_anonymous(BlockDef::new(AIR));
     assert_eq!(
         format!("{:?}", u),
-        "Universe { [anonymous #0]: all_is_cubes::block::BlockDef, 'foo': all_is_cubes::space::Space }"
+        "Universe { [anonymous #0]: all_is_cubes::block::block_def::BlockDef, 'foo': all_is_cubes::space::Space }"
     );
     assert_eq!(
         format!("{:#?}", u),
         "\
 Universe {
-    [anonymous #0]: all_is_cubes::block::BlockDef,
+    [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
     'foo': all_is_cubes::space::Space,
 }\
             "
