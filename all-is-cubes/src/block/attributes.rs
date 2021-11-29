@@ -8,6 +8,7 @@ use std::fmt;
 
 use crate::math::Rgb;
 
+use crate::raycast::Face;
 #[cfg(doc)]
 use crate::{block::Block, space::Space};
 
@@ -37,7 +38,7 @@ pub struct BlockAttributes {
     /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
     /// some agent not otherwise specifying rotation.
     ///
-    /// The default value is [`PlacementRotationRule::Never`].
+    /// The default value is [`RotationPlacementRule::Never`].
     pub rotation_rule: RotationPlacementRule,
 
     /// Light emitted by the block.
@@ -160,11 +161,25 @@ pub enum BlockCollision {
 
 /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
 /// some agent not otherwise specifying rotation.
+///
+/// TODO: We may want to replace this with a struct that also carries declared symmetries
+/// ("this is a vertical pillar so never make it upside down") and/or prohibited rotations
+/// rather than requiring each individual rule variant to be sufficiently expressive.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum RotationPlacementRule {
+    /// Never rotate the block.
     Never,
+    /// Rotate the block so that the specified face meets the face it was placed against.
+    Attach {
+        /// This face of the placed block will meet the face it was placed against.
+        ///
+        /// If the block was somehow placed without such an adjacent block, it will not be
+        /// rotated.
+        by: Face,
+        // TODO: control rotation about additional axis
+    },
 }
 
 /// Specifies how the appearance of a [`Block`] might change, for the benefit of rendering

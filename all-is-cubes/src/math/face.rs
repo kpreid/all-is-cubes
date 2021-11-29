@@ -19,6 +19,7 @@ use crate::math::*;
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(u8)]
 pub enum Face {
     /// The interior volume of a cube, or an undefined direction. Corresponds to the vector `(0, 0, 0)`.

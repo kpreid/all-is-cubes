@@ -7,11 +7,12 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use crate::block::{Block, AIR};
+use crate::block::{Block, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
-use crate::math::GridPoint;
+use crate::math::{GridPoint, GridRotation};
+use crate::raycast::Face;
 use crate::space::SpaceTransaction;
 use crate::transaction::{Merge, Transaction, UniverseTransaction};
 use crate::universe::{RefError, RefVisitor, URef, VisitRefs};
@@ -110,15 +111,12 @@ impl Tool {
             Self::Block(ref block) => {
                 let cursor = input.cursor()?;
                 let block = block.clone();
-                Ok((None, input.set_cube(cursor.place.adjacent(), AIR, block)?))
+                Ok((None, input.place_block(cursor, AIR, block)?))
             }
             Self::InfiniteBlocks(ref block) => {
                 let cursor = input.cursor()?;
                 let block = block.clone();
-                Ok((
-                    Some(self),
-                    input.set_cube(cursor.place.adjacent(), AIR, block)?,
-                ))
+                Ok((Some(self), input.place_block(cursor, AIR, block)?))
             }
             Self::CopyFromSpace => {
                 let cursor = input.cursor()?;
@@ -247,6 +245,40 @@ impl ToolInput {
         )
     }
 
+    /// As [`Self::set_cube`] but also applying rotation (or other transformations
+    /// in the future) specified by the block's attributes
+    fn place_block(
+        &self,
+        cursor: &Cursor,
+        old_block: Block,
+        new_block: Block,
+    ) -> Result<UniverseTransaction, ToolError> {
+        let rotation = match new_block
+            .evaluate()
+            .map_err(|e| ToolError::Internal(e.to_string()))? // TODO: better error typing here
+            .attributes
+            .rotation_rule
+        {
+            RotationPlacementRule::Never => GridRotation::IDENTITY,
+            RotationPlacementRule::Attach { by: attached_face } => {
+                // TODO: RotationPlacementRule should control the "up" axis choices
+                GridRotation::from_to(attached_face, cursor.place.face.opposite(), Face::PY)
+                    .or_else(|| {
+                        GridRotation::from_to(attached_face, cursor.place.face.opposite(), Face::PX)
+                    })
+                    .or_else(|| {
+                        GridRotation::from_to(attached_face, cursor.place.face.opposite(), Face::PZ)
+                    })
+                    .unwrap_or(GridRotation::IDENTITY)
+            }
+        };
+        self.set_cube(
+            cursor.place.adjacent(),
+            old_block,
+            new_block.rotate(rotation),
+        )
+    }
+
     /// Returns a [`Cursor`] indicating what blocks the tool should act on, if it is
     /// a sort of tool that acts on blocks. If there is no [`Cursor`], because of aim
     /// or because of being used in a context where there cannot be any aiming, returns
@@ -360,17 +392,17 @@ impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaq
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use super::*;
     use crate::character::cursor_raycast;
-    use crate::content::make_some_blocks;
+    use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::inv::Slot;
-    use crate::math::FreeCoordinate;
+    use crate::math::{FreeCoordinate, GridRotation};
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
     use crate::space::Space;
     use crate::universe::{UBorrow, URef, Universe};
+    use pretty_assertions::assert_eq;
+    use std::error::Error;
 
     #[derive(Debug)]
     struct ToolTester {
@@ -586,6 +618,40 @@ mod tests {
             assert_eq!(&tester.space()[(1, 0, 0)], &existing);
             assert_eq!(&tester.space()[(0, 0, 0)], &tool_block);
         }
+    }
+
+    /// TODO: Expand this test to exhaustively test all rotation placement rules?
+    #[test]
+    fn use_block_automatic_rotation() {
+        let [existing] = make_some_blocks();
+        let mut tester = ToolTester::new(|space| {
+            space.set((1, 0, 0), &existing).unwrap();
+        });
+
+        // Make a block with a rotation rule
+        let [mut tool_block] = make_some_voxel_blocks(&mut tester.universe);
+        if let Block::Recur {
+            ref mut attributes, ..
+        } = tool_block
+        {
+            attributes.rotation_rule = RotationPlacementRule::Attach { by: Face::NZ };
+        } else {
+            unreachable!();
+        }
+
+        // TODO: For more thorough testing, we need to be able to control ToolTester's choice of ray
+        let transaction = tester
+            .equip_and_use_tool(Tool::InfiniteBlocks(tool_block.clone()))
+            .unwrap();
+        assert_eq!(
+            transaction,
+            SpaceTransaction::set_cube(
+                [0, 0, 0],
+                Some(AIR),
+                Some(tool_block.clone().rotate(GridRotation::CLOCKWISE))
+            )
+            .bind(tester.space_ref.clone())
+        );
     }
 
     /// Note: This is more of a test of [`Inventory`] and [`Slot`] stack management

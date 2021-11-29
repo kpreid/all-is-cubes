@@ -16,6 +16,7 @@ use crate::block::{
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
 use crate::math::{GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba};
+use crate::raycast::Face;
 use crate::space::{Grid, GridArray, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
@@ -466,12 +467,13 @@ fn builder_defaults() {
 fn builder_every_field() {
     let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
     let light_emission = Rgb::new(0.1, 3.0, 0.1);
+    let rotation_rule = RotationPlacementRule::Attach { by: Face::NZ };
     assert_eq!(
         Block::builder()
             .color(color)
             .display_name("hello world")
             .collision(BlockCollision::Recur)
-            .rotation_rule(RotationPlacementRule::Never) // TODO: when we have more interesting values, use one
+            .rotation_rule(rotation_rule)
             .selectable(false)
             .light_emission(light_emission)
             .animation_hint(AnimationHint::TEMPORARY)
@@ -480,7 +482,7 @@ fn builder_every_field() {
             BlockAttributes {
                 display_name: "hello world".into(),
                 collision: BlockCollision::Recur,
-                rotation_rule: RotationPlacementRule::Never,
+                rotation_rule,
                 selectable: false,
                 light_emission,
                 animation_hint: AnimationHint::TEMPORARY,
