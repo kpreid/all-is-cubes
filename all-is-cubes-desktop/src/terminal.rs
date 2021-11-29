@@ -584,28 +584,56 @@ impl TerminalMain {
         // TODO: Refactor to read patches separately from picking graphic characters
         if options.graphic_characters {
             // TODO: This is a mess
-            let (_, color1) = image[(char_pos.y * 2) * row + char_pos.x];
+            let (ref text1, color1) = image[(char_pos.y * 2) * row + char_pos.x];
             let (_, color2) = image[(char_pos.y * 2 + 1) * row + char_pos.x];
-            let color1 = options.colors.convert(color1);
-            let color2 = options.colors.convert(color2);
-            if color1 == color2 {
+            if options.colors == ColorMode::None {
+                // Use "black and white" graphic characters — the alternative would be a blank screen.
+
+                let lum1 = color1.unwrap_or(Rgba::TRANSPARENT).luminance();
+                let lum2 = color2.unwrap_or(Rgba::TRANSPARENT).luminance();
+                // Checkerboard dithering.
+                let [threshold1, threshold2] = if char_pos.x % 2 == 0 {
+                    [0.5, 0.7]
+                } else {
+                    [0.7, 0.5]
+                };
+                let text = match (lum1 > threshold1, lum2 > threshold2) {
+                    // Assume that background is black and foreground is white (this could be an option).
+                    (true, true) => "█",  // U+2588 FULL BLOCK
+                    (true, false) => "▀", // U+2580 UPPER HALF BLOCK
+                    (false, true) => "▄", // U+2584 LOWER HALF BLOCK
+                    (false, false) if lum2 > 0.2 => text1.as_str(),
+                    (false, false) => " ", // U+0020 SPACE
+                };
                 (
-                    // TODO: Offer choice of showing character sometimes. Also use characters for dithering.
-                    " ", // text.as_str(),
+                    text,
                     Colors {
-                        // Emit color at all only if we're not doing no-colors
-                        foreground: color1.map(|_| Color::Black),
-                        background: color1,
+                        foreground: None,
+                        background: None,
                     },
                 )
             } else {
-                (
-                    "▄",
-                    Colors {
-                        foreground: color2,
-                        background: color1,
-                    },
-                )
+                let color1 = options.colors.convert(color1);
+                let color2 = options.colors.convert(color2);
+                if color1 == color2 {
+                    (
+                        // TODO: Offer choice of showing character sometimes. Also use characters for dithering.
+                        " ", // text.as_str(),
+                        Colors {
+                            // Emit color at all only if we're not doing no-colors
+                            foreground: color1.map(|_| Color::Black),
+                            background: color1,
+                        },
+                    )
+                } else {
+                    (
+                        "▄",
+                        Colors {
+                            foreground: color2,
+                            background: color1,
+                        },
+                    )
+                }
             }
         } else {
             let (ref text, color) = image[char_pos.y * row + char_pos.x];
