@@ -124,6 +124,35 @@ impl Rgb {
         self.0.z
     }
 
+    /// Combines the red, green, and blue components to obtain a [relative luminance]
+    /// (“grayscale”) value. This will be equal to 1 if all components are 1.
+    ///
+    /// ```
+    /// use all_is_cubes::math::Rgb;
+    /// 
+    /// assert_eq!(0.0, Rgb::ZERO.luminance());
+    /// assert_eq!(0.5, (Rgb::ONE * 0.5).luminance());
+    /// assert_eq!(1.0, Rgb::ONE.luminance());
+    /// assert_eq!(2.0, (Rgb::ONE * 2.0).luminance());
+    /// 
+    /// assert_eq!(0.2126, Rgb::new(1., 0., 0.).luminance());
+    /// assert_eq!(0.7152, Rgb::new(0., 1., 0.).luminance());
+    /// assert_eq!(0.0722, Rgb::new(0., 0., 1.).luminance());
+    /// ```
+    /// 
+    /// [relative luminance]: https://en.wikipedia.org/wiki/Relative_luminance
+    #[inline]
+    pub fn luminance(self) -> f32 {
+        // Coefficients as per
+        // https://en.wikipedia.org/wiki/Relative_luminance
+        // Rec. ITU-R BT.709-6 https://www.itu.int/dms_pubrec/itu-r/rec/bt/R-REC-BT.709-6-201506-I!!PDF-E.pdf
+        //
+        // Arithmetic operations ordered for minimum floating point error.
+        // (This probably doesn't matter at all.)
+        self.green().into_inner() * 0.7152
+            + (self.red().into_inner() * 0.2126 + self.blue().into_inner() * 0.0722)
+    }
+
     /// Clamp each component to lie within the range 0 to 1, inclusive.
     #[inline]
     pub fn clamp(self) -> Self {
@@ -214,6 +243,15 @@ impl Rgba {
     #[inline]
     pub fn to_rgb(self) -> Rgb {
         Rgb(self.0.truncate())
+    }
+
+    /// Combines the red, green, and blue components to obtain a luminance (“grayscale”)
+    /// value. This will be equal to 1 if all components are 1.
+    /// 
+    /// This is identical to [`Rgb::luminance`], ignoring the alpha component.
+    #[inline]
+    pub fn luminance(self) -> f32 {
+        self.to_rgb().luminance()
     }
 
     /// Converts this color to sRGB (nonlinear RGB components).
