@@ -12,11 +12,8 @@ use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::Point;
 use embedded_graphics::Pixel;
 use instant::{Duration, Instant};
-use luminance::backend::shader::Uniformable;
 use luminance::context::GraphicsContext;
-use luminance::pipeline::TextureBinding;
-use luminance::pixel::NormUnsigned;
-use luminance::texture::{Dim2, MagFilter, MinFilter};
+use luminance::texture::{MagFilter, MinFilter};
 use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;
 #[cfg(feature = "rayon")]
@@ -46,7 +43,6 @@ pub(crate) struct RaytraceToTexture<Backend: AicLumBackend> {
 impl<Backend> RaytraceToTexture<Backend>
 where
     Backend: AicLumBackend,
-    TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
 {
     pub fn new(fp: Rc<FullFramePainter<Backend>>) -> Result<Self, GraphicsResourceError> {
         Ok(Self {

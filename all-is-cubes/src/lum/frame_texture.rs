@@ -11,7 +11,6 @@ use embedded_graphics::prelude::OriginDimensions;
 use embedded_graphics::prelude::RgbColor;
 use embedded_graphics::prelude::Size;
 use embedded_graphics::Pixel;
-use luminance::backend::shader::Uniformable;
 use luminance::context::GraphicsContext;
 use luminance::pipeline::{Pipeline, TextureBinding};
 use luminance::pixel::{NormRGBA8UI, NormUnsigned};
@@ -19,7 +18,8 @@ use luminance::render_state::RenderState;
 use luminance::shader::{Program, Uniform};
 use luminance::shading_gate::ShadingGate;
 use luminance::tess::{Mode, Tess};
-use luminance::texture::{Dim2, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, Wrap};
+use luminance::texture::TexelUpload;
+use luminance::texture::{Dim2, MagFilter, MinFilter, Sampler, Texture, Wrap};
 use luminance::UniformInterface;
 
 use crate::camera::Viewport;
@@ -43,7 +43,6 @@ where
 impl<Backend> FullFramePainter<Backend>
 where
     Backend: AicLumBackend,
-    TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
 {
     /// Construct a [`FullFramePainter`] with the default vertex shader and given fragment shader.
     pub fn new<C: GraphicsContext<Backend = Backend>>(
@@ -118,7 +117,6 @@ where
 impl<Backend> FullFrameTexture<Backend>
 where
     Backend: AicLumBackend,
-    TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
 {
     /// Adjusts the texture size to the given framebuffer size.
     ///
@@ -147,9 +145,8 @@ where
         // TODO: systematic overflow checks
         self.local_data = vec![0; (size.x as usize) * (size.y as usize) * 4].into_boxed_slice();
         self.texture_is_valid = false;
-        self.texture = Some(context.new_texture_no_texels(
+        self.texture = Some(context.new_texture(
             [size.x, size.y],
-            0, // mipmaps
             Sampler {
                 wrap_s: Wrap::ClampToEdge,
                 wrap_t: Wrap::ClampToEdge,
@@ -157,6 +154,11 @@ where
                 min_filter: filters.1,
                 ..Sampler::default()
             },
+            // TODO: luminance 0.45 seems to be requiring us to upload some texels but we'd rather skip it
+            TexelUpload::base_level_without_mipmaps(&vec![
+                [0, 0, 0, 0];
+                size.x as usize * size.y as usize
+            ]),
         )?);
 
         self.scaled_viewport = Some(scaled_viewport);
@@ -177,7 +179,7 @@ where
         self.texture
             .as_mut()
             .expect("upload() without resize()")
-            .upload_raw(GenMipmaps::No, &self.local_data)?;
+            .upload_raw(TexelUpload::base_level_without_mipmaps(&self.local_data))?;
         self.texture_is_valid = true;
         Ok(())
     }

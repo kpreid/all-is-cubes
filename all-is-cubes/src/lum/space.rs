@@ -8,19 +8,18 @@ use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3, Zero as _};
-use luminance::backend::shader::Uniformable;
 use luminance::blending::{Blending, Equation, Factor};
 use luminance::context::GraphicsContext;
-use luminance::depth_test::DepthWrite;
+use luminance::depth_stencil::Write;
 use luminance::face_culling::{FaceCulling, FaceCullingMode, FaceCullingOrder};
-use luminance::pipeline::{BoundTexture, Pipeline, PipelineError, TextureBinding};
-use luminance::pixel::{NormRGBA8UI, NormUnsigned};
+use luminance::pipeline::{BoundTexture, Pipeline, PipelineError};
+use luminance::pixel::NormRGBA8UI;
 use luminance::render_state::RenderState;
 use luminance::shading_gate::ShadingGate;
 use luminance::tess::View as _;
 use luminance::tess::{Mode, Tess};
 use luminance::tess_gate::TessGate;
-use luminance::texture::{Dim2, Dim3, GenMipmaps, Sampler, Texture, TextureError};
+use luminance::texture::{Dim3, Sampler, TexelUpload, Texture, TextureError};
 
 use crate::camera::Camera;
 use crate::chunking::ChunkPos;
@@ -284,15 +283,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererOutputData<'a, Backend> {
         self.camera.options().use_frustum_culling && !self.camera.aab_in_view(chunk.grid().into())
     }
 }
-impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend>
-where
-    f32: Uniformable<Backend>,
-    [i32; 3]: Uniformable<Backend>,
-    [f32; 3]: Uniformable<Backend>,
-    [[f32; 4]; 4]: Uniformable<Backend>,
-    TextureBinding<Dim2, NormUnsigned>: Uniformable<Backend>,
-    TextureBinding<Dim3, NormUnsigned>: Uniformable<Backend>,
-{
+impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
     /// Use a [`ShadingGate`] to actually draw the space.
     pub(crate) fn render<E>(
         &self,
@@ -435,7 +426,7 @@ impl SpaceRendererPass {
         match self {
             SpaceRendererPass::Opaque => base,
             SpaceRendererPass::Transparent => {
-                base.set_depth_write(DepthWrite::Off) // Unnecessary
+                base.set_depth_write(Write::Off) // Unnecessary
                     .set_blending(Some(Blending {
                         // Note that this blending configuration is for premultiplied alpha.
                         // The fragment shaders are responsible for producing premultiplied alpha outputs.
@@ -589,10 +580,11 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
             nz: 0,
             within: 0,
         });
-        let texture = context.new_texture_no_texels(
+        let texture = context.new_texture(
             texture_grid.unsigned_size().into(),
-            /* mipmaps= */ 0,
             Sampler::default(), // sampler options don't matter because we're using texelFetch()
+            // TODO: luminance 0.45 seems to be requiring us to upload some texels but we'd rather skip it
+            TexelUpload::base_level_without_mipmaps(&vec![[0, 0, 0, 0]; texture_grid.volume()]),
         )?;
         Ok(Self {
             texture,
@@ -616,12 +608,11 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
             }
         }
         self.texture.upload_part(
-            GenMipmaps::No,
             (region.lower_bounds() - self.texture_grid.lower_bounds())
                 .map(|s| s as u32)
                 .into(),
             region.unsigned_size().into(),
-            &data,
+            TexelUpload::base_level_without_mipmaps(&data),
         )
     }
 

@@ -10,7 +10,7 @@ use luminance::pipeline::BoundTexture;
 use luminance::pixel::SRGBA8UI;
 use luminance::tess::{Mode, Tess};
 use luminance::texture::{
-    Dim3, Dimensionable, GenMipmaps, MagFilter, MinFilter, Sampler, Texture, TextureError, Wrap,
+    Dim3, Dimensionable, MagFilter, MinFilter, Sampler, TexelUpload, Texture, TextureError, Wrap,
 };
 use std::cell::RefCell;
 use std::convert::TryInto;
@@ -94,9 +94,8 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
             row_length: 16,
         };
 
-        let mut texture = context.new_texture_no_texels(
+        let texture = context.new_texture(
             layout.dimensions(),
-            0, // mipmaps
             Sampler {
                 wrap_s: Wrap::ClampToEdge,
                 wrap_t: Wrap::ClampToEdge,
@@ -105,14 +104,14 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
                 min_filter: MinFilter::Nearest,
                 ..Sampler::default()
             },
+            // Mark unused area for easier debugging (error color instead of transparency)
+            TexelUpload::base_level_without_mipmaps(&vec![
+                palette::UNPAINTED_TEXTURE_FALLBACK
+                    .to_srgb_32bit();
+                layout.texel_count()
+            ]),
         )?;
         // TODO: distinguish between "logic error" errors and "out of texture memory" errors...though it doesn't matter much until we have atlas resizing reallocations.
-
-        // Mark unused area for easier debugging (error color instead of transparency)
-        texture.clear(
-            GenMipmaps::No,
-            palette::UNPAINTED_TEXTURE_FALLBACK.to_srgb_32bit(),
-        )?;
 
         Ok(Self {
             texture,
@@ -152,10 +151,9 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
                 if backing.dirty && error.is_none() {
                     if let Some(data) = backing.data.as_ref() {
                         match texture.upload_part(
-                            GenMipmaps::No,
                             backing.atlas_grid.lower_bounds().map(|c| c as u32).into(),
                             backing.atlas_grid.size().map(|c| c as u32).into(),
-                            data,
+                            TexelUpload::base_level_without_mipmaps(data),
                         ) {
                             Ok(()) => {
                                 // Only clear dirty flag if upload was successful.
@@ -337,6 +335,11 @@ impl AtlasLayout {
     #[inline]
     fn texel_edge_length(&self) -> u32 {
         u32::from(self.row_length) * u32::from(self.resolution)
+    }
+
+    fn texel_count(&self) -> usize {
+        let [x, y, z] = self.dimensions();
+        x as usize * y as usize * z as usize
     }
 
     /// Compute location in the atlas of a tile. Units are tiles, not texels.

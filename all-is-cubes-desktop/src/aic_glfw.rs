@@ -3,16 +3,26 @@
 
 //! Glue between [`all_is_cubes`] and [`glfw`] & [`luminance_glfw`].
 
+use std::error::Error;
+use std::fmt;
 use std::time::Instant;
 
-use glfw::{Action, Context as _, CursorMode, Window, WindowEvent};
-use luminance_glfw::GlfwSurface;
-use luminance_windowing::{WindowDim, WindowOpt};
+use glfw::{Action, Context as _, CursorMode, SwapInterval, Window, WindowEvent, WindowMode};
+use luminance_glfw::{GlfwSurface, GlfwSurfaceError};
 
 use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::lum::GLRenderer;
+
+#[derive(Clone, Copy, Debug)]
+struct CannotCreateWindow;
+impl fmt::Display for CannotCreateWindow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Failed to create window (GLFW)")
+    }
+}
+impl Error for CannotCreateWindow {}
 
 /// Run GLFW-based rendering and event loop.
 ///
@@ -28,28 +38,27 @@ pub fn glfw_main_loop(
     // Pick a window size.
     let dim = glfw.with_primary_monitor(|_, monitor| {
         if let Some(size) = requested_size {
-            WindowDim::Windowed {
-                width: size.x.max(1),
-                height: size.y.max(1),
-            }
+            [size.x.max(1), size.y.max(1)]
         } else if let Some(monitor) = monitor {
             let (_, _, width, height) = monitor.get_workarea();
             // TODO: consider constraining the aspect ratio, setting a maximum size, and other caveats
-            WindowDim::Windowed {
-                width: width as u32 * 7 / 10,
-                height: height as u32 * 7 / 10,
-            }
+            [width as u32 * 7 / 10, height as u32 * 7 / 10]
         } else {
-            WindowDim::Windowed {
-                width: 800,
-                height: 600,
-            }
+            [800, 600]
         }
     });
 
     let GlfwSurface {
         context, events_rx, ..
-    } = GlfwSurface::new_gl33(window_title, WindowOpt::default().set_dim(dim))?;
+    } = GlfwSurface::new(|glfw| {
+        let (mut window, events_rx) = glfw
+            .create_window(dim[0], dim[1], window_title, WindowMode::Windowed)
+            .ok_or(GlfwSurfaceError::UserError(CannotCreateWindow))?;
+        window.make_current();
+        window.set_all_polling(true);
+        glfw.set_swap_interval(SwapInterval::Sync(1));
+        Ok((window, events_rx))
+    })?;
     let viewport = map_glfw_viewport(&context.window);
     let mut renderer = GLRenderer::new(context, StandardCameras::from_app_state(&app, viewport)?)?;
 

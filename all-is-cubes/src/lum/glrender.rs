@@ -13,18 +13,16 @@ use embedded_graphics::prelude::{Drawable, Point};
 use embedded_graphics::text::Baseline;
 use embedded_graphics::text::Text;
 use instant::Instant; // wasm-compatible replacement for std::time::Instant
-use luminance::backend::shader::Uniformable;
 use luminance::blending::Blending;
 use luminance::blending::Equation;
 use luminance::blending::Factor;
 use luminance::context::GraphicsContext;
-use luminance::depth_test::DepthWrite;
+use luminance::depth_stencil::Write;
 use luminance::framebuffer::Framebuffer;
-use luminance::pipeline::{PipelineState, TextureBinding};
-use luminance::pixel::NormUnsigned;
+use luminance::pipeline::PipelineState;
 use luminance::render_state::RenderState;
 use luminance::tess::Mode;
-use luminance::texture::{Dim2, Dim3, MagFilter, MinFilter};
+use luminance::texture::{Dim2, MagFilter, MinFilter};
 
 use crate::apps::{Layers, StandardCameras};
 use crate::camera::{Camera, Viewport};
@@ -64,12 +62,6 @@ impl<C> GLRenderer<C>
 where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
-    f32: Uniformable<C::Backend>,
-    [i32; 3]: Uniformable<C::Backend>,
-    [f32; 3]: Uniformable<C::Backend>,
-    [[f32; 4]; 4]: Uniformable<C::Backend>,
-    TextureBinding<Dim2, NormUnsigned>: Uniformable<C::Backend>,
-    TextureBinding<Dim3, NormUnsigned>: Uniformable<C::Backend>,
 {
     /// Constructs `GLRenderer` for the given camera configuration.
     ///
@@ -98,7 +90,7 @@ where
                 info_text_size_policy,
                 (MagFilter::Nearest, MinFilter::Linear),
             )
-            .unwrap();
+            .unwrap(); // TODO: texture allocation can fail; handle this gracefully
 
         Ok(Self {
             surface,
@@ -272,7 +264,7 @@ where
                 &self.back_buffer,
                 // TODO: port skybox cube map code
                 &PipelineState::default()
-                    .set_clear_color(world_output.data.clear_color().to_srgb_float()),
+                    .set_clear_color(Some(world_output.data.clear_color().to_srgb_float())),
                 |pipeline, mut shading_gate| {
                     let world_output_bound = world_output.bind(&pipeline)?;
                     // Space
@@ -310,7 +302,7 @@ where
             .pipeline(
                 &self.back_buffer,
                 // TODO: port skybox cube map code
-                &PipelineState::default().enable_clear_color(false),
+                &PipelineState::default().set_clear_color(None),
                 |ref pipeline, ref mut shading_gate| {
                     if let Some(ui_output) = ui_output {
                         // TODO: Ignoring info
@@ -353,11 +345,11 @@ where
             .new_pipeline_gate()
             .pipeline(
                 &self.back_buffer,
-                &PipelineState::default().enable_clear_color(false),
+                &PipelineState::default().set_clear_color(None),
                 |ref pipeline, ref mut shading_gate| -> Result<(), GraphicsResourceError> {
                     let success = info_text_texture.render(
                         &RenderState::default()
-                            .set_depth_write(DepthWrite::Off)
+                            .set_depth_write(Write::Off)
                             .set_blending(Some(Blending {
                                 equation: Equation::Additive,
                                 src: Factor::One,

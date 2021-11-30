@@ -26,6 +26,7 @@ mod backend {
     };
     use luminance::pipeline::TextureBinding;
     use luminance::pixel::{NormRGBA8UI, NormUnsigned, SRGBA8UI};
+    use luminance::shader::types::{Mat44, Vec3};
     use luminance::tess::Interleaved;
     use luminance::texture::{Dim2, Dim3};
 
@@ -43,14 +44,24 @@ mod backend {
         + TessGate<(), (), (), Interleaved>
         + TessGate<LumBlockVertex, (), (), Interleaved>
         + TessGate<LumBlockVertex, u32, (), Interleaved>
-        + VertexSlice<LumBlockVertex, u32, (), Interleaved, LumBlockVertex>
-        + IndexSlice<LumBlockVertex, u32, (), Interleaved>
-    where
-        (): luminance::backend::depth_slot::DepthSlot<Self, Dim2>,
+        + for<'a> Uniformable<'a, f32, Target = f32>
+        + for<'a> Uniformable<'a, Vec3<i32>, Target = Vec3<i32>>
+        + for<'a> Uniformable<'a, Vec3<f32>, Target = Vec3<f32>>
+        + for<'a> Uniformable<'a, Mat44<f32>, Target = Mat44<f32>>
+        + for<'a> Uniformable<
+            'a,
+            TextureBinding<Dim2, NormUnsigned>,
+            Target = TextureBinding<Dim2, NormUnsigned>,
+        > + for<'a> Uniformable<
+            'a,
+            TextureBinding<Dim3, NormUnsigned>,
+            Target = TextureBinding<Dim3, NormUnsigned>,
+        > + for<'a> VertexSlice<'a, LumBlockVertex, u32, (), Interleaved, LumBlockVertex>
+        + for<'a> IndexSlice<'a, LumBlockVertex, u32, (), Interleaved>
+    //TODO: (): luminance::backend::depth_slot::DepthSlot<Self, Dim2>,
     {
     }
-    impl<B> AicLumBackend for B
-    where
+    impl<B> AicLumBackend for B where
         Self: Sized
             + FramebufferBackBuffer
             + Pipeline<Dim2>
@@ -62,16 +73,20 @@ mod backend {
             + TessGate<(), (), (), Interleaved>
             + TessGate<LumBlockVertex, (), (), Interleaved>
             + TessGate<LumBlockVertex, u32, (), Interleaved>
-            + VertexSlice<LumBlockVertex, u32, (), Interleaved, LumBlockVertex>
-            + IndexSlice<LumBlockVertex, u32, (), Interleaved>,
-        // These not-on-self bounds don't seem to actually help when put on the trait, but
-        // putting them here at least centrally documents that we need them.
-        f32: Uniformable<Self>,
-        [i32; 3]: Uniformable<Self>,
-        [f32; 3]: Uniformable<Self>,
-        [[f32; 4]; 4]: Uniformable<Self>,
-        TextureBinding<Dim2, NormUnsigned>: Uniformable<Self>,
-        TextureBinding<Dim3, NormUnsigned>: Uniformable<Self>,
+            + for<'a> Uniformable<'a, f32, Target = f32>
+            + for<'a> Uniformable<'a, Vec3<i32>, Target = Vec3<i32>>
+            + for<'a> Uniformable<'a, Vec3<f32>, Target = Vec3<f32>>
+            + for<'a> Uniformable<'a, Mat44<f32>, Target = Mat44<f32>>
+            + for<'a> Uniformable<
+                'a,
+                TextureBinding<Dim2, NormUnsigned>,
+                Target = TextureBinding<Dim2, NormUnsigned>,
+            > + for<'a> Uniformable<
+                'a,
+                TextureBinding<Dim3, NormUnsigned>,
+                Target = TextureBinding<Dim3, NormUnsigned>,
+            > + for<'a> VertexSlice<'a, LumBlockVertex, u32, (), Interleaved, LumBlockVertex>
+            + for<'a> IndexSlice<'a, LumBlockVertex, u32, (), Interleaved>
     {
     }
 }
