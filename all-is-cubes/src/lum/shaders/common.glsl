@@ -47,7 +47,11 @@ lowp vec4 light_texture_fetch(mediump vec3 p) {
 
   lowp vec4 texel = texelFetch(light_texture, lookup_position, 0);
   lowp vec3 packed_light = texel.rgb;
-  lowp vec3 unpacked_light = pow(vec3(2.0), (packed_light - 128.0 / 255.0) * (255.0 / 16.0));
+
+  // Decode logarithmic representation.
+  // Exception: A texel value of exactly 0 is taken as 0, not the lowest power of 2.
+  bvec3 not_zero = greaterThan(packed_light, vec3(0.0));
+  lowp vec3 unpacked_light = pow(vec3(2.0), (packed_light - 128.0 / 255.0) * (255.0 / 16.0)) * vec3(not_zero);
 
   // See all_is_cubes::space::LightStatus for the value this is interpreting.
   // The enum values are grouped into approximately {0, 128, 255}, so multiplying by 2 and rounding
