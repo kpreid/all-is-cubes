@@ -148,10 +148,11 @@
     doc = "[`luminance`]: https://docs.rs/luminance/"
 )]
 #![cfg_attr(not(feature = "rayon"), doc = "[`rayon`]: https://docs.rs/rayon/")]
-#![deny(rust_2018_idioms)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::needless_update)]
+#![deny(rust_2018_idioms)]
+#![warn(unused_extern_crates)]
 #![warn(clippy::cast_lossless)]
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]

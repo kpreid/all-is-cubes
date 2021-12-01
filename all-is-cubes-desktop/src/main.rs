@@ -4,6 +4,7 @@
 //! Binary for All is Cubes desktop app.
 
 #![deny(rust_2018_idioms)]
+#![warn(unused_extern_crates)]
 #![warn(clippy::cast_lossless)]
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]

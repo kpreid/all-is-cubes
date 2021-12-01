@@ -4,6 +4,9 @@
 //! Web server and game server (multiplayer/server-side storage) for All is Cubes.
 
 #![deny(rust_2018_idioms)]
+#![warn(unused_extern_crates)]
 #![warn(clippy::cast_lossless)]
+#![warn(clippy::exhaustive_enums)]
+#![warn(clippy::exhaustive_structs)]
 
 pub mod webserver;

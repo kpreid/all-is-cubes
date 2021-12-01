@@ -10,6 +10,12 @@
 //! provide [`UniverseTemplate`]; other items should be assumed not particularly
 //! stable.
 
+#![deny(rust_2018_idioms)]
+#![warn(unused_extern_crates)]
+#![warn(clippy::cast_lossless)]
+#![warn(clippy::exhaustive_enums)]
+#![warn(clippy::exhaustive_structs)]
+
 #[cfg(feature = "arbitrary")]
 extern crate arbitrary_crate as arbitrary;
 

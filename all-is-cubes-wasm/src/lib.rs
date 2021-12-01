@@ -7,6 +7,7 @@
 //! most of the modules excluded from compilation.
 
 #![deny(rust_2018_idioms)]
+#![warn(unused_extern_crates)]
 #![warn(clippy::cast_lossless)]
 
 #[cfg(target_family = "wasm")]
