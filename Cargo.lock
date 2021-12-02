@@ -61,7 +61,7 @@ dependencies = [
  "instant",
  "itertools",
  "log",
- "luminance",
+ "luminance 0.44.1",
  "noise",
  "num-traits",
  "once_cell",
@@ -107,7 +107,7 @@ dependencies = [
  "glfw",
  "indicatif",
  "log",
- "luminance",
+ "luminance 0.44.1",
  "luminance-glfw",
  "luminance-windowing",
  "png",
@@ -145,9 +145,9 @@ dependencies = [
  "instant",
  "js-sys",
  "log",
- "luminance",
+ "luminance 0.44.1",
  "luminance-web-sys",
- "luminance-webgl",
+ "luminance-webgl 0.4.0",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
@@ -1837,7 +1837,16 @@ version = "0.44.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53f17426227044c3fde0f81117f16234fce327200d00c6157c273ed6f1875891"
 dependencies = [
- "luminance-derive",
+ "luminance-derive 0.7.0",
+]
+
+[[package]]
+name = "luminance"
+version = "0.45.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfd5efcf7e0135fdfd45cd8dcb3ae64a1e4f8c4b988e128ce96f8e4989b2e506"
+dependencies = [
+ "luminance-derive 0.8.0",
 ]
 
 [[package]]
@@ -1852,13 +1861,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "luminance-derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3cd298b8987127cf92e7ee547f4d90be766806197e1fb843f05a772948d169b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "luminance-gl"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf778578a4afbd0d61c6d807bc4ab88b502f40383bd1fa1ad9bf6bd31dade8b8"
 dependencies = [
  "gl",
- "luminance",
+ "luminance 0.44.1",
 ]
 
 [[package]]
@@ -1869,20 +1889,28 @@ checksum = "ba8c0f17ac19a7b2b92d1465ac0859039e937e1aa65b9d1252d438575d6e65e1"
 dependencies = [
  "gl",
  "glfw",
- "luminance",
+ "luminance 0.44.1",
  "luminance-gl",
  "luminance-windowing",
 ]
 
 [[package]]
-name = "luminance-web-sys"
-version = "0.3.0"
+name = "luminance-std140"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73be32de8d9a1641a465f6b83b85765b9892611871a2c8a940589107bc3c90b6"
+checksum = "cc674080f5b890f26b5c8a1e4b905476a956e95208fe999ca0a4c5a9c954ca02"
 dependencies = [
- "luminance",
- "luminance-webgl",
- "luminance-windowing",
+ "luminance 0.45.0",
+]
+
+[[package]]
+name = "luminance-web-sys"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62138e1e6b1aaa1ef583087fde539a4bd7c16b190c1af5747a9ecd108cccb4b1"
+dependencies = [
+ "luminance 0.45.0",
+ "luminance-webgl 0.5.0",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -1894,7 +1922,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c43d540b33973a0e40654d4db12159f9a214e3d339da89354e06cd8bcd532df"
 dependencies = [
  "js-sys",
- "luminance",
+ "luminance 0.44.1",
+ "serde",
+ "serde_derive",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "luminance-webgl"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85a0fba5788885c419fec3063634a1bf84a930bd42e5767d572108861ff2a706"
+dependencies = [
+ "js-sys",
+ "luminance 0.45.0",
+ "luminance-std140",
  "serde",
  "serde_derive",
  "wasm-bindgen",
@@ -1907,7 +1950,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11704e4e6131156444a2208f38ad3bc936a183a38f6c32073db6de880a5cb488"
 dependencies = [
- "luminance",
+ "luminance 0.44.1",
 ]
 
 [[package]]
@@ -2258,9 +2301,9 @@ dependencies = [
 
 [[package]]
 name = "ouroboros"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f357ef82d1b4db66fbed0b8d542cbd3c22d0bf5b393b3c257b9ba4568e70c9c3"
+checksum = "06562f88448f4f22a6cfb76b3d0d01af62e82e3dacb2a88c1a3a8a1694a501c6"
 dependencies = [
  "aliasable",
  "ouroboros_macro",
@@ -2269,9 +2312,9 @@ dependencies = [
 
 [[package]]
 name = "ouroboros_macro"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44a0b52c2cbaef7dffa5fec1a43274afe8bd2a644fa9fc50a9ef4ff0269b1257"
+checksum = "39cdc8f765173c2dad6c1f371d0997c2d21003bd14949da99d910ad409d88a85"
 dependencies = [
  "Inflector",
  "proc-macro-error",
@@ -2993,6 +3036,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustversion"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61b3909d758bb75c79f23d4736fac9433868679d3ad2ea7a61e3c25cfda9a088"
+
+[[package]]
 name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3315,22 +3364,23 @@ dependencies = [
 
 [[package]]
 name = "strum"
-version = "0.22.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7ac893c7d471c8a21f31cfe213ec4f6d9afeed25537c772e08ef3f005f8729e"
+checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
 dependencies = [
  "strum_macros",
 ]
 
 [[package]]
 name = "strum_macros"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "339f799d8b549e3744c7ac7feb216383e4005d94bdb22561b3ab8f3b808ae9fb"
+checksum = "5bb0dc7ee9c15cea6199cde9a127fa16a4c5819af85395457ad72d68edc85a38"
 dependencies = [
  "heck",
  "proc-macro2",
  "quote",
+ "rustversion",
  "syn",
 ]
 
