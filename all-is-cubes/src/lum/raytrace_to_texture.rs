@@ -29,13 +29,13 @@ use crate::listen::ListenableCellWithLocal;
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::lum::types::AicLumBackend;
 use crate::lum::GraphicsResourceError;
-use crate::raytracer::{ColorBuf, PixelBuf, UpdatingSpaceRaytracer};
-use crate::space::{Space, SpaceBlockData};
+use crate::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
+use crate::space::Space;
 use crate::universe::URef;
 
 pub(crate) struct RaytraceToTexture<Backend: AicLumBackend> {
     graphics_options: ListenableCellWithLocal<GraphicsOptions>,
-    raytracer: Option<UpdatingSpaceRaytracer<Srgb8Adapter>>,
+    raytracer: Option<UpdatingSpaceRaytracer<ColorBuf>>,
     // TODO: should not be public but we want an easy way to grab it for drawing
     pub(crate) render_target: FullFrameTexture<Backend>,
     pixel_picker: PixelPicker,
@@ -97,16 +97,15 @@ where
                 .collect();
 
             let start_time = Instant::now();
-            let trace = |p| {
-                Pixel(
-                    p,
-                    tracer
-                        .trace_ray(camera.project_ndc_into_world(Point2::new(
-                            render_viewport.normalize_fb_x(p.x as usize),
-                            render_viewport.normalize_fb_y(p.y as usize),
-                        )))
-                        .0,
-                )
+            let trace = |point: Point| {
+                let (linear_color, _info) =
+                    tracer.trace_ray(camera.project_ndc_into_world(Point2::new(
+                        render_viewport.normalize_fb_x(point.x as usize),
+                        render_viewport.normalize_fb_y(point.y as usize),
+                    )));
+                let [r, g, b, _a] = linear_color.to_srgb_32bit();
+                let color = Rgb888::new(r, g, b);
+                Pixel(point, color)
             };
             #[cfg(feature = "rayon")]
             let traces: Vec<Pixel<Rgb888>> = this_frame_pixels.into_par_iter().map(trace).collect();
@@ -177,40 +176,6 @@ impl Iterator for PixelPicker {
             index.rem_euclid(size.x) as i32,
             index.div_euclid(size.x).rem_euclid(size.y) as i32,
         ))
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-struct Srgb8Adapter(ColorBuf);
-
-impl PixelBuf for Srgb8Adapter {
-    //type Pixel = [u8; 4];
-    type Pixel = Rgb888;
-    type BlockData = <ColorBuf as PixelBuf>::BlockData;
-
-    fn compute_block_data(block: &SpaceBlockData) -> Self::BlockData {
-        ColorBuf::compute_block_data(block)
-    }
-
-    fn error_block_data() -> Self::BlockData {
-        ColorBuf::error_block_data()
-    }
-
-    fn sky_block_data() -> Self::BlockData {
-        ColorBuf::sky_block_data()
-    }
-
-    fn opaque(&self) -> bool {
-        self.0.opaque()
-    }
-
-    fn result(self) -> Self::Pixel {
-        let [r, g, b, _] = self.0.result().to_srgb_32bit();
-        Rgb888::new(r, g, b)
-    }
-
-    fn add(&mut self, surface_color: crate::math::Rgba, block_data: &Self::BlockData) {
-        self.0.add(surface_color, block_data)
     }
 }
 

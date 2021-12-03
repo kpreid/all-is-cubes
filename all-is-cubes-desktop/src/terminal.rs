@@ -5,7 +5,7 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::convert::{identity, TryInto};
 use std::io;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
@@ -174,7 +174,7 @@ impl TerminalMain {
                         scene,
                     }) = render_thread_in.recv()
                     {
-                        let (image, info) = scene.get().trace_scene_to_image(&camera);
+                        let (image, info) = scene.get().trace_scene_to_image(&camera, identity);
                         // Ignore send errors as they just mean we're shutting down or died elsewhere
                         let _ = render_thread_out.send(FrameOutput {
                             viewport: camera.viewport(),
