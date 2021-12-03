@@ -48,12 +48,10 @@ where
 /// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
 pub struct LumAtlasTile {
-    /// Texel grid that was requested for the allocation.
-    requested_grid: Grid,
     /// Translation of the requested grid to the actual region within the texture.
     /// (This is always integer but will always be used in a float computation.)
     offset: Vector3<TextureCoordinate>,
-    /// Scale factor to convert from texel grid coordinates (`requested_grid` and
+    /// Scale factor to convert from texel grid coordinates (`backing.atlas_grid` and
     /// `offset`) to GPU texture coordinates where 0.0 and 1.0 are the final size.
     /// In other words, the reciprocal of the overall texture size. This does not
     /// vary per-tile but is stored here for convenience of implementing [`TextureTile`].
@@ -230,7 +228,6 @@ impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
             .index_to_location(index)
             .map(|c| GridCoordinate::from(c * self.layout.resolution));
         let result = LumAtlasTile {
-            requested_grid,
             offset: offset.map(|c| c as TextureCoordinate),
             scale: (self.layout.texel_edge_length() as TextureCoordinate).recip(),
             backing: Rc::new(RefCell::new(TileBacking {
