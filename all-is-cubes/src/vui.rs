@@ -6,9 +6,7 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
-use std::cell::RefCell;
 use std::error::Error;
-use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
 
 use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
@@ -24,7 +22,7 @@ use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::ToolError;
-use crate::listen::{ListenableSource, Listener};
+use crate::listen::ListenableSource;
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::Space;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -45,17 +43,9 @@ pub(crate) struct Vui {
 
     hud_blocks: HudBlocks,
     hud_space: URef<Space>,
-    hud_layout: HudLayout,
     hud_widgets: Vec<Box<dyn WidgetController>>,
-    aspect_ratio: FreeCoordinate,
 
     tooltip_state: Arc<Mutex<TooltipState>>,
-
-    todo: Rc<RefCell<VuiTodo>>,
-
-    // Things we're listening to...
-    mouselook_mode: ListenableSource<bool>,
-    paused: ListenableSource<bool>,
 }
 
 impl Vui {
@@ -63,13 +53,13 @@ impl Vui {
     /// `character` is the `Character` whose inventory is displayed. TODO: Allow for character switching
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
-    pub fn new(input_processor: &InputProcessor, paused: ListenableSource<bool>) -> Self {
+    /// TODO: should be displaying paused state
+    pub fn new(input_processor: &InputProcessor, _paused: ListenableSource<bool>) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = HudBlocks::new(&mut universe, 16);
         let hud_layout = HudLayout::default();
         let hud_space = hud_layout.new_space(&mut universe, &hud_blocks);
 
-        let todo = Rc::new(RefCell::new(VuiTodo::default()));
         let tooltip_state = Arc::default();
 
         // TODO: HudLayout should take care of this maybe
@@ -102,16 +92,9 @@ impl Vui {
             current_space: hud_space.clone(),
             hud_blocks,
             hud_space,
-            hud_layout,
             hud_widgets,
-            aspect_ratio: 4. / 3., // arbitrary placeholder assumption
 
             tooltip_state,
-
-            todo,
-
-            mouselook_mode: input_processor.mouselook_mode(),
-            paused,
         };
 
         // Initialize widgets
@@ -219,29 +202,6 @@ impl Vui {
         if let Ok(mut state) = self.tooltip_state.lock() {
             state.set_message(error.to_string().into());
         }
-    }
-}
-
-/// [`Vui`]'s set of things that need updating.
-#[derive(Debug, Default)]
-struct VuiTodo {}
-
-/// [`Listener`] adapter for [`VuiTodo`].
-struct TodoListener {
-    target: Weak<RefCell<VuiTodo>>,
-    handler: fn(&mut VuiTodo),
-}
-
-impl Listener<()> for TodoListener {
-    fn receive(&self, _message: ()) {
-        if let Some(cell) = self.target.upgrade() {
-            let mut todo = RefCell::borrow_mut(&cell);
-            (self.handler)(&mut todo);
-        }
-    }
-
-    fn alive(&self) -> bool {
-        self.target.strong_count() > 0
     }
 }
 
