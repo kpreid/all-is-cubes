@@ -678,6 +678,7 @@ mod tests {
 
     #[derive(Debug)]
     struct CstTester {
+        #[allow(dead_code)] // Universe must be kept alive but is not read after construction
         universe: Universe,
         space: URef<Space>,
         camera: Camera,

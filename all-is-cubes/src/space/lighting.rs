@@ -460,6 +460,7 @@ impl CustomFormat<StatusText> for LightUpdatesInfo {
 /// This is detailed information which is not computed except when requested.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
+#[allow(dead_code)] // fields used for Debug printing
 pub struct LightUpdateCubeInfo {
     cube: GridPoint,
     result: PackedLight,
@@ -491,6 +492,7 @@ impl Geometry for LightUpdateCubeInfo {
 #[derive(Clone, Copy, Debug)]
 pub struct LightUpdateRayInfo {
     ray: Ray,
+    #[allow(dead_code)] // field used for Debug printing but not visualized yet
     trigger_cube: GridPoint,
     value_cube: GridPoint,
     value: PackedLight,
