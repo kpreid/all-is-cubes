@@ -222,7 +222,6 @@ struct UEntry<T> {
     // TODO: It might make more sense for data to be a RwLock<T> (instead of the
     // RwLock containing UEntry), but we don't have enough examples to be certain yet.
     data: T,
-    name: Name,
 }
 
 /// The unique reference to an entry in a `Universe` from that `Universe`.
@@ -238,7 +237,6 @@ impl<T> URootRef<T> {
         URootRef {
             strong_ref: Arc::new(RwLock::new(UEntry {
                 data: initial_value,
-                name: name.clone(),
             })),
             name,
         }
