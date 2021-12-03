@@ -721,7 +721,7 @@ exhibit! {
 exhibit! {
     const MAKE_SOME_BLOCKS,
     name: "make_some_blocks",
-    (_this, mut universe) {
+    (_this, universe) {
         const ROWS: GridCoordinate = 5;
         fn make_both_blocks<const N: usize>(universe: &mut Universe) -> (Vec<Block>, Vec<Block>) {
             (
@@ -730,11 +730,11 @@ exhibit! {
             )
         }
         let rows: [(Vec<Block>, Vec<Block>); ROWS as usize] = [
-            make_both_blocks::<5>(&mut universe),
-            make_both_blocks::<4>(&mut universe),
-            make_both_blocks::<3>(&mut universe),
-            make_both_blocks::<2>(&mut universe),
-            make_both_blocks::<1>(&mut universe),
+            make_both_blocks::<5>(universe),
+            make_both_blocks::<4>(universe),
+            make_both_blocks::<3>(universe),
+            make_both_blocks::<2>(universe),
+            make_both_blocks::<1>(universe),
         ];
         let mut space = Space::empty_positive(3, ROWS, ROWS);
         for (y, (blocks_a, blocks_v)) in rows.into_iter().enumerate() {
