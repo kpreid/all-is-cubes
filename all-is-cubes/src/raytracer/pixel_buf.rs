@@ -16,17 +16,14 @@ use crate::space::SpaceBlockData;
 ///
 /// They should be an efficiently updatable buffer able to accumulate partial values,
 /// and it must represent the transparency so as to be able to signal when to stop
-/// tracing.
+/// tracing past an opaque surface.
 ///
 /// The implementation of the [`Default`] trait must provide a suitable initial state,
 /// i.e. fully transparent/no light accumulated.
+///
+/// Each implementation should provide its own conversion to a final output format,
+/// if any (e.g. an inherent method or an [`impl From`](From)).
 pub trait PixelBuf: Default {
-    /// Type of the pixel value this [`PixelBuf`] produces; the value that will be
-    /// returned by tracing a single ray.
-    ///
-    /// This trait does not define how multiple pixels are combined into an image.
-    type Pixel: Send + Sync + 'static;
-
     /// Type of the data precomputed for each distinct block by
     /// [`Self::compute_block_data()`].
     ///
@@ -51,10 +48,6 @@ pub trait PixelBuf: Default {
     /// be affected by future calls to [`Self::add`].
     fn opaque(&self) -> bool;
 
-    /// Computes the value the raytracer should return for this pixel when tracing is
-    /// complete.
-    fn result(self) -> Self::Pixel;
-
     /// Adds the color of a surface to the buffer. The provided color should already
     /// have the effect of lighting applied.
     ///
@@ -70,7 +63,8 @@ pub trait PixelBuf: Default {
     fn hit_nothing(&mut self) {}
 }
 
-/// Implements [`PixelBuf`] for RGB(A) color with [`f32`] components.
+/// Implements [`PixelBuf`] for RGB(A) color with [`f32`] components,
+/// and conversion to [`Rgba`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ColorBuf {
     /// Color buffer.
@@ -88,7 +82,6 @@ pub struct ColorBuf {
 }
 
 impl PixelBuf for ColorBuf {
-    type Pixel = Rgba;
     type BlockData = ();
 
     fn compute_block_data(_: &SpaceBlockData) {}
@@ -96,19 +89,6 @@ impl PixelBuf for ColorBuf {
     fn error_block_data() {}
 
     fn sky_block_data() {}
-
-    #[inline]
-    fn result(self) -> Rgba {
-        if self.ray_alpha >= 1.0 {
-            // Special case to avoid dividing by zero
-            Rgba::TRANSPARENT
-        } else {
-            let color_alpha = 1.0 - self.ray_alpha;
-            let non_premultiplied_color = self.color_accumulator / color_alpha;
-            Rgba::try_from(non_premultiplied_color.extend(color_alpha))
-                .unwrap_or_else(|_| Rgba::new(1.0, 0.0, 0.0, 1.0))
-        }
-    }
 
     #[inline]
     fn opaque(&self) -> bool {
@@ -137,6 +117,20 @@ impl Default for ColorBuf {
     }
 }
 
+impl From<ColorBuf> for Rgba {
+    fn from(buf: ColorBuf) -> Rgba {
+        if buf.ray_alpha >= 1.0 {
+            // Special case to avoid dividing by zero
+            Rgba::TRANSPARENT
+        } else {
+            let color_alpha = 1.0 - buf.ray_alpha;
+            let non_premultiplied_color = buf.color_accumulator / color_alpha;
+            Rgba::try_from(non_premultiplied_color.extend(color_alpha))
+                .unwrap_or_else(|_| Rgba::new(1.0, 0.0, 0.0, 1.0))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,11 +142,11 @@ mod tests {
         let color_3 = Rgba::new(0.0, 0.0, 1.0, 1.0);
 
         let mut buf = ColorBuf::default();
-        assert_eq!(buf.clone().result(), Rgba::TRANSPARENT);
+        assert_eq!(Rgba::from(buf.clone()), Rgba::TRANSPARENT);
         assert!(!buf.opaque());
 
         buf.add(color_1, &());
-        assert_eq!(buf.clone().result(), color_1);
+        assert_eq!(Rgba::from(buf.clone()), color_1);
         assert!(!buf.opaque());
 
         buf.add(color_2, &());
@@ -165,7 +159,7 @@ mod tests {
         assert!(!buf.opaque());
 
         buf.add(color_3, &());
-        assert!(buf.clone().result().fully_opaque());
+        assert!(Rgba::from(buf.clone()).fully_opaque());
         //assert_eq!(
         //    buf.result(),
         //    (color_1.to_rgb() * 0.75 + color_2.to_rgb() * 0.125 + color_3.to_rgb() * 0.125)

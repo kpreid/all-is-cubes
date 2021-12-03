@@ -3,7 +3,7 @@
 
 //! Headless image (and someday video) generation.
 
-use std::convert::{identity, TryFrom, TryInto};
+use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::ops::RangeInclusive;
@@ -105,7 +105,7 @@ pub(crate) fn record_main(
         .spawn({
             move || {
                 while let Ok((frame_number, camera, raytracer)) = scene_receiver.recv() {
-                    let (image_data, _info) = raytracer.trace_scene_to_image(&camera, identity);
+                    let (image_data, _info) = raytracer.trace_scene_to_image(&camera, Rgba::from);
                     // TODO: Offer supersampling (multiple rays per output pixel).
                     image_data_sender.send((frame_number, image_data)).unwrap();
                 }

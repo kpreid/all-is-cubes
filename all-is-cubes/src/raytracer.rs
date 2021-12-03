@@ -61,7 +61,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 
     /// Computes a single image pixel from the given ray.
-    pub fn trace_ray(&self, ray: Ray) -> (P::Pixel, RaytraceInfo) {
+    pub fn trace_ray(&self, ray: Ray) -> (P, RaytraceInfo) {
         let t_to_absolute_distance = ray.direction.magnitude();
         let mut s: TracingState<P> = TracingState::default();
         let surface_iter = SurfaceIter::new(self, ray);
@@ -143,7 +143,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         encoder: E,
     ) -> (Box<[O]>, RaytraceInfo)
     where
-        E: Fn(P::Pixel) -> O + Send + Sync,
+        E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
         // This wrapper function ensures that the two implementations have consistent
@@ -158,7 +158,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         encoder: E,
     ) -> (Box<[O]>, RaytraceInfo)
     where
-        E: Fn(P::Pixel) -> O + Send + Sync,
+        E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
         let viewport = camera.viewport();
@@ -191,7 +191,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
         encoder: E,
     ) -> (Box<[O]>, RaytraceInfo)
     where
-        E: Fn(P::Pixel) -> O + Send + Sync,
+        E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
         let viewport = camera.viewport();
@@ -307,8 +307,8 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 }
 
-impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
-    /// Raytrace to text, using any [`PixelBuf`] whose output is [`String`].
+impl<P: PixelBuf + Into<String>> SpaceRaytracer<P> {
+    /// Raytrace to text, using any [`PixelBuf`] whose output can be [`String`].
     ///
     /// `F` is the function accepting the output, and `E` is the type of error it may
     /// produce. This function-based interface is intended to abstract over the
@@ -349,7 +349,9 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
                     .into_par_iter()
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);
-                        self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)))
+                        let (buf, info) =
+                            self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
+                        (buf.into(), info)
                     })
                     .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
             })
@@ -357,7 +359,7 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
 
         let (text, info_sum): (String, rayon_helper::ParExtSum<RaytraceInfo>) =
             output_iterator.unzip();
-        write(text.as_ref())?;
+        write(text.as_str())?;
 
         Ok(info_sum.result())
     }
@@ -380,9 +382,9 @@ impl<P: PixelBuf<Pixel = String>> SpaceRaytracer<P> {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
-                let (text, info) = self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
+                let (buf, info) = self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
                 total_info += info;
-                write(text.as_ref())?;
+                write(buf.into().as_str())?;
             }
             write(line_ending)?;
         }
@@ -513,7 +515,7 @@ impl<P: PixelBuf> TracingState<P> {
         }
     }
 
-    fn finish(mut self, sky_color: Rgb) -> (P::Pixel, RaytraceInfo) {
+    fn finish(mut self, sky_color: Rgb) -> (P, RaytraceInfo) {
         if self.cubes_traced == 0 {
             // Didn't intersect the world at all. Draw these as plain background.
             // TODO: Switch to using the sky color, unless debugging options are set.
@@ -535,7 +537,7 @@ impl<P: PixelBuf> TracingState<P> {
         }
 
         (
-            self.pixel_buf.result(),
+            self.pixel_buf,
             RaytraceInfo {
                 cubes_traced: self.cubes_traced,
             },

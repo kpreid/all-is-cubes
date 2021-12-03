@@ -29,6 +29,7 @@ use crate::listen::ListenableCellWithLocal;
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::lum::types::AicLumBackend;
 use crate::lum::GraphicsResourceError;
+use crate::math::Rgba;
 use crate::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
 use crate::space::Space;
 use crate::universe::URef;
@@ -98,12 +99,13 @@ where
 
             let start_time = Instant::now();
             let trace = |point: Point| {
-                let (linear_color, _info) =
+                let (color_buf, _info) =
                     tracer.trace_ray(camera.project_ndc_into_world(Point2::new(
                         render_viewport.normalize_fb_x(point.x as usize),
                         render_viewport.normalize_fb_y(point.y as usize),
                     )));
-                let [r, g, b, _a] = linear_color.to_srgb_32bit();
+                // TODO: simplify this via `impl From<ColorBuf> for Rgb888`?
+                let [r, g, b, _a] = Rgba::from(color_buf).to_srgb_32bit();
                 let color = Rgb888::new(r, g, b);
                 Pixel(point, color)
             };

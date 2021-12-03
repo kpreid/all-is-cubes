@@ -21,7 +21,6 @@ pub struct CharacterBuf {
 }
 
 impl PixelBuf for CharacterBuf {
-    type Pixel = String;
     type BlockData = Cow<'static, str>;
 
     fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
@@ -50,11 +49,6 @@ impl PixelBuf for CharacterBuf {
     }
 
     #[inline]
-    fn result(self) -> String {
-        self.hit_text.unwrap_or_else(|| ".".to_owned())
-    }
-
-    #[inline]
     fn add(&mut self, _surface_color: Rgba, text: &Self::BlockData) {
         if self.hit_text.is_none() {
             self.hit_text = Some(text.to_owned().to_string());
@@ -63,6 +57,13 @@ impl PixelBuf for CharacterBuf {
 
     fn hit_nothing(&mut self) {
         self.hit_text = Some(".".to_owned());
+    }
+}
+
+impl From<CharacterBuf> for String {
+    #[inline]
+    fn from(buf: CharacterBuf) -> String {
+        buf.hit_text.unwrap_or_else(|| ".".to_owned())
     }
 }
 

@@ -5,7 +5,7 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::convert::{identity, TryInto};
+use std::convert::TryInto;
 use std::io;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
@@ -131,7 +131,7 @@ struct FrameInput {
 struct FrameOutput {
     viewport: Viewport,
     options: TerminalOptions,
-    image: Box<[<ColorCharacterBuf as PixelBuf>::Pixel]>,
+    image: Box<[TextAndColor]>,
     info: RaytraceInfo,
 }
 
@@ -174,7 +174,9 @@ impl TerminalMain {
                         scene,
                     }) = render_thread_in.recv()
                     {
-                        let (image, info) = scene.get().trace_scene_to_image(&camera, identity);
+                        let (image, info) = scene
+                            .get()
+                            .trace_scene_to_image(&camera, TextAndColor::from);
                         // Ignore send errors as they just mean we're shutting down or died elsewhere
                         let _ = render_thread_out.send(FrameOutput {
                             viewport: camera.viewport(),
@@ -811,6 +813,9 @@ impl ColorMode {
     }
 }
 
+/// Output of ColorCharacterBuf
+type TextAndColor = (String, Option<Rgba>);
+
 /// Implements `PixelBuf` for colored text output using `termion`.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct ColorCharacterBuf {
@@ -822,7 +827,6 @@ struct ColorCharacterBuf {
 }
 
 impl PixelBuf for ColorCharacterBuf {
-    type Pixel = (String, Option<Rgba>);
     type BlockData = <CharacterBuf as PixelBuf>::BlockData;
 
     fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
@@ -843,16 +847,6 @@ impl PixelBuf for ColorCharacterBuf {
     }
 
     #[inline]
-    fn result(self) -> (String, Option<Rgba>) {
-        // TODO: override_color should be less clunky
-        if self.override_color {
-            (self.text.result(), None)
-        } else {
-            (self.text.result(), Some(self.color.result()))
-        }
-    }
-
-    #[inline]
     fn add(&mut self, surface_color: Rgba, text: &Self::BlockData) {
         if self.override_color {
             return;
@@ -865,6 +859,18 @@ impl PixelBuf for ColorCharacterBuf {
     fn hit_nothing(&mut self) {
         self.text.add(Rgba::TRANSPARENT, &Cow::Borrowed(" "));
         self.override_color = true;
+    }
+}
+
+impl From<ColorCharacterBuf> for TextAndColor {
+    #[inline]
+    fn from(buf: ColorCharacterBuf) -> (String, Option<Rgba>) {
+        // TODO: override_color should be less clunky
+        if buf.override_color {
+            (buf.text.into(), None)
+        } else {
+            (buf.text.into(), Some(buf.color.into()))
+        }
     }
 }
 
