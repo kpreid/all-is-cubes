@@ -10,6 +10,7 @@ use std::io;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
+use all_is_cubes::listen::ListenableSource;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -29,9 +30,8 @@ use all_is_cubes::cgmath::{ElementWise as _, Point2};
 use all_is_cubes::inv::Slot;
 use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::raytracer::{
-    CharacterBuf, ColorBuf, PixelBuf, RaytraceInfo, UpdatingSpaceRaytracer,
+    CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RaytraceInfo, UpdatingSpaceRaytracer,
 };
-use all_is_cubes::space::SpaceBlockData;
 
 /// Options for the terminal UI.
 ///
@@ -115,7 +115,7 @@ struct TerminalMain {
     /// position.
     widths: HashMap<String, u16>,
 
-    buffer_reuse_out: mpsc::Receiver<UpdatingSpaceRaytracer<ColorCharacterBuf>>,
+    buffer_reuse_out: mpsc::Receiver<UpdatingSpaceRaytracer<CharacterRtData>>,
     render_pipe_in: mpsc::SyncSender<FrameInput>,
     render_pipe_out: mpsc::Receiver<FrameOutput>,
 }
@@ -123,7 +123,7 @@ struct TerminalMain {
 struct FrameInput {
     camera: Camera,
     options: TerminalOptions,
-    scene: UpdatingSpaceRaytracer<ColorCharacterBuf>,
+    scene: UpdatingSpaceRaytracer<CharacterRtData>,
 }
 
 /// A frame's pixels and all the context needed to interpret it (which duplicates fields
@@ -146,15 +146,15 @@ impl TerminalMain {
         // Generate reusable buffers for scene.
         // They are recirculated through the channels so that one can be updated while another is being raytraced.
         let number_of_scene_buffers = 3;
-        let (buffer_reuse_in, buffer_reuse_out) = mpsc::sync_channel::<
-            UpdatingSpaceRaytracer<ColorCharacterBuf>,
-        >(number_of_scene_buffers);
+        let (buffer_reuse_in, buffer_reuse_out) =
+            mpsc::sync_channel::<UpdatingSpaceRaytracer<CharacterRtData>>(number_of_scene_buffers);
         for _ in 0..number_of_scene_buffers {
             buffer_reuse_in
                 .send(UpdatingSpaceRaytracer::new(
                     // TODO: too many unwraps... and what if there is no character/space
                     cameras.character().unwrap().borrow().space.clone(),
                     app.graphics_options(),
+                    ListenableSource::constant(()),
                 ))
                 .unwrap();
         }
@@ -174,9 +174,11 @@ impl TerminalMain {
                         scene,
                     }) = render_thread_in.recv()
                     {
-                        let (image, info) = scene
-                            .get()
-                            .trace_scene_to_image(&camera, TextAndColor::from);
+                        let (image, info) =
+                            scene.get().trace_scene_to_image::<ColorCharacterBuf, _, _>(
+                                &camera,
+                                TextAndColor::from,
+                            );
                         // Ignore send errors as they just mean we're shutting down or died elsewhere
                         let _ = render_thread_out.send(FrameOutput {
                             viewport: camera.viewport(),
@@ -829,18 +831,6 @@ struct ColorCharacterBuf {
 impl PixelBuf for ColorCharacterBuf {
     type BlockData = <CharacterBuf as PixelBuf>::BlockData;
 
-    fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
-        CharacterBuf::compute_block_data(s)
-    }
-
-    fn error_block_data() -> Self::BlockData {
-        CharacterBuf::error_block_data()
-    }
-
-    fn sky_block_data() -> Self::BlockData {
-        CharacterBuf::sky_block_data()
-    }
-
     #[inline]
     fn opaque(&self) -> bool {
         self.color.opaque()
@@ -857,7 +847,8 @@ impl PixelBuf for ColorCharacterBuf {
     }
 
     fn hit_nothing(&mut self) {
-        self.text.add(Rgba::TRANSPARENT, &Cow::Borrowed(" "));
+        self.text
+            .add(Rgba::TRANSPARENT, &CharacterRtData(Cow::Borrowed(" ")));
         self.override_color = true;
     }
 }

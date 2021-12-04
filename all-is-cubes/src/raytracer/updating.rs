@@ -11,15 +11,24 @@ use crate::universe::{RefError, URef};
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
 /// changed.
-pub struct UpdatingSpaceRaytracer<P: PixelBuf> {
+pub struct UpdatingSpaceRaytracer<D: RtBlockData> {
     space: URef<Space>,
-    options: ListenableSource<GraphicsOptions>,
-    state: SpaceRaytracer<P>,
+    graphics_options: ListenableSource<GraphicsOptions>,
+    custom_options: ListenableSource<D::Options>,
+    state: SpaceRaytracer<D>,
     todo: Arc<Mutex<SrtTodo>>,
 }
 
-impl<P: PixelBuf> UpdatingSpaceRaytracer<P> {
-    pub fn new(space: URef<Space>, options: ListenableSource<GraphicsOptions>) -> Self {
+impl<D: RtBlockData> UpdatingSpaceRaytracer<D>
+where
+    D::Options: Clone + Sync + 'static,
+{
+    // TODO: document args
+    pub fn new(
+        space: URef<Space>,
+        graphics_options: ListenableSource<GraphicsOptions>,
+        custom_options: ListenableSource<D::Options>,
+    ) -> Self {
         // TODO: don't unconditionally borrow and maybe panic on the first call
         let todo = Arc::default();
 
@@ -27,18 +36,23 @@ impl<P: PixelBuf> UpdatingSpaceRaytracer<P> {
         space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
 
         // TODO: Placeholder for more detailed graphics options updating
-        options
+        graphics_options
             .listen(TodoListener(Arc::downgrade(&todo)).filter(|()| Some(SpaceChange::EveryBlock)));
 
         Self {
-            state: SpaceRaytracer::new(&space_borrowed, options.snapshot()),
+            state: SpaceRaytracer::new(
+                &space_borrowed,
+                graphics_options.snapshot(),
+                custom_options.snapshot(),
+            ),
             space,
-            options,
+            graphics_options,
+            custom_options,
             todo,
         }
     }
 
-    pub fn get(&self) -> &SpaceRaytracer<P> {
+    pub fn get(&self) -> &SpaceRaytracer<D> {
         &self.state
     }
 
@@ -59,20 +73,34 @@ impl<P: PixelBuf> UpdatingSpaceRaytracer<P> {
         let space = self.space.try_borrow()?;
 
         if mem::take(&mut todo.everything) {
-            self.state = SpaceRaytracer::new(&space, self.options.snapshot());
+            self.state = SpaceRaytracer::new(
+                &space,
+                self.graphics_options.snapshot(),
+                self.custom_options.snapshot(),
+            );
             todo.blocks.clear();
             todo.cubes.clear();
         } else {
+            let graphics_options = &*self.graphics_options.get();
+            let custom_options = &*self.custom_options.get();
+            let options = RtOptionsRef {
+                graphics_options,
+                custom_options,
+            };
+
             let block_data_slice = space.block_data();
             if block_data_slice.len() > self.state.blocks.len() {
                 for block_data in block_data_slice[self.state.blocks.len()..].iter() {
-                    self.state.blocks.push(prepare_block::<P>(block_data));
+                    self.state
+                        .blocks
+                        .push(TracingBlock::from_block(options, block_data));
                 }
             }
             for block_index in todo.blocks.drain() {
                 // TODO: handle extending the vector
                 let block_index = usize::from(block_index);
-                self.state.blocks[block_index] = prepare_block::<P>(&block_data_slice[block_index]);
+                self.state.blocks[block_index] =
+                    TracingBlock::from_block(options, &block_data_slice[block_index]);
             }
 
             for cube in todo.cubes.drain() {
@@ -141,18 +169,21 @@ mod tests {
     struct EquivalenceTester {
         camera: Camera,
         space: URef<Space>,
-        options: ListenableSource<GraphicsOptions>,
-        updating: UpdatingSpaceRaytracer<CharacterBuf>,
+        graphics_options: ListenableSource<GraphicsOptions>,
+        custom_options: ListenableSource<()>,
+        updating: UpdatingSpaceRaytracer<CharacterRtData>,
     }
 
     impl EquivalenceTester {
         fn new(space: URef<Space>) -> Self {
             let grid = space.borrow().grid();
 
-            let options = ListenableSource::constant(GraphicsOptions::default());
+            // TODO: add tests of changing the options
+            let graphics_options = ListenableSource::constant(GraphicsOptions::default());
+            let custom_options = ListenableSource::constant(());
 
             let mut camera = Camera::new(
-                options.snapshot(),
+                graphics_options.snapshot(),
                 Viewport {
                     nominal_size: Vector2::new(72., 72.),
                     framebuffer_size: Vector2::new(72, 36),
@@ -169,23 +200,32 @@ mod tests {
             );
 
             Self {
-                updating: UpdatingSpaceRaytracer::new(space.clone(), options.clone()),
+                updating: UpdatingSpaceRaytracer::new(
+                    space.clone(),
+                    graphics_options.clone(),
+                    custom_options.clone(),
+                ),
                 camera,
                 space,
-                options,
+                graphics_options,
+                custom_options,
             }
         }
 
         fn update_and_assert(&mut self) -> Result<(), RefError> {
-            self.camera.set_options(self.options.snapshot());
+            self.camera.set_options(self.graphics_options.snapshot());
             self.updating.update()?;
             let image_updating = self
                 .updating
                 .get()
-                .trace_scene_to_string(&self.camera, "\n");
-            let image_fresh =
-                SpaceRaytracer::<CharacterBuf>::new(&self.space.borrow(), self.options.snapshot())
-                    .trace_scene_to_string(&self.camera, "\n");
+                .trace_scene_to_string::<CharacterBuf>(&self.camera, "\n");
+            #[allow(clippy::unit_arg)]
+            let image_fresh = SpaceRaytracer::<CharacterRtData>::new(
+                &self.space.borrow(),
+                self.graphics_options.snapshot(),
+                self.custom_options.snapshot(),
+            )
+            .trace_scene_to_string::<CharacterBuf>(&self.camera, "\n");
 
             assert_eq!(
                 image_updating.custom_format(Unquote),

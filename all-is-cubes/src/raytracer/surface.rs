@@ -7,7 +7,7 @@ use crate::block::{recursive_ray, Evoxel};
 use crate::camera::LightingOption;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
-use crate::raytracer::{PixelBuf, SpaceRaytracer, TracingBlock, TracingCubeData};
+use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::GridArray;
 
 /// Description of a surface the ray passes through (or from the volumetric perspective,
@@ -28,19 +28,18 @@ pub(crate) struct Surface<'a, D> {
     pub normal: Face,
 }
 
-impl<D> Surface<'_, D> {
+impl<D: RtBlockData> Surface<'_, D> {
     /// Convert the surface and its lighting to a single RGBA value as determined by
     /// the given graphics options, or [`None`] if it is invisible.
     ///
     /// Note this is not true volumetric ray tracing: we're considering each
     /// voxel surface to be discrete.
     #[inline]
-    pub(crate) fn to_lit_color<P>(&self, rt: &SpaceRaytracer<P>) -> Option<Rgba>
-    where
-        P: PixelBuf<BlockData = D>,
-        D: 'static,
-    {
-        let diffuse_color = rt.options.transparency.limit_alpha(self.diffuse_color);
+    pub(crate) fn to_lit_color(&self, rt: &SpaceRaytracer<D>) -> Option<Rgba> {
+        let diffuse_color = rt
+            .graphics_options
+            .transparency
+            .limit_alpha(self.diffuse_color);
         if diffuse_color.fully_transparent() {
             return None;
         }
@@ -48,12 +47,8 @@ impl<D> Surface<'_, D> {
         Some(adjusted_rgb.with_alpha(diffuse_color.alpha()))
     }
 
-    fn compute_illumination<P>(&self, rt: &SpaceRaytracer<P>) -> Rgb
-    where
-        P: PixelBuf<BlockData = D>,
-        D: 'static,
-    {
-        match rt.options.lighting_display {
+    fn compute_illumination(&self, rt: &SpaceRaytracer<D>) -> Rgb {
+        match rt.graphics_options.lighting_display {
             LightingOption::None => Rgb::ONE,
             LightingOption::Flat => {
                 rt.get_lighting(self.cube + self.normal.normal_vector())
@@ -113,7 +108,7 @@ pub(crate) enum TraceStep<'a, D> {
 /// An [`Iterator`] which reports each visible surface a [`Raycaster`] ray passes through.
 // TODO: make public?
 #[derive(Clone, Debug)]
-pub(crate) struct SurfaceIter<'a, D: 'static> {
+pub(crate) struct SurfaceIter<'a, D> {
     ray: Ray,
     block_raycaster: Raycaster,
     state: SurfaceIterState,
@@ -130,12 +125,9 @@ enum SurfaceIterState {
     EnteredSpace,
 }
 
-impl<'a, D: 'static> SurfaceIter<'a, D> {
+impl<'a, D: RtBlockData> SurfaceIter<'a, D> {
     #[inline]
-    pub(crate) fn new<P>(rt: &'a SpaceRaytracer<P>, ray: Ray) -> Self
-    where
-        P: PixelBuf<BlockData = D>,
-    {
+    pub(crate) fn new(rt: &'a SpaceRaytracer<D>, ray: Ray) -> Self {
         Self {
             ray,
             block_raycaster: ray
@@ -150,7 +142,7 @@ impl<'a, D: 'static> SurfaceIter<'a, D> {
     }
 }
 
-impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
+impl<'a, D> Iterator for SurfaceIter<'a, D> {
     type Item = TraceStep<'a, D>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -242,7 +234,7 @@ impl<'a, D: 'static> Iterator for SurfaceIter<'a, D> {
 
 /// Iterates over a [`Block`]'s voxels. Internal helper for [`SurfaceIter`].
 #[derive(Clone, Debug)]
-struct VoxelSurfaceIter<'a, D: 'static> {
+struct VoxelSurfaceIter<'a, D> {
     voxel_ray: Ray,
     voxel_raycaster: Raycaster,
     block_data: &'a D,
@@ -282,7 +274,7 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
 }
 
 /// Builds on [`SurfaceIter`] to report spans of transparency along the ray.
-pub(crate) struct DepthIter<'a, D: 'static> {
+pub(crate) struct DepthIter<'a, D> {
     surface_iter: SurfaceIter<'a, D>,
     /// Present if the last `EnterSurface` we discovered was transparent, or if
     /// we have another surface to report.
@@ -341,7 +333,6 @@ mod tests {
     use crate::block::Block;
     use crate::camera::GraphicsOptions;
     use crate::content::{make_slab, palette};
-    use crate::raytracer::ColorBuf;
     use crate::space::{Grid, Space};
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
@@ -357,7 +348,7 @@ mod tests {
         space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
         space.set([0, 2, 0], make_slab(universe, 2, 4)).unwrap();
 
-        let rt = SpaceRaytracer::<ColorBuf>::new(&space, GraphicsOptions::default());
+        let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
 
         assert_eq!(
             SurfaceIter::new(&rt, Ray::new([0.5, -0.5, 0.5], [0., 1., 0.]))
@@ -410,7 +401,7 @@ mod tests {
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
         space.set([0, 0, 0], Block::from(solid_test_color)).unwrap();
 
-        let rt = SpaceRaytracer::<ColorBuf>::new(&space, GraphicsOptions::default());
+        let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
 
         assert_eq!(
             SurfaceIter::new(&rt, Ray::new([-0.5, 0.5, 0.5], [1., 0., 0.]))

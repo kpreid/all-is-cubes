@@ -7,8 +7,26 @@ use std::convert::TryFrom as _;
 
 use cgmath::{Vector3, Zero as _};
 
+use crate::camera::GraphicsOptions;
 use crate::math::Rgba;
 use crate::space::SpaceBlockData;
+
+/// Borrowed data which may be used to customize the result of raytracing.
+#[derive(Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct RtOptionsRef<'a, C> {
+    pub graphics_options: &'a GraphicsOptions,
+    /// Arbitrary data for the [`RtBlockData`] in use.
+    pub custom_options: &'a C,
+}
+
+// Non-derived implementations for no `C: Clone` bound.
+impl<'a, C> Copy for RtOptionsRef<'a, C> {}
+impl<'a, C> Clone for RtOptionsRef<'a, C> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
 
 /// Implementations of [`PixelBuf`] define output formats of the raytracer, by being
 /// responsible for accumulating the color (and/or other information) for each image
@@ -24,25 +42,10 @@ use crate::space::SpaceBlockData;
 /// Each implementation should provide its own conversion to a final output format,
 /// if any (e.g. an inherent method or an [`impl From`](From)).
 pub trait PixelBuf: Default {
-    /// Type of the data precomputed for each distinct block by
-    /// [`Self::compute_block_data()`].
+    /// Data precomputed for each distinct block or other type of visible object.
     ///
     /// If no data beyond color is needed, this may be `()`.
-    // Note: I tried letting BlockData contain references but I couldn't satisfy
-    // the borrow checker.
-    type BlockData: Send + Sync + 'static;
-
-    /// Computes whatever data this [`PixelBuf`] wishes to have available in
-    /// [`Self::add`], for a given block.
-    fn compute_block_data(block: &SpaceBlockData) -> Self::BlockData;
-
-    /// Computes whatever value should be passed to [`Self::add`] when the raytracer
-    /// encounters an error.
-    fn error_block_data() -> Self::BlockData;
-
-    /// Computes whatever value should be passed to [`Self::add`] when the raytracer
-    /// encounters the sky (background behind all blocks).
-    fn sky_block_data() -> Self::BlockData;
+    type BlockData: RtBlockData;
 
     /// Returns whether `self` has recorded an opaque surface and therefore will not
     /// be affected by future calls to [`Self::add`].
@@ -61,6 +64,39 @@ pub trait PixelBuf: Default {
     /// anything to draw. May be used for special diagnostic drawing. If used, should
     /// disable the effects of future [`Self::add`] calls.
     fn hit_nothing(&mut self) {}
+}
+
+/// Precomputed data about a [`Space`]'s blocks that may be used by a [`PixelBuf`].
+///
+/// Design note: This is a trait of the data type itself so as to require that there
+/// cannot be more than one way to construct a given data type (other than explicit
+/// configuration). This prevents multiple conflicting interpretations of a single data
+/// type.
+///
+/// [`Space`]: crate::space::Space
+pub trait RtBlockData: Send + Sync {
+    /// Optional additional configuration.
+    type Options: Send + Sync;
+
+    /// Returns the data that should be stored for a particular block and passed
+    /// to [`PixelBuf::add`] when that block is traced onto/through.
+    fn from_block(options: RtOptionsRef<'_, Self::Options>, block: &SpaceBlockData) -> Self;
+
+    /// Returns what should be passed to [`PixelBuf::add`] when the raytracer
+    /// encounters an error.
+    fn error(options: RtOptionsRef<'_, Self::Options>) -> Self;
+
+    /// Returns what should be passed to [`PixelBuf::add`] when the raytracer
+    /// encounters the sky (background behind all blocks).
+    fn sky(options: RtOptionsRef<'_, Self::Options>) -> Self;
+}
+
+/// Trivial implementation of [`RtBlockData`] which stores nothing.
+impl RtBlockData for () {
+    type Options = ();
+    fn from_block(_: RtOptionsRef<'_, Self::Options>, _: &SpaceBlockData) -> Self {}
+    fn error(_: RtOptionsRef<'_, Self::Options>) -> Self {}
+    fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {}
 }
 
 /// Implements [`PixelBuf`] for RGB(A) color with [`f32`] components,
@@ -83,12 +119,6 @@ pub struct ColorBuf {
 
 impl PixelBuf for ColorBuf {
     type BlockData = ();
-
-    fn compute_block_data(_: &SpaceBlockData) {}
-
-    fn error_block_data() {}
-
-    fn sky_block_data() {}
 
     #[inline]
     fn opaque(&self) -> bool {

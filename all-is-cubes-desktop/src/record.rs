@@ -95,7 +95,7 @@ pub(crate) fn record_main(
     // thread everything else too so we're not alternating single-threaded and parallel
     // operations.
     let (scene_sender, scene_receiver) =
-        mpsc::sync_channel::<(usize, Camera, SpaceRaytracer<ColorBuf>)>(1);
+        mpsc::sync_channel::<(usize, Camera, SpaceRaytracer<()>)>(1);
     let (image_data_sender, image_data_receiver) = mpsc::sync_channel(1);
     let (mut write_status_sender, status_receiver) = mpsc::channel();
 
@@ -105,7 +105,8 @@ pub(crate) fn record_main(
         .spawn({
             move || {
                 while let Ok((frame_number, camera, raytracer)) = scene_receiver.recv() {
-                    let (image_data, _info) = raytracer.trace_scene_to_image(&camera, Rgba::from);
+                    let (image_data, _info) =
+                        raytracer.trace_scene_to_image::<ColorBuf, _, Rgba>(&camera, Rgba::from);
                     // TODO: Offer supersampling (multiple rays per output pixel).
                     image_data_sender.send((frame_number, image_data)).unwrap();
                 }
@@ -134,9 +135,10 @@ pub(crate) fn record_main(
 
         for frame_number in options.frame_range() {
             camera.set_view_transform(character_ref.borrow().view());
-            let scene = SpaceRaytracer::<ColorBuf>::new(
+            let scene = SpaceRaytracer::<()>::new(
                 &*space_ref.borrow(),
                 app.graphics_options().snapshot(),
+                (),
             );
             scene_sender
                 .send((frame_number, camera.clone(), scene))

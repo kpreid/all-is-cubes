@@ -38,39 +38,61 @@ pub use text::*;
 
 /// Precomputed data for raytracing a single frame of a single [`Space`], and bearer of
 /// the methods for actually performing raytracing.
-pub struct SpaceRaytracer<P: PixelBuf> {
-    blocks: Vec<TracingBlock<P::BlockData>>,
+pub struct SpaceRaytracer<D: RtBlockData> {
+    blocks: Vec<TracingBlock<D>>,
     cubes: GridArray<TracingCubeData>,
 
-    options: GraphicsOptions,
+    graphics_options: GraphicsOptions,
+    custom_options: D::Options,
     sky_color: Rgb,
+    sky_data: D,
     packed_sky_color: PackedLight,
 }
 
-impl<P: PixelBuf> SpaceRaytracer<P> {
+impl<D: RtBlockData> SpaceRaytracer<D> {
     /// Snapshots the given [`Space`] to prepare for raytracing it.
-    pub fn new(space: &Space, options: GraphicsOptions) -> Self {
+    pub fn new(
+        space: &Space,
+        graphics_options: GraphicsOptions,
+        custom_options: D::Options,
+    ) -> Self {
+        let options = RtOptionsRef {
+            graphics_options: &graphics_options,
+            custom_options: &custom_options,
+        };
         let sky_color = space.physics().sky_color;
         SpaceRaytracer {
-            blocks: prepare_blocks::<P>(space),
+            blocks: space
+                .block_data()
+                .iter()
+                .map(|sbd| TracingBlock::<D>::from_block(options, sbd))
+                .collect(),
             cubes: prepare_cubes(space),
-            options,
             sky_color,
+            sky_data: D::sky(options),
             packed_sky_color: sky_color.into(),
+
+            graphics_options,
+            custom_options,
         }
     }
 
     /// Computes a single image pixel from the given ray.
-    pub fn trace_ray(&self, ray: Ray) -> (P, RaytraceInfo) {
+    pub fn trace_ray<P: PixelBuf<BlockData = D>>(&self, ray: Ray) -> (P, RaytraceInfo) {
+        let options = RtOptionsRef {
+            graphics_options: &self.graphics_options,
+            custom_options: &self.custom_options,
+        };
+
         let t_to_absolute_distance = ray.direction.magnitude();
         let mut s: TracingState<P> = TracingState::default();
         let surface_iter = SurfaceIter::new(self, ray);
 
         // Use the more expensive volumetric tracing strategy only if we need it.
-        match self.options.transparency {
+        match self.graphics_options.transparency {
             TransparencyOption::Volumetric => {
                 for step in DepthIter::new(surface_iter) {
-                    if s.count_step_should_stop() {
+                    if s.count_step_should_stop(options) {
                         break;
                     }
 
@@ -108,7 +130,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
             }
             _ => {
                 for step in surface_iter {
-                    if s.count_step_should_stop() {
+                    if s.count_step_should_stop(options) {
                         break;
                     }
 
@@ -125,7 +147,7 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
                 }
             }
         }
-        s.finish(self.sky_color)
+        s.finish(self.sky_color, &self.sky_data)
     }
 
     /// Compute a full image.
@@ -137,12 +159,13 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     ///
     /// TODO: Add a mechanism for incrementally rendering into a mutable buffer instead of
     /// all-at-once into a newly allocated one, for interactive use.
-    pub fn trace_scene_to_image<E, O>(
+    pub fn trace_scene_to_image<P, E, O>(
         &self,
         camera: &Camera,
         encoder: E,
     ) -> (Box<[O]>, RaytraceInfo)
     where
+        P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
@@ -152,12 +175,13 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 
     #[cfg(feature = "rayon")]
-    fn trace_scene_to_image_impl<E, O>(
+    fn trace_scene_to_image_impl<P, E, O>(
         &self,
         camera: &Camera,
         encoder: E,
     ) -> (Box<[O]>, RaytraceInfo)
     where
+        P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
@@ -185,12 +209,13 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 
     #[cfg(not(feature = "rayon"))]
-    fn trace_scene_to_image_impl<E, O>(
+    fn trace_scene_to_image_impl<P, E, O>(
         &self,
         camera: &Camera,
         encoder: E,
     ) -> (Box<[O]>, RaytraceInfo)
     where
+        P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
@@ -307,7 +332,8 @@ impl<P: PixelBuf> SpaceRaytracer<P> {
     }
 }
 
-impl<P: PixelBuf + Into<String>> SpaceRaytracer<P> {
+/// Text-specific methods.
+impl<D: RtBlockData> SpaceRaytracer<D> {
     /// Raytrace to text, using any [`PixelBuf`] whose output can be [`String`].
     ///
     /// `F` is the function accepting the output, and `E` is the type of error it may
@@ -315,28 +341,30 @@ impl<P: PixelBuf + Into<String>> SpaceRaytracer<P> {
     /// inconvenient difference between [`std::io::Write`] and [`std::fmt::Write`].
     ///
     /// After each line (row) of the image, `write(line_ending)` will be called.
-    pub fn trace_scene_to_text<F, E>(
+    pub fn trace_scene_to_text<P, F, E>(
         &self,
         camera: &Camera,
         line_ending: &str,
         write: F,
     ) -> Result<RaytraceInfo, E>
     where
+        P: PixelBuf<BlockData = D> + Into<String>,
         F: FnMut(&str) -> Result<(), E>,
     {
         // This wrapper function ensures that the two implementations have consistent
         // signatures.
-        self.trace_scene_to_text_impl(camera, line_ending, write)
+        self.trace_scene_to_text_impl::<P, F, E>(camera, line_ending, write)
     }
 
     #[cfg(feature = "rayon")]
-    fn trace_scene_to_text_impl<F, E>(
+    fn trace_scene_to_text_impl<P, F, E>(
         &self,
         camera: &Camera,
         line_ending: &str,
         mut write: F,
     ) -> Result<RaytraceInfo, E>
     where
+        P: PixelBuf<BlockData = D> + Into<String>,
         F: FnMut(&str) -> Result<(), E>,
     {
         let viewport = camera.viewport();
@@ -350,7 +378,7 @@ impl<P: PixelBuf + Into<String>> SpaceRaytracer<P> {
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);
                         let (buf, info) =
-                            self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
+                            self.trace_ray::<P>(camera.project_ndc_into_world(Point2::new(x, y)));
                         (buf.into(), info)
                     })
                     .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
@@ -365,13 +393,14 @@ impl<P: PixelBuf + Into<String>> SpaceRaytracer<P> {
     }
 
     #[cfg(not(feature = "rayon"))]
-    fn trace_scene_to_text_impl<F, E>(
+    fn trace_scene_to_text_impl<P, F, E>(
         &self,
         camera: &Camera,
         line_ending: &str,
         mut write: F,
     ) -> Result<RaytraceInfo, E>
     where
+        P: PixelBuf<BlockData = D> + Into<String>,
         F: FnMut(&str) -> Result<(), E>,
     {
         let mut total_info = RaytraceInfo::default();
@@ -382,7 +411,8 @@ impl<P: PixelBuf + Into<String>> SpaceRaytracer<P> {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
-                let (buf, info) = self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
+                let (buf, info) =
+                    self.trace_ray::<P>(camera.project_ndc_into_world(Point2::new(x, y)));
                 total_info += info;
                 write(buf.into().as_str())?;
             }
@@ -392,11 +422,14 @@ impl<P: PixelBuf + Into<String>> SpaceRaytracer<P> {
         Ok(total_info)
     }
 
-    pub fn trace_scene_to_string(&self, camera: &Camera, line_ending: &str) -> String {
+    pub fn trace_scene_to_string<P>(&self, camera: &Camera, line_ending: &str) -> String
+    where
+        P: PixelBuf<BlockData = D> + Into<String>,
+    {
         let mut out = String::with_capacity(
             camera.viewport().framebuffer_size.dot(Vector2::new(1, 1)) as usize,
         );
-        self.trace_scene_to_text(camera, line_ending, |s| {
+        self.trace_scene_to_text::<P, _, _>(camera, line_ending, |s| {
             out.push_str(s);
             Ok::<(), std::convert::Infallible>(())
         })
@@ -405,12 +438,17 @@ impl<P: PixelBuf + Into<String>> SpaceRaytracer<P> {
     }
 }
 
-impl<P: PixelBuf> fmt::Debug for SpaceRaytracer<P> {
+impl<D: RtBlockData> fmt::Debug for SpaceRaytracer<D>
+where
+    D: fmt::Debug,
+    D::Options: fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SpaceRaytracer")
             .field("blocks.len", &self.blocks.len())
             .field("cubes.grid", &self.cubes.grid())
-            .field("options", &self.options)
+            .field("graphics_options", &self.graphics_options)
+            .field("custom_options", &self.custom_options)
             .field("sky_color", &self.sky_color)
             .finish_non_exhaustive()
     }
@@ -443,24 +481,6 @@ impl std::iter::Sum for RaytraceInfo {
     }
 }
 
-/// Copy all block data out of [`Space`].
-#[inline]
-fn prepare_blocks<P: PixelBuf>(space: &Space) -> Vec<TracingBlock<P::BlockData>> {
-    space.block_data().iter().map(prepare_block::<P>).collect()
-}
-
-/// Copy one block's data out of [`Space`].
-#[inline]
-fn prepare_block<P: PixelBuf>(block_data: &SpaceBlockData) -> TracingBlock<P::BlockData> {
-    let evaluated = block_data.evaluated();
-    let pixel_block_data = P::compute_block_data(block_data);
-    if let Some(ref voxels) = evaluated.voxels {
-        TracingBlock::Recur(pixel_block_data, evaluated.resolution, voxels.clone())
-    } else {
-        TracingBlock::Atom(pixel_block_data, evaluated.color)
-    }
-}
-
 /// Get cube data out of [`Space`].
 #[inline]
 fn prepare_cubes(space: &Space) -> GridArray<TracingCubeData> {
@@ -488,11 +508,24 @@ struct TracingCubeData {
 }
 
 #[derive(Clone, Debug)]
-enum TracingBlock<B: 'static> {
-    Atom(B, Rgba),
-    Recur(B, Resolution, GridArray<Evoxel>),
+enum TracingBlock<D> {
+    Atom(D, Rgba),
+    Recur(D, Resolution, GridArray<Evoxel>),
 }
 
+impl<D: RtBlockData> TracingBlock<D> {
+    fn from_block(options: RtOptionsRef<'_, D::Options>, block_data: &SpaceBlockData) -> Self {
+        let evaluated = block_data.evaluated();
+        let pixel_block_data = D::from_block(options, block_data);
+        if let Some(ref voxels) = evaluated.voxels {
+            TracingBlock::Recur(pixel_block_data, evaluated.resolution, voxels.clone())
+        } else {
+            TracingBlock::Atom(pixel_block_data, evaluated.color)
+        }
+    }
+}
+
+/// Holds a [`PixelBuf`] and other per-ray state.
 #[derive(Clone, Debug, Default)]
 struct TracingState<P: PixelBuf> {
     /// Number of cubes traced through -- controlled by the caller, so not necessarily
@@ -502,28 +535,30 @@ struct TracingState<P: PixelBuf> {
 }
 impl<P: PixelBuf> TracingState<P> {
     #[inline]
-    fn count_step_should_stop(&mut self) -> bool {
+    fn count_step_should_stop(
+        &mut self,
+        options: RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>,
+    ) -> bool {
         self.cubes_traced += 1;
         if self.cubes_traced > 1000 {
             // Abort excessively long traces.
             self.pixel_buf = Default::default();
             self.pixel_buf
-                .add(Rgba::new(1.0, 1.0, 1.0, 1.0), &P::error_block_data());
+                .add(Rgba::new(1.0, 1.0, 1.0, 1.0), &P::BlockData::error(options));
             true
         } else {
             self.pixel_buf.opaque()
         }
     }
 
-    fn finish(mut self, sky_color: Rgb) -> (P, RaytraceInfo) {
+    fn finish(mut self, sky_color: Rgb, sky_data: &P::BlockData) -> (P, RaytraceInfo) {
         if self.cubes_traced == 0 {
             // Didn't intersect the world at all. Draw these as plain background.
             // TODO: Switch to using the sky color, unless debugging options are set.
             self.pixel_buf.hit_nothing();
         }
 
-        self.pixel_buf
-            .add(sky_color.with_alpha_one(), &P::sky_block_data());
+        self.pixel_buf.add(sky_color.with_alpha_one(), sky_data);
 
         // Debug visualization of number of raytracing steps.
         // TODO: Make this togglable and less of a kludge — we'd like to be able to mix with
@@ -532,7 +567,7 @@ impl<P: PixelBuf> TracingState<P> {
             self.pixel_buf = Default::default();
             self.pixel_buf.add(
                 (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32).with_alpha_one(),
-                &P::sky_block_data(),
+                sky_data,
             );
         }
 
@@ -549,7 +584,7 @@ impl<P: PixelBuf> TracingState<P> {
     fn trace_through_surface(
         &mut self,
         surface: Surface<'_, P::BlockData>,
-        rt: &SpaceRaytracer<P>,
+        rt: &SpaceRaytracer<P::BlockData>,
     ) {
         if let Some(color) = surface.to_lit_color(rt) {
             self.pixel_buf.add(color, surface.block_data);

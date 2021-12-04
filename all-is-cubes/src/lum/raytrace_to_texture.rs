@@ -25,7 +25,7 @@ use std::rc::Rc;
 
 use crate::camera::Viewport;
 use crate::camera::{Camera, GraphicsOptions};
-use crate::listen::ListenableCellWithLocal;
+use crate::listen::{ListenableCellWithLocal, ListenableSource};
 use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::lum::types::AicLumBackend;
 use crate::lum::GraphicsResourceError;
@@ -36,7 +36,7 @@ use crate::universe::URef;
 
 pub(crate) struct RaytraceToTexture<Backend: AicLumBackend> {
     graphics_options: ListenableCellWithLocal<GraphicsOptions>,
-    raytracer: Option<UpdatingSpaceRaytracer<ColorBuf>>,
+    raytracer: Option<UpdatingSpaceRaytracer<()>>,
     // TODO: should not be public but we want an easy way to grab it for drawing
     pub(crate) render_target: FullFrameTexture<Backend>,
     pixel_picker: PixelPicker,
@@ -63,8 +63,13 @@ where
 
     pub fn set_space(&mut self, space: Option<URef<Space>>) {
         // TODO: hook up options
-        self.raytracer =
-            space.map(|s| UpdatingSpaceRaytracer::new(s, self.graphics_options.as_source()));
+        self.raytracer = space.map(|s| {
+            UpdatingSpaceRaytracer::new(
+                s,
+                self.graphics_options.as_source(),
+                ListenableSource::constant(()),
+            )
+        });
     }
 
     /// Trace a frame's worth of rays and update the texture.
@@ -100,7 +105,7 @@ where
             let start_time = Instant::now();
             let trace = |point: Point| {
                 let (color_buf, _info) =
-                    tracer.trace_ray(camera.project_ndc_into_world(Point2::new(
+                    tracer.trace_ray::<ColorBuf>(camera.project_ndc_into_world(Point2::new(
                         render_viewport.normalize_fb_x(point.x as usize),
                         render_viewport.normalize_fb_y(point.y as usize),
                     )));

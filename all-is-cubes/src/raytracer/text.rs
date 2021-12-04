@@ -9,8 +9,38 @@ use cgmath::{Decomposed, Transform, Vector2, Vector3};
 
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
 use crate::math::{FreeCoordinate, Rgba};
-use crate::raytracer::{PixelBuf, RaytraceInfo, SpaceRaytracer};
+use crate::raytracer::{PixelBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
+
+// TODO: better name, docs
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct CharacterRtData(pub Cow<'static, str>);
+
+impl RtBlockData for CharacterRtData {
+    type Options = ();
+
+    fn from_block(_: RtOptionsRef<'_, Self::Options>, s: &SpaceBlockData) -> Self {
+        // TODO: For more Unicode correctness, index by grapheme cluster
+        Self(
+            s.evaluated()
+                .attributes
+                .display_name
+                .chars()
+                .next()
+                .map(|c| Cow::Owned(c.to_string()))
+                .unwrap_or(Cow::Borrowed(" ")),
+        )
+    }
+
+    fn error(_: RtOptionsRef<'_, Self::Options>) -> Self {
+        Self(Cow::Borrowed("X"))
+    }
+
+    fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {
+        Self(Cow::Borrowed(" "))
+    }
+}
 
 /// Implements [`PixelBuf`] for text output: captures the first characters of block names
 /// rather than colors.
@@ -21,27 +51,7 @@ pub struct CharacterBuf {
 }
 
 impl PixelBuf for CharacterBuf {
-    type BlockData = Cow<'static, str>;
-
-    fn compute_block_data(s: &SpaceBlockData) -> Self::BlockData {
-        // TODO: For more Unicode correctness, index by grapheme cluster...
-        // ...and do something clever about double-width characters.
-        s.evaluated()
-            .attributes
-            .display_name
-            .chars()
-            .next()
-            .map(|c| Cow::Owned(c.to_string()))
-            .unwrap_or(Cow::Borrowed(" "))
-    }
-
-    fn error_block_data() -> Self::BlockData {
-        Cow::Borrowed("X")
-    }
-
-    fn sky_block_data() -> Self::BlockData {
-        Cow::Borrowed(" ")
-    }
+    type BlockData = CharacterRtData;
 
     #[inline]
     fn opaque(&self) -> bool {
@@ -49,9 +59,9 @@ impl PixelBuf for CharacterBuf {
     }
 
     #[inline]
-    fn add(&mut self, _surface_color: Rgba, text: &Self::BlockData) {
+    fn add(&mut self, _surface_color: Rgba, d: &Self::BlockData) {
         if self.hit_text.is_none() {
-            self.hit_text = Some(text.to_owned().to_string());
+            self.hit_text = Some(String::from(d.0.clone()));
         }
     }
 
@@ -105,8 +115,8 @@ fn print_space_impl<F: FnMut(&str)>(
         .unwrap(),
     );
 
-    SpaceRaytracer::<CharacterBuf>::new(space, GraphicsOptions::default())
-        .trace_scene_to_text(&camera, "\n", move |s| {
+    SpaceRaytracer::<CharacterRtData>::new(space, GraphicsOptions::default(), ())
+        .trace_scene_to_text::<CharacterBuf, _, _>(&camera, "\n", move |s| {
             write(s);
             let r: Result<(), ()> = Ok(());
             r
