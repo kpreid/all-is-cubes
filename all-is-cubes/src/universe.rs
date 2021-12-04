@@ -22,7 +22,6 @@
 //!
 //! -->
 
-use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -93,10 +92,10 @@ impl Universe {
     /// Construct an empty [`Universe`].
     pub fn new() -> Self {
         Universe {
-            blocks: HashMap::new(),
-            spaces: HashMap::new(),
+            blocks: Storage::new(),
+            spaces: Storage::new(),
             // TODO: bodies so body-in-world stepping
-            characters: HashMap::new(),
+            characters: Storage::new(),
             next_anonym: 0,
         }
     }
@@ -224,7 +223,7 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
 }
 
 /// Iterator type for [`UniverseIndex::iter_by_type`].
-pub struct UniverseIter<'u, T>(std::collections::hash_map::Iter<'u, Name, URootRef<T>>);
+pub struct UniverseIter<'u, T>(std::collections::btree_map::Iter<'u, Name, URootRef<T>>);
 impl<'u, T> Iterator for UniverseIter<'u, T> {
     type Item = (Name, URef<T>);
     fn next(&mut self) -> Option<Self::Item> {

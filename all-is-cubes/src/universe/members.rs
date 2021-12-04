@@ -1,14 +1,16 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
 use crate::universe::{InsertError, Name, URef, URootRef, Universe, UniverseIndex, UniverseIter};
 
-pub(super) type Storage<T> = HashMap<Name, URootRef<T>>;
+/// A BTreeMap is used to ensure that the iteration order is deterministic across
+/// runs/versions.
+pub(super) type Storage<T> = BTreeMap<Name, URootRef<T>>;
 
 /// Trait implemented once for each type of object that can be stored in a [`Universe`]
 /// that internally provides the table for that type. This trait differs from
@@ -31,7 +33,7 @@ fn index_insert<T>(this: &mut Universe, name: Name, value: T) -> Result<URef<T>,
 where
     Universe: UniverseTable<T>,
 {
-    use std::collections::hash_map::Entry::*;
+    use std::collections::btree_map::Entry::*;
     // TODO: prohibit existing names under any type, not just the same type
     let table = this.table_mut();
     match table.entry(name.clone()) {
