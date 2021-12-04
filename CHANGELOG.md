@@ -4,9 +4,13 @@
 
 ### Added
 
+- Graphics:
+    - The software raytracer now implements volumetric transparency; blocks whose colors have alpha between 0 and 1 may be rendered as a solid volume of translucent material, rather than the alpha being applied at the surface, if the graphics options request it. However, the light model does not yet have a reasonable interpretation of how to light these volumes, so blocks may have unreasonably dark parts. I hope that future work will address this and also better handling of material surfaces (e.g. light reflections at the surface of glass, vs the lack of them in fog or at the meeting surfaces of adjacent similar blocks).
+
 - `all_is_cubes` library:
-    - `Evoxel::from_block()`
+    - `Evoxel::from_block()` for performing the same conversion from a full block to a voxel that `Block::Recur(...).evaluate()` does.
     - `Face::dot()`, for dot product with a vector without constructing an intermediate unit vector.
+    - `Rgb::luminance()` and `Rgba::luminance()`.
     - `SpaceMesh` now remembers the `TextureAllocator::Tile`s it was constructed using, just like `BlockMesh` does, so callers no longer need to do so.
     - `SpaceMesh::blocks_used_iter()` reports which block indices went into the mesh.
     - `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
@@ -14,27 +18,36 @@
     - `VisitRefs` allows traversing the `URef` graph inside a `Universe`.
 
 - `all-is-cubes-desktop`:
-    - Terminal mode now has mouse support.
+    - Terminal mode now has mouse support for placing and removing blocks.
+    - Terminal mode no longer goes blank if asked to use graphic characters but not colors.
 
 ### Changed
 
+- Graphics:
+    - Fixed a bug in the GPU renderer where dark areas would always have a noticeable minimum brightness (`PackedLight` did not have the same interpretation in the Rust and GLSL code for a value of zero).
+    - Optimized construction and depth-sorting of meshes for transparent blocks. They still don't draw correctly, but they are less slow.
+
 - `all_is_cubes` library:
-    * The new minimum supported Rust version is 1.56.0 (2021 edition).
-    * Breaking: All types with `Triangulation` in the name now use `Mesh` instead.
-        * `BlockTriangulation` → `BlockMesh`
-        * `BlockTriangulations` → `BlockMeshes`
-        * `SpaceTriangulation` → `SpaceMesh`
-            * `SpaceMesh` takes an additional type parameter for the texture type.
-        * `BlockTriangulationProvider` → `BlockMeshProvider`
-    * Breaking: The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
-    * Breaking: `GLRenderer::new()` now expects a `StandardCameras` (instead of the components of one).
-    * Breaking: `AllIsCubesAppState::update_cursor()` now expects a `&StandardCameras` instead of two `Camera`s.
-    * Breaking: `Camera::set_view_matrix()` is now `Camera::set_view_transform()`, and expects a `cgmath::Decomposed` transform, inverted from the matrix version.
-    * Breaking: `Space::spawn_mut()` replaced by `Space::set_spawn()`.
-    * The `Name` enum is now intended to be reliably cheap to clone:
-        * `Name::Specific`'s field holds an `Arc<str>` instead of a `String`. 
-        * `Universe`-related errors now hold `Name` instead of `Arc<Name>`.
-    * Renamed: `Evoxel::new()` to `Evoxel::from_color()`.
+    - The new minimum supported Rust version is 1.56.0 (2021 edition).
+    - Breaking: All types with `Triangulation` in the name now use `Mesh` instead.
+        - `BlockTriangulation` → `BlockMesh`
+        - `BlockTriangulations` → `BlockMeshes`
+        - `SpaceTriangulation` → `SpaceMesh`
+            - `SpaceMesh` takes an additional type parameter for the texture type.
+        - `BlockTriangulationProvider` → `BlockMeshProvider`
+    - Breaking: The raytracer is now more flexible and allows custom data to pass into the tracing process.
+        - Instead of `PixelBuf` having a single output type, the raytracer returns the `PixelBuf` and lets the caller convert it (or provide a conversion function, for `trace_scene_to_image` which returns a slice of converted values).
+        - Block data is computed via a separate trait, `RtBlockData`, and has access to `GraphicsOptions` and an arbitrary extra parameter. Multiple types of `PixelBuf` may be used with the same `SpaceRaytracer` as long as they agree on a concrete type of `RtBlockData`.
+
+    - Breaking: The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
+    - Breaking: `GLRenderer::new()` now expects a `StandardCameras` (instead of the components of one).
+    - Breaking: `AllIsCubesAppState::update_cursor()` now expects a `&StandardCameras` instead of two `Camera`s.
+    - Breaking: `Camera::set_view_matrix()` is now `Camera::set_view_transform()`, and expects a `cgmath::Decomposed` transform, inverted from the matrix version.
+    - Breaking: `Space::spawn_mut()` replaced by `Space::set_spawn()`.
+    - The `Name` enum is now intended to be reliably cheap to clone:
+        - `Name::Specific`'s field holds an `Arc<str>` instead of a `String`. 
+        - `Universe`-related errors now hold `Name` instead of `Arc<Name>`.
+    - Renamed: `Evoxel::new()` to `Evoxel::from_color()`.
 
 ### Removed
 
