@@ -129,17 +129,17 @@ impl Rgb {
     ///
     /// ```
     /// use all_is_cubes::math::Rgb;
-    /// 
+    ///
     /// assert_eq!(0.0, Rgb::ZERO.luminance());
     /// assert_eq!(0.5, (Rgb::ONE * 0.5).luminance());
     /// assert_eq!(1.0, Rgb::ONE.luminance());
     /// assert_eq!(2.0, (Rgb::ONE * 2.0).luminance());
-    /// 
+    ///
     /// assert_eq!(0.2126, Rgb::new(1., 0., 0.).luminance());
     /// assert_eq!(0.7152, Rgb::new(0., 1., 0.).luminance());
     /// assert_eq!(0.0722, Rgb::new(0., 0., 1.).luminance());
     /// ```
-    /// 
+    ///
     /// [relative luminance]: https://en.wikipedia.org/wiki/Relative_luminance
     #[inline]
     pub fn luminance(self) -> f32 {
@@ -247,7 +247,7 @@ impl Rgba {
 
     /// Combines the red, green, and blue components to obtain a luminance (“grayscale”)
     /// value. This will be equal to 1 if all components are 1.
-    /// 
+    ///
     /// This is identical to [`Rgb::luminance`], ignoring the alpha component.
     #[inline]
     pub fn luminance(self) -> f32 {

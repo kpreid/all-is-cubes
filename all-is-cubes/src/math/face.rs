@@ -205,7 +205,7 @@ impl Face {
     /// ```
     /// use cgmath::{Vector3, InnerSpace};
     /// use all_is_cubes::math::Face;
-    /// 
+    ///
     /// let sample_vector = Vector3::new(1.0, 2.0, 5.0_f64);
     /// for face in Face::ALL_SEVEN {
     ///     assert_eq!(face.dot(sample_vector), face.normal_vector().dot(sample_vector));
