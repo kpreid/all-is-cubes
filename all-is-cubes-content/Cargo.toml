@@ -16,7 +16,8 @@ bench = false
 
 [features]
 # Enables `UniverseTemplate::Random`.
-arbitrary = ["arbitrary-crate", "all-is-cubes/arbitrary"]
+# rand features are for `rand::thread_rng()`.
+arbitrary = ["arbitrary-crate", "all-is-cubes/arbitrary", "rand/std", "rand/std_rng"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
