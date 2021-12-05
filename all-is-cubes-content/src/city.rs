@@ -88,8 +88,8 @@ pub(crate) async fn demo_city(
                 Tool::Jetpack { active: false }.into(),
             ];
             for block in [
-                &landscape_blocks[Grass],
                 &landscape_blocks[Stone],
+                &demo_blocks[GlassBlock],
                 &demo_blocks[Lamp],
                 &demo_blocks[Arrow],
             ] {

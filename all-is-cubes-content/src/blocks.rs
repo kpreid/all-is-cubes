@@ -9,14 +9,14 @@ use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
 };
-use all_is_cubes::rgb_const;
+use all_is_cubes::{rgb_const, rgba_const};
 use noise::Seedable as _;
 
 use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector, NoiseFnExt as _, NotNan, Rgb,
-    Rgba,
+    FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
+    NoiseFnExt as _, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::universe::Universe;
@@ -29,6 +29,7 @@ use crate::palette;
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum DemoBlocks {
+    GlassBlock,
     Lamp,
     Lamppost,
     Sconce,
@@ -62,7 +63,6 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
 
     install_landscape_blocks(universe, resolution)?;
 
-    use DemoBlocks::*;
     let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
     let road_noise_v = noise::Value::new().set_seed(0x52b19f6a);
@@ -82,8 +82,37 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
         }
     };
 
+    use DemoBlocks::*;
     BlockProvider::<DemoBlocks>::new(|key| {
         Ok(match key {
+            GlassBlock => {
+                let glass_densities = [
+                    //Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)),
+                    Block::from(rgba_const!(0.95, 1.0, 0.95, 0.9)),
+                    Block::from(rgba_const!(0.95, 0.95, 1.0, 0.65)),
+                    Block::from(rgba_const!(0.95, 1.0, 0.95, 0.3)),
+                    Block::from(rgba_const!(0.95, 0.95, 1.0, 0.07)),
+                    Block::from(rgba_const!(0.95, 1.0, 0.95, 0.05)),
+                ];
+
+                Block::builder()
+                    .display_name("Glass Block")
+                    .voxels_fn(universe, resolution, |cube| {
+                        let unit_radius_point = cube.map(|c| {
+                            (FreeCoordinate::from(c) + 0.5)
+                                / (FreeCoordinate::from(resolution_g) / 2.0)
+                                - 1.0
+                        });
+                        let power = 7.;
+                        let r = unit_radius_point
+                            .to_vec()
+                            .map(|c| c.abs().powf(power))
+                            .dot(Vector3::new(1.0, 1.0, 1.0));
+                        gradient_lookup(&glass_densities, (1.0 - r as f32) * 2.0)
+                    })?
+                    .build()
+            }
+
             Road => Block::builder()
                 .display_name("Road")
                 .voxels_fn(universe, resolution, |cube| {
@@ -308,14 +337,50 @@ pub(crate) fn scale_color(block: Block, scalar: f64, quantization: f64) -> Block
     }
 }
 
+/// Subdivide the range 0.0 to 1.0 into `gradient.len()` parts and return the [`Block`]
+/// which the value falls into.
+///
+/// Panics if `gradient.len() == 0`.
+pub(crate) fn gradient_lookup(gradient: &[Block], value: f32) -> &Block {
+    &gradient[((value * gradient.len() as f32) as usize).clamp(0, gradient.len() - 1)]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::content::make_some_blocks;
 
     #[test]
     pub fn install_demo_blocks_test() {
         let mut universe = Universe::new();
         install_demo_blocks(&mut universe).unwrap();
         // TODO: assert what entries were created, once Universe has iteration
+    }
+
+    #[test]
+    fn gradient_lookup_cases() {
+        let blocks = make_some_blocks::<4>();
+        let inputs_and_output_indices = [
+            (-f32::INFINITY, 0),
+            (-10.0, 0),
+            (-0.1, 0),
+            (0.0, 0),
+            (0.24, 0),
+            (0.25, 1),
+            (0.26, 1),
+            (0.49, 1),
+            (0.50, 2),
+            (0.51, 2),
+            (0.9, 3),
+            (1.0, 3),
+            (1.1, 3),
+            (10.0, 3),
+            (f32::INFINITY, 3),
+            (f32::NAN, 0),
+        ];
+        assert_eq!(
+            inputs_and_output_indices.map(|(i, _)| gradient_lookup(&blocks, i)),
+            inputs_and_output_indices.map(|(_, o)| &blocks[o]),
+        );
     }
 }
