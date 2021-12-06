@@ -114,14 +114,15 @@ where
     pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), GraphicsResourceError> {
         self.cameras.set_viewport(viewport);
 
-        self.info_text_texture
-            .resize(&mut self.surface, viewport, info_text_size_policy)
-            .unwrap();
-
         self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
             &mut self.surface,
             viewport.framebuffer_size.into(),
         )?;
+
+        // TODO: If this fails, it should be "warning, not error"
+        self.info_text_texture
+            .resize(&mut self.surface, viewport, info_text_size_policy)?;
+
         Ok(())
     }
 
