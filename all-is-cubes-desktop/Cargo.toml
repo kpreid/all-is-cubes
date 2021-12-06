@@ -29,7 +29,7 @@ futures-executor = { version = "0.3.17", default-features = false, features = ["
 glfw = "0.41"
 indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
-luminance = "0.44.0"
+luminance = "0.45.0"
 luminance-glfw = "0.16.0"
 luminance-windowing = "0.10.0"
 png = "0.17.0"
