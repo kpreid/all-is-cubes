@@ -3,6 +3,9 @@ use ordered_float::NotNan;
 
 use crate::math::{FreeCoordinate, Rgb, Rgba};
 
+#[cfg(doc)]
+use crate::{block::Block, space::Space};
+
 /// Options for controlling rendering (not affecting gameplay except informationally).
 ///
 /// Some options may be ignored by some renderers, such as when they request a particular
@@ -15,6 +18,12 @@ use crate::math::{FreeCoordinate, Rgb, Rgba};
 #[cfg_attr(feature = "save", serde(default))]
 #[non_exhaustive]
 pub struct GraphicsOptions {
+    /// Overall rendering technique to use.
+    ///
+    /// May be ignored if the method requested is not supported in the current
+    /// environment.
+    pub render_method: RenderMethod,
+
     /// Whether and how to draw fog obscuring the view distance limit.
     ///
     /// TODO: Implement fog in raytracer.
@@ -104,6 +113,7 @@ impl GraphicsOptions {
     /// Future versions may set other options as necessary to maintain the intended
     /// property.
     pub const UNALTERED_COLORS: Self = Self {
+        render_method: RenderMethod::Preferred,
         fog: FogOption::None,
         fov_y: notnan!(90.),
         // TODO: Change tone mapping default once we have a good implementation.
@@ -142,6 +152,7 @@ impl Default for GraphicsOptions {
     /// TODO: Explain exactly what the default is.
     fn default() -> Self {
         Self {
+            render_method: RenderMethod::Preferred,
             fog: FogOption::Abrupt,
             fov_y: NotNan::from(90),
             // TODO: Change tone mapping default once we have a good implementation.
@@ -161,6 +172,34 @@ impl Default for GraphicsOptions {
             debug_light_rays_at_cursor: false,
         }
     }
+}
+
+/// Choices for [`GraphicsOptions::render_method`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum RenderMethod {
+    /// Use whichever method is presumed to be better for the current situation.
+    ///
+    /// Currently, this typically means [`RenderMethod::Reference`] for
+    /// non-interactive (headless) rendering and [`RenderMethod::Mesh`] for
+    /// interactive usage.
+    Preferred,
+
+    /// Make triangle meshes of [`Block`]s and of chunks of [`Space`]s and draw them
+    /// using the GPU (or software triangle rasterizer as a fallback).
+    ///
+    /// As of this documentation being written, the available implementation has trouble
+    /// with transparent volumes.
+    Mesh,
+
+    /// Use the reference implementation of All is Cubes content rendering.
+    ///
+    /// This means [`all_is_cubes::raytracer`](crate::raytracer), a CPU-based raytracer.
+    /// It is too slow for high-resolution interactive use, though it does have a potential
+    /// advantage in rapidly changing content.
+    Reference,
+    // TODO: Someday, GpuRaytracing.
 }
 
 /// Choices for [`GraphicsOptions::fog`].

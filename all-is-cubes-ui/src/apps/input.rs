@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 
 use all_is_cubes::camera::{
-    FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, TransparencyOption,
-    Viewport,
+    FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, RenderMethod,
+    TransparencyOption, Viewport,
 };
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::{Point2D, Vector2D};
@@ -107,6 +107,7 @@ impl InputProcessor {
             Key::Character('o') => true,
             Key::Character('p') => true,
             Key::Character('u') => true,
+            Key::Character('y') => true,
             _ => false,
         }
     }
@@ -122,6 +123,7 @@ impl InputProcessor {
             Key::Character('o') => true,
             Key::Character('p') => true,
             Key::Character('u') => true,
+            Key::Character('y') => true,
             // TODO: move slot selection commands here
             _ => false,
         }
@@ -372,6 +374,17 @@ impl InputProcessor {
                                 FogOption::Compromise => FogOption::Physical,
                                 FogOption::Physical => FogOption::None,
                                 _ => FogOption::None, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
+                            };
+                        });
+                    }
+                }
+                Key::Character('y') => {
+                    if let Some(cell) = graphics_options {
+                        cell.update_mut(|options| {
+                            options.render_method = match options.render_method {
+                                RenderMethod::Mesh => RenderMethod::Reference,
+                                RenderMethod::Reference => RenderMethod::Mesh,
+                                _ => RenderMethod::Reference,
                             };
                         });
                     }
