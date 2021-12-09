@@ -4,22 +4,22 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
+use noise::Seedable as _;
+
+use all_is_cubes::block::{Block, BlockCollision, RotationPlacementRule, AIR};
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
 };
-use all_is_cubes::{rgb_const, rgba_const};
-use noise::Seedable as _;
-
-use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
+    Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
     NoiseFnExt as _, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::universe::Universe;
+use all_is_cubes::{rgb_const, rgba_const};
 
 use crate::int_magnitude_squared;
 use crate::landscape::install_landscape_blocks;
@@ -139,6 +139,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 .display_name("Lamppost")
                 .light_emission(Rgb::new(3.0, 3.0, 3.0))
                 .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(universe, resolution, |p| {
                     if int_magnitude_squared(
                         (p * 2 + one_diagonal - center_point_doubled)
@@ -156,6 +157,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 .display_name("Sconce")
                 .light_emission(Rgb::new(8.0, 7.0, 6.0))
                 .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
                 .voxels_fn(universe, resolution, |p| {
                     // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
                     let r2 = int_magnitude_squared(
@@ -217,6 +219,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 Block::builder()
                     .display_name("Arrow")
                     .collision(BlockCollision::Recur)
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
@@ -224,12 +227,15 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
             Curb => Block::builder()
                 .display_name("Curb")
                 .collision(BlockCollision::Recur)
+                // TODO: rotation should specify curb line direction
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(universe, resolution, curb_fn)?
                 .build(),
 
             CurbCorner => Block::builder()
                 .display_name("Curb Corner")
                 .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     // TODO: rework so this isn't redoing the rotation calculations for every single voxel
                     // We should have tools for composing blocks instead...
@@ -310,6 +316,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 Block::builder()
                     .display_name("Signboard")
                     .collision(BlockCollision::Recur)
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }

@@ -3,18 +3,20 @@
 
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
-use all_is_cubes::character::Spawn;
-use all_is_cubes::rgba_const;
 use noise::Seedable;
 
-use all_is_cubes::block::{space_to_blocks, Block, BlockAttributes, BlockCollision, AIR};
+use all_is_cubes::block::{
+    space_to_blocks, Block, BlockAttributes, BlockCollision, RotationPlacementRule, AIR,
+};
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
+use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
     NoiseFnExt as _, Rgb,
 };
+use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 
@@ -530,6 +532,7 @@ fn install_atrium_blocks(
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
                 .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x + mid.z < resolution_g * 6 / 4 {
@@ -542,6 +545,7 @@ fn install_atrium_blocks(
             AtriumBlocks::SquareColumn => Block::builder()
                 .display_name("Square Atrium Column")
                 .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.max(p.z) < resolution_g * 6 / 4 {
@@ -554,6 +558,7 @@ fn install_atrium_blocks(
             AtriumBlocks::SmallColumn => Block::builder()
                 .display_name("Round Atrium Column")
                 .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.pow(2) + mid.z.pow(2) < (resolution_g * 3 / 4).pow(2) {
@@ -566,6 +571,7 @@ fn install_atrium_blocks(
             AtriumBlocks::Molding => Block::builder()
                 .display_name("Atrium Top Edge Molding")
                 .collision(BlockCollision::Recur)
+                // TODO: rotation rule
                 .voxels_fn(universe, resolution, molding_fn)?
                 .build(),
             AtriumBlocks::MoldingCorner => Block::builder()

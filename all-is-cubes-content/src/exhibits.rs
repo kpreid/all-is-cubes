@@ -7,26 +7,28 @@
 use std::convert::TryFrom;
 use std::f64::consts::PI;
 
+use all_is_cubes::block::{
+    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Resolution,
+    RotationPlacementRule, AIR,
+};
 use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
     Vector2, Vector3,
 };
-use all_is_cubes::drawing::embedded_graphics::{
-    geometry::Point,
-    mono_font::{
-        iso_8859_1::{FONT_6X10, FONT_8X13_BOLD},
-        MonoTextStyle,
+use all_is_cubes::drawing::{
+    draw_to_blocks,
+    embedded_graphics::{
+        geometry::Point,
+        mono_font::{
+            iso_8859_1::{FONT_6X10, FONT_8X13_BOLD},
+            MonoTextStyle,
+        },
+        pixelcolor::Rgb888,
+        prelude::Size,
+        primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
+        text::{Baseline, Text},
     },
-    pixelcolor::Rgb888,
-    prelude::Size,
-    primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
-    text::{Baseline, Text},
 };
-
-use all_is_cubes::block::{
-    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Resolution, AIR,
-};
-use all_is_cubes::drawing::draw_to_blocks;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
@@ -135,6 +137,7 @@ exhibit! {
 
             Block::builder()
                 .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
                 .voxels_fn(universe, window_pane_resolution, |p| {
                     if p.z >= depth {
                         return &AIR;
@@ -624,7 +627,8 @@ exhibit! {
 
         // Wall corner
         let corner = Block::builder()
-            .display_name("Color room wall")
+            .display_name("Color room wall corner")
+            .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ }) // TODO: more specific
             .voxels_fn(universe, wall_resolution, |p| {
                 if p.x.pow(2) + p.z.pow(2) < GridCoordinate::from(wall_resolution).pow(2) {
                     &wall_color_block

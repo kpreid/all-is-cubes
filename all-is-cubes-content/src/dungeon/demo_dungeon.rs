@@ -1,13 +1,13 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::inv::Tool;
 use maze_generator::prelude::{Direction, Field, FieldType, Generator};
 use rand::{Rng, SeedableRng};
 
-use all_is_cubes::block::{Block, BlockCollision, AIR};
+use all_is_cubes::block::{Block, BlockCollision, RotationPlacementRule, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
+use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb,
@@ -304,6 +304,7 @@ pub fn install_dungeon_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 .display_name("Corridor Light")
                 .light_emission(Rgb::new(8.0, 7.0, 0.7))
                 .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::PY })
                 .voxels_fn(universe, resolution, |cube| {
                     let centered = cube * 2 - center_point_doubled;
                     if centered.y > centered.x.abs() && centered.y > centered.z.abs() {
