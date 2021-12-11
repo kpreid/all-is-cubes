@@ -44,9 +44,9 @@ fn test_triangulate_block(block: Block) -> BlockMesh<BlockVertex, TestTextureTil
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
-        &TriangulatorOptions {
+        &MeshOptions {
             transparency: TransparencyOption::Volumetric,
-            ..TriangulatorOptions::dont_care_for_test()
+            ..MeshOptions::dont_care_for_test()
         },
     )
 }
@@ -57,9 +57,9 @@ fn test_triangulate_block_threshold(block: Block) -> BlockMesh<BlockVertex, Test
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
-        &TriangulatorOptions {
+        &MeshOptions {
             transparency: TransparencyOption::Threshold(notnan!(0.5)),
-            ..TriangulatorOptions::dont_care_for_test()
+            ..MeshOptions::dont_care_for_test()
         },
     )
 }
@@ -72,7 +72,7 @@ fn triangulate_blocks_and_space(
     BlockMeshes<BlockVertex, TestTextureTile>,
     SpaceMesh<BlockVertex, TestTextureTile>,
 ) {
-    let options = &TriangulatorOptions::new(&GraphicsOptions::default());
+    let options = &MeshOptions::new(&GraphicsOptions::default());
     let mut tex = TestTextureAllocator::new();
     let block_meshes = triangulate_blocks(space, &mut tex, options);
     let space_mesh: SpaceMesh<BlockVertex, TestTextureTile> =
@@ -123,7 +123,7 @@ fn no_panic_on_missing_blocks() {
     let block_meshes: BlockMeshes<BlockVertex, _> = triangulate_blocks(
         &space,
         &mut TestTextureAllocator::new(),
-        &TriangulatorOptions::dont_care_for_test(),
+        &MeshOptions::dont_care_for_test(),
     );
     assert_eq!(block_meshes.len(), 1); // check our assumption
 
@@ -132,7 +132,7 @@ fn no_panic_on_missing_blocks() {
     triangulate_space(
         &space,
         space.grid(),
-        &TriangulatorOptions::dont_care_for_test(),
+        &MeshOptions::dont_care_for_test(),
         &*block_meshes,
     );
 }
@@ -501,7 +501,7 @@ fn handling_allocation_failure() {
     let capacity = 0;
     tex.set_capacity(capacity);
     let block_meshes: BlockMeshes<BlockVertex, _> =
-        triangulate_blocks(&space, &mut tex, &TriangulatorOptions::dont_care_for_test());
+        triangulate_blocks(&space, &mut tex, &MeshOptions::dont_care_for_test());
 
     // Check results.
     assert_eq!(tex.count_allocated(), capacity);

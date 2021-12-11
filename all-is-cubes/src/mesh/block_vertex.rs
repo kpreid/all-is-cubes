@@ -99,11 +99,15 @@ impl fmt::Debug for Coloring {
 /// The life cycle of a [`GfxVertex`]:
 ///
 /// * First, it is constructed by [`triangulate_block`](super::triangulate_block)
-///   for a particular block.
-/// * Then, whenever that block appears in a [`Space`](crate::space::Space) to be
-///   triangulated, the block vertices are copied to become the space vertices, and
-///   [`GfxVertex::instantiate_vertex`] is called on each one to position it at the
-///   particular block's location.
+///   for a particular [`Block`] value, and stored in a [`BlockMesh`].
+/// * Then, wherever that block appears in a [`Space`], the block vertices are copied
+///   to become the [`SpaceMesh`]’s vertices, and [`GfxVertex::instantiate_vertex`] is
+///   called on each copy to position it at the particular block's location.
+///
+/// [`Block`]: crate::block::Block
+/// [`BlockMesh`]: crate::mesh::BlockMesh
+/// [`Space`]: crate::space::Space
+/// [`SpaceMesh`]: crate::mesh::SpaceMesh
 pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
     /// Number type for the vertex position coordinates.
     type Coordinate: cgmath::BaseFloat;

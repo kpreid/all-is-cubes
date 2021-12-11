@@ -13,7 +13,7 @@ use crate::content::palette;
 use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, OpacityCategory, Rgba};
 use crate::mesh::{
     copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
-    GreedyMesher, QuadColoring, TextureAllocator, TextureTile, TriangulatorOptions,
+    GreedyMesher, MeshOptions, QuadColoring, TextureAllocator, TextureTile,
 };
 use crate::space::{Grid, GridArray, Space};
 
@@ -72,6 +72,8 @@ impl<V> Default for BlockFaceMesh<V> {
 /// * `T` is the type of textures, which come from a [`TextureAllocator`].
 ///
 /// TODO: Add methods so this can be read out directly if you really want to.
+///
+/// [`Block`]: crate::block::Block
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockMesh<V, T> {
     /// Vertices grouped by the face they belong to.
@@ -159,7 +161,7 @@ impl<V, T> Default for BlockMesh<V, T> {
 pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     block: &EvaluatedBlock,
     texture_allocator: &mut A,
-    options: &TriangulatorOptions,
+    options: &MeshOptions,
 ) -> BlockMesh<V, A::Tile> {
     // If this is true, avoid using vertex coloring even on solid rectangles.
     let prefer_textures = block.attributes.animation_hint.expect_color_update;
@@ -439,7 +441,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
     space: &Space,
     texture_allocator: &mut A,
-    options: &TriangulatorOptions,
+    options: &MeshOptions,
 ) -> BlockMeshes<V, A::Tile> {
     space
         .block_data()

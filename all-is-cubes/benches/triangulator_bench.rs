@@ -9,13 +9,13 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use all_is_cubes::block::{Block, AIR};
 
 use all_is_cubes::mesh::{
-    triangulate_blocks, triangulate_space, BlockMeshes, BlockVertex, SpaceMesh,
-    TestTextureAllocator, TestTextureTile, TriangulatorOptions,
+    triangulate_blocks, triangulate_space, BlockMeshes, BlockVertex, MeshOptions, SpaceMesh,
+    TestTextureAllocator, TestTextureTile,
 };
 use all_is_cubes::space::{Grid, Space};
 
 pub fn triangulator_bench(c: &mut Criterion) {
-    let options = &TriangulatorOptions::new(&GraphicsOptions::default());
+    let options = &MeshOptions::new(&GraphicsOptions::default());
 
     c.bench_function("triangulate_space: checkerboard, new buffer", |b| {
         b.iter_batched(
@@ -64,7 +64,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
 }
 
 fn checkerboard_setup(
-    options: &TriangulatorOptions,
+    options: &MeshOptions,
     transparent: bool,
 ) -> (Space, BlockMeshes<BlockVertex, TestTextureTile>) {
     let grid = Grid::new((0, 0, 0), (16, 16, 16));

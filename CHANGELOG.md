@@ -36,6 +36,7 @@
         - `SpaceTriangulation` → `SpaceMesh`
             - `SpaceMesh` takes an additional type parameter for the texture type.
         - `BlockTriangulationProvider` → `BlockMeshProvider`
+        - `TriangulatorOptions` → `MeshOptions`
     - Breaking: The raytracer is now more flexible and allows custom data to pass into the tracing process.
         - Instead of `PixelBuf` having a single output type, the raytracer returns the `PixelBuf` and lets the caller convert it (or provide a conversion function, for `trace_scene_to_image` which returns a slice of converted values).
         - Block data is computed via a separate trait, `RtBlockData`, and has access to `GraphicsOptions` and an arbitrary extra parameter. Multiple types of `PixelBuf` may be used with the same `SpaceRaytracer` as long as they agree on a concrete type of `RtBlockData`.

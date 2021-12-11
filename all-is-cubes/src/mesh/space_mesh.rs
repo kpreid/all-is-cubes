@@ -8,7 +8,7 @@ use std::fmt::Debug;
 use std::ops::Range;
 
 use crate::math::{Face, FaceMap, GridCoordinate, GridRotation};
-use crate::mesh::{BlockMesh, GfxVertex, TextureTile, TriangulatorOptions};
+use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
 
 /// Computes a triangle mesh of a [`Space`].
@@ -19,7 +19,7 @@ use crate::space::{BlockIndex, Grid, PackedLight, Space};
 pub fn triangulate_space<'p, V, T, P>(
     space: &Space,
     bounds: Grid,
-    options: &TriangulatorOptions,
+    options: &MeshOptions,
     block_meshes: P,
 ) -> SpaceMesh<V, T>
 where
@@ -41,6 +41,8 @@ where
 /// The type parameters allow adaptation to the target graphics API:
 /// * `V` is the type of vertices.
 /// * `T` is the type of textures, which come from a [`TextureAllocator`].
+///
+/// [`TextureAllocator`]: super::TextureAllocator
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpaceMesh<V, T> {
     vertices: Vec<V>,
@@ -158,7 +160,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
         &mut self,
         space: &Space,
         bounds: Grid,
-        options: &TriangulatorOptions,
+        options: &MeshOptions,
         mut block_meshes: P,
     ) where
         P: BlockMeshProvider<'p, V, T>,

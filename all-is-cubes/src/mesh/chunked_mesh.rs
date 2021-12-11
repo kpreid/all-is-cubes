@@ -14,8 +14,7 @@ use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
 use crate::listen::Listener;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::mesh::{
-    triangulate_block, BlockMesh, GfxVertex, SpaceMesh, TextureAllocator, TextureTile,
-    TriangulatorOptions,
+    triangulate_block, BlockMesh, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
 };
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::universe::URef;
@@ -53,7 +52,7 @@ where
     /// If so, then we prioritize adding new chunks over updating existing ones.
     chunks_were_missing: bool,
 
-    last_tri_options: Option<TriangulatorOptions>,
+    last_mesh_options: Option<MeshOptions>,
 }
 
 impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<D, Vert, Tex, CHUNK_SIZE>
@@ -76,7 +75,7 @@ where
             chunks: HashMap::new(),
             chunk_chart: ChunkChart::new(0.0),
             chunks_were_missing: true,
-            last_tri_options: None,
+            last_mesh_options: None,
         }
     }
 
@@ -122,7 +121,7 @@ where
         IF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
     {
         let graphics_options = camera.options();
-        let tri_options = TriangulatorOptions::new(graphics_options);
+        let mesh_options = MeshOptions::new(graphics_options);
         let max_updates = graphics_options.chunks_per_frame.into();
         let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
@@ -136,11 +135,11 @@ where
             return (CstUpdateInfo::default(), view_chunk);
         };
 
-        if Some(&tri_options) != self.last_tri_options.as_ref() {
+        if Some(&mesh_options) != self.last_mesh_options.as_ref() {
             todo.all_blocks_and_chunks = true;
-            self.last_tri_options = Some(tri_options);
+            self.last_mesh_options = Some(mesh_options);
         }
-        let tri_options = self.last_tri_options.as_ref().unwrap();
+        let mesh_options = self.last_mesh_options.as_ref().unwrap();
 
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
@@ -155,7 +154,7 @@ where
             &mut todo.blocks,
             space,
             block_texture_allocator,
-            tri_options,
+            mesh_options,
         );
 
         // We are now done with todo preparation, and block mesh updates,
@@ -200,7 +199,7 @@ where
                 chunk.recompute_mesh(
                     todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
                     &*space,
-                    tri_options,
+                    mesh_options,
                     &self.block_meshes,
                 );
                 chunk_render_updater(&chunk.mesh, &mut chunk.render_data);
@@ -274,13 +273,13 @@ where
     /// After this method returns, `self.meshes.len()` and `self.versioning.len()` will
     /// always equal `space.block_data().len()`.
     ///
-    /// TODO: Missing handling for tri_options changing.
+    /// TODO: Missing handling for mesh_options changing.
     fn update<A>(
         &mut self,
         todo: &mut HashSet<BlockIndex>,
         space: &Space,
         block_texture_allocator: &mut A,
-        tri_options: &TriangulatorOptions,
+        mesh_options: &MeshOptions,
     ) -> usize
     where
         A: TextureAllocator<Tile = Tile>,
@@ -330,7 +329,7 @@ where
                 // Updated the texture in-place. No need for mesh updates.
             } else {
                 let new_block_mesh =
-                    triangulate_block(new_evaluated_block, block_texture_allocator, tri_options);
+                    triangulate_block(new_evaluated_block, block_texture_allocator, mesh_options);
 
                 // Only invalidate the chunks if we actually have different data.
                 // Note: This comparison depends on such things as the definition of PartialEq
@@ -392,7 +391,7 @@ where
         &mut self,
         chunk_todo: &mut ChunkTodo,
         space: &Space,
-        options: &TriangulatorOptions,
+        options: &MeshOptions,
         block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>,
     ) {
         let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
