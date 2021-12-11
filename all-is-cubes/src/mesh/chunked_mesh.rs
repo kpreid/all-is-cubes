@@ -13,11 +13,11 @@ use crate::camera::Camera;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
 use crate::listen::Listener;
 use crate::math::{GridCoordinate, GridPoint};
-use crate::space::{BlockIndex, Grid, Space, SpaceChange};
-use crate::triangulator::{
+use crate::mesh::{
     triangulate_block, BlockMesh, GfxVertex, SpaceMesh, TextureAllocator, TextureTile,
     TriangulatorOptions,
 };
+use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat};
 
@@ -555,8 +555,8 @@ mod tests {
     use crate::block::Block;
     use crate::camera::{GraphicsOptions, TransparencyOption, Viewport};
     use crate::math::GridCoordinate;
+    use crate::mesh::{BlockVertex, NoTextures};
     use crate::space::SpaceTransaction;
-    use crate::triangulator::{BlockVertex, NoTextures};
     use crate::universe::Universe;
 
     const CHUNK_SIZE: GridCoordinate = 16;

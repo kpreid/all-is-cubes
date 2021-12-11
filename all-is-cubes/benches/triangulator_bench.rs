@@ -8,11 +8,11 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, AIR};
 
-use all_is_cubes::space::{Grid, Space};
-use all_is_cubes::triangulator::{
+use all_is_cubes::mesh::{
     triangulate_blocks, triangulate_space, BlockMeshes, BlockVertex, SpaceMesh,
     TestTextureAllocator, TestTextureTile, TriangulatorOptions,
 };
+use all_is_cubes::space::{Grid, Space};
 
 pub fn triangulator_bench(c: &mut Criterion) {
     let options = &TriangulatorOptions::new(&GraphicsOptions::default());

@@ -3,7 +3,7 @@ use libfuzzer_sys::fuzz_target;
 extern crate all_is_cubes;
 
 use all_is_cubes::block::EvaluatedBlock;
-use all_is_cubes::triangulator::{
+use all_is_cubes::mesh::{
     triangulate_block, BlockVertex, TestTextureAllocator, TriangulatorOptions,
 };
 

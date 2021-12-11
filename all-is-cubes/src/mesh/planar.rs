@@ -11,7 +11,7 @@ use cgmath::{
 };
 
 use crate::math::{Face, FreeCoordinate, GridCoordinate, Rgba};
-use crate::triangulator::{BlockVertex, Coloring, TextureCoordinate, TextureTile};
+use crate::mesh::{BlockVertex, Coloring, TextureCoordinate, TextureTile};
 
 /// Data structure for the state and components of the "greedy meshing" algorithm.
 /// <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>

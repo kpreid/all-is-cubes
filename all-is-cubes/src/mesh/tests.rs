@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Tests for [`crate::triangulator`].
+//! Tests for [`crate::mesh`].
 
 use cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 use pretty_assertions::assert_eq;
@@ -12,8 +12,8 @@ use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
 use crate::math::{Face, GridRotation};
 use crate::math::{Face::*, FaceMap, FreeCoordinate, GridPoint, Rgba};
+use crate::mesh::BlockMesh;
 use crate::space::{Grid, Space, SpacePhysics};
-use crate::triangulator::BlockMesh;
 use crate::universe::Universe;
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.

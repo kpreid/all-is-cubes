@@ -31,9 +31,9 @@ use crate::lum::shading::BlockPrograms;
 use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::lum::{wireframe_vertices, GraphicsResourceError};
 use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
+use crate::mesh::{ChunkMesh, ChunkedSpaceMesh, DepthOrdering, SpaceMesh};
 use crate::raycast::Face;
 use crate::space::{Grid, Space, SpaceChange};
-use crate::triangulator::{ChunkMesh, ChunkedSpaceMesh, DepthOrdering, SpaceMesh};
 use crate::universe::URef;
 use crate::util::{CustomFormat, StatusText};
 

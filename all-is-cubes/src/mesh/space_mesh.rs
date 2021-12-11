@@ -8,8 +8,8 @@ use std::fmt::Debug;
 use std::ops::Range;
 
 use crate::math::{Face, FaceMap, GridCoordinate, GridRotation};
+use crate::mesh::{BlockMesh, GfxVertex, TextureTile, TriangulatorOptions};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
-use crate::triangulator::{BlockMesh, GfxVertex, TextureTile, TriangulatorOptions};
 
 /// Computes a triangle mesh of a [`Space`].
 ///

@@ -21,8 +21,8 @@ use crate::content::palette;
 use crate::intalloc::IntAllocator;
 use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::math::GridCoordinate;
+use crate::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 use crate::space::Grid;
-use crate::triangulator::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 use crate::util::{CustomFormat, StatusText};
 
 /// Alias for the concrete type of the block texture.

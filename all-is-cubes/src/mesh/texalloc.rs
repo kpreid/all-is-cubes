@@ -13,8 +13,8 @@ use cgmath::Vector3;
 
 use crate::block::Evoxel;
 use crate::content::palette;
+use crate::mesh::TextureCoordinate;
 use crate::space::{Grid, GridArray};
-use crate::triangulator::TextureCoordinate;
 
 /// Color data accepted by [`TextureAllocator`].
 /// The components are sRGB `[R, G, B, A]`.

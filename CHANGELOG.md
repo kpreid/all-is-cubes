@@ -30,7 +30,7 @@
 
 - `all_is_cubes` library:
     - The new minimum supported Rust version is 1.56.0 (2021 edition).
-    - Breaking: All types with `Triangulation` in the name now use `Mesh` instead.
+    - Breaking: The `triangulator` module has been renamed to `mesh`. All types with `Triangulation` in the name now use `Mesh` instead.
         - `BlockTriangulation` → `BlockMesh`
         - `BlockTriangulations` → `BlockMeshes`
         - `SpaceTriangulation` → `SpaceMesh`
@@ -40,7 +40,7 @@
         - Instead of `PixelBuf` having a single output type, the raytracer returns the `PixelBuf` and lets the caller convert it (or provide a conversion function, for `trace_scene_to_image` which returns a slice of converted values).
         - Block data is computed via a separate trait, `RtBlockData`, and has access to `GraphicsOptions` and an arbitrary extra parameter. Multiple types of `PixelBuf` may be used with the same `SpaceRaytracer` as long as they agree on a concrete type of `RtBlockData`.
 
-    - Breaking: The color values written into `all_is_cubes::triangulator::TextureTile` are now in sRGB; previously, they were linear.
+    - Breaking: The color values written into `all_is_cubes::mesh::TextureTile` are now in sRGB; previously, they were linear.
     - Breaking: `GLRenderer::new()` now expects a `StandardCameras` (instead of the components of one).
     - Breaking: `AllIsCubesAppState::update_cursor()` now expects a `&StandardCameras` instead of two `Camera`s.
     - Breaking: `Camera::set_view_matrix()` is now `Camera::set_view_transform()`, and expects a `cgmath::Decomposed` transform, inverted from the matrix version.

@@ -78,7 +78,7 @@
 //!   Future versions may support arbitrary character orientation.
 //! * [`vui`] uses the same coordinate system as [`camera`] for user interface layout
 //!   and text orientation.
-//! * [`triangulator`] generates triangles with counterclockwise winding order.
+//! * [`mesh`] algorithms generate triangles with counterclockwise winding order.
 //!
 //! ### User interface, rendering, application
 //!
@@ -179,12 +179,12 @@ pub mod inv;
 pub mod linking;
 pub mod listen;
 pub mod lum;
+pub mod mesh;
 pub mod physics;
 pub mod raycast;
 pub mod raytracer;
 pub mod space;
 pub mod transaction;
-pub mod triangulator;
 pub mod universe;
 pub mod util;
 pub mod vui;

@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Vertices and related types for the triangulator.
+//! Mesh vertices.
 
 use std::fmt;
 
@@ -14,9 +14,11 @@ use crate::util::{ConciseDebug, CustomFormat as _};
 /// Numeric type used to store texture coordinates in vertices.
 pub type TextureCoordinate = f32;
 
-/// Generic structure of output from triangulator. Implement
-/// <code>[`From`]&lt;[`BlockVertex`]&gt;</code>
+/// Basic vertex data type from [`triangulate_block`].
+/// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`GfxVertex`])
 /// to provide a specialized version fit for the target graphics API.
+///
+/// [`triangulate_block`]: super::triangulate_block
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct BlockVertex {

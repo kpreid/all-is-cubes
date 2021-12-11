@@ -10,8 +10,8 @@ use luminance::{Semantics, Vertex};
 
 use crate::lum::GraphicsResourceError;
 use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
+use crate::mesh::{BlockVertex, Coloring, GfxVertex};
 use crate::space::PackedLight;
-use crate::triangulator::{BlockVertex, Coloring, GfxVertex};
 
 /// Module to isolate the `luminance::backend` traits which have conflicting names.
 mod backend {

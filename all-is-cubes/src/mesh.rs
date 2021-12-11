@@ -1,27 +1,28 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Algorithms for converting blocks/voxels to triangle meshes for rendering
-//! (as opposed to raytracing, voxel display hardware, or whatever else).
+//! Data structures for triangle meshes and algorithms for converting blocks/voxels to
+//! meshes for rendering.
 //!
-//! All of the algorithms here are independent of graphics API but may presume that
-//! one exists and has specific data types to specialize in.
+//! All of the algorithms here are independent of graphics API, but they require providing
+//! vertex and texture data types suitable for the API or data format you wish to use.
 //!
-//! Note on terminology: Some sources say that “tesselation” would be a better name
+//! Note on terminology: Some sources say that “tesselation” would be a better verb
 //! for this operation than “triangulation”. However, “tesselation” means a specific
 //! other operation in OpenGL graphics programming, and “triangulation” seems to
-//! be the more commonly used term.
+//! be the more commonly used term — at least among those who don't say “meshing”
+//! instead.
 
 use crate::camera::{GraphicsOptions, LightingOption, TransparencyOption};
 
 mod block_vertex;
 pub use block_vertex::*;
-mod block_tri;
-pub use block_tri::*;
-mod chunked_tri;
-pub(crate) use chunked_tri::*; // TODO: candidate for being public
-mod space_tri;
-pub use space_tri::*;
+mod block_mesh;
+pub use block_mesh::*;
+mod chunked_mesh;
+pub(crate) use chunked_mesh::*; // TODO: candidate for being public
+mod space_mesh;
+pub use space_mesh::*;
 mod planar;
 use planar::*;
 mod texalloc;
