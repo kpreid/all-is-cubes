@@ -61,7 +61,7 @@ impl<V> Default for BlockFaceMesh<V> {
     }
 }
 
-/// A triangle mesh for a single block.
+/// A triangle mesh for a single [`Block`].
 ///
 /// Get it from [`triangulate_block`] or [`triangulate_blocks`].
 /// Pass it to [`triangulate_space`](super::triangulate_space) to assemble blocks into an
@@ -105,6 +105,7 @@ impl<V, T> BlockMesh<V, T> {
         &self.textures_used
     }
 
+    /// Returns whether this mesh contains no vertices so it has no visual effect.
     pub fn is_empty(&self) -> bool {
         self.faces.iter().all(|(_, ft)| ft.is_empty())
     }

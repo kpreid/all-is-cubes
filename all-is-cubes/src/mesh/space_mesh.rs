@@ -40,7 +40,7 @@ where
 ///
 /// The type parameters allow adaptation to the target graphics API:
 /// * `V` is the type of vertices.
-/// * `T` is the type of [`TextureTile`]s.
+/// * `T` is the type of textures, which come from a [`TextureAllocator`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpaceMesh<V, T> {
     vertices: Vec<V>,
