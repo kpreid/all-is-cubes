@@ -53,10 +53,13 @@ where
             graphics_options: ListenableCellWithLocal::new(GraphicsOptions::default()),
             raytracer: None,
             render_target: fp.new_texture(),
-            pixel_picker: PixelPicker::new(Viewport {
-                nominal_size: Vector2::new(1., 1.),
-                framebuffer_size: Vector2::new(1, 1),
-            }),
+            pixel_picker: PixelPicker::new(
+                Viewport {
+                    nominal_size: Vector2::new(1., 1.),
+                    framebuffer_size: Vector2::new(1, 1),
+                },
+                false,
+            ),
             rays_per_frame: 50000,
         })
     }
@@ -150,18 +153,22 @@ where
 struct PixelPicker {
     iter: std::iter::Cycle<std::ops::Range<usize>>,
     viewport: Viewport,
-    shuffled_pixels: Box<[usize]>,
+    /// If None, don't shuffle.
+    shuffled_pixels: Option<Box<[usize]>>,
 }
 
 impl PixelPicker {
-    fn new(viewport: Viewport) -> Self {
-        // Generate a pseudorandom order to evenly distributed update rays about the
-        // screen. Note that this is deterministic since we don't reuse the RNG.
+    fn new(viewport: Viewport, shuffle: bool) -> Self {
         let pixel_count = viewport.pixel_count().unwrap();
-        let mut shuffled_pixels: Box<[usize]> = (0..pixel_count).collect();
-        shuffled_pixels.shuffle(&mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(
-            0x9aa8bc4be2112757,
-        ));
+        let shuffled_pixels = shuffle.then(|| {
+            // Generate a pseudorandom order to evenly distributed update rays about the
+            // screen. Note that this is deterministic since we don't reuse the RNG.
+            let mut shuffled_pixels: Box<[usize]> = (0..pixel_count).collect();
+            shuffled_pixels.shuffle(&mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(
+                0x9aa8bc4be2112757,
+            ));
+            shuffled_pixels
+        });
 
         PixelPicker {
             iter: (0..pixel_count).cycle(),
@@ -172,7 +179,7 @@ impl PixelPicker {
 
     fn resize(&mut self, viewport: Viewport) {
         if self.viewport != viewport {
-            *self = Self::new(viewport);
+            *self = Self::new(viewport, self.shuffled_pixels.is_some());
         }
     }
 }
@@ -184,7 +191,10 @@ impl Iterator for PixelPicker {
         // `as usize` is safe because we would have failed earlier if it doesn't fit in usize.
         let size = self.viewport.framebuffer_size.map(|s| s as usize);
         let linear_index = self.iter.next().unwrap();
-        let index = self.shuffled_pixels[linear_index];
+        let index = match &self.shuffled_pixels {
+            Some(lookup) => lookup[linear_index],
+            None => linear_index,
+        };
         Some(Point::new(
             index.rem_euclid(size.x) as i32,
             index.div_euclid(size.x).rem_euclid(size.y) as i32,
