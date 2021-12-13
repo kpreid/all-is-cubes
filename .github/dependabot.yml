@@ -6,6 +6,7 @@ updates:
       interval: "weekly"
       time: "17:00"
       timezone: "America/Los_Angeles"
+    versioning-strategy: "increase"
 
   - package-ecosystem: "cargo"
     directory: "/"
@@ -13,10 +14,14 @@ updates:
       interval: "weekly"
       time: "17:00"
       timezone: "America/Los_Angeles"
+    # Note: We would *like* the versioning strategy "increase-if-necessary",
+    # but Dependabot does not currently support that. As a workaround, to
+    # decrease noise, we configure to ignore patch releases below.
+    versioning-strategy: "auto"
     ignore:
-      - dependency-name: "glfw"
-        # `glfw` must be updated in sync with `luminance`, and its version
-        # numbering is currently in the 0.x range, which Cargo considers major
-        # but Dependabot considers minor. So, ignore those "minor" updates which
-        # will predictably cause version skew and thus aren't useful PRs.
-        update-types: ["version-update:semver-minor"]
+      - dependency-name: "*"
+        # Ignore patch updates because we prefer to just `cargo update` which
+        # does not make the error of increasing version *requirements* to require
+        # the patch. See comments above on versioning-strategy.
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "glfw" # Must be updated in sync with `luminance` anyway.
