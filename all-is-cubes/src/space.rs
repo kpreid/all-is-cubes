@@ -18,7 +18,6 @@ use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::*;
-use crate::space::lighting::opaque_for_light_computation;
 use crate::transaction::{Transaction as _, UniverseTransaction};
 use crate::universe::{RefVisitor, URef, VisitRefs};
 use crate::util::ConciseDebug;
@@ -30,12 +29,8 @@ pub use builder::SpaceBuilder;
 mod grid;
 pub use grid::*;
 
-mod lighting;
-pub use lighting::LightUpdatesInfo;
-
-mod light_data;
-pub use light_data::PackedLight;
-use light_data::{LightUpdateQueue, PackedLightScalar};
+mod light;
+pub use light::*;
 
 mod space_txn;
 pub use space_txn::*;
