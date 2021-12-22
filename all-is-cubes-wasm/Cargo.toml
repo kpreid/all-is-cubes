@@ -25,7 +25,8 @@ all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
 console_log = "0.2"
 console_error_panic_hook = "0.1.5"
 form_urlencoded = "1.0.1"
-# Feature enabling for indirect dependency all-is-cubes → rand → getrandom
+# Feature enabling for indirect dependency all-is-cubes → rand → getrandom,
+# as well as our direct dependency
 getrandom = { version = "0.2.3", features = ["js"] }
 # Feature enabling for indirect dependency all-is-cubes-content → maze_generator → rand → getrandom
 getrandom_old = { package = "getrandom", version = "0.1.16", features = ["wasm-bindgen"] }
@@ -37,6 +38,7 @@ log = { version = "0.4.14", default-features = false }
 luminance = "0.44.0"
 luminance-web-sys = "0.3.0"
 luminance-webgl = "0.4.0"
+rand = { version = "0.8.2", default-features = false, features = ["std", "std_rng"] }
 wasm-bindgen = "0.2.70"
 wasm-bindgen-futures =  "0.4.28"
 

@@ -8,6 +8,7 @@ use std::time::Duration;
 use gloo_timers::future::TimeoutFuture;
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
+use rand::{thread_rng, Rng as _};
 use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
@@ -75,7 +76,10 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     yield_arbitrary().await;
     // TODO: Display progress bar
     let universe = template
-        .build(YieldProgress::new(yield_arbitrary, |_| {}))
+        .build(
+            YieldProgress::new(yield_arbitrary, |_| {}),
+            thread_rng().gen(),
+        )
         .await
         .expect("universe template error");
 

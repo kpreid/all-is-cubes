@@ -230,11 +230,12 @@ impl Theme<DemoRoom> for DemoTheme {
 pub(crate) async fn demo_dungeon(
     universe: &mut Universe,
     progress: YieldProgress,
+    seed: u64,
 ) -> Result<Space, InGenError> {
     install_dungeon_blocks(universe)?;
 
     // TODO: reintroduce random elements separate from the maze.
-    let mut rng = rand_xoshiro::Xoshiro256Plus::from_entropy();
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
     let dungeon_grid = DungeonGrid {
         room_box: Grid::new([0, 0, 0], [9, 5, 9]),
@@ -253,8 +254,11 @@ pub(crate) async fn demo_dungeon(
         lamp_block: demo_blocks[DemoBlocks::Lamp].clone(),
     };
 
-    let maze =
-        maze_to_array(&maze_generator::ellers_algorithm::EllersGenerator::new(None).generate(9, 9));
+    let mut maze_seed = [0; 32];
+    maze_seed[0..8].copy_from_slice(&seed.to_le_bytes());
+    let maze = maze_to_array(
+        &maze_generator::ellers_algorithm::EllersGenerator::new(Some(maze_seed)).generate(9, 9),
+    );
     let dungeon_map = maze.map(|maze_field| DemoRoom {
         maze_field,
         //windowed_faces: FaceMap::repeat(rng.gen_bool(0.1)),

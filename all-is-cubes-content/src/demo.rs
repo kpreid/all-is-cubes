@@ -77,7 +77,9 @@ impl UniverseTemplate {
         }
     }
 
-    pub async fn build(self, p: YieldProgress) -> Result<Universe, GenError> {
+    // Design note: u64 was chosen as that both `std::hash::Hasher` and `rand::SeedableRng`
+    // agree on this many bits.
+    pub async fn build(self, p: YieldProgress, seed: u64) -> Result<Universe, GenError> {
         let mut universe = Universe::new();
 
         // TODO: Later we want a "module loading" system that can lazily bring in content.
@@ -95,7 +97,7 @@ impl UniverseTemplate {
                 "the Fail template always fails to generate".into(),
             ))),
             DemoCity => Some(demo_city(&mut universe, p.take().unwrap()).await),
-            Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap()).await),
+            Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), seed).await),
             Atrium => Some(atrium(&mut universe)),
             CornellBox => Some(cornell_box()),
             PhysicsLab => Some(physics_lab(50, 16).await),
@@ -332,7 +334,11 @@ mod tests {
         for template in UniverseTemplate::iter() {
             eprintln!("{:?}", template);
 
-            let result = block_on(template.clone().build(YieldProgress::noop()));
+            let result = block_on(
+                template
+                    .clone()
+                    .build(YieldProgress::noop(), 0x7f16dfe65954583e),
+            );
             if matches!(template, UniverseTemplate::Fail) {
                 result.unwrap_err();
                 continue;

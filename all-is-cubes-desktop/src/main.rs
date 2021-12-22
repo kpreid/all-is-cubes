@@ -13,6 +13,7 @@ use std::time::Instant;
 
 use clap::value_t;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
+use rand::{thread_rng, Rng};
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::GraphicsOptions;
@@ -83,7 +84,11 @@ fn main() -> Result<(), anyhow::Error> {
             move |fraction| universe_progress_bar.set_position((fraction * 100.0) as u64),
         )
     };
-    let universe = futures_executor::block_on(universe_template.clone().build(yield_progress))?;
+    let universe = futures_executor::block_on(
+        universe_template
+            .clone()
+            .build(yield_progress, thread_rng().gen()),
+    )?;
     app.set_universe(universe);
     universe_progress_bar.finish();
     let universe_done_time = Instant::now();
