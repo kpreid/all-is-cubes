@@ -9,9 +9,9 @@ use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool};
 use crate::listen::Sink;
-use crate::math::{Face, Rgb};
+use crate::math::{Aab, Face, Rgb};
 use crate::physics::BodyTransaction;
-use crate::space::Space;
+use crate::space::{Grid, Space};
 use crate::time::Tick;
 use crate::transaction::{Transaction as _, TransactionTester};
 use crate::universe::Universe;
@@ -22,6 +22,24 @@ fn test_spawn(f: impl Fn(&mut Space) -> Spawn) -> Character {
     let spawn = f(&mut space);
     let space = universe.insert_anonymous(space);
     Character::spawn(&spawn, space)
+}
+
+#[test]
+fn spawn_inferred_position() {
+    let bounds = Grid::new([0, 17, 0], [3, 3, 3]);
+    let character = test_spawn(|space| {
+        let mut spawn = Spawn::default_for_new_space(space.grid());
+        spawn.set_bounds(bounds);
+        spawn
+    });
+
+    // Character's box should be standing on the bottom of the bounds.
+    let cbox = character.body.collision_box_abs();
+    dbg!(character.body.position, cbox);
+    assert_eq!(
+        Aab::from(bounds).face_coordinate(Face::NY),
+        cbox.face_coordinate(Face::NY)
+    );
 }
 
 #[test]

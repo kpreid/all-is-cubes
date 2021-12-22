@@ -11,6 +11,7 @@ use cgmath::{
     Vector3,
 };
 use num_traits::identities::Zero;
+use ordered_float::NotNan;
 
 use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
@@ -154,15 +155,31 @@ impl Character {
         let yaw = Deg::atan2(look_direction.x, -look_direction.z);
         let pitch = Deg::atan2(-look_direction.y, look_direction.z.hypot(look_direction.x));
 
+        // TODO: This should be configurable, possibly in some more 'template' way
+        // than per-spawn?
+        let collision_box = Aab::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35);
+
+        // Choose position.
+        // TODO: Should also check if the chosen position is intersecting with the contents
+        // of the Space, and avoid that.
+        let position = match spawn.eye_position {
+            Some(pos) => pos.map(NotNan::into_inner),
+            None => {
+                // Stand on the floor of the spawn bounds.
+                // TODO: Account for different gravity.
+                let mut pos = spawn.bounds.center();
+                pos.y = collision_box.face_coordinate(Face::NY)
+                    - Aab::from(spawn.bounds).face_coordinate(Face::NY);
+                pos
+            }
+        };
+
         Self {
             body: Body {
                 flying: false, // will be overriden anyway
                 yaw: yaw.0,
                 pitch: pitch.0,
-                ..Body::new_minimal(
-                    spawn.position.map(|s| s.into_inner()),
-                    Aab::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35),
-                )
+                ..Body::new_minimal(position, collision_box)
             },
             space,
             velocity_input: Vector3::zero(),

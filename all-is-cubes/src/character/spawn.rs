@@ -1,11 +1,11 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use cgmath::{Point3, Vector3};
 
 use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
-use crate::math::{FreeCoordinate, NotNan};
+use crate::math::{Face, FreeCoordinate, NotNan};
 use crate::space::Grid;
 use crate::universe::{RefVisitor, VisitRefs};
 
@@ -17,8 +17,11 @@ use crate::universe::{RefVisitor, VisitRefs};
 /// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Spawn {
-    /// Position, in cube coordinates.
-    pub(super) position: Point3<NotNan<FreeCoordinate>>,
+    /// Volume which is permitted to be occupied.
+    pub(super) bounds: Grid,
+
+    /// Desired eye position, in cube coordinates.
+    pub(super) eye_position: Option<Point3<NotNan<FreeCoordinate>>>,
 
     /// Direction the character should be facing, or looking at.
     ///
@@ -31,9 +34,16 @@ pub struct Spawn {
 }
 
 impl Spawn {
-    pub fn default_for_new_space(_grid: Grid) -> Self {
+    /// Create the default Spawn configuration for a Space.
+    ///
+    /// TODO: There is no good default, really: we don't know if it is better to be
+    /// outside the space looking in or to be within it at some particular position.
+    /// Come up with some kind of hint that we can use to configure this better without
+    /// necessarily mandating a specification.
+    pub fn default_for_new_space(grid: Grid) -> Self {
         Spawn {
-            position: Point3::origin(), // TODO: pick something better? For what criteria?
+            bounds: grid.abut(Face::PZ, 40).unwrap_or(grid),
+            eye_position: None,
             look_direction: Vector3::new(notnan!(0.), notnan!(0.), notnan!(-1.)),
             inventory: vec![],
         }
@@ -61,12 +71,17 @@ impl Spawn {
     /// Sets the position at which the character will appear, in terms of its viewpoint.
     pub fn set_eye_position(&mut self, position: impl Into<Point3<FreeCoordinate>>) {
         let position = position.into();
+        // TODO: accept None for clearing
         // TODO: If we're going to suppress NaN, then it makes sense to suppress infinities too; come up with a general theory of how we want all-is-cubes to handle unreasonable positions.
-        self.position = Point3 {
+        self.eye_position = Some(Point3 {
             x: NotNan::new(position.x).unwrap_or(notnan!(0.)),
             y: NotNan::new(position.y).unwrap_or(notnan!(0.)),
             z: NotNan::new(position.z).unwrap_or(notnan!(0.)),
-        };
+        });
+    }
+
+    pub fn set_bounds(&mut self, bounds: Grid) {
+        self.bounds = bounds;
     }
 
     /// Sets the direction the character should be facing, or looking at.
@@ -91,7 +106,8 @@ impl VisitRefs for Spawn {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         let Self {
             inventory,
-            position: _,
+            bounds: _,
+            eye_position: _,
             look_direction: _,
         } = self;
         inventory.visit_refs(visitor);
@@ -102,14 +118,25 @@ impl VisitRefs for Spawn {
 impl<'a> arbitrary::Arbitrary<'a> for Spawn {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
-            position: Point3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
+            bounds: Grid::arbitrary(u)?,
+            eye_position: if u.arbitrary()? {
+                Some(Point3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
+            } else {
+                None
+            },
             look_direction: Vector3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
             inventory: vec![], // TODO: need impl Arbitrary for Tool
         })
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{size_hint::and_all, Arbitrary};
-        and_all(&[<f64 as Arbitrary>::size_hint(depth); 6])
+        use arbitrary::{
+            size_hint::{and, and_all},
+            Arbitrary,
+        };
+        and(
+            and(Grid::size_hint(depth), bool::size_hint(depth)),
+            and_all(&[<f64 as Arbitrary>::size_hint(depth); 6]),
+        )
     }
 }
