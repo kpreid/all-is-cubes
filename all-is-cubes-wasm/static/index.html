@@ -36,13 +36,27 @@
     <!-- TODO: Reimplement this feature
       <button id="save-button" onclick="main.save(); document.getElementById('view-canvas').focus(); return false;">Save</button>
     -->
-    <button id="fullscreen-button" onclick="document.body.requestFullscreen(); document.getElementById('view-canvas').focus(); return false;">Full screen</button>
+    <button id="fullscreen-button">Full screen</button>
     <script>(function () {
       // TODO: pull this out into JS/Rust file just for systematic organization.
       "use strict";
       const button = document.getElementById("fullscreen-button");
       const ourFullscreenElement = document.body;
-      document.addEventListener("fullscreenchange", function listener(event) {
+
+      button.addEventListener("click", event => {
+        if (document.body.requestFullscreen) {
+          document.body.requestFullscreen();
+        } else if (document.body.webkitRequestFullscreen) {
+          // Safari still has no unprefixed requestFullscreen as of version 15.1
+          document.body.webkitRequestFullscreen();
+        } else {
+          alert("Full screen not supported, apparently.");
+        }
+        document.getElementById('view-canvas').focus();
+        event.stopPropagation();
+      }, false);
+
+      document.addEventListener("fullscreenchange", event => {
         if (document.fullscreenElement === ourFullscreenElement) {
           button.style.visibility = "hidden";
         } else {
