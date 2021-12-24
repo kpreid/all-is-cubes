@@ -34,6 +34,7 @@ pub fn app() -> clap::App<'static, 'static> {
                     terminal - Colored text in this terminal (uses raytracing)\n\
                     headless - Non-interactive; don't draw anything but only simulates\n\
                     record   - Non-interactive; save an image or video (uses raytracing)\n\
+                    print    - Non-interactive; print one frame like 'terminal' mode then exit\
                     ",
                 ),
         )
@@ -96,6 +97,7 @@ pub enum GraphicsType {
     Window,
     Terminal,
     Record,
+    Print,
 }
 
 pub fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {

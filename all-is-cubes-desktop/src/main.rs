@@ -11,6 +11,7 @@
 
 use std::time::Instant;
 
+use all_is_cubes::cgmath::Vector2;
 use clap::value_t;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rand::{thread_rng, Rng};
@@ -30,6 +31,8 @@ mod record;
 use record::record_main;
 mod terminal;
 use terminal::{terminal_main_loop, TerminalOptions};
+
+use crate::terminal::terminal_print_once;
 
 // TODO: put version numbers in the title when used as a window title
 static TITLE: &str = "All is Cubes";
@@ -114,6 +117,15 @@ fn main() -> Result<(), anyhow::Error> {
         GraphicsType::Window => glfw_main_loop(app, TITLE, display_size),
         GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
         GraphicsType::Record => record_main(app, parse_record_options(options, display_size)?),
+        GraphicsType::Print => terminal_print_once(
+            app,
+            TerminalOptions::default(),
+            // TODO: Default display size should be based on terminal width
+            // (but not necessarily the full height)
+            display_size
+                .unwrap_or_else(|| Vector2::new(80, 24))
+                .map(|component| component.min(u16::MAX.into()) as u16),
+        ),
         GraphicsType::Headless => {
             // TODO: Right now this is useless. Eventually, we may have other paths for side
             // effects from the universe, or interesting logging.

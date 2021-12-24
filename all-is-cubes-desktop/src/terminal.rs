@@ -6,7 +6,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::io;
+use std::io::{self, Write as _};
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
@@ -93,6 +93,21 @@ pub fn terminal_main_loop(
 ) -> Result<(), anyhow::Error> {
     let mut main = TerminalMain::new(app, options)?;
     main.run()?;
+    main.clean_up_terminal()?; // note this is _also_ run on drop
+    Ok(())
+}
+
+/// Print the scene to stdout and return, instead of starting any interaction.
+///
+/// TODO: This shouldn't need to take ownership of the `app`; it does so because it is
+/// built on the same components as [`terminal_main_loop`].
+pub fn terminal_print_once(
+    app: AllIsCubesAppState,
+    options: TerminalOptions,
+    display_size: Vector2<u16>,
+) -> Result<(), anyhow::Error> {
+    let mut main = TerminalMain::new(app, options)?;
+    main.print_once(display_size)?;
     main.clean_up_terminal()?; // note this is _also_ run on drop
     Ok(())
 }
@@ -218,6 +233,7 @@ impl TerminalMain {
         Ok(())
     }
 
+    /// Run the simulation and interactive UI. Returns after user's quit command.
     fn run(&mut self) -> crossterm::Result<()> {
         self.tuiout
             .backend_mut()
@@ -299,7 +315,7 @@ impl TerminalMain {
             match self.render_pipe_out.try_recv() {
                 Ok(frame) => {
                     self.write_ui(&frame)?;
-                    self.write_frame(frame)?;
+                    self.write_frame(frame, true)?;
                 }
                 // TODO: Even if we don't have a frame, we might want to update the UI anyway.
                 Err(mpsc::TryRecvError::Empty) => {}
@@ -313,6 +329,22 @@ impl TerminalMain {
                 std::thread::yield_now();
             }
         }
+    }
+
+    /// Prints one frame, without clearing the terminal, and returns.
+    fn print_once(&mut self, image_size_in_characters: Vector2<u16>) -> crossterm::Result<()> {
+        self.viewport_position =
+            Rect::new(0, 0, image_size_in_characters.x, image_size_in_characters.y);
+        self.sync_viewport();
+
+        self.send_frame_to_render();
+        let frame = self
+            .render_pipe_out
+            .recv()
+            .expect("Internal error in rendering");
+        self.write_frame(frame, false)?;
+
+        Ok(())
     }
 
     fn sync_viewport(&mut self) {
@@ -515,7 +547,11 @@ impl TerminalMain {
         Ok(())
     }
 
-    fn write_frame(&mut self, frame: FrameOutput) -> crossterm::Result<()> {
+    /// Actually write image data to the terminal.
+    ///
+    /// If `draw_into_rect` is true, moves the cursor to fit into `self.viewport_position`.
+    /// If it is false, does not affect the cursor position and uses newlines.
+    fn write_frame(&mut self, frame: FrameOutput, draw_into_rect: bool) -> crossterm::Result<()> {
         let FrameOutput {
             viewport,
             options,
@@ -547,7 +583,9 @@ impl TerminalMain {
         rect.height = rect.height.min(image_size_in_characters.y as u16);
 
         for y in 0..rect.height {
-            backend.queue(MoveTo(rect.x, rect.y + y))?;
+            if draw_into_rect {
+                backend.queue(MoveTo(rect.x, rect.y + y))?;
+            }
             let mut x = 0;
             while x < rect.width {
                 let (text, color) = Self::image_patch_to_character(
@@ -566,6 +604,13 @@ impl TerminalMain {
                     rect.width - x,
                 )?;
                 x += width.max(1); // max(1) prevents infinite looping in edge case
+            }
+            if !draw_into_rect {
+                // don't colorize the rest of the line
+                current_color = None;
+                backend.queue(SetAttribute(Attribute::Reset))?;
+
+                backend.write_all(b"\r\n")?;
             }
         }
 
