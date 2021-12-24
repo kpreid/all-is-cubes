@@ -9,6 +9,7 @@ use cgmath::{
     Point3, SquareMatrix, Transform, Vector2, Vector3,
 };
 use itertools::Itertools as _;
+use ordered_float::NotNan;
 
 use crate::math::{Aab, FreeCoordinate, Rgba};
 use crate::raycast::Ray;
@@ -35,7 +36,7 @@ pub struct Camera {
     options: GraphicsOptions,
 
     /// Scale factor for scene brightness.
-    pub exposure: f32,
+    pub exposure: NotNan<f32>,
 
     /// Caller-provided viewport.
     viewport: Viewport,
@@ -68,7 +69,7 @@ impl Camera {
     pub fn new(options: GraphicsOptions, viewport: Viewport) -> Self {
         let mut new_self = Self {
             options: options.repair(),
-            exposure: 1.0,
+            exposure: notnan!(1.0),
             viewport,
             eye_to_world_transform: ViewTransform::one(),
 
@@ -391,5 +392,18 @@ mod tests {
             disp: pos.to_vec(),
         });
         assert_eq!(camera.view_position(), pos);
+    }
+
+    #[test]
+    fn post_process() {
+        let mut camera = Camera::new(GraphicsOptions::default(), DUMMY_VIEWPORT);
+
+        // A camera with all default options should pass colors unchanged.
+        let color = rgba_const!(0.1, 0.2, 0.3, 0.4);
+        assert_eq!(camera.post_process_color(color), color);
+
+        // Try exposure
+        camera.exposure = notnan!(0.5);
+        assert_eq!(camera.post_process_color(color), color.map_rgb(|rgb| rgb * 0.5));
     }
 }
