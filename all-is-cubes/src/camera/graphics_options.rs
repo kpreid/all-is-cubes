@@ -78,12 +78,12 @@ impl GraphicsOptions {
 impl Default for GraphicsOptions {
     fn default() -> Self {
         Self {
-            fog: FogOption::Compromise,
+            fog: FogOption::Abrupt,
             fov_y: NotNan::new(90.).unwrap(),
             // TODO: Change tone mapping default once we have a good implementation.
             tone_mapping: ToneMappingOperator::Clamp,
             view_distance: NotNan::new(200.).unwrap(),
-            lighting_display: LightingOption::Flat,
+            lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
             chunks_per_frame: 4,
             use_frustum_culling: true,
