@@ -20,18 +20,19 @@ use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_content::UniverseTemplate;
 
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
 mod command_options;
 use command_options::{parse_dimensions, parse_record_options, GraphicsType};
 mod config_files;
+mod data_files;
 mod record;
 use record::record_main;
 mod terminal;
 use terminal::{terminal_main_loop, TerminalOptions};
 
+use crate::command_options::{parse_universe_source, UniverseSource};
 use crate::terminal::terminal_print_once;
 
 // TODO: put version numbers in the title when used as a window title
@@ -43,8 +44,7 @@ fn main() -> Result<(), anyhow::Error> {
     // Convert options we will consult multiple times.
     let display_size = parse_dimensions(options.value_of("display_size").unwrap()).unwrap();
     let graphics_type = value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit());
-    let universe_template =
-        value_t!(options, "template", UniverseTemplate).unwrap_or_else(|e| e.exit());
+    let input_source = parse_universe_source(&options).unwrap_or_else(|e| e.exit());
 
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal || options.is_present("verbose") {
@@ -87,17 +87,18 @@ fn main() -> Result<(), anyhow::Error> {
             move |fraction| universe_progress_bar.set_position((fraction * 100.0) as u64),
         )
     };
-    let universe = futures_executor::block_on(
-        universe_template
-            .clone()
-            .build(yield_progress, thread_rng().gen()),
-    )?;
+    let universe = match input_source.clone() {
+        UniverseSource::Template(template) => {
+            futures_executor::block_on(template.build(yield_progress, thread_rng().gen()))?
+        }
+        UniverseSource::File(path) => data_files::load_universe_from_file(&path)?,
+    };
     app.set_universe(universe);
     universe_progress_bar.finish();
     let universe_done_time = Instant::now();
     log::debug!(
         "Initialized game state with {:?} ({:.3} s)",
-        universe_template,
+        input_source,
         universe_done_time
             .duration_since(app_done_time)
             .as_secs_f32()

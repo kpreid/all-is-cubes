@@ -56,7 +56,10 @@ pub fn app() -> clap::App<'static, 'static> {
                         .collect::<Vec<_>>(),
                 )
                 .default_value("demo-city")
-                .help("Which world template to use."),
+                .help(
+                    "Which world template to use.\n\
+                    Mutually exclusive with specifying an input file.",
+                ),
         )
         .arg(
             Arg::with_name("precompute_light")
@@ -94,6 +97,17 @@ pub fn app() -> clap::App<'static, 'static> {
                     "Ignore all configuration files, using only defaults and command-line options.",
                 ),
         )
+        .arg(
+            Arg::with_name("input_file")
+                .value_name("FILE")
+                .conflicts_with("template")
+                .help(
+                    "Existing save/document file to load. \
+                    Mutually exclusive with --template. \
+                    Currently supported formats:\n\
+                    • MagicaVoxel .vox (partial support)",
+                ),
+        )
 }
 
 #[derive(Debug, PartialEq, strum::EnumString, strum::EnumIter, strum::IntoStaticStr)]
@@ -124,6 +138,16 @@ pub fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
     }
 }
 
+/// Source of the universe to create/load
+///
+/// TODO: we will eventually want to support new/open while running and this will
+/// no longer be about command line exactly, so it should move.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum UniverseSource {
+    Template(UniverseTemplate),
+    File(PathBuf),
+}
+
 pub fn parse_record_options(
     options: clap::ArgMatches<'_>,
     display_size: Option<Vector2<u32>>,
@@ -146,6 +170,20 @@ pub fn parse_record_options(
             Err(e) => return Err(e),
         },
     })
+}
+
+pub(crate) fn parse_universe_source(
+    options: &clap::ArgMatches<'_>,
+) -> Result<UniverseSource, clap::Error> {
+    if let Some(file) = options.value_of_os("input_file") {
+        Ok(UniverseSource::File(PathBuf::from(file)))
+    } else {
+        Ok(UniverseSource::Template(value_t!(
+            options,
+            "template",
+            UniverseTemplate
+        )?))
+    }
 }
 
 #[cfg(test)]
@@ -195,6 +233,58 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("'X' isn't"));
+    }
+
+    fn parse_universe_test(args: &[&str]) -> clap::Result<UniverseSource> {
+        parse_universe_source(
+            &app().get_matches_from_safe(
+                std::iter::once("all-is-cubes").chain(args.iter().cloned()),
+            )?,
+        )
+    }
+
+    #[test]
+    fn universe_default() {
+        assert_eq!(
+            parse_universe_test(&[]).unwrap(),
+            UniverseSource::Template(UniverseTemplate::DemoCity),
+        );
+    }
+
+    #[test]
+    fn universe_from_template() {
+        assert_eq!(
+            parse_universe_test(&["--template", "cornell-box"]).unwrap(),
+            UniverseSource::Template(UniverseTemplate::CornellBox),
+        );
+    }
+
+    #[test]
+    fn universe_from_file() {
+        assert_eq!(
+            parse_universe_test(&["foo/bar"]).unwrap(),
+            UniverseSource::File(PathBuf::from("foo/bar")),
+        );
+    }
+
+    #[test]
+    fn universe_option_conflict() {
+        assert_eq!(
+            parse_universe_test(&["--template", "demo-city", "foo"])
+                .unwrap_err()
+                .kind,
+            clap::ErrorKind::ArgumentConflict
+        );
+    }
+
+    #[test]
+    fn universe_option_invalid_template() {
+        assert_eq!(
+            parse_universe_test(&["--template", "foo"])
+                .unwrap_err()
+                .kind,
+            clap::ErrorKind::InvalidValue
+        );
     }
 
     #[test]
