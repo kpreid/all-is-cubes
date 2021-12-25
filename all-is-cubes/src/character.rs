@@ -118,11 +118,12 @@ impl Character {
         // * The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
         // * And we shouldn't have special slots identified solely by number.
         // * And not every character should have a CopyFromSpace.
-        let mut inventory = vec![Slot::Empty; 11];
-        let selected_slots = [0, 1, 10];
-        let [_sel_1, _sel_2, sel_3] = selected_slots;
-        inventory[sel_3] = Tool::CopyFromSpace.into();
+        const SLOT_COUNT: usize = 11;
+        const INVISIBLE_SLOT: usize = SLOT_COUNT - 1;
+        let mut inventory = vec![Slot::Empty; SLOT_COUNT];
+        inventory[INVISIBLE_SLOT] = Tool::CopyFromSpace.into();
         let mut free = 0;
+        let mut ordinary_tool_selection = 0;
         'fill: for item in spawn.inventory.iter() {
             while inventory[free] != Slot::Empty {
                 free += 1;
@@ -131,7 +132,21 @@ impl Character {
                 }
             }
             inventory[free] = item.clone();
+
+            // Pick the first empty slot or tool that's not one of these as the button-2 tool
+            if matches!(
+                item,
+                Slot::Stack(_, Tool::RemoveBlock { .. } | Tool::Jetpack { .. })
+            ) && ordinary_tool_selection == free
+            {
+                ordinary_tool_selection += 1;
+            }
         }
+        let selected_slots = [
+            0,
+            ordinary_tool_selection.min(INVISIBLE_SLOT - 1),
+            INVISIBLE_SLOT,
+        ];
 
         let look_direction = spawn.look_direction.map(|c| c.into_inner());
         let yaw = Deg::atan2(look_direction.x, -look_direction.z);
