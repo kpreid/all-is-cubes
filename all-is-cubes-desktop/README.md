@@ -10,6 +10,14 @@ This crate is the “desktop edition” that you can build and run to “play th
 [all-is-cubes]: https://crates.io/crates/all-is-cubes
 [all-is-cubes-server]: https://crates.io/crates/all-is-cubes-server
 
+Requirements
+------------
+
+Your system must have these installed:
+
+* OpenGL. (Note: This excludes macOS on ARM computers.)
+* The `cmake` build tool. (This is used to build GLFW.)
+
 Usage
 -----
 
