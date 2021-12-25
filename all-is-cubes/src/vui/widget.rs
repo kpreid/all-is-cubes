@@ -413,8 +413,10 @@ impl TooltipState {
                         //     self.last_inventory_message,
                         //     new_contents
                         // );
-                        self.last_inventory_message = new_contents.clone();
-                        self.set_contents(new_contents);
+                        if self.last_inventory_message != TooltipContents::JustStartedExisting {
+                            self.set_contents(new_contents.clone());
+                        }
+                        self.last_inventory_message = new_contents;
                     }
                 }
             }
@@ -436,8 +438,8 @@ impl Default for TooltipState {
             character_gate: Gate::default(),
             dirty_inventory: false,
             dirty_text: false,
-            current_contents: TooltipContents::Blanked,
-            last_inventory_message: TooltipContents::Blanked,
+            current_contents: TooltipContents::JustStartedExisting,
+            last_inventory_message: TooltipContents::JustStartedExisting,
             age: None,
         }
     }
@@ -450,15 +452,21 @@ impl Default for TooltipState {
 /// future it might also provide styling information.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TooltipContents {
+    /// Special value for when the UI is initialized, to avoid popping up a tooltip
+    /// right away.
+    JustStartedExisting,
     Blanked,
     Message(Arc<str>),
-    InventoryItem { source_slot: usize, text: Arc<str> },
+    InventoryItem {
+        source_slot: usize,
+        text: Arc<str>,
+    },
 }
 
 impl TooltipContents {
     fn text(&self) -> &Arc<str> {
         match self {
-            TooltipContents::Blanked => &*EMPTY_ARC_STR,
+            TooltipContents::JustStartedExisting | TooltipContents::Blanked => &*EMPTY_ARC_STR,
             TooltipContents::Message(m) => m,
             TooltipContents::InventoryItem { text, .. } => text,
         }
