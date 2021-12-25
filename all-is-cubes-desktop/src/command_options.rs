@@ -44,7 +44,7 @@ pub fn app() -> clap::App<'static, 'static> {
                 .value_name("W×H")
                 .default_value("auto")
                 .validator(|s| parse_dimensions(&s).map(|_| ()))
-                .help("Window size, if applicable to the selected graphics mode."),
+                .help("Window size or image size, if applicable to the selected --graphics mode."),
         )
         .arg(
             Arg::with_name("template")
@@ -58,16 +58,21 @@ pub fn app() -> clap::App<'static, 'static> {
                 .default_value("demo-city")
                 .help("Which world template to use."),
         )
-        .arg(Arg::with_name("precompute_light")
-            .long("precompute-light")
-            .help("Fully calculate light before starting the game."))
         .arg(
-            Arg::with_name("output")
+            Arg::with_name("precompute_light")
+                .long("precompute-light")
+                .help("Fully calculate light before starting the game."),
+        )
+        .arg(
+            Arg::with_name("output_file")
                 .long("output")
                 .short("o")
                 .required_if("graphics", "record")
                 .value_name("FILE")
-                .help("Output PNG file name for 'record' mode. If animating, a frame number will be inserted."),
+                .help(
+                    "Output PNG file name for 'record' mode. \
+                    If animating, a frame number will be inserted.",
+                ),
         )
         .arg(
             Arg::with_name("duration")
@@ -85,7 +90,9 @@ pub fn app() -> clap::App<'static, 'static> {
         .arg(
             Arg::with_name("no_config_files")
                 .long("no-config-files")
-                .help("Ignore all configuration files, using only defaults and command-line options."),
+                .help(
+                    "Ignore all configuration files, using only defaults and command-line options.",
+                ),
         )
 }
 
@@ -122,7 +129,7 @@ pub fn parse_record_options(
     display_size: Option<Vector2<u32>>,
 ) -> Result<RecordOptions, clap::Error> {
     Ok(RecordOptions {
-        output_path: PathBuf::from(options.value_of_os("output").unwrap()),
+        output_path: PathBuf::from(options.value_of_os("output_file").unwrap()),
         image_size: display_size.unwrap_or_else(|| Vector2::new(640, 480)),
         animation: match value_t!(options, "duration", f64) {
             Ok(duration) => {
