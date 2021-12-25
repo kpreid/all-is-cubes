@@ -216,7 +216,11 @@ impl Icons {
                         (4.5, &exhaust),
                     ];
                     Block::builder()
-                        .display_name("Jetpack")
+                        .display_name(if active {
+                            "Jetpack (on)"
+                        } else {
+                            "Jetpack (off)"
+                        })
                         .collision(BlockCollision::Recur)
                         .light_emission(if active {
                             rgb_const!(1.0, 0.8, 0.8) * 0.5
