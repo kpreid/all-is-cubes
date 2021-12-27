@@ -30,7 +30,7 @@ use crate::lum::shading::BlockPrograms;
 use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::lum::{wireframe_vertices, GraphicsResourceError};
 use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
-use crate::mesh::{ChunkMesh, ChunkedSpaceMesh, DepthOrdering, SpaceMesh};
+use crate::mesh::{ChunkMesh, ChunkedSpaceMesh, CstUpdateInfo, DepthOrdering, SpaceMesh};
 use crate::raycast::Face;
 use crate::space::{Grid, Space, SpaceChange};
 use crate::universe::URef;
@@ -203,9 +203,8 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
                 view_chunk,
                 info: SpaceRenderInfo {
-                    chunk_update_count: cst_info.chunk_update_count,
-                    block_update_count: cst_info.block_update_count,
-                    chunks_drawn: 0,
+                    chunk_info: cst_info,
+                    chunks_drawn: 0,  // filled later
                     squares_drawn: 0, // filled later
                     texture_info,
                 },
@@ -381,10 +380,8 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
 /// Performance info from a [`SpaceRenderer`] drawing one frame.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SpaceRenderInfo {
-    /// How many chunk meshes were recomputed this frame.
-    pub chunk_update_count: usize,
-    /// How many block meshes were recomputed this frame.
-    pub block_update_count: usize,
+    /// Status of the block and chunk meshes.
+    pub chunk_info: CstUpdateInfo,
     pub chunks_drawn: usize,
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
     /// to draw this frame.
@@ -395,11 +392,7 @@ pub struct SpaceRenderInfo {
 
 impl CustomFormat<StatusText> for SpaceRenderInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
-        writeln!(
-            fmt,
-            "Chunk updates: {:3} Block updates: {:3}",
-            self.chunk_update_count, self.block_update_count,
-        )?;
+        writeln!(fmt, "{}", self.chunk_info.custom_format(StatusText))?;
         writeln!(
             fmt,
             "Chunks drawn: {:3} Quads drawn: {:3}",

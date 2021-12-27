@@ -6,11 +6,13 @@
 use std::fmt::{self, Debug, Display};
 use std::future::Future;
 use std::marker::PhantomData;
+use std::ops::AddAssign;
 use std::rc::Rc;
 use std::time::Duration;
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use futures_core::future::LocalBoxFuture;
+use instant::Instant;
 
 /// Generic extension to [`std::fmt`'s set of formatting traits](std::fmt#formatting-traits).
 ///
@@ -273,6 +275,72 @@ impl YieldProgress {
                 self.point_in_range((index + 1) as f32 / count as f32),
             )
         })
+    }
+}
+
+/// Aggregation of the time taken by a set of events.
+///
+/// TODO: Consider including an identifier for the longest.
+/// TODO: Consider generalizing this to quantities other than time? Probably not.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct TimeStats {
+    pub count: usize,
+    pub sum: Duration,
+    pub min: Option<Duration>,
+    pub max: Duration,
+}
+
+impl TimeStats {
+    pub const fn one(duration: Duration) -> Self {
+        Self {
+            count: 1,
+            sum: duration,
+            min: Some(duration),
+            max: duration,
+        }
+    }
+
+    pub(crate) fn record_consecutive_interval(
+        &mut self,
+        last_marked_instant: &mut Instant,
+        now: Instant,
+    ) {
+        let previous = *last_marked_instant;
+        *last_marked_instant = now;
+
+        *self += Self::one(now.duration_since(previous));
+    }
+}
+
+impl AddAssign for TimeStats {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = TimeStats {
+            count: self.count + rhs.count,
+            sum: self.sum + rhs.sum,
+            min: self.min.map_or(rhs.min, |value| Some(value.min(rhs.min?))),
+            max: self.max.max(rhs.max),
+        };
+    }
+}
+
+impl Display for TimeStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.min {
+            None => write!(
+                f,
+                "-------- .. {} for {:3}",
+                self.max.custom_format(StatusText),
+                self.count
+            ),
+            Some(min) => write!(
+                f,
+                "{} .. {} for {:3}",
+                min.custom_format(StatusText),
+                self.max.custom_format(StatusText),
+                self.count
+            ),
+        }
     }
 }
 

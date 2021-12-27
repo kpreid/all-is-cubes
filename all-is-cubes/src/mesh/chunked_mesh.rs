@@ -3,10 +3,12 @@
 
 use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
+use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::Point3;
-use instant::Instant;
+use indoc::indoc;
+use instant::{Duration, Instant};
 
 use crate::block::EvaluatedBlock;
 use crate::camera::Camera;
@@ -18,7 +20,7 @@ use crate::mesh::{
 };
 use crate::space::{BlockIndex, Grid, Space, SpaceChange};
 use crate::universe::URef;
-use crate::util::{ConciseDebug, CustomFormat};
+use crate::util::{ConciseDebug, CustomFormat, StatusText, TimeStats};
 
 /// If true, enables reporting chunk update timing at [`log::trace`] level.
 const LOG_CHUNK_UPDATES: bool = false;
@@ -150,7 +152,7 @@ where
             // stale by the new block versioning value.
         }
 
-        let block_update_count = self.block_meshes.update(
+        let block_updates = self.block_meshes.update(
             &mut todo.blocks,
             space,
             block_texture_allocator,
@@ -164,16 +166,18 @@ where
 
         // Update some chunk geometry.
         let chunk_grid = space.grid().divide(CHUNK_SIZE);
-        let mut chunk_update_count: usize = 0;
+        let mut chunk_mesh_generation_times = TimeStats::default();
+        let mut chunk_mesh_callback_times = TimeStats::default();
         let mut chunks_are_missing = false;
+        let chunk_scan_start_time = Instant::now();
         for p in self.chunk_chart.chunks(view_chunk) {
             if !chunk_grid.contains_cube(p.0) {
                 // Chunk not in the Space
                 continue;
             }
 
-            // TODO: tune max update count dynamically?
-            if chunk_update_count >= max_updates {
+            // TODO: tune max update count dynamically / use time instead of count?
+            if chunk_mesh_generation_times.count >= max_updates {
                 break;
             }
 
@@ -188,6 +192,7 @@ where
                 || matches!(chunk_entry, Vacant(_))
                 || matches!(chunk_entry, Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes))
             {
+                let compute_start = Instant::now();
                 let chunk = chunk_entry.or_insert_with(|| {
                     // Chunk is missing. Note this for update planning.
                     chunks_are_missing = true;
@@ -202,25 +207,43 @@ where
                     mesh_options,
                     &self.block_meshes,
                 );
+                let compute_end_update_start = Instant::now();
                 chunk_render_updater(&chunk.mesh, &mut chunk.render_data);
-                chunk_update_count += 1;
+
+                chunk_mesh_generation_times +=
+                    TimeStats::one(compute_end_update_start.duration_since(compute_start));
+                chunk_mesh_callback_times +=
+                    TimeStats::one(Instant::now().duration_since(compute_end_update_start));
             }
         }
         self.chunks_were_missing = chunks_are_missing;
+        let chunk_scan_end_time = Instant::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
-        if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
+        let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
             if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>().unwrap()) {
                 indices_only_updater(&chunk.mesh, &mut chunk.render_data);
+                Some(Instant::now())
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        };
 
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
         (
             CstUpdateInfo {
-                chunk_update_count,
-                block_update_count,
+                chunk_scan_time: chunk_scan_end_time
+                    .saturating_duration_since(chunk_scan_start_time)
+                    .saturating_sub(
+                        chunk_mesh_generation_times.sum + chunk_mesh_callback_times.sum,
+                    ),
+                chunk_mesh_generation_times,
+                chunk_mesh_callback_times,
+                depth_sort_time: depth_sort_end_time.map(|t| t.duration_since(chunk_scan_end_time)),
+                block_updates,
             },
             view_chunk,
         )
@@ -230,10 +253,38 @@ where
 /// Performance info from a [`ChunkedSpaceMesh`]'s per-frame update.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CstUpdateInfo {
-    /// How many chunk meshes were recomputed this frame.
-    pub chunk_update_count: usize,
-    /// How many block meshes were recomputed this frame.
-    pub block_update_count: usize,
+    /// Time spent on traversing chunks in view this frame,
+    /// excluding the other steps.
+    pub chunk_scan_time: Duration,
+    /// Time spent on building chunk meshes this frame.
+    pub chunk_mesh_generation_times: TimeStats,
+    /// Time spent on `chunk_mesh_updater` callbacks this frame.
+    pub chunk_mesh_callback_times: TimeStats,
+    depth_sort_time: Option<Duration>,
+    /// Time spent on building block meshes this frame.
+    pub block_updates: TimeStats,
+}
+
+impl CustomFormat<StatusText> for CstUpdateInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        write!(
+            fmt,
+            indoc! {"
+                Block mesh gen {}
+                Chunk scan     {}
+                      mesh gen {}
+                      upload   {}
+                      depthsort {}\
+            "},
+            self.block_updates,
+            self.chunk_scan_time.custom_format(StatusText),
+            self.chunk_mesh_generation_times,
+            self.chunk_mesh_callback_times,
+            self.depth_sort_time
+                .unwrap_or(Duration::ZERO)
+                .custom_format(StatusText),
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -280,12 +331,13 @@ where
         space: &Space,
         block_texture_allocator: &mut A,
         mesh_options: &MeshOptions,
-    ) -> usize
+    ) -> TimeStats
     where
         A: TextureAllocator<Tile = Tile>,
     {
         if todo.is_empty() {
-            return 0;
+            // Don't increment the version counter if we don't need to.
+            return TimeStats::default();
         }
 
         self.last_version_counter = self.last_version_counter.wrapping_add(1);
@@ -310,7 +362,8 @@ where
         assert_eq!(self.meshes.len(), new_length);
 
         // Update individual meshes.
-        let mut block_update_count = 0;
+        let mut last_start_time = Instant::now();
+        let mut stats = TimeStats::default();
         let mut cost = 0;
         while cost < 100000 && !todo.is_empty() {
             let index: BlockIndex = todo.iter().next().copied().unwrap();
@@ -348,10 +401,10 @@ where
                     // the chunks.
                 }
             }
-            block_update_count += 1;
+            stats.record_consecutive_interval(&mut last_start_time, Instant::now());
         }
 
-        block_update_count
+        stats
     }
 }
 
