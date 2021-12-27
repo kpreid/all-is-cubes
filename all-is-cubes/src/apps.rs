@@ -31,6 +31,8 @@ pub use input::*;
 mod time;
 pub use time::*;
 
+const LOG_FIRST_FRAMES: bool = false;
+
 /// Everything that a game application needs regardless of platform.
 ///
 /// Once we have multiplayer / client-server support, this will become the client-side
@@ -69,6 +71,8 @@ pub struct AllIsCubesAppState {
     cursor_result: Option<Cursor>,
 
     last_step_info: UniverseStepInfo,
+
+    tick_counter_for_logging: u8,
     // When adding fields, remember to update the `Debug` impl.
 }
 
@@ -88,6 +92,7 @@ impl fmt::Debug for AllIsCubesAppState {
             .field("ui", &self.ui)
             .field("cursor_result", &self.cursor_result)
             .field("last_step_info", &self.last_step_info)
+            .field("tick_counter_for_logging", &self.tick_counter_for_logging)
             .finish_non_exhaustive()
     }
 }
@@ -126,6 +131,7 @@ impl AllIsCubesAppState {
             control_channel: control_recv,
             cursor_result: None,
             last_step_info: UniverseStepInfo::default(),
+            tick_counter_for_logging: 0,
         }
     }
 
@@ -261,8 +267,16 @@ impl AllIsCubesAppState {
 
                 info += self.ui.step(base_tick);
 
+                if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
+                    self.tick_counter_for_logging = self.tick_counter_for_logging.saturating_add(1);
+                    log::debug!(
+                        "tick={} step {}",
+                        self.tick_counter_for_logging,
+                        info.computation_time.custom_format(StatusText)
+                    );
+                }
                 self.last_step_info = info.clone();
-                result = Some(info)
+                result = Some(info);
             }
         }
         result
@@ -339,7 +353,15 @@ impl AllIsCubesAppState {
 
     /// Returns textual information intended to be overlaid as a HUD on top of the rendered scene
     /// containing diagnostic information about rendering and stepping.
-    pub fn info_text<T>(&self, render: T) -> InfoText<'_, T> {
+    pub fn info_text<T: CustomFormat<StatusText>>(&self, render: T) -> InfoText<'_, T> {
+        if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
+            log::debug!(
+                "tick={} draw {}",
+                self.tick_counter_for_logging,
+                render.custom_format(StatusText)
+            )
+        }
+
         InfoText { app: self, render }
     }
 
