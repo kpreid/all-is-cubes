@@ -110,7 +110,7 @@ where
 /// or incompatibility, and the requested graphics initialization or drawing could not be
 /// completed.
 #[derive(Debug, thiserror::Error)]
-#[error("graphics error (in {0}): {source}", context.as_ref().map(|s| s.as_ref()).unwrap_or("?"))]
+#[error("graphics error (in {0})", context.as_ref().map(|s| s.as_ref()).unwrap_or("?"))]
 pub struct GraphicsResourceError {
     context: Option<String>,
     #[source]
