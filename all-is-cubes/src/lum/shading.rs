@@ -252,9 +252,9 @@ static SHADER_SOURCES: Lazy<Arc<Mutex<ShaderSources>>> = Lazy::new(|| {
     Arc::new(Mutex::new(ShaderSources {
         version: 0,
         common: resource_str!("src/lum/shaders/common.glsl"),
-        common_vertex: resource_str!("src/lum/shaders/vertex-common.glsl"),
-        block_vertex: resource_str!("src/lum/shaders/vertex-block.glsl"),
-        block_fragment: resource_str!("src/lum/shaders/fragment.glsl"),
+        common_vertex: resource_str!("src/lum/shaders/common-vertex.glsl"),
+        block_vertex: resource_str!("src/lum/shaders/block-vertex.glsl"),
+        block_fragment: resource_str!("src/lum/shaders/block-fragment.glsl"),
         lines_vertex: resource_str!("src/lum/shaders/lines-vertex.glsl"),
         lines_fragment: resource_str!("src/lum/shaders/lines-fragment.glsl"),
     }))
