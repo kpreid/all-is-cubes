@@ -170,16 +170,16 @@ pub fn glfw_main_loop(
                 }
 
                 WindowEvent::FileDrop(files) => {
-                    // TODO: This should be async since loading could be expensive
                     // TODO: Offer confirmation before replacing the current universe
-                    if let Some(path) = files.get(0) {
-                        match crate::data_files::load_universe_from_file(path) {
-                            Ok(u) => app.set_universe(u),
-                            Err(e) => {
-                                // TODO: show error in user interface
-                                log::error!("Failed to load file '{}':\n{}", path.display(), e);
-                            }
-                        }
+                    if let Some(path) = files.into_iter().next() {
+                        app.set_universe_async(async move {
+                            crate::data_files::load_universe_from_file(&path)
+                                .await
+                                .map_err(|e| {
+                                    // TODO: show error in user interface
+                                    log::error!("Failed to load file '{}':\n{}", path.display(), e);
+                                })
+                        })
                     }
                 }
 

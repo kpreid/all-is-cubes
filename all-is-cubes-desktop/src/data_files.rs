@@ -24,7 +24,7 @@ use all_is_cubes_content::free_editing_starter_inventory;
 /// Load a [`Universe`] described by the given file (of guessed format).
 ///
 /// TODO: Define what errors it returns.
-pub(crate) fn load_universe_from_file(path: &Path) -> Result<Universe, anyhow::Error> {
+pub(crate) async fn load_universe_from_file(path: &Path) -> Result<Universe, anyhow::Error> {
     let bytes = std::fs::read(path)
         .with_context(|| format!("Could not read the file '{}'", path.display()))?;
     load_dot_vox(&bytes).with_context(|| {

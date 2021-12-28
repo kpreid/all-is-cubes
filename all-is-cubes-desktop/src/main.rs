@@ -87,12 +87,15 @@ fn main() -> Result<(), anyhow::Error> {
             move |fraction| universe_progress_bar.set_position((fraction * 100.0) as u64),
         )
     };
-    let universe = match input_source.clone() {
-        UniverseSource::Template(template) => {
-            futures_executor::block_on(template.build(yield_progress, thread_rng().gen()))?
+    let universe = futures_executor::block_on(async {
+        match input_source.clone() {
+            UniverseSource::Template(template) => template
+                .build(yield_progress, thread_rng().gen())
+                .await
+                .map_err(anyhow::Error::from),
+            UniverseSource::File(path) => data_files::load_universe_from_file(&path).await,
         }
-        UniverseSource::File(path) => data_files::load_universe_from_file(&path)?,
-    };
+    })?;
     app.set_universe(universe);
     universe_progress_bar.finish();
     let universe_done_time = Instant::now();
