@@ -3,6 +3,7 @@
 
 //! Shaders, uniforms, etc.
 
+use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
 use cgmath::Matrix4;
@@ -96,15 +97,20 @@ impl<Backend: AicLumBackend> BlockPrograms<Backend> {
     {
         let base_defines: Vec<(&str, &str)> = constants.to_defines();
         Ok(BlockPrograms {
-            constants,
-            opaque: prepare_block_program(context, base_defines.iter().copied())?,
+            opaque: prepare_block_program(
+                context,
+                &(&constants, "opaque"),
+                base_defines.iter().copied(),
+            )?,
             transparent: prepare_block_program(
                 context,
+                &(&constants, "transparent"),
                 base_defines
                     .iter()
                     .chain([("ALLOW_TRANSPARENCY", "1")].iter())
                     .copied(),
             )?,
+            constants,
         })
     }
 }
@@ -112,6 +118,7 @@ impl<Backend: AicLumBackend> BlockPrograms<Backend> {
 /// Compile the block shader program for the given [`GraphicsContext`].
 fn prepare_block_program<'a, C>(
     context: &mut C,
+    description: &dyn Debug,
     defines: impl IntoIterator<Item = (&'a str, &'a str)>,
 ) -> Result<BlockProgram<C::Backend>, GraphicsResourceError>
 where
@@ -136,6 +143,7 @@ where
 
     let start_compile_time = Instant::now();
     let result = map_shader_result(
+        description,
         context
             .new_shader_program::<VertexSemantics, (), BlockUniformInterface>()
             .from_strings(
@@ -181,6 +189,7 @@ where
         + sources.lines_fragment.as_ref();
 
     map_shader_result(
+        &"LinesProgram",
         context
             .new_shader_program::<VertexSemantics, (), LinesUniformInterface>()
             .from_strings(
@@ -194,6 +203,7 @@ where
 
 /// Unwraps [`BuiltProgram`] and logs any warnings.
 pub(crate) fn map_shader_result<Backend, Sem, Out, Uni>(
+    description: &dyn Debug,
     program_attempt: Result<BuiltProgram<Backend, Sem, Out, Uni>, ProgramError>,
 ) -> Result<Program<Backend, Sem, Out, Uni>, GraphicsResourceError>
 where
@@ -203,8 +213,14 @@ where
     match program_attempt {
         Err(error) => Err(GraphicsResourceError::new(error)),
         Ok(BuiltProgram { program, warnings }) => {
-            for warning in warnings {
-                log::warn!("{}", warning);
+            if !warnings.is_empty() {
+                log::warn!(
+                    "Warnings occurred while compiling shader for {:?}",
+                    description
+                );
+                for warning in warnings {
+                    log::warn!("  {}", warning);
+                }
             }
             Ok(program)
         }

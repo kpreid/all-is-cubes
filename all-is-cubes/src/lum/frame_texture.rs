@@ -49,12 +49,15 @@ where
         context: &mut C,
         fragment_shader: &str,
     ) -> Result<Rc<Self>, GraphicsResourceError> {
-        let program = map_shader_result(context.new_shader_program().from_strings(
-            include_str!("shaders/full-frame-vertex.glsl"),
-            None,
-            None,
-            fragment_shader,
-        ))?;
+        let program = map_shader_result(
+            &("FullFramePainter", fragment_shader), // debug info
+            context.new_shader_program().from_strings(
+                include_str!("shaders/full-frame-vertex.glsl"),
+                None,
+                None,
+                fragment_shader,
+            ),
+        )?;
 
         Ok(Rc::new(FullFramePainter {
             program: RefCell::new(program),
