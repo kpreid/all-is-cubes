@@ -117,7 +117,7 @@ where
         block_texture_allocator: &mut Tex,
         mut chunk_render_updater: CF,
         mut indices_only_updater: IF,
-    ) -> (CstUpdateInfo, ChunkPos<CHUNK_SIZE>)
+    ) -> (CsmUpdateInfo, ChunkPos<CHUNK_SIZE>)
     where
         CF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
         IF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
@@ -134,7 +134,7 @@ where
             space
         } else {
             // TODO: report error
-            return (CstUpdateInfo::default(), view_chunk);
+            return (CsmUpdateInfo::default(), view_chunk);
         };
 
         if Some(&mesh_options) != self.last_mesh_options.as_ref() {
@@ -234,7 +234,7 @@ where
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
         (
-            CstUpdateInfo {
+            CsmUpdateInfo {
                 chunk_scan_time: chunk_scan_end_time
                     .saturating_duration_since(chunk_scan_start_time)
                     .saturating_sub(
@@ -252,7 +252,7 @@ where
 
 /// Performance info from a [`ChunkedSpaceMesh`]'s per-frame update.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct CstUpdateInfo {
+pub struct CsmUpdateInfo {
     /// Time spent on traversing chunks in view this frame,
     /// excluding the other steps.
     pub chunk_scan_time: Duration,
@@ -265,7 +265,7 @@ pub struct CstUpdateInfo {
     pub block_updates: TimeStats,
 }
 
-impl CustomFormat<StatusText> for CstUpdateInfo {
+impl CustomFormat<StatusText> for CsmUpdateInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         write!(
             fmt,
@@ -546,7 +546,7 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
     }
 }
 
-/// [`Listener`] adapter for [`CstTodo`].
+/// [`Listener`] adapter for [`CsmTodo`].
 struct TodoListener<const CHUNK_SIZE: GridCoordinate>(Weak<Mutex<CsmTodo<CHUNK_SIZE>>>);
 
 impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CHUNK_SIZE> {
@@ -729,19 +729,19 @@ mod tests {
     }
 
     #[derive(Debug)]
-    struct CstTester {
+    struct CsmTester {
         #[allow(dead_code)] // Universe must be kept alive but is not read after construction
         universe: Universe,
         space: URef<Space>,
         camera: Camera,
-        cst: ChunkedSpaceMesh<(), BlockVertex, NoTextures, 16>,
+        csm: ChunkedSpaceMesh<(), BlockVertex, NoTextures, 16>,
     }
 
-    impl CstTester {
+    impl CsmTester {
         fn new(space: Space) -> Self {
             let mut universe = Universe::new();
             let space_ref = universe.insert_anonymous(space);
-            let cst = ChunkedSpaceMesh::<(), BlockVertex, NoTextures, 16>::new(space_ref.clone());
+            let csm = ChunkedSpaceMesh::<(), BlockVertex, NoTextures, 16>::new(space_ref.clone());
             let camera = Camera::new(
                 GraphicsOptions::default(),
                 Viewport {
@@ -754,21 +754,21 @@ mod tests {
                 universe,
                 space: space_ref,
                 camera,
-                cst,
+                csm,
             }
         }
 
-        /// Call `cst.update_blocks_and_some_chunks()` with the tester's placeholders
+        /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
         fn update<CF, IF>(
             &mut self,
             chunk_render_updater: CF,
             indices_only_updater: IF,
-        ) -> (CstUpdateInfo, ChunkPos<16>)
+        ) -> (CsmUpdateInfo, ChunkPos<16>)
         where
             CF: FnMut(&SpaceMesh<BlockVertex, NoTextures>, &mut ()),
             IF: FnMut(&SpaceMesh<BlockVertex, NoTextures>, &mut ()),
         {
-            self.cst.update_blocks_and_some_chunks(
+            self.csm.update_blocks_and_some_chunks(
                 &self.camera,
                 &mut NoTextures,
                 chunk_render_updater,
@@ -779,17 +779,17 @@ mod tests {
 
     #[test]
     fn basic_chunk_presence() {
-        let mut tester = CstTester::new(Space::empty_positive(1, 1, 1));
+        let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1));
         tester.update(|_, _| {}, |_, _| {});
-        assert_ne!(None, tester.cst.chunk(ChunkPos::new(0, 0, 0)));
+        assert_ne!(None, tester.csm.chunk(ChunkPos::new(0, 0, 0)));
         // There should not be a chunk where there's no Space
-        assert_eq!(None, tester.cst.chunk(ChunkPos::new(1, 0, 0)));
+        assert_eq!(None, tester.csm.chunk(ChunkPos::new(1, 0, 0)));
         // TODO: Check that chunks end at the view distance.
     }
 
     #[test]
     fn sort_view_every_frame_only_if_transparent() {
-        let mut tester = CstTester::new(Space::empty_positive(1, 1, 1));
+        let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1));
         tester.update(
             |_, _| {},
             |_, _| {
@@ -836,7 +836,7 @@ mod tests {
             .set([0, 0, 0], Block::from(rgba_const!(1., 1., 1., 0.25)))
             .unwrap();
 
-        let mut tester = CstTester::new(space);
+        let mut tester = CsmTester::new(space);
         tester.camera.set_options(options.clone());
 
         let mut vertices = None;

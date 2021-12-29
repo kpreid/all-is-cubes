@@ -30,7 +30,7 @@ use crate::lum::shading::{BlockPrograms, LinesProgram};
 use crate::lum::types::{AicLumBackend, LinesVertex, LumBlockVertex};
 use crate::lum::{wireframe_vertices, GraphicsResourceError};
 use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
-use crate::mesh::{ChunkMesh, ChunkedSpaceMesh, CstUpdateInfo, DepthOrdering, SpaceMesh};
+use crate::mesh::{ChunkMesh, ChunkedSpaceMesh, CsmUpdateInfo, DepthOrdering, SpaceMesh};
 use crate::raycast::Face;
 use crate::space::{Grid, Space, SpaceChange};
 use crate::universe::URef;
@@ -45,7 +45,7 @@ type ChunkData<Backend> = Option<Tess<Backend, LumBlockVertex, u32>>;
 /// Manages cached data and GPU resources for drawing a single [`Space`] and
 /// following its changes.
 pub struct SpaceRenderer<Backend: AicLumBackend> {
-    /// Note that `self.cst` has its own todo listener.
+    /// Note that `self.csm` has its own todo listener.
     todo: Arc<Mutex<SpaceRendererTodo>>,
     block_texture: Option<LumAtlasAllocator<Backend>>,
     light_texture: Option<SpaceLightTexture<Backend>>,
@@ -128,7 +128,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         }
 
         // Update chunks
-        let (cst_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
+        let (csm_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
             camera,
             block_texture_allocator,
             |mesh, render_data| {
@@ -151,7 +151,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         );
 
         // Flush all texture updates to GPU.
-        // This must happen after `cst.update_blocks_and_some_chunks`.
+        // This must happen after `csm.update_blocks_and_some_chunks`.
         let texture_info = block_texture_allocator.flush()?;
 
         if graphics_options.debug_chunk_boxes {
@@ -198,11 +198,11 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         Ok(SpaceRendererOutput {
             data: SpaceRendererOutputData {
                 camera: camera.clone(),
-                cst: &self.csm,
+                csm: &self.csm,
                 debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
                 view_chunk,
                 info: SpaceRenderInfo {
-                    chunk_info: cst_info,
+                    chunk_info: csm_info,
                     chunks_drawn: 0,  // filled later
                     squares_drawn: 0, // filled later
                     texture_info,
@@ -226,7 +226,7 @@ pub(super) struct SpaceRendererOutput<'a, Backend: AicLumBackend> {
 /// The portion of [`SpaceRendererOutput`] which does not vary with the pipeline progress.
 pub(super) struct SpaceRendererOutputData<'a, Backend: AicLumBackend> {
     pub(super) camera: Camera,
-    cst: &'a ChunkedSpaceMesh<
+    csm: &'a ChunkedSpaceMesh<
         ChunkData<Backend>,
         LumBlockVertex,
         LumAtlasAllocator<Backend>,
@@ -300,8 +300,8 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
                 u.initialize(program_iface, self);
                 let pass = SpaceRendererPass::Opaque;
                 render_gate.render(&pass.render_state(), |mut tess_gate| {
-                    for p in self.data.cst.chunk_chart().chunks(self.data.view_chunk) {
-                        if let Some(chunk) = self.data.cst.chunk(p) {
+                    for p in self.data.csm.chunk_chart().chunks(self.data.view_chunk) {
+                        if let Some(chunk) = self.data.csm.chunk(p) {
                             if self.data.cull(p) {
                                 continue;
                             }
@@ -347,12 +347,12 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
                     render_gate.render(&pass.render_state(), |mut tess_gate| {
                         for p in self
                             .data
-                            .cst
+                            .csm
                             .chunk_chart()
                             .chunks(self.data.view_chunk)
                             .rev()
                         {
-                            if let Some(chunk) = self.data.cst.chunk(p) {
+                            if let Some(chunk) = self.data.csm.chunk(p) {
                                 if self.data.cull(p) {
                                     continue;
                                 }
@@ -385,7 +385,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SpaceRenderInfo {
     /// Status of the block and chunk meshes.
-    pub chunk_info: CstUpdateInfo,
+    pub chunk_info: CsmUpdateInfo,
     pub chunks_drawn: usize,
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
     /// to draw this frame.
@@ -552,8 +552,6 @@ impl Listener<SpaceChange> for TodoListener {
 /// Keeps a 3D [`Texture`] up to date with the light data from a [`Space`].
 ///
 /// The texels are in [`PackedLight`] form.
-/// The alpha component is unused.
-/// TODO: Use alpha component to communicate block opacity.
 struct SpaceLightTexture<Backend: AicLumBackend> {
     texture: Texture<Backend, Dim3, NormRGBA8UI>,
     /// The region of cube coordinates for which there are valid texels.

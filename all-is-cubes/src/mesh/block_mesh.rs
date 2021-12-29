@@ -21,7 +21,7 @@ use crate::space::{Grid, GridArray, Space};
 /// by [`Face`].
 ///
 /// All triangles which are on the surface of the unit cube (such that they may be omitted
-/// when a [`fully_opaque`](EvaluatedBlock::fully_opaque) block is adjacent) are grouped
+/// when a [`opaque`](EvaluatedBlock::opaque) block is adjacent) are grouped
 /// under the corresponding face, and all other triangles are grouped under
 /// [`Face::Within`]. In future versions, the triangulator might be improved so that blocks
 /// with concavities on their faces have the surface of each concavity included in that

@@ -118,7 +118,7 @@ pub enum VertexSemantics {
     #[sem(name = "a_color_or_texture", repr = "[f32; 4]", wrapper = "VertexColorOrTexture")]
     ColorOrTexture,
     /// Interpolated texture coordinates are clamped to be ≥ this value, to avoid bleeding.
-    #[sem(name = "a_clamp_min", repr = "[f32; 3]", wrapper = "VertexClampLow")]
+    #[sem(name = "a_clamp_min", repr = "[f32; 3]", wrapper = "VertexClampLow", unbound)]
     ClampLow,
     /// Interpolated texture coordinates are clamped to be ≤ this value, to avoid bleeding.
     #[sem(name = "a_clamp_max", repr = "[f32; 3]", wrapper = "VertexClampHigh")]
