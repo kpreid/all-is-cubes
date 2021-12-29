@@ -459,10 +459,15 @@ fn install_atrium_blocks(
             .build_empty();
             space.fill(space.grid(), |p| {
                 // Flip middle of first block, so that the arch to our left appears on it
-                let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 { resolution_g - 1 - p.z } else { p.z };
+                let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {
+                    resolution_g - 1 - p.z
+                } else {
+                    p.z
+                };
                 let arch_z_doubled = z_for_arch * 2 - arch_center_z_doubled;
                 let arch_y_doubled = p.y * 2;
-                let distance_from_edge = p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
+                let distance_from_edge =
+                    p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
                 let r = (arch_z_doubled as f32 / arch_opening_width as f32)
                     .hypot(arch_y_doubled as f32 / (arch_opening_height as f32 * 2.));
                 if r < 1.0 {
@@ -470,13 +475,21 @@ fn install_atrium_blocks(
                     None
                 } else if r < 1.04 {
                     // Beveled edge
-                    if distance_from_edge < ((1. - r) * 2.0 + 0.1) { None } else { Some(&stone_range[3]) }
+                    if distance_from_edge < ((1. - r) * 2.0 + 0.1) {
+                        None
+                    } else {
+                        Some(&stone_range[3])
+                    }
                 } else if r < 1.1 {
                     // Surface
                     Some(&stone_range[3])
                 } else if r < 1.14 {
                     // Groove
-                    if distance_from_edge == 0. { None } else { Some(&stone_range[4]) }
+                    if distance_from_edge == 0. {
+                        None
+                    } else {
+                        Some(&stone_range[4])
+                    }
                 } else {
                     // Body
                     Some(brick_pattern(p))

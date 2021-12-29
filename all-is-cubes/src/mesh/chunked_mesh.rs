@@ -190,7 +190,9 @@ where
                 .unwrap_or(false)
                 && !self.chunks_were_missing)
                 || matches!(chunk_entry, Vacant(_))
-                || matches!(chunk_entry, Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes))
+                || matches!(
+                    chunk_entry,
+                    Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes))
             {
                 let compute_start = Instant::now();
                 let chunk = chunk_entry.or_insert_with(|| {

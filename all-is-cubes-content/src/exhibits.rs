@@ -82,7 +82,10 @@ exhibit! {
         ];
         let alphas = [0.25, 0.5, 0.75, 0.95];
         for (rot, color) in GridRotation::CLOCKWISE.iterate().zip(&colors) {
-            let windowpane = Grid::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
+            let windowpane = Grid::from_lower_upper(
+                [-1, 0, 3],
+                [2, alphas.len() as GridCoordinate, 4]
+            );
             space.fill(
                 windowpane
                     .transform(rot.to_positive_octant_matrix(1))

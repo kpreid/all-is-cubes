@@ -404,6 +404,9 @@ mod tests {
 
         // Try exposure
         camera.exposure = notnan!(0.5);
-        assert_eq!(camera.post_process_color(color), color.map_rgb(|rgb| rgb * 0.5));
+        assert_eq!(
+            camera.post_process_color(color),
+            color.map_rgb(|rgb| rgb * 0.5)
+        );
     }
 }
