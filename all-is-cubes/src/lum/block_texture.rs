@@ -12,10 +12,9 @@ use luminance::tess::{Mode, Tess};
 use luminance::texture::{
     Dim3, Dimensionable, MagFilter, MinFilter, Sampler, TexelUpload, Texture, TextureError, Wrap,
 };
-use std::cell::RefCell;
 use std::convert::TryInto;
 use std::fmt;
-use std::rc::{Rc, Weak};
+use std::sync::{Arc, Mutex, Weak};
 
 use crate::intalloc::IntAllocator;
 use crate::lum::types::{AicLumBackend, LumBlockVertex};
@@ -39,8 +38,9 @@ where
 {
     pub texture: BlockTexture<Backend>,
     layout: AtlasLayout,
-    backing: Rc<RefCell<AllocatorBacking>>,
-    in_use: Vec<Weak<RefCell<TileBacking>>>,
+    /// Note on lock ordering: Do not attempt to acquire this lock while a tile's lock is held.
+    backing: Arc<Mutex<AllocatorBacking>>,
+    in_use: Vec<Weak<Mutex<TileBacking>>>,
 }
 /// Texture tile handle used by [`LumAtlasAllocator`].
 ///
@@ -57,7 +57,10 @@ pub struct LumAtlasTile {
     scale: TextureCoordinate,
     /// Actual storage and metadata about the tile; may be updated as needed by the
     /// allocator to grow the texture.
-    backing: Rc<RefCell<TileBacking>>,
+    ///
+    /// Note on lock ordering: Do not attempt to acquire the allocator's lock while this
+    /// lock is held.
+    backing: Arc<Mutex<TileBacking>>,
 }
 #[derive(Debug)]
 struct TileBacking {
@@ -72,7 +75,7 @@ struct TileBacking {
     dirty: bool,
     /// Reference to the allocator so we can coordinate.
     /// Weak because if the allocator is dropped, nobody cares.
-    allocator: Weak<RefCell<AllocatorBacking>>,
+    allocator: Weak<Mutex<AllocatorBacking>>,
 }
 /// Data shared by [`LumAtlasAllocator`] and all its [`LumAtlasTile`]s.
 #[derive(Debug)]
@@ -110,7 +113,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
         Ok(Self {
             texture,
             layout,
-            backing: Rc::new(RefCell::new(AllocatorBacking {
+            backing: Arc::new(Mutex::new(AllocatorBacking {
                 dirty: false,
                 index_allocator: IntAllocator::new(),
             })),
@@ -123,7 +126,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
     /// If any errors prevent complete flushing, it will be attempted again on the next
     /// call.
     pub fn flush(&mut self) -> Result<AtlasFlushInfo, TextureError> {
-        let dirty = &mut self.backing.borrow_mut().dirty;
+        let dirty = &mut self.backing.lock().unwrap().dirty;
         if !*dirty {
             return Ok(AtlasFlushInfo {
                 flushed: 0,
@@ -141,7 +144,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
         self.in_use.retain(|weak_backing| {
             // Process the non-dropped weak references
             weak_backing.upgrade().map_or(false, |strong_backing| {
-                let backing: &mut TileBacking = &mut strong_backing.borrow_mut();
+                let backing: &mut TileBacking = &mut strong_backing.lock().unwrap();
                 if backing.dirty && error.is_none() {
                     if let Some(data) = backing.data.as_ref() {
                         match texture.upload_part(
@@ -208,7 +211,7 @@ impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
             return None;
         }
 
-        let index_allocator = &mut self.backing.borrow_mut().index_allocator;
+        let index_allocator = &mut self.backing.lock().unwrap().index_allocator;
         let index = index_allocator.allocate().unwrap();
         if index >= self.layout.tile_count() {
             // TODO: Attempt expansion of the atlas.
@@ -222,15 +225,15 @@ impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
         let result = LumAtlasTile {
             offset: offset.map(|c| c as TextureCoordinate),
             scale: (self.layout.texel_edge_length() as TextureCoordinate).recip(),
-            backing: Rc::new(RefCell::new(TileBacking {
+            backing: Arc::new(Mutex::new(TileBacking {
                 index,
                 atlas_grid: requested_grid.translate(offset),
                 data: None,
                 dirty: false,
-                allocator: Rc::downgrade(&self.backing),
+                allocator: Arc::downgrade(&self.backing),
             })),
         };
-        self.in_use.push(Rc::downgrade(&result.backing));
+        self.in_use.push(Arc::downgrade(&result.backing));
         Some(result)
     }
 }
@@ -248,11 +251,27 @@ impl TextureTile for LumAtlasTile {
     }
 
     fn write(&mut self, data: &[Texel]) {
-        let mut backing = self.backing.borrow_mut();
-        backing.data = Some(data.into());
-        backing.dirty = true;
-        if let Some(allocator_backing_ref) = backing.allocator.upgrade() {
-            allocator_backing_ref.borrow_mut().dirty = true;
+        // Note: acquiring the two locks separately to avoid possible deadlock
+        // with another thread trying to flush() (which acquires allocator and
+        // then tile locks). I believe that in all possible interleavings, the
+        // worst cases are:
+        //
+        // * a redundant setting of the AllocatorBacking::dirty flag.
+        // * this write() blocking until flush() finishes (this could be fixed with
+        //   making the dirty flag a `DirtyFlag` (atomic bool based) instead of being
+        //   inside the lock).
+        //
+        // It should always be the case that a write() then flush() will actually
+        // write the data.
+        let allocator_backing_ref = {
+            let mut backing = self.backing.lock().unwrap();
+            backing.data = Some(data.into());
+            backing.dirty = true;
+
+            backing.allocator.upgrade()
+        };
+        if let Some(allocator_backing_ref) = allocator_backing_ref {
+            allocator_backing_ref.lock().unwrap().dirty = true;
         }
     }
 }
@@ -261,7 +280,7 @@ impl TextureTile for LumAtlasTile {
 /// vs. the derived behavior of RefCell::eq which is to borrow and compare the contents.
 impl PartialEq for LumAtlasTile {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.backing, &other.backing)
+        Arc::ptr_eq(&self.backing, &other.backing)
     }
 }
 impl Eq for LumAtlasTile {}
@@ -269,7 +288,7 @@ impl Eq for LumAtlasTile {}
 impl Drop for TileBacking {
     fn drop(&mut self) {
         if let Some(ab) = self.allocator.upgrade() {
-            ab.borrow_mut().index_allocator.free(self.index);
+            ab.lock().unwrap().index_allocator.free(self.index);
         }
     }
 }
