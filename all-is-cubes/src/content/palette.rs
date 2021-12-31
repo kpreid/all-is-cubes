@@ -49,6 +49,12 @@ pub const HUD_TOOLBAR_BACK: Rgba = rgba_const!(0.21, 0.21, 0.21, 1.);
 pub const HUD_TOOLBAR_FRAME: Rgba = rgba_const!(0.72, 0.72, 0.72, 1.);
 pub const MENU_BACK: Rgba = rgba_const!(0.5, 0.5, 0.5, 1.0);
 pub const MENU_FRAME: Rgba = rgba_const!(0.95, 0.95, 0.95, 1.0);
+pub const BUTTON_FRAME: Rgba = ALMOST_BLACK.with_alpha_one();
+pub const BUTTON_BACK: Rgba = rgba_const!(0.5, 0.5, 0.5, 1.0);
+pub const BUTTON_LABEL: Rgba = ALMOST_BLACK.with_alpha_one();
+pub const BUTTON_ACTIVATED_BACK: Rgba = rgba_const!(0.75, 0.75, 0.75, 1.0);
+pub const BUTTON_ACTIVATED_LABEL: Rgba = rgba_const!(0.125, 0.125, 0.125, 1.0);
+pub const BUTTON_ACTIVATED_GLOW: Rgb = rgb_const!(2.0, 0.4, 0.4);
 
 // Debug UI elements (all wireframe)
 pub const DEBUG_COLLISION_BOX: Rgba = rgba_const!(0.0, 0.0, 1.0, 1.0);

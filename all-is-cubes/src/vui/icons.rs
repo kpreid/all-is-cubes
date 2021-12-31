@@ -1,14 +1,20 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::borrow::Cow;
+
 use cgmath::{ElementWise, EuclideanSpace as _, InnerSpace, Vector3};
 use embedded_graphics::geometry::Point;
-use embedded_graphics::prelude::{Drawable, Primitive};
-use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
+use embedded_graphics::prelude::{Drawable, PixelColor, Primitive, Size};
+use embedded_graphics::primitives::{
+    Circle, Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle,
+    StrokeAlignment, StyledDrawable,
+};
 
-use crate::block::{Block, BlockCollision, AIR, AIR_EVALUATED};
-use crate::drawing::VoxelBrush;
-use crate::linking::{BlockModule, BlockProvider};
+use crate::block::{Block, BlockCollision, Resolution, AIR, AIR_EVALUATED};
+use crate::content::palette;
+use crate::drawing::{DrawingPlane, VoxelBrush};
+use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{
     Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
 };
@@ -40,6 +46,10 @@ pub enum Icons {
     JetpackOn,
     /// Icon for [`Tool::Jetpack`], inactive.
     JetpackOff,
+    PauseButtonOn,
+    PauseButtonOff,
+    MouselookButtonOn,
+    MouselookButtonOff,
 }
 
 impl BlockModule for Icons {
@@ -253,8 +263,153 @@ impl Icons {
                         })?
                         .build()
                 }
+
+                b @ (Icons::PauseButtonOff | Icons::PauseButtonOn) => {
+                    let active = b == Icons::PauseButtonOn;
+                    let mut button_builder = ButtonBuilder::new(active)?;
+
+                    // Draw pause symbol
+                    for x in [-3, 2] {
+                        Line::new(Point::new(x, -4), Point::new(x, 3)).draw_styled(
+                            &PrimitiveStyle::with_stroke(button_builder.label_color, 3),
+                            &mut button_builder.label_draw_target(),
+                        )?;
+                    }
+
+                    button_builder.into_block(universe, "Pause")
+                }
+
+                b @ (Icons::MouselookButtonOff | Icons::MouselookButtonOn) => {
+                    let active = b == Icons::MouselookButtonOn;
+                    let mut button_builder = ButtonBuilder::new(active)?;
+
+                    // Draw crosshair
+                    // TODO: Suspicious inconsistency between x and y coordinates
+                    let style = PrimitiveStyle::with_stroke(button_builder.label_color, 2);
+                    Line::new(Point::new(-1, -4), Point::new(-1, 3))
+                        .draw_styled(&style, &mut button_builder.label_draw_target())?;
+                    Line::new(Point::new(-4, 0), Point::new(3, 0))
+                        .draw_styled(&style, &mut button_builder.label_draw_target())?;
+
+                    button_builder.into_block(universe, "Mouselook")
+                }
             })
         })
         .unwrap()
     }
+}
+
+struct ButtonBuilder {
+    space: Space,
+    active: bool,
+    label_z: GridCoordinate,
+    label_color: Rgba,
+}
+
+impl ButtonBuilder {
+    // TODO: We probably want a higher resolution, but it has to wait for texture alloc improvements
+    pub const RESOLUTION: Resolution = 16;
+    pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION as GridCoordinate;
+
+    pub fn new(active: bool) -> Result<Self, InGenError> {
+        let back_block = Block::from(if active {
+            palette::BUTTON_ACTIVATED_BACK
+        } else {
+            palette::BUTTON_BACK
+        });
+        let cap_rim_block = Block::from(palette::BUTTON_BACK.map_rgb(|rgb| rgb * 1.1));
+
+        let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
+        let back_brush = VoxelBrush::new(vec![
+            ([0, 0, 0], &back_block),
+            ([0, 0, 1], &back_block),
+            ([0, 0, 2], &back_block),
+            ([0, 0, 3], &back_block),
+            ([0, 0, 4], &back_block),
+            ([0, 0, 5], &back_block),
+            ([0, 0, 6], &back_block),
+            ([0, 0, 7], &back_block),
+            // up to but not including BUTTON_LABEL_Z
+        ]);
+        let cap_rim_brush = VoxelBrush::new(vec![([0, 0, 7], &cap_rim_block)]);
+
+        let outer_rectangle = Rectangle::with_corners(
+            Point::new(1, 1),
+            Point::new(Self::RESOLUTION_G - 2, Self::RESOLUTION_G - 2),
+        );
+        let rr = |inset: i32| {
+            RoundedRectangle::with_equal_corners(
+                outer_rectangle.offset(-inset),
+                Size::new(3 - inset as u32, 3 - inset as u32),
+            )
+        };
+
+        let mut space = Space::for_block(Self::RESOLUTION).build_empty();
+        let draw_target = &mut space.draw_target(
+            GridMatrix::from_translation([0, Self::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
+        );
+
+        // unwrap()s because if this drawing fails, tests will catch that — no parameters
+        rr(0)
+            .into_styled(
+                PrimitiveStyleBuilder::new()
+                    .fill_color(&back_brush)
+                    .stroke_color(&frame_brush)
+                    .stroke_width(1)
+                    .stroke_alignment(StrokeAlignment::Inside)
+                    .build(),
+            )
+            .draw(draw_target)?;
+        rr(1)
+            .into_styled(
+                PrimitiveStyleBuilder::new()
+                    .stroke_color(&cap_rim_brush)
+                    .stroke_width(1)
+                    .stroke_alignment(StrokeAlignment::Inside)
+                    .build(),
+            )
+            .draw(draw_target)?;
+
+        Ok(ButtonBuilder {
+            space,
+            active,
+            label_z: 8,
+            label_color: if active {
+                palette::BUTTON_ACTIVATED_LABEL
+            } else {
+                palette::BUTTON_LABEL
+            },
+        })
+    }
+
+    pub fn into_block(self, universe: &mut Universe, label: impl Into<Cow<'static, str>>) -> Block {
+        Block::builder()
+            .display_name(label)
+            .light_emission(if self.active {
+                palette::BUTTON_ACTIVATED_GLOW
+            } else {
+                Rgb::ZERO
+            })
+            .voxels_ref(Self::RESOLUTION, universe.insert_anonymous(self.space))
+            .build()
+    }
+
+    /// Returns an [`embedded_graphics::DrawTarget`] for drawing the button label, with a
+    /// Y-down coordinate system whose origin is centered on the button (or more precisely,
+    /// (0, 0) is the lower-right pixel closest to the center, since e-g uses a convention
+    /// where coordinates identify pixels, not their edges).
+    pub fn label_draw_target<C: PixelColor>(&mut self) -> DrawingPlane<'_, C> {
+        self.space.draw_target(
+            GridMatrix::from_translation([
+                Self::RESOLUTION_G / 2,
+                Self::RESOLUTION_G / 2 - 1,
+                self.label_z,
+            ]) * GridMatrix::FLIP_Y,
+        )
+    }
+}
+
+#[test]
+fn icons_smoke_test() {
+    Icons::new(&mut Universe::new());
 }
