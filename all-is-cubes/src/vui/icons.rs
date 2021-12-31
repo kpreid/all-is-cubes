@@ -18,13 +18,15 @@ use crate::universe::Universe;
 #[cfg(doc)]
 use crate::inv::Tool;
 
+/// Blocks that are icons for tools or UI components.
+///
+/// TODO: Consider splitting the tools part from the UI part, especially as tool icons may
+/// end up being game-specific?
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum Icons {
     /// HUD crosshair indicating cursor position.
-    ///
-    /// TODO: This should be kept elsewhere than the icons enum.
     Crosshair,
     /// Icon for an empty toolbar slot.
     EmptySlot,
