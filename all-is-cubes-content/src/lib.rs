@@ -19,8 +19,10 @@
 #[cfg(feature = "arbitrary")]
 extern crate arbitrary_crate as arbitrary;
 
-use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution};
-use all_is_cubes::cgmath::Transform as _;
+use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution, AIR};
+use all_is_cubes::cgmath::{
+    ElementWise, EuclideanSpace, InnerSpace, Point3, Transform as _, Vector3,
+};
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{iso_8859_1::FONT_9X15_BOLD, MonoTextStyle},
     prelude::{Dimensions as _, Drawable, Point, Transform as _},
@@ -28,7 +30,9 @@ use all_is_cubes::drawing::embedded_graphics::{
 };
 use all_is_cubes::drawing::{draw_to_blocks, VoxelBrush, VoxelColor};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Face, FaceMap, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use all_is_cubes::math::{
+    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
+};
 use all_is_cubes::space::{Grid, SetCubeError, Space};
 
 mod animation;
@@ -51,6 +55,7 @@ pub use landscape::*;
 mod menu;
 
 pub use all_is_cubes::content::*;
+use ordered_float::OrderedFloat;
 
 /// Draw the All Is Cubes logo text.
 pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) -> Result<(), SetCubeError> {
@@ -142,6 +147,39 @@ fn draw_text_in_blocks<'a, C: Clone + VoxelColor<'a>>(
         .unwrap();
     space_to_space_copy(&name_blocks, truncated_block_grid, space, transform)?;
     Ok(truncated_block_grid)
+}
+
+/// Create a function to define texture in a block, based on a set of points
+/// to form a 3D Voronoi diagram.
+///
+/// TODO: Once we have better composable tools than `impl Fn(GridPoint)`, allow
+/// each point to refer to a pattern of its own to delegate to.
+pub(crate) fn voronoi_pattern<'a>(
+    resolution: Resolution,
+    // TODO: not a well-founded choice of iterator type, just convenient
+    points: impl IntoIterator<Item = &'a (Point3<FreeCoordinate>, Block)> + Clone,
+) -> impl Fn(GridPoint) -> &'a Block {
+    let point_offsets = Grid::new([-1, -1, -1], [3, 3, 3]);
+    move |cube| {
+        // TODO: I keep writing this cast-to-midpoints function. Should make it easy.
+        let p = cube.map(|c| (FreeCoordinate::from(c) + 0.5) / FreeCoordinate::from(resolution));
+        points
+            .clone()
+            .into_iter()
+            .flat_map(|(vp, c)| {
+                point_offsets
+                    .interior_iter()
+                    .map(move |offset| (vp + offset.to_vec().map(FreeCoordinate::from), c))
+            })
+            .min_by_key(|(voronoi_point, _)| {
+                let offset = voronoi_point - p;
+                // TODO: add ability to muck with the distance metric in custom ways
+                let offset = offset.mul_element_wise(Vector3::new(1.0, 2.0, 1.0));
+                OrderedFloat(offset.magnitude2())
+            })
+            .map(|(_, block)| block)
+            .unwrap_or(&AIR) // happens iff the point iterator is empty
+    }
 }
 
 /// Given a room's exterior bounding box, act on its four walls.

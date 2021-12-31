@@ -89,6 +89,7 @@ dependencies = [
  "log",
  "maze_generator",
  "noise",
+ "ordered-float",
  "rand 0.8.4",
  "rand_xoshiro",
  "strum",

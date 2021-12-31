@@ -2,15 +2,18 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use noise::Seedable as _;
+use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{Block, BlockCollision, Resolution, AIR};
+use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
-    FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, NotNan, Rgb,
+    Aab, FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, NotNan, Rgb,
 };
 use all_is_cubes::space::{Grid, SetCubeError, Space};
 use all_is_cubes::universe::Universe;
 
+use crate::voronoi_pattern;
 use crate::{blocks::scale_color, palette};
 
 /// Names for blocks assigned specific roles in generating outdoor landscapes.
@@ -76,13 +79,10 @@ pub fn install_landscape_blocks(
 ) -> Result<(), GenError> {
     use LandscapeBlocks::*;
     let colors = BlockProvider::<LandscapeBlocks>::default();
+    let rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(123890483921741);
 
-    let stone_noise_v = noise::Value::new().set_seed(0x21b5cc6b);
-    let stone_noise = noise::ScaleBias::new(&stone_noise_v)
-        .set_bias(1.0)
-        .set_scale(0.04);
-    let dirt_noise_v = noise::Value::new().set_seed(0x2e240365);
-    let dirt_noise = noise::ScaleBias::new(&dirt_noise_v)
+    let blade_color_noise_v = noise::Value::new().set_seed(0x2e240365);
+    let blade_color_noise = noise::ScaleBias::new(&blade_color_noise_v)
         .set_bias(1.0)
         .set_scale(0.12);
     let overhang_noise_v = noise::Value::new();
@@ -94,6 +94,23 @@ pub fn install_landscape_blocks(
     let blade_noise = noise::ScaleBias::new(&blade_noise_stretch)
         .set_bias(f64::from(resolution) * -0.34)
         .set_scale(f64::from(resolution) * 1.7);
+
+    let stone_points = [(); 240].map(|_| {
+        (
+            Aab::from_cube(GridPoint::origin()).random_point(rng),
+            scale_color(colors[Stone].clone(), rng.gen_range(0.9..1.1), 0.02),
+        )
+    });
+    let stone_pattern = voronoi_pattern(resolution, &stone_points);
+
+    // TODO: give dirt a palette of varying hue and saturation
+    let dirt_points = [(); 1024].map(|_| {
+        (
+            Aab::from_cube(GridPoint::origin()).random_point(rng),
+            scale_color(colors[Dirt].clone(), rng.gen_range(0.9..1.1), 0.02),
+        )
+    });
+    let dirt_pattern = voronoi_pattern(resolution, &dirt_points);
 
     BlockProvider::<LandscapeBlocks>::new(|key| {
         let grass_blades = |universe, index: GridCoordinate| -> Result<Block, InGenError> {
@@ -114,7 +131,7 @@ pub fn install_landscape_blocks(
                             ) * index,
                         )
                     {
-                        scale_color(colors[Grass].clone(), dirt_noise.at_grid(cube), 0.02)
+                        scale_color(colors[Grass].clone(), blade_color_noise.at_grid(cube), 0.02)
                     } else {
                         AIR
                     }
@@ -130,9 +147,7 @@ pub fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
-                .voxels_fn(universe, resolution, |cube| {
-                    scale_color(colors[Stone].clone(), stone_noise.at_grid(cube), 0.02)
-                })?
+                .voxels_fn(universe, resolution, &stone_pattern)?
                 .build(),
 
             Grass => Block::builder()
@@ -144,9 +159,9 @@ pub fn install_landscape_blocks(
                 )
                 .voxels_fn(universe, resolution, |cube| {
                     if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
-                        scale_color(colors[Grass].clone(), dirt_noise.at_grid(cube), 0.02)
+                        scale_color(colors[Grass].clone(), blade_color_noise.at_grid(cube), 0.02)
                     } else {
-                        scale_color(colors[Dirt].clone(), dirt_noise.at_grid(cube), 0.02)
+                        dirt_pattern(cube).clone()
                     }
                 })?
                 .build(),
@@ -161,9 +176,7 @@ pub fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
-                .voxels_fn(universe, resolution, |cube| {
-                    scale_color(colors[Dirt].clone(), dirt_noise.at_grid(cube), 0.02)
-                })?
+                .voxels_fn(universe, resolution, &dirt_pattern)?
                 .build(),
 
             Trunk => colors[Trunk].clone(),

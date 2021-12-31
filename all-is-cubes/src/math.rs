@@ -304,8 +304,7 @@ impl Aab {
 
     /// Returns a random point within this box, using inclusive ranges
     /// (`lower_bounds[axis] ≤ random_point()[axis] ≤ upper_bounds[axis]`).
-    #[cfg(test)] // Only used in tests at this time
-    pub(crate) fn random_point(self, rng: &mut impl rand::Rng) -> Point3<FreeCoordinate> {
+    pub fn random_point(self, rng: &mut impl rand::Rng) -> Point3<FreeCoordinate> {
         Point3::new(
             rng.gen_range(self.lower_bounds[0]..=self.upper_bounds[0]),
             rng.gen_range(self.lower_bounds[1]..=self.upper_bounds[1]),
