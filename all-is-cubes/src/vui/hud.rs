@@ -86,9 +86,16 @@ impl HudLayout {
         universe.insert_anonymous(space)
     }
 
-    // TODO: Make a block-setting function instead
     pub(crate) fn crosshair_position(&self) -> GridPoint {
         GridPoint::new(self.size.x / 2, self.size.y / 2, 0)
+    }
+
+    pub(crate) fn control_button_position(&self, index: usize) -> GridPoint {
+        GridPoint::new(
+            self.size.x - 1 - (index as GridCoordinate),
+            self.size.y - 1,
+            -1,
+        )
     }
 
     pub(crate) fn first_tool_icon_position(&self) -> GridPoint {

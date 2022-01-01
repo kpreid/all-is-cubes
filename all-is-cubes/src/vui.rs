@@ -54,7 +54,7 @@ impl Vui {
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
     /// TODO: should be displaying paused state
-    pub fn new(input_processor: &InputProcessor, _paused: ListenableSource<bool>) -> Self {
+    pub fn new(input_processor: &InputProcessor, paused: ListenableSource<bool>) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = HudBlocks::new(&mut universe, 16);
         let hud_layout = HudLayout::default();
@@ -85,6 +85,18 @@ impl Vui {
                     })
                     .expect("hud space mutate"),
             ),
+            Box::new(ToggleButtonController::new(
+                hud_layout.control_button_position(0),
+                paused,
+                hud_blocks.icons[Icons::PauseButtonOff].clone(),
+                hud_blocks.icons[Icons::PauseButtonOn].clone(),
+            )),
+            Box::new(ToggleButtonController::new(
+                hud_layout.control_button_position(1),
+                input_processor.mouselook_mode(),
+                hud_blocks.icons[Icons::MouselookButtonOff].clone(),
+                hud_blocks.icons[Icons::MouselookButtonOn].clone(),
+            )),
         ];
 
         let mut new_self = Self {

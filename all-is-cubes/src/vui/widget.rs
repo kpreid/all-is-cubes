@@ -63,6 +63,48 @@ pub(crate) trait WidgetController: Debug {
     fn set_character(&mut self, _character: Option<&URef<Character>>) {}
 }
 
+/// Manages a single-block toggle button.
+#[derive(Debug)]
+pub(crate) struct ToggleButtonController {
+    position: GridPoint,
+    states: [Block; 2],
+    data_source: ListenableSource<bool>,
+    todo: DirtyFlag,
+    //action: Box<dyn Fn() + Send + Sync>,
+}
+
+impl ToggleButtonController {
+    pub(crate) fn new(
+        position: GridPoint,
+        data_source: ListenableSource<bool>,
+        off: Block,
+        on: Block,
+    ) -> Self {
+        let todo = DirtyFlag::new(true);
+        data_source.listen(todo.listener());
+        Self {
+            position,
+            states: [off, on],
+            todo,
+            data_source,
+        }
+    }
+}
+
+impl WidgetController for ToggleButtonController {
+    fn step(&mut self, sv: &WidgetSpaceView<'_>, _: Tick) -> Result<(), Box<dyn Error>> {
+        if self.todo.get_and_clear() {
+            sv.space.try_modify(|space| {
+                space.set(
+                    self.position,
+                    &self.states[self.data_source.snapshot() as usize],
+                )
+            })??;
+        }
+        Ok(())
+    }
+}
+
 /// Shows/hides the crosshair depending on mouselook mode.
 #[derive(Debug)]
 pub(crate) struct CrosshairController {
