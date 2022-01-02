@@ -4,6 +4,7 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
+use all_is_cubes::util::YieldProgress;
 use noise::Seedable as _;
 
 use all_is_cubes::block::{Block, BlockCollision, RotationPlacementRule, AIR};
@@ -49,7 +50,10 @@ impl BlockModule for DemoBlocks {
 /// Add to `universe` demo-content blocks: all of [`DemoBlocks`] and [`LandscapeBlocks`].
 ///
 /// [`LandscapeBlocks`]: crate::landscape::LandscapeBlocks
-pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
+pub async fn install_demo_blocks(
+    universe: &mut Universe,
+    p: YieldProgress,
+) -> Result<(), GenError> {
     let resolution = 16;
     let resolution_g = GridCoordinate::from(resolution);
 
@@ -62,6 +66,10 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
 
     install_landscape_blocks(universe, resolution)?;
+
+    // TODO: In order to split this into better pieces we need to make BlockProvider::new
+    // async.
+    p.progress(0.5).await;
 
     let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
@@ -324,6 +332,7 @@ pub fn install_demo_blocks(universe: &mut Universe) -> Result<(), GenError> {
     })?
     .install(universe)?;
 
+    p.progress(1.0).await;
     Ok(())
 }
 
@@ -360,7 +369,11 @@ mod tests {
     #[test]
     pub fn install_demo_blocks_test() {
         let mut universe = Universe::new();
-        install_demo_blocks(&mut universe).unwrap();
+        futures_executor::block_on(async {
+            install_demo_blocks(&mut universe, YieldProgress::noop())
+                .await
+                .unwrap()
+        });
         // TODO: assert what entries were created, once Universe has iteration
     }
 

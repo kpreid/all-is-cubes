@@ -84,11 +84,13 @@ impl UniverseTemplate {
 
         // TODO: Later we want a "module loading" system that can lazily bring in content.
         // For now, unconditionally add all these blocks.
-        install_demo_blocks(&mut universe)?;
-        let mut p = Some(p.finish_and_cut(0.1).await);
+        let [demo_blocks_progress, p] = p.split(0.1);
+        install_demo_blocks(&mut universe, demo_blocks_progress).await?;
+        p.progress(0.).await;
 
         let default_space_name: Name = "space".into();
 
+        let mut p = Some(p);
         use UniverseTemplate::*;
         let maybe_space: Option<Result<Space, InGenError>> = match self {
             Menu => Some(template_menu(&mut universe)),
