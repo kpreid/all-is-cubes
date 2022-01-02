@@ -1345,15 +1345,14 @@ dependencies = [
 
 [[package]]
 name = "glfw"
-version = "0.42.0"
+version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06a3f9afbfd6576fca75be1e5cfc6db259b3a9b65844d34890b0711e82953605"
+checksum = "ae1439ba800d82c8fc55b86c400b5a4c30c5de5c5c24bb549981274bffba7b05"
 dependencies = [
  "bitflags",
  "glfw-sys",
  "objc",
- "raw-window-handle 0.3.4",
- "semver 0.9.0",
+ "raw-window-handle",
  "winapi 0.3.9",
 ]
 
@@ -1846,18 +1845,18 @@ dependencies = [
 
 [[package]]
 name = "luminance"
-version = "0.45.0"
+version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfd5efcf7e0135fdfd45cd8dcb3ae64a1e4f8c4b988e128ce96f8e4989b2e506"
+checksum = "a47228d234ba564c78977edcc0c060dd9d3c59f92a3bb4d371b212c6a9175846"
 dependencies = [
  "luminance-derive",
 ]
 
 [[package]]
 name = "luminance-derive"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3cd298b8987127cf92e7ee547f4d90be766806197e1fb843f05a772948d169b"
+checksum = "bf7171711b76a555ec4296cd68f987a53f1bb331b6d4ebb15ddcba3049fe12b4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1866,9 +1865,9 @@ dependencies = [
 
 [[package]]
 name = "luminance-gl"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae4bfaabc2d43c618f8021f896537ba3779f84977134dda3a40dbb761db7377b"
+checksum = "6f93835f19260aee619e50c819b2be144c33662eeccb5c60f861bef505e7b440"
 dependencies = [
  "gl",
  "luminance",
@@ -1877,9 +1876,9 @@ dependencies = [
 
 [[package]]
 name = "luminance-glfw"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec57b20a151ef1f7ebcf400043a4b62f6755cc9c5cfeba51e5b6ffed64545e83"
+checksum = "aa0a42da8bf426d190c3556a67ad35b6eb920b6291cc9fb46e46e5ee2f79c258"
 dependencies = [
  "gl",
  "glfw",
@@ -1889,18 +1888,18 @@ dependencies = [
 
 [[package]]
 name = "luminance-std140"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc674080f5b890f26b5c8a1e4b905476a956e95208fe999ca0a4c5a9c954ca02"
+checksum = "3c438359eebd19f4345c32af377dfc0cc48635ecfd318e252116fe206588d81d"
 dependencies = [
  "luminance",
 ]
 
 [[package]]
 name = "luminance-web-sys"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62138e1e6b1aaa1ef583087fde539a4bd7c16b190c1af5747a9ecd108cccb4b1"
+checksum = "27f6ef1a635161352fa36d5371f860276268dbdaeae59eb4f64018ccad7bfdee"
 dependencies = [
  "luminance",
  "luminance-webgl",
@@ -1910,9 +1909,9 @@ dependencies = [
 
 [[package]]
 name = "luminance-webgl"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85a0fba5788885c419fec3063634a1bf84a930bd42e5767d572108861ff2a706"
+checksum = "700ac331c1e28bdaf79f6e2e5781730d9d8fa42e4b7989297ebcc503eed94258"
 dependencies = [
  "js-sys",
  "luminance",
@@ -2823,16 +2822,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f97cdb2a36ed4183de61b2f824cc45c9f1037f28afe0a322e9fff4c108b5aaa"
 dependencies = [
  "rand_core 0.6.3",
-]
-
-[[package]]
-name = "raw-window-handle"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e28f55143d0548dad60bb4fbdc835a3d7ac6acc3324506450c5fdd6e42903a76"
-dependencies = [
- "libc",
- "raw-window-handle 0.4.2",
 ]
 
 [[package]]

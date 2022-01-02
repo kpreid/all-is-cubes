@@ -17,7 +17,6 @@ use std::convert::TryInto;
 use std::fmt;
 use std::rc::{Rc, Weak};
 
-use crate::content::palette;
 use crate::intalloc::IntAllocator;
 use crate::lum::types::{AicLumBackend, LumBlockVertex};
 use crate::math::GridCoordinate;
@@ -104,12 +103,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
                 min_filter: MinFilter::Nearest,
                 ..Sampler::default()
             },
-            // Mark unused area for easier debugging (error color instead of transparency)
-            TexelUpload::base_level_without_mipmaps(&vec![
-                palette::UNPAINTED_TEXTURE_FALLBACK
-                    .to_srgb_32bit();
-                layout.texel_count()
-            ]),
+            TexelUpload::reserve(0),
         )?;
         // TODO: distinguish between "logic error" errors and "out of texture memory" errors...though it doesn't matter much until we have atlas resizing reallocations.
 
@@ -153,7 +147,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
                         match texture.upload_part(
                             backing.atlas_grid.lower_bounds().map(|c| c as u32).into(),
                             backing.atlas_grid.size().map(|c| c as u32).into(),
-                            TexelUpload::base_level_without_mipmaps(data),
+                            TexelUpload::levels(&[data]),
                         ) {
                             Ok(()) => {
                                 // Only clear dirty flag if upload was successful.
@@ -337,7 +331,8 @@ impl AtlasLayout {
         u32::from(self.row_length) * u32::from(self.resolution)
     }
 
-    fn texel_count(&self) -> usize {
+    // unused now, might be handy later ...
+    fn _texel_count(&self) -> usize {
         let [x, y, z] = self.dimensions();
         x as usize * y as usize * z as usize
     }

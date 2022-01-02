@@ -578,8 +578,7 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
         let texture = context.new_texture(
             texture_grid.unsigned_size().into(),
             Sampler::default(), // sampler options don't matter because we're using texelFetch()
-            // TODO: luminance 0.45 seems to be requiring us to upload some texels but we'd rather skip it
-            TexelUpload::base_level_without_mipmaps(&vec![[0, 0, 0, 0]; texture_grid.volume()]),
+            TexelUpload::reserve(0),
         )?;
         Ok(Self {
             texture,
@@ -607,7 +606,7 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
                 .map(|s| s as u32)
                 .into(),
             region.unsigned_size().into(),
-            TexelUpload::base_level_without_mipmaps(&data),
+            TexelUpload::base_level(&data, 0),
         )
     }
 

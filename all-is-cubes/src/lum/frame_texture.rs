@@ -157,11 +157,7 @@ where
                 min_filter: filters.1,
                 ..Sampler::default()
             },
-            // TODO: luminance 0.45 seems to be requiring us to upload some texels but we'd rather skip it
-            TexelUpload::base_level_without_mipmaps(&vec![
-                [0, 0, 0, 0];
-                size.x as usize * size.y as usize
-            ]),
+            TexelUpload::reserve(0),
         )?);
 
         self.scaled_viewport = Some(scaled_viewport);
@@ -182,7 +178,7 @@ where
         self.texture
             .as_mut()
             .expect("upload() without resize()")
-            .upload_raw(TexelUpload::base_level_without_mipmaps(&self.local_data))?;
+            .upload_raw(TexelUpload::base_level(&self.local_data, 0))?;
         self.texture_is_valid = true;
         Ok(())
     }
