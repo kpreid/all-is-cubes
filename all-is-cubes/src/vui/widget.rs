@@ -25,10 +25,13 @@ use crate::inv::Slot;
 use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::raycast::Face;
-use crate::space::{Grid, Space, SpacePhysics};
+use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
 use crate::vui::Icons;
+
+// Placeholder for likely wanting to change this later
+pub(super) type WidgetTransaction = SpaceTransaction;
 
 pub(crate) struct WidgetSpaceView<'a> {
     // TODO: Eliminate HudLayout's functions in favor of widgets having been configured with their location
@@ -46,20 +49,28 @@ impl WidgetSpaceView<'_> {}
 pub(crate) trait WidgetController: Debug {
     /// Write the initial state of the widget to the space.
     ///
-    /// TODO: Replace direct mutations with returning a UniverseTransaction
     /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
-    fn initialize(&mut self, _sv: &WidgetSpaceView<'_>) -> Result<(), Box<dyn Error>> {
-        Ok(())
+    /// TODO: Stop using &mut self in favor of a transaction, like Behavior
+    fn initialize(
+        &mut self,
+        _sv: &WidgetSpaceView<'_>,
+    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+        Ok(WidgetTransaction::default())
     }
 
-    /// TODO: Replace direct mutations with returning a UniverseTransaction
     /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Result<(), Box<dyn Error>>;
+    /// TODO: Stop using &mut self in favor of a transaction, like Behavior
+    fn step(
+        &mut self,
+        sv: &WidgetSpaceView<'_>,
+        tick: Tick,
+    ) -> Result<WidgetTransaction, Box<dyn Error>>;
 
     /// Update which character this widget displays the state of.
     ///
     /// TODO: Replace this with maybe a ListenableSource<URef<Character>> or some other data binding
     /// strategy that doesn't hardwire the Character type in quite this way
+    /// TODO: Stop using &mut self in favor of a transaction, like Behavior
     fn set_character(&mut self, _character: Option<&URef<Character>>) {}
 }
 
@@ -92,16 +103,20 @@ impl ToggleButtonController {
 }
 
 impl WidgetController for ToggleButtonController {
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, _: Tick) -> Result<(), Box<dyn Error>> {
-        if self.todo.get_and_clear() {
-            sv.space.try_modify(|space| {
-                space.set(
-                    self.position,
-                    &self.states[self.data_source.snapshot() as usize],
-                )
-            })??;
-        }
-        Ok(())
+    fn step(
+        &mut self,
+        _: &WidgetSpaceView<'_>,
+        _: Tick,
+    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+        Ok(if self.todo.get_and_clear() {
+            SpaceTransaction::set_cube(
+                self.position,
+                None,
+                Some(self.states[self.data_source.snapshot() as usize].clone()),
+            )
+        } else {
+            SpaceTransaction::default()
+        })
     }
 }
 
@@ -126,20 +141,24 @@ impl CrosshairController {
 }
 
 impl WidgetController for CrosshairController {
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, _tick: Tick) -> Result<(), Box<dyn Error>> {
-        if self.todo.get_and_clear() {
-            sv.space.try_modify(|space| {
-                space.set(
-                    self.position,
-                    if *self.mouselook_mode.get() {
-                        &sv.hud_blocks.icons[Icons::Crosshair]
-                    } else {
-                        &AIR
-                    },
-                )
-            })??;
-        }
-        Ok(())
+    fn step(
+        &mut self,
+        sv: &WidgetSpaceView<'_>,
+        _tick: Tick,
+    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+        Ok(if self.todo.get_and_clear() {
+            SpaceTransaction::set_cube(
+                self.position,
+                None,
+                Some(if *self.mouselook_mode.get() {
+                    sv.hud_blocks.icons[Icons::Crosshair].clone()
+                } else {
+                    AIR
+                }),
+            )
+        } else {
+            SpaceTransaction::default()
+        })
     }
 }
 
@@ -206,13 +225,13 @@ impl ToolbarController {
         self.first_slot_position + GridVector::unit_x() * 2 * slot_index as GridCoordinate
     }
 
-    /// Helper for WidgetController impl; writes to the space without using self.character
+    /// Helper for WidgetController impl; generates a transaction without using self.character
     fn write_items(
         &self,
         sv: &WidgetSpaceView<'_>,
         slots: &[Slot],
         selected_slots: &[usize],
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<WidgetTransaction, Box<dyn Error>> {
         // Update stack count text.
         self.slot_text_space.try_modify(|text_space| {
             // Erase old text.
@@ -275,13 +294,18 @@ impl ToolbarController {
                     &sv.hud_blocks.toolbar_pointer[this_slot_selected_mask];
                 Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
             }
-            Ok(())
-        })?
+            Ok::<(), Box<dyn Error>>(())
+        })??;
+
+        Ok(WidgetTransaction::default())
     }
 }
 
 impl WidgetController for ToolbarController {
-    fn initialize(&mut self, sv: &WidgetSpaceView<'_>) -> Result<(), Box<dyn Error>> {
+    fn initialize(
+        &mut self,
+        sv: &WidgetSpaceView<'_>,
+    ) -> Result<WidgetTransaction, Box<dyn Error>> {
         let hud_blocks = sv.hud_blocks;
         sv.space.try_modify(|space| {
             let toolbar_disp = &mut space.draw_target(GridMatrix::from_origin(
@@ -332,20 +356,26 @@ impl WidgetController for ToolbarController {
                     .unwrap();
             }
         })?;
-        Ok(())
+        Ok(WidgetTransaction::default())
     }
 
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, _: Tick) -> Result<(), Box<dyn Error>> {
-        if self.todo.get_and_clear() {
+    fn step(
+        &mut self,
+        sv: &WidgetSpaceView<'_>,
+        _: Tick,
+    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+        Ok(if self.todo.get_and_clear() {
             if let Some(inventory_source) = &self.inventory_source {
                 let character = inventory_source.borrow();
                 let slots: &[Slot] = &character.inventory().slots;
-                self.write_items(sv, slots, &character.selected_slots())?;
+                self.write_items(sv, slots, &character.selected_slots())?
             } else {
                 // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
+                WidgetTransaction::default()
             }
-        }
-        Ok(())
+        } else {
+            WidgetTransaction::default()
+        })
     }
 
     fn set_character(&mut self, character: Option<&URef<Character>>) {
@@ -575,7 +605,11 @@ impl TooltipController {
 }
 
 impl WidgetController for TooltipController {
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Result<(), Box<dyn Error>> {
+    fn step(
+        &mut self,
+        sv: &WidgetSpaceView<'_>,
+        tick: Tick,
+    ) -> Result<WidgetTransaction, Box<dyn Error>> {
         // None if no update is needed
         let text_update: Option<Arc<str>> = self
             .state
@@ -605,7 +639,7 @@ impl WidgetController for TooltipController {
                 Ok::<(), Box<dyn Error>>(())
             })??;
         }
-        Ok(())
+        Ok(WidgetTransaction::default())
     }
 }
 

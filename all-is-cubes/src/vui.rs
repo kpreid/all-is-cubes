@@ -24,7 +24,7 @@ use crate::drawing::VoxelBrush;
 use crate::inv::ToolError;
 use crate::listen::ListenableSource;
 use crate::math::{FreeCoordinate, GridMatrix};
-use crate::space::Space;
+use crate::space::{Space, SpaceTransaction};
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
 mod hud;
@@ -133,7 +133,7 @@ impl Vui {
         // TODO: This a quick and dirty solution because widgets shouldn't necessarily know the _character_, we need a better general data-binding strategy
         self.for_each_widget(|wc, _sv| {
             wc.set_character(c.as_ref());
-            Ok(())
+            Ok(WidgetTransaction::default())
         });
     }
 
@@ -195,16 +195,24 @@ impl Vui {
         F: for<'a, 'b> FnMut(
             &mut dyn WidgetController,
             &'a WidgetSpaceView<'b>,
-        ) -> Result<(), Box<dyn Error>>,
+        ) -> Result<SpaceTransaction, Box<dyn Error>>,
     {
         let sv = WidgetSpaceView {
             hud_blocks: &self.hud_blocks,
             space: self.hud_space.clone(),
         };
         for controller in &mut self.hud_widgets {
-            if let Err(e) = f(&mut **controller, &sv) {
-                // TODO: reduce log-spam if this ever happens
-                log::error!("VUI widget error: {}\nSource:{:#?}", e, controller);
+            match f(&mut **controller, &sv) {
+                Err(e) => {
+                    // TODO: reduce log-spam if this ever happens
+                    log::error!("VUI widget error: {}\nSource:{:#?}", e, controller);
+                }
+                Ok(transaction) => match sv.space.execute(&transaction) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        log::error!("VUI transaction error: {}\nSource:{:#?}", e, controller);
+                    }
+                },
             }
         }
     }
