@@ -7,10 +7,14 @@
 use std::cmp::Ordering;
 use std::ops::Mul;
 
-use cgmath::{InnerSpace, Matrix4, One, Transform, Vector3, Vector4, Zero as _};
+use cgmath::{
+    EuclideanSpace as _, InnerSpace, Matrix4, One, Transform, Vector3, Vector4, Zero as _,
+};
 pub use ordered_float::{FloatIsNan, NotNan};
 
-use crate::math::*;
+use crate::math::{
+    Face, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Point3,
+};
 
 /// A 4×3 affine transformation matrix in [`GridCoordinate`]s, rather than floats as
 /// [`cgmath::Matrix4`] requires.
@@ -146,6 +150,8 @@ impl GridMatrix {
     /// assert_eq!(reflected.transform_point(GridPoint::new(1, 5, 5)), GridPoint::new(9, 5, 5));
     /// assert_eq!(reflected.transform_cube(GridPoint::new(1, 5, 5)), GridPoint::new(8, 5, 5));
     /// ```
+    ///
+    /// [`Grid::single_cube`]: crate::space::Grid
     #[inline]
     pub fn transform_cube(&self, cube: GridPoint) -> GridPoint {
         self.transform_point(cube + Vector3::new(1, 1, 1))
