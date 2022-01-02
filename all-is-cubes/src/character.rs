@@ -363,9 +363,11 @@ impl Character {
     }
 
     fn is_on_ground(&self) -> bool {
-        self.colliding_cubes
-            .iter()
-            .any(|contact| contact.normal() == Face::PY)
+        self.body.velocity.y <= 0.0
+            && self
+                .colliding_cubes
+                .iter()
+                .any(|contact| contact.normal() == Face::PY)
     }
 }
 

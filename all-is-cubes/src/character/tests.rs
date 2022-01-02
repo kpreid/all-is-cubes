@@ -3,12 +3,14 @@
 
 use std::sync::Arc;
 
-use cgmath::{Angle as _, Deg, Vector3};
+use cgmath::{Angle as _, Deg, Point3, Vector3};
 
+use crate::apps::Tick;
 use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool};
 use crate::listen::Sink;
+use crate::math::{Face, Rgb};
 use crate::physics::BodyTransaction;
 use crate::space::Space;
 use crate::transaction::{Transaction as _, TransactionTester};
@@ -145,6 +147,39 @@ fn transaction_systematic() {
             character
         })
         .test();
+}
+
+#[test]
+fn no_superjumping() {
+    let mut universe = Universe::new();
+    let space = universe.insert_anonymous({
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set([0, 0, 0], Block::from(Rgb::ONE)).unwrap();
+        space
+    });
+    let mut character = Character::spawn_default(space);
+    character.body.position = Point3::new(
+        0.,
+        character.body.collision_box.face_coordinate(Face::NY) + 1.1,
+        0.,
+    );
+    let _ = character.step(None, Tick::from_seconds(1.0)); // initial settling
+
+    assert!(
+        character.is_on_ground(),
+        "should be on ground; current position = {:?}",
+        character.body.position
+    );
+    assert_eq!(character.body.velocity.y, 0.0);
+
+    character.jump_if_able();
+    assert!(!character.is_on_ground());
+    let velocity = character.body.velocity;
+    assert!(velocity.y > 0.0);
+
+    // Second jump without ticking should do nothing
+    character.jump_if_able();
+    assert_eq!(character.body.velocity, velocity);
 }
 
 // TODO: more tests
