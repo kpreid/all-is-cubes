@@ -80,6 +80,7 @@ fn main() -> Result<(), anyhow::Error> {
             common_progress_style().template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}%      "),
         )
         .with_prefix("Building");
+    universe_progress_bar.set_position(0); // Show bar promptly
     let yield_progress = {
         let universe_progress_bar = universe_progress_bar.clone();
         YieldProgress::new(
