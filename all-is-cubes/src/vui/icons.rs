@@ -16,7 +16,8 @@ use crate::content::palette;
 use crate::drawing::{DrawingPlane, VoxelBrush};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{
-    Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+    cube_to_midpoint, Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb,
+    Rgba,
 };
 use crate::space::{GridArray, Space, SpacePhysics};
 use crate::universe::Universe;
@@ -243,7 +244,7 @@ impl Icons {
                             let (shape_radius, block) =
                                 shape[((GridCoordinate::from(resolution) - 1) - p.y) as usize];
                             let centered_p =
-                                p.map(|c| f64::from(c) + 0.5 - f64::from(resolution) / 2.0);
+                                cube_to_midpoint(p).map(|c| c - f64::from(resolution) / 2.0);
                             let r4 = centered_p
                                 .to_vec()
                                 .mul_element_wise(Vector3::new(1., 0., 1.))

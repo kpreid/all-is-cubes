@@ -19,6 +19,7 @@
     - `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
     - `StandardCameras` manages the `Camera`s needed for rendering, given the necessary inputs. It is intended to reduce duplicated code and coupling in each renderer.
     - `VisitRefs` allows traversing the `URef` graph inside a `Universe`.
+    - `math::cube_to_midpoint()` function for the pattern of converting to float and adding 0.5.
 
 - `all-is-cubes-desktop`:
     - Terminal mode now has mouse support for placing and removing blocks.

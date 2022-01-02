@@ -15,8 +15,8 @@ use all_is_cubes::drawing::embedded_graphics::{
 };
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
-    NoiseFnExt as _, NotNan, Rgb, Rgba,
+    cube_to_midpoint, Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    GridVector, NoiseFnExt as _, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::universe::Universe;
@@ -106,11 +106,8 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Glass Block")
                     .voxels_fn(universe, resolution, |cube| {
-                        let unit_radius_point = cube.map(|c| {
-                            (FreeCoordinate::from(c) + 0.5)
-                                / (FreeCoordinate::from(resolution_g) / 2.0)
-                                - 1.0
-                        });
+                        let unit_radius_point = cube_to_midpoint(cube)
+                            .map(|c| c / (FreeCoordinate::from(resolution_g) / 2.0) - 1.0);
                         let power = 7.;
                         let r = unit_radius_point
                             .to_vec()

@@ -17,21 +17,14 @@ pub use aab::*;
 #[macro_use]
 mod color;
 pub use color::*;
+mod coord;
+pub use coord::*;
 mod face;
 pub use face::*;
 mod matrix;
 pub use matrix::*;
 mod rotation;
 pub use rotation::*;
-
-/// Coordinates that are locked to the cube grid.
-pub type GridCoordinate = i32;
-/// Positions that are locked to the cube grid.
-pub type GridPoint = Point3<GridCoordinate>;
-/// Vectors that are locked to the cube grid.
-pub type GridVector = Vector3<GridCoordinate>;
-/// Coordinates that are not locked to the cube grid.
-pub type FreeCoordinate = f64;
 
 /// Allows writing a [`NotNan`] value as a constant expression  (which is not currently
 /// a feature provided by the [`ordered_float`] crate itself).
@@ -115,14 +108,6 @@ pub(crate) fn arbitrary_notnan<
 pub(crate) fn smoothstep(x: f64) -> f64 {
     let x = x.clamp(0.0, 1.0);
     3. * x.powi(2) - 2. * x.powi(3)
-}
-
-/// Compute the squared magnitude of a [`GridVector`].
-///
-/// [`cgmath::InnerSpace::magnitude2`] would do the same but only for floats.
-#[inline]
-pub(crate) fn int_magnitude_squared(v: GridVector) -> GridCoordinate {
-    v.x * v.x + v.y * v.y + v.z * v.z
 }
 
 /// Common features of objects that have a location and shape in space.

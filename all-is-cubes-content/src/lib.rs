@@ -31,7 +31,8 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::{draw_to_blocks, VoxelBrush, VoxelColor};
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
+    cube_to_midpoint, Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint,
+    GridVector,
 };
 use all_is_cubes::space::{Grid, SetCubeError, Space};
 
@@ -161,8 +162,7 @@ pub(crate) fn voronoi_pattern<'a>(
 ) -> impl Fn(GridPoint) -> &'a Block {
     let point_offsets = Grid::new([-1, -1, -1], [3, 3, 3]);
     move |cube| {
-        // TODO: I keep writing this cast-to-midpoints function. Should make it easy.
-        let p = cube.map(|c| (FreeCoordinate::from(c) + 0.5) / FreeCoordinate::from(resolution));
+        let p = cube_to_midpoint(cube) / FreeCoordinate::from(resolution);
         points
             .clone()
             .into_iter()
