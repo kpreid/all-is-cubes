@@ -5,6 +5,7 @@
 
 use std::error::Error;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use cgmath::EuclideanSpace as _;
@@ -28,20 +29,16 @@ use crate::raycast::Face;
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
-use crate::vui::Icons;
 
 // Placeholder for likely wanting to change this later
 pub(super) type WidgetTransaction = SpaceTransaction;
 
 pub(crate) struct WidgetSpaceView<'a> {
-    // TODO: Eliminate HudLayout's functions in favor of widgets having been configured with their location
-    pub(super) hud_blocks: &'a HudBlocks,
+    pub(super) _phantom: PhantomData<&'a ()>,
     pub(super) space: URef<Space>,
     // TODO: Define a coordinate transform rather than each widget knowing its location
     // view_to_space_transform: GridMatrix,
 }
-
-impl WidgetSpaceView<'_> {}
 
 /// A form of using a region of a [`Space`] as a UI widget.
 ///
@@ -123,16 +120,18 @@ impl WidgetController for ToggleButtonController {
 /// Shows/hides the crosshair depending on mouselook mode.
 #[derive(Debug)]
 pub(crate) struct CrosshairController {
+    icon: Block,
     todo: DirtyFlag,
     position: GridPoint,
     mouselook_mode: ListenableSource<bool>,
 }
 
 impl CrosshairController {
-    pub fn new(position: GridPoint, mouselook_mode: ListenableSource<bool>) -> Self {
+    pub fn new(position: GridPoint, icon: Block, mouselook_mode: ListenableSource<bool>) -> Self {
         let todo = DirtyFlag::new(false);
         mouselook_mode.listen(todo.listener());
         Self {
+            icon,
             todo,
             position,
             mouselook_mode,
@@ -143,7 +142,7 @@ impl CrosshairController {
 impl WidgetController for CrosshairController {
     fn step(
         &mut self,
-        sv: &WidgetSpaceView<'_>,
+        _sv: &WidgetSpaceView<'_>,
         _tick: Tick,
     ) -> Result<WidgetTransaction, Box<dyn Error>> {
         Ok(if self.todo.get_and_clear() {
@@ -151,7 +150,7 @@ impl WidgetController for CrosshairController {
                 self.position,
                 None,
                 Some(if *self.mouselook_mode.get() {
-                    sv.hud_blocks.icons[Icons::Crosshair].clone()
+                    self.icon.clone()
                 } else {
                     AIR
                 }),
@@ -167,6 +166,7 @@ impl WidgetController for CrosshairController {
 /// TODO: We may or may not want to expand this to handle general inventory viewing
 #[derive(Debug)]
 pub(crate) struct ToolbarController {
+    hud_blocks: Arc<HudBlocks>,
     todo: DirtyFlag,
     /// TODO: Generalize to noncharacters
     inventory_source: Option<URef<Character>>,
@@ -183,6 +183,7 @@ impl ToolbarController {
 
     pub fn new(
         inventory_source: Option<URef<Character>>,
+        hud_blocks: Arc<HudBlocks>,
         layout: &HudLayout,
         universe: &mut Universe,
     ) -> Self {
@@ -211,6 +212,7 @@ impl ToolbarController {
         );
 
         Self {
+            hud_blocks,
             todo,
             inventory_source,
             inventory_gate: gate,
@@ -273,7 +275,7 @@ impl ToolbarController {
 
                 let position = self.slot_position(index);
                 // Draw icon
-                space.set(position, &*stack.icon(&sv.hud_blocks.icons))?;
+                space.set(position, &*stack.icon(&self.hud_blocks.icons))?;
                 // Draw pointers.
                 // TODO: refactor to not use FLIP_Y now that it isn't a hardcoded feature
                 // TODO: draw_target isn't especially helpful here
@@ -291,7 +293,7 @@ impl ToolbarController {
                     })
                     .sum();
                 let brush: &VoxelBrush<'_> =
-                    &sv.hud_blocks.toolbar_pointer[this_slot_selected_mask];
+                    &self.hud_blocks.toolbar_pointer[this_slot_selected_mask];
                 Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
             }
             Ok::<(), Box<dyn Error>>(())
@@ -306,7 +308,7 @@ impl WidgetController for ToolbarController {
         &mut self,
         sv: &WidgetSpaceView<'_>,
     ) -> Result<WidgetTransaction, Box<dyn Error>> {
-        let hud_blocks = sv.hud_blocks;
+        let hud_blocks = &self.hud_blocks;
         sv.space.try_modify(|space| {
             let toolbar_disp = &mut space.draw_target(GridMatrix::from_origin(
                 self.slot_position(0),
@@ -445,7 +447,12 @@ impl TooltipState {
     }
 
     /// Advances time and returns the string that should be newly written to the screen, if different than the previous call.
-    fn step(&mut self, sv: &WidgetSpaceView<'_>, tick: Tick) -> Option<Arc<str>> {
+    fn step(
+        &mut self,
+        hud_blocks: &HudBlocks,
+        _sv: &WidgetSpaceView<'_>,
+        tick: Tick,
+    ) -> Option<Arc<str>> {
         if let Some(ref mut age) = self.age {
             *age += tick.delta_t;
             if *age > Duration::from_secs(1) {
@@ -466,7 +473,7 @@ impl TooltipState {
                     .unwrap_or(usize::MAX);
                 if let Some(tool) = character.inventory().slots.get(selected_slot).cloned() {
                     let new_text = tool
-                        .icon(&sv.hud_blocks.icons)
+                        .icon(&hud_blocks.icons)
                         .evaluate()
                         .ok()
                         .map(|ev_block| ev_block.attributes.display_name.to_owned().into())
@@ -547,6 +554,7 @@ impl TooltipContents {
 
 #[derive(Debug)]
 pub(crate) struct TooltipController {
+    hud_blocks: Arc<HudBlocks>,
     /// Tracks what we should be displaying and serves as dirty flag.
     state: Arc<Mutex<TooltipState>>,
     text_space: URef<Space>,
@@ -559,6 +567,7 @@ impl TooltipController {
         state: Arc<Mutex<TooltipState>>,
         space: &mut Space,
         layout: &HudLayout,
+        hud_blocks: Arc<HudBlocks>,
         universe: &mut Universe,
     ) -> Self {
         let frame = layout.toolbar_text_frame();
@@ -598,6 +607,7 @@ impl TooltipController {
             .unwrap();
 
         Self {
+            hud_blocks,
             state,
             text_space: text_space_ref,
         }
@@ -615,7 +625,7 @@ impl WidgetController for TooltipController {
             .state
             .try_lock()
             .ok()
-            .and_then(|mut state| state.step(sv, tick));
+            .and_then(|mut state| state.step(&self.hud_blocks, sv, tick));
 
         if let Some(text) = text_update {
             self.text_space.try_modify(|text_space| {
@@ -629,7 +639,7 @@ impl WidgetController for TooltipController {
                 let text_obj = Text::with_text_style(
                     &text,
                     Point::new(grid.size().x / 2, -1),
-                    MonoTextStyle::new(&HudFont, &sv.hud_blocks.text),
+                    MonoTextStyle::new(&HudFont, &self.hud_blocks.text),
                     TextStyleBuilder::new()
                         .baseline(Baseline::Bottom)
                         .alignment(Alignment::Center)
@@ -651,31 +661,35 @@ mod tests {
     fn tooltip_timeout_and_dirty_text() {
         // TODO: reduce boilerplate
         let mut universe = Universe::new();
+        let hud_blocks = &HudBlocks::new(&mut universe, 16);
         let sv = WidgetSpaceView {
-            hud_blocks: &HudBlocks::new(&mut universe, 16),
+            _phantom: PhantomData,
             space: universe.insert_anonymous(Space::empty_positive(1, 1, 1)),
         };
 
         // Initial state: no update.
         let mut t = TooltipState::default();
-        assert_eq!(t.step(&sv, Tick::from_seconds(0.5)), None);
+        assert_eq!(t.step(hud_blocks, &sv, Tick::from_seconds(0.5)), None);
         assert_eq!(t.age, None);
 
         // Add a message.
         t.set_message("Hello world".into());
         assert_eq!(t.age, Some(Duration::ZERO));
         assert_eq!(
-            t.step(&sv, Tick::from_seconds(0.25)),
+            t.step(hud_blocks, &sv, Tick::from_seconds(0.25)),
             Some("Hello world".into())
         );
         // Message is only emitted from step() once.
-        assert_eq!(t.step(&sv, Tick::from_seconds(0.25)), None);
+        assert_eq!(t.step(hud_blocks, &sv, Tick::from_seconds(0.25)), None);
         assert_eq!(t.age, Some(Duration::from_millis(500)));
 
         // Advance time until it should time out.
-        assert_eq!(t.step(&sv, Tick::from_seconds(0.501)), Some("".into()));
+        assert_eq!(
+            t.step(hud_blocks, &sv, Tick::from_seconds(0.501)),
+            Some("".into())
+        );
         assert_eq!(t.age, None);
         // Empty string is only emitted from step() once.
-        assert_eq!(t.step(&sv, Tick::from_seconds(2.00)), None);
+        assert_eq!(t.step(hud_blocks, &sv, Tick::from_seconds(2.00)), None);
     }
 }

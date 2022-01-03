@@ -7,6 +7,7 @@
 //! GUI as well as the game.
 
 use std::error::Error;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
@@ -41,7 +42,8 @@ pub(crate) struct Vui {
     universe: Universe,
     current_space: URef<Space>,
 
-    hud_blocks: HudBlocks,
+    #[allow(dead_code)] // TODO: not used but probably will be when we have more dynamic UI
+    hud_blocks: Arc<HudBlocks>,
     hud_space: URef<Space>,
     hud_widgets: Vec<Box<dyn WidgetController>>,
 
@@ -56,7 +58,7 @@ impl Vui {
     /// TODO: should be displaying paused state
     pub fn new(input_processor: &InputProcessor, paused: ListenableSource<bool>) -> Self {
         let mut universe = Universe::new();
-        let hud_blocks = HudBlocks::new(&mut universe, 16);
+        let hud_blocks = Arc::new(HudBlocks::new(&mut universe, 16));
         let hud_layout = HudLayout::default();
         let hud_space = hud_layout.new_space(&mut universe, &hud_blocks);
 
@@ -66,11 +68,13 @@ impl Vui {
         let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
             Box::new(ToolbarController::new(
                 None, // TODO: remove or bind
+                Arc::clone(&hud_blocks),
                 &hud_layout,
                 &mut universe,
             )),
             Box::new(CrosshairController::new(
                 hud_layout.crosshair_position(),
+                hud_blocks.icons[Icons::Crosshair].clone(),
                 input_processor.mouselook_mode(),
             )),
             Box::new(
@@ -80,6 +84,7 @@ impl Vui {
                             Arc::clone(&tooltip_state),
                             sp,
                             &hud_layout,
+                            hud_blocks.clone(),
                             &mut universe,
                         )
                     })
@@ -198,7 +203,7 @@ impl Vui {
         ) -> Result<SpaceTransaction, Box<dyn Error>>,
     {
         let sv = WidgetSpaceView {
-            hud_blocks: &self.hud_blocks,
+            _phantom: PhantomData,
             space: self.hud_space.clone(),
         };
         for controller in &mut self.hud_widgets {
