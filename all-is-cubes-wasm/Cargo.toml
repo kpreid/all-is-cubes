@@ -39,6 +39,9 @@ luminance = "0.46.0"
 luminance-web-sys = "0.5.0"
 luminance-webgl = "0.6.0"
 rand = { version = "0.8.2", default-features = false, features = ["std", "std_rng"] }
+# Feature enabling for indirect dependency all-is-cubes → resource
+# If we don't set this feature, it will try to access files at run time and fail
+resource = { version = "0.5.0", features = ["force-static"] }
 wasm-bindgen = "0.2.70"
 wasm-bindgen-futures =  "0.4.28"
 
