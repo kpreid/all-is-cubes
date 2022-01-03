@@ -27,6 +27,7 @@ use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::raycast::Face;
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
+use crate::transaction::Merge;
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
 
@@ -230,11 +231,13 @@ impl ToolbarController {
     /// Helper for WidgetController impl; generates a transaction without using self.character
     fn write_items(
         &self,
-        sv: &WidgetSpaceView<'_>,
+        _sv: &WidgetSpaceView<'_>,
         slots: &[Slot],
         selected_slots: &[usize],
     ) -> Result<WidgetTransaction, Box<dyn Error>> {
         // Update stack count text.
+        // TODO: This needs to stop being direct modification, eventually, at least if
+        // we want to have parallel updates.
         self.slot_text_space.try_modify(|text_space| {
             // Erase old text.
             // TODO: Do this incrementally and only-if-different.
@@ -266,40 +269,36 @@ impl ToolbarController {
             }
         })?;
 
-        sv.space.try_modify(|space| {
-            for (index, stack) in slots.iter().enumerate() {
-                if index >= self.slot_count {
-                    // TODO: must clear nonexistent positions, eventually
-                    break;
-                }
-
-                let position = self.slot_position(index);
-                // Draw icon
-                space.set(position, &*stack.icon(&self.hud_blocks.icons))?;
-                // Draw pointers.
-                // TODO: refactor to not use FLIP_Y now that it isn't a hardcoded feature
-                // TODO: draw_target isn't especially helpful here
-                let toolbar_disp = &mut space.draw_target(
-                    GridMatrix::from_translation(position.to_vec()) * GridMatrix::FLIP_Y,
-                );
-                // TODO: magic number in how many selections we display
-                let this_slot_selected_mask: usize = (0..2_usize)
-                    .map(|sel| {
-                        (selected_slots
-                            .get(sel)
-                            .map(|&i| i == index)
-                            .unwrap_or(false) as usize)
-                            << sel
-                    })
-                    .sum();
-                let brush: &VoxelBrush<'_> =
-                    &self.hud_blocks.toolbar_pointer[this_slot_selected_mask];
-                Pixel(Point::new(0, 0), brush).draw(toolbar_disp)?;
+        let mut txn = SpaceTransaction::default();
+        for (index, stack) in slots.iter().enumerate() {
+            if index >= self.slot_count {
+                // TODO: must clear nonexistent positions, eventually
+                break;
             }
-            Ok::<(), Box<dyn Error>>(())
-        })??;
 
-        Ok(WidgetTransaction::default())
+            let position = self.slot_position(index);
+            // Draw icon
+            txn.set(
+                position,
+                None,
+                Some(stack.icon(&self.hud_blocks.icons).to_owned().into_owned()),
+            )?;
+            // Draw pointers.
+            // TODO: magic number in how many selections we display
+            let this_slot_selected_mask: usize = (0..2_usize)
+                .map(|sel| {
+                    (selected_slots
+                        .get(sel)
+                        .map(|&i| i == index)
+                        .unwrap_or(false) as usize)
+                        << sel
+                })
+                .sum();
+            let brush: &VoxelBrush<'_> = &self.hud_blocks.toolbar_pointer[this_slot_selected_mask];
+            txn = txn.merge(brush.paint_transaction(position)).unwrap();
+        }
+
+        Ok(txn)
     }
 }
 

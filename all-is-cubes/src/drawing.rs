@@ -32,7 +32,7 @@ pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
 use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
-use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
+use crate::space::{Grid, SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
 /// Adapter to use a [`Space`] as a [`DrawTarget`].
@@ -221,6 +221,22 @@ impl<'a> VoxelBrush<'a> {
         Ok(())
     }
 
+    /// Creates a transaction equivalent to [`VoxelBrush::paint`].
+    ///
+    /// Note that [`VoxelBrush::paint`] or using it in a [`DrawTarget`] ignores
+    /// out-of-bounds drawing, but transactions do not support this and will fail instead.
+    pub fn paint_transaction(&self, origin: GridPoint) -> SpaceTransaction {
+        let mut txn = SpaceTransaction::default();
+        for (offset, block) in &self.0 {
+            txn.set(
+                origin + offset.to_vec(),
+                None,
+                Some(block.to_owned().into_owned()),
+            ).unwrap(/* TODO: make conflict not possible */);
+        }
+        txn
+    }
+
     /// Converts a `&VoxelBrush` into a `VoxelBrush` that borrows it.
     pub fn as_ref(&self) -> VoxelBrush<'_> {
         VoxelBrush(
@@ -265,6 +281,21 @@ impl<'a> VoxelColor<'a> for &'a VoxelBrush<'a> {
         let min = zs.clone().fold(0, GridCoordinate::min);
         let max = zs.fold(0, GridCoordinate::max);
         min..=max
+    }
+}
+
+impl<'a> From<&'a VoxelBrush<'a>> for SpaceTransaction {
+    /// Converts the brush into an equivalent transaction, as by
+    /// [`VoxelBrush::paint_transaction`] at the origin.
+    fn from(brush: &'a VoxelBrush<'a>) -> Self {
+        brush.paint_transaction(GridPoint::origin())
+    }
+}
+impl<'a> From<VoxelBrush<'a>> for SpaceTransaction {
+    /// Converts the brush into an equivalent transaction, as by
+    /// [`VoxelBrush::paint_transaction`] at the origin.
+    fn from(brush: VoxelBrush<'a>) -> Self {
+        SpaceTransaction::from(&brush)
     }
 }
 
