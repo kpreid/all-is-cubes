@@ -7,7 +7,7 @@
 use all_is_cubes::util::YieldProgress;
 use noise::Seedable as _;
 
-use all_is_cubes::block::{Block, BlockCollision, RotationPlacementRule, AIR};
+use all_is_cubes::block::{Block, BlockCollision, Resolution, RotationPlacementRule, AIR};
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
@@ -32,7 +32,9 @@ use crate::palette;
 pub enum DemoBlocks {
     GlassBlock,
     Lamp,
-    Lamppost,
+    LamppostSegment,
+    LamppostBase,
+    LamppostTop,
     Sconce,
     Arrow,
     Road,
@@ -90,6 +92,10 @@ pub async fn install_demo_blocks(
         }
     };
 
+    let lamp_globe = Block::from(Rgba::WHITE);
+    let lamppost_metal = Block::from(palette::ALMOST_BLACK);
+    let lamppost_edge = Block::from(palette::ALMOST_BLACK * 1.12);
+
     use DemoBlocks::*;
     BlockProvider::<DemoBlocks>::new(|key| {
         Ok(match key {
@@ -133,27 +139,66 @@ pub async fn install_demo_blocks(
                     if int_magnitude_squared(p * 2 + one_diagonal - center_point_doubled)
                         <= resolution_g.pow(2)
                     {
-                        Rgba::WHITE.into()
+                        &lamp_globe
                     } else {
-                        AIR.clone()
+                        &AIR
                     }
                 })?
                 .build(),
 
-            Lamppost => Block::builder()
+            LamppostSegment => Block::builder()
                 .display_name("Lamppost")
                 .light_emission(Rgb::new(3.0, 3.0, 3.0))
                 .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
-                .voxels_fn(universe, resolution, |p| {
+                .voxels_fn(universe, resolution, |cube| {
                     if int_magnitude_squared(
-                        (p * 2 + one_diagonal - center_point_doubled)
+                        (cube * 2 + one_diagonal - center_point_doubled)
                             .mul_element_wise(GridVector::new(1, 0, 1)),
                     ) <= 4i32.pow(2)
                     {
-                        palette::ALMOST_BLACK.into()
+                        &lamppost_metal
                     } else {
-                        AIR.clone()
+                        &AIR
+                    }
+                })?
+                .build(),
+
+            LamppostBase => Block::builder()
+                .display_name("Lamppost Base")
+                .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .voxels_fn(universe, resolution, |cube| {
+                    let shape: [GridCoordinate; 16] =
+                        [8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 6, 6, 5, 4, 4, 3];
+                    let [radius, secondary] = square_radius(resolution, cube);
+                    if radius < shape.get(cube.y as usize).copied().unwrap_or(0) {
+                        if secondary == radius {
+                            &lamppost_edge
+                        } else {
+                            &lamppost_metal
+                        }
+                    } else {
+                        &AIR
+                    }
+                })?
+                .build(),
+
+            LamppostTop => Block::builder()
+                .display_name("Lamppost Top")
+                .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .voxels_fn(universe, resolution, |cube| {
+                    let shape: [GridCoordinate; 16] =
+                        [4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 7, 8];
+                    let r2 = int_magnitude_squared(
+                        (cube * 2 + one_diagonal - center_point_doubled)
+                            .mul_element_wise(GridVector::new(1, 0, 1)),
+                    );
+                    if r2 < shape.get(cube.y as usize).copied().unwrap_or(0).pow(2) {
+                        &lamppost_metal
+                    } else {
+                        &AIR
                     }
                 })?
                 .build(),
@@ -171,11 +216,11 @@ pub async fn install_demo_blocks(
                         .mul_element_wise(GridVector::new(3, 1, 1)),
                     );
                     if r2 <= (resolution_g - 2).pow(2) {
-                        Rgba::WHITE.into()
+                        &lamp_globe
                     } else if r2 <= (resolution_g + 4).pow(2) && p.z == 0 {
-                        palette::ALMOST_BLACK.into()
+                        &lamppost_metal
                     } else {
-                        AIR.clone()
+                        &AIR
                     }
                 })?
                 .build(),
@@ -358,6 +403,24 @@ pub(crate) fn gradient_lookup(gradient: &[Block], value: f32) -> &Block {
     &gradient[((value * gradient.len() as f32) as usize).clamp(0, gradient.len() - 1)]
 }
 
+/// Compute the cube's distance from the midpoint of the Y axis of the block grid.
+///
+/// If the resolution is even, then the centermost 4 cubes all have a distance of 1.
+/// If the resolution is odd, then there is only 1 cube that has a distance of 1.
+/// (No cube has a distance of 0, so 0 can be used in a comparison for “never”.)
+///
+/// The first returned number is the "radius" value and the second is the distance
+/// on the lesser axis, which may be used for distance from the center or corner along
+/// the surface.
+fn square_radius(resolution: Resolution, cube: GridPoint) -> [GridCoordinate; 2] {
+    let distances_vec = cube.map(|c| (c * 2 + 1 - GridCoordinate::from(resolution)).abs() / 2 + 1);
+    if distances_vec.x > distances_vec.z {
+        [distances_vec.x, distances_vec.z]
+    } else {
+        [distances_vec.z, distances_vec.x]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,6 +461,20 @@ mod tests {
         assert_eq!(
             inputs_and_output_indices.map(|(i, _)| gradient_lookup(&blocks, i)),
             inputs_and_output_indices.map(|(_, o)| &blocks[o]),
+        );
+    }
+
+    #[test]
+    fn square_radius_cases() {
+        assert_eq!(
+            [6, 7, 8, 9].map(|x| square_radius(16, GridPoint::new(x, 2, 8))[0]),
+            [2, 1, 1, 2]
+        );
+
+        // TODO: Make this work
+        assert_eq!(
+            [3, 4, 5, 6].map(|x| square_radius(9, GridPoint::new(x, 2, 4))[0]),
+            [2, 1, 2, 3]
         );
     }
 }

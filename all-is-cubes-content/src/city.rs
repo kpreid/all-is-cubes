@@ -68,9 +68,9 @@ pub(crate) async fn demo_city(
 
     // Prepare brushes.
     let lamp_brush = VoxelBrush::new(vec![
-        ((0, 0, 0), &demo_blocks[Lamppost]),
-        ((0, 1, 0), &demo_blocks[Lamppost]),
-        ((0, 2, 0), &demo_blocks[Lamppost]),
+        ((0, 0, 0), &demo_blocks[LamppostBase]),
+        ((0, 1, 0), &demo_blocks[LamppostSegment]),
+        ((0, 2, 0), &demo_blocks[LamppostTop]),
         ((0, 3, 0), &demo_blocks[Lamp]),
     ]);
 
