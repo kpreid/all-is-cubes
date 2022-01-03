@@ -13,7 +13,7 @@ use embedded_graphics::mono_font::iso_8859_1;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::Point;
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
-use embedded_graphics::{Drawable as _, Pixel};
+use embedded_graphics::Drawable as _;
 use instant::Duration;
 use once_cell::sync::Lazy;
 
@@ -25,7 +25,6 @@ use crate::drawing::VoxelBrush;
 use crate::inv::Slot;
 use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
-use crate::raycast::Face;
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::transaction::Merge;
 use crate::universe::{URef, Universe};
@@ -303,61 +302,59 @@ impl ToolbarController {
 }
 
 impl WidgetController for ToolbarController {
-    fn initialize(
-        &mut self,
-        sv: &WidgetSpaceView<'_>,
-    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn initialize(&mut self, _: &WidgetSpaceView<'_>) -> Result<WidgetTransaction, Box<dyn Error>> {
         let hud_blocks = &self.hud_blocks;
-        sv.space.try_modify(|space| {
-            let toolbar_disp = &mut space.draw_target(GridMatrix::from_origin(
-                self.slot_position(0),
-                Face::PX,
-                Face::NY,
-                Face::PZ,
-            ));
-            Pixel(Point::new(-1, 0), &hud_blocks.toolbar_left_cap)
-                .draw(toolbar_disp)
-                .unwrap();
-            Pixel(
-                Point::new((self.slot_count as i32 - 1) * Self::TOOLBAR_STEP + 1, 0),
-                &hud_blocks.toolbar_right_cap,
-            )
-            .draw(toolbar_disp)
-            .unwrap();
-            for index in 0..self.slot_count {
-                let x = index as i32 * Self::TOOLBAR_STEP;
-                Pixel(Point::new(x, 0), &hud_blocks.toolbar_middle)
-                    .draw(toolbar_disp)
-                    .unwrap();
-                if index > 0 {
-                    Pixel(Point::new(x - 1, 0), &hud_blocks.toolbar_divider)
-                        .draw(toolbar_disp)
-                        .unwrap();
-                }
-            }
+        let mut txn = SpaceTransaction::default();
 
-            // Place stack-count text blocks. This is done separately because it's easier
-            // without getting `draw_target` involved.
-            for index in 0..self.slot_count {
-                space
-                    .set(
-                        self.slot_position(index) + GridVector::new(-1, 0, 0),
-                        Block::Recur {
-                            attributes: BlockAttributes::default(),
-                            offset: GridPoint::new(
-                                index as GridCoordinate
-                                    * GridCoordinate::from(self.slot_text_resolution),
-                                0,
-                                1 - GridCoordinate::from(self.slot_text_resolution), // align to front face
-                            ),
-                            resolution: self.slot_text_resolution,
-                            space: self.slot_text_space.clone(),
-                        },
+        txn = txn
+            .merge(
+                hud_blocks
+                    .toolbar_left_cap
+                    .paint_transaction(self.slot_position(0) + GridVector::new(-1, 0, 0)),
+            )
+            .unwrap();
+        txn = txn
+            .merge(hud_blocks.toolbar_right_cap.paint_transaction(
+                self.slot_position(self.slot_count - 1) + GridVector::new(1, 0, 0),
+            ))
+            .unwrap();
+        for index in 0..self.slot_count {
+            txn = txn
+                .merge(
+                    hud_blocks
+                        .toolbar_middle
+                        .paint_transaction(self.slot_position(index)),
+                )
+                .unwrap();
+            if index > 0 {
+                txn = txn
+                    .merge(
+                        hud_blocks.toolbar_divider.paint_transaction(
+                            self.slot_position(index) + GridVector::new(-1, 0, 0),
+                        ),
                     )
                     .unwrap();
             }
-        })?;
-        Ok(WidgetTransaction::default())
+        }
+
+        // Place stack-count text blocks. This is done separately because it's easier
+        // without getting `draw_target` involved.
+        for index in 0..self.slot_count {
+            txn.set_overwrite(
+                self.slot_position(index) + GridVector::new(-1, 0, 0),
+                Block::Recur {
+                    attributes: BlockAttributes::default(),
+                    offset: GridPoint::new(
+                        index as GridCoordinate * GridCoordinate::from(self.slot_text_resolution),
+                        0,
+                        1 - GridCoordinate::from(self.slot_text_resolution), // align to front face
+                    ),
+                    resolution: self.slot_text_resolution,
+                    space: self.slot_text_space.clone(),
+                },
+            );
+        }
+        Ok(txn)
     }
 
     fn step(

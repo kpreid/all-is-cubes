@@ -65,6 +65,25 @@ impl SpaceTransaction {
         }
     }
 
+    /// Expand this transaction to include modifying the given cube, replacing any
+    /// existing modification instruction (but not an existing `old` block precondition).
+    /// This is thus comparable to a direct [`Space::set()`] after the rest of the
+    /// transaction.
+    // TODO: no tests
+    pub fn set_overwrite(&mut self, cube: impl Into<GridPoint>, block: Block) {
+        match self.cubes.entry(cube.into().into()) {
+            Vacant(entry) => {
+                entry.insert(CubeTransaction {
+                    old: None,
+                    new: Some(block),
+                });
+            }
+            Occupied(mut entry) => {
+                entry.get_mut().new = Some(block);
+            }
+        }
+    }
+
     fn single(cube: impl Into<GridPoint>, transaction: CubeTransaction) -> Self {
         let cube: GridPoint = cube.into();
         let mut cubes = BTreeMap::new();
