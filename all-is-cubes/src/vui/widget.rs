@@ -47,13 +47,6 @@ pub(crate) trait WidgetController: Debug {
     /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
     /// TODO: Stop using &mut self in favor of a transaction, like Behavior
     fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>>;
-
-    /// Update which character this widget displays the state of.
-    ///
-    /// TODO: Replace this with maybe a ListenableSource<URef<Character>> or some other data binding
-    /// strategy that doesn't hardwire the Character type in quite this way
-    /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    fn set_character(&mut self, _character: Option<&URef<Character>>) {}
 }
 
 /// Manages a single-block toggle button.
@@ -144,10 +137,13 @@ impl WidgetController for CrosshairController {
 #[derive(Debug)]
 pub(crate) struct ToolbarController {
     hud_blocks: Arc<HudBlocks>,
-    todo: DirtyFlag,
+    todo_change_character: DirtyFlag,
+    todo_inventory: DirtyFlag,
+    /// Which character self.character should be
+    character_source: ListenableSource<Option<URef<Character>>>,
     /// TODO: Generalize to noncharacters
-    inventory_source: Option<URef<Character>>,
-    inventory_gate: Gate,
+    character: Option<URef<Character>>,
+    character_listener_gate: Gate,
     first_slot_position: GridPoint,
     slot_count: usize,
     /// Space for drawing per-slot text labels
@@ -159,18 +155,22 @@ impl ToolbarController {
     pub(crate) const TOOLBAR_STEP: GridCoordinate = 2;
 
     pub fn new(
-        inventory_source: Option<URef<Character>>,
+        character_source: ListenableSource<Option<URef<Character>>>,
         hud_blocks: Arc<HudBlocks>,
         layout: &HudLayout,
         universe: &mut Universe,
     ) -> Self {
         let slot_count = layout.toolbar_positions;
 
-        let todo = DirtyFlag::new(true);
+        let todo_change_character = DirtyFlag::new(false);
+        let todo_inventory = DirtyFlag::new(true);
 
-        let (gate, listener) = todo.listener().gate();
-        if let Some(character) = &inventory_source {
-            character.borrow().listen(listener);
+        character_source.listen(todo_change_character.listener());
+        let character = character_source.snapshot();
+
+        let (character_listener_gate, character_listener) = todo_inventory.listener().gate();
+        if let Some(character) = &character {
+            character.borrow().listen(character_listener);
         }
 
         let slot_text_resolution: Resolution = 32;
@@ -190,9 +190,11 @@ impl ToolbarController {
 
         Self {
             hud_blocks,
-            todo,
-            inventory_source,
-            inventory_gate: gate,
+            todo_change_character,
+            todo_inventory,
+            character_source,
+            character,
+            character_listener_gate,
             first_slot_position: layout.first_tool_icon_position(),
             slot_count,
             slot_text_space,
@@ -334,8 +336,19 @@ impl WidgetController for ToolbarController {
     }
 
     fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
-        Ok(if self.todo.get_and_clear() {
-            if let Some(inventory_source) = &self.inventory_source {
+        if self.todo_change_character.get_and_clear() {
+            self.character = self.character_source.snapshot();
+
+            let (gate, listener) = self.todo_inventory.listener().gate();
+            if let Some(character) = &self.character {
+                character.borrow().listen(listener);
+            }
+            self.character_listener_gate = gate;
+            self.todo_inventory.set();
+        }
+
+        Ok(if self.todo_inventory.get_and_clear() {
+            if let Some(inventory_source) = &self.character {
                 let character = inventory_source.borrow();
                 let slots: &[Slot] = &character.inventory().slots;
                 self.write_items(slots, &character.selected_slots())?
@@ -346,16 +359,6 @@ impl WidgetController for ToolbarController {
         } else {
             WidgetTransaction::default()
         })
-    }
-
-    fn set_character(&mut self, character: Option<&URef<Character>>) {
-        let (gate, listener) = self.todo.listener().gate();
-        if let Some(character) = character {
-            character.borrow().listen(listener);
-        }
-        self.inventory_source = character.cloned();
-        self.inventory_gate = gate;
-        self.todo.set();
     }
 }
 

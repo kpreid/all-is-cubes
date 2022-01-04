@@ -55,7 +55,11 @@ impl Vui {
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
     /// TODO: should be displaying paused state
-    pub fn new(input_processor: &InputProcessor, paused: ListenableSource<bool>) -> Self {
+    pub fn new(
+        input_processor: &InputProcessor,
+        character_source: ListenableSource<Option<URef<Character>>>,
+        paused: ListenableSource<bool>,
+    ) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = Arc::new(HudBlocks::new(&mut universe, 16));
         let hud_layout = HudLayout::default();
@@ -66,7 +70,7 @@ impl Vui {
         // TODO: HudLayout should take care of this maybe
         let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
             Box::new(ToolbarController::new(
-                None, // TODO: remove or bind
+                character_source,
                 Arc::clone(&hud_blocks),
                 &hud_layout,
                 &mut universe,
@@ -129,16 +133,11 @@ impl Vui {
     }
 
     /// Change which character's inventory and other state are displayed.
+    /// TODO: Eliminate this fully in favor of self.character_source
     pub fn set_character(&mut self, c: Option<URef<Character>>) {
         if let Some(character_ref) = &c {
             TooltipState::bind_to_character(&self.tooltip_state, character_ref.clone());
         }
-
-        // TODO: This a quick and dirty solution because widgets shouldn't necessarily know the _character_, we need a better general data-binding strategy
-        self.for_each_widget(|wc| {
-            wc.set_character(c.as_ref());
-            Ok(WidgetTransaction::default())
-        });
     }
 
     // TODO: It'd be more encapsulating if we could provide a _read-only_ reference...
@@ -253,7 +252,11 @@ mod tests {
     use super::*;
 
     fn new_vui_for_test() -> Vui {
-        Vui::new(&InputProcessor::new(), ListenableSource::constant(false))
+        Vui::new(
+            &InputProcessor::new(),
+            ListenableSource::constant(None),
+            ListenableSource::constant(false),
+        )
     }
 
     #[test]

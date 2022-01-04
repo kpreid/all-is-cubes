@@ -90,16 +90,21 @@ impl AllIsCubesAppState {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let game_universe = Universe::new();
+        let game_character = ListenableCellWithLocal::new(None);
         let input_processor = InputProcessor::new();
         let paused = ListenableCell::new(false);
 
         Self {
-            ui: Vui::new(&input_processor, paused.as_source()),
+            ui: Vui::new(
+                &input_processor,
+                game_character.as_source(),
+                paused.as_source(),
+            ),
 
             frame_clock: FrameClock::new(),
             input_processor,
             graphics_options: ListenableCell::new(GraphicsOptions::default()),
-            game_character: ListenableCellWithLocal::new(None),
+            game_character,
             game_universe,
             game_universe_in_progress: None,
             paused,
@@ -122,6 +127,8 @@ impl AllIsCubesAppState {
         self.game_universe = u;
         let c = self.game_universe.get_default_character();
         self.game_character.set(c.clone());
+
+        // TODO: This is redundant with the ListenableSource the UI already has
         self.ui.set_character(c);
     }
 
