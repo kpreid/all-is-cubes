@@ -571,9 +571,10 @@ exhibit! {
     const COLOR_LIGHTS,
     name: "Colored Lights",
     (_this, universe) {
-        let room_width = 7;
-        let room_length = 12;
-        let room_height = 5;
+        let room_width = 11;
+        let room_length = 16;
+        let room_height = 7;
+        let separator_width = 4;  // less than room_width/2
         let interior = Grid::new([0, 0, 0], [room_width, room_height, room_length]);
         let mut space = Space::empty(interior.expand(FaceMap::from_fn(|_| 1)));
 
@@ -664,7 +665,6 @@ exhibit! {
         )?;
 
         // Vertical separators
-        let separator_width = 2;
         space.fill_uniform(
             Grid::new([0, room_height / 2, 0], [separator_width, 1, room_length]),
             &wall_block,
@@ -683,7 +683,7 @@ exhibit! {
             &AIR,
         )?;
 
-        // Place lights
+        // Place lights and horizontal separators
         for (i, color) in light_colors.iter().copied().enumerate() {
             let z = (i as GridCoordinate) * (room_length - 1)
                 / (light_colors.len() as GridCoordinate - 1);
@@ -704,6 +704,15 @@ exhibit! {
                     .light_emission(color * 10.0)
                     .build(),
             )?;
+
+            // Separator between different light areas
+            if true || i > 0  {
+                if i % 2 == 0 {
+                    space.fill_uniform(Grid::new([room_width - separator_width, 0, z], [separator_width, room_height, 1]), &wall_block)?;
+                } else {
+                    space.fill_uniform(Grid::new([0, 0, z], [separator_width, room_height, 1]), &wall_block)?;
+                }
+            }
         }
 
         // TODO: Add an RGBCMY section, and also a color-temperature section (or maybe different buildings)
