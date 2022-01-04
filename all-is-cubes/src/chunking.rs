@@ -6,6 +6,8 @@
 //! For the time being, the chunk size is locked to the constant `CHUNK_SIZE`.
 
 use std::iter::FusedIterator;
+use std::ops::RangeTo;
+use std::sync::Arc;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero};
 use ordered_float::NotNan;
@@ -47,7 +49,7 @@ pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
 
 /// Precomputed information about the spherical pattern of chunks within view distance.
 ///
-/// In order to use the same pattern for all posible view positions, the view position is
+/// In order to use the same pattern for all possible view positions, the view position is
 /// rounded to enclosing chunk position.
 #[derive(Clone, Debug, Eq, PartialEq)] // TODO: customize Debug and PartialEq
 pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
@@ -68,7 +70,13 @@ pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
     /// +++++
     ///  +++
     /// ```
-    octant_chunks: Vec<GridVector>,
+    ///
+    /// This vector may contain more than the desired chunks; this is done so that a small
+    /// chart can reuse the work to construct a large one.
+    octant_chunks: Arc<[GridVector]>,
+
+    /// Range of elements of `octant_chunks` to actually use.
+    octant_range: RangeTo<usize>,
 }
 
 impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
@@ -76,9 +84,11 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         let view_distance = Self::sanitize_distance(view_distance);
         let view_distance_in_chunks = view_distance.into_inner() / FreeCoordinate::from(CHUNK_SIZE);
 
+        let octant_chunks = compute_chart_octant(view_distance_in_chunks);
         Self {
             view_distance,
-            octant_chunks: compute_chart_octant(view_distance_in_chunks),
+            octant_range: ..octant_chunks.len(),
+            octant_chunks,
         }
     }
 
@@ -88,10 +98,10 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     }
 
     /// Recalculate the chart if the provided distance is different.
-    ///
-    /// Equivalent to replacing `self` with a new chart from [`ChunkChart::new`].
     pub fn resize_if_needed(&mut self, view_distance: FreeCoordinate) {
         if Self::sanitize_distance(view_distance) != self.view_distance {
+            // TODO: If shrinking the chart, just shrink octant_range instead of
+            // recomputing
             *self = Self::new(view_distance);
         }
     }
@@ -107,7 +117,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         &self,
         origin: ChunkPos<CHUNK_SIZE>,
     ) -> impl Iterator<Item = ChunkPos<CHUNK_SIZE>> + DoubleEndedIterator + FusedIterator + '_ {
-        self.octant_chunks
+        self.octant_chunks[self.octant_range]
             .iter()
             .copied()
             .flat_map(AxisMirrorIter::for_axis(0))
@@ -123,7 +133,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         use crate::math::Rgba;
 
         let mut max = GridPoint::origin();
-        for chunk in self.octant_chunks.iter().copied() {
+        for chunk in self.octant_chunks[self.octant_range].iter().copied() {
             max = max.zip(Point3::from_vec(chunk), GridCoordinate::max);
         }
         let extent = Grid::from_lower_upper(max.map(|c| -c - 1), max.map(|c| c + 2));
@@ -158,7 +168,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     }
 }
 
-fn compute_chart_octant(view_distance_in_chunks: FreeCoordinate) -> Vec<GridVector> {
+fn compute_chart_octant(view_distance_in_chunks: FreeCoordinate) -> Arc<[GridVector]> {
     // We're going to compute in the zero-or-positive octant, which means that the chunk origin
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
     // each chunk.
@@ -190,7 +200,7 @@ fn compute_chart_octant(view_distance_in_chunks: FreeCoordinate) -> Vec<GridVect
     // Sort by distance, with coordinates for tiebreakers.
     octant_chunks
         .sort_unstable_by_key(|&chunk| (int_magnitude_squared(chunk), chunk.x, chunk.y, chunk.z));
-    octant_chunks
+    octant_chunks.into()
 }
 
 /// An iterator that returns a vector and its opposite in the specified axis.
