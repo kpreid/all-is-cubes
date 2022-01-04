@@ -575,8 +575,15 @@ exhibit! {
         let room_length = 16;
         let room_height = 7;
         let separator_width = 4;  // less than room_width/2
+        let brightness = 1.0;
+
         let interior = Grid::new([0, 0, 0], [room_width, room_height, room_length]);
         let mut space = Space::empty(interior.expand(FaceMap::from_fn(|_| 1)));
+
+
+        fn normalize(color: Rgb) -> Rgb {
+            color * color.luminance().recip()
+        }
 
         let light_colors = [
             rgb_const!(1.0, 0.0, 0.0),
@@ -693,7 +700,7 @@ exhibit! {
                 Block::builder()
                     .display_name("Colored light with colored surface")
                     .color(color.with_alpha_one())
-                    .light_emission(color * 1.2)
+                    .light_emission(normalize(color) * brightness)
                     .build(),
             )?;
             space.set(
@@ -701,7 +708,7 @@ exhibit! {
                 Block::builder()
                     .display_name("Colored light with white surface")
                     .color(Rgba::WHITE)
-                    .light_emission(color * 10.0)
+                    .light_emission(normalize(color) * brightness)
                     .build(),
             )?;
 
