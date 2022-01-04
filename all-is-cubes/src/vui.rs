@@ -6,7 +6,6 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
-use std::error::Error;
 use std::sync::{Arc, Mutex};
 
 use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
@@ -24,7 +23,7 @@ use crate::drawing::VoxelBrush;
 use crate::inv::ToolError;
 use crate::listen::ListenableSource;
 use crate::math::{FreeCoordinate, GridMatrix};
-use crate::space::{Space, SpaceTransaction};
+use crate::space::Space;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
 mod hud;
@@ -43,8 +42,8 @@ pub(crate) struct Vui {
 
     #[allow(dead_code)] // TODO: not used but probably will be when we have more dynamic UI
     hud_blocks: Arc<HudBlocks>,
+    #[allow(dead_code)] // TODO: not used but probably will be when we have more dynamic UI
     hud_space: URef<Space>,
-    hud_widgets: Vec<Box<dyn WidgetController>>,
 
     tooltip_state: Arc<Mutex<TooltipState>>,
 }
@@ -107,29 +106,30 @@ impl Vui {
             )),
         ];
 
-        let mut new_self = Self {
-            universe,
-            current_space: hud_space.clone(),
-            hud_blocks,
-            hud_space,
-            hud_widgets,
-
-            tooltip_state,
-        };
-
-        // Initialize widgets
-        new_self.for_each_widget(|wc| wc.initialize());
+        for controller in hud_widgets {
+            hud_space
+                .try_modify(|space| {
+                    WidgetBehavior::install(space, controller).expect("initializing widget");
+                })
+                .unwrap();
+        }
 
         // Initialize lighting
-        new_self
-            .hud_space
+        hud_space
             .try_modify(|space| {
                 space.fast_evaluate_light();
                 space.evaluate_light(10, |_| {});
             })
             .unwrap();
 
-        new_self
+        Self {
+            universe,
+            current_space: hud_space.clone(),
+            hud_blocks,
+            hud_space,
+
+            tooltip_state,
+        }
     }
 
     /// Change which character's inventory and other state are displayed.
@@ -188,29 +188,7 @@ impl Vui {
     }
 
     pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
-        self.for_each_widget(|controller| controller.step(tick));
-
         self.universe.step(tick)
-    }
-
-    fn for_each_widget<F>(&mut self, mut f: F)
-    where
-        F: for<'a, 'b> FnMut(&mut dyn WidgetController) -> Result<SpaceTransaction, Box<dyn Error>>,
-    {
-        for controller in &mut self.hud_widgets {
-            match f(&mut **controller) {
-                Err(e) => {
-                    // TODO: reduce log-spam if this ever happens
-                    log::error!("VUI widget error: {}\nSource:{:#?}", e, controller);
-                }
-                Ok(transaction) => match self.hud_space.execute(&transaction) {
-                    Ok(()) => {}
-                    Err(e) => {
-                        log::error!("VUI transaction error: {}\nSource:{:#?}", e, controller);
-                    }
-                },
-            }
-        }
     }
 
     pub fn show_tool_error(&mut self, error: ToolError) {

@@ -17,6 +17,7 @@ use instant::Duration;
 use once_cell::sync::Lazy;
 
 use crate::apps::Tick;
+use crate::behavior::{Behavior, BehaviorContext};
 use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
 use crate::content::palette;
@@ -25,8 +26,8 @@ use crate::inv::Slot;
 use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
-use crate::transaction::Merge;
-use crate::universe::{URef, Universe};
+use crate::transaction::{Merge, Transaction};
+use crate::universe::{URef, Universe, VisitRefs};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
 
 // Placeholder for likely wanting to change this later
@@ -35,7 +36,7 @@ pub(super) type WidgetTransaction = SpaceTransaction;
 /// A form of using a region of a [`Space`] as a UI widget.
 ///
 /// TODO: Merge this into the Behavior trait
-pub(crate) trait WidgetController: Debug {
+pub(crate) trait WidgetController: Debug + Send + Sync + 'static {
     /// Write the initial state of the widget to the space.
     ///
     /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
@@ -47,6 +48,71 @@ pub(crate) trait WidgetController: Debug {
     /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
     /// TODO: Stop using &mut self in favor of a transaction, like Behavior
     fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>>;
+}
+
+impl WidgetController for Box<dyn WidgetController> {
+    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
+        (**self).step(tick)
+    }
+
+    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
+        (**self).initialize()
+    }
+}
+
+/// Wraps a [`WidgetController`] to make it into a [`Behavior`].
+// TODO: Eliminate this iff it doesn't continue to be a useful abstraction.
+// TODO: This uses interior mutability when it shouldn't (behaviors are supposed
+// to mutate self via transaction); is that fine? It'll certainly mean that failing
+// transactions might be lost, but that might be as good as anything.
+#[derive(Debug)]
+pub(super) struct WidgetBehavior<C> {
+    controller: Mutex<C>,
+}
+
+impl<C: WidgetController> WidgetBehavior<C> {
+    /// Attaches the given widget controller to the space.
+    /// Returns an error if the controller's `initialize()` fails.
+    pub(crate) fn install(space: &mut Space, mut controller: C) -> Result<(), Box<dyn Error>> {
+        controller.initialize()?.execute(space)?;
+        space.add_behavior(WidgetBehavior {
+            controller: Mutex::new(controller),
+        });
+        Ok(())
+    }
+}
+
+impl<C> VisitRefs for WidgetBehavior<C> {
+    fn visit_refs(&self, _: &mut dyn crate::universe::RefVisitor) {
+        // TODO: Do we need to visit the widget controllers?
+    }
+}
+
+impl<C> Behavior<Space> for WidgetBehavior<C>
+where
+    C: WidgetController + Send,
+{
+    fn step(
+        &self,
+        context: &BehaviorContext<'_, Space>,
+        tick: Tick,
+    ) -> crate::transaction::UniverseTransaction {
+        context.bind_host(
+            self.controller
+                .lock()
+                .unwrap()
+                .step(tick)
+                .expect("TODO: behaviors should have an error reporting path"),
+        )
+    }
+
+    fn alive(&self, _: &BehaviorContext<'_, Space>) -> bool {
+        true
+    }
+
+    fn ephemeral(&self) -> bool {
+        true
+    }
 }
 
 /// Manages a single-block toggle button.
