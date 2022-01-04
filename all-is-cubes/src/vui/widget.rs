@@ -5,7 +5,6 @@
 
 use std::error::Error;
 use std::fmt::Debug;
-use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use cgmath::EuclideanSpace as _;
@@ -33,13 +32,6 @@ use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
 // Placeholder for likely wanting to change this later
 pub(super) type WidgetTransaction = SpaceTransaction;
 
-pub(crate) struct WidgetSpaceView<'a> {
-    pub(super) _phantom: PhantomData<&'a ()>,
-    pub(super) space: URef<Space>,
-    // TODO: Define a coordinate transform rather than each widget knowing its location
-    // view_to_space_transform: GridMatrix,
-}
-
 /// A form of using a region of a [`Space`] as a UI widget.
 ///
 /// TODO: Merge this into the Behavior trait
@@ -48,20 +40,13 @@ pub(crate) trait WidgetController: Debug {
     ///
     /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
     /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    fn initialize(
-        &mut self,
-        _sv: &WidgetSpaceView<'_>,
-    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
         Ok(WidgetTransaction::default())
     }
 
     /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
     /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    fn step(
-        &mut self,
-        sv: &WidgetSpaceView<'_>,
-        tick: Tick,
-    ) -> Result<WidgetTransaction, Box<dyn Error>>;
+    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>>;
 
     /// Update which character this widget displays the state of.
     ///
@@ -100,11 +85,7 @@ impl ToggleButtonController {
 }
 
 impl WidgetController for ToggleButtonController {
-    fn step(
-        &mut self,
-        _: &WidgetSpaceView<'_>,
-        _: Tick,
-    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
         Ok(if self.todo.get_and_clear() {
             SpaceTransaction::set_cube(
                 self.position,
@@ -140,11 +121,7 @@ impl CrosshairController {
 }
 
 impl WidgetController for CrosshairController {
-    fn step(
-        &mut self,
-        _sv: &WidgetSpaceView<'_>,
-        _tick: Tick,
-    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, _tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
         Ok(if self.todo.get_and_clear() {
             SpaceTransaction::set_cube(
                 self.position,
@@ -230,7 +207,6 @@ impl ToolbarController {
     /// Helper for WidgetController impl; generates a transaction without using self.character
     fn write_items(
         &self,
-        _sv: &WidgetSpaceView<'_>,
         slots: &[Slot],
         selected_slots: &[usize],
     ) -> Result<WidgetTransaction, Box<dyn Error>> {
@@ -302,7 +278,7 @@ impl ToolbarController {
 }
 
 impl WidgetController for ToolbarController {
-    fn initialize(&mut self, _: &WidgetSpaceView<'_>) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
         let hud_blocks = &self.hud_blocks;
         let mut txn = SpaceTransaction::default();
 
@@ -357,16 +333,12 @@ impl WidgetController for ToolbarController {
         Ok(txn)
     }
 
-    fn step(
-        &mut self,
-        sv: &WidgetSpaceView<'_>,
-        _: Tick,
-    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
         Ok(if self.todo.get_and_clear() {
             if let Some(inventory_source) = &self.inventory_source {
                 let character = inventory_source.borrow();
                 let slots: &[Slot] = &character.inventory().slots;
-                self.write_items(sv, slots, &character.selected_slots())?
+                self.write_items(slots, &character.selected_slots())?
             } else {
                 // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
                 WidgetTransaction::default()
@@ -443,12 +415,7 @@ impl TooltipState {
     }
 
     /// Advances time and returns the string that should be newly written to the screen, if different than the previous call.
-    fn step(
-        &mut self,
-        hud_blocks: &HudBlocks,
-        _sv: &WidgetSpaceView<'_>,
-        tick: Tick,
-    ) -> Option<Arc<str>> {
+    fn step(&mut self, hud_blocks: &HudBlocks, tick: Tick) -> Option<Arc<str>> {
         if let Some(ref mut age) = self.age {
             *age += tick.delta_t;
             if *age > Duration::from_secs(1) {
@@ -611,17 +578,13 @@ impl TooltipController {
 }
 
 impl WidgetController for TooltipController {
-    fn step(
-        &mut self,
-        sv: &WidgetSpaceView<'_>,
-        tick: Tick,
-    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
         // None if no update is needed
         let text_update: Option<Arc<str>> = self
             .state
             .try_lock()
             .ok()
-            .and_then(|mut state| state.step(&self.hud_blocks, sv, tick));
+            .and_then(|mut state| state.step(&self.hud_blocks, tick));
 
         if let Some(text) = text_update {
             self.text_space.try_modify(|text_space| {
@@ -658,34 +621,30 @@ mod tests {
         // TODO: reduce boilerplate
         let mut universe = Universe::new();
         let hud_blocks = &HudBlocks::new(&mut universe, 16);
-        let sv = WidgetSpaceView {
-            _phantom: PhantomData,
-            space: universe.insert_anonymous(Space::empty_positive(1, 1, 1)),
-        };
 
         // Initial state: no update.
         let mut t = TooltipState::default();
-        assert_eq!(t.step(hud_blocks, &sv, Tick::from_seconds(0.5)), None);
+        assert_eq!(t.step(hud_blocks, Tick::from_seconds(0.5)), None);
         assert_eq!(t.age, None);
 
         // Add a message.
         t.set_message("Hello world".into());
         assert_eq!(t.age, Some(Duration::ZERO));
         assert_eq!(
-            t.step(hud_blocks, &sv, Tick::from_seconds(0.25)),
+            t.step(hud_blocks, Tick::from_seconds(0.25)),
             Some("Hello world".into())
         );
         // Message is only emitted from step() once.
-        assert_eq!(t.step(hud_blocks, &sv, Tick::from_seconds(0.25)), None);
+        assert_eq!(t.step(hud_blocks, Tick::from_seconds(0.25)), None);
         assert_eq!(t.age, Some(Duration::from_millis(500)));
 
         // Advance time until it should time out.
         assert_eq!(
-            t.step(hud_blocks, &sv, Tick::from_seconds(0.501)),
+            t.step(hud_blocks, Tick::from_seconds(0.501)),
             Some("".into())
         );
         assert_eq!(t.age, None);
         // Empty string is only emitted from step() once.
-        assert_eq!(t.step(hud_blocks, &sv, Tick::from_seconds(2.00)), None);
+        assert_eq!(t.step(hud_blocks, Tick::from_seconds(2.00)), None);
     }
 }

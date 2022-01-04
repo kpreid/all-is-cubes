@@ -7,7 +7,6 @@
 //! GUI as well as the game.
 
 use std::error::Error;
-use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
@@ -115,7 +114,7 @@ impl Vui {
         };
 
         // Initialize widgets
-        new_self.for_each_widget(|wc, sv| wc.initialize(sv));
+        new_self.for_each_widget(|wc| wc.initialize());
 
         // Initialize lighting
         new_self
@@ -136,7 +135,7 @@ impl Vui {
         }
 
         // TODO: This a quick and dirty solution because widgets shouldn't necessarily know the _character_, we need a better general data-binding strategy
-        self.for_each_widget(|wc, _sv| {
+        self.for_each_widget(|wc| {
             wc.set_character(c.as_ref());
             Ok(WidgetTransaction::default())
         });
@@ -190,29 +189,22 @@ impl Vui {
     }
 
     pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
-        self.for_each_widget(|controller, sv| controller.step(sv, tick));
+        self.for_each_widget(|controller| controller.step(tick));
 
         self.universe.step(tick)
     }
 
     fn for_each_widget<F>(&mut self, mut f: F)
     where
-        F: for<'a, 'b> FnMut(
-            &mut dyn WidgetController,
-            &'a WidgetSpaceView<'b>,
-        ) -> Result<SpaceTransaction, Box<dyn Error>>,
+        F: for<'a, 'b> FnMut(&mut dyn WidgetController) -> Result<SpaceTransaction, Box<dyn Error>>,
     {
-        let sv = WidgetSpaceView {
-            _phantom: PhantomData,
-            space: self.hud_space.clone(),
-        };
         for controller in &mut self.hud_widgets {
-            match f(&mut **controller, &sv) {
+            match f(&mut **controller) {
                 Err(e) => {
                     // TODO: reduce log-spam if this ever happens
                     log::error!("VUI widget error: {}\nSource:{:#?}", e, controller);
                 }
-                Ok(transaction) => match sv.space.execute(&transaction) {
+                Ok(transaction) => match self.hud_space.execute(&transaction) {
                     Ok(()) => {}
                     Err(e) => {
                         log::error!("VUI transaction error: {}\nSource:{:#?}", e, controller);
