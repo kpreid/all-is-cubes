@@ -86,9 +86,12 @@ impl Tool {
     ) -> Result<(Option<Self>, UniverseTransaction), ToolError> {
         match self {
             Self::Activate => {
-                // TODO: We have nothing to activate yet.
-                // (But this error also needs work.)
-                Err(ToolError::NotUsable)
+                let cursor = input.cursor()?;
+                // TODO: cursor is probably not _exactly_ the right set of data that should be passed on
+                Ok((
+                    Some(self),
+                    SpaceTransaction::activate_block(cursor.place.cube).bind(cursor.space.clone()),
+                ))
             }
             Self::RemoveBlock { keep } => {
                 let cursor = input.cursor()?;
@@ -337,7 +340,7 @@ pub enum ToolError {
 /// TODO: relocate this type once we figure out where it belongs.
 /// TODO: Probably they should be their own kind of UniverseMember, so that they can
 /// be reattached in the future.
-pub struct EphemeralOpaque<T: ?Sized>(Option<Arc<T>>);
+pub struct EphemeralOpaque<T: ?Sized>(pub(crate) Option<Arc<T>>);
 
 impl<T: ?Sized> From<Arc<T>> for EphemeralOpaque<T> {
     fn from(contents: Arc<T>) -> Self {

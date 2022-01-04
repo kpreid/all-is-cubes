@@ -15,6 +15,7 @@ use crate::math::{GridCoordinate, GridPoint};
 use crate::transaction::{Merge, PreconditionFailed};
 use crate::transaction::{Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat as _};
+use crate::vui::ActivatableRegion;
 
 impl Transactional for Space {
     type Transaction = SpaceTransaction;
@@ -35,7 +36,14 @@ impl SpaceTransaction {
     ///
     /// TODO: This name is a poor name now that [`Self::set`] exists.
     pub fn set_cube(cube: impl Into<GridPoint>, old: Option<Block>, new: Option<Block>) -> Self {
-        Self::single(cube, CubeTransaction { old, new })
+        Self::single(
+            cube,
+            CubeTransaction {
+                old,
+                new,
+                ..Default::default()
+            },
+        )
     }
 
     /// Expand this transaction to include modifying the given cube, or return an error if
@@ -50,7 +58,11 @@ impl SpaceTransaction {
         old: Option<Block>,
         new: Option<Block>,
     ) -> Result<(), TransactionConflict> {
-        let ct = CubeTransaction { old, new };
+        let ct = CubeTransaction {
+            old,
+            new,
+            ..Default::default()
+        };
         match self.cubes.entry(cube.into().into()) {
             Vacant(entry) => {
                 entry.insert(ct);
@@ -76,6 +88,7 @@ impl SpaceTransaction {
                 entry.insert(CubeTransaction {
                     old: None,
                     new: Some(block),
+                    ..Default::default()
                 });
             }
             Occupied(mut entry) => {
@@ -100,6 +113,10 @@ impl SpaceTransaction {
             ..Default::default()
         }
     }
+
+    pub(crate) fn activate_block(cube: GridPoint) -> Self {
+        Self::single(cube, CubeTransaction::ACTIVATE)
+    }
 }
 
 impl Transaction<Space> for SpaceTransaction {
@@ -108,7 +125,15 @@ impl Transaction<Space> for SpaceTransaction {
     type Output = ();
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
-        for (&cube, CubeTransaction { old, new: _ }) in &self.cubes {
+        for (
+            &cube,
+            CubeTransaction {
+                old,
+                new: _,
+                activate: _,
+            },
+        ) in &self.cubes
+        {
             if let Some(cube_index) = space.grid().index(cube) {
                 if let Some(old) = old {
                     // Raw lookup because we already computed the index for a bounds check
@@ -134,12 +159,36 @@ impl Transaction<Space> for SpaceTransaction {
     }
 
     fn commit(&self, space: &mut Space, check: Self::CommitCheck) -> Result<(), Box<dyn Error>> {
-        for (&cube, CubeTransaction { old: _, new }) in &self.cubes {
+        let mut to_activate = Vec::new();
+        for (
+            &cube,
+            CubeTransaction {
+                old: _,
+                new,
+                activate,
+            },
+        ) in &self.cubes
+        {
             if let Some(new) = new {
                 space.set(cube, new)?;
             }
+            if *activate {
+                // Deferred for slightly more consistency
+                to_activate.push(cube);
+            }
         }
         self.behaviors.commit(&mut space.behaviors, check)?;
+        if !to_activate.is_empty() {
+            'b: for behavior in space.behaviors.query::<ActivatableRegion>() {
+                // TODO: error return from the function? error report for nonexistence?
+                for cube in to_activate.iter().copied() {
+                    if behavior.region.contains_cube(cube) {
+                        behavior.activate();
+                        continue 'b;
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -213,6 +262,18 @@ struct CubeTransaction {
     old: Option<Block>,
     /// If `None`, this is only a precondition for modifying another block.
     new: Option<Block>,
+
+    /// The cube was “activated” (clicked on, more or less) and should
+    /// respond to that.
+    activate: bool,
+}
+
+impl CubeTransaction {
+    const ACTIVATE: Self = Self {
+        old: None,
+        new: None,
+        activate: true,
+    };
 }
 
 impl Merge for CubeTransaction {
@@ -240,13 +301,18 @@ where {
         if other.new.is_some() {
             self.new = other.new;
         }
+        self.activate |= other.activate;
         self
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
+
     use crate::content::make_some_blocks;
+    use crate::inv::EphemeralOpaque;
     use crate::space::Grid;
     use crate::transaction::TransactionTester;
 
@@ -299,14 +365,16 @@ mod tests {
                     [0, 0, 0],
                     CubeTransaction {
                         old: Some(b1.clone()),
-                        new: Some(b2.clone())
+                        new: Some(b2.clone()),
+                        activate: false,
                     }
                 ),
                 (
                     [1, 0, 0],
                     CubeTransaction {
                         old: Some(b1.clone()),
-                        new: Some(b3.clone())
+                        new: Some(b3.clone()),
+                        activate: false,
                     }
                 ),
             ]
@@ -343,6 +411,29 @@ mod tests {
         let t1 = SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b2.clone()));
         let t2 = SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), None);
         assert_eq!(t1.clone(), t1.clone().merge(t2).unwrap());
+    }
+
+    #[test]
+    fn activate() {
+        let mut space = Space::empty_positive(1, 1, 1);
+        let cube = GridPoint::new(0, 0, 0);
+
+        let signal = Arc::new(AtomicU32::new(0));
+        space.add_behavior(ActivatableRegion {
+            region: Grid::single_cube(cube),
+            // TODO: This sure is clunky
+            effect: EphemeralOpaque::from(Arc::new({
+                let signal = signal.clone();
+                move || {
+                    signal.fetch_add(1, Ordering::Relaxed);
+                }
+            }) as Arc<dyn Fn() + Send + Sync>),
+        });
+
+        SpaceTransaction::activate_block(cube)
+            .execute(&mut space)
+            .unwrap();
+        assert_eq!(signal.load(Ordering::Relaxed), 1);
     }
 
     #[test]
@@ -383,6 +474,16 @@ mod tests {
             )
             .transaction(
                 SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), None),
+                |_, _| Ok(()),
+            )
+            .transaction(
+                SpaceTransaction::activate_block(GridPoint::new(0, 0, 0)),
+                // TODO: Add a test that activation happened once that's possible
+                |_, _| Ok(()),
+            )
+            .transaction(
+                SpaceTransaction::activate_block(GridPoint::new(1, 0, 0)),
+                // TODO: Add a test that activation happened once that's possible
                 |_, _| Ok(()),
             )
             .target(|| Space::empty_positive(1, 1, 1))

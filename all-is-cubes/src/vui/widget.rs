@@ -22,12 +22,12 @@ use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, Resol
 use crate::character::{Character, CharacterChange};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
-use crate::inv::Slot;
+use crate::inv::{EphemeralOpaque, Slot};
 use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
-use crate::universe::{URef, Universe, VisitRefs};
+use crate::universe::{RefVisitor, URef, Universe, VisitRefs};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
 
 // Placeholder for likely wanting to change this later
@@ -83,7 +83,7 @@ impl<C: WidgetController> WidgetBehavior<C> {
 }
 
 impl<C> VisitRefs for WidgetBehavior<C> {
-    fn visit_refs(&self, _: &mut dyn crate::universe::RefVisitor) {
+    fn visit_refs(&self, _: &mut dyn RefVisitor) {
         // TODO: Do we need to visit the widget controllers?
     }
 }
@@ -678,6 +678,44 @@ impl WidgetController for TooltipController {
             })??;
         }
         Ok(WidgetTransaction::default())
+    }
+}
+
+/// A region of a [`Space`] that does something if [`Tool::Activate`] is used on it.
+///
+/// TODO: This is a placeholder for a better design; it's too specific (external side
+/// effect) and yet also not general enough (we would like buttons to have detailed
+/// reactions to clicking) considering that it's hardcoded in Space.
+///
+/// TODO: Make the better version of this public
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ActivatableRegion {
+    pub(crate) region: Grid,
+    pub(crate) effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
+}
+
+impl ActivatableRegion {
+    pub fn activate(&self) {
+        if let Some(f) = &self.effect.0 {
+            f();
+        }
+    }
+}
+
+impl Behavior<Space> for ActivatableRegion {
+    fn alive(&self, _: &BehaviorContext<'_, Space>) -> bool {
+        // TODO: Give a way for this to be deleted automatically
+        true
+    }
+
+    fn ephemeral(&self) -> bool {
+        true
+    }
+}
+
+impl VisitRefs for ActivatableRegion {
+    fn visit_refs(&self, _: &mut dyn RefVisitor) {
+        // Our only interesting member is an EphemeralOpaque — which is opaque.
     }
 }
 
