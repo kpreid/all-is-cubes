@@ -21,7 +21,7 @@ use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::ToolError;
-use crate::listen::ListenableSource;
+use crate::listen::{DirtyFlag, ListenableSource};
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::Space;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -45,15 +45,16 @@ pub(crate) struct Vui {
     #[allow(dead_code)] // TODO: not used but probably will be when we have more dynamic UI
     hud_space: URef<Space>,
 
+    character_source: ListenableSource<Option<URef<Character>>>,
+    changed_character: DirtyFlag,
     tooltip_state: Arc<Mutex<TooltipState>>,
 }
 
 impl Vui {
     /// `input_processor` is the `InputProcessor` whose state may be reflected on the HUD.
-    /// `character` is the `Character` whose inventory is displayed. TODO: Allow for character switching
+    /// `character_source` reports the `Character` whose inventory should be displayed.
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
-    /// TODO: should be displaying paused state
     pub fn new(
         input_processor: &InputProcessor,
         character_source: ListenableSource<Option<URef<Character>>>,
@@ -64,12 +65,15 @@ impl Vui {
         let hud_layout = HudLayout::default();
         let hud_space = hud_layout.new_space(&mut universe, &hud_blocks);
 
+        let changed_character = DirtyFlag::new(false);
+        character_source.listen(changed_character.listener());
+
         let tooltip_state = Arc::default();
 
         // TODO: HudLayout should take care of this maybe
         let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
             Box::new(ToolbarController::new(
-                character_source,
+                character_source.clone(),
                 Arc::clone(&hud_blocks),
                 &hud_layout,
                 &mut universe,
@@ -128,15 +132,9 @@ impl Vui {
             hud_blocks,
             hud_space,
 
+            character_source,
+            changed_character,
             tooltip_state,
-        }
-    }
-
-    /// Change which character's inventory and other state are displayed.
-    /// TODO: Eliminate this fully in favor of self.character_source
-    pub fn set_character(&mut self, c: Option<URef<Character>>) {
-        if let Some(character_ref) = &c {
-            TooltipState::bind_to_character(&self.tooltip_state, character_ref.clone());
         }
     }
 
@@ -188,6 +186,13 @@ impl Vui {
     }
 
     pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
+        // TODO: This should possibly be the responsibility of the TooltipState itself?
+        if self.changed_character.get_and_clear() {
+            if let Some(character_ref) = &*self.character_source.get() {
+                TooltipState::bind_to_character(&self.tooltip_state, character_ref.clone());
+            }
+        }
+
         self.universe.step(tick)
     }
 

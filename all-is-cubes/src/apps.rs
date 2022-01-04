@@ -125,11 +125,8 @@ impl AllIsCubesAppState {
         self.game_universe_in_progress = None;
 
         self.game_universe = u;
-        let c = self.game_universe.get_default_character();
-        self.game_character.set(c.clone());
-
-        // TODO: This is redundant with the ListenableSource the UI already has
-        self.ui.set_character(c);
+        self.game_character
+            .set(self.game_universe.get_default_character());
     }
 
     /// Perform [`Self::set_universe`] on the result of the provided future when it
