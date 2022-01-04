@@ -500,7 +500,7 @@ fn component_to_srgb_8bit(c: NotNan<f32>) -> u8 {
 #[inline]
 fn component_from_linear_8bit(c: u8) -> NotNan<f32> {
     // TODO: make this const when Rust `const_fn_floating_point_arithmetic` is stable
-    NotNan::new(f32::from(c) / 255.0).unwrap()
+    NotNan::from(c) / notnan!(255.0)
 }
 
 #[inline]

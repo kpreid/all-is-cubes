@@ -69,7 +69,7 @@ impl Camera {
     pub fn new(options: GraphicsOptions, viewport: Viewport) -> Self {
         let mut new_self = Self {
             options: options.repair(),
-            exposure: notnan!(1.0),
+            exposure: NotNan::one(),
             viewport,
             eye_to_world_transform: ViewTransform::one(),
 

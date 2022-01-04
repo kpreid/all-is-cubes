@@ -8,8 +8,9 @@ use all_is_cubes::block::{Block, BlockCollision, Resolution, AIR};
 use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
-    Aab, FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, NotNan, Rgb,
+    Aab, FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, Rgb,
 };
+use all_is_cubes::notnan;
 use all_is_cubes::space::{Grid, SetCubeError, Space};
 use all_is_cubes::universe::Universe;
 
@@ -52,7 +53,7 @@ impl DefaultProvision for LandscapeBlocks {
         fn blades() -> Block {
             Block::builder()
                 .display_name("Grass Blades")
-                .color(palette::GRASS.with_alpha(NotNan::new(0.1).unwrap()))
+                .color(palette::GRASS.with_alpha(notnan!(0.1)))
                 .collision(BlockCollision::None)
                 .build()
         }

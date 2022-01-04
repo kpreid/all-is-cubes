@@ -63,14 +63,11 @@ pub struct GraphicsOptions {
 impl GraphicsOptions {
     /// Constrain fields to valid/practical values.
     pub fn repair(mut self) -> Self {
-        self.fov_y = self
-            .fov_y
-            .max(NotNan::new(1.0).unwrap())
-            .min(NotNan::new(189.0).unwrap());
+        self.fov_y = self.fov_y.max(NotNan::from(1)).min(NotNan::from(189));
         self.view_distance = self
             .view_distance
-            .max(NotNan::new(1.0).unwrap())
-            .min(NotNan::new(10000.0).unwrap());
+            .max(NotNan::from(1))
+            .min(NotNan::from(10000));
         self
     }
 }
@@ -79,10 +76,10 @@ impl Default for GraphicsOptions {
     fn default() -> Self {
         Self {
             fog: FogOption::Abrupt,
-            fov_y: NotNan::new(90.).unwrap(),
+            fov_y: NotNan::from(90),
             // TODO: Change tone mapping default once we have a good implementation.
             tone_mapping: ToneMappingOperator::Clamp,
-            view_distance: NotNan::new(200.).unwrap(),
+            view_distance: NotNan::from(200),
             lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
             chunks_per_frame: 4,

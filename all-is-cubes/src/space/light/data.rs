@@ -368,9 +368,9 @@ mod tests {
     fn packed_light_clipping_in() {
         assert_eq!(
             [
-                PackedLight::scalar_in(NotNan::new(-1.).unwrap()),
-                PackedLight::scalar_in(NotNan::new(1e-30).unwrap()),
-                PackedLight::scalar_in(NotNan::new(1e+30).unwrap()),
+                PackedLight::scalar_in(notnan!(-1.)),
+                PackedLight::scalar_in(notnan!(1e-30)),
+                PackedLight::scalar_in(notnan!(1e+30)),
             ],
             [0, 0, 255],
         );

@@ -170,14 +170,14 @@ impl Vui {
     /// Compute graphics options to render the VUI space given the user's regular options.
     pub fn graphics_options(mut options: GraphicsOptions) -> GraphicsOptions {
         // Set FOV to give a predictable, not-too-wide-angle perspective.
-        options.fov_y = NotNan::new(30.).unwrap();
+        options.fov_y = NotNan::from(30);
 
         // Disable fog for maximum clarity and because we shouldn't have any far clipping to hide.
         options.fog = FogOption::None;
 
         // Fixed view distance for our layout.
         // TODO: Derive this from HudLayout and also FOV (since FOV determines eye-to-space distance).
-        options.view_distance = NotNan::new(100.0).unwrap();
+        options.view_distance = NotNan::from(100);
 
         // clutter
         options.debug_chunk_boxes = false;

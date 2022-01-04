@@ -23,6 +23,7 @@ mod tests {
     use crate::space::{Grid, Space, SpacePhysics};
     use crate::universe::Universe;
     use cgmath::{EuclideanSpace, InnerSpace as _, Point3, Vector3, Zero as _};
+    use ordered_float::NotNan;
     use rand::prelude::SliceRandom as _;
     use rand::{Rng as _, SeedableRng as _};
     use std::collections::VecDeque;
@@ -54,7 +55,7 @@ mod tests {
     fn freefall_with_gravity() {
         let mut space = Space::empty_positive(1, 1, 1);
         space.set_physics(SpacePhysics {
-            gravity: Vector3::new(notnan!(0.0), notnan!(-20.0), notnan!(0.0)),
+            gravity: Vector3::new(0, -20, 0).map(NotNan::from),
             ..SpacePhysics::default()
         });
         let mut body = Body {
