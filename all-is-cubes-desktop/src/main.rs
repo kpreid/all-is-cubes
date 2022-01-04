@@ -38,6 +38,11 @@ use crate::terminal::terminal_print_once;
 // TODO: put version numbers in the title when used as a window title
 static TITLE: &str = "All is Cubes";
 
+fn title_and_version() -> String {
+    // TODO: include git version if different
+    format!("{} v{}", TITLE, clap::crate_version!())
+}
+
 fn main() -> Result<(), anyhow::Error> {
     let options = command_options::app().get_matches();
 
@@ -119,7 +124,7 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     match graphics_type {
-        GraphicsType::Window => glfw_main_loop(app, TITLE, display_size),
+        GraphicsType::Window => glfw_main_loop(app, &title_and_version(), display_size),
         GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
         GraphicsType::Record => record_main(app, parse_record_options(options, display_size)?),
         GraphicsType::Print => terminal_print_once(
