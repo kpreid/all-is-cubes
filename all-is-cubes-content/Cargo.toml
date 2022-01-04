@@ -27,7 +27,7 @@ instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }
 maze_generator = "1.1.1"
 noise = { version = "0.7.0", default-features = false }
-ordered-float = { version = "2.1.1" }
+ordered-float = { version = "2.9.0" }
 rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
 strum = { version = "0.23.0", default-features = false, features = ["derive"] }
