@@ -452,12 +452,7 @@ impl fmt::Debug for Rgba {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Rgb {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use crate::math::arbitrary_notnan;
-        Ok(Rgb::new_nn(
-            arbitrary_notnan(u)?,
-            arbitrary_notnan(u)?,
-            arbitrary_notnan(u)?,
-        ))
+        Ok(Rgb::new_nn(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
@@ -467,12 +462,11 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgb {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Rgba {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use crate::math::arbitrary_notnan;
         Ok(Rgba::new_nn(
-            arbitrary_notnan(u)?,
-            arbitrary_notnan(u)?,
-            arbitrary_notnan(u)?,
-            arbitrary_notnan(u)?,
+            u.arbitrary()?,
+            u.arbitrary()?,
+            u.arbitrary()?,
+            u.arbitrary()?,
         ))
     }
 

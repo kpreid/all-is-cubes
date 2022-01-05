@@ -152,6 +152,7 @@ pub enum LightingOption {
 /// and `Volumetric` options; this will probably be changed in the future in favor
 /// of the volumetric interpretation.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum TransparencyOption {
     /// Conventional transparent surfaces.
@@ -187,22 +188,5 @@ impl TransparencyOption {
     #[inline]
     pub(crate) fn will_output_alpha(&self) -> bool {
         !matches!(self, Self::Threshold(_))
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for TransparencyOption {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use crate::math::arbitrary_notnan;
-        Ok(match u.choose(&[0, 1, 2])? {
-            0 => Self::Surface,
-            1 => Self::Volumetric,
-            2 => Self::Threshold(arbitrary_notnan(u)?),
-            _ => unreachable!(),
-        })
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        arbitrary::size_hint::and(u8::size_hint(depth), Option::<f32>::size_hint(depth))
     }
 }

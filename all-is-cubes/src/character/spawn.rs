@@ -101,18 +101,9 @@ impl VisitRefs for Spawn {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Spawn {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use crate::math::arbitrary_notnan;
         Ok(Self {
-            position: Point3::new(
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-            ),
-            look_direction: Vector3::new(
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-            ),
+            position: Point3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
+            look_direction: Vector3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
             inventory: vec![], // TODO: need impl Arbitrary for Tool
         })
     }

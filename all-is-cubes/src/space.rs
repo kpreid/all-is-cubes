@@ -957,11 +957,7 @@ impl Default for SpacePhysics {
 impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
-            gravity: Vector3::new(
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-                arbitrary_notnan(u)?,
-            ),
+            gravity: Vector3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
             sky_color: u.arbitrary()?,
             light: u.arbitrary()?,
         })
@@ -977,6 +973,7 @@ impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
         ])
     }
 }
+
 /// Method used to compute the illumination of individual blocks in a [`Space`].
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
