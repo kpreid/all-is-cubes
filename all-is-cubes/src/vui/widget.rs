@@ -17,7 +17,7 @@ use instant::Duration;
 use once_cell::sync::Lazy;
 
 use crate::apps::Tick;
-use crate::behavior::{Behavior, BehaviorContext};
+use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
 use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
 use crate::content::palette;
@@ -122,7 +122,7 @@ pub(crate) struct ToggleButtonController {
     states: [Block; 2],
     data_source: ListenableSource<bool>,
     todo: DirtyFlag,
-    //action: Box<dyn Fn() + Send + Sync>,
+    action: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 
 impl ToggleButtonController {
@@ -131,6 +131,7 @@ impl ToggleButtonController {
         data_source: ListenableSource<bool>,
         off: Block,
         on: Block,
+        action: impl Fn() + Send + Sync + 'static,
     ) -> Self {
         let todo = DirtyFlag::new(true);
         data_source.listen(todo.listener());
@@ -139,11 +140,21 @@ impl ToggleButtonController {
             states: [off, on],
             todo,
             data_source,
+            action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
         }
     }
 }
 
 impl WidgetController for ToggleButtonController {
+    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
+        Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
+            Arc::new(ActivatableRegion {
+                region: Grid::single_cube(self.position),
+                effect: self.action.clone(),
+            }),
+        )))
+    }
+
     fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
         Ok(if self.todo.get_and_clear() {
             SpaceTransaction::set_cube(

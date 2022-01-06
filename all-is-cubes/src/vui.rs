@@ -101,12 +101,14 @@ impl Vui {
                 paused,
                 hud_blocks.icons[Icons::PauseButtonOff].clone(),
                 hud_blocks.icons[Icons::PauseButtonOn].clone(),
+                || log::error!("pause toggle not implemented (press the P key)"),
             )),
             Box::new(ToggleButtonController::new(
                 hud_layout.control_button_position(1),
                 input_processor.mouselook_mode(),
                 hud_blocks.icons[Icons::MouselookButtonOff].clone(),
                 hud_blocks.icons[Icons::MouselookButtonOn].clone(),
+                || log::error!("mouselook toggle not implemented (press the L key)"),
             )),
         ];
 
