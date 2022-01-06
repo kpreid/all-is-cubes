@@ -6,7 +6,7 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 
 use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
 use embedded_graphics::geometry::Point;
@@ -14,7 +14,7 @@ use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
 use ordered_float::NotNan;
 
-use crate::apps::{InputProcessor, Tick};
+use crate::apps::{ControlMessage, InputProcessor, Tick};
 use crate::block::Block;
 use crate::camera::{FogOption, GraphicsOptions, ViewTransform};
 use crate::character::Character;
@@ -59,6 +59,7 @@ impl Vui {
         input_processor: &InputProcessor,
         character_source: ListenableSource<Option<URef<Character>>>,
         paused: ListenableSource<bool>,
+        control_channel: mpsc::SyncSender<ControlMessage>,
     ) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = Arc::new(HudBlocks::new(&mut universe, 16));
@@ -101,14 +102,24 @@ impl Vui {
                 paused,
                 hud_blocks.icons[Icons::PauseButtonOff].clone(),
                 hud_blocks.icons[Icons::PauseButtonOn].clone(),
-                || log::error!("pause toggle not implemented (press the P key)"),
+                {
+                    let cc = control_channel.clone();
+                    move || {
+                        let _ignore_errors = cc.send(ControlMessage::TogglePause);
+                    }
+                },
             )),
             Box::new(ToggleButtonController::new(
                 hud_layout.control_button_position(1),
                 input_processor.mouselook_mode(),
                 hud_blocks.icons[Icons::MouselookButtonOff].clone(),
                 hud_blocks.icons[Icons::MouselookButtonOn].clone(),
-                || log::error!("mouselook toggle not implemented (press the L key)"),
+                {
+                    let cc = control_channel;
+                    move || {
+                        let _ignore_errors = cc.send(ControlMessage::ToggleMouselook);
+                    }
+                },
             )),
         ];
 
@@ -241,6 +252,7 @@ mod tests {
             &InputProcessor::new(),
             ListenableSource::constant(None),
             ListenableSource::constant(false),
+            mpsc::sync_channel(1).0,
         )
     }
 

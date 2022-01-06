@@ -307,6 +307,7 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('l') => {
+                    // TODO: duplicated with fn toggle_mouselook_mode() because of borrow conflicts
                     let new_state = !*self.mouselook_mode.get();
                     self.mouselook_mode.set(new_state);
                     if new_state {
@@ -361,6 +362,16 @@ impl InputProcessor {
 
     pub fn mouselook_mode(&self) -> ListenableSource<bool> {
         self.mouselook_mode.as_source()
+    }
+
+    // TODO: duplicated with the keybinding impl because of borrow conflicts
+    pub(crate) fn toggle_mouselook_mode(&mut self) {
+        let new_state = !*self.mouselook_mode.get();
+        self.mouselook_mode.set(new_state);
+        if new_state {
+            // Clear delta tracking just in case
+            self.mouse_previous_pixel_position = None;
+        }
     }
 
     /// Returns the position which should be used for click/cursor raycasting.

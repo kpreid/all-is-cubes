@@ -6,6 +6,7 @@
 use std::fmt::{self, Display};
 use std::future::Future;
 use std::mem;
+use std::sync::mpsc::{self, TryRecvError};
 use std::task::{Context, Poll};
 
 use cgmath::{One, Point2};
@@ -55,6 +56,12 @@ pub struct AllIsCubesAppState {
 
     ui: Vui,
 
+    /// Messages for controlling the state that aren't via [`InputProcessor`].
+    ///
+    /// TODO: This is originally a quick kludge to make onscreen UI buttons work.
+    /// Not sure whether it is a good strategy overall.
+    control_channel: mpsc::Receiver<ControlMessage>,
+
     /// Last cursor raycast result.
     /// TODO: This needs to handle clicking on the HUD and thus explicitly point into
     /// one of two different spaces.
@@ -93,12 +100,14 @@ impl AllIsCubesAppState {
         let game_character = ListenableCellWithLocal::new(None);
         let input_processor = InputProcessor::new();
         let paused = ListenableCell::new(false);
+        let (control_send, control_recv) = mpsc::sync_channel(100);
 
         Self {
             ui: Vui::new(
                 &input_processor,
                 game_character.as_source(),
                 paused.as_source(),
+                control_send,
             ),
 
             frame_clock: FrameClock::new(),
@@ -108,6 +117,7 @@ impl AllIsCubesAppState {
             game_universe,
             game_universe_in_progress: None,
             paused,
+            control_channel: control_recv,
             cursor_result: None,
             last_step_info: UniverseStepInfo::default(),
         }
@@ -170,7 +180,26 @@ impl AllIsCubesAppState {
 
     /// Steps the universe if the `FrameClock` says it's time to do so.
     /// Always returns info for the last step even if multiple steps were taken.
+    ///
+    /// Also applies input from the control channel. TODO: Should that be separate?
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
+        loop {
+            match self.control_channel.try_recv() {
+                Ok(msg) => match msg {
+                    ControlMessage::TogglePause => {
+                        self.paused.set(!*self.paused.get());
+                    }
+                    ControlMessage::ToggleMouselook => {
+                        self.input_processor.toggle_mouselook_mode();
+                    }
+                },
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    // Lack of whatever control sources is non-fatal.
+                }
+            }
+        }
+
         if let Some(future) = self.game_universe_in_progress.as_mut() {
             match future
                 .as_mut()
@@ -480,6 +509,15 @@ impl StandardCameras {
 
         None
     }
+}
+
+/// A message sent to the [`AllIsCubesAppState`], such as from a user interface element.
+// TODO: make public if this proves to be a good approach
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub(crate) enum ControlMessage {
+    TogglePause,
+    ToggleMouselook,
 }
 
 #[derive(Copy, Clone, Debug)]
