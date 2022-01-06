@@ -178,7 +178,14 @@ impl<H> BehaviorSetTransaction<H> {
         replace.insert(index, new);
         BehaviorSetTransaction {
             replace,
-            insert: vec![],
+            ..Default::default()
+        }
+    }
+
+    pub fn insert(behavior: Arc<dyn Behavior<H>>) -> Self {
+        BehaviorSetTransaction {
+            insert: vec![behavior],
+            ..Default::default()
         }
     }
 }
