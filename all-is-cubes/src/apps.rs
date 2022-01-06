@@ -227,10 +227,12 @@ impl AllIsCubesAppState {
         // TODO: Catch-up implementation should probably live in FrameClock.
         for _ in 0..FrameClock::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
-                let mut tick = self.frame_clock.tick();
-                if *self.paused.get() {
-                    tick = tick.pause();
-                }
+                let base_tick = self.frame_clock.tick();
+                let game_tick = if *self.paused.get() {
+                    base_tick.pause()
+                } else {
+                    base_tick
+                };
                 self.frame_clock.did_step();
 
                 if let Some(character_ref) = self.game_character.borrow() {
@@ -241,14 +243,14 @@ impl AllIsCubesAppState {
                             paused: Some(&self.paused),
                             graphics_options: Some(&self.graphics_options),
                         },
-                        tick,
+                        game_tick,
                     );
                 }
-                self.input_processor.step(tick);
+                self.input_processor.step(game_tick);
 
-                let mut info = self.game_universe.step(tick);
+                let mut info = self.game_universe.step(game_tick);
 
-                info += self.ui.step(tick);
+                info += self.ui.step(base_tick);
 
                 self.last_step_info = info.clone();
                 result = Some(info)
