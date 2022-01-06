@@ -3,10 +3,13 @@
 
 //! Dynamic add-ons to game objects; we might also have called them “components”.
 
-use ordered_float::NotNan;
+use std::any::TypeId;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
+
+use downcast_rs::{impl_downcast, Downcast};
+use ordered_float::NotNan;
 
 use crate::apps::Tick;
 use crate::character::{Character, CharacterTransaction};
@@ -19,7 +22,9 @@ use crate::universe::{RefVisitor, VisitRefs};
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
-pub trait Behavior<H: Transactional>: Debug + Send + Sync + VisitRefs {
+pub trait Behavior<H: Transactional + 'static>:
+    Debug + Send + Sync + Downcast + VisitRefs + 'static
+{
     /// Computes a transaction to apply the effects of this behavior for one timestep.
     ///
     /// TODO: Define what happens if the transaction fails.
@@ -41,6 +46,8 @@ pub trait Behavior<H: Transactional>: Debug + Send + Sync + VisitRefs {
     // TODO: serialization, quiescence, incoming events...
 }
 
+impl_downcast!(Behavior<H> where H: Transactional);
+
 #[non_exhaustive]
 pub struct BehaviorContext<'a, H: Transactional> {
     pub host: &'a H,
@@ -48,7 +55,7 @@ pub struct BehaviorContext<'a, H: Transactional> {
     self_transaction_binder: &'a dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
 }
 
-impl<'a, H: Transactional> BehaviorContext<'a, H> {
+impl<'a, H: Transactional + 'static> BehaviorContext<'a, H> {
     pub fn bind_host(&self, transaction: H::Transaction) -> UniverseTransaction {
         (self.host_transaction_binder)(transaction)
     }
@@ -67,7 +74,7 @@ pub struct BehaviorSet<H> {
     items: Vec<Arc<dyn Behavior<H>>>,
 }
 
-impl<H: Transactional> BehaviorSet<H> {
+impl<H: Transactional + 'static> BehaviorSet<H> {
     pub(crate) fn new() -> Self {
         BehaviorSet { items: Vec::new() }
     }
@@ -78,6 +85,26 @@ impl<H: Transactional> BehaviorSet<H> {
         B: Behavior<H> + 'static,
     {
         self.items.push(Arc::new(behavior));
+    }
+
+    /// Find behaviors of a specified type.
+    ///
+    /// TODO: We probably want other filtering strategies than just type, so this might change.
+    pub fn query<T: Behavior<H>>(&self) -> impl Iterator<Item = &T> + '_ {
+        self.query_dyn(TypeId::of::<T>())
+            .map(|b| b.downcast_ref::<T>().unwrap())
+    }
+
+    /// Implementation for [`Self::query`].
+    fn query_dyn<'a>(&'a self, t: TypeId) -> impl Iterator<Item = &'a (dyn Behavior<H>)> + 'a {
+        self.items
+            .iter()
+            .map(
+                move |ref_to_arc: &'a Arc<dyn Behavior<H>>| -> &'a (dyn Behavior<H> + 'static) {
+                    &**ref_to_arc
+                },
+            )
+            .filter(move |behavior| (*behavior).type_id() == t)
     }
 
     pub(crate) fn step(
@@ -363,5 +390,39 @@ mod tests {
         // Until we have a way to query the behavior set, the best test we can do is to
         // read its effects.
         assert_eq!(character.borrow().body.yaw, 3.0);
+    }
+
+    #[test]
+    fn query() {
+        #[derive(Debug, Eq, PartialEq)]
+        struct Expected;
+        #[derive(Debug, Eq, PartialEq)]
+        struct Unexpected;
+
+        /// A parameterized behavior so we can easily have two types
+        #[derive(Debug, Eq, PartialEq)]
+        struct Q<T>(T);
+        impl<T: Debug + Send + Sync + 'static> Behavior<Character> for Q<T> {
+            fn alive(&self, _context: &BehaviorContext<'_, Character>) -> bool {
+                true
+            }
+            fn ephemeral(&self) -> bool {
+                false
+            }
+        }
+        impl<T> VisitRefs for Q<T> {
+            // No references
+            fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
+        }
+
+        let mut set = BehaviorSet::<Character>::new();
+        set.insert(Q(Expected));
+        set.insert(Q(Unexpected)); // different type, so it should not be found
+        assert_eq!(
+            set.query_dyn(TypeId::of::<Q<Expected>>())
+                .map(|b| b.downcast_ref::<Q<Expected>>().unwrap())
+                .collect::<Vec<_>>(),
+            vec![&Q(Expected)],
+        )
     }
 }

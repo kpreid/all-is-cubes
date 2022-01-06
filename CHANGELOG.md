@@ -8,6 +8,7 @@
     - The software raytracer now implements volumetric transparency; blocks whose colors have alpha between 0 and 1 may be rendered as a solid volume of translucent material, rather than the alpha being applied at the surface, if the graphics options request it. However, the light model does not yet have a reasonable interpretation of how to light these volumes, so blocks may have unreasonably dark parts. I hope that future work will address this and also better handling of material surfaces (e.g. light reflections at the surface of glass, vs the lack of them in fog or at the meeting surfaces of adjacent similar blocks).
 
 - `all_is_cubes` library:
+    - `BehaviorSet::query()` for looking up existing behaviors.
     - `Camera::exposure` for controlling displayed brightness. Both renderers implement it. Nothing sets it yet.
     - `Camera::post_process_color()` applies the new exposure and tone-mapping settings to a color value.
     - `Evoxel::from_block()` for performing the same conversion from a full block to a voxel that `Block::Recur(...).evaluate()` does.
