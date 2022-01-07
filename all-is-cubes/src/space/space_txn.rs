@@ -486,14 +486,14 @@ mod tests {
                 // TODO: Add a test that activation happened once that's possible
                 |_, _| Ok(()),
             )
-            .target(|| Space::empty_positive(1, 1, 1))
+            .target(|| Space::empty_positive(2, 1, 1))
             .target(|| {
-                let mut space = Space::empty_positive(1, 1, 1);
+                let mut space = Space::empty_positive(2, 1, 1);
                 space.set([0, 0, 0], &b1).unwrap();
                 space
             })
             .target(|| {
-                let mut space = Space::empty_positive(1, 1, 1);
+                let mut space = Space::empty_positive(2, 1, 1);
                 space.set([0, 0, 0], &b2).unwrap();
                 space
             })

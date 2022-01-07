@@ -503,20 +503,19 @@ mod tests {
     }
 
     #[test]
-    fn use_activate_noop() {
+    fn use_activate() {
         let [existing] = make_some_blocks();
         let tester = ToolTester::new(|space| {
             space.set((1, 0, 0), &existing).unwrap();
         });
         assert_eq!(
             tester.equip_and_use_tool(Tool::Activate),
-            Err(ToolError::NotUsable)
+            Ok(SpaceTransaction::activate_block(GridPoint::new(1, 0, 0))
+                .bind(tester.space_ref.clone()))
         );
-    }
 
-    #[test]
-    fn use_activate_effect() {
-        // TODO: When Tool::Activate actually gains some effects, test them here.
+        // Tool::Activate currently has no cases where it fails
+        // (unless the transaction fails), so there are no tests for that.
     }
 
     #[test]
