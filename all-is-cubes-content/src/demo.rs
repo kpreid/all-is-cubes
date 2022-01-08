@@ -1,4 +1,4 @@
-// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
+// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
