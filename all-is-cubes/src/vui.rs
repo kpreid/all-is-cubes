@@ -63,81 +63,22 @@ impl Vui {
     ) -> Self {
         let mut universe = Universe::new();
         let hud_blocks = Arc::new(HudBlocks::new(&mut universe, 16));
-        let hud_layout = HudLayout::default();
-        let hud_space = hud_layout.new_space(&mut universe, &hud_blocks);
 
         let changed_character = DirtyFlag::new(false);
         character_source.listen(changed_character.listener());
 
-        let tooltip_state = Arc::default();
+        let tooltip_state = Arc::<Mutex<TooltipState>>::default();
 
-        // TODO: HudLayout should take care of this maybe
-        let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
-            Box::new(ToolbarController::new(
-                character_source.clone(),
-                Arc::clone(&hud_blocks),
-                &hud_layout,
-                &mut universe,
-            )),
-            Box::new(CrosshairController::new(
-                hud_layout.crosshair_position(),
-                hud_blocks.icons[Icons::Crosshair].clone(),
-                input_processor.mouselook_mode(),
-            )),
-            Box::new(
-                hud_space
-                    .try_modify(|sp| {
-                        TooltipController::new(
-                            Arc::clone(&tooltip_state),
-                            sp,
-                            &hud_layout,
-                            hud_blocks.clone(),
-                            &mut universe,
-                        )
-                    })
-                    .expect("hud space mutate"),
-            ),
-            Box::new(ToggleButtonController::new(
-                hud_layout.control_button_position(0),
-                paused,
-                hud_blocks.icons[Icons::PauseButtonOff].clone(),
-                hud_blocks.icons[Icons::PauseButtonOn].clone(),
-                {
-                    let cc = control_channel.clone();
-                    move || {
-                        let _ignore_errors = cc.send(ControlMessage::TogglePause);
-                    }
-                },
-            )),
-            Box::new(ToggleButtonController::new(
-                hud_layout.control_button_position(1),
-                input_processor.mouselook_mode(),
-                hud_blocks.icons[Icons::MouselookButtonOff].clone(),
-                hud_blocks.icons[Icons::MouselookButtonOn].clone(),
-                {
-                    let cc = control_channel;
-                    move || {
-                        let _ignore_errors = cc.send(ControlMessage::ToggleMouselook);
-                    }
-                },
-            )),
-        ];
-
-        for controller in hud_widgets {
-            hud_space
-                .try_modify(|space| {
-                    WidgetBehavior::install(space, controller).expect("initializing widget");
-                })
-                .unwrap();
-        }
-
-        // Initialize lighting
-        hud_space
-            .try_modify(|space| {
-                space.fast_evaluate_light();
-                space.evaluate_light(10, |_| {});
-            })
-            .unwrap();
+        // TODO: terrible mess of tightly coupled parameters
+        let hud_space = new_hud_space(
+            &mut universe,
+            tooltip_state.clone(),
+            hud_blocks.clone(),
+            input_processor,
+            character_source.clone(),
+            paused,
+            control_channel,
+        );
 
         Self {
             universe,

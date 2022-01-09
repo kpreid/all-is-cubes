@@ -2,6 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::convert::TryInto;
+use std::sync::{mpsc, Arc, Mutex};
 
 use cgmath::Vector2;
 use embedded_graphics::geometry::Point;
@@ -9,15 +10,21 @@ use embedded_graphics::prelude::{Primitive as _, Transform as _};
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Triangle};
 use embedded_graphics::Drawable as _;
 
+use crate::apps::{ControlMessage, InputProcessor};
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
+use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
+use crate::listen::ListenableSource;
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
 use crate::space::{Grid, Space, SpacePhysics};
 
 use crate::universe::{URef, Universe};
-use crate::vui::Icons;
+use crate::vui::{
+    CrosshairController, Icons, ToggleButtonController, ToolbarController, TooltipController,
+    TooltipState, WidgetBehavior, WidgetController,
+};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -99,7 +106,6 @@ impl HudLayout {
     }
 
     pub(crate) fn first_tool_icon_position(&self) -> GridPoint {
-        use super::widget::ToolbarController;
         GridPoint::new(
             (self.size.x
                 - (self.toolbar_positions as GridCoordinate) * ToolbarController::TOOLBAR_STEP
@@ -113,6 +119,89 @@ impl HudLayout {
     pub(super) fn toolbar_text_frame(&self) -> Grid {
         Grid::new((0, 3, 0), (self.size.x, 1, 1))
     }
+}
+
+pub(super) fn new_hud_space(
+    // TODO: terrible mess of tightly coupled parameters
+    universe: &mut Universe,
+    tooltip_state: Arc<Mutex<TooltipState>>,
+    hud_blocks: Arc<HudBlocks>,
+    input_processor: &InputProcessor,
+    character_source: ListenableSource<Option<URef<Character>>>,
+    paused: ListenableSource<bool>,
+    control_channel: mpsc::SyncSender<ControlMessage>,
+) -> URef<Space> {
+    let hud_layout = HudLayout::default();
+    let hud_space = hud_layout.new_space(universe, &hud_blocks);
+
+    // TODO: dyn is no longer needed here
+    let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
+        Box::new(ToolbarController::new(
+            character_source,
+            Arc::clone(&hud_blocks),
+            &hud_layout,
+            universe,
+        )),
+        Box::new(CrosshairController::new(
+            hud_layout.crosshair_position(),
+            hud_blocks.icons[Icons::Crosshair].clone(),
+            input_processor.mouselook_mode(),
+        )),
+        Box::new(
+            hud_space
+                .try_modify(|sp| {
+                    TooltipController::new(
+                        Arc::clone(&tooltip_state),
+                        sp,
+                        &hud_layout,
+                        hud_blocks.clone(),
+                        universe,
+                    )
+                })
+                .expect("hud space mutate"),
+        ),
+        Box::new(ToggleButtonController::new(
+            hud_layout.control_button_position(0),
+            paused,
+            hud_blocks.icons[Icons::PauseButtonOff].clone(),
+            hud_blocks.icons[Icons::PauseButtonOn].clone(),
+            {
+                let cc = control_channel.clone();
+                move || {
+                    let _ignore_errors = cc.send(ControlMessage::TogglePause);
+                }
+            },
+        )),
+        Box::new(ToggleButtonController::new(
+            hud_layout.control_button_position(1),
+            input_processor.mouselook_mode(),
+            hud_blocks.icons[Icons::MouselookButtonOff].clone(),
+            hud_blocks.icons[Icons::MouselookButtonOn].clone(),
+            {
+                let cc = control_channel;
+                move || {
+                    let _ignore_errors = cc.send(ControlMessage::ToggleMouselook);
+                }
+            },
+        )),
+    ];
+    for controller in hud_widgets {
+        hud_space
+            .try_modify(|space| {
+                WidgetBehavior::install(space, controller).expect("initializing widget");
+            })
+            .unwrap();
+    }
+
+    // Initialize lighting
+    hud_space
+        .try_modify(|space| {
+            space.fast_evaluate_light();
+            space.evaluate_light(10, |_| {});
+        })
+        .unwrap();
+
+    hud_space
 }
 
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.
