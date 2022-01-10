@@ -11,6 +11,7 @@ use crate::block::{
     AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
     Modifier, Primitive, Resolution, RotationPlacementRule,
 };
+use crate::drawing::VoxelBrush;
 use crate::math::{GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::universe::{Name, URef, Universe, UniverseIndex};
@@ -101,6 +102,12 @@ impl<C> BlockBuilder<C> {
     /// Sets the value for [`BlockAttributes::light_emission`].
     pub fn light_emission(mut self, value: impl Into<Rgb>) -> Self {
         self.attributes.light_emission = value.into();
+        self
+    }
+
+    /// Sets the value for [`BlockAttributes::tick_action`].
+    pub fn tick_action(mut self, value: Option<VoxelBrush<'static>>) -> Self {
+        self.attributes.tick_action = value;
         self
     }
 

@@ -40,6 +40,7 @@ impl Modifier {
     ) -> Result<EvaluatedBlock, EvalBlockError> {
         Ok(match *self {
             Modifier::Quote { ambient } => {
+                value.attributes.tick_action = None;
                 if ambient {
                     value.attributes.light_emission = Rgb::ZERO;
                 }

@@ -545,6 +545,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     collision: BlockCollision::None,
     rotation_rule: RotationPlacementRule::Never,
     light_emission: Rgb::ZERO,
+    tick_action: None,
     animation_hint: AnimationHint::UNCHANGING,
 };
 

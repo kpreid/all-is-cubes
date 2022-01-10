@@ -6,6 +6,7 @@
 use std::borrow::Cow;
 use std::fmt;
 
+use crate::drawing::VoxelBrush;
 use crate::math::Rgb;
 
 use crate::raycast::Face;
@@ -46,6 +47,13 @@ pub struct BlockAttributes {
     /// The default value is [`Rgb::ZERO`].
     pub light_emission: Rgb,
 
+    /// Something this block does when time passes.
+    ///
+    /// Currently the only possibility is “turn into another block”.
+    ///
+    /// TODO: Very placeholder. This needs more possible effects and also time/probability options.
+    pub tick_action: Option<VoxelBrush<'static>>,
+
     /// Advice to the renderer about how to expect this block to change, and hence
     /// what rendering strategy to use.
     pub animation_hint: AnimationHint,
@@ -80,6 +88,9 @@ impl fmt::Debug for BlockAttributes {
             if self.light_emission != Self::default().light_emission {
                 s.field("light_emission", &self.light_emission);
             }
+            if self.tick_action != Self::default().tick_action {
+                s.field("tick_action", &self.tick_action);
+            }
             if self.animation_hint != Self::default().animation_hint {
                 s.field("animation_hint", &self.animation_hint);
             }
@@ -100,6 +111,7 @@ impl BlockAttributes {
             collision: BlockCollision::Hard,
             rotation_rule: RotationPlacementRule::Never,
             light_emission: Rgb::ZERO,
+            tick_action: None,
             animation_hint: AnimationHint::UNCHANGING,
         }
     }
@@ -122,6 +134,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             collision: u.arbitrary()?,
             rotation_rule: u.arbitrary()?,
             light_emission: u.arbitrary()?,
+            tick_action: None, // TODO: need Arbitrary for Block
             animation_hint: u.arbitrary()?,
         })
     }

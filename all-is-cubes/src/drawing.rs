@@ -182,7 +182,7 @@ impl<'a> VoxelColor<'a> for Rgb888 {
 ///
 /// Note that only `&VoxelBrush` implements [`PixelColor`]; this is because `PixelColor`
 /// requires a value implementing [`Copy`].
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct VoxelBrush<'a>(Vec<(GridPoint, Cow<'a, Block>)>);
 
 impl<'a> VoxelBrush<'a> {

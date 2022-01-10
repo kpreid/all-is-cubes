@@ -14,6 +14,7 @@ use crate::block::{
     RotationPlacementRule, AIR, AIR_EVALUATED,
 };
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
+use crate::drawing::VoxelBrush;
 use crate::listen::{NullListener, Sink};
 use crate::math::{GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba};
 use crate::raycast::Face;
@@ -534,6 +535,7 @@ fn builder_every_field() {
     let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
     let light_emission = Rgb::new(0.1, 3.0, 0.1);
     let rotation_rule = RotationPlacementRule::Attach { by: Face::NZ };
+    let tick_action = Some(VoxelBrush::single(AIR));
     assert_eq!(
         Block::builder()
             .color(color)
@@ -542,6 +544,7 @@ fn builder_every_field() {
             .rotation_rule(rotation_rule)
             .selectable(false)
             .light_emission(light_emission)
+            .tick_action(tick_action.clone())
             .animation_hint(AnimationHint::TEMPORARY)
             .build(),
         Block::from_primitive(Primitive::Atom(
@@ -551,6 +554,7 @@ fn builder_every_field() {
                 rotation_rule,
                 selectable: false,
                 light_emission,
+                tick_action,
                 animation_hint: AnimationHint::TEMPORARY,
             },
             color
