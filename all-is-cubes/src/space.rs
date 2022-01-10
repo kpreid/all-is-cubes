@@ -18,7 +18,7 @@ use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::*;
 use crate::time::Tick;
-use crate::transaction::{Transaction as _, UniverseTransaction};
+use crate::transaction::{Merge, Transaction as _, UniverseTransaction};
 use crate::universe::{RefVisitor, URef, VisitRefs};
 use crate::util::ConciseDebug;
 use crate::util::{CustomFormat, StatusText};
@@ -79,6 +79,9 @@ pub struct Space {
 
     spawn: Spawn,
 
+    /// Cubes that should be checked on the next call to step()
+    cubes_wanting_ticks: HashSet<GridPoint>,
+
     notifier: Notifier<SpaceChange>,
 
     /// Storage for incoming change notifications from blocks.
@@ -108,6 +111,7 @@ impl fmt::Debug for Space {
             .field("block_data", &self.block_data)
             .field("physics", &self.physics)
             .field("behaviors", &self.behaviors)
+            .field("cubes_wanting_ticks", &self.cubes_wanting_ticks) // TODO: truncate?
             .finish_non_exhaustive()
     }
 }
@@ -186,6 +190,7 @@ impl Space {
             physics,
             behaviors: BehaviorSet::new(),
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(grid)),
+            cubes_wanting_ticks: HashSet::new(),
             notifier: Notifier::new(),
             todo: Default::default(),
         }
@@ -386,9 +391,14 @@ impl Space {
         position: GridPoint,
         contents_index: usize,
     ) {
+        let evaluated = &self.block_data[block_index as usize].evaluated;
+
+        if evaluated.attributes.tick_action.is_some() {
+            self.cubes_wanting_ticks.insert(position);
+        }
+
         // TODO: Move this into a function in the lighting module since it is so tied to lighting
         if self.physics.light != LightPhysics::None {
-            let evaluated = &self.block_data[block_index as usize].evaluated;
             if opaque_for_light_computation(evaluated) {
                 // Since we already have the information, immediately update light value
                 // to zero rather than putting it in the queue.
@@ -570,6 +580,21 @@ impl Space {
             // TODO: Process side effects on individual cubes such as reevaluating the
             // lighting influenced by the block.
         }
+
+        // Process cubes_wanting_ticks.
+        let mut tick_txn = SpaceTransaction::default();
+        // TODO: don't empty the queue until the transaction succeeds
+        for position in std::mem::take(&mut self.cubes_wanting_ticks) {
+            if let Some(brush) = self.get_evaluated(position).attributes.tick_action.as_ref() {
+                // TODO: nonconserved should be at the block's choice
+                tick_txn = tick_txn
+                    .merge(brush.paint_transaction(position).nonconserved())
+                    .expect("TODO: don't panic on tick conflict");
+            }
+        }
+        // TODO: We need a strategy for, if this transaction fails, trying again while finding
+        // the non-conflicting pieces in a deterministic fashion.
+        let _ignored_failure = tick_txn.execute(self);
 
         let mut transaction = UniverseTransaction::default();
         if let Some(self_ref) = self_ref {
@@ -818,6 +843,7 @@ impl VisitRefs for Space {
             packed_sky_color: _,
             behaviors,
             spawn,
+            cubes_wanting_ticks: _,
             notifier: _,
             todo: _,
         } = self;

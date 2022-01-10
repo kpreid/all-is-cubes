@@ -11,6 +11,7 @@ use indoc::indoc;
 use super::*;
 use crate::block::AIR;
 use crate::content::make_some_blocks;
+use crate::drawing::VoxelBrush;
 use crate::listen::Sink;
 use crate::math::GridPoint;
 use crate::universe::{RefError, Universe, UniverseIndex as _};
@@ -369,6 +370,7 @@ fn space_debug() {
                     light: None,
                 },
                 behaviors: BehaviorSet([]),
+                cubes_wanting_ticks: {},
                 ..
             }
         "}
@@ -419,4 +421,23 @@ fn set_physics_light_rays() {
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(space.light_update_queue.len(), 1);
     // TODO: test what change notifications are sent
+}
+
+#[test]
+fn block_tick_action() {
+    let [mut block1, block2] = make_some_blocks();
+    if let Block::Atom(attributes, _) = &mut block1 {
+        attributes.tick_action = Some(VoxelBrush::single(block2.clone()));
+    } else {
+        panic!();
+    }
+
+    let mut space = Space::empty_positive(1, 1, 1);
+    space.set([0, 0, 0], block1).unwrap();
+
+    // TODO: the block effect isn't a transaction yet but it should be
+    let (_info, step_txn) = space.step(None, Tick::arbitrary());
+    assert_eq!(step_txn, UniverseTransaction::default());
+
+    assert_eq!(&space[[0, 0, 0]], &block2);
 }
