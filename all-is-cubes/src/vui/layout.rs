@@ -1,6 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::error::Error;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -8,7 +9,9 @@ use cgmath::Zero as _;
 
 use crate::math::GridVector;
 use crate::raycast::Face;
-use crate::space::Grid;
+use crate::space::{Grid, SpaceTransaction};
+use crate::transaction::Merge;
+use crate::vui::{Widget, WidgetBehavior};
 
 /// Requested size and relative positioning of a widget or other thing occupying space,
 /// to be interpreted by a layout algorithm to choose the real position.
@@ -152,6 +155,23 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 }
             }
         }))
+    }
+}
+
+impl<W: Widget> LayoutTree<Positioned<Arc<W>>> {
+    /// Creates a transaction which will install all of the widgets in this tree.
+    ///
+    /// Returns an error if the widgets conflict with each other.
+    ///
+    /// TODO: better return type than dyn Error
+    pub fn installation(&self) -> Result<SpaceTransaction, Box<dyn Error>> {
+        let mut txn = SpaceTransaction::default();
+        for Positioned { value, position } in self.leaves() {
+            let controller_installation =
+                WidgetBehavior::installation(value.clone().controller(position.lower_bounds()))?;
+            txn = txn.merge(controller_installation)?;
+        }
+        Ok(txn)
     }
 }
 

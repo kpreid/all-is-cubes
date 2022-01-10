@@ -18,11 +18,13 @@ use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
+use crate::raycast::Face;
 use crate::space::{Grid, Space, SpacePhysics};
 
 use crate::universe::{URef, Universe};
+use crate::vui::layout::LayoutTree;
 use crate::vui::{
-    CrosshairController, Icons, ToggleButtonController, ToolbarController, TooltipController,
+    CrosshairController, Icons, ToggleButtonWidget, ToolbarController, TooltipController,
     TooltipState, WidgetBehavior, WidgetController,
 };
 
@@ -97,12 +99,8 @@ impl HudLayout {
         GridPoint::new(self.size.x / 2, self.size.y / 2, 0)
     }
 
-    pub(crate) fn control_button_position(&self, index: usize) -> GridPoint {
-        GridPoint::new(
-            self.size.x - 1 - (index as GridCoordinate),
-            self.size.y - 1,
-            -1,
-        )
+    pub(crate) fn control_bar_bounds(&self) -> Grid {
+        Grid::new([0, self.size.y - 1, -1], [self.size.x, 1, 1])
     }
 
     pub(crate) fn first_tool_icon_position(&self) -> GridPoint {
@@ -134,7 +132,7 @@ pub(super) fn new_hud_space(
     let hud_layout = HudLayout::default();
     let hud_space = hud_layout.new_space(universe, &hud_blocks);
 
-    // TODO: dyn is no longer needed here
+    // TODO: this is a legacy kludge which should be replaced by LayoutTree
     let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
         Box::new(ToolbarController::new(
             character_source,
@@ -160,36 +158,52 @@ pub(super) fn new_hud_space(
                 })
                 .expect("hud space mutate"),
         ),
-        Box::new(ToggleButtonController::new(
-            hud_layout.control_button_position(0),
-            paused,
-            hud_blocks.icons[Icons::PauseButtonOff].clone(),
-            hud_blocks.icons[Icons::PauseButtonOn].clone(),
-            {
-                let cc = control_channel.clone();
-                move || {
-                    let _ignore_errors = cc.send(ControlMessage::TogglePause);
-                }
-            },
-        )),
-        Box::new(ToggleButtonController::new(
-            hud_layout.control_button_position(1),
-            input_processor.mouselook_mode(),
-            hud_blocks.icons[Icons::MouselookButtonOff].clone(),
-            hud_blocks.icons[Icons::MouselookButtonOn].clone(),
-            {
-                let cc = control_channel;
-                move || {
-                    let _ignore_errors = cc.send(ControlMessage::ToggleMouselook);
-                }
-            },
-        )),
     ];
     for controller in hud_widgets {
         hud_space
             .execute(&WidgetBehavior::installation(controller).expect("initializing widget"))
             .expect("installing widget");
     }
+
+    // Widgets laid out in top-right corner
+    let top_right_buttons = LayoutTree::Stack {
+        direction: Face::NX,
+        children: vec![
+            LayoutTree::leaf(ToggleButtonWidget::new(
+                paused,
+                hud_blocks.icons[Icons::PauseButtonOff].clone(),
+                hud_blocks.icons[Icons::PauseButtonOn].clone(),
+                {
+                    let cc = control_channel.clone();
+                    move || {
+                        let _ignore_errors = cc.send(ControlMessage::TogglePause);
+                    }
+                },
+            )),
+            LayoutTree::leaf(ToggleButtonWidget::new(
+                input_processor.mouselook_mode(),
+                hud_blocks.icons[Icons::MouselookButtonOff].clone(),
+                hud_blocks.icons[Icons::MouselookButtonOn].clone(),
+                {
+                    let cc = control_channel;
+                    move || {
+                        let _ignore_errors = cc.send(ControlMessage::ToggleMouselook);
+                    }
+                },
+            )),
+        ],
+    };
+
+    // TODO: error handling
+    hud_space
+        .execute(
+            &top_right_buttons
+                .perform_layout(hud_layout.control_bar_bounds())
+                .expect("layout/widget error")
+                .installation()
+                .expect("installation error"),
+        )
+        .expect("transaction error");
 
     // Initialize lighting
     hud_space

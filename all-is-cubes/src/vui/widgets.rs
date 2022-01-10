@@ -1,7 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! TODO: Explain this file properly once it is stabler. Right now it is just a piece of refactoring the VUI code towards modularity.
+//! Specific UI widgets.
 
 use std::error::Error;
 use std::fmt::Debug;
@@ -17,7 +17,7 @@ use instant::Duration;
 use once_cell::sync::Lazy;
 
 use crate::apps::Tick;
-use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
+use crate::behavior::BehaviorSetTransaction;
 use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
 use crate::content::palette;
@@ -27,121 +27,63 @@ use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::transaction::Merge as _;
-use crate::universe::{RefVisitor, URef, Universe, VisitRefs};
+use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
+use crate::vui::layout::{LayoutRequest, Layoutable};
+use crate::vui::{ActivatableRegion, Widget, WidgetController, WidgetTransaction};
 
-// Placeholder for likely wanting to change this later
-pub(super) type WidgetTransaction = SpaceTransaction;
-
-/// A form of using a region of a [`Space`] as a UI widget.
-///
-/// TODO: Merge this into the Behavior trait
-pub(crate) trait WidgetController: Debug + Send + Sync + 'static {
-    /// Write the initial state of the widget to the space.
-    ///
-    /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
-    /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
-        Ok(WidgetTransaction::default())
-    }
-
-    /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
-    /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>>;
+#[derive(Clone, Debug)]
+pub(crate) struct ToggleButtonWidget {
+    states: [Block; 2],
+    data_source: ListenableSource<bool>,
+    action: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 
-impl WidgetController for Box<dyn WidgetController> {
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
-        (**self).step(tick)
-    }
-
-    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
-        (**self).initialize()
+impl ToggleButtonWidget {
+    pub(crate) fn new(
+        data_source: ListenableSource<bool>,
+        off: Block,
+        on: Block,
+        action: impl Fn() + Send + Sync + 'static,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            data_source,
+            states: [off, on],
+            action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
+        })
     }
 }
 
-/// Wraps a [`WidgetController`] to make it into a [`Behavior`].
-// TODO: Eliminate this iff it doesn't continue to be a useful abstraction.
-// TODO: This uses interior mutability when it shouldn't (behaviors are supposed
-// to mutate self via transaction); is that fine? It'll certainly mean that failing
-// transactions might be lost, but that might be as good as anything.
-#[derive(Debug)]
-pub(super) struct WidgetBehavior<C> {
-    controller: Mutex<C>,
-}
-
-impl<C: WidgetController> WidgetBehavior<C> {
-    /// Returns a transaction which adds the given widget controller to the space,
-    /// or an error if the controller's `initialize()` fails.
-    pub(crate) fn installation(mut controller: C) -> Result<SpaceTransaction, Box<dyn Error>> {
-        // TODO: give error context
-        let init_txn = controller.initialize()?;
-        let add_txn = BehaviorSetTransaction::insert(Arc::new(WidgetBehavior {
-            controller: Mutex::new(controller),
-        }));
-        Ok(init_txn.merge(SpaceTransaction::behaviors(add_txn))?)
+impl Layoutable for ToggleButtonWidget {
+    fn requirements(&self) -> LayoutRequest {
+        LayoutRequest {
+            minimum: GridVector::new(1, 1, 1),
+        }
     }
 }
 
-impl<C> VisitRefs for WidgetBehavior<C> {
-    fn visit_refs(&self, _: &mut dyn RefVisitor) {
-        // TODO: Do we need to visit the widget controllers?
-    }
-}
-
-impl<C> Behavior<Space> for WidgetBehavior<C>
-where
-    C: WidgetController + Send,
-{
-    fn step(
-        &self,
-        context: &BehaviorContext<'_, Space>,
-        tick: Tick,
-    ) -> crate::transaction::UniverseTransaction {
-        context.bind_host(
-            self.controller
-                .lock()
-                .unwrap()
-                .step(tick)
-                .expect("TODO: behaviors should have an error reporting path"),
-        )
-    }
-
-    fn alive(&self, _: &BehaviorContext<'_, Space>) -> bool {
-        true
-    }
-
-    fn ephemeral(&self) -> bool {
-        true
+impl Widget for ToggleButtonWidget {
+    fn controller(self: Arc<Self>, position: GridPoint) -> Box<dyn WidgetController> {
+        Box::new(ToggleButtonController::new(position, self))
     }
 }
 
 /// Manages a single-block toggle button.
 #[derive(Debug)]
 pub(crate) struct ToggleButtonController {
+    definition: Arc<ToggleButtonWidget>,
     position: GridPoint,
-    states: [Block; 2],
-    data_source: ListenableSource<bool>,
     todo: DirtyFlag,
-    action: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 
 impl ToggleButtonController {
-    pub(crate) fn new(
-        position: GridPoint,
-        data_source: ListenableSource<bool>,
-        off: Block,
-        on: Block,
-        action: impl Fn() + Send + Sync + 'static,
-    ) -> Self {
+    pub(crate) fn new(position: GridPoint, definition: Arc<ToggleButtonWidget>) -> Self {
         let todo = DirtyFlag::new(true);
-        data_source.listen(todo.listener());
+        definition.data_source.listen(todo.listener());
         Self {
             position,
-            states: [off, on],
+            definition,
             todo,
-            data_source,
-            action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
         }
     }
 }
@@ -151,7 +93,7 @@ impl WidgetController for ToggleButtonController {
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             Arc::new(ActivatableRegion {
                 region: Grid::single_cube(self.position),
-                effect: self.action.clone(),
+                effect: self.definition.action.clone(),
             }),
         )))
     }
@@ -161,7 +103,9 @@ impl WidgetController for ToggleButtonController {
             SpaceTransaction::set_cube(
                 self.position,
                 None,
-                Some(self.states[self.data_source.snapshot() as usize].clone()),
+                Some(
+                    self.definition.states[self.definition.data_source.snapshot() as usize].clone(),
+                ),
             )
         } else {
             SpaceTransaction::default()
@@ -690,44 +634,6 @@ impl WidgetController for TooltipController {
             })??;
         }
         Ok(WidgetTransaction::default())
-    }
-}
-
-/// A region of a [`Space`] that does something if [`Tool::Activate`] is used on it.
-///
-/// TODO: This is a placeholder for a better design; it's too specific (external side
-/// effect) and yet also not general enough (we would like buttons to have detailed
-/// reactions to clicking) considering that it's hardcoded in Space.
-///
-/// TODO: Make the better version of this public
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ActivatableRegion {
-    pub(crate) region: Grid,
-    pub(crate) effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
-}
-
-impl ActivatableRegion {
-    pub fn activate(&self) {
-        if let Some(f) = &self.effect.0 {
-            f();
-        }
-    }
-}
-
-impl Behavior<Space> for ActivatableRegion {
-    fn alive(&self, _: &BehaviorContext<'_, Space>) -> bool {
-        // TODO: Give a way for this to be deleted automatically
-        true
-    }
-
-    fn ephemeral(&self) -> bool {
-        true
-    }
-}
-
-impl VisitRefs for ActivatableRegion {
-    fn visit_refs(&self, _: &mut dyn RefVisitor) {
-        // Our only interesting member is an EphemeralOpaque — which is opaque.
     }
 }
 
