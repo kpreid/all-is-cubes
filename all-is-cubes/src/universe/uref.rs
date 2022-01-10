@@ -97,7 +97,7 @@ impl<T: 'static> URef<T> {
     }
 
     /// Shortcut for executing a transaction.
-    pub(crate) fn execute(
+    pub fn execute(
         &self,
         transaction: &<T as Transactional>::Transaction,
     ) -> Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, CommitError>

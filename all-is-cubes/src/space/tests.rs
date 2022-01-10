@@ -426,7 +426,7 @@ fn set_physics_light_rays() {
 #[test]
 fn block_tick_action() {
     let [mut block1, block2] = make_some_blocks();
-    if let Block::Atom(attributes, _) = &mut block1 {
+    if let Primitive::Atom(attributes, _) = block1.primitive_mut() {
         attributes.tick_action = Some(VoxelBrush::single(block2.clone()));
     } else {
         panic!();

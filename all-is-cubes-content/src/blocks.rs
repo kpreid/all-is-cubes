@@ -4,17 +4,21 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
+use std::fmt;
+
 use exhaust::Exhaust;
 use noise::Seedable as _;
 
 use all_is_cubes::block::{
-    AnimationHint, Block, BlockCollision, Primitive, Resolution, RotationPlacementRule, AIR,
+    AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution,
+    RotationPlacementRule, AIR,
 };
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
 };
+use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     cube_to_midpoint, Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
@@ -29,7 +33,7 @@ use crate::int_magnitude_squared;
 use crate::landscape::install_landscape_blocks;
 use crate::palette;
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::IntoStaticStr /* kludge */, Exhaust)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum DemoBlocks {
@@ -46,10 +50,19 @@ pub enum DemoBlocks {
     ExhibitBackground,
     Signboard,
     Clock,
+    Explosion(u8),
 }
 impl BlockModule for DemoBlocks {
     fn namespace() -> &'static str {
         "all-is-cubes/demo-blocks"
+    }
+}
+impl fmt::Display for DemoBlocks {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DemoBlocks::Explosion(i) => write!(f, "{}/{}", <&str>::from(self), i),
+            _ => write!(f, "{}", <&str>::from(self)),
+        }
     }
 }
 
@@ -385,10 +398,84 @@ pub async fn install_demo_blocks(
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
+
+            Explosion(timer) => {
+                let decay = (f32::from(timer) * -0.1).exp();
+                Block::builder()
+                    .display_name(format!("Explosion {}", timer))
+                    .collision(BlockCollision::None)
+                    .light_emission(Rgb::ONE * decay)
+                    .color(Rgb::ONE.with_alpha(NotNan::new(decay).unwrap()))
+                    .build()
+            }
         })
     })
     .await?
     .install(universe)?;
+
+    // Kludge to patch up tick action cross-references
+    // TODO: This should be possible to do as a built-in feature of the "linking" system
+    let provider_for_patch = BlockProvider::using(universe)
+        .map_err(|e| GenError::failure(e, "TODO: dummy name".into()))?;
+    for i in 0..=255 {
+        if let Primitive::Indirect(block_def_ref) = provider_for_patch[Explosion(i)].primitive() {
+            let mut block: Block = (*block_def_ref.borrow()).clone();
+
+            if let Primitive::Atom(attributes, _) = block.primitive_mut() {
+                attributes.tick_action = if i > 30 {
+                    // Expire
+                    Some(VoxelBrush::single(AIR))
+                } else {
+                    let next = &provider_for_patch[Explosion(i + 1)];
+                    if i < 15 {
+                        // Expand for the first 0.25 seconds out to ~5 blocks
+                        if i % 3 == 0 {
+                            if i % 6 == 0 {
+                                Some(VoxelBrush::new(vec![
+                                    ([0, 0, 0], next.clone()),
+                                    ([1, 0, 0], next.clone()),
+                                    ([-1, 0, 0], next.clone()),
+                                    ([0, 1, 0], next.clone()),
+                                    ([0, -1, 0], next.clone()),
+                                    ([0, 0, 1], next.clone()),
+                                    ([0, 0, -1], next.clone()),
+                                ]))
+                            } else {
+                                Some(VoxelBrush::new(vec![
+                                    ([0, 0, 0], next.clone()),
+                                    ([1, 1, 0], next.clone()),
+                                    ([-1, 1, 0], next.clone()),
+                                    ([0, 1, 1], next.clone()),
+                                    ([0, -1, 1], next.clone()),
+                                    ([1, 0, 1], next.clone()),
+                                    ([1, 0, -1], next.clone()),
+                                    ([1, -1, 0], next.clone()),
+                                    ([-1, -1, 0], next.clone()),
+                                    ([0, 1, -1], next.clone()),
+                                    ([0, -1, -1], next.clone()),
+                                    ([-1, 0, 1], next.clone()),
+                                    ([-1, 0, -1], next.clone()),
+                                ]))
+                            }
+                        } else {
+                            Some(VoxelBrush::new(vec![([0, 0, 0], next.clone())]))
+                        }
+                    } else {
+                        // Just fade
+                        Some(VoxelBrush::new(vec![([0, 0, 0], next.clone())]))
+                    }
+                };
+            } else {
+                panic!("not atom");
+            }
+
+            block_def_ref
+                .execute(&BlockDefTransaction::overwrite(block))
+                .unwrap();
+        } else {
+            panic!("not indirect");
+        }
+    }
 
     Ok(())
 }
