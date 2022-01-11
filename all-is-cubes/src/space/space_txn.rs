@@ -41,6 +41,7 @@ impl SpaceTransaction {
             CubeTransaction {
                 old,
                 new,
+                conserved: true,
                 ..Default::default()
             },
         )
@@ -61,6 +62,7 @@ impl SpaceTransaction {
         let ct = CubeTransaction {
             old,
             new,
+            conserved: true,
             ..Default::default()
         };
         match self.cubes.entry(cube.into().into()) {
@@ -97,6 +99,21 @@ impl SpaceTransaction {
         }
     }
 
+    /// Marks all cube modifications in this transaction as [non-conservative].
+    ///
+    /// This means that two transactions which both place the same block in a given cube
+    /// may be merged, whereas the default state is that they will conflict (on the
+    /// principle that such a merge could cause there to be fewer total occurrences of
+    /// that block than intended).
+    ///
+    /// [non-conservative]: https://en.wikipedia.org/wiki/Conserved_quantity
+    pub fn nonconserved(mut self) -> Self {
+        for (_, cube_txn) in self.cubes.iter_mut() {
+            cube_txn.conserved = false;
+        }
+        self
+    }
+
     fn single(cube: impl Into<GridPoint>, transaction: CubeTransaction) -> Self {
         let cube: GridPoint = cube.into();
         let mut cubes = BTreeMap::new();
@@ -130,6 +147,7 @@ impl Transaction<Space> for SpaceTransaction {
             CubeTransaction {
                 old,
                 new: _,
+                conserved: _,
                 activate: _,
             },
         ) in &self.cubes
@@ -165,6 +183,7 @@ impl Transaction<Space> for SpaceTransaction {
             CubeTransaction {
                 old: _,
                 new,
+                conserved: _,
                 activate,
             },
         ) in &self.cubes
@@ -258,10 +277,16 @@ impl fmt::Debug for SpaceTransaction {
 /// transaction on its own, though it does implement [`Merge`].
 #[derive(Clone, Debug, Default, PartialEq)]
 struct CubeTransaction {
+    /// Previous block which must occupy this cube.
     /// If `None`, no precondition.
     old: Option<Block>,
+
+    /// Block to be put in this cube.
     /// If `None`, this is only a precondition for modifying another block.
     new: Option<Block>,
+
+    /// If true, two transactions with the same `new` block may not be merged.
+    conserved: bool,
 
     /// The cube was “activated” (clicked on, more or less) and should
     /// respond to that.
@@ -272,6 +297,7 @@ impl CubeTransaction {
     const ACTIVATE: Self = Self {
         old: None,
         new: None,
+        conserved: false,
         activate: true,
     };
 }
@@ -284,25 +310,25 @@ impl Merge for CubeTransaction {
             // Incompatible preconditions will always fail.
             return Err(TransactionConflict {});
         }
-        if self.new.is_some() && other.new.is_some() {
+        if self.new.is_some() && other.new.is_some() && self.conserved {
             // Replacing the same cube twice is not allowed -- even if they're
-            // equal, since doing so could violate an intended conservation law.
-            // TODO: Might want to make that optional.
+            // equal, doing so could violate an intended conservation law.
             return Err(TransactionConflict {});
         }
         Ok(())
     }
 
-    fn commit_merge(mut self, other: Self, (): Self::MergeCheck) -> Self
+    fn commit_merge(self, other: Self, (): Self::MergeCheck) -> Self
 where {
-        if other.old.is_some() {
-            self.old = other.old;
+        CubeTransaction {
+            // This would be more elegant if `conserved` was within the `self.new` Option.
+            conserved: (self.conserved && self.new.is_some())
+                || (other.conserved && other.new.is_some()),
+
+            old: self.old.or(other.old),
+            new: self.new.or(other.new),
+            activate: self.activate || other.activate,
         }
-        if other.new.is_some() {
-            self.new = other.new;
-        }
-        self.activate |= other.activate;
-        self
     }
 }
 
@@ -310,6 +336,8 @@ where {
 mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
+
+    use pretty_assertions::assert_eq;
 
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
@@ -366,6 +394,7 @@ mod tests {
                     CubeTransaction {
                         old: Some(b1.clone()),
                         new: Some(b2.clone()),
+                        conserved: true,
                         activate: false,
                     }
                 ),
@@ -374,6 +403,7 @@ mod tests {
                     CubeTransaction {
                         old: Some(b1.clone()),
                         new: Some(b3.clone()),
+                        conserved: true,
                         activate: false,
                     }
                 ),
@@ -382,11 +412,19 @@ mod tests {
     }
 
     #[test]
-    fn merge_rejects_same_new() {
+    fn merge_rejects_same_new_conserved() {
         let [block] = make_some_blocks();
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block.clone()));
         let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block.clone()));
         t1.merge(t2).unwrap_err();
+    }
+
+    #[test]
+    fn merge_allows_same_new_nonconserved() {
+        let [old, new] = make_some_blocks();
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], Some(old), Some(new.clone())).nonconserved();
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(new.clone())).nonconserved();
+        assert_eq!(t1.clone().merge(t2).unwrap(), t1);
     }
 
     #[test]

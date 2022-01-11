@@ -366,6 +366,7 @@ mod tests {
 
     use crate::content::make_some_blocks;
     use crate::space::SpaceTransaction;
+    use crate::util::{CustomFormat, Unquote};
 
     #[test]
     fn has_default() {
@@ -388,7 +389,7 @@ mod tests {
 
         println!("{:#?}", transaction);
         assert_eq!(
-            format!("{:#?}\n", transaction),
+            format!("{:#?}\n", transaction).custom_format(Unquote),
             indoc! {"
             UniverseTransaction {
                 [anonymous #0]: SpaceTransaction {
@@ -402,11 +403,14 @@ mod tests {
                                 Rgba(0.5, 0.5, 0.5, 1.0),
                             ),
                         ),
+                        conserved: true,
                         activate: false,
                     },
                 },
             }
-        "}
+            "}
+            .to_string()
+            .custom_format(Unquote)
         );
     }
 
