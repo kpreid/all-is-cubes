@@ -12,6 +12,7 @@ use super::Space;
 use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
+use crate::space::SetCubeError;
 use crate::transaction::{Merge, PreconditionFailed};
 use crate::transaction::{Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat as _};
@@ -106,6 +107,9 @@ impl SpaceTransaction {
     /// principle that such a merge could cause there to be fewer total occurrences of
     /// that block than intended).
     ///
+    /// Also, the transaction will not fail if some of its cubes are outside the bounds of
+    /// the [`Space`].
+    ///
     /// [non-conservative]: https://en.wikipedia.org/wiki/Conserved_quantity
     pub fn nonconserved(mut self) -> Self {
         for (_, cube_txn) in self.cubes.iter_mut() {
@@ -147,7 +151,7 @@ impl Transaction<Space> for SpaceTransaction {
             CubeTransaction {
                 old,
                 new: _,
-                conserved: _,
+                conserved,
                 activate: _,
             },
         ) in &self.cubes
@@ -164,13 +168,17 @@ impl Transaction<Space> for SpaceTransaction {
                     }
                 }
             } else {
-                // It is an error for cubes to be out of bounds, whether old or new.
-                // TODO: Should we allow `old: Some(AIR), new: None`, since we treat
-                // outside-space as being AIR? Let's wait until a use case appears.
-                return Err(PreconditionFailed {
-                    location: "Space",
-                    problem: "cube out of space's bounds",
-                });
+                if *conserved || old.is_some() {
+                    // It is an error for conserved cube txns to be out of bounds,
+                    // or for a precondition to be not meetable because it is out of bounds.
+                    // TODO: Should we allow `old: Some(AIR), new: None`, since we treat
+                    // outside-space as being AIR? Let's wait until a use case appears rather than
+                    // making AIR more special.
+                    return Err(PreconditionFailed {
+                        location: "Space",
+                        problem: "cube out of space's bounds",
+                    });
+                }
             }
         }
         self.behaviors.check(&space.behaviors)
@@ -183,13 +191,19 @@ impl Transaction<Space> for SpaceTransaction {
             CubeTransaction {
                 old: _,
                 new,
-                conserved: _,
+                conserved,
                 activate,
             },
         ) in &self.cubes
         {
             if let Some(new) = new {
-                space.set(cube, new)?;
+                match space.set(cube, new) {
+                    Err(SetCubeError::OutOfBounds {..}) if !conserved => {
+                        // ignore
+                        Ok(false)
+                    }
+                    other => other,
+                }?;
             }
             if *activate {
                 // Deferred for slightly more consistency
@@ -345,6 +359,41 @@ mod tests {
     use crate::transaction::TransactionTester;
 
     use super::*;
+
+    #[test]
+    fn set_out_of_bounds_conserved_fails() {
+        let [block] = make_some_blocks();
+        // Note: by using .check() we validate that it doesn't fail in the commit phase
+        SpaceTransaction::set_cube([1, 0, 0], None, Some(block))
+            .check(&Space::empty_positive(1, 1, 1))
+            .unwrap_err();
+    }
+
+    #[test]
+    fn set_out_of_bounds_nonconserved_succeeds() {
+        let [block] = make_some_blocks();
+        SpaceTransaction::set_cube([1, 0, 0], None, Some(block))
+            .nonconserved()
+            .execute(&mut Space::empty_positive(1, 1, 1))
+            .unwrap();
+    }
+
+    #[test]
+    fn compare_out_of_bounds_conserved_fails() {
+        let [block] = make_some_blocks();
+        SpaceTransaction::set_cube([1, 0, 0], Some(block), None)
+            .check(&Space::empty_positive(1, 1, 1))
+            .unwrap_err();
+    }
+
+    #[test]
+    fn compare_out_of_bounds_nonconserved_fails() {
+        let [block] = make_some_blocks();
+        SpaceTransaction::set_cube([1, 0, 0], Some(block), None)
+            .nonconserved()
+            .check(&Space::empty_positive(1, 1, 1))
+            .unwrap_err();
+    }
 
     #[test]
     fn set_cube_mutate_equivalent_to_merge() {
