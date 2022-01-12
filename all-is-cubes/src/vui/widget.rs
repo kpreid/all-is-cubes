@@ -26,7 +26,7 @@ use crate::inv::{EphemeralOpaque, Slot};
 use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
-use crate::transaction::{Merge, Transaction};
+use crate::transaction::Merge as _;
 use crate::universe::{RefVisitor, URef, Universe, VisitRefs};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
 
@@ -71,14 +71,15 @@ pub(super) struct WidgetBehavior<C> {
 }
 
 impl<C: WidgetController> WidgetBehavior<C> {
-    /// Attaches the given widget controller to the space.
-    /// Returns an error if the controller's `initialize()` fails.
-    pub(crate) fn install(space: &mut Space, mut controller: C) -> Result<(), Box<dyn Error>> {
-        controller.initialize()?.execute(space)?;
-        space.add_behavior(WidgetBehavior {
+    /// Returns a transaction which adds the given widget controller to the space,
+    /// or an error if the controller's `initialize()` fails.
+    pub(crate) fn installation(mut controller: C) -> Result<SpaceTransaction, Box<dyn Error>> {
+        // TODO: give error context
+        let init_txn = controller.initialize()?;
+        let add_txn = BehaviorSetTransaction::insert(Arc::new(WidgetBehavior {
             controller: Mutex::new(controller),
-        });
-        Ok(())
+        }));
+        Ok(init_txn.merge(SpaceTransaction::behaviors(add_txn))?)
     }
 }
 

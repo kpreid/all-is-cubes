@@ -187,10 +187,8 @@ pub(super) fn new_hud_space(
     ];
     for controller in hud_widgets {
         hud_space
-            .try_modify(|space| {
-                WidgetBehavior::install(space, controller).expect("initializing widget");
-            })
-            .unwrap();
+            .execute(&WidgetBehavior::installation(controller).expect("initializing widget"))
+            .expect("installing widget");
     }
 
     // Initialize lighting
