@@ -1,54 +1,150 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::block::{space_to_blocks, Block, BlockAttributes};
-use all_is_cubes::cgmath::{EuclideanSpace, One, Vector3, Zero};
-use all_is_cubes::character::Spawn;
-use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_9X18_BOLD;
-use all_is_cubes::drawing::embedded_graphics::mono_font::MonoTextStyle;
-use all_is_cubes::drawing::embedded_graphics::prelude::Point;
-use all_is_cubes::drawing::embedded_graphics::text::{Baseline, Text};
-use all_is_cubes::inv::Tool;
-use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
-use all_is_cubes::space::{Grid, Space, SpacePhysics};
-use all_is_cubes::universe::Universe;
+use std::sync::Arc;
+
 use strum::IntoEnumIterator;
 
-use crate::{
-    draw_text_in_blocks,
-    logo::{logo_text, logo_text_extent},
-    space_to_space_copy, UniverseTemplate,
+use all_is_cubes::{
+    block::{Block, BlockAttributes},
+    cgmath::{Vector3, Zero as _},
+    character::Spawn,
+    content::palette,
+    drawing::{
+        draw_to_blocks,
+        embedded_graphics::{
+            mono_font::{iso_8859_1::FONT_9X18_BOLD, MonoTextStyle},
+            prelude::Point,
+            text::{Baseline, Text},
+        },
+    },
+    inv::Tool,
+    linking::InGenError,
+    math::{Face, GridMatrix, GridVector},
+    space::{Grid, Space, SpacePhysics, SpaceTransaction},
+    transaction::{Merge, Transaction as _},
+    universe::Universe,
+    vui::{self, LayoutGrant, LayoutRequest, LayoutTree, Layoutable, Widget, WidgetController},
 };
+
+use crate::{logo::LogoTextLarge, UniverseTemplate};
+
+#[derive(Debug)]
+struct TemplateButtonWidget {
+    // template: UniverseTemplate,
+    background_block: Block,
+    /// TODO: Instead of pregenerated text we should be able to synthesize it as-needed,
+    /// but that requires new facilities in the Universe (insert transactions and GC)
+    text_blocks: Space,
+}
+
+impl TemplateButtonWidget {
+    fn new(universe: &mut Universe, template: UniverseTemplate) -> Result<Self, InGenError> {
+        let background_block = Block::builder()
+            .display_name(template.to_string())
+            .color(palette::MENU_FRAME)
+            .build();
+
+        // TODO: We should be doing this when the widget is instantiated, not now, but that's not yet possible.
+        let text_blocks = draw_to_blocks(
+            universe,
+            16,
+            0,
+            0..1,
+            BlockAttributes::default(),
+            &Text::with_baseline(
+                &template.to_string(),
+                Point::new(0, 0),
+                MonoTextStyle::new(&FONT_9X18_BOLD, palette::ALMOST_BLACK),
+                Baseline::Bottom,
+            ),
+        )?;
+
+        Ok(Self {
+            // template,
+            background_block,
+            text_blocks,
+        })
+    }
+}
+
+impl vui::Layoutable for TemplateButtonWidget {
+    fn requirements(&self) -> vui::LayoutRequest {
+        LayoutRequest {
+            minimum: GridVector::new(10, 1, 2),
+        }
+    }
+}
+impl vui::Widget for TemplateButtonWidget {
+    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn WidgetController> {
+        Box::new(TemplateButtonController {
+            definition: self,
+            position: *position,
+        })
+    }
+}
+
+#[derive(Debug)]
+struct TemplateButtonController {
+    definition: Arc<TemplateButtonWidget>,
+    position: LayoutGrant,
+}
+impl vui::WidgetController for TemplateButtonController {
+    fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+        let mut txn = SpaceTransaction::default();
+
+        // TODO: propagate error
+        let bounds = &mut self.position.bounds;
+        let background_bounds = bounds.abut(Face::NZ, -1).unwrap();
+        let text_bounds = bounds.abut(Face::PZ, -1).unwrap();
+
+        // Fill background
+        // TODO: give SpaceTransaction a fill_uniform() analogue
+        let background_block = &self.definition.background_block;
+        for cube in background_bounds.interior_iter() {
+            txn.set(cube, None, Some(background_block.clone())).unwrap();
+        }
+
+        // Fill text
+        let text_dest_origin = GridVector::new(
+            bounds.lower_bounds().x,
+            bounds.lower_bounds().y,
+            bounds.upper_bounds().z - 1,
+        );
+        txn = txn
+            .merge(crate::space_to_transaction_copy(
+                &self.definition.text_blocks,
+                text_bounds.translate(-text_dest_origin),
+                GridMatrix::from_translation(text_dest_origin),
+            ))
+            .unwrap();
+
+        Ok(txn)
+    }
+}
 
 pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError> {
     let template_iter = UniverseTemplate::iter().filter(UniverseTemplate::include_in_lists);
 
-    let logo_resolution = 4;
-    let logo_extent = logo_text_extent();
-    let small_logo_space = {
-        let mut drawing_space = Space::empty(logo_extent);
-        logo_text(GridMatrix::one(), &mut drawing_space)?;
-        space_to_blocks(
-            6,
-            BlockAttributes::default(),
-            universe.insert_anonymous(drawing_space),
-        )?
+    let mut vertical_widgets: Vec<Arc<LayoutTree<Arc<dyn Widget>>>> = Vec::with_capacity(10);
+    vertical_widgets.push(LayoutTree::leaf(Arc::new(LogoTextLarge)));
+    for template in template_iter {
+        vertical_widgets.push(LayoutTree::spacer(LayoutRequest {
+            minimum: GridVector::new(1, 1, 1),
+        }));
+        vertical_widgets.push(LayoutTree::leaf(Arc::new(TemplateButtonWidget::new(
+            universe, template,
+        )?)));
+    }
+    let tree: LayoutTree<Arc<dyn Widget>> = LayoutTree::Stack {
+        direction: Face::NY,
+        children: vertical_widgets,
     };
 
-    let button_label_width = 10;
-    let logo_height = small_logo_space.grid().size().y;
-    let overall_width = button_label_width.max(logo_extent.size().x / logo_resolution) + 2;
+    let size = tree.requirements().minimum;
+    dbg!(size);
+    let bounds = Grid::new([0, 0, 0], size);
 
-    let bounds = Grid::new(
-        [-overall_width / 2, 0, -2],
-        [
-            overall_width,
-            logo_height + template_iter.clone().count() as GridCoordinate * 2,
-            4,
-        ],
-    );
     let mut space = Space::builder(bounds)
         .physics({
             let mut p = SpacePhysics::default();
@@ -63,51 +159,12 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         })
         .build_empty();
 
-    // TODO: we need a widget-layout system to use here
-    let mut y_top;
-
-    // Small logo
-    // TODO: This should be simpler to set up
-    // TODO: a slight truncation is happening; check bounds calculation
-    {
-        space_to_space_copy(
-            &small_logo_space,
-            small_logo_space.grid(),
-            &mut space,
-            GridMatrix::from_translation([
-                0,
-                bounds.upper_bounds().y - small_logo_space.grid().upper_bounds().y,
-                0,
-            ]),
-        )?;
-        y_top = bounds.upper_bounds().y - logo_height;
-    }
-
-    for template in template_iter {
-        y_top -= 2;
-        let button_lower_bounds = GridPoint::new(-button_label_width / 2, y_top, 0);
-        space.fill_uniform(
-            Grid::new(button_lower_bounds, [button_label_width, 1, 1]),
-            Block::builder()
-                .display_name(template.to_string())
-                .color(palette::MENU_FRAME)
-                .build(),
-        )?;
-        // TODO: draw_text_in_blocks needs justification options
-        draw_text_in_blocks(
-            universe,
-            &mut space,
-            20,
-            button_label_width,
-            GridMatrix::from_translation(button_lower_bounds.to_vec() + GridVector::new(0, 0, 1)),
-            &Text::with_baseline(
-                &template.to_string(),
-                Point::new(0, 0),
-                MonoTextStyle::new(&FONT_9X18_BOLD, palette::ALMOST_BLACK),
-                Baseline::Bottom,
-            ),
-        )?;
-    }
+    // TODO: These errors ought to autoconvert into InGenError
+    dbg!(tree.perform_layout(bounds).unwrap())
+        .installation()
+        .map_err(|e| InGenError::Other(e.into()))?
+        .execute(&mut space)
+        .map_err(|e| InGenError::Other(e))?; // TODO: shouldn't need to convert
 
     Ok(space)
 }

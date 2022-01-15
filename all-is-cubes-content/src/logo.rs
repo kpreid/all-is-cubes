@@ -1,8 +1,11 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::sync::Arc;
+
 use all_is_cubes::{
     block::Block,
+    cgmath::One,
     drawing::{
         embedded_graphics::{
             mono_font::{iso_8859_1::FONT_9X15_BOLD, MonoTextStyle},
@@ -13,9 +16,40 @@ use all_is_cubes::{
     },
     math::{Face, FaceMap, GridMatrix},
     space::{Grid, SetCubeError, Space},
+    vui::{
+        widgets::OneshotController, LayoutGrant, LayoutRequest, Layoutable, Widget,
+        WidgetController,
+    },
 };
 
-use crate::palette;
+use crate::{palette, space_to_transaction_copy};
+
+/// All is Cubes logo text as a widget, at "1:1" scale.
+#[derive(Clone, Debug)]
+pub(crate) struct LogoTextLarge;
+
+impl Layoutable for LogoTextLarge {
+    fn requirements(&self) -> LayoutRequest {
+        LayoutRequest {
+            minimum: logo_text_extent().size(),
+        }
+    }
+}
+impl Widget for LogoTextLarge {
+    fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
+        let logo_extent = logo_text_extent();
+        let mut drawing_space = Space::empty(logo_extent);
+        logo_text(GridMatrix::one(), &mut drawing_space).unwrap();
+
+        Box::new(OneshotController(Some(space_to_transaction_copy(
+            &drawing_space,
+            drawing_space.grid(),
+            GridMatrix::from_translation(
+                position.bounds.lower_bounds() - logo_extent.lower_bounds(),
+            ),
+        ))))
+    }
+}
 
 /// Draw the All Is Cubes logo text.
 pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) -> Result<(), SetCubeError> {

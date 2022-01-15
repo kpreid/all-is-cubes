@@ -45,7 +45,7 @@ use all_is_cubes::math::{
     cube_to_midpoint, point_to_enclosing_cube, Face, FaceMap, FreeCoordinate, GridCoordinate,
     GridMatrix, GridPoint, GridVector,
 };
-use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space};
+use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpaceTransaction};
 
 mod animation;
 use all_is_cubes::universe::Universe;
@@ -230,6 +230,30 @@ fn space_to_space_copy(
                 .rotate(block_rotation),
         )
     })
+}
+
+/// As [`space_to_space_copy`], but producing a transaction.
+pub fn space_to_transaction_copy(
+    src: &Space,
+    src_grid: Grid,
+    src_to_dst_transform: GridMatrix,
+) -> SpaceTransaction {
+    // TODO: don't panic
+    let (block_rotation, _) = src_to_dst_transform
+        .decompose()
+        .expect("could not decompose transform");
+
+    let mut txn = SpaceTransaction::default();
+    for cube in src_grid.interior_iter() {
+        // TODO: provide control over what the old-values are
+        txn.set(
+            src_to_dst_transform.transform_cube(cube),
+            None,
+            Some(src[cube].clone().rotate(block_rotation)),
+        )
+        .unwrap();
+    }
+    txn
 }
 
 /// Compute the squared magnitude of a [`GridVector`].
