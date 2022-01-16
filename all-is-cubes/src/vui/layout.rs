@@ -158,7 +158,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
     }
 }
 
-impl<W: Widget> LayoutTree<Positioned<Arc<W>>> {
+impl<W: ?Sized + Widget> LayoutTree<Positioned<Arc<W>>> {
     /// Creates a transaction which will install all of the widgets in this tree.
     ///
     /// Returns an error if the widgets conflict with each other.
