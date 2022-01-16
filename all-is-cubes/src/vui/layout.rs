@@ -67,6 +67,7 @@ impl<T: ?Sized + Layoutable> Layoutable for Arc<T> {
 /// that implement [`Layoutable`]); the tree structure itself describes how they are
 /// arranged relative to each other. In this system, widgets do not contain other widgets
 /// (at least, not for the purposes of the layout algorithm).
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum LayoutTree<W> {
     /// A single widget.

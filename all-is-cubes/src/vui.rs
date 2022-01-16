@@ -37,7 +37,8 @@ mod widget_trait;
 #[doc(hidden)]
 pub use widget_trait::*;
 mod widgets;
-use widgets::*;
+#[doc(hidden)]
+pub use widgets::*;
 
 /// `Vui` builds user interfaces out of voxels. It owns a `Universe` dedicated to the
 /// purpose and draws into spaces to form the HUD and menus.

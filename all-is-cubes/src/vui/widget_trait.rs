@@ -16,8 +16,9 @@ use crate::universe::{RefVisitor, VisitRefs};
 use crate::vui::layout::Layoutable;
 use crate::vui::LayoutGrant;
 
-// Placeholder for likely wanting to change this later
-pub(super) type WidgetTransaction = SpaceTransaction;
+/// Transaction type produced by [`WidgetController`]s.
+/// Placeholder for likely wanting to change this later.
+pub type WidgetTransaction = SpaceTransaction;
 
 /// Something that can participate in layout and turn into some contents of a Space.
 ///
@@ -47,7 +48,10 @@ pub trait WidgetController: Debug + Send + Sync + 'static {
 
     /// TODO: Be more specific than Box<dyn Error>
     /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>>;
+    /// TODO: If this is not overridden, arrange to automatically drop the controller for efficiency
+    fn step(&mut self, _tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+        Ok(WidgetTransaction::default())
+    }
 }
 
 impl WidgetController for Box<dyn WidgetController> {

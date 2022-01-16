@@ -34,6 +34,19 @@ use crate::vui::{
     WidgetController, WidgetTransaction,
 };
 
+/// Generic widget controller that only does something initialize.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct OneshotController(pub Option<WidgetTransaction>);
+
+impl WidgetController for OneshotController {
+    fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
+        Ok(self.0.take().unwrap_or_default())
+    }
+
+    // TODO: Arrange somehow for this controller to be deleted since it doesn't need to be step()ped
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ToggleButtonWidget {
     states: [Block; 2],
