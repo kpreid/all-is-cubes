@@ -12,7 +12,7 @@ use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
 use crate::inv::EphemeralOpaque;
 use crate::math::GridPoint;
 use crate::space::{Grid, Space, SpaceTransaction};
-use crate::transaction::Merge as _;
+use crate::transaction::{Merge as _, TransactionConflict};
 use crate::universe::{RefVisitor, VisitRefs};
 use crate::vui::layout::Layoutable;
 
@@ -27,6 +27,8 @@ pub(super) type WidgetTransaction = SpaceTransaction;
 /// TODO: Can we name this trait in verb instead of noun form?
 ///
 /// TODO: Explain expectations about interior mutability and sharing.
+///
+/// [`LayoutTree`]: crate::vui::LayoutTree
 pub trait Widget: Layoutable + Debug {
     fn controller(self: Arc<Self>, position: GridPoint) -> Box<dyn WidgetController>;
 }
@@ -37,23 +39,23 @@ pub trait Widget: Layoutable + Debug {
 pub trait WidgetController: Debug + Send + Sync + 'static {
     /// Write the initial state of the widget to the space.
     ///
-    /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
     /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
+    /// TODO: Should this even have an error return?
+    fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
         Ok(WidgetTransaction::default())
     }
 
-    /// TODO: Be more specific than Box<dyn Error> -- perhaps InGenError
+    /// TODO: Be more specific than Box<dyn Error>
     /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>>;
+    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>>;
 }
 
 impl WidgetController for Box<dyn WidgetController> {
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         (**self).step(tick)
     }
 
-    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
         (**self).initialize()
     }
 }
@@ -73,13 +75,22 @@ impl WidgetBehavior {
     /// or an error if the controller's `initialize()` fails.
     pub(crate) fn installation(
         mut controller: Box<dyn WidgetController>,
-    ) -> Result<SpaceTransaction, Box<dyn Error>> {
-        // TODO: give error context
-        let init_txn = controller.initialize()?;
+    ) -> Result<SpaceTransaction, InstallVuiError> {
+        let init_txn = match controller.initialize() {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(InstallVuiError::WidgetInitialization {
+                    widget: controller,
+                    error: Box::new(e),
+                });
+            }
+        };
         let add_txn = BehaviorSetTransaction::insert(Arc::new(WidgetBehavior {
             controller: Mutex::new(controller),
         }));
-        Ok(init_txn.merge(SpaceTransaction::behaviors(add_txn))?)
+        init_txn
+            .merge(SpaceTransaction::behaviors(add_txn))
+            .map_err(|error| InstallVuiError::Conflict { error })
     }
 }
 
@@ -111,6 +122,33 @@ impl Behavior<Space> for WidgetBehavior {
     fn ephemeral(&self) -> bool {
         true
     }
+}
+
+/// Errors that may arise from setting up [`LayoutTree`]s and [`Widget`]s and installing
+/// them in a [`Space`].
+///
+/// [`LayoutTree`]: crate::vui::LayoutTree
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum InstallVuiError {
+    /// The widget failed to initialize for some reason.
+    #[error("error initializing widget ({:?})", .widget)]
+    WidgetInitialization {
+        /// TODO: This should be `Arc<dyn Widget>` instead.
+        /// Or, if we come up with some way of giving widgets IDs, that.
+        widget: Box<dyn WidgetController>,
+
+        #[source]
+        error: Box<InstallVuiError>,
+    },
+    //// A transaction conflict arose between two widgets or parts of a widget's installation.
+    #[error("transaction conflict involving a widget")]
+    Conflict {
+        // TODO: Include the widget(s) involved, once `Arc<dyn Widget>` is piped around everywhere
+        // and not just sometimes Widget or sometimes WidgetController.
+        #[source]
+        error: TransactionConflict,
+    },
 }
 
 /// A region of a [`Space`] that does something if [`Tool::Activate`] is used on it.

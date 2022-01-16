@@ -29,8 +29,10 @@ use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::transaction::Merge as _;
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
-use crate::vui::layout::{LayoutRequest, Layoutable};
-use crate::vui::{ActivatableRegion, Widget, WidgetController, WidgetTransaction};
+use crate::vui::{
+    ActivatableRegion, InstallVuiError, LayoutRequest, Layoutable, Widget, WidgetController,
+    WidgetTransaction,
+};
 
 #[derive(Clone, Debug)]
 pub(crate) struct ToggleButtonWidget {
@@ -89,7 +91,7 @@ impl ToggleButtonController {
 }
 
 impl WidgetController for ToggleButtonController {
-    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             Arc::new(ActivatableRegion {
                 region: Grid::single_cube(self.position),
@@ -98,7 +100,7 @@ impl WidgetController for ToggleButtonController {
         )))
     }
 
-    fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         Ok(if self.todo.get_and_clear() {
             SpaceTransaction::set_cube(
                 self.position,
@@ -136,7 +138,7 @@ impl CrosshairController {
 }
 
 impl WidgetController for CrosshairController {
-    fn step(&mut self, _tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, _tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         Ok(if self.todo.get_and_clear() {
             SpaceTransaction::set_cube(
                 self.position,
@@ -233,7 +235,7 @@ impl ToolbarController {
         &self,
         slots: &[Slot],
         selected_slots: &[usize],
-    ) -> Result<WidgetTransaction, Box<dyn Error>> {
+    ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         // Update stack count text.
         // TODO: This needs to stop being direct modification, eventually, at least if
         // we want to have parallel updates.
@@ -302,7 +304,7 @@ impl ToolbarController {
 }
 
 impl WidgetController for ToolbarController {
-    fn initialize(&mut self) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
         let hud_blocks = &self.hud_blocks;
         let mut txn = SpaceTransaction::default();
 
@@ -357,7 +359,7 @@ impl WidgetController for ToolbarController {
         Ok(txn)
     }
 
-    fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         if self.todo_change_character.get_and_clear() {
             self.character = self.character_source.snapshot();
 
@@ -603,7 +605,7 @@ impl TooltipController {
 }
 
 impl WidgetController for TooltipController {
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error>> {
+    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         // None if no update is needed
         let text_update: Option<Arc<str>> = self
             .state
@@ -630,7 +632,7 @@ impl WidgetController for TooltipController {
                         .build(),
                 );
                 text_obj.draw(&mut text_space.draw_target(GridMatrix::FLIP_Y))?;
-                Ok::<(), Box<dyn Error>>(())
+                Ok::<(), Box<dyn Error + Send + Sync>>(())
             })??;
         }
         Ok(WidgetTransaction::default())
