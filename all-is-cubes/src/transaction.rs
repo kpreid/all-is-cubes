@@ -68,11 +68,8 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// to the particular `T`). The consequences of doing so may include mutating the
     /// wrong components, signaling an error partway through the transaction, or merely
     /// committing the transaction while its preconditions do not hold.
-    fn commit(
-        &self,
-        target: &mut T,
-        check: Self::CommitCheck,
-    ) -> Result<Self::Output, Box<dyn Error>>;
+    fn commit(&self, target: &mut T, check: Self::CommitCheck)
+        -> Result<Self::Output, CommitError>;
 
     /// Convenience method to execute a transaction in one step. Implementations should not
     /// need to override this. Equivalent to:
@@ -86,9 +83,11 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// # let _output: () =
     /// transaction.commit(target, check)?
     /// # ;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    fn execute(&self, target: &mut T) -> Result<Self::Output, Box<dyn Error>> {
+    ///
+    /// TODO: this should have an error type which distinguishes precondition from unexpected errors
+    fn execute(&self, target: &mut T) -> Result<Self::Output, CommitError> {
         let check = self.check(target)?;
         self.commit(target, check)
     }
@@ -154,6 +153,9 @@ pub trait Merge {
         Ok(self.commit_merge(other, check))
     }
 }
+
+/// Type of “unexpected errors” from [`Transaction::commit`].
+pub type CommitError = Box<dyn Error + Send + Sync>;
 
 /// Error type returned by [`Transaction::check`].
 ///

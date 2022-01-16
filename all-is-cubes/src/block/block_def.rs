@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::block::{Block, BlockChange};
 use crate::listen::{Gate, Listener, Notifier};
 use crate::transaction::{
-    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{RefError, RefVisitor, VisitRefs};
 
@@ -143,7 +143,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
         &self,
         target: &mut BlockDef,
         (): Self::CommitCheck,
-    ) -> Result<Self::Output, Box<dyn std::error::Error>> {
+    ) -> Result<Self::Output, CommitError> {
         if let Some(new) = &self.new {
             target.block = new.clone();
 

@@ -470,7 +470,10 @@ mod tests {
 
         /// As `equip_and_use_tool`, but also commit the transaction.
         /// TODO: Needs a better error return type (requires Transaction to do so).
-        fn equip_use_commit(&mut self, stack: impl Into<Slot>) -> Result<(), Box<dyn Error>> {
+        fn equip_use_commit(
+            &mut self,
+            stack: impl Into<Slot>,
+        ) -> Result<(), Box<dyn Error + Send + Sync>> {
             let transaction = self.equip_and_use_tool(stack)?;
             transaction.execute(&mut self.universe)?;
             Ok(())

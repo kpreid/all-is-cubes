@@ -15,7 +15,7 @@ use crate::physics::StopAt;
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::transaction::{
-    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
@@ -493,11 +493,7 @@ impl Transaction<Body> for BodyTransaction {
         Ok(())
     }
 
-    fn commit(
-        &self,
-        body: &mut Body,
-        _: Self::CommitCheck,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn commit(&self, body: &mut Body, _: Self::CommitCheck) -> Result<(), CommitError> {
         body.yaw += self.delta_yaw;
         Ok(())
     }

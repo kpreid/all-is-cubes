@@ -2,7 +2,6 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::borrow::Borrow;
-use std::error::Error;
 use std::fmt;
 use std::hash;
 use std::ops::Deref;
@@ -10,6 +9,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use ouroboros::self_referencing;
 
+use crate::transaction::CommitError;
 use crate::transaction::Transaction;
 use crate::transaction::Transactional;
 use crate::universe::Name;
@@ -97,11 +97,10 @@ impl<T: 'static> URef<T> {
     }
 
     /// Shortcut for executing a transaction.
-    #[allow(dead_code)] // Currently only used in tests
     pub(crate) fn execute(
         &self,
         transaction: &<T as Transactional>::Transaction,
-    ) -> Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, Box<dyn Error>>
+    ) -> Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, CommitError>
     where
         T: Transactional,
     {

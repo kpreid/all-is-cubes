@@ -3,14 +3,14 @@
 
 //! Player-character stuff.
 
+use std::collections::HashSet;
+use std::fmt;
+
 use cgmath::{
     Angle as _, Basis3, Decomposed, Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Rotation3,
     Vector3,
 };
 use num_traits::identities::Zero;
-use std::collections::HashSet;
-use std::error::Error;
-use std::fmt;
 
 use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
@@ -21,7 +21,8 @@ use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::space::Space;
 use crate::transaction::{
-    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
+    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    UniverseTransaction,
 };
 use crate::universe::{RefVisitor, URef, VisitRefs};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
@@ -449,7 +450,7 @@ impl Transaction<Character> for CharacterTransaction {
         &self,
         target: &mut Character,
         (body_check, inventory_check, behaviors_check): Self::CommitCheck,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), CommitError> {
         self.body.commit(&mut target.body, body_check)?;
 
         // TODO: Perhaps Transaction should have an explicit cheap ".is_empty()"?

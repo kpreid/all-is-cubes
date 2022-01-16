@@ -15,7 +15,8 @@ use crate::apps::Tick;
 use crate::character::{Character, CharacterTransaction};
 use crate::physics::BodyTransaction;
 use crate::transaction::{
-    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional, UniverseTransaction,
+    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    UniverseTransaction,
 };
 use crate::universe::{RefVisitor, VisitRefs};
 
@@ -210,7 +211,7 @@ impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
         &self,
         target: &mut BehaviorSet<H>,
         (): Self::CommitCheck,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), CommitError> {
         for (index, new) in &self.replace {
             target.items[*index] = new.clone();
         }

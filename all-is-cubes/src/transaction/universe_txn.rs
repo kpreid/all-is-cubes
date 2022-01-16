@@ -3,14 +3,13 @@
 
 use std::any::Any;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fmt::{self, Debug};
 
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
 use crate::transaction::{
-    Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{Name, UBorrowMutImpl, URef, Universe};
 
@@ -67,7 +66,7 @@ where
         &self,
         _dummy_target: &mut (),
         (mut borrow, check): Self::CommitCheck,
-    ) -> Result<Self::Output, Box<dyn Error>> {
+    ) -> Result<Self::Output, CommitError> {
         borrow.with_data_mut(|target_data| self.transaction.commit(target_data, check))
     }
 }
@@ -163,11 +162,11 @@ impl Transaction<()> for AnyTransaction {
         })
     }
 
-    fn commit(&self, _target: &mut (), check: Self::CommitCheck) -> Result<(), Box<dyn Error>> {
+    fn commit(&self, _target: &mut (), check: Self::CommitCheck) -> Result<(), CommitError> {
         fn commit_helper<O>(
             transaction: &TransactionInUniverse<O>,
             check: Box<dyn Any>,
-        ) -> Result<(), Box<dyn Error>>
+        ) -> Result<(), CommitError>
         where
             O: Transactional,
             TransactionInUniverse<O>: Transaction<()>,
@@ -313,11 +312,7 @@ impl Transaction<Universe> for UniverseTransaction {
         Ok(checks)
     }
 
-    fn commit(
-        &self,
-        _target: &mut Universe,
-        checks: Self::CommitCheck,
-    ) -> Result<(), Box<dyn Error>> {
+    fn commit(&self, _target: &mut Universe, checks: Self::CommitCheck) -> Result<(), CommitError> {
         for (name, check) in checks {
             self.members[&name].commit(&mut (), check)?;
         }

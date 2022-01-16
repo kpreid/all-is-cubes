@@ -5,7 +5,6 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::num::NonZeroU16;
 use std::sync::Arc;
 
@@ -14,7 +13,7 @@ use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
 use crate::transaction::{
-    Merge, PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
+    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, UniverseTransaction,
 };
 use crate::universe::{RefVisitor, URef, VisitRefs};
 use crate::vui::Icons;
@@ -405,7 +404,7 @@ impl Transaction<Inventory> for InventoryTransaction {
         &self,
         inventory: &mut Inventory,
         check: Self::CommitCheck,
-    ) -> Result<Self::Output, Box<dyn Error>> {
+    ) -> Result<Self::Output, CommitError> {
         if let Some(InventoryCheck { new, change }) = check {
             assert_eq!(new.len(), inventory.slots.len());
             inventory.slots = new;

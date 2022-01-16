@@ -5,7 +5,6 @@
 
 use std::collections::btree_map::Entry::*;
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::{fmt, mem};
 
 use super::Space;
@@ -13,7 +12,7 @@ use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::space::SetCubeError;
-use crate::transaction::{Merge, PreconditionFailed};
+use crate::transaction::{CommitError, Merge, PreconditionFailed};
 use crate::transaction::{Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat as _};
 use crate::vui::ActivatableRegion;
@@ -184,7 +183,7 @@ impl Transaction<Space> for SpaceTransaction {
         self.behaviors.check(&space.behaviors)
     }
 
-    fn commit(&self, space: &mut Space, check: Self::CommitCheck) -> Result<(), Box<dyn Error>> {
+    fn commit(&self, space: &mut Space, check: Self::CommitCheck) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
         for (
             &cube,
@@ -198,7 +197,7 @@ impl Transaction<Space> for SpaceTransaction {
         {
             if let Some(new) = new {
                 match space.set(cube, new) {
-                    Err(SetCubeError::OutOfBounds {..}) if !conserved => {
+                    Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
                         // ignore
                         Ok(false)
                     }
