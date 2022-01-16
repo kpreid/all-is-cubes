@@ -21,7 +21,7 @@ impl Transactional for Space {
     type Transaction = SpaceTransaction;
 }
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, Default, Eq, PartialEq)]
 pub struct SpaceTransaction {
     cubes: BTreeMap<[GridCoordinate; 3], CubeTransaction>,
     behaviors: BehaviorSetTransaction<Space>,
@@ -288,7 +288,7 @@ impl fmt::Debug for SpaceTransaction {
 
 /// Data for a single cube in a [`SpaceTransaction`]. This does not function as a
 /// transaction on its own, though it does implement [`Merge`].
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct CubeTransaction {
     /// Previous block which must occupy this cube.
     /// If `None`, no precondition.

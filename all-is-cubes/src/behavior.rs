@@ -278,6 +278,8 @@ impl<H> PartialEq for BehaviorSetTransaction<H> {
     }
 }
 
+impl<H> Eq for BehaviorSetTransaction<H> {}
+
 /// A simple behavior for exercising the system, which causes a `Character`'s viewpoint to
 /// rotate without user input.
 /// TODO: Delete this, replace with a more general camera movement scripting mechanism.
