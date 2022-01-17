@@ -10,11 +10,11 @@ use std::sync::{Arc, Mutex};
 use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
 use crate::inv::EphemeralOpaque;
-use crate::math::GridPoint;
 use crate::space::{Grid, Space, SpaceTransaction};
 use crate::transaction::{Merge as _, TransactionConflict};
 use crate::universe::{RefVisitor, VisitRefs};
 use crate::vui::layout::Layoutable;
+use crate::vui::LayoutGrant;
 
 // Placeholder for likely wanting to change this later
 pub(super) type WidgetTransaction = SpaceTransaction;
@@ -30,7 +30,7 @@ pub(super) type WidgetTransaction = SpaceTransaction;
 ///
 /// [`LayoutTree`]: crate::vui::LayoutTree
 pub trait Widget: Layoutable + Debug {
-    fn controller(self: Arc<Self>, position: GridPoint) -> Box<dyn WidgetController>;
+    fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController>;
 }
 
 /// A form of using a region of a [`Space`] as a UI widget.

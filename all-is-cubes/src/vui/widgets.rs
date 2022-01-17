@@ -30,8 +30,8 @@ use crate::transaction::Merge as _;
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
 use crate::vui::{
-    ActivatableRegion, InstallVuiError, LayoutRequest, Layoutable, Widget, WidgetController,
-    WidgetTransaction,
+    ActivatableRegion, InstallVuiError, LayoutGrant, LayoutRequest, Layoutable, Widget,
+    WidgetController, WidgetTransaction,
 };
 
 #[derive(Clone, Debug)]
@@ -65,8 +65,11 @@ impl Layoutable for ToggleButtonWidget {
 }
 
 impl Widget for ToggleButtonWidget {
-    fn controller(self: Arc<Self>, position: GridPoint) -> Box<dyn WidgetController> {
-        Box::new(ToggleButtonController::new(position, self))
+    fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
+        Box::new(ToggleButtonController::new(
+            position.bounds.lower_bounds(),
+            self,
+        ))
     }
 }
 

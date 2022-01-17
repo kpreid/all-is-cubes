@@ -24,6 +24,15 @@ pub struct LayoutRequest {
     pub minimum: GridVector,
 }
 
+/// Region a widget has been given by the layout algorithm, based on its
+/// [`LayoutRequest`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct LayoutGrant {
+    /// The widget may have exclusive access to this volume.
+    pub bounds: Grid,
+}
+
 /// Something which can occupy space in a [`LayoutTree`], or is one.
 ///
 /// TODO: give this trait and [`LayoutRequest`] better names
@@ -72,11 +81,11 @@ pub enum LayoutTree<W> {
 
 /// Result of [`LayoutTree::perform_layout`]: specifies where items were positioned, in
 /// absolute coordinates (independent of the tree).
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct Positioned<W> {
     pub value: W,
-    pub position: Grid,
+    pub position: LayoutGrant,
 }
 
 impl<W> LayoutTree<W> {
@@ -122,7 +131,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 // TODO: Implicitly Arc the leaf values? Or just drop this idea of the tree being
                 // shared at all?
                 value: W::clone(w),
-                position: bounds,
+                position: LayoutGrant { bounds },
             }),
             LayoutTree::Stack {
                 direction,
@@ -166,7 +175,7 @@ impl<W: ?Sized + Widget> LayoutTree<Positioned<Arc<W>>> {
         for Positioned { value, position } in self.leaves() {
             let widget = value.clone();
             let controller_installation =
-                WidgetBehavior::installation(widget.controller(position.lower_bounds()))?;
+                WidgetBehavior::installation(widget.controller(position))?;
             txn = txn
                 .merge(controller_installation)
                 .map_err(|error| InstallVuiError::Conflict { error })?;
@@ -250,15 +259,21 @@ mod tests {
             vec![
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
-                    position: Grid::new([10, 10, 10], [1, 10, 10]),
+                    position: LayoutGrant {
+                        bounds: Grid::new([10, 10, 10], [1, 10, 10])
+                    },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
-                    position: Grid::new([11, 10, 10], [1, 10, 10]),
+                    position: LayoutGrant {
+                        bounds: Grid::new([11, 10, 10], [1, 10, 10])
+                    },
                 },
                 &Positioned {
                     value: LT::new("c", [1, 1, 1]),
-                    position: Grid::new([12, 10, 10], [1, 10, 10]),
+                    position: LayoutGrant {
+                        bounds: Grid::new([12, 10, 10], [1, 10, 10])
+                    },
                 }
             ]
         );
