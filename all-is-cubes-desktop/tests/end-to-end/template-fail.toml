@@ -1,0 +1,3 @@
+bin.name = "all-is-cubes"
+args = "--template fail --graphics headless"
+status.code = 1

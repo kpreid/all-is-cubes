@@ -42,3 +42,6 @@ termion = "1.5.5" # TODO: Only used for ANSI color table. Remove?
 thiserror = "1.0.22"
 tui = { version = "0.16.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
+
+[dev-dependencies]
+trycmd = "0.12.0"
