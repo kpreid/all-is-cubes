@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use clap::{value_t, Arg, ErrorKind};
+use clap::{Arg, ErrorKind};
 use strum::IntoEnumIterator;
 
 use all_is_cubes::cgmath::Vector2;
@@ -15,16 +15,16 @@ use all_is_cubes_content::UniverseTemplate;
 use crate::record::{RecordAnimationOptions, RecordOptions};
 use crate::TITLE;
 
-pub fn app() -> clap::App<'static, 'static> {
+pub fn app() -> clap::App<'static> {
     clap::App::new(TITLE)
         .version(clap::crate_version!()) // TODO: include all_is_cubes library version
         .author(clap::crate_authors!())
         .about(clap::crate_description!())
         .arg(
-            Arg::with_name("graphics")
+            Arg::new("graphics")
                 .long("graphics")
-                .short("g")
-                .possible_values(&GraphicsType::iter().map(<&str>::from).collect::<Vec<_>>())
+                .short('g')
+                .possible_values(GraphicsType::iter().map(<&str>::from))
                 .default_value("window")
                 .value_name("MODE")
                 .hide_possible_values(true)
@@ -39,22 +39,18 @@ pub fn app() -> clap::App<'static, 'static> {
                 ),
         )
         .arg(
-            Arg::with_name("display_size")
+            Arg::new("display_size")
                 .long("display-size")
                 .value_name("W×H")
                 .default_value("auto")
-                .validator(|s| parse_dimensions(&s).map(|_| ()))
+                .validator(|s| parse_dimensions(s).map(|_| ()))
                 .help("Window size or image size, if applicable to the selected --graphics mode."),
         )
         .arg(
-            Arg::with_name("template")
+            Arg::new("template")
                 .long("template")
-                .short("t")
-                .possible_values(
-                    &UniverseTemplate::iter()
-                        .map(<&str>::from)
-                        .collect::<Vec<_>>(),
-                )
+                .short('t')
+                .possible_values(UniverseTemplate::iter().map(<&str>::from))
                 .default_value("demo-city")
                 .help(
                     "Which world template to use.\n\
@@ -62,15 +58,16 @@ pub fn app() -> clap::App<'static, 'static> {
                 ),
         )
         .arg(
-            Arg::with_name("precompute_light")
+            Arg::new("precompute_light")
                 .long("precompute-light")
                 .help("Fully calculate light before starting the game."),
         )
         .arg(
-            Arg::with_name("output_file")
+            Arg::new("output_file")
+                .allow_invalid_utf8(true)
                 .long("output")
-                .short("o")
-                .required_if("graphics", "record")
+                .short('o')
+                .required_if_eq("graphics", "record")
                 .value_name("FILE")
                 .help(
                     "Output PNG file name for 'record' mode. \
@@ -78,27 +75,26 @@ pub fn app() -> clap::App<'static, 'static> {
                 ),
         )
         .arg(
-            Arg::with_name("duration")
+            Arg::new("duration")
                 .long("duration")
                 .value_name("SECONDS")
                 // TODO: Generalize this to "exit after this much time has passed".
                 .help("Time to record video, in 'record' mode only (omit for still image)."),
         )
         .arg(
-            Arg::with_name("verbose")
+            Arg::new("verbose")
                 .long("verbose")
-                .short("v")
+                .short('v')
                 .help("Additional logging to stderr."),
         )
         .arg(
-            Arg::with_name("no_config_files")
-                .long("no-config-files")
-                .help(
-                    "Ignore all configuration files, using only defaults and command-line options.",
-                ),
+            Arg::new("no_config_files").long("no-config-files").help(
+                "Ignore all configuration files, using only defaults and command-line options.",
+            ),
         )
         .arg(
-            Arg::with_name("input_file")
+            Arg::new("input_file")
+                .allow_invalid_utf8(true)
                 .value_name("FILE")
                 .conflicts_with("template")
                 .help(
@@ -149,13 +145,13 @@ pub(crate) enum UniverseSource {
 }
 
 pub fn parse_record_options(
-    options: clap::ArgMatches<'_>,
+    options: clap::ArgMatches,
     display_size: Option<Vector2<u32>>,
 ) -> Result<RecordOptions, clap::Error> {
     Ok(RecordOptions {
         output_path: PathBuf::from(options.value_of_os("output_file").unwrap()),
         image_size: display_size.unwrap_or_else(|| Vector2::new(640, 480)),
-        animation: match value_t!(options, "duration", f64) {
+        animation: match options.value_of_t::<f64>("duration") {
             Ok(duration) => {
                 let frame_rate = 60.0;
                 Some(RecordAnimationOptions {
@@ -173,16 +169,12 @@ pub fn parse_record_options(
 }
 
 pub(crate) fn parse_universe_source(
-    options: &clap::ArgMatches<'_>,
+    options: &clap::ArgMatches,
 ) -> Result<UniverseSource, clap::Error> {
     if let Some(file) = options.value_of_os("input_file") {
         Ok(UniverseSource::File(PathBuf::from(file)))
     } else {
-        Ok(UniverseSource::Template(value_t!(
-            options,
-            "template",
-            UniverseTemplate
-        )?))
+        Ok(UniverseSource::Template(options.value_of_t("template")?))
     }
 }
 
@@ -194,7 +186,7 @@ mod tests {
     fn test_record_options() {
         fn parse(args: &[&str]) -> clap::Result<RecordOptions> {
             parse_record_options(
-                app().get_matches_from_safe(
+                app().try_get_matches_from(
                     std::iter::once("all-is-cubes").chain(args.iter().cloned()),
                 )?,
                 None,
@@ -237,7 +229,7 @@ mod tests {
 
     fn parse_universe_test(args: &[&str]) -> clap::Result<UniverseSource> {
         parse_universe_source(
-            &app().get_matches_from_safe(
+            &app().try_get_matches_from(
                 std::iter::once("all-is-cubes").chain(args.iter().cloned()),
             )?,
         )

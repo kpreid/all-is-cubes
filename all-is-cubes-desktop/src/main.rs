@@ -11,13 +11,12 @@
 
 use std::time::Instant;
 
-use all_is_cubes::cgmath::Vector2;
-use clap::value_t;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rand::{thread_rng, Rng};
 
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::util::YieldProgress;
 
@@ -48,7 +47,9 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Convert options we will consult multiple times.
     let display_size = parse_dimensions(options.value_of("display_size").unwrap()).unwrap();
-    let graphics_type = value_t!(options, "graphics", GraphicsType).unwrap_or_else(|e| e.exit());
+    let graphics_type = options
+        .value_of_t::<GraphicsType>("graphics")
+        .unwrap_or_else(|e| e.exit());
     let input_source = parse_universe_source(&options).unwrap_or_else(|e| e.exit());
 
     // Initialize logging -- but only if it won't interfere.
