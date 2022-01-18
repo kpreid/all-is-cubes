@@ -3,6 +3,9 @@
 
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
 
+use macro_rules_attribute::macro_rules_derive;
+use paste::paste;
+
 use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::{Character, Spawn};
@@ -16,6 +19,32 @@ use all_is_cubes::util::YieldProgress;
 use crate::fractal::menger_sponge;
 use crate::menu::template_menu;
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
+
+/// Generate a `#[test]` function for each element of [`UniverseTemplate`].
+/// This macro is used as a derive macro via [`macro_rules_derive`].
+macro_rules! generate_template_test {
+    (
+        $(#[$type_meta:meta])*
+        $vis:vis enum $enum_name:ident {
+            $(
+                $( #[doc = $doc:literal] )*
+                $( #[cfg($variant_cfg:meta)] )*
+                $variant_name:ident
+            ),* $(,)?
+        }
+    ) => {
+        $(
+            paste! {
+                $( #[cfg($variant_cfg)] )*
+                #[test]
+                #[allow(non_snake_case)]
+                fn [< template_ $variant_name >] () {
+                    tests::check_universe_template($enum_name::$variant_name);
+                }
+            }
+        )*
+    }
+}
 
 /// Selection of initial content for constructing a new [`Universe`].
 //
@@ -33,6 +62,7 @@ use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_block
 )]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
+#[macro_rules_derive(generate_template_test!)]
 pub enum UniverseTemplate {
     /// Provides an interactive menu of other templates.
     Menu,
@@ -329,22 +359,16 @@ mod tests {
     use super::*;
     use all_is_cubes::apps::Tick;
     use futures_executor::block_on;
-    use strum::IntoEnumIterator as _;
 
-    #[test]
-    pub fn template_smoke_test() {
-        for template in UniverseTemplate::iter() {
-            eprintln!("{:?}", template);
-
-            let result = block_on(
-                template
-                    .clone()
-                    .build(YieldProgress::noop(), 0x7f16dfe65954583e),
-            );
-            if matches!(template, UniverseTemplate::Fail) {
-                result.unwrap_err();
-                continue;
-            }
+    pub(super) fn check_universe_template(template: UniverseTemplate) {
+        let result = block_on(
+            template
+                .clone()
+                .build(YieldProgress::noop(), 0x7f16dfe65954583e),
+        );
+        if matches!(template, UniverseTemplate::Fail) {
+            result.unwrap_err();
+        } else {
             let mut u = result.unwrap();
 
             if template != UniverseTemplate::Blank {
