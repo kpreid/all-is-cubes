@@ -10,5 +10,5 @@ name = "xtask"
 path = "src/xtask.rs"
 
 [dependencies]
-clap = "2.33.3"
+clap = "3.0.8"
 xaction = "0.2.4"
