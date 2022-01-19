@@ -4544,7 +4544,7 @@ checksum = "4916a4a3cad759e499a3620523bf9545cc162d7a06163727dde97ce9aaa4cf39"
 name = "xtask"
 version = "0.1.0"
 dependencies = [
- "clap 2.34.0",
+ "clap 3.0.8",
  "xaction",
 ]
 

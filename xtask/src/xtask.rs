@@ -16,68 +16,82 @@
 use std::path::Path;
 use std::time::Duration;
 
-use clap::{App, AppSettings, Arg, SubCommand};
 use xaction::{cmd, Cmd};
 
-fn main() -> Result<(), xaction::Error> {
-    let matches = App::new("xtask")
-        .setting(AppSettings::SubcommandRequired)
-        .arg(
-            Arg::with_name("without-luminance")
-                .long("without-luminance")
-                .global(true)
-                .help("Avoid depending on the luminance library."),
-        )
-        .subcommand(SubCommand::with_name("test"))
-        .subcommand(
-            SubCommand::with_name("lint").help("Compile and report warnings without testing."),
-        )
-        .subcommand(SubCommand::with_name("run-dev"))
-        .subcommand(SubCommand::with_name("run-game-server"))
-        .subcommand(SubCommand::with_name("update").help("Update dependency versions."))
-        .subcommand(
-            SubCommand::with_name("publish-all").arg(
-                Arg::with_name("for-real")
-                    .long("for-real")
-                    .help("Actually publish crates rather than dry run"),
-            ),
-        )
-        .get_matches();
+#[derive(Debug, clap::Parser)]
+struct XtaskArgs {
+    /// Avoid depending on the luminance library
+    /// (for platforms where OpenGL libraries are not available).
+    #[clap(long)]
+    without_luminance: bool,
 
-    let features = if matches.is_present("without-luminance") {
+    #[clap(subcommand)]
+    command: XtaskCommand,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum XtaskCommand {
+    /// Run all tests (and some builds without tests).
+    Test,
+
+    /// Compile and report warnings without testing.
+    Lint,
+
+    /// Run webpack dev server (for testing `all-is-cubes-wasm`).
+    RunDev,
+
+    RunGameServer,
+
+    /// Update dependency versions.
+    Update,
+
+    /// Publish all of the crates in this workspace that are intended to be published.
+    PublishAll {
+        /// Actually publish crates rather than dry run.
+        #[clap(long = "for-real")]
+        for_real: bool,
+    },
+}
+
+fn main() -> Result<(), xaction::Error> {
+    let XtaskArgs {
+        without_luminance,
+        command,
+    } = <XtaskArgs as clap::Parser>::parse();
+
+    let features = if without_luminance {
         Features::WithoutLuminance
     } else {
         Features::Default
     };
 
-    match matches.subcommand() {
-        ("test", Some(_matches)) => {
+    match command {
+        XtaskCommand::Test => {
             do_for_all_packages(TestOrCheck::Test, features)?;
         }
-        ("lint", Some(_matches)) => {
+        XtaskCommand::Lint => {
             do_for_all_packages(TestOrCheck::Lint, features)?;
             // Build docs to verify that there are no broken doc links.
             cargo().arg("doc").run()?;
         }
-        ("run-dev", Some(_matches)) => {
+        XtaskCommand::RunDev => {
             let _pushd = xaction::pushd("all-is-cubes-wasm");
             cmd!("npm start").run()?;
         }
-        ("run-game-server", Some(_matches)) => {
+        XtaskCommand::RunGameServer => {
             update_server_static()?;
             cargo().arg("run").arg("--bin").arg("aic-server").run()?;
         }
-        ("update", Some(_matches)) => {
+        XtaskCommand::Update => {
             cargo().arg("update").run()?;
             let _pushd = xaction::pushd("all-is-cubes-wasm");
             cmd!("npm update").run()?;
             cmd!("npm install").run()?;
         }
-        ("publish-all", Some(publish_matches)) => {
+        XtaskCommand::PublishAll { for_real } => {
             update_server_static()?;
             exhaustive_test()?;
 
-            let for_real = publish_matches.is_present("for-real");
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
             for package in [
                 "all-is-cubes",
@@ -98,7 +112,6 @@ fn main() -> Result<(), xaction::Error> {
                 cmd.run()?;
             }
         }
-        _ => panic!("shouldn't happen: command not matched"),
     }
     Ok(())
 }
