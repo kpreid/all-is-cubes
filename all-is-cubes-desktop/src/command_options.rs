@@ -3,10 +3,12 @@
 
 //! Command line option parsing.
 
+use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use clap::{Arg, ErrorKind};
+use clap::{Arg, ArgEnum, ErrorKind};
+use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
 use all_is_cubes::cgmath::Vector2;
@@ -24,19 +26,15 @@ pub fn app() -> clap::App<'static> {
             Arg::new("graphics")
                 .long("graphics")
                 .short('g')
-                .possible_values(GraphicsType::iter().map(<&str>::from))
+                .possible_values(
+                    GraphicsType::value_variants()
+                        .iter()
+                        .filter_map(|v| v.to_possible_value()),
+                )
                 .default_value("window")
                 .value_name("MODE")
                 .hide_possible_values(true)
-                .help(
-                    "Graphics/UI mode; one of the following keywords:\n\
-                    window   - Open a window (uses OpenGL)\n\
-                    terminal - Colored text in this terminal (uses raytracing)\n\
-                    headless - Non-interactive; don't draw anything but only simulates\n\
-                    record   - Non-interactive; save an image or video (uses raytracing)\n\
-                    print    - Non-interactive; print one frame like 'terminal' mode then exit\
-                    ",
-                ),
+                .help(&**GRAPHICS_HELP),
         )
         .arg(
             Arg::new("display_size")
@@ -106,14 +104,51 @@ pub fn app() -> clap::App<'static> {
         )
 }
 
-#[derive(Debug, PartialEq, strum::EnumString, strum::EnumIter, strum::IntoStaticStr)]
+/// clap doesn't automatically compile the possible value help
+/// (<https://github.com/clap-rs/clap/issues/3312>), so do it ourselves.
+/// This is in a static so that it can become an `&'static str`.
+static GRAPHICS_HELP: Lazy<String> = Lazy::new(|| {
+    let pv_iter = GraphicsType::value_variants()
+        .iter()
+        .filter_map(|v| v.to_possible_value());
+
+    let max_width = pv_iter
+        .clone()
+        .filter_map(|pv| pv.get_visible_name())
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+
+    let mut text = String::from("Graphics/UI mode; one of the following keywords:\n");
+    for pv in pv_iter {
+        // Note: There's a final newline so that clap's default value text is put on a new line.
+        writeln!(
+            text,
+            "• {:max_width$} — {}",
+            pv.get_name(),
+            pv.get_help().unwrap()
+        )
+        .unwrap();
+    }
+    text
+});
+
+#[derive(
+    Clone, Copy, Debug, Eq, PartialEq, clap::ArgEnum, strum::EnumString, strum::IntoStaticStr,
+)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum GraphicsType {
-    Headless,
+    // These variants are sorted for the benefit of the help text presentation.
+    #[clap(help = "Open a window (uses OpenGL)")]
     Window,
+    #[clap(help = "Colored text in this terminal (uses raytracing)")]
     Terminal,
+    #[clap(help = "Non-interactive; don't draw anything but only simulates")]
+    Headless,
+    #[clap(help = "Non-interactive; save an image or video (uses raytracing)")]
     Record,
+    #[clap(help = "Non-interactive; print one frame like 'terminal' mode then exit")]
     Print,
 }
 

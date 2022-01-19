@@ -22,7 +22,7 @@ bench = false
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
 anyhow = "1.0"
-clap = { version = "3.0.8", default-features = false, features = ["cargo", "std", "suggestions"] }
+clap = { version = "3.0.8", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }
 crossterm = "0.22.0"
 directories-next = "2.0.0"
 dot_vox = "4.1.0" # TODO: belongs in a separate import/export lib
@@ -32,6 +32,7 @@ indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
 luminance = "0.46.0"
 luminance-glfw = "0.18.0"
+once_cell = "1.4.1"
 png = "0.17.0"
 rand = { version = "0.8.2", default-features = false, features = ["std", "std_rng"] }
 serde = { version = "1.0.126", default-features = false }

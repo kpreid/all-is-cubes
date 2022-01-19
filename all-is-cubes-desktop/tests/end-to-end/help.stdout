@@ -15,13 +15,15 @@ OPTIONS:
                                  mode. [default: auto]
         --duration <SECONDS>     Time to record video, in 'record' mode only (omit for still image).
     -g, --graphics <MODE>        Graphics/UI mode; one of the following keywords:
-                                 window   - Open a window (uses OpenGL)
-                                 terminal - Colored text in this terminal (uses raytracing)
-                                 headless - Non-interactive; don't draw anything but only simulates
-                                 record   - Non-interactive; save an image or video (uses
+                                 • window   — Open a window (uses OpenGL)
+                                 • terminal — Colored text in this terminal (uses raytracing)
+                                 • headless — Non-interactive; don't draw anything but only
+                                 simulates
+                                 • record   — Non-interactive; save an image or video (uses
                                  raytracing)
-                                 print    - Non-interactive; print one frame like 'terminal' mode
-                                 then exit [default: window]
+                                 • print    — Non-interactive; print one frame like 'terminal'
+                                 mode then exit
+                                  [default: window]
     -h, --help                   Print help information
         --no-config-files        Ignore all configuration files, using only defaults and command-
                                  line options.
