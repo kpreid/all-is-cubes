@@ -5,9 +5,10 @@
 
 use std::fmt::Write as _;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
 
-use clap::{Arg, ArgEnum, ErrorKind};
+use clap::{ArgEnum, Parser};
 use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
@@ -17,102 +18,107 @@ use all_is_cubes_content::UniverseTemplate;
 use crate::record::{RecordAnimationOptions, RecordOptions};
 use crate::TITLE;
 
-pub fn app() -> clap::App<'static> {
-    clap::App::new(TITLE)
-        .version(clap::crate_version!()) // TODO: include all_is_cubes library version
-        .author(clap::crate_authors!())
-        .about(clap::crate_description!())
-        .arg(
-            Arg::new("graphics")
-                .long("graphics")
-                .short('g')
-                .possible_values(
-                    GraphicsType::value_variants()
-                        .iter()
-                        .filter_map(|v| v.to_possible_value()),
-                )
-                .default_value("window")
-                .value_name("MODE")
-                .hide_possible_values(true)
-                .help(&**GRAPHICS_HELP),
-        )
-        .arg(
-            Arg::new("display_size")
-                .long("display-size")
-                .value_name("W×H")
-                .default_value("auto")
-                .validator(|s| parse_dimensions(s).map(|_| ()))
-                .help("Window size or image size, if applicable to the selected --graphics mode."),
-        )
-        .arg(
-            Arg::new("template")
-                .long("template")
-                .short('t')
-                .possible_values(UniverseTemplate::iter().map(<&str>::from))
-                .default_value("demo-city")
-                .help(
-                    "Which world template to use.\n\
-                    Mutually exclusive with specifying an input file.",
-                ),
-        )
-        .arg(
-            Arg::new("precompute_light")
-                .long("precompute-light")
-                .help("Fully calculate light before starting the game."),
-        )
-        .arg(
-            Arg::new("output_file")
-                .allow_invalid_utf8(true)
-                .long("output")
-                .short('o')
-                .required_if_eq("graphics", "record")
-                .value_name("FILE")
-                .help(
-                    "Output PNG file name for 'record' mode. \
-                    If animating, a frame number will be inserted.",
-                ),
-        )
-        .arg(
-            Arg::new("duration")
-                .long("duration")
-                .value_name("SECONDS")
-                // TODO: Generalize this to "exit after this much time has passed".
-                .help(
-                    "Length of time to simulate.\n\
-                    In 'record' mode, sets duration of video (or still image if absent).\n\
-                    In 'headless' mode, sets a time to exit rather than running infinitely.\n\
-                    In all other modes, does nothing.",
-                ),
-        )
-        .arg(
-            Arg::new("verbose")
-                .long("verbose")
-                .short('v')
-                .help("Additional logging to stderr."),
-        )
-        .arg(
-            Arg::new("no_config_files").long("no-config-files").help(
-                "Ignore all configuration files, using only defaults and command-line options.",
-            ),
-        )
-        .arg(
-            Arg::new("input_file")
-                .allow_invalid_utf8(true)
-                .value_name("FILE")
-                .conflicts_with("template")
-                .help(
-                    "Existing save/document file to load. \
-                    Mutually exclusive with --template. \
-                    Currently supported formats:\n\
-                    • MagicaVoxel .vox (partial support)",
-                ),
-        )
+#[derive(Clone, Debug, Parser)]
+#[clap(name = TITLE, author, about, version)]
+pub(crate) struct AicDesktopArgs {
+    #[clap(
+        long = "graphics",
+        short = 'g',
+        default_value = "window",
+        value_name = "mode",
+        hide_possible_values = true,
+        help = "Graphics/UI mode",
+        long_help = &**GRAPHICS_HELP_LONG,
+    )]
+    pub(crate) graphics: GraphicsType,
+
+    /// Window size or image size, if applicable to the selected --graphics mode.
+    #[clap(long = "display-size", value_name = "W×H", default_value = "auto")]
+    pub(crate) display_size: DisplaySizeArg,
+
+    /// Which world template to use.
+    ///
+    /// Mutually exclusive with specifying an input file.
+    #[clap(
+        long = "template",
+        short = 't',
+        default_value = "demo-city",
+        possible_values = UniverseTemplate::iter().map(<&'static str>::from).collect::<Vec<&'static str>>(),
+    )]
+    pub(crate) template: UniverseTemplate,
+
+    /// Fully calculate light before starting the game.
+    #[clap(long = "precompute-light")]
+    pub(crate) precompute_light: bool,
+
+    /// Output PNG file name for 'record' mode.
+    ///
+    /// If animating, a frame number will be inserted.
+    #[clap(
+        long = "output",
+        short = 'o',
+        required_if_eq("graphics", "record"),
+        value_name = "FILE",
+        parse(from_os_str)
+    )]
+    pub(crate) output_file: Option<PathBuf>,
+
+    // TODO: Generalize this to "exit after this much time has passed".
+    /// Length of time to simulate.
+    ///
+    /// * In 'record' mode, sets duration of video (or still image if absent).
+    /// * In 'headless' mode, sets a time to exit rather than running infinitely.
+    /// * In all other modes, does nothing.
+    #[clap(long = "duration", value_name = "SECONDS", verbatim_doc_comment)]
+    pub(crate) duration: Option<f64>,
+
+    /// Additional logging to stderr.
+    #[clap(long = "verbose", short = 'v')]
+    pub(crate) verbose: bool,
+
+    /// Ignore all configuration files, using only defaults and command-line options.
+    #[clap(long = "no-config-files")]
+    pub(crate) no_config_files: bool,
+
+    /// Existing save/document file to load. If not specified, a template will be used
+    /// instead.
+    ///
+    /// Currently supported formats:
+    ///
+    /// * MagicaVoxel .vox (partial support)
+    #[clap(conflicts_with = "template", value_name = "FILE", parse(from_os_str))]
+    pub(crate) input_file: Option<PathBuf>,
+}
+
+impl AicDesktopArgs {
+    /// Construct RecordOptions.
+    ///
+    /// Panics if `output_path` is not set, which should have been validated already.
+    pub fn record_options(&self) -> RecordOptions {
+        RecordOptions {
+            output_path: self.output_file.clone().unwrap(),
+            image_size: self
+                .display_size
+                .0
+                .unwrap_or_else(|| Vector2::new(640, 480)),
+            animation: match self.duration {
+                Some(duration) => {
+                    let frame_rate = 60.0;
+                    Some(RecordAnimationOptions {
+                        frame_count: ((duration * frame_rate).round() as usize).max(1),
+                        frame_period: Duration::from_nanos((1e9 / frame_rate) as u64),
+                    })
+                }
+                None => None,
+            },
+        }
+    }
 }
 
 /// clap doesn't automatically compile the possible value help
 /// (<https://github.com/clap-rs/clap/issues/3312>), so do it ourselves.
 /// This is in a static so that it can become an `&'static str`.
-static GRAPHICS_HELP: Lazy<String> = Lazy::new(|| {
+static GRAPHICS_HELP_LONG: Lazy<String> = Lazy::new(|| {
     let pv_iter = GraphicsType::value_variants()
         .iter()
         .filter_map(|v| v.to_possible_value());
@@ -126,10 +132,9 @@ static GRAPHICS_HELP: Lazy<String> = Lazy::new(|| {
 
     let mut text = String::from("Graphics/UI mode; one of the following keywords:\n");
     for pv in pv_iter {
-        // Note: There's a final newline so that clap's default value text is put on a new line.
-        writeln!(
+        write!(
             text,
-            "• {:max_width$} — {}",
+            "\n* {:max_width$} — {}",
             pv.get_name(),
             pv.get_help().unwrap()
         )
@@ -155,6 +160,17 @@ pub enum GraphicsType {
     Record,
     #[clap(help = "Non-interactive; print one frame like 'terminal' mode then exit")]
     Print,
+}
+
+/// This is just to hide the `Option` from `clap` because we don't want it to mean optional-argument.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DisplaySizeArg(pub Option<Vector2<u32>>);
+
+impl FromStr for DisplaySizeArg {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_dimensions(s).map(DisplaySizeArg)
+    }
 }
 
 pub fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
@@ -184,37 +200,15 @@ pub(crate) enum UniverseSource {
     File(PathBuf),
 }
 
-pub fn parse_record_options(
-    options: clap::ArgMatches,
-    display_size: Option<Vector2<u32>>,
-) -> Result<RecordOptions, clap::Error> {
-    Ok(RecordOptions {
-        output_path: PathBuf::from(options.value_of_os("output_file").unwrap()),
-        image_size: display_size.unwrap_or_else(|| Vector2::new(640, 480)),
-        animation: match options.value_of_t::<f64>("duration") {
-            Ok(duration) => {
-                let frame_rate = 60.0;
-                Some(RecordAnimationOptions {
-                    frame_count: ((duration * frame_rate).round() as usize).max(1),
-                    frame_period: Duration::from_nanos((1e9 / frame_rate) as u64),
-                })
-            }
-            Err(clap::Error {
-                kind: ErrorKind::ArgumentNotFound,
-                ..
-            }) => None,
-            Err(e) => return Err(e),
-        },
-    })
-}
-
+// TODO: express the inputs here as a sub-struct of AicDesktopArgs
 pub(crate) fn parse_universe_source(
-    options: &clap::ArgMatches,
-) -> Result<UniverseSource, clap::Error> {
-    if let Some(file) = options.value_of_os("input_file") {
-        Ok(UniverseSource::File(PathBuf::from(file)))
+    input_file: Option<PathBuf>,
+    template: UniverseTemplate,
+) -> UniverseSource {
+    if let Some(file) = input_file {
+        UniverseSource::File(file)
     } else {
-        Ok(UniverseSource::Template(options.value_of_t("template")?))
+        UniverseSource::Template(template)
     }
 }
 
@@ -222,27 +216,29 @@ pub(crate) fn parse_universe_source(
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_record_options() {
-        fn parse(args: &[&str]) -> clap::Result<RecordOptions> {
-            parse_record_options(
-                app().try_get_matches_from(
-                    std::iter::once("all-is-cubes").chain(args.iter().cloned()),
-                )?,
-                None,
-            )
-        }
+    fn parse(args: &[&str]) -> clap::Result<AicDesktopArgs> {
+        AicDesktopArgs::try_parse_from(std::iter::once("all-is-cubes").chain(args.iter().cloned()))
+    }
 
+    #[test]
+    fn record_options_image() {
         assert_eq!(
-            parse(&["-g", "record", "-o", "output.png"]).unwrap(),
+            parse(&["-g", "record", "-o", "output.png"])
+                .unwrap()
+                .record_options(),
             RecordOptions {
                 output_path: PathBuf::from("output.png"),
                 image_size: Vector2::new(640, 480),
                 animation: None,
             },
         );
+    }
+    #[test]
+    fn record_options_animation() {
         assert_eq!(
-            parse(&["-g", "record", "-o", "fancy.png", "--duration", "3"]).unwrap(),
+            parse(&["-g", "record", "-o", "fancy.png", "--duration", "3"])
+                .unwrap()
+                .record_options(),
             RecordOptions {
                 output_path: PathBuf::from("fancy.png"),
                 image_size: Vector2::new(640, 480),
@@ -252,27 +248,34 @@ mod tests {
                 }),
             },
         );
+    }
 
-        // TODO: exercise display size, perhaps with better data flow
+    // TODO: exercise record display size
 
-        // Check expected errors. TODO: Better contains-string assert
-        // No output file
-        assert!(parse(&["-g", "record"])
-            .unwrap_err()
-            .to_string()
-            .contains("required arguments"));
-        assert!(parse(&["-g", "record", "-o", "o.png", "--duration", "X"])
-            .unwrap_err()
-            .to_string()
-            .contains("'X' isn't"));
+    #[test]
+    fn record_options_missing_file() {
+        let e = parse(&["-g", "record"]).unwrap_err();
+        assert!(e.to_string().contains("required arguments"), "{}", e);
+    }
+
+    #[test]
+    fn record_options_invalid_duration() {
+        let e = parse(&["-g", "record", "-o", "o.png", "--duration", "X"]).unwrap_err();
+        assert!(
+            e.to_string().contains("Invalid value for '--duration"),
+            "{}",
+            e
+        );
     }
 
     fn parse_universe_test(args: &[&str]) -> clap::Result<UniverseSource> {
-        parse_universe_source(
-            &app().try_get_matches_from(
-                std::iter::once("all-is-cubes").chain(args.iter().cloned()),
-            )?,
-        )
+        let AicDesktopArgs {
+            template,
+            input_file,
+            ..
+        } = parse(args)?;
+        // TODO: make this a method on AicDesktopArgs
+        Ok(parse_universe_source(input_file, template))
     }
 
     #[test]

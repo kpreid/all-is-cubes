@@ -11,6 +11,7 @@
 
 use std::time::{Duration, Instant};
 
+use clap::Parser as _;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rand::{thread_rng, Rng};
 
@@ -23,7 +24,7 @@ use all_is_cubes::util::YieldProgress;
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
 mod command_options;
-use command_options::{parse_dimensions, parse_record_options, GraphicsType};
+use command_options::GraphicsType;
 mod config_files;
 mod data_files;
 mod record;
@@ -31,7 +32,9 @@ use record::record_main;
 mod terminal;
 use terminal::{terminal_main_loop, TerminalOptions};
 
-use crate::command_options::{parse_universe_source, UniverseSource};
+use crate::command_options::{
+    parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
+};
 use crate::terminal::terminal_print_once;
 
 // TODO: put version numbers in the title when used as a window title
@@ -43,23 +46,32 @@ fn title_and_version() -> String {
 }
 
 fn main() -> Result<(), anyhow::Error> {
-    let options = command_options::app().get_matches();
+    // Parse and transform command-line arguments.
+    let options = AicDesktopArgs::parse();
+    // Destructure as a check that we're using/skipping all the args
+    let AicDesktopArgs {
+        graphics: graphics_type,
+        display_size: DisplaySizeArg(display_size),
+        template,
+        precompute_light,
+        input_file,
+        output_file: _,
+        duration,
+        verbose,
+        no_config_files,
+    } = options.clone();
+    let input_source = parse_universe_source(input_file, template);
 
     // Convert options we will consult multiple times.
-    let display_size = parse_dimensions(options.value_of("display_size").unwrap()).unwrap();
-    let graphics_type = options
-        .value_of_t::<GraphicsType>("graphics")
-        .unwrap_or_else(|e| e.exit());
-    let input_source = parse_universe_source(&options).unwrap_or_else(|e| e.exit());
 
     // Initialize logging -- but only if it won't interfere.
-    if graphics_type != GraphicsType::Terminal || options.is_present("verbose") {
+    if graphics_type != GraphicsType::Terminal || verbose {
         use simplelog::LevelFilter::{Debug, Off, Trace};
         simplelog::TermLogger::init(
-            match options.occurrences_of("verbose") {
+            match verbose {
                 // TODO: When we're closer to 1.0, change the default level to `Info`
-                0 => Debug,
-                _ => Trace,
+                false => Debug,
+                true => Trace,
             },
             simplelog::ConfigBuilder::new()
                 .set_target_level(Off)
@@ -70,7 +82,7 @@ fn main() -> Result<(), anyhow::Error> {
         )?;
     }
 
-    let graphics_options = if options.is_present("no_config_files") {
+    let graphics_options = if no_config_files {
         GraphicsOptions::default()
     } else {
         config_files::load_config().expect("Error loading configuration files")
@@ -118,7 +130,7 @@ fn main() -> Result<(), anyhow::Error> {
             .as_secs_f32()
     );
 
-    if options.is_present("precompute_light") || graphics_type == GraphicsType::Record {
+    if precompute_light || graphics_type == GraphicsType::Record {
         app.character()
             .snapshot()
             .expect("no character to record the viewpoint of")
@@ -131,7 +143,7 @@ fn main() -> Result<(), anyhow::Error> {
     match graphics_type {
         GraphicsType::Window => glfw_main_loop(app, &title_and_version(), display_size),
         GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
-        GraphicsType::Record => record_main(app, parse_record_options(options, display_size)?),
+        GraphicsType::Record => record_main(app, options.record_options()),
         GraphicsType::Print => terminal_print_once(
             app,
             TerminalOptions::default(),
@@ -146,14 +158,7 @@ fn main() -> Result<(), anyhow::Error> {
             // effects from the universe, or interesting logging.
             log::info!("Simulating a universe nobody's looking at...");
 
-            let duration = match options.value_of_t::<f64>("duration") {
-                Ok(duration) => Some(Duration::from_secs_f64(duration)),
-                Err(clap::Error {
-                    kind: clap::ErrorKind::ArgumentNotFound,
-                    ..
-                }) => None,
-                Err(e) => return Err(e.into()),
-            };
+            let duration = duration.map(Duration::from_secs_f64);
 
             let t0 = Instant::now();
             loop {
