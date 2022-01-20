@@ -364,7 +364,7 @@ fn space_debug() {
                 ],
                 physics: SpacePhysics {
                     gravity: (+0.000, -20.000, +0.000),
-                    sky_color: Rgb(0.79, 0.79, 1.0),
+                    sky_color: Rgb(0.8962694, 0.8962694, 1.0),
                     light: None,
                 },
                 behaviors: BehaviorSet([]),

@@ -9,55 +9,127 @@
 //!
 //! TODO: Split "system UI" colors and "demo content" colors.
 
-use crate::math::{Rgb, Rgba};
+// Implementation notes:
+//
+// Most of these colors are defined in sRGB because that way, they can be directly viewed
+// in the documentation (using only macro_rules for the generation). However, All is Cubes
+// internally uses strictly linear color space.
+//
+// 0xBB is the sRGB value approximating linear value 0.5.
 
-/// Default sky color for new [`Space`](crate::space::Space)s.
-pub const DAY_SKY_COLOR: Rgb = rgb_const!(0.79, 0.79, 1.0);
+use crate::math::Rgb;
 
-// Rendering fallbacks.
-/// Used when there should be a texture but we ran out of texture space.
-pub const MISSING_TEXTURE_FALLBACK: Rgba = rgba_const!(1.0, 0.0, 0.5, 1.0);
-/// Used when a recursive block definition should have provided a voxel color but did not.
-pub const MISSING_VOXEL_FALLBACK: Rgba = rgba_const!(0.5, 0.0, 1.0, 1.0);
-/// Used in unallocated texture atlas space.
-pub const UNPAINTED_TEXTURE_FALLBACK: Rgba = rgba_const!(0.0, 0.7, 0.7, 1.0);
+/// Define a color constant and preview it in the documentation.
+macro_rules! palette_entry {
+    (
+        $( #[doc = $doc:literal] )*
+        $name:ident = srgb[$r:literal $g:literal $b:literal]
+    ) => {
+        #[doc = concat!(
+            "<svg width='3.2em' height='3em' style='vertical-align: top; float: left; clear: left; padding-right: .2em;'>",
+            "<rect width='100%' height='100%' fill='rgb(", $r, ",", $g, ",", $b, ")' /></svg>"
+        )]
+        $( #[doc = $doc] )*
+        pub const $name: $crate::math::Rgb = $crate::math::Rgb::from_srgb_32bit([$r, $g, $b]);
+    };
+    (
+        $( #[doc = $doc:literal] )*
+        $name:ident = srgb[$r:literal $g:literal $b:literal $a:literal]
+    ) => {
+        // TODO: visualize alpha
+        #[doc = concat!
+            ("<svg width='3.2em' height='3em' style='vertical-align: top; float: left; clear: left; padding-right: .2em;'>",
+            "<rect width='100%' height='100%' fill='rgb(", $r, ",", $g, ",", $b, ")' /></svg>"
+        )]
+        $( #[doc = $doc] )*
+        pub const $name: $crate::math::Rgba = $crate::math::Rgba::from_srgb_32bit([$r, $g, $b, $a]);
+    };
+}
 
-// Physical material colors.
-/// A realistic value for typical black materials, which do not absorb all light.
-///
-/// (The particular value 0.046875 was chosen to be an exactly representable simple
-/// fraction, 3/64.)
-pub const ALMOST_BLACK: Rgb = rgb_const!(0.046875, 0.046875, 0.046875);
-pub const GRASS: Rgb = rgb_const!(0.117, 0.402, 0.029);
-pub const DIRT: Rgb = rgb_const!(0.150, 0.080, 0.058);
-pub const STONE: Rgb = rgb_const!(0.694, 0.672, 0.658);
-pub const TREE_BARK: Rgb = rgb_const!(0.317, 0.072, 0.119); // TODO: never used, wrong
-pub const TREE_LEAVES: Rgb = rgb_const!(0.010, 0.445, 0.033); // TODO: never used, wrong
-pub const STEEL: Rgb = rgb_const!(0.4, 0.4, 0.4); // TODO: not taken from real references
-pub const PLANK: Rgb = rgb_const!(0.8, 0.6, 0.3); // TODO: not taken from real references
+/// Define many color constants. In the future, this might start defining an enum; I haven't decided.
+macro_rules! palette {
+    ( $(
+        $( #[doc = $doc:literal] )*
+        $name:ident = srgb $data:tt ;
+    )* ) => {
+        $( palette_entry! {
+            $( #[doc = $doc] )*
+            $name = srgb $data
+        } )*
+    }
+}
 
-// TODO: Decide what we want *actual* logo(type) colors to be.
-pub const LOGO_FILL: Rgb = rgb_const!(0.565, 0.033, 0.184);
-pub const LOGO_STROKE: Rgb = rgb_const!(0.033, 0.033, 0.033);
+palette! {
+    /// Default sky color for new [`Space`](crate::space::Space)s.
+    DAY_SKY_COLOR = srgb[243 243 255];
 
-// UI elements
-pub const CURSOR_OUTLINE: Rgba = Rgba::BLACK;
-pub const HUD_SKY: Rgb = Rgb::ONE;
-pub const HUD_TEXT_FILL: Rgba = Rgba::BLACK;
-pub const HUD_TEXT_STROKE: Rgba = Rgba::WHITE;
-pub const HUD_TOOLBAR_BACK: Rgba = rgba_const!(0.21, 0.21, 0.21, 1.);
-pub const HUD_TOOLBAR_FRAME: Rgba = rgba_const!(0.72, 0.72, 0.72, 1.);
-pub const MENU_BACK: Rgba = rgba_const!(0.5, 0.5, 0.5, 1.0);
-pub const MENU_FRAME: Rgba = rgba_const!(0.95, 0.95, 0.95, 1.0);
-pub const BUTTON_FRAME: Rgba = ALMOST_BLACK.with_alpha_one();
-pub const BUTTON_BACK: Rgba = rgba_const!(0.5, 0.5, 0.5, 1.0);
-pub const BUTTON_LABEL: Rgba = ALMOST_BLACK.with_alpha_one();
-pub const BUTTON_ACTIVATED_BACK: Rgba = rgba_const!(0.75, 0.75, 0.75, 1.0);
-pub const BUTTON_ACTIVATED_LABEL: Rgba = rgba_const!(0.125, 0.125, 0.125, 1.0);
-pub const BUTTON_ACTIVATED_GLOW: Rgb = rgb_const!(2.0, 0.4, 0.4);
+    // Rendering fallbacks.
+    /// Used on the surface of a mesh where there should be a texture, but something went
+    /// wrong.
+    MISSING_TEXTURE_FALLBACK = srgb[0xFF 0x00 0xBB 0xFF];
+    /// Used when a recursive block definition should have provided a voxel color but did not.
+    MISSING_VOXEL_FALLBACK = srgb[0xBB 0x00 0xFF 0xFF];
+    /// Used in unallocated texture atlas space.
+    ///
+    /// TODO: Not currently used.
+    UNPAINTED_TEXTURE_FALLBACK = srgb[0x00 0xC5 0xC5 0xFF];
+}
 
-// Debug UI elements (all wireframe)
-pub const DEBUG_COLLISION_BOX: Rgba = rgba_const!(0.0, 0.0, 1.0, 1.0);
-pub const DEBUG_COLLISION_CUBES: Rgba = rgba_const!(1.0, 0.0, 0.0, 1.0);
-pub const DEBUG_CHUNK_MAJOR: Rgba = rgba_const!(0.0, 0.0, 0.8, 1.0);
-pub const DEBUG_CHUNK_MINOR: Rgba = rgba_const!(0.0, 0.8, 0.8, 1.0);
+palette! {
+    // Physical material colors.
+    /// A realistic value for typical black materials, which do not absorb all light.
+    ALMOST_BLACK = srgb[0x3d 0x3d 0x3d];
+    ///
+    GRASS = srgb[0x61 0xAA 0x31];
+    ///
+    DIRT = srgb[0x6C 0x50 0x44];
+    /// Generic unspecified some-kind-of-stone...
+    STONE = srgb[0xD9 0xD7 0xD5];
+    /// TODO: Not actually exercised in demo content yet
+    TREE_BARK = srgb[0x93 0x5C 0x32];
+    /// TODO: Not actually exercised in demo content yet
+    TREE_LEAVES = srgb[0x61 0xAA 0x31];
+    /// Some kind of metallic structure.
+    ///
+    /// TODO: not taken from real references
+    STEEL = srgb[0xAA 0xAA 0xAA];
+    /// Some kind of prepared wood.
+    ///
+    /// TODO: not taken from real references
+    PLANK = srgb[0xE8 0xCC 0x95];
+}
+
+palette! {
+    // All is Cubes logo components
+    // TODO: Decide what we want *actual* logo(type) colors to be.
+    LOGO_FILL = srgb[0xC7 0x33 0x78];
+    LOGO_STROKE = srgb[0x33 0x33 0x33];
+}
+
+palette! {
+    // UI elements
+    CURSOR_OUTLINE = srgb[0x00 0x00 0x00 0xFF];
+    /// Illumination color in the HUD.
+    HUD_SKY = srgb[0xFF 0xFF 0xFF];
+    HUD_TEXT_FILL = srgb[0x00 0x00 0x00 0xFF];
+    HUD_TEXT_STROKE = srgb[0xFF 0xFF 0xFF 0xFF];
+    HUD_TOOLBAR_BACK = srgb[0x7E 0x7E 0x7E 0xFF];
+    HUD_TOOLBAR_FRAME = srgb[0xDD 0xDD 0xDD 0xFF];
+    MENU_BACK = srgb[0xBC 0xBC 0xBC 0xFF];
+    MENU_FRAME = srgb[0xFA 0xFA 0xFA 0xFF];
+    BUTTON_FRAME = srgb[0x3d 0x3d 0x3d 0xFF];
+    BUTTON_BACK = srgb[0xBC 0xBC 0xBC 0xFF];
+    BUTTON_LABEL = srgb[0x3d 0x3d 0x3d 0xFF];
+    BUTTON_ACTIVATED_BACK = srgb[0xE1 0xE1 0xE1 0xFF];
+    BUTTON_ACTIVATED_LABEL = srgb[0x63 0x63 0x63 0xFF];
+}
+pub const BUTTON_ACTIVATED_GLOW: Rgb = rgb_const!(2.0, 0.4, 0.4); // not representable as integer srgb
+
+palette! {
+    // In-world debug UI elements (all wireframe)
+    // TODO: these have no reason to be public
+    DEBUG_COLLISION_BOX = srgb[0x00 0x00 0xFF 0xFF];
+    DEBUG_COLLISION_CUBES = srgb[0xFF 0x00 0x00 0xFF];
+    DEBUG_CHUNK_MAJOR = srgb[0x00 0x00 0xE8 0xFF];
+    DEBUG_CHUNK_MINOR = srgb[0x00 0xE8 0xE8 0xFF];
+}
