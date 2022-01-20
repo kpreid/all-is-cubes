@@ -1,0 +1,2 @@
+bin.name = "all-is-cubes"
+args = "--no-config-files --template lighting-bench --graphics headless --duration 0.05"

@@ -13,7 +13,12 @@ ARGS:
 OPTIONS:
         --display-size <W×H>     Window size or image size, if applicable to the selected --graphics
                                  mode. [default: auto]
-        --duration <SECONDS>     Time to record video, in 'record' mode only (omit for still image).
+        --duration <SECONDS>     Length of time to simulate.
+                                 In 'record' mode, sets duration of video (or still image if
+                                 absent).
+                                 In 'headless' mode, sets a time to exit rather than running
+                                 infinitely.
+                                 In all other modes, does nothing.
     -g, --graphics <MODE>        Graphics/UI mode; one of the following keywords:
                                  • window   — Open a window (uses OpenGL)
                                  • terminal — Colored text in this terminal (uses raytracing)

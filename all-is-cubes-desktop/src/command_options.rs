@@ -77,7 +77,12 @@ pub fn app() -> clap::App<'static> {
                 .long("duration")
                 .value_name("SECONDS")
                 // TODO: Generalize this to "exit after this much time has passed".
-                .help("Time to record video, in 'record' mode only (omit for still image)."),
+                .help(
+                    "Length of time to simulate.\n\
+                    In 'record' mode, sets duration of video (or still image if absent).\n\
+                    In 'headless' mode, sets a time to exit rather than running infinitely.\n\
+                    In all other modes, does nothing.",
+                ),
         )
         .arg(
             Arg::new("verbose")

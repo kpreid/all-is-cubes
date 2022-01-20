@@ -9,7 +9,7 @@
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rand::{thread_rng, Rng};
@@ -142,11 +142,29 @@ fn main() -> Result<(), anyhow::Error> {
             // effects from the universe, or interesting logging.
             log::info!("Simulating a universe nobody's looking at...");
 
+            let duration = match options.value_of_t::<f64>("duration") {
+                Ok(duration) => Some(Duration::from_secs_f64(duration)),
+                Err(clap::Error {
+                    kind: clap::ErrorKind::ArgumentNotFound,
+                    ..
+                }) => None,
+                Err(e) => return Err(e.into()),
+            };
+
+            let t0 = Instant::now();
             loop {
                 // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.
-                app.frame_clock.advance_to(Instant::now());
+                // TODO: Offer a faster-than-real-time option. (Right now, FrameClock bakes in a slowdown policy that would need adjustment.)
+                let t = Instant::now();
+                app.frame_clock.advance_to(t);
                 app.maybe_step_universe();
+
+                if duration.map(|d| t.duration_since(t0) > d).unwrap_or(false) {
+                    break;
+                }
             }
+
+            Ok(())
         }
     }
 }
