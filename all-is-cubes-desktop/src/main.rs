@@ -54,13 +54,17 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal || options.is_present("verbose") {
+        use simplelog::LevelFilter::{Debug, Off, Trace};
         simplelog::TermLogger::init(
             match options.occurrences_of("verbose") {
                 // TODO: When we're closer to 1.0, change the default level to `Info`
-                0 => simplelog::LevelFilter::Debug,
-                _ => simplelog::LevelFilter::Trace,
+                0 => Debug,
+                _ => Trace,
             },
-            simplelog::Config::default(),
+            simplelog::ConfigBuilder::new()
+                .set_target_level(Off)
+                .set_location_level(Off)
+                .build(),
             simplelog::TerminalMode::Stderr,
             simplelog::ColorChoice::Auto,
         )?;
