@@ -20,9 +20,7 @@
 extern crate arbitrary_crate as arbitrary;
 
 use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution, AIR};
-use all_is_cubes::cgmath::{
-    ElementWise, EuclideanSpace, InnerSpace, Point3, Transform as _, Vector3,
-};
+use all_is_cubes::cgmath::{ElementWise, InnerSpace, Point3, Transform as _, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{iso_8859_1::FONT_9X15_BOLD, MonoTextStyle},
     prelude::{Dimensions as _, Drawable, Point, Transform as _},
@@ -34,7 +32,7 @@ use all_is_cubes::math::{
     cube_to_midpoint, Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint,
     GridVector,
 };
-use all_is_cubes::space::{Grid, SetCubeError, Space};
+use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space};
 
 mod animation;
 use all_is_cubes::universe::Universe;
@@ -56,7 +54,6 @@ pub use landscape::*;
 mod menu;
 
 pub use all_is_cubes::content::*;
-use ordered_float::OrderedFloat;
 
 /// Draw the All Is Cubes logo text.
 pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) -> Result<(), SetCubeError> {
@@ -151,7 +148,9 @@ fn draw_text_in_blocks<'a, C: Clone + VoxelColor<'a>>(
 }
 
 /// Create a function to define texture in a block, based on a set of points
-/// to form a 3D Voronoi diagram.
+/// to form a _tiled_ 3D Voronoi diagram.
+///
+/// The points' coordinates should be in the range 0 to 1.
 ///
 /// TODO: Once we have better composable tools than `impl Fn(GridPoint)`, allow
 /// each point to refer to a pattern of its own to delegate to.
@@ -160,26 +159,48 @@ pub(crate) fn voronoi_pattern<'a>(
     // TODO: not a well-founded choice of iterator type, just convenient
     points: impl IntoIterator<Item = &'a (Point3<FreeCoordinate>, Block)> + Clone,
 ) -> impl Fn(GridPoint) -> &'a Block {
-    let point_offsets = Grid::new([-1, -1, -1], [3, 3, 3]);
-    move |cube| {
-        let p = cube_to_midpoint(cube) / FreeCoordinate::from(resolution);
-        points
-            .clone()
-            .into_iter()
-            .flat_map(|(vp, c)| {
-                point_offsets
-                    .interior_iter()
-                    .map(move |offset| (vp + offset.to_vec().map(FreeCoordinate::from), c))
-            })
-            .min_by_key(|(voronoi_point, _)| {
-                let offset = voronoi_point - p;
-                // TODO: add ability to muck with the distance metric in custom ways
-                let offset = offset.mul_element_wise(Vector3::new(1.0, 2.0, 1.0));
-                OrderedFloat(offset.magnitude2())
-            })
-            .map(|(_, block)| block)
-            .unwrap_or(&AIR) // happens iff the point iterator is empty
+    // We use the strategy of flood-filling each point up front, because for
+    // large numbers of points that's much cheaper than evaluating every cube
+    // against every point. (An alternative would be to build a spatial index
+    // of the points, but the only benefit that would give would be supporting
+    // using the same precomputation with different resolutions.)
+    //
+    // Note: This is not strictly correct if we view it as a discrete rendering
+    // of continuous space, because some nearly-parallel boundary planes could
+    // produce "Moiré patterns" of non-contiguous blocks, which a flood-fill
+    // will not. However, this should be good enough for the procedural-generation
+    // goals of this function.
+
+    let mut pattern: GridArray<(FreeCoordinate, &Block)> =
+        GridArray::from_fn(Grid::for_block(resolution), |_| (f64::INFINITY, &AIR));
+    let mut flood_fill_todo = Vec::new();
+    for &(region_point, ref block) in points {
+        let region_point = region_point * FreeCoordinate::from(resolution);
+        let starting_cube = region_point.map(|component| component.floor() as GridCoordinate);
+        flood_fill_todo.push(starting_cube);
+        while let Some(cube) = flood_fill_todo.pop() {
+            let cube_wrapped = cube.map(|component| component.rem_euclid(resolution.into()));
+            let test_point = cube_to_midpoint(cube);
+
+            let offset = test_point - region_point;
+            // TODO: add ability to muck with the distance metric in custom ways
+            // instead of this hardcoded one.
+            let offset = offset.mul_element_wise(Vector3::new(1.0, 2.0, 1.0));
+            let distance_squared = offset.magnitude2();
+
+            if distance_squared < pattern[cube_wrapped].0 {
+                pattern[cube_wrapped] = (distance_squared, block);
+                for direction in Face::ALL_SIX {
+                    let adjacent = cube + direction.normal_vector();
+                    // The flood fill can escape the cube bounds here,
+                    // but is wrapped around at lookup time (so the distance stays true).
+                    flood_fill_todo.push(adjacent);
+                }
+            }
+        }
     }
+
+    move |cube| pattern[cube.map(|component| component.rem_euclid(resolution.into()))].1
 }
 
 /// Given a room's exterior bounding box, act on its four walls.
