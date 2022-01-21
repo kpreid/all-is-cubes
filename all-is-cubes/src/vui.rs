@@ -70,6 +70,7 @@ impl Vui {
         input_processor: &InputProcessor,
         character_source: ListenableSource<Option<URef<Character>>>,
         paused: ListenableSource<bool>,
+        graphics_options: ListenableSource<GraphicsOptions>,
         control_channel: mpsc::SyncSender<ControlMessage>,
     ) -> Self {
         let mut universe = Universe::new();
@@ -85,11 +86,14 @@ impl Vui {
         let hud_space = new_hud_space(
             &mut universe,
             tooltip_state.clone(),
-            hud_blocks.clone(),
             input_processor,
             character_source.clone(),
             paused,
-            control_channel,
+            &HudInputs {
+                hud_blocks: hud_blocks.clone(),
+                control_channel,
+                graphics_options,
+            },
         );
 
         Self {
@@ -206,6 +210,7 @@ mod tests {
             &InputProcessor::new(),
             ListenableSource::constant(None),
             ListenableSource::constant(false),
+            ListenableSource::constant(GraphicsOptions::default()),
             mpsc::sync_channel(1).0,
         ))
     }

@@ -7,6 +7,7 @@ use std::fmt::{self, Display};
 use std::future::Future;
 use std::mem;
 use std::sync::mpsc::{self, TryRecvError};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use cgmath::{One, Point2};
@@ -101,6 +102,7 @@ impl AllIsCubesAppState {
         let game_universe = Universe::new();
         let game_character = ListenableCellWithLocal::new(None);
         let input_processor = InputProcessor::new();
+        let graphics_options = ListenableCell::new(GraphicsOptions::default());
         let paused = ListenableCell::new(false);
         let (control_send, control_recv) = mpsc::sync_channel(100);
 
@@ -109,13 +111,14 @@ impl AllIsCubesAppState {
                 &input_processor,
                 game_character.as_source(),
                 paused.as_source(),
+                graphics_options.as_source(),
                 control_send,
             )
             .await,
 
             frame_clock: FrameClock::new(),
             input_processor,
-            graphics_options: ListenableCell::new(GraphicsOptions::default()),
+            graphics_options,
             game_character,
             game_universe,
             game_universe_in_progress: None,
@@ -194,6 +197,9 @@ impl AllIsCubesAppState {
                     }
                     ControlMessage::ToggleMouselook => {
                         self.input_processor.toggle_mouselook_mode();
+                    }
+                    ControlMessage::ModifyGraphicsOptions(f) => {
+                        self.graphics_options.set(f(self.graphics_options.get()));
                     }
                 },
                 Err(TryRecvError::Empty) => break,
@@ -518,11 +524,12 @@ impl StandardCameras {
 
 /// A message sent to the [`AllIsCubesAppState`], such as from a user interface element.
 // TODO: make public if this proves to be a good approach
-#[derive(Clone, Debug)]
 #[non_exhaustive]
 pub(crate) enum ControlMessage {
     TogglePause,
     ToggleMouselook,
+    /// TODO: this should be "modify user preferences", from which graphics options are derived.
+    ModifyGraphicsOptions(Box<dyn FnOnce(Arc<GraphicsOptions>) -> Arc<GraphicsOptions> + Send>),
 }
 
 #[derive(Copy, Clone, Debug)]

@@ -12,6 +12,7 @@ use embedded_graphics::Drawable as _;
 
 use crate::apps::{ControlMessage, InputProcessor};
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
+use crate::camera::GraphicsOptions;
 use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
@@ -20,15 +21,15 @@ use crate::listen::ListenableSource;
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
 use crate::raycast::Face;
 use crate::space::{Grid, Space, SpacePhysics};
-
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
+use crate::vui::widgets::ToggleButtonVisualState;
 use crate::vui::{
     layout::LayoutTree,
     widgets::{
         CrosshairController, ToggleButtonWidget, ToolbarController, TooltipController, TooltipState,
     },
-    Icons, WidgetBehavior, WidgetController,
+    Icons, Widget, WidgetBehavior, WidgetController,
 };
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
@@ -122,30 +123,40 @@ impl HudLayout {
     }
 }
 
+/// Ad-hoc bundle of elements needed to construct HUD UI widgets.
+///
+/// TODO: Still looking for the right general abstraction here...
+#[derive(Debug)]
+pub(crate) struct HudInputs {
+    pub hud_blocks: Arc<HudBlocks>,
+    pub control_channel: mpsc::SyncSender<ControlMessage>,
+    pub graphics_options: ListenableSource<GraphicsOptions>,
+}
+
+#[allow(clippy::too_many_arguments, clippy::redundant_clone)]
 pub(super) fn new_hud_space(
     // TODO: terrible mess of tightly coupled parameters
     universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
-    hud_blocks: Arc<HudBlocks>,
     input_processor: &InputProcessor,
     character_source: ListenableSource<Option<URef<Character>>>,
     paused: ListenableSource<bool>,
-    control_channel: mpsc::SyncSender<ControlMessage>,
+    hud_inputs: &HudInputs,
 ) -> URef<Space> {
     let hud_layout = HudLayout::default();
-    let hud_space = hud_layout.new_space(universe, &hud_blocks);
+    let hud_space = hud_layout.new_space(universe, &hud_inputs.hud_blocks);
 
     // TODO: this is a legacy kludge which should be replaced by LayoutTree
     let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
         Box::new(ToolbarController::new(
             character_source,
-            Arc::clone(&hud_blocks),
+            Arc::clone(&hud_inputs.hud_blocks),
             &hud_layout,
             universe,
         )),
         Box::new(CrosshairController::new(
             hud_layout.crosshair_position(),
-            hud_blocks.icons[Icons::Crosshair].clone(),
+            hud_inputs.hud_blocks.icons[Icons::Crosshair].clone(),
             input_processor.mouselook_mode(),
         )),
         Box::new(
@@ -155,7 +166,7 @@ pub(super) fn new_hud_space(
                         Arc::clone(&tooltip_state),
                         sp,
                         &hud_layout,
-                        hud_blocks.clone(),
+                        hud_inputs.hud_blocks.clone(),
                         universe,
                     )
                 })
@@ -169,15 +180,19 @@ pub(super) fn new_hud_space(
     }
 
     // Widgets laid out in top-right corner
-    let top_right_buttons = LayoutTree::Stack {
+    let top_right_buttons: LayoutTree<Arc<dyn Widget>> = LayoutTree::Stack {
         direction: Face::NX,
         children: vec![
+            Arc::new(LayoutTree::Stack {
+                direction: Face::NX,
+                children: graphics_options_widgets(hud_inputs),
+            }),
             LayoutTree::leaf(ToggleButtonWidget::new(
                 paused,
                 |&value| value,
-                |state| hud_blocks.icons[Icons::PauseButton(state)].clone(),
+                |state| hud_inputs.hud_blocks.icons[Icons::PauseButton(state)].clone(),
                 {
-                    let cc = control_channel.clone();
+                    let cc = hud_inputs.control_channel.clone();
                     move || {
                         let _ignore_errors = cc.send(ControlMessage::TogglePause);
                     }
@@ -186,9 +201,9 @@ pub(super) fn new_hud_space(
             LayoutTree::leaf(ToggleButtonWidget::new(
                 input_processor.mouselook_mode(),
                 |&value| value,
-                |state| hud_blocks.icons[Icons::MouselookButton(state)].clone(),
+                |state| hud_inputs.hud_blocks.icons[Icons::MouselookButton(state)].clone(),
                 {
-                    let cc = control_channel;
+                    let cc = hud_inputs.control_channel.clone();
                     move || {
                         let _ignore_errors = cc.send(ControlMessage::ToggleMouselook);
                     }
@@ -217,6 +232,63 @@ pub(super) fn new_hud_space(
         .unwrap();
 
     hud_space
+}
+
+// TODO: These arguments should be a bundle of UI-setup context
+#[allow(clippy::redundant_clone)]
+fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<Arc<LayoutTree<Arc<dyn Widget>>>> {
+    vec![
+        LayoutTree::leaf(graphics_toggle_button(
+            hud_inputs,
+            Icons::DebugInfoTextButton,
+            |g| g.debug_info_text,
+            |g, v| g.debug_info_text = v,
+        )),
+        LayoutTree::leaf(graphics_toggle_button(
+            hud_inputs,
+            Icons::DebugChunkBoxesButton,
+            |g| g.debug_chunk_boxes,
+            |g, v| g.debug_chunk_boxes = v,
+        )),
+        LayoutTree::leaf(graphics_toggle_button(
+            hud_inputs,
+            Icons::DebugCollisionBoxesButton,
+            |g| g.debug_collision_boxes,
+            |g, v| g.debug_collision_boxes = v,
+        )),
+        LayoutTree::leaf(graphics_toggle_button(
+            hud_inputs,
+            Icons::DebugLightRaysButton,
+            |g| g.debug_light_rays_at_cursor,
+            |g, v| g.debug_light_rays_at_cursor = v,
+        )),
+    ]
+}
+
+/// Generate a button that toggles a boolean graphics option.
+fn graphics_toggle_button(
+    hud_inputs: &HudInputs,
+    icon_ctor: fn(ToggleButtonVisualState) -> Icons,
+    getter: fn(&GraphicsOptions) -> bool,
+    setter: fn(&mut GraphicsOptions, bool),
+) -> Arc<dyn Widget> {
+    ToggleButtonWidget::new(
+        hud_inputs.graphics_options.clone(),
+        getter,
+        |state| hud_inputs.hud_blocks.icons[icon_ctor(state)].clone(),
+        {
+            let cc = hud_inputs.control_channel.clone();
+            move || {
+                let _ignore_errors = cc.send(ControlMessage::ModifyGraphicsOptions(Box::new(
+                    move |mut g| {
+                        let mg = Arc::make_mut(&mut g);
+                        setter(mg, !getter(mg));
+                        g
+                    },
+                )));
+            }
+        },
+    )
 }
 
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.

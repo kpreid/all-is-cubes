@@ -6,11 +6,14 @@ use std::fmt;
 
 use cgmath::{ElementWise, EuclideanSpace as _, InnerSpace, Vector3};
 use embedded_graphics::geometry::Point;
+use embedded_graphics::mono_font::iso_8859_1::{FONT_5X8, FONT_6X12};
+use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
 use embedded_graphics::prelude::{Drawable, PixelColor, Primitive, Size};
 use embedded_graphics::primitives::{
     Circle, Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle,
     StrokeAlignment, StyledDrawable,
 };
+use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use exhaust::Exhaust;
 
 use crate::block::{Block, BlockCollision, Resolution, AIR, AIR_EVALUATED};
@@ -50,8 +53,14 @@ pub enum Icons {
     Jetpack {
         active: bool,
     },
+    // TODO: Should we do a `Button(ButtonLabel, ToggleButtonVisualState)` variant instead?
+    // Probably this whole business of Icons being responsible for this job should go away.
     PauseButton(ToggleButtonVisualState),
     MouselookButton(ToggleButtonVisualState),
+    DebugInfoTextButton(ToggleButtonVisualState),
+    DebugChunkBoxesButton(ToggleButtonVisualState),
+    DebugCollisionBoxesButton(ToggleButtonVisualState),
+    DebugLightRaysButton(ToggleButtonVisualState),
 }
 
 impl BlockModule for Icons {
@@ -71,6 +80,12 @@ impl fmt::Display for Icons {
             Icons::Jetpack { active } => write!(f, "jetpack/{}", active),
             Icons::PauseButton(state) => write!(f, "pause-button/{}", state),
             Icons::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
+            Icons::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{}", state),
+            Icons::DebugChunkBoxesButton(state) => write!(f, "debug-chunk-boxes-button/{}", state),
+            Icons::DebugCollisionBoxesButton(state) => {
+                write!(f, "debug-collision-boxes-button/{}", state)
+            }
+            Icons::DebugLightRaysButton(state) => write!(f, "debug-light-rays-button/{}", state),
         }
     }
 }
@@ -307,6 +322,30 @@ impl Icons {
 
                     button_builder.into_block(universe, "Mouselook")
                 }
+
+                Icons::DebugInfoTextButton(state) => {
+                    let mut button_builder = ButtonBuilder::new(state)?;
+                    button_builder.draw_text(&FONT_6X12, "i")?;
+                    button_builder.into_block(universe, "Debug: Info Text")
+                }
+
+                Icons::DebugChunkBoxesButton(state) => {
+                    let mut button_builder = ButtonBuilder::new(state)?;
+                    button_builder.draw_text(&FONT_5X8, "Ch")?;
+                    button_builder.into_block(universe, "Debug: Chunk Boxes")
+                }
+
+                Icons::DebugCollisionBoxesButton(state) => {
+                    let mut button_builder = ButtonBuilder::new(state)?;
+                    button_builder.draw_text(&FONT_5X8, "Co")?;
+                    button_builder.into_block(universe, "Debug: Collision Boxes")
+                }
+
+                Icons::DebugLightRaysButton(state) => {
+                    let mut button_builder = ButtonBuilder::new(state)?;
+                    button_builder.draw_text(&FONT_5X8, "Li")?;
+                    button_builder.into_block(universe, "Debug: Light Rays at Cursor")
+                }
             })
         })
         .await
@@ -422,6 +461,21 @@ impl ButtonBuilder {
                 self.label_z,
             ]) * GridMatrix::FLIP_Y,
         )
+    }
+
+    // Draw a text label (only one or two characters will fit).
+    pub fn draw_text(&mut self, font: &MonoFont<'_>, text: &str) -> Result<(), InGenError> {
+        Text::with_text_style(
+            text,
+            Point::new(-1, -1),
+            MonoTextStyle::new(font, self.label_color),
+            TextStyleBuilder::new()
+                .baseline(Baseline::Middle)
+                .alignment(Alignment::Center)
+                .build(),
+        )
+        .draw(&mut self.label_draw_target())?;
+        Ok(())
     }
 }
 
