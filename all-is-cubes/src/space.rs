@@ -10,7 +10,6 @@ use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::Vector3;
 
-use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet};
 use crate::block::*;
 use crate::character::Spawn;
@@ -18,6 +17,7 @@ use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::*;
+use crate::time::Tick;
 use crate::transaction::{Transaction as _, UniverseTransaction};
 use crate::universe::{RefVisitor, URef, VisitRefs};
 use crate::util::ConciseDebug;

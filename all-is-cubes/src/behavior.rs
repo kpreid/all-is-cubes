@@ -11,9 +11,9 @@ use std::sync::Arc;
 use downcast_rs::{impl_downcast, Downcast};
 use ordered_float::NotNan;
 
-use crate::apps::Tick;
 use crate::character::{Character, CharacterTransaction};
 use crate::physics::BodyTransaction;
+use crate::time::Tick;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
     UniverseTransaction,

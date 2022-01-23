@@ -12,7 +12,6 @@ use cgmath::{
 };
 use num_traits::identities::Zero;
 
-use crate::apps::Tick;
 use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
@@ -20,6 +19,7 @@ use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face, FreeCoordinate};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::space::Space;
+use crate::time::Tick;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
     UniverseTransaction,

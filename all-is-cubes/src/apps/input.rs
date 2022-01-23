@@ -5,11 +5,11 @@ use cgmath::{EuclideanSpace as _, Point2, Vector2, Vector3, Zero as _};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use crate::apps::Tick;
 use crate::camera::{FogOption, GraphicsOptions, LightingOption, TransparencyOption, Viewport};
 use crate::character::Character;
 use crate::listen::{ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
+use crate::time::Tick;
 use crate::universe::{URef, Universe};
 
 /// Parse input events, particularly key-down/up pairs, into character control and such.

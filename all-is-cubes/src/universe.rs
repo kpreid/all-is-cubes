@@ -29,11 +29,11 @@ use std::time::Duration;
 
 use instant::Instant;
 
-use crate::apps::Tick;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
-use crate::transaction::Transaction;
+use crate::time::Tick;
+use crate::transaction::Transaction as _;
 use crate::util::{CustomFormat, StatusText, TypeName};
 
 mod members;

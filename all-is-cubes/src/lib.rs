@@ -184,6 +184,7 @@ pub mod physics;
 pub mod raycast;
 pub mod raytracer;
 pub mod space;
+pub mod time;
 pub mod transaction;
 pub mod universe;
 pub mod util;

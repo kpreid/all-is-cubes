@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use cgmath::{Angle as _, Deg, Point3, Vector3};
 
-use crate::apps::Tick;
 use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool};
@@ -13,6 +12,7 @@ use crate::listen::Sink;
 use crate::math::{Face, Rgb};
 use crate::physics::BodyTransaction;
 use crate::space::Space;
+use crate::time::Tick;
 use crate::transaction::{Transaction as _, TransactionTester};
 use crate::universe::Universe;
 

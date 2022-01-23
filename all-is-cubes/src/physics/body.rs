@@ -8,7 +8,6 @@ use std::fmt;
 use super::collision::{
     aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
 };
-use crate::apps::Tick;
 use crate::block::BlockCollision;
 use crate::math::{Aab, Face, FreeCoordinate, Geometry as _};
 use crate::physics::StopAt;
@@ -17,6 +16,7 @@ use crate::space::Space;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
+use crate::time::Tick;
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.

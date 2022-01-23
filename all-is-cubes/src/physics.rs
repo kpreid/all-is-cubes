@@ -16,11 +16,11 @@ pub(crate) const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::apps::Tick;
     use crate::block::{Resolution, AIR};
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::{Aab, CubeFace, Face, Geometry, GridPoint};
     use crate::space::{Grid, Space, SpacePhysics};
+    use crate::time::Tick;
     use crate::universe::Universe;
     use cgmath::{EuclideanSpace, InnerSpace as _, Point3, Vector3, Zero as _};
     use ordered_float::NotNan;

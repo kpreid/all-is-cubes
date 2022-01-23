@@ -14,7 +14,7 @@ use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
 use ordered_float::NotNan;
 
-use crate::apps::{ControlMessage, InputProcessor, Tick};
+use crate::apps::{ControlMessage, InputProcessor};
 use crate::block::Block;
 use crate::camera::{FogOption, GraphicsOptions, ViewTransform};
 use crate::character::Character;
@@ -24,6 +24,7 @@ use crate::inv::ToolError;
 use crate::listen::{DirtyFlag, ListenableSource};
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::Space;
+use crate::time::Tick;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 
 mod hud;

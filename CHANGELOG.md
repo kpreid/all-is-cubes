@@ -54,6 +54,7 @@
         - `Name::Specific`'s field holds an `Arc<str>` instead of a `String`. 
         - `Universe`-related errors now hold `Name` instead of `Arc<Name>`.
     - Renamed: `Evoxel::new()` to `Evoxel::from_color()`.
+    - Renamed: `apps::Tick` is now `time::Tick`. 
 
 ### Removed
 

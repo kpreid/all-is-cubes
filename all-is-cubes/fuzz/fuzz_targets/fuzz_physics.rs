@@ -1,11 +1,11 @@
 #![no_main]
 extern crate all_is_cubes;
 
-use all_is_cubes::apps::Tick;
 use all_is_cubes::cgmath::{InnerSpace, Point3, Vector3};
 use all_is_cubes::character::Character;
 use all_is_cubes::math::{Aab, FreeCoordinate, NotNan};
 use all_is_cubes::space::Space;
+use all_is_cubes::time::Tick;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 

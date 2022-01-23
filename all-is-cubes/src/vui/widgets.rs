@@ -16,7 +16,6 @@ use embedded_graphics::Drawable as _;
 use instant::Duration;
 use once_cell::sync::Lazy;
 
-use crate::apps::Tick;
 use crate::behavior::BehaviorSetTransaction;
 use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
@@ -26,6 +25,7 @@ use crate::inv::{EphemeralOpaque, Slot};
 use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
+use crate::time::Tick;
 use crate::transaction::Merge as _;
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};

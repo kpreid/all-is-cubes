@@ -3,7 +3,6 @@
 
 //! Tests for the behavior of light in a [`Space`].
 
-use crate::apps::Tick;
 use crate::block::{AnimationHint, Block, AIR};
 use crate::listen::{Listener, Sink};
 use crate::math::{FaceMap, GridPoint, Rgb, Rgba};
@@ -11,6 +10,7 @@ use crate::space::{
     Grid, LightPhysics, LightStatus, LightUpdatesInfo, PackedLight, Space, SpaceChange,
     SpacePhysics,
 };
+use crate::time::Tick;
 use pretty_assertions::assert_eq;
 
 #[test]

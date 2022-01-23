@@ -357,7 +357,7 @@ fn arbitrary_space(_: &mut Universe) -> Result<Space, InGenError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::apps::Tick;
+    use all_is_cubes::time::Tick;
     use futures_executor::block_on;
 
     pub(super) fn check_universe_template(template: UniverseTemplate) {

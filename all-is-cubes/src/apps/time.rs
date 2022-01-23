@@ -2,7 +2,9 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use instant::{Duration, Instant};
-use ordered_float::NotNan; // wasm-compatible replacement for std::time::Instant
+use ordered_float::NotNan;
+
+use crate::time::Tick;
 
 /// Algorithm for deciding how to execute simulation and rendering frames.
 /// Platform-independent; does not consult any clocks, only makes decisions
@@ -107,10 +109,7 @@ impl FrameClock {
     /// when stepping in response to [`FrameClock::should_step`] returning true.
     #[must_use] // avoid confusion with side-effecting methods
     pub fn tick(&self) -> Tick {
-        Tick {
-            delta_t: Self::STEP_LENGTH,
-            paused: false,
-        }
+        Tick::from_duration(Self::STEP_LENGTH)
     }
 
     #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
@@ -128,56 +127,6 @@ impl FrameClock {
 impl Default for FrameClock {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Information to pass from the [`FrameClock`] or other timing mechanism to
-/// the [`Universe`](crate::universe::Universe) and other game objects having `step` methods.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Tick {
-    // TODO: Replace this with a rational-number-based system so that we can
-    // (1) step in exact 60ths or other frame rate fractions
-    // (2) have a standard subdivision for slower-than-every-frame events
-    pub(crate) delta_t: Duration,
-
-    paused: bool,
-}
-
-impl Tick {
-    pub const fn arbitrary() -> Self {
-        Self {
-            delta_t: Duration::from_secs(1),
-            paused: false,
-        }
-    }
-
-    pub fn from_seconds(dt: f64) -> Self {
-        Self {
-            delta_t: Duration::from_micros((dt * 1e6) as u64),
-            paused: false,
-        }
-    }
-
-    /// Return the amount of time passed as a [`Duration`].
-    pub fn delta_t(self) -> Duration {
-        self.delta_t
-    }
-
-    /// Set the paused flag. See [`Tick::paused`] for more information.
-    #[must_use]
-    pub fn pause(self) -> Self {
-        Self {
-            paused: true,
-            ..self
-        }
-    }
-
-    /// Returns the "paused" state of this Tick. If true, then step operations should
-    /// not perform any changes that reflect "in-game" time passing. They should still
-    /// take care of the side effects of other mutations/transactions, particularly where
-    /// not doing so might lead to a stale or inconsistent view.
-    pub fn paused(&self) -> bool {
-        self.paused
     }
 }
 

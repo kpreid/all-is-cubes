@@ -5,18 +5,18 @@
 
 use std::fmt;
 
-use all_is_cubes::rgba_const;
-use all_is_cubes::universe::{RefVisitor, VisitRefs};
 use instant::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
-use all_is_cubes::apps::Tick;
 use all_is_cubes::behavior::{Behavior, BehaviorContext};
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::math::{GridPoint, GridVector};
+use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Grid, GridArray, Space, SpaceTransaction};
+use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::{Merge, UniverseTransaction};
+use all_is_cubes::universe::{RefVisitor, VisitRefs};
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.
