@@ -1,0 +1,43 @@
+All is Cubes 0.3.0
+Kevin Reid <kpreid@switchb.org>
+Recursive voxel game.
+
+USAGE:
+    all-is-cubes [OPTIONS] [FILE]
+
+ARGS:
+    <FILE>    Existing save/document file to load. Mutually exclusive with --template. Currently
+              supported formats:
+              • MagicaVoxel .vox (partial support)
+
+OPTIONS:
+        --display-size <W×H>     Window size or image size, if applicable to the selected --graphics
+                                 mode. [default: auto]
+        --duration <SECONDS>     Length of time to simulate.
+                                 In 'record' mode, sets duration of video (or still image if
+                                 absent).
+                                 In 'headless' mode, sets a time to exit rather than running
+                                 infinitely.
+                                 In all other modes, does nothing.
+    -g, --graphics <MODE>        Graphics/UI mode; one of the following keywords:
+                                 • window   — Open a window (uses OpenGL)
+                                 • terminal — Colored text in this terminal (uses raytracing)
+                                 • headless — Non-interactive; don't draw anything but only
+                                 simulates
+                                 • record   — Non-interactive; save an image or video (uses
+                                 raytracing)
+                                 • print    — Non-interactive; print one frame like 'terminal'
+                                 mode then exit
+                                  [default: window]
+    -h, --help                   Print help information
+        --no-config-files        Ignore all configuration files, using only defaults and command-
+                                 line options.
+    -o, --output <FILE>          Output PNG file name for 'record' mode. If animating, a frame
+                                 number will be inserted.
+        --precompute-light       Fully calculate light before starting the game.
+    -t, --template <template>    Which world template to use.
+                                 Mutually exclusive with specifying an input file. [default: demo-
+                                 city] [possible values: menu, blank, fail, demo-city, dungeon,
+                                 atrium, cornell-box, physics-lab, menger-sponge, lighting-bench]
+    -v, --verbose                Additional logging to stderr.
+    -V, --version                Print version information
