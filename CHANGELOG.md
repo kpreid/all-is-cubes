@@ -4,33 +4,59 @@
 
 ### Added
 
+- Functionality:
+    - New universe template, "dungeon", generating an enclosed maze of rooms. I hope to build on this further to create some sort of gameplay (e.g. finding keys to unlock doors) and a tutorial for All is Cubes' functionality from a player's perspective; currently, all the rooms are the same.
+    - New universe template, "menger-sponge". Fractals are cool.
+    - There is now some amount of clickable user interface: pause and mouselook functions are visible as clickable buttons. Soon we may have actual menu screens!
+
 - Graphics:
     - The software raytracer now implements volumetric transparency; blocks whose colors have alpha between 0 and 1 may be rendered as a solid volume of translucent material, rather than the alpha being applied at the surface, if the graphics options request it. However, the light model does not yet have a reasonable interpretation of how to light these volumes, so blocks may have unreasonably dark parts. I hope that future work will address this and also better handling of material surfaces (e.g. light reflections at the surface of glass, vs the lack of them in fog or at the meeting surfaces of adjacent similar blocks).
 
-- `all_is_cubes` library:
-    - `BehaviorSet::query()` for looking up existing behaviors.
-    - `Camera::exposure` for controlling displayed brightness. Both renderers implement it. Nothing sets it yet.
-    - `Camera::post_process_color()` applies the new exposure and tone-mapping settings to a color value.
-    - `Evoxel::from_block()` for performing the same conversion from a full block to a voxel that `Block::Recur(...).evaluate()` does.
-    - `Face::dot()`, for dot product with a vector without constructing an intermediate unit vector.
-    - `GraphicsOptions::tone_mapping` and `ToneMappingOperator` (not yet providing good operators, just the mechanisms to have the feature at all).
-    - `Rgb::luminance()` and `Rgba::luminance()`.
-    - `SpaceMesh` now remembers the `TextureAllocator::Tile`s it was constructed using, just like `BlockMesh` does, so callers no longer need to do so.
-    - `SpaceMesh::blocks_used_iter()` reports which block indices went into the mesh.
-    - `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones.
-    - `StandardCameras` manages the `Camera`s needed for rendering, given the necessary inputs. It is intended to reduce duplicated code and coupling in each renderer.
-    - `VisitRefs` allows traversing the `URef` graph inside a `Universe`.
-    - `math::cube_to_midpoint()` function for the pattern of converting to float and adding 0.5.
+- `all-is-cubes` library:
+    - New major items:
+        - `apps::StandardCameras` manages the `Camera`s needed for rendering, given the necessary inputs. It is intended to reduce duplicated code and coupling in each renderer.
+        - `universe::VisitRefs` trait allows traversing the `URef` graph inside a `Universe`.
+        - `util::YieldProgress` is an interface for long-running async tasks to report their progress.
+    - New features in existing types:
+        - `Aab::center()` returns the center point of the box.
+        - `BehaviorSet::query()` for looking up existing behaviors.
+        - `BehaviorSetTransaction::insert()` for adding a behavior via transaction.
+        - `BlockAttributes::rotation_rule` and `RotationPlacementRule` define how a block should be automatically rotated when placed.
+        - `Camera::exposure` for controlling displayed brightness. Both renderers implement it. Nothing sets it yet.
+        - `Camera::post_process_color()` applies the new exposure and tone-mapping settings to a color value.
+        - `Evoxel::from_block()` for performing the same conversion from a full block to a voxel that `Block::Recur(...).evaluate()` does.
+        - `Face::dot()`, for dot product with a vector without constructing an intermediate unit vector.
+        - `GraphicsOptions::tone_mapping` and `ToneMappingOperator` (not yet providing good operators, just the mechanisms to have the feature at all).
+        - `Rgb::luminance()` and `Rgba::luminance()`.
+        - `SpaceMesh` now remembers the `TextureAllocator::Tile`s it was constructed using, just like `BlockMesh` does, so callers no longer need to do so.
+        - `SpaceMesh::blocks_used_iter()` reports which block indices went into the mesh.
+        - `SpaceTransaction::set()`, for faster construction of large transactions instead of many small ones. (This will likely be changed further to have better naming and convenience.)
+        - `SpaceTransaction::nonconserved()` requests that merging two transactions with the same effect on some cube should not be considered a conflict.
+        - `math::cube_to_midpoint()` function for the pattern of converting to float and adding 0.5.
+    - The following functions are now `const fn`:
+        - `Grid::for_block()`
+        - `Rgb::from_srgb_32bit()`
+        - `Rgba::from_srgb_32bit()`
+
+- `all-is-cubes-content` library:
+    - `UniverseTemplate::build` is now an async function, which accepts a `YieldProgress` hook parameter. This means that there can be progress bars (currently implemented in desktop but not web) and that building doesn't hang the web event loop.
 
 - `all-is-cubes-desktop`:
+    - Can now “open data files”. Currently the only file format supported is MagicaVoxel `.vox` scene files; when we have a native file format that will be supported too. Files can be opened by passing them on the command line or by dropping them on an open window.
     - Terminal mode now has mouse support for placing and removing blocks.
     - Terminal mode no longer goes blank if asked to use graphic characters but not colors.
 
 ### Changed
 
+- Game mechanics:
+    - `Character`s no longer inherently have the ability to fly; they can only do so if they have a `Tool::Jetpack` in their inventory.
+    - It is no longer possible to jump multiple times in the same frame.
+
 - Graphics:
     - Fixed a bug in the GPU renderer where dark areas would always have a noticeable minimum brightness (`PackedLight` did not have the same interpretation in the Rust and GLSL code for a value of zero).
+    - Block meshes are no longer computed all at once, reducing maximum frame time during startup (or, in the future, when moving from viewing one `Space` to another).
     - Optimized construction and depth-sorting of meshes for transparent blocks. They still don't draw correctly, but they are less slow.
+    - Various performance improvements to the raytracer.
 
 - `all_is_cubes` library:
     - The new minimum supported Rust version is 1.56.0 (2021 edition).
