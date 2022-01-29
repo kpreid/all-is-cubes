@@ -9,7 +9,7 @@ description = "Optional GPU rendering implementation for the all-is-cubes crate.
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"
 # TODO: revisit categories once it's more settled how useful this is as an engine
-categories = ["games", "graphics"]
+categories = ["games", "graphics", "rendering::engine"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }

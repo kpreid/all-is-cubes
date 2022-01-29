@@ -8,8 +8,8 @@ description = "Recursive voxel game engine. Can be used for voxel raytracing."
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"
-# TODO: revisit categories once it's more settled how useful this is as an engine
-categories = ["games", "graphics"]
+# TODO: revisit categories once it's more settled how useful this is as a game engine
+categories = ["games", "graphics", "rendering::engine"]
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
