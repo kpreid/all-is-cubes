@@ -10,7 +10,7 @@ repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT"
 # TODO: revisit categories once it's more settled what's in this package
 categories = ["games", "rendering"]
-include = ["static-all-is-cubes-wasm/**", "src/**"]
+include = ["static-all-is-cubes-wasm/**", "src/**", "README.md"]
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
