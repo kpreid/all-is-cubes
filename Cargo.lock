@@ -46,7 +46,7 @@ checksum = "250f629c0161ad8107cf89319e990051fae62832fd343083bea452d93e2205fd"
 
 [[package]]
 name = "all-is-cubes"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "arbitrary",
  "bitvec",
@@ -78,7 +78,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-content"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "all-is-cubes",
  "arbitrary",
@@ -98,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-desktop"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
@@ -130,7 +130,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-gpu"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "all-is-cubes",
  "instant",
@@ -145,7 +145,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-server"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "all-is-cubes",
  "static_dir",
@@ -155,7 +155,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-wasm"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
