@@ -13,6 +13,7 @@
 // We might or might not want to reduce this to "compute all the primitive combinations, then find the minimal set of cargo commands to produce this effect".
 // That might be overkill or it might be straightforward.
 
+use std::io::Write as _;
 use std::path::Path;
 use std::time::Duration;
 
@@ -39,6 +40,11 @@ enum XtaskCommand {
 
     /// Update dependency versions.
     Update,
+
+    /// Set the version number of all packages and their dependencies on each other.
+    SetVersion {
+        version: String,
+    },
 
     /// Publish all of the crates in this workspace that are intended to be published.
     PublishAll {
@@ -76,18 +82,52 @@ fn main() -> Result<(), xaction::Error> {
             cmd!("npm update").run()?;
             cmd!("npm install").run()?;
         }
+        XtaskCommand::SetVersion { version } => {
+            let version_value = toml_edit::value(version.as_str());
+            for package in ALL_NONTEST_PACKAGES {
+                let manifest_path = format!("{package}/Cargo.toml");
+                eprint!("Editing {manifest_path}...");
+                let _ = std::io::stderr().flush();
+                let mut manifest: toml_edit::Document =
+                    std::fs::read_to_string(&manifest_path)?.parse()?;
+                assert_eq!(manifest["package"]["name"].as_str(), Some(package));
+
+                // Update version of the package itself
+                manifest["package"]["version"] = version_value.clone();
+
+                // Update versions of dependencies
+                let mut count_deps = 0;
+                for (_dep_key, dep_item) in manifest["dependencies"]
+                    .as_table_mut()
+                    .expect("dependencies not a table")
+                    .iter_mut()
+                    .filter(|(dep_key, _)| ALL_NONTEST_PACKAGES.contains(&dep_key.get()))
+                {
+                    dep_item["version"] = version_value.clone();
+                    count_deps += 1;
+                }
+
+                std::fs::write(&manifest_path, manifest.to_string())?;
+                eprintln!("wrote version and {count_deps} deps.");
+            }
+            eprint!(
+                "Versions updated. Manual updates are still needed for:\n\
+                Documentation links\n\
+                npm package\n\
+                "
+            );
+        }
         XtaskCommand::PublishAll { for_real } => {
             update_server_static()?;
             exhaustive_test()?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
-            for package in [
-                "all-is-cubes",
-                "all-is-cubes-gpu",
-                "all-is-cubes-content",
-                "all-is-cubes-desktop",
-                "all-is-cubes-server",
-            ] {
+            for package in ALL_NONTEST_PACKAGES {
+                if package == "all-is-cubes-wasm" {
+                    // Not published to crates.io; built and packaged as a part of of all-is-cubes-server.
+                    continue;
+                }
+
                 let _pushd = xaction::pushd(package);
                 let mut cmd = cargo().arg("publish").args(maybe_dry.iter().copied());
                 if package == "all-is-cubes-server" {
@@ -104,6 +144,16 @@ fn main() -> Result<(), xaction::Error> {
     }
     Ok(())
 }
+
+// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
+const ALL_NONTEST_PACKAGES: [&str; 6] = [
+    "all-is-cubes",
+    "all-is-cubes-gpu",
+    "all-is-cubes-content",
+    "all-is-cubes-desktop",
+    "all-is-cubes-wasm",
+    "all-is-cubes-server",
+];
 
 const CHECK_SUBCMD: &str = "clippy";
 const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";

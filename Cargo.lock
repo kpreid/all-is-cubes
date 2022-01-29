@@ -3956,6 +3956,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml_edit"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a0e86b53683f540d6920ba1a9ac4648b389d28e7eb12ddd202687f132364c5f"
+dependencies = [
+ "combine",
+ "indexmap",
+ "itertools",
+ "kstring",
+]
+
+[[package]]
 name = "tower-service"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4015,7 +4027,7 @@ dependencies = [
  "serde",
  "shlex",
  "tempfile 3.3.0",
- "toml_edit",
+ "toml_edit 0.12.6",
  "wait-timeout",
  "walkdir",
  "yansi",
@@ -4535,6 +4547,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "clap 3.0.8",
+ "toml_edit 0.13.3",
  "xaction",
 ]
 
