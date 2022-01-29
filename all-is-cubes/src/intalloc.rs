@@ -75,6 +75,12 @@ impl<T: PrimInt + Debug> IntAllocator<T> {
     }
 }
 
+impl<T: PrimInt + Debug> Default for IntAllocator<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

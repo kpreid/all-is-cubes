@@ -6,13 +6,6 @@
 use std::fmt;
 use std::time::Duration;
 
-use cgmath::{Matrix4, SquareMatrix};
-use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;
-use embedded_graphics::mono_font::MonoTextStyle;
-use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::prelude::{Drawable, Point};
-use embedded_graphics::text::Baseline;
-use embedded_graphics::text::Text;
 use instant::Instant; // wasm-compatible replacement for std::time::Instant
 use luminance::blending::Blending;
 use luminance::blending::Equation;
@@ -25,18 +18,27 @@ use luminance::render_state::RenderState;
 use luminance::tess::Mode;
 use luminance::texture::{Dim2, MagFilter, MinFilter};
 
-use crate::apps::{Layers, StandardCameras};
-use crate::camera::{Camera, Viewport};
-use crate::character::{Character, Cursor};
-use crate::content::palette;
-use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
-use crate::lum::shading::{prepare_lines_program, BlockPrograms, LinesProgram, ShaderConstants};
-use crate::lum::space::{SpaceRenderInfo, SpaceRenderer};
-use crate::lum::types::{AicLumBackend, LinesVertex};
-use crate::lum::GraphicsResourceError;
-use crate::lum::{make_cursor_tess, wireframe_vertices};
-use crate::math::{Aab, Rgba};
-use crate::util::{CustomFormat, StatusText};
+use all_is_cubes::cgmath::{Matrix4, SquareMatrix};
+use all_is_cubes::drawing::embedded_graphics::{
+    mono_font::{iso_8859_1::FONT_7X13_BOLD, MonoTextStyle},
+    pixelcolor::Rgb888,
+    prelude::{Drawable, Point},
+    text::{Baseline, Text},
+};
+
+use all_is_cubes::apps::{Layers, StandardCameras};
+use all_is_cubes::camera::{Camera, Viewport};
+use all_is_cubes::character::{Character, Cursor};
+use all_is_cubes::content::palette;
+use all_is_cubes::math::{Aab, Rgba};
+use all_is_cubes::util::{CustomFormat, StatusText};
+
+use crate::frame_texture::{FullFramePainter, FullFrameTexture};
+use crate::shading::{prepare_lines_program, BlockPrograms, LinesProgram, ShaderConstants};
+use crate::space::{SpaceRenderInfo, SpaceRenderer};
+use crate::types::{AicLumBackend, LinesVertex};
+use crate::GraphicsResourceError;
+use crate::{make_cursor_tess, wireframe_vertices};
 
 /// Game world/UI renderer targeting `luminance`.
 // TODO: give this and its module a better name

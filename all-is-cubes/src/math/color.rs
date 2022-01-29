@@ -271,7 +271,8 @@ impl Rgba {
     /// Converts this color to sRGB (nonlinear RGB components).
     // TODO: decide whether to make this public and what to call it -- it is rarely needed
     #[inline]
-    pub(crate) fn to_srgb_float(self) -> [f32; 4] {
+    #[doc(hidden)] // used by all-is-cubes-gpu
+    pub fn to_srgb_float(self) -> [f32; 4] {
         [
             component_to_srgb(self.0.x),
             component_to_srgb(self.0.y),

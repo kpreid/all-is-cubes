@@ -20,6 +20,7 @@ bench = false
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
+all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.3.0" }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
 anyhow = "1.0"
 clap = { version = "3.0.8", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }

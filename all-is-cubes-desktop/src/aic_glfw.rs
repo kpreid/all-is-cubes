@@ -13,7 +13,7 @@ use luminance_glfw::{GlfwSurface, GlfwSurfaceError};
 use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
-use all_is_cubes::lum::GLRenderer;
+use all_is_cubes_gpu::GLRenderer;
 
 #[derive(Clone, Copy, Debug)]
 struct CannotCreateWindow;

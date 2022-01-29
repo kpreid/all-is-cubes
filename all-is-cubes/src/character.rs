@@ -68,7 +68,8 @@ pub struct Character {
     eye_displacement_vel: Vector3<FreeCoordinate>,
 
     // TODO: Does this belong here? Or in the Space?
-    pub(crate) colliding_cubes: HashSet<Contact>,
+    #[doc(hidden)] // pub to be used by all-is-cubes-gpu
+    pub colliding_cubes: HashSet<Contact>,
 
     /// Last [`Character::step`] info result, for debugging.
     pub(crate) last_step_info: Option<BodyStepInfo>,

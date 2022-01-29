@@ -64,7 +64,8 @@ pub struct Space {
     light_update_queue: LightUpdateQueue,
     /// Debug log of the updated cubes from last frame.
     /// Empty unless this debug function is enabled.
-    pub(crate) last_light_updates: Vec<GridPoint>,
+    #[doc(hidden)] // pub to be used by all-is-cubes-gpu
+    pub last_light_updates: Vec<GridPoint>,
 
     /// Global characteristics such as the behavior of light and gravity.
     physics: SpacePhysics,
@@ -1028,7 +1029,7 @@ pub enum SetCubeError {
 
 /// Description of a change to a [`Space`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
+#[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
 pub enum SpaceChange {
     // TODO: This set of names is not very clear and self-consistent.
     /// The block at the given location was replaced.

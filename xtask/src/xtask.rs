@@ -20,11 +20,6 @@ use xaction::{cmd, Cmd};
 
 #[derive(Debug, clap::Parser)]
 struct XtaskArgs {
-    /// Avoid depending on the luminance library
-    /// (for platforms where OpenGL libraries are not available).
-    #[clap(long)]
-    without_luminance: bool,
-
     #[clap(subcommand)]
     command: XtaskCommand,
 }
@@ -54,16 +49,9 @@ enum XtaskCommand {
 }
 
 fn main() -> Result<(), xaction::Error> {
-    let XtaskArgs {
-        without_luminance,
-        command,
-    } = <XtaskArgs as clap::Parser>::parse();
+    let XtaskArgs { command } = <XtaskArgs as clap::Parser>::parse();
 
-    let features = if without_luminance {
-        Features::WithoutLuminance
-    } else {
-        Features::Default
-    };
+    let features = Features::Default;
 
     match command {
         XtaskCommand::Test => {
@@ -95,6 +83,7 @@ fn main() -> Result<(), xaction::Error> {
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
             for package in [
                 "all-is-cubes",
+                "all-is-cubes-gpu",
                 "all-is-cubes-content",
                 "all-is-cubes-desktop",
                 "all-is-cubes-server",
@@ -209,7 +198,7 @@ impl TestOrCheck {
 /// This will need to become more combinatorial.
 enum Features {
     Default,
-    WithoutLuminance,
+    // NoDefault,
 }
 
 impl Features {
@@ -217,7 +206,7 @@ impl Features {
     fn cargo_flags(self) -> impl IntoIterator<Item = &'static str> {
         match self {
             Self::Default => vec![],
-            Self::WithoutLuminance => vec!["--no-default-features"],
+            // Self::NoDefault => vec!["--no-default-features"],
         }
     }
 }

@@ -351,10 +351,8 @@ pub struct Layers<T> {
 }
 
 impl<T> Layers<T> {
-    pub(crate) fn try_map_ref<U, E>(
-        &self,
-        mut f: impl FnMut(&T) -> Result<U, E>,
-    ) -> Result<Layers<U>, E> {
+    #[doc(hidden)] // used in related crates, but it's ugly and experimental
+    pub fn try_map_ref<U, E>(&self, mut f: impl FnMut(&T) -> Result<U, E>) -> Result<Layers<U>, E> {
         Ok(Layers {
             world: f(&self.world)?,
             ui: f(&self.ui)?,

@@ -151,7 +151,10 @@ impl CustomFormat<StatusText> for Duration {
 
 /// Equivalent of [`Iterator::map`] but applied to an [`Extend`] instead, transforming
 /// the incoming elements.
-pub(crate) struct MapExtend<'a, A, B, T, F>
+///
+/// TODO: this is only used by the wireframe debug mesh mechanism and should be reconsidered
+#[doc(hidden)] // pub to be used by all-is-cubes-gpu
+pub struct MapExtend<'a, A, B, T, F>
 where
     T: Extend<B>,
     F: Fn(A) -> B,
@@ -166,7 +169,7 @@ where
     T: Extend<B>,
     F: Fn(A) -> B,
 {
-    pub(crate) fn new(target: &'a mut T, function: F) -> Self {
+    pub fn new(target: &'a mut T, function: F) -> Self {
         Self {
             target,
             function,

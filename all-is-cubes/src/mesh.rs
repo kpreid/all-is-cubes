@@ -19,8 +19,8 @@ mod block_vertex;
 pub use block_vertex::*;
 mod block_mesh;
 pub use block_mesh::*;
-mod chunked_mesh;
-pub(crate) use chunked_mesh::*; // TODO: candidate for being public
+#[doc(hidden)] // TODO: candidate for being public
+pub mod chunked_mesh;
 mod space_mesh;
 pub use space_mesh::*;
 mod planar;

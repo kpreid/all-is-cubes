@@ -87,7 +87,7 @@
 //! If you create an [`AllIsCubesAppState`], it will manage the [`Universe`], the
 //! [UI](crate::vui), and user input; you need to provide:
 //!
-//! * A renderer, possibly using the [GPU rendering in this crate via `luminance`](crate::lum),
+//! * A renderer, possibly using the [`all-is-cubes-gpu`](https://docs.rs/all-is-cubes-gpu),
 //!   [the software raytracer](crate::raytracer), or your own code.
 //! * Deliver input events to [`AllIsCubesAppState::input_processor`].
 //!
@@ -98,9 +98,6 @@
 //!
 //! This crate, `all_is_cubes`, defines the following feature flags:
 //!
-//! * `lum` (default):
-//!   Enable dependency on [`luminance`] for GPU rendering.
-//!   The [`all_is_cubes::lum`](crate::lum) module exists only if this feature is enabled.
 //! * `rayon`:
 //!   Enable use of [`rayon`] for multithreaded raytracing.
 //!   This feature does not affect the public API.
@@ -126,9 +123,6 @@
 //! * [`ordered_float`] (as `all_is_cubes::math::NotNan`).
 //! * [`embedded_graphics`] (as `all_is_cubes::drawing::embedded_graphics`).
 //!
-//! The optional dependency on [`luminance`] is not re-exported, because a matching version
-//! of a platform backend crate must be explicitly chosen anyway.
-//!
 //! [`AllIsCubesAppState`]: crate::apps::AllIsCubesAppState
 //! [`AllIsCubesAppState::input_processor`]: crate::apps::AllIsCubesAppState::input_processor
 //! [`Behavior`]: crate::behavior::Behavior
@@ -142,10 +136,6 @@
 #![cfg_attr(
     not(feature = "arbitrary"),
     doc = "[`arbitrary::Arbitrary`]: https://docs.rs/arbitrary/1.0.2/arbitrary/trait.Arbitrary.html"
-)]
-#![cfg_attr(
-    not(feature = "lum"),
-    doc = "[`luminance`]: https://docs.rs/luminance/"
 )]
 #![cfg_attr(not(feature = "rayon"), doc = "[`rayon`]: https://docs.rs/rayon/")]
 #![allow(clippy::collapsible_if)]
@@ -174,11 +164,11 @@ pub mod chunking;
 #[doc(hidden)] // Exported only for use by all_is_cubes_content
 pub mod content;
 pub mod drawing;
-mod intalloc;
+#[doc(hidden)] // Exported only for use by all_is_cubes_gpu
+pub mod intalloc;
 pub mod inv;
 pub mod linking;
 pub mod listen;
-pub mod lum;
 pub mod mesh;
 pub mod physics;
 pub mod raycast;

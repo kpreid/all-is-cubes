@@ -7,7 +7,7 @@
 //!
 //! The original reason this exists is that I thought “we have [`raycast`](crate::raycast),
 //! and that's nearly all the work, so why not?” Secondarily, it was written before
-//! the [mesh-based renderer](crate::lum), and was useful as a cross-check since
+//! [the mesh-based renderer](crate::mesh), and was useful as a cross-check since
 //! it is much simpler. It continues to serve as a “reference implementation” and is used
 //! by the terminal UI and in unit tests via [`print_space`].
 
@@ -255,7 +255,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     }
 
     fn get_interpolated_light(&self, point: Point3<FreeCoordinate>, face: Face) -> Rgb {
-        // This implementation is duplicated in GLSL at src/lum/shaders/fragment.glsl
+        // This implementation is duplicated in GLSL at all-is-cubes-gpu/src/shaders/fragment.glsl
 
         // About half the size of the smallest permissible voxel.
         let above_surface_epsilon = 0.5 / 256.0;

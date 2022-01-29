@@ -120,7 +120,8 @@ impl<T: Clone + Sync> ListenableSource<T> {
 /// Convenience wrapper around [`ListenableCell`] which allows borrowing the current
 /// value, at the cost of requiring `&mut` access to set it.
 #[derive(Debug)] // TODO: custom format ?
-pub(crate) struct ListenableCellWithLocal<T> {
+#[doc(hidden)] // TODO: decide if good API -- currently used by all_is_cubes_gpu
+pub struct ListenableCellWithLocal<T> {
     cell: ListenableCell<T>,
     value: Arc<T>,
 }
@@ -140,6 +141,7 @@ impl<T: Sync> ListenableCellWithLocal<T> {
         self.value = value;
     }
 
+    #[allow(clippy::should_implement_trait)] // TODO: consider renaming
     pub fn borrow(&self) -> &T {
         &*self.value
     }

@@ -4,7 +4,7 @@
 //! Traits for texture atlas/array allocator for block textures.
 
 // TODO: Look at this module together with the concrete implementation
-// module [`crate::lum::block_texture`] and figure out better names for
+// module `all_is_cubes_gpu::block_texture` and figure out better names for
 // both of them.
 
 use std::fmt::Debug;

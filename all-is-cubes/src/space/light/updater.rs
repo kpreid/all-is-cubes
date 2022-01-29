@@ -162,7 +162,8 @@ impl Space {
     /// The returned vector of points lists those cubes which the computed value depends on
     /// (imprecisely; empty cubes passed through are not listed).
     #[inline]
-    pub(crate) fn compute_lighting(
+    #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging
+    pub fn compute_lighting(
         &self,
         cube: GridPoint,
     ) -> (PackedLight, Vec<GridPoint>, usize, LightUpdateCubeInfo) {
@@ -463,7 +464,8 @@ impl CustomFormat<StatusText> for LightUpdatesInfo {
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 #[allow(dead_code)] // fields used for Debug printing
-pub(crate) struct LightUpdateCubeInfo {
+#[doc(hidden)] // pub to be used by all-is-cubes-gpu
+pub struct LightUpdateCubeInfo {
     cube: GridPoint,
     result: PackedLight,
     rays: [Option<LightUpdateRayInfo>; ALL_RAYS_COUNT],

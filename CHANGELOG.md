@@ -61,6 +61,7 @@
 
 - `all_is_cubes` library:
     - The new minimum supported Rust version is 1.56.0 (2021 edition).
+    - Breaking: The items previously in `all_is_cubes::lum` are now in a separate crate `all_is_cubes_gpu`, and the `"lum"` feature no longer exists.
     - Breaking: The `triangulator` module has been renamed to `mesh`. All types with `Triangulation` in the name now use `Mesh` instead.
         - `BlockTriangulation` → `BlockMesh`
         - `BlockTriangulations` → `BlockMeshes`

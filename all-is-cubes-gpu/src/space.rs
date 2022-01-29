@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
-use cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3};
 use luminance::blending::{Blending, Equation, Factor};
 use luminance::context::GraphicsContext;
 use luminance::depth_stencil::Write;
@@ -21,22 +21,23 @@ use luminance::tess::{Mode, Tess};
 use luminance::tess_gate::TessGate;
 use luminance::texture::{Dim3, Sampler, TexelUpload, Texture, TextureError};
 
-use crate::camera::Camera;
-use crate::chunking::ChunkPos;
-use crate::content::palette;
-use crate::listen::Listener;
-use crate::lum::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
-use crate::lum::shading::{BlockPrograms, LinesProgram};
-use crate::lum::types::{AicLumBackend, LinesVertex, LumBlockVertex};
-use crate::lum::{wireframe_vertices, GraphicsResourceError};
-use crate::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
-use crate::mesh::{ChunkMesh, ChunkedSpaceMesh, CsmUpdateInfo, DepthOrdering, SpaceMesh};
-use crate::raycast::Face;
-use crate::space::{Grid, Space, SpaceChange};
-use crate::universe::URef;
-use crate::util::{CustomFormat, StatusText};
+use all_is_cubes::camera::Camera;
+use all_is_cubes::chunking::ChunkPos;
+use all_is_cubes::content::palette;
+use all_is_cubes::listen::Listener;
+use all_is_cubes::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
+use all_is_cubes::mesh::chunked_mesh::{ChunkMesh, ChunkedSpaceMesh, CsmUpdateInfo};
+use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
+use all_is_cubes::raycast::Face;
+use all_is_cubes::space::{Grid, Space, SpaceChange};
+use all_is_cubes::universe::URef;
+use all_is_cubes::util::{CustomFormat, StatusText};
 
-use super::block_texture::AtlasFlushInfo;
+use crate::block_texture::AtlasFlushInfo;
+use crate::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
+use crate::shading::{BlockPrograms, LinesProgram};
+use crate::types::{AicLumBackend, LinesVertex, LumBlockVertex};
+use crate::{wireframe_vertices, GraphicsResourceError};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 

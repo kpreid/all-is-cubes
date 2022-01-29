@@ -6,7 +6,7 @@ A “voxel game” engine where each block is made out of smaller blocks (one le
 This is a work in progress; it's my very first project written in Rust, and I am aiming to duplicate and expand on my previous work [Cubes](https://github.com/kpreid/cubes/). Currently implemented:
 
 * Core data model of [Blocks] and [Spaces] (subject to change).
-* Rendering using [luminance] (OpenGL bindings) or a software raytracer.
+* Rendering using a CPU-only raytracer.
 * Basic user interface (not yet able to edit all aspects of the data).
 * 2D drawing into the voxel space, built on top of the [embedded-graphics] library.
 
@@ -18,12 +18,13 @@ This library is intended to be somewhat reusable for working with block/voxel da
 [the crate documentation]: https://docs.rs/all-is-cubes/0.3.0/all_is_cubes/
 [Blocks]: https://docs.rs/all-is-cubes/0.3.0/all_is_cubes/block/enum.Block.html
 [Spaces]: https://docs.rs/all-is-cubes/0.3.0/all_is_cubes/space/struct.Space.html
-[luminance]: https://github.com/phaazon/luminance-rs/
 [embedded-graphics]: https://crates.io/crates/embedded-graphics
 
 Related crates
 --------------
 
+*   [`all-is-cubes-gpu`](https://crates.io/crates/all-is-cubes-gpu)
+    renders using GPU functionality rather than CPU-only.
 *   [`all-is-cubes-content`](https://crates.io/crates/all-is-cubes-content)
     contains procedural generation and data for “game content” as opposed to the engine; it is separated so that it is possible to depend on the engine alone, and for compilation speed.
 *   [`all-is-cubes-desktop`](https://crates.io/crates/all-is-cubes-desktop)
@@ -31,7 +32,7 @@ Related crates
 *   [`all-is-cubes-server`](https://crates.io/crates/all-is-cubes-server)
     is to be a network server for the game, but right now only contains a preconfigured HTTP static file server for the web version of the “game”.
 
-“The game” is in quotes because all you can do for the moment is place and remove blocks.
+“The game” is in quotes because all you can do for the moment is place and remove blocks and look at the scenery.
 
 Stability and versioning
 ------------------------

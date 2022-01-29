@@ -186,7 +186,8 @@ impl TransparencyOption {
     }
 
     #[inline]
-    pub(crate) fn will_output_alpha(&self) -> bool {
+    #[doc(hidden)] // TODO: make public/documented?
+    pub fn will_output_alpha(&self) -> bool {
         !matches!(self, Self::Threshold(_))
     }
 }

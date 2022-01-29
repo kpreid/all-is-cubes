@@ -6,7 +6,6 @@
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
-use cgmath::Matrix4;
 use instant::{Duration, Instant};
 use luminance::context::GraphicsContext;
 use luminance::pipeline::TextureBinding;
@@ -18,11 +17,15 @@ use luminance::UniformInterface;
 use once_cell::sync::Lazy;
 use resource::{resource_str, Resource};
 
-use crate::camera::{GraphicsOptions, LightingOption, ToneMappingOperator, TransparencyOption};
-use crate::lum::space::SpaceRendererBound;
-use crate::lum::types::{AicLumBackend, VertexSemantics};
-use crate::lum::GraphicsResourceError;
-use crate::math::FreeCoordinate;
+use all_is_cubes::camera::{
+    FogOption, GraphicsOptions, LightingOption, ToneMappingOperator, TransparencyOption,
+};
+use all_is_cubes::cgmath::Matrix4;
+use all_is_cubes::math::FreeCoordinate;
+
+use crate::space::SpaceRendererBound;
+use crate::types::{AicLumBackend, VertexSemantics};
+use crate::GraphicsResourceError;
 
 /// Subset of [`GraphicsOptions`] that requires shader recompilation if changed.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -42,6 +45,7 @@ impl ShaderConstants {
             match self.tone_mapping {
                 ToneMappingOperator::Clamp => "0",
                 ToneMappingOperator::Reinhard => "1",
+                ref tmo => panic!("Missing implementation for tone mapping operator {:?}", tmo),
             },
         ));
         if self.lighting_display != LightingOption::None {
@@ -64,6 +68,7 @@ impl From<&GraphicsOptions> for ShaderConstants {
             volumetric_transparency: match options.transparency {
                 TransparencyOption::Surface | TransparencyOption::Threshold(_) => false,
                 TransparencyOption::Volumetric => true,
+                _ => false,
             },
             tone_mapping: options.tone_mapping.clone(),
             /// Embed the latest version number so that if there is a new version it is a motive for
@@ -267,12 +272,12 @@ static SHADER_SOURCES: Lazy<Arc<Mutex<ShaderSources>>> = Lazy::new(|| {
 
     Arc::new(Mutex::new(ShaderSources {
         version: 0,
-        common: resource_str!("src/lum/shaders/common.glsl"),
-        common_vertex: resource_str!("src/lum/shaders/common-vertex.glsl"),
-        block_vertex: resource_str!("src/lum/shaders/block-vertex.glsl"),
-        block_fragment: resource_str!("src/lum/shaders/block-fragment.glsl"),
-        lines_vertex: resource_str!("src/lum/shaders/lines-vertex.glsl"),
-        lines_fragment: resource_str!("src/lum/shaders/lines-fragment.glsl"),
+        common: resource_str!("src/shaders/common.glsl"),
+        common_vertex: resource_str!("src/shaders/common-vertex.glsl"),
+        block_vertex: resource_str!("src/shaders/block-vertex.glsl"),
+        block_fragment: resource_str!("src/shaders/block-fragment.glsl"),
+        lines_vertex: resource_str!("src/shaders/lines-vertex.glsl"),
+        lines_fragment: resource_str!("src/shaders/lines-fragment.glsl"),
     }))
 });
 
@@ -339,10 +344,10 @@ impl BlockUniformInterface {
 
         let view_distance = camera.view_distance() as f32;
         let (fog_mode_blend, fog_distance) = match options.fog {
-            crate::camera::FogOption::None => (0.0, f32::INFINITY),
-            crate::camera::FogOption::Abrupt => (1.0, view_distance),
-            crate::camera::FogOption::Compromise => (0.5, view_distance),
-            crate::camera::FogOption::Physical => (0.0, view_distance),
+            FogOption::Abrupt => (1.0, view_distance),
+            FogOption::Compromise => (0.5, view_distance),
+            FogOption::Physical => (0.0, view_distance),
+            /* FogOption::None | */ _ => (0.0, f32::INFINITY),
         };
         program_iface.set(&self.fog_mode_blend, fog_mode_blend);
         program_iface.set(&self.fog_distance, fog_distance);

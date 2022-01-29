@@ -5,12 +5,13 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::prelude::OriginDimensions;
-use embedded_graphics::prelude::RgbColor;
-use embedded_graphics::prelude::Size;
-use embedded_graphics::Pixel;
+use all_is_cubes::drawing::embedded_graphics::{
+    self,
+    draw_target::DrawTarget,
+    pixelcolor::Rgb888,
+    prelude::{OriginDimensions, RgbColor, Size},
+    Pixel,
+};
 use luminance::context::GraphicsContext;
 use luminance::pipeline::{Pipeline, TextureBinding};
 use luminance::pixel::{NormRGBA8UI, NormUnsigned};
@@ -22,11 +23,12 @@ use luminance::texture::TexelUpload;
 use luminance::texture::{Dim2, MagFilter, MinFilter, Sampler, Texture, Wrap};
 use luminance::UniformInterface;
 
-use crate::camera::Viewport;
-use crate::lum::shading::map_shader_result;
-use crate::lum::types::AicLumBackend;
-use crate::lum::GraphicsResourceError;
-use crate::space::Grid;
+use all_is_cubes::camera::Viewport;
+use all_is_cubes::space::Grid;
+
+use crate::shading::map_shader_result;
+use crate::types::AicLumBackend;
+use crate::GraphicsResourceError;
 
 /// Resources for drawing a texture onto the entire framebuffer.
 /// This is stateless and can be shared by multiple textures,

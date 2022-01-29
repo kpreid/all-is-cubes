@@ -128,7 +128,8 @@ impl PackedLight {
     }
 
     #[inline]
-    pub(crate) fn as_texel(self) -> [u8; 4] {
+    #[doc(hidden)] // TODO: used by all_is_cubes_gpu; but it should be doable equivalently using public functions
+    pub fn as_texel(self) -> [u8; 4] {
         let Self {
             value: Vector3 { x, y, z },
             status,

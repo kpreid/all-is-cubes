@@ -4,7 +4,6 @@
 //! Block texture atlas management: provides [`LumAtlasAllocator`], the
 //! [`TextureAllocator`] implementation for use with [`luminance`].
 
-use cgmath::Vector3;
 use luminance::context::GraphicsContext;
 use luminance::pipeline::BoundTexture;
 use luminance::pixel::SRGBA8UI;
@@ -16,12 +15,14 @@ use std::convert::TryInto;
 use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::intalloc::IntAllocator;
-use crate::lum::types::{AicLumBackend, LumBlockVertex};
-use crate::math::GridCoordinate;
-use crate::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
-use crate::space::Grid;
-use crate::util::{CustomFormat, StatusText};
+use all_is_cubes::cgmath::Vector3;
+use all_is_cubes::intalloc::IntAllocator;
+use all_is_cubes::math::GridCoordinate;
+use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
+use all_is_cubes::space::Grid;
+use all_is_cubes::util::{CustomFormat, StatusText};
+
+use crate::types::{AicLumBackend, LumBlockVertex};
 
 /// Alias for the concrete type of the block texture.
 pub type BlockTexture<Backend> = Texture<Backend, Dim3, SRGBA8UI>;

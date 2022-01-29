@@ -18,7 +18,7 @@ use web_sys::{
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
-use all_is_cubes::lum::GLRenderer;
+use all_is_cubes_gpu::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 

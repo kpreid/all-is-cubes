@@ -7,23 +7,33 @@
 //! unclear what, if anything, library users might want to do with the subcomponents
 //! (that we can stably support). Revisit.
 
-#![cfg(feature = "lum")]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::collapsible_else_if)]
+#![allow(clippy::needless_update)]
+#![deny(rust_2018_idioms)]
+#![warn(unused_extern_crates)]
+#![warn(clippy::cast_lossless)]
+#![warn(clippy::exhaustive_enums)]
+#![warn(clippy::exhaustive_structs)]
+#![cfg_attr(test,
+    allow(clippy::float_cmp), // Tests work with predictable floats
+    allow(clippy::redundant_clone), // Tests prefer regularity over efficiency
+)]
 
 use std::error::Error;
 
-use cgmath::{Point3, Transform as _};
 use luminance::context::GraphicsContext;
 use luminance::framebuffer::FramebufferError;
 use luminance::pipeline::PipelineError;
 use luminance::tess::{Mode, Tess, TessError};
 use luminance::texture::TextureError;
 
-use crate::character::Cursor;
-use crate::content::palette;
-use crate::lum::types::LinesVertex;
-use crate::math::{Aab, FreeCoordinate, Geometry, Rgba};
-use crate::raycast::Face;
-use crate::util::MapExtend;
+use all_is_cubes::cgmath::{Point3, Transform as _};
+use all_is_cubes::character::Cursor;
+use all_is_cubes::content::palette;
+use all_is_cubes::math::{Aab, FreeCoordinate, Geometry, Rgba};
+use all_is_cubes::raycast::Face;
+use all_is_cubes::util::MapExtend;
 
 mod block_texture;
 mod frame_texture;
@@ -34,6 +44,7 @@ mod shading;
 mod space;
 mod types;
 pub use types::AicLumBackend;
+use types::LinesVertex;
 
 /// Creates a [`Tess`] to draw a [`Cursor`] as a wireframe cube.
 /// Caller must set up the camera for the cursor's space.

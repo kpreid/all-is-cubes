@@ -6,11 +6,10 @@
 // TODO: This is not yet used. Finish hooking it up or delete it.
 #![allow(dead_code)]
 
-use cgmath::{Point2, Vector2};
-use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::prelude::Point;
-use embedded_graphics::Pixel;
+use all_is_cubes::cgmath::{Point2, Vector2};
+use all_is_cubes::drawing::embedded_graphics::{
+    draw_target::DrawTarget, pixelcolor::Rgb888, prelude::Point, Pixel,
+};
 use instant::{Duration, Instant};
 use luminance::context::GraphicsContext;
 use luminance::texture::{MagFilter, MinFilter};
@@ -20,16 +19,17 @@ use rand::SeedableRng as _;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::rc::Rc;
 
-use crate::camera::Viewport;
-use crate::camera::{Camera, GraphicsOptions};
-use crate::listen::{ListenableCellWithLocal, ListenableSource};
-use crate::lum::frame_texture::{FullFramePainter, FullFrameTexture};
-use crate::lum::types::AicLumBackend;
-use crate::lum::GraphicsResourceError;
-use crate::math::Rgba;
-use crate::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
-use crate::space::Space;
-use crate::universe::URef;
+use all_is_cubes::camera::Viewport;
+use all_is_cubes::camera::{Camera, GraphicsOptions};
+use all_is_cubes::listen::{ListenableCellWithLocal, ListenableSource};
+use all_is_cubes::math::Rgba;
+use all_is_cubes::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::URef;
+
+use crate::frame_texture::{FullFramePainter, FullFrameTexture};
+use crate::types::AicLumBackend;
+use crate::GraphicsResourceError;
 
 pub(crate) struct RaytraceToTexture<Backend: AicLumBackend> {
     graphics_options: ListenableCellWithLocal<GraphicsOptions>,

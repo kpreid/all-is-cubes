@@ -3,12 +3,12 @@
 
 //! Core data types for graphics code to use.
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use luminance::{Semantics, Vertex};
 
-use crate::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
-use crate::mesh::{BlockVertex, Coloring, GfxVertex};
-use crate::space::PackedLight;
+use all_is_cubes::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
+use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
+use all_is_cubes::space::PackedLight;
 
 /// Module to isolate the `luminance::backend` traits which have conflicting names.
 mod backend {
@@ -295,8 +295,8 @@ impl LinesVertex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::{Face, Rgb};
-    use cgmath::Vector3;
+    use all_is_cubes::cgmath::Vector3;
+    use all_is_cubes::math::{Face, Rgb};
 
     #[test]
     fn vertex_dummy() {

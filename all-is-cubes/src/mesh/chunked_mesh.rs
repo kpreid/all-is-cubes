@@ -32,7 +32,7 @@ const LOG_CHUNK_UPDATES: bool = false;
 /// Each chunk, a [`ChunkMesh`], owns a data value of type `D`, which is
 /// initialized using `D::default()`.
 #[derive(Debug)]
-pub(crate) struct ChunkedSpaceMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
+pub struct ChunkedSpaceMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
     Tex: TextureAllocator,
 {
@@ -413,7 +413,7 @@ where
 /// Stores a [`SpaceMesh`] covering one chunk of a [`Space`], caller-provided rendering
 /// data, and incidentals.
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) struct ChunkMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
+pub struct ChunkMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
     Tex: TextureAllocator,
 {

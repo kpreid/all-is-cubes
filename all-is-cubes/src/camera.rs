@@ -178,7 +178,7 @@ impl Camera {
     }
 
     /// Determine whether the given `Aab` is visible in this projection+view.
-    pub(crate) fn aab_in_view(&self, aab: Aab) -> bool {
+    pub fn aab_in_view(&self, aab: Aab) -> bool {
         // Check for the AAB being outside the viewport, using the separating axis theorem.
         // First, check if the view frustum's corner points lie outside the AAB. This is
         // the simpler case since it is axis-aligned.
