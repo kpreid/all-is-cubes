@@ -154,11 +154,11 @@ impl Rgb {
     }
 
     #[inline]
-    pub const fn from_srgb_32bit(rgb: [u8; 3]) -> Self {
+    pub const fn from_srgb8(rgb: [u8; 3]) -> Self {
         Self(Vector3::new(
-            component_from_srgb_8bit_const(rgb[0]),
-            component_from_srgb_8bit_const(rgb[1]),
-            component_from_srgb_8bit_const(rgb[2]),
+            component_from_srgb8_const(rgb[0]),
+            component_from_srgb8_const(rgb[1]),
+            component_from_srgb8_const(rgb[2]),
         ))
     }
 
@@ -282,22 +282,22 @@ impl Rgba {
 
     /// Converts this color lossily to sRGB 8-bits-per-component color.
     #[inline]
-    pub fn to_srgb_32bit(self) -> [u8; 4] {
+    pub fn to_srgb8(self) -> [u8; 4] {
         [
-            component_to_srgb_8bit(self.0.x),
-            component_to_srgb_8bit(self.0.y),
-            component_to_srgb_8bit(self.0.z),
+            component_to_srgb8(self.0.x),
+            component_to_srgb8(self.0.y),
+            component_to_srgb8(self.0.z),
             (self.0.w.into_inner() * 255.0).round() as u8,
         ]
     }
 
     #[inline]
-    pub const fn from_srgb_32bit(rgba: [u8; 4]) -> Self {
+    pub const fn from_srgb8(rgba: [u8; 4]) -> Self {
         Self(Vector4::new(
-            component_from_srgb_8bit_const(rgba[0]),
-            component_from_srgb_8bit_const(rgba[1]),
-            component_from_srgb_8bit_const(rgba[2]),
-            component_from_linear_8bit_const(rgba[3]),
+            component_from_srgb8_const(rgba[0]),
+            component_from_srgb8_const(rgba[1]),
+            component_from_srgb8_const(rgba[2]),
+            component_from_linear8_const(rgba[3]),
         ))
     }
 
@@ -495,26 +495,26 @@ fn component_to_srgb(c: NotNan<f32>) -> f32 {
     }
 }
 
-fn component_to_srgb_8bit(c: NotNan<f32>) -> u8 {
+fn component_to_srgb8(c: NotNan<f32>) -> u8 {
     (component_to_srgb(c) * 255.).round() as u8
 }
 
 #[cfg(test)] // only used to validate the lookup tables
-fn component_from_linear_8bit_arithmetic(c: u8) -> NotNan<f32> {
+fn component_from_linear8_arithmetic(c: u8) -> NotNan<f32> {
     // TODO: make this const when Rust `const_fn_floating_point_arithmetic` is stable,
     // and we can do away with the lookup tables.
     NotNan::from(c) / notnan!(255.0)
 }
 
 #[inline]
-const fn component_from_linear_8bit_const(c: u8) -> NotNan<f32> {
+const fn component_from_linear8_const(c: u8) -> NotNan<f32> {
     // Safety: the table may be inspected to contain no NaNs.
     unsafe { NotNan::new_unchecked(CONST_LINEAR_LOOKUP_TABLE[c as usize]) }
 }
 
 /// Implements sRGB decoding using the standard arithmetic.
 #[cfg(test)] // only used to validate the lookup tables
-fn component_from_srgb_8bit_arithmetic(c: u8) -> NotNan<f32> {
+fn component_from_srgb8_arithmetic(c: u8) -> NotNan<f32> {
     // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_reverse_transformation> (version as of Feb 3, 2020)
     // Convert to float
     let c = f32::from(c) / 255.0;
@@ -529,7 +529,7 @@ fn component_from_srgb_8bit_arithmetic(c: u8) -> NotNan<f32> {
 
 /// Implements sRGB decoding using a lookup table.
 #[inline]
-const fn component_from_srgb_8bit_const(c: u8) -> NotNan<f32> {
+const fn component_from_srgb8_const(c: u8) -> NotNan<f32> {
     // Safety: the table may be inspected to contain no NaNs.
     unsafe { NotNan::new_unchecked(CONST_SRGB_LOOKUP_TABLE[c as usize]) }
 }
@@ -549,7 +549,7 @@ pub(crate) enum OpacityCategory {
     Opaque = 2,
 }
 
-/// Precomputed lookup table of the results of [`component_from_srgb_8bit_arithmetic()`].
+/// Precomputed lookup table of the results of [`component_from_srgb8_arithmetic()`].
 /// This allows converting sRGB colors to [`Rgb`] linear colors in const evaluation
 /// contexts.
 /// 
@@ -661,15 +661,15 @@ mod tests {
     // TODO: Add tests of the color not-NaN mechanisms.
 
     #[test]
-    fn rgba_to_srgb_32bit() {
+    fn rgba_to_srgb8() {
         assert_eq!(
-            Rgba::new(0.125, 0.25, 0.5, 0.75).to_srgb_32bit(),
+            Rgba::new(0.125, 0.25, 0.5, 0.75).to_srgb8(),
             [99, 137, 188, 191]
         );
 
         // Test saturation
         assert_eq!(
-            Rgba::new(0.5, -1.0, 10.0, 1.0).to_srgb_32bit(),
+            Rgba::new(0.5, -1.0, 10.0, 1.0).to_srgb8(),
             [188, 0, 255, 255]
         );
     }
@@ -686,7 +686,7 @@ mod tests {
         );
     }
 
-    /// Test that [`Rgba::from_srgb_32bit`] agrees with [`Rgba::to_srgb_32bit`].
+    /// Test that [`Rgba::from_srgb8`] agrees with [`Rgba::to_srgb8`].
     #[test]
     fn srgb_round_trip() {
         let srgb_figures = [
@@ -697,8 +697,8 @@ mod tests {
             .cartesian_product(srgb_figures.iter())
             .map(|(&r, &a)| {
                 let srgb = [r, 0, 0, a];
-                let color = Rgba::from_srgb_32bit(srgb);
-                (srgb, color, color.to_srgb_32bit())
+                let color = Rgba::from_srgb8(srgb);
+                (srgb, color, color.to_srgb8())
             })
             .collect::<Vec<_>>();
         // Print all the results before asserting
@@ -715,9 +715,9 @@ mod tests {
     fn srgb_float() {
         let color = Rgba::new(0.05, 0.1, 0.4, 0.5);
         let srgb_float = color.to_srgb_float();
-        let srgb_32bit = color.to_srgb_32bit();
+        let srgb8 = color.to_srgb8();
         assert_eq!(
-            srgb_32bit,
+            srgb8,
             [
                 (srgb_float[0] * 255.).round() as u8,
                 (srgb_float[1] * 255.).round() as u8,
@@ -730,7 +730,7 @@ mod tests {
     #[test]
     fn check_const_srgb_table() {
         let generated_table: Vec<f32> = (0..=u8::MAX)
-            .map(|component| component_from_srgb_8bit_arithmetic(component).into_inner())
+            .map(|component| component_from_srgb8_arithmetic(component).into_inner())
             .collect();
         print!("const CONST_SRGB_LOOKUP_TABLE: [f32; 256] = [");
         for i in 0..=u8::MAX {
@@ -748,7 +748,7 @@ mod tests {
     #[test]
     fn check_const_linear_table() {
         let generated_table: Vec<f32> = (0..=u8::MAX)
-            .map(|component| component_from_linear_8bit_arithmetic(component).into_inner())
+            .map(|component| component_from_linear8_arithmetic(component).into_inner())
             .collect();
         print!("const CONST_LINEAR_LOOKUP_TABLE: [f32; 256] = [");
         for i in 0..=u8::MAX {

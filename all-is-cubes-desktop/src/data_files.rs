@@ -80,7 +80,7 @@ fn convert_dot_vox_palette(palette: &[u32]) -> Vec<Block> {
             // TODO: Which endianness / component ordering should we expect?
             Block::builder()
                 .display_name(index.to_string())
-                .color(Rgba::from_srgb_32bit(rgba.to_le_bytes()))
+                .color(Rgba::from_srgb8(rgba.to_le_bytes()))
                 .build()
         })
         .collect()

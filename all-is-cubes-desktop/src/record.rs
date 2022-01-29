@@ -205,7 +205,7 @@ fn write_frame(
 ) -> Result<(), std::io::Error> {
     let byte_raster = image_data
         .iter()
-        .flat_map(|c| c.to_srgb_32bit())
+        .flat_map(|c| c.to_srgb8())
         .collect::<Vec<u8>>();
     png_writer.write_image_data(&byte_raster)?;
     Ok(())

@@ -27,6 +27,7 @@
         - `Evoxel::from_block()` for performing the same conversion from a full block to a voxel that `Block::Recur(...).evaluate()` does.
         - `Face::dot()`, for dot product with a vector without constructing an intermediate unit vector.
         - `GraphicsOptions::tone_mapping` and `ToneMappingOperator` (not yet providing good operators, just the mechanisms to have the feature at all).
+        - `Rgb::from_srgb8()`.
         - `Rgb::luminance()` and `Rgba::luminance()`.
         - `SpaceMesh` now remembers the `TextureAllocator::Tile`s it was constructed using, just like `BlockMesh` does, so callers no longer need to do so.
         - `SpaceMesh::blocks_used_iter()` reports which block indices went into the mesh.
@@ -35,8 +36,8 @@
         - `math::cube_to_midpoint()` function for the pattern of converting to float and adding 0.5.
     - The following functions are now `const fn`:
         - `Grid::for_block()`
-        - `Rgb::from_srgb_32bit()`
-        - `Rgba::from_srgb_32bit()`
+        - `Rgb::from_srgb8()`
+        - `Rgba::from_srgb8()`
 
 - `all-is-cubes-content` library:
     - `UniverseTemplate::build` is now an async function, which accepts a `YieldProgress` hook parameter. This means that there can be progress bars (currently implemented in desktop but not web) and that building doesn't hang the web event loop.
@@ -81,6 +82,7 @@
         - `Universe`-related errors now hold `Name` instead of `Arc<Name>`.
     - Renamed: `Evoxel::new()` to `Evoxel::from_color()`.
     - Renamed: `apps::Tick` is now `time::Tick`. 
+    - Renamed: `Rgba::from_srgb_32bit()` is now `Rgba::from_srgb8()`, and `Rgba::to_srgb_32bit()` is now `Rgba::to_srgb8()`. This is more consistent with what I understand to be common terminology (specifying the component size instead of the total size), and allows the same name to be used sensibly for `Rgb`.
 
 ### Removed
 

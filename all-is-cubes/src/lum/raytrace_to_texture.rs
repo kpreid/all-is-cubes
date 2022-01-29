@@ -112,9 +112,7 @@ where
                         render_viewport.normalize_fb_x(point.x as usize),
                         render_viewport.normalize_fb_y(point.y as usize),
                     )));
-                let [r, g, b, _a] = camera
-                    .post_process_color(Rgba::from(color_buf))
-                    .to_srgb_32bit();
+                let [r, g, b, _a] = camera.post_process_color(Rgba::from(color_buf)).to_srgb8();
                 let color = Rgb888::new(r, g, b);
                 Pixel(point, color)
             };

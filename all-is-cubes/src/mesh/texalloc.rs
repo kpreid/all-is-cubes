@@ -87,7 +87,7 @@ pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(
                         .get([x, y, z])
                         .unwrap_or(&Evoxel::from_color(palette::MISSING_VOXEL_FALLBACK))
                         .color
-                        .to_srgb_32bit(),
+                        .to_srgb8(),
                 );
             }
         }

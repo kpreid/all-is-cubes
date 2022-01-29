@@ -30,7 +30,7 @@ macro_rules! palette_entry {
             "<rect width='100%' height='100%' fill='rgb(", $r, ",", $g, ",", $b, ")' /></svg>"
         )]
         $( #[doc = $doc] )*
-        pub const $name: $crate::math::Rgb = $crate::math::Rgb::from_srgb_32bit([$r, $g, $b]);
+        pub const $name: $crate::math::Rgb = $crate::math::Rgb::from_srgb8([$r, $g, $b]);
     };
     (
         $( #[doc = $doc:literal] )*
@@ -42,7 +42,7 @@ macro_rules! palette_entry {
             "<rect width='100%' height='100%' fill='rgb(", $r, ",", $g, ",", $b, ")' /></svg>"
         )]
         $( #[doc = $doc] )*
-        pub const $name: $crate::math::Rgba = $crate::math::Rgba::from_srgb_32bit([$r, $g, $b, $a]);
+        pub const $name: $crate::math::Rgba = $crate::math::Rgba::from_srgb8([$r, $g, $b, $a]);
     };
 }
 

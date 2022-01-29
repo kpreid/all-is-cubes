@@ -840,7 +840,7 @@ impl ColorMode {
             (None, _) => Some(Color::Reset),
             // ColorMode::Sixteen => {}
             (Some(rgba), ColorMode::TwoFiftySix) => {
-                let [r, g, b, _] = rgba.to_srgb_32bit();
+                let [r, g, b, _] = rgba.to_srgb8();
 
                 // Crossterm doesn't have a convenient 216-color table. Use Termion's.
                 use termion::color::AnsiValue;
@@ -852,7 +852,7 @@ impl ColorMode {
                 Some(Color::AnsiValue(byte))
             }
             (Some(rgba), ColorMode::Rgb) => {
-                let [r, g, b, _] = rgba.to_srgb_32bit();
+                let [r, g, b, _] = rgba.to_srgb8();
                 let c = Color::Rgb { r, g, b };
                 Some(c)
             }

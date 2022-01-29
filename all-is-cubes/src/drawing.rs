@@ -119,7 +119,7 @@ impl<C> Dimensions for DrawingPlane<'_, C> {
 impl From<Rgb888> for Rgb {
     #[inline]
     fn from(color: Rgb888) -> Rgb {
-        Rgba::from_srgb_32bit([color.r(), color.g(), color.b(), u8::MAX]).to_rgb()
+        Rgba::from_srgb8([color.r(), color.g(), color.b(), u8::MAX]).to_rgb()
     }
 }
 

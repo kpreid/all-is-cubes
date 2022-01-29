@@ -519,7 +519,7 @@ exhibit! {
                     .to_vec()
                     .map(|s| NotNan::new(s as f32 / (gradient_resolution - 1) as f32).unwrap()),
             );
-            let color_srgb = color.with_alpha_one().to_srgb_32bit();
+            let color_srgb = color.with_alpha_one().to_srgb8();
             let description = format!(
                 "Linear\n  {:0.2}\n  {:0.2}\n  {:0.2}\nsRGB\n  #{:02x}{:02x}{:02x}",
                 color.red(),
