@@ -4,6 +4,14 @@
 
 ### Added
 
+### Changed
+
+### Removed
+
+## 0.4.0 (2022-01-29)
+
+### Added
+
 - Functionality:
     - New universe template, "dungeon", generating an enclosed maze of rooms. I hope to build on this further to create some sort of gameplay (e.g. finding keys to unlock doors) and a tutorial for All is Cubes' functionality from a player's perspective; currently, all the rooms are the same.
     - New universe template, "menger-sponge". Fractals are cool.
@@ -84,8 +92,6 @@
     - Renamed: `Evoxel::new()` to `Evoxel::from_color()`.
     - Renamed: `apps::Tick` is now `time::Tick`. 
     - Renamed: `Rgba::from_srgb_32bit()` is now `Rgba::from_srgb8()`, and `Rgba::to_srgb_32bit()` is now `Rgba::to_srgb8()`. This is more consistent with what I understand to be common terminology (specifying the component size instead of the total size), and allows the same name to be used sensibly for `Rgb`.
-
-### Removed
 
 ## 0.3.0 (2021-10-09)
 

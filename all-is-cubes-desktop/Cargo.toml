@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes-desktop"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
 rust-version = "1.56"
@@ -19,9 +19,9 @@ doc = false # Do not overwrite library crate's documentation
 bench = false
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.3.0" }
-all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.3.0" }
-all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.3.0" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
+all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0" }
+all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 anyhow = "1.0"
 clap = { version = "3.0.8", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }
 crossterm = "0.22.0"
