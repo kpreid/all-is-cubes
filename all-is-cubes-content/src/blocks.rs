@@ -67,11 +67,12 @@ pub async fn install_demo_blocks(
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
 
-    install_landscape_blocks(universe, resolution)?;
+    let [landscape_p, p] = p.split(0.5);
+    install_landscape_blocks(universe, resolution, landscape_p).await?;
+    p.progress(0.0).await;
 
     // TODO: In order to split this into better pieces we need to make BlockProvider::new
     // async.
-    p.progress(0.5).await;
 
     let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();

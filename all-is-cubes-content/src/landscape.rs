@@ -1,6 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use all_is_cubes::util::YieldProgress;
 use noise::Seedable as _;
 use rand::{Rng as _, SeedableRng as _};
 
@@ -74,9 +75,10 @@ impl DefaultProvision for LandscapeBlocks {
 /// Construct blocks for [`LandscapeBlocks`] with some detail and add block definitions to the universe.
 // TODO: not sure if we want this to be a public interface; is currently in use by lighting_bench
 #[doc(hidden)]
-pub fn install_landscape_blocks(
+pub async fn install_landscape_blocks(
     universe: &mut Universe,
     resolution: Resolution,
+    _p: YieldProgress,
 ) -> Result<(), GenError> {
     use LandscapeBlocks::*;
     let colors = BlockProvider::<LandscapeBlocks>::default();
