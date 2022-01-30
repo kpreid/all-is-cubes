@@ -71,9 +71,6 @@ pub async fn install_demo_blocks(
     install_landscape_blocks(universe, resolution, landscape_p).await?;
     p.progress(0.0).await;
 
-    // TODO: In order to split this into better pieces we need to make BlockProvider::new
-    // async.
-
     let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
     let road_noise_v = noise::Value::new().set_seed(0x52b19f6a);
@@ -98,7 +95,7 @@ pub async fn install_demo_blocks(
     let lamppost_edge = Block::from(palette::ALMOST_BLACK * 1.12);
 
     use DemoBlocks::*;
-    BlockProvider::<DemoBlocks>::new(|key| {
+    BlockProvider::<DemoBlocks>::new(p, |key| {
         Ok(match key {
             GlassBlock => {
                 let glass_densities = [
@@ -372,10 +369,10 @@ pub async fn install_demo_blocks(
                     .build()
             }
         })
-    })?
+    })
+    .await?
     .install(universe)?;
 
-    p.progress(1.0).await;
     Ok(())
 }
 

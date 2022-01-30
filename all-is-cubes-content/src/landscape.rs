@@ -73,12 +73,15 @@ impl DefaultProvision for LandscapeBlocks {
 }
 
 /// Construct blocks for [`LandscapeBlocks`] with some detail and add block definitions to the universe.
+///
+/// This is an async function for the sake of cancellation and optional cooperative
+/// multitasking. It may be blocked on from a synchronous context.
 // TODO: not sure if we want this to be a public interface; is currently in use by lighting_bench
 #[doc(hidden)]
 pub async fn install_landscape_blocks(
     universe: &mut Universe,
     resolution: Resolution,
-    _p: YieldProgress,
+    progress: YieldProgress,
 ) -> Result<(), GenError> {
     use LandscapeBlocks::*;
     let colors = BlockProvider::<LandscapeBlocks>::default();
@@ -115,7 +118,7 @@ pub async fn install_landscape_blocks(
     });
     let dirt_pattern = voronoi_pattern(resolution, &dirt_points);
 
-    BlockProvider::<LandscapeBlocks>::new(|key| {
+    BlockProvider::<LandscapeBlocks>::new(progress, |key| {
         let grass_blades = |universe, index: GridCoordinate| -> Result<Block, InGenError> {
             Ok(Block::builder()
                 .attributes(
@@ -186,7 +189,8 @@ pub async fn install_landscape_blocks(
 
             Leaves => colors[Leaves].clone(),
         })
-    })?
+    })
+    .await?
     .install(universe)?;
     Ok(())
 }

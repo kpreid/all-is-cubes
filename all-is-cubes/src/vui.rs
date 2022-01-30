@@ -12,6 +12,7 @@ use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
+use futures_executor::block_on;
 use ordered_float::NotNan;
 
 use crate::apps::{ControlMessage, InputProcessor};
@@ -26,6 +27,7 @@ use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::Space;
 use crate::time::Tick;
 use crate::universe::{URef, Universe, UniverseStepInfo};
+use crate::util::YieldProgress;
 
 mod hud;
 use hud::*;
@@ -70,7 +72,12 @@ impl Vui {
         control_channel: mpsc::SyncSender<ControlMessage>,
     ) -> Self {
         let mut universe = Universe::new();
-        let hud_blocks = Arc::new(HudBlocks::new(&mut universe, 16));
+        // TODO: eliminate this block_on, propagate async further
+        let hud_blocks = Arc::new(block_on(HudBlocks::new(
+            &mut universe,
+            YieldProgress::noop(),
+            16,
+        )));
 
         let changed_character = DirtyFlag::new(false);
         character_source.listen(changed_character.listener());

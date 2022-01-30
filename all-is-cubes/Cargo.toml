@@ -41,9 +41,8 @@ bytemuck = { version = "1.7.2", default-features = false }
 cgmath = "0.18.0"
 downcast-rs = "1.2.0"
 embedded-graphics = "0.7.0"
-# Explanation: the re-exports of futures-* into futures are a little subtle, so I'm
-# choosing to use the individual implementing modules to be precise and minimal.
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
 futures-task = { version = "0.3.17", default-features = false, features = [] }
 indoc = "1.0.3"
 instant = "0.1.9"

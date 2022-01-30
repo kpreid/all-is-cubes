@@ -57,6 +57,7 @@ dependencies = [
  "embedded-graphics",
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-task",
  "indoc",
  "instant",

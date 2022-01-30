@@ -22,6 +22,7 @@ use crate::raycast::Face;
 use crate::space::{Grid, Space, SpacePhysics};
 
 use crate::universe::{URef, Universe};
+use crate::util::YieldProgress;
 use crate::vui::layout::LayoutTree;
 use crate::vui::{
     CrosshairController, Icons, ToggleButtonWidget, ToolbarController, TooltipController,
@@ -230,10 +231,14 @@ pub(crate) struct HudBlocks {
 }
 
 impl HudBlocks {
-    pub(crate) fn new(universe: &mut Universe, resolution: Resolution) -> Self {
+    pub(crate) async fn new(
+        universe: &mut Universe,
+        p: YieldProgress,
+        resolution: Resolution,
+    ) -> Self {
         let resolution_g = GridCoordinate::from(resolution);
 
-        let icons = Icons::new(universe).install(universe).unwrap();
+        let icons = Icons::new(universe, p).await.install(universe).unwrap();
 
         let text_brush = VoxelBrush::new::<_, Block>(vec![
             ([0, 0, 1], palette::HUD_TEXT_FILL.into()),

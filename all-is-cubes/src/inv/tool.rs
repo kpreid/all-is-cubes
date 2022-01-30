@@ -404,6 +404,8 @@ mod tests {
     use crate::raytracer::print_space;
     use crate::space::Space;
     use crate::universe::{UBorrow, URef, Universe};
+    use crate::util::YieldProgress;
+    use futures_executor::block_on;
     use pretty_assertions::assert_eq;
     use std::error::Error;
 
@@ -493,7 +495,10 @@ mod tests {
     fn dummy_icons() -> BlockProvider<Icons> {
         // TODO: Might be good to generate differently labeled blocks... maybe BlockProvider should have a way to do that for any enum.
         let [block] = make_some_blocks();
-        BlockProvider::new(|_| Ok(block.clone())).unwrap()
+        block_on(BlockProvider::new(YieldProgress::noop(), |_| {
+            Ok(block.clone())
+        }))
+        .unwrap()
     }
 
     #[test]

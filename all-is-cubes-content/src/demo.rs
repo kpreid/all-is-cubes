@@ -130,7 +130,7 @@ impl UniverseTemplate {
             ))),
             DemoCity => Some(demo_city(&mut universe, p.take().unwrap()).await),
             Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), seed).await),
-            Atrium => Some(atrium(&mut universe)),
+            Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
             CornellBox => Some(cornell_box()),
             PhysicsLab => Some(physics_lab(50, 16).await),
             MengerSponge => Some(menger_sponge(&mut universe, 0, 4)),

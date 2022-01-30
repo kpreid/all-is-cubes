@@ -657,13 +657,16 @@ impl WidgetController for TooltipController {
 
 #[cfg(test)]
 mod tests {
+    use crate::util::YieldProgress;
+
     use super::*;
+    use futures_executor::block_on;
 
     #[test]
     fn tooltip_timeout_and_dirty_text() {
         // TODO: reduce boilerplate
         let mut universe = Universe::new();
-        let hud_blocks = &HudBlocks::new(&mut universe, 16);
+        let hud_blocks = &block_on(HudBlocks::new(&mut universe, YieldProgress::noop(), 16));
 
         // Initial state: no update.
         let mut t = TooltipState::default();

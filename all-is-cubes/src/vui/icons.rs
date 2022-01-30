@@ -24,6 +24,7 @@ use crate::universe::Universe;
 
 #[cfg(doc)]
 use crate::inv::Tool;
+use crate::util::YieldProgress;
 
 /// Blocks that are icons for tools or UI components.
 ///
@@ -60,11 +61,11 @@ impl BlockModule for Icons {
 }
 
 impl Icons {
-    pub fn new(universe: &mut Universe) -> BlockProvider<Icons> {
+    pub async fn new(universe: &mut Universe, p: YieldProgress) -> BlockProvider<Icons> {
         let resolution = 16;
         let crosshair_resolution = 29; // Odd resolution allows centering
 
-        BlockProvider::new(|key| {
+        BlockProvider::new(p, |key| {
             Ok(match key {
                 Icons::Crosshair => {
                     let mut space = Space::empty_positive(
@@ -296,6 +297,7 @@ impl Icons {
                 }
             })
         })
+        .await
         .unwrap()
     }
 }
@@ -410,7 +412,12 @@ impl ButtonBuilder {
     }
 }
 
-#[test]
-fn icons_smoke_test() {
-    Icons::new(&mut Universe::new());
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_executor::block_on;
+    #[test]
+    fn icons_smoke_test() {
+        block_on(Icons::new(&mut Universe::new(), YieldProgress::noop()));
+    }
 }

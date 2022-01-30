@@ -232,7 +232,8 @@ pub(crate) async fn demo_dungeon(
     progress: YieldProgress,
     seed: u64,
 ) -> Result<Space, InGenError> {
-    install_dungeon_blocks(universe)?;
+    let [blocks_progress, progress] = progress.split(0.2);
+    install_dungeon_blocks(universe, blocks_progress).await?;
 
     // TODO: reintroduce random elements separate from the maze.
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
@@ -289,7 +290,10 @@ impl BlockModule for DungeonBlocks {
 use DungeonBlocks::*;
 
 /// Add [`DungeonBlocks`] to the universe.
-pub fn install_dungeon_blocks(universe: &mut Universe) -> Result<(), GenError> {
+pub async fn install_dungeon_blocks(
+    universe: &mut Universe,
+    progress: YieldProgress,
+) -> Result<(), GenError> {
     let resolution = 16;
     let resolution_g = GridCoordinate::from(resolution);
     let one_diagonal = GridVector::new(1, 1, 1);
@@ -302,7 +306,7 @@ pub fn install_dungeon_blocks(universe: &mut Universe) -> Result<(), GenError> {
     let stone_grout_2 = Block::from(stone_color * 0.9);
 
     use DungeonBlocks::*;
-    BlockProvider::<DungeonBlocks>::new(|key| {
+    BlockProvider::<DungeonBlocks>::new(progress, |key| {
         Ok(match key {
             CorridorLight => Block::builder()
                 .display_name("Corridor Light")
@@ -339,7 +343,8 @@ pub fn install_dungeon_blocks(universe: &mut Universe) -> Result<(), GenError> {
                 })?
                 .build(),
         })
-    })?
+    })
+    .await?
     .install(universe)?;
 
     Ok(())

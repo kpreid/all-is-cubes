@@ -3,6 +3,7 @@
 
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
+use all_is_cubes::util::YieldProgress;
 use noise::Seedable;
 
 use all_is_cubes::block::{
@@ -25,8 +26,12 @@ use crate::{four_walls, scale_color, Fire};
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
 const WALL: GridCoordinate = 1;
 
-pub(crate) fn atrium(universe: &mut Universe) -> Result<Space, InGenError> {
-    let blocks = install_atrium_blocks(universe)?;
+pub(crate) async fn atrium(
+    universe: &mut Universe,
+    progress: YieldProgress,
+) -> Result<Space, InGenError> {
+    // TODO: subdivide progress
+    let blocks = install_atrium_blocks(universe, progress).await?;
 
     let ceiling_height = 6;
     let between_small_arches = 3;
@@ -380,8 +385,9 @@ impl BlockModule for AtriumBlocks {
     }
 }
 
-fn install_atrium_blocks(
+async fn install_atrium_blocks(
     universe: &mut Universe,
+    progress: YieldProgress,
 ) -> Result<BlockProvider<AtriumBlocks>, InGenError> {
     let resolution = 16;
     let resolution_g = GridCoordinate::from(resolution);
@@ -503,7 +509,7 @@ fn install_atrium_blocks(
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
 
-    BlockProvider::<AtriumBlocks>::new(|key| {
+    BlockProvider::<AtriumBlocks>::new(progress, |key| {
         Ok(match key {
             AtriumBlocks::GroundFloor => Block::builder()
                 .display_name("Atrium Ground Floor")
@@ -638,7 +644,8 @@ fn install_atrium_blocks(
                 })
                 .build(),
         })
-    })?
+    })
+    .await?
     .install(universe)?;
     Ok(BlockProvider::<AtriumBlocks>::using(universe)?)
 }

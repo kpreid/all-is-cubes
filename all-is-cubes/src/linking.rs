@@ -21,6 +21,7 @@ use strum::IntoEnumIterator;
 use crate::block::{Block, BlockDef};
 use crate::space::SetCubeError;
 use crate::universe::{InsertError, Name, URef, Universe, UniverseIndex};
+use crate::util::YieldProgress;
 
 fn name_in_module<E: BlockModule>(key: &E) -> Name {
     Name::from(format!("{}/{}", E::namespace(), key).as_str())
@@ -86,17 +87,22 @@ where
     E: BlockModule,
 {
     /// Constructs a `BlockProvider` with block definitions computed by the given function.
-    pub fn new<F, B>(mut definer: F) -> Result<Self, GenError>
+    ///
+    /// This is an async function for the sake of cancellation and optional cooperative
+    /// multitasking. It may be blocked on from a synchronous context.
+    pub async fn new<F, B>(progress: YieldProgress, mut definer: F) -> Result<Self, GenError>
     where
         F: FnMut(E) -> Result<B, InGenError>,
         B: Into<Block>,
     {
+        let count = E::iter().count();
         let mut map = HashMap::new();
-        for key in E::iter() {
+        for (key, progress) in E::iter().zip(progress.split_evenly(count)) {
             let block: Block = definer(key.clone())
                 .map_err(|e| GenError::failure(e, name_in_module(&key)))?
                 .into();
             map.insert(key, block);
+            progress.progress(1.0).await;
         }
         Ok(Self { map })
     }
