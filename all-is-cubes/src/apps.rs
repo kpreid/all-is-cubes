@@ -92,10 +92,12 @@ impl fmt::Debug for AllIsCubesAppState {
 }
 
 impl AllIsCubesAppState {
-    /// Construct a new `AllIsCubesAppState` with a new [`Universe`] from the given
-    /// template.
+    /// Construct a new `AllIsCubesAppState` with an empty [`Universe`].
+    ///
+    /// This is an async function for the sake of cancellation and optional cooperative
+    /// multitasking. It may be blocked on from a synchronous context.
     #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let game_universe = Universe::new();
         let game_character = ListenableCellWithLocal::new(None);
         let input_processor = InputProcessor::new();
@@ -108,7 +110,8 @@ impl AllIsCubesAppState {
                 game_character.as_source(),
                 paused.as_source(),
                 control_send,
-            ),
+            )
+            .await,
 
             frame_clock: FrameClock::new(),
             input_processor,
@@ -549,6 +552,7 @@ impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
 #[cfg(test)]
 mod tests {
     use futures_channel::oneshot;
+    use futures_executor::block_on;
 
     use crate::apps::AllIsCubesAppState;
     use crate::space::Space;
@@ -558,7 +562,7 @@ mod tests {
     fn set_universe_async() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
-        let mut app = AllIsCubesAppState::new();
+        let mut app = block_on(AllIsCubesAppState::new());
         app.universe_mut()
             .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))
             .unwrap();

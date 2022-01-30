@@ -12,7 +12,6 @@ use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
-use futures_executor::block_on;
 use ordered_float::NotNan;
 
 use crate::apps::{ControlMessage, InputProcessor};
@@ -65,19 +64,18 @@ impl Vui {
     /// `character_source` reports the `Character` whose inventory should be displayed.
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
-    pub fn new(
+    ///
+    /// This is an async function for the sake of cancellation and optional cooperative
+    /// multitasking. It may be blocked on from a synchronous context.
+    pub async fn new(
         input_processor: &InputProcessor,
         character_source: ListenableSource<Option<URef<Character>>>,
         paused: ListenableSource<bool>,
         control_channel: mpsc::SyncSender<ControlMessage>,
     ) -> Self {
         let mut universe = Universe::new();
-        // TODO: eliminate this block_on, propagate async further
-        let hud_blocks = Arc::new(block_on(HudBlocks::new(
-            &mut universe,
-            YieldProgress::noop(),
-            16,
-        )));
+        // TODO: take YieldProgress as a parameter
+        let hud_blocks = Arc::new(HudBlocks::new(&mut universe, YieldProgress::noop(), 16).await);
 
         let changed_character = DirtyFlag::new(false);
         character_source.listen(changed_character.listener());
@@ -202,14 +200,15 @@ pub(crate) fn draw_background(space: &mut Space) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_executor::block_on;
 
     fn new_vui_for_test() -> Vui {
-        Vui::new(
+        block_on(Vui::new(
             &InputProcessor::new(),
             ListenableSource::constant(None),
             ListenableSource::constant(false),
             mpsc::sync_channel(1).0,
-        )
+        ))
     }
 
     #[test]

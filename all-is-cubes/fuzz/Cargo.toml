@@ -13,6 +13,7 @@ cargo-fuzz = true
 
 [dependencies]
 arbitrary = { version = "1.0.1", features = ["derive"] }
+futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
 libfuzzer-sys = "0.4"
 
 [dependencies.all-is-cubes]

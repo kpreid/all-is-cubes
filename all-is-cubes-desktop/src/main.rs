@@ -89,7 +89,7 @@ fn main() -> Result<(), anyhow::Error> {
     };
 
     let start_app_time = Instant::now();
-    let mut app = AllIsCubesAppState::new();
+    let mut app = futures_executor::block_on(AllIsCubesAppState::new());
     app.graphics_options_mut().set(graphics_options);
     let app_done_time = Instant::now();
     log::debug!(

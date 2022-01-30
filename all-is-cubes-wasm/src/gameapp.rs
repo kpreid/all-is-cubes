@@ -68,7 +68,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .append_data("\nInitializing application...")?;
     yield_arbitrary().await;
     // The main cost of this is constructing the `Vui` instance.
-    let mut app = AllIsCubesAppState::new();
+    let mut app = AllIsCubesAppState::new().await;
 
     static_dom
         .scene_info_text_node

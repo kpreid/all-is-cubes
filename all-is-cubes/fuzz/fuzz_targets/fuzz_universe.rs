@@ -3,6 +3,8 @@ extern crate all_is_cubes;
 
 use std::time::Instant;
 
+use futures_executor::block_on;
+
 use all_is_cubes::apps::AllIsCubesAppState;
 use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
@@ -15,7 +17,7 @@ struct FuzzUniverseTemplate {
 }
 
 fuzz_target!(|input: FuzzUniverseTemplate| {
-    let mut app = AllIsCubesAppState::new();
+    let mut app = block_on(AllIsCubesAppState::new());
 
     // TODO: add some of all kinds of universe objects
     let space = app.universe_mut().insert_anonymous(input.space);

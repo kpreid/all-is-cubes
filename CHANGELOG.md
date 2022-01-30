@@ -6,6 +6,9 @@
 
 ### Changed
 
+- `all-is-cubes` library:
+    - `AllIsCubesAppState::new()` and `BlockProvider::new()` are now async functions.
+
 ### Removed
 
 ## 0.4.0 (2022-01-29)

@@ -42,7 +42,6 @@ cgmath = "0.18.0"
 downcast-rs = "1.2.0"
 embedded-graphics = "0.7.0"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
-futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
 futures-task = { version = "0.3.17", default-features = false, features = [] }
 indoc = "1.0.3"
 instant = "0.1.9"
@@ -63,4 +62,5 @@ thiserror = "1.0.22"
 [dev-dependencies]
 criterion = "0.3.3"
 futures-channel = { version = "0.3.17", default-features = false, features = ["alloc"] }
+futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
 pretty_assertions = "1.0.0"
