@@ -387,7 +387,7 @@ impl TerminalMain {
                     .constraints([
                         Constraint::Min(1),
                         Constraint::Length(3),
-                        Constraint::Length(1),
+                        Constraint::Length(2),
                         Constraint::Length(3),
                     ])
                     .split(f.size())
@@ -499,7 +499,10 @@ impl TerminalMain {
                 );
 
                 f.render_widget(
-                    Paragraph::new(format!("Colors: {:?}", self.options.colors)),
+                    Paragraph::new(format!(
+                        "Colors: {:?}\nChars: {:?}",
+                        self.options.colors, self.options.characters
+                    )),
                     colors_info_rect,
                 );
 
