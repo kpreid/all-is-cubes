@@ -9,8 +9,7 @@ use std::iter::FusedIterator;
 use std::ops::RangeTo;
 use std::sync::Arc;
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero};
-use ordered_float::NotNan;
+use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::math::{int_magnitude_squared, FreeCoordinate, GridCoordinate, GridPoint, GridVector};
 use crate::space::Grid;
@@ -53,8 +52,9 @@ pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
 /// rounded to enclosing chunk position.
 #[derive(Clone, Debug, Eq, PartialEq)] // TODO: customize Debug and PartialEq
 pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
-    /// The maximum view distance which this chart is designed for.
-    view_distance: NotNan<FreeCoordinate>,
+    /// The maximum view distance which this chart is designed for,
+    /// squared, in multiples of a whole chunk.
+    view_distance_in_squared_chunks: GridCoordinate,
 
     /// One octant of chunk positions (scaled down by CHUNK_SIZE) sorted by distance.
     /// (It could be further reduced to a 64th by mirroring across the diagonal,
@@ -81,25 +81,30 @@ pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
 
 impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     pub fn new(view_distance: FreeCoordinate) -> Self {
-        let view_distance = Self::sanitize_distance(view_distance);
-        let view_distance_in_chunks = view_distance.into_inner() / FreeCoordinate::from(CHUNK_SIZE);
-
-        let octant_chunks = compute_chart_octant(view_distance_in_chunks);
+        let view_distance_in_squared_chunks = Self::sanitize_and_square_distance(view_distance);
+        let octant_chunks = compute_chart_octant(view_distance_in_squared_chunks);
         Self {
-            view_distance,
+            view_distance_in_squared_chunks,
             octant_range: ..octant_chunks.len(),
             octant_chunks,
         }
     }
 
-    fn sanitize_distance(view_distance: FreeCoordinate) -> NotNan<FreeCoordinate> {
-        // TODO: What should we do about overly large inputs?
-        NotNan::try_from(view_distance.max(0.)).unwrap_or_else(|_| NotNan::zero())
+    fn sanitize_and_square_distance(view_distance: FreeCoordinate) -> GridCoordinate {
+        let sanitized = if view_distance.is_finite() {
+            view_distance.max(0.)
+        } else {
+            0.
+        };
+        let view_distance_in_chunks = sanitized / FreeCoordinate::from(CHUNK_SIZE);
+
+        view_distance_in_chunks.powf(2.).ceil() as GridCoordinate
     }
 
     /// Recalculate the chart if the provided distance is different.
     pub fn resize_if_needed(&mut self, view_distance: FreeCoordinate) {
-        if Self::sanitize_distance(view_distance) != self.view_distance {
+        if Self::sanitize_and_square_distance(view_distance) != self.view_distance_in_squared_chunks
+        {
             // TODO: If shrinking the chart, just shrink octant_range instead of
             // recomputing
             *self = Self::new(view_distance);
@@ -168,16 +173,15 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     }
 }
 
-fn compute_chart_octant(view_distance_in_chunks: FreeCoordinate) -> Arc<[GridVector]> {
+fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[GridVector]> {
     // We're going to compute in the zero-or-positive octant, which means that the chunk origin
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
     // each chunk.
 
-    // We can do the squared distance calculation in GridCoordinate integers but only after
-    // the squaring.
-    let distance_squared = view_distance_in_chunks.powf(2.).ceil() as GridCoordinate;
-
-    let candidates = Grid::new((0, 0, 0), Vector3::new(1, 1, 1) * (distance_squared + 1));
+    let candidates = Grid::new(
+        (0, 0, 0),
+        Vector3::new(1, 1, 1) * (view_distance_in_squared_chunks + 1),
+    );
     let mut octant_chunks: Vec<GridVector> = Vec::with_capacity(candidates.volume());
     // (This for loop has been measured as slightly faster than a .filter().collect().)
     for chunk in candidates.interior_iter() {
@@ -192,7 +196,7 @@ fn compute_chart_octant(view_distance_in_chunks: FreeCoordinate) -> Arc<[GridVec
         if int_magnitude_squared(chunk.map(
             #[inline(always)]
             |s| (s - 1).max(0),
-        )) <= distance_squared
+        )) <= view_distance_in_squared_chunks
         {
             octant_chunks.push(chunk);
         }
