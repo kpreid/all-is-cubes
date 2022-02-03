@@ -52,10 +52,12 @@ features = [
   "console",
   "AddEventListenerOptions",
   "Document",
+  "DomTokenList", # classList
   "Element",
   "EventTarget",
   "FocusEvent",
   "HtmlElement",
+  "HtmlProgressElement",
   "KeyboardEvent",
   "Location",
   "MouseEvent",

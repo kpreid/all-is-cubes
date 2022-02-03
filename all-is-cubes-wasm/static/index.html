@@ -3,7 +3,7 @@
    Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
    in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 -->
-<html><head>
+<html id="app-root" class="state-script-not-loaded"><head>
   <title>All is Cubes</title>
   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width">
@@ -20,6 +20,7 @@
   </canvas>
   <div id="scene-info-overlay" class="overlay">
     <pre>Move: WS AD EC — Turn: ←→ ↑↓ or L for mouselook — Delete: left click — Place: right click — Select items: 0-9.</pre>
+    <progress id="loading-progress-bar" value="0.0" min="0.0" max="1.0"></progress>
     <pre id="scene-info-text">JavaScript not loaded...</pre>
   </div>
   <div id="world-overlays"></div>

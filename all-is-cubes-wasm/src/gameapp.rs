@@ -12,7 +12,7 @@ use rand::{thread_rng, Rng as _};
 use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
-    console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,
+    console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement, HtmlProgressElement,
     KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
 };
 
@@ -50,6 +50,11 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them?
     let static_dom = StaticDom::new(&document)?;
+    {
+        let list = static_dom.app_root.class_list();
+        list.remove_1("state-script-not-loaded").unwrap();
+        list.add_1("state-loading").unwrap();
+    }
 
     let OptionsInUrl {
         template,
@@ -77,7 +82,10 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     // TODO: Display progress bar
     let universe = template
         .build(
-            YieldProgress::new(yield_arbitrary, |_| {}),
+            YieldProgress::new(yield_arbitrary, {
+                let progress_bar = static_dom.progress_bar.clone();
+                move |fraction| progress_bar.set_value(fraction.into())
+            }),
             thread_rng().gen(),
         )
         .await
@@ -114,6 +122,13 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .scene_info_text_node
         .append_data("\nFinal initialization...")?;
     yield_arbitrary().await;
+
+    {
+        // TODO: make this part the WebGameRoot's responsibility? Move the class list manip to StaticDom?
+        let list = static_dom.app_root.class_list();
+        list.remove_1("state-loading").unwrap();
+        list.add_1("state-fully-loaded").unwrap();
+    }
     let root = WebGameRoot::new(gui_helpers, static_dom, app, renderer);
 
     root.borrow().start_loop();
@@ -423,6 +438,10 @@ impl WebGameRoot {
 }
 
 struct StaticDom {
+    /// The highest-level element we're supposed to touch, used for setting CSS classes.
+    /// Usually the document element.
+    app_root: HtmlElement,
+    progress_bar: HtmlProgressElement,
     scene_info_text_node: Text,
 }
 
@@ -438,6 +457,8 @@ impl StaticDom {
             .unwrap();
 
         Ok(Self {
+            app_root: get_mandatory_element(document, "app-root")?,
+            progress_bar: get_mandatory_element(document, "loading-progress-bar")?,
             scene_info_text_node,
         })
     }
