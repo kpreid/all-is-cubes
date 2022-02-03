@@ -56,6 +56,13 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         list.add_1("state-loading").unwrap();
     }
 
+    let progress = YieldProgress::new(yield_arbitrary, {
+        let progress_bar = static_dom.progress_bar.clone();
+        move |fraction| progress_bar.set_value(fraction.into())
+    });
+    let [app_progress, progress] = progress.split(0.1);
+    let [universe_progress, final_progress] = progress.split(0.75);
+
     let OptionsInUrl {
         template,
         graphics_options,
@@ -71,21 +78,19 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     static_dom
         .scene_info_text_node
         .append_data("\nInitializing application...")?;
-    yield_arbitrary().await;
+    app_progress.progress(0.05).await;
     // The main cost of this is constructing the `Vui` instance.
+    // TODO: pipe in YieldProgress
     let mut app = AllIsCubesAppState::new().await;
 
     static_dom
         .scene_info_text_node
         .append_data("\nConstructing universe...")?;
-    yield_arbitrary().await;
-    // TODO: Display progress bar
+    app_progress.progress(1.0).await;
+
     let universe = template
         .build(
-            YieldProgress::new(yield_arbitrary, {
-                let progress_bar = static_dom.progress_bar.clone();
-                move |fraction| progress_bar.set_value(fraction.into())
-            }),
+            universe_progress,
             thread_rng().gen(),
         )
         .await
@@ -97,7 +102,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     static_dom
         .scene_info_text_node
         .append_data("\nInitializing WebGL...")?;
-    yield_arbitrary().await;
+    final_progress.progress(0.1).await;
     let surface = WebSysWebGL2Surface::from_canvas_with_params(
         web_sys::window().unwrap(), // TODO messy
         document,
@@ -111,7 +116,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     static_dom
         .scene_info_text_node
         .append_data("\nLoading shaders...")?;
-    yield_arbitrary().await;
+    final_progress.progress(0.5).await;
     let renderer = GLRenderer::new(
         surface,
         StandardCameras::from_app_state(&app, gui_helpers.canvas_helper().viewport()).unwrap(),
@@ -121,7 +126,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     static_dom
         .scene_info_text_node
         .append_data("\nFinal initialization...")?;
-    yield_arbitrary().await;
+    final_progress.progress(1.0).await;
 
     {
         // TODO: make this part the WebGameRoot's responsibility? Move the class list manip to StaticDom?
