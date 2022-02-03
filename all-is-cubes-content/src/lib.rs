@@ -19,6 +19,8 @@
 #[cfg(feature = "arbitrary")]
 extern crate arbitrary_crate as arbitrary;
 
+use std::collections::HashSet;
+
 use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution, AIR};
 use all_is_cubes::cgmath::{ElementWise, InnerSpace, Point3, Transform as _, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
@@ -173,12 +175,13 @@ pub(crate) fn voronoi_pattern<'a>(
 
     let mut pattern: GridArray<(FreeCoordinate, &Block)> =
         GridArray::from_fn(Grid::for_block(resolution), |_| (f64::INFINITY, &AIR));
-    let mut flood_fill_todo = Vec::new();
+    let mut flood_fill_todo = HashSet::new();
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);
         let starting_cube = region_point.map(|component| component.floor() as GridCoordinate);
-        flood_fill_todo.push(starting_cube);
-        while let Some(cube) = flood_fill_todo.pop() {
+        flood_fill_todo.insert(starting_cube);
+        while let Some(cube) = flood_fill_todo.iter().next().copied() {
+            flood_fill_todo.remove(&cube);
             let cube_wrapped = cube.map(|component| component.rem_euclid(resolution.into()));
             let test_point = cube_to_midpoint(cube);
 
@@ -191,10 +194,14 @@ pub(crate) fn voronoi_pattern<'a>(
             if distance_squared < pattern[cube_wrapped].0 {
                 pattern[cube_wrapped] = (distance_squared, block);
                 for direction in Face::ALL_SIX {
+                    // TODO: I tried filtering to
+                    //    direction.normal_vector().dot(offset) >= 0.0
+                    // which should be an optimization but it changed the results.
+                    // Investigate with actual well-defined test cases.
                     let adjacent = cube + direction.normal_vector();
                     // The flood fill can escape the cube bounds here,
                     // but is wrapped around at lookup time (so the distance stays true).
-                    flood_fill_todo.push(adjacent);
+                    flood_fill_todo.insert(adjacent);
                 }
             }
         }
