@@ -869,7 +869,7 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
     /// bounds.
     ///
     /// Use [`GridArray::get`] for a non-panicing alternative.
-    #[inline]
+    #[inline(always)] // measured faster on wasm32 in worldgen
     fn index(&self, position: P) -> &Self::Output {
         let position: GridPoint = position.into();
         if let Some(index) = self.grid.index(position) {
@@ -885,7 +885,7 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
 impl<P: Into<GridPoint>, V> std::ops::IndexMut<P> for GridArray<V> {
     /// Returns the element at `position` of this array, or panics if `position` is out of
     /// bounds.
-    #[inline]
+    #[inline(always)]
     fn index_mut(&mut self, position: P) -> &mut Self::Output {
         let position: GridPoint = position.into();
         if let Some(index) = self.grid.index(position) {

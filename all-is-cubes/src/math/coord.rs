@@ -23,6 +23,7 @@ pub type FreeCoordinate = f64;
 
 /// Convert a `GridPoint` used to identify a cube to the midpoint of that cube.
 /// That is, convert the number type and add 0.5.
+#[inline(always)] // trivial arithmetic that almost certainly should be inlined
 pub fn cube_to_midpoint(cube: GridPoint) -> Point3<FreeCoordinate> {
     cube.map(|component| FreeCoordinate::from(component) + 0.5)
 }
@@ -30,7 +31,7 @@ pub fn cube_to_midpoint(cube: GridPoint) -> Point3<FreeCoordinate> {
 /// Compute the squared magnitude of a [`GridVector`].
 ///
 /// [`cgmath::InnerSpace::magnitude2`] would do the same but only for floats.
-#[inline]
+#[inline(always)] // trivial arithmetic that almost certainly should be inlined
 pub(crate) fn int_magnitude_squared(v: GridVector) -> GridCoordinate {
     v.x * v.x + v.y * v.y + v.z * v.z
 }
