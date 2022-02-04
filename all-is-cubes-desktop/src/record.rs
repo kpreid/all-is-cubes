@@ -91,40 +91,7 @@ pub(crate) fn record_main(
         })?;
     }
 
-    // Set up threads. Raytracing is internally parallel using Rayon, but we want to
-    // thread everything else too so we're not alternating single-threaded and parallel
-    // operations.
-    let (scene_sender, scene_receiver) =
-        mpsc::sync_channel::<(usize, Camera, SpaceRaytracer<()>)>(1);
-    let (image_data_sender, image_data_receiver) = mpsc::sync_channel(1);
-    let (mut write_status_sender, status_receiver) = mpsc::channel();
-
-    // Raytracing thread.
-    std::thread::Builder::new()
-        .name("raytracer".to_string())
-        .spawn({
-            move || {
-                while let Ok((frame_number, camera, raytracer)) = scene_receiver.recv() {
-                    let (image_data, _info) = raytracer
-                        .trace_scene_to_image::<ColorBuf, _, Rgba>(&camera, |pixel_buf| {
-                            camera.post_process_color(Rgba::from(pixel_buf))
-                        });
-                    // TODO: Offer supersampling (multiple rays per output pixel).
-                    image_data_sender.send((frame_number, image_data)).unwrap();
-                }
-            }
-        })?;
-
-    // Image encoding and writing thread.
-    std::thread::Builder::new()
-        .name("image encoder".to_string())
-        .spawn({
-            let file = File::create(&options.output_path)?;
-            let options = options.clone();
-            move || {
-                threaded_write_frames(file, options, image_data_receiver, &mut write_status_sender)
-            }
-        })?;
+    let recorder = Recorder::new(options.clone())?;
 
     // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
     // (We could move the universe stepping to another thread to get more precise progress updates,
@@ -142,7 +109,8 @@ pub(crate) fn record_main(
                 app.graphics_options().snapshot(),
                 (),
             );
-            scene_sender
+            recorder
+                .scene_sender
                 .send((frame_number, camera.clone(), scene))
                 .unwrap();
 
@@ -154,14 +122,14 @@ pub(crate) fn record_main(
             }
 
             // Update progress bar.
-            if let Ok(frame_number) = status_receiver.try_recv() {
+            if let Ok(frame_number) = recorder.status_receiver.try_recv() {
                 drawing_progress_bar.set_position((frame_number + 1) as u64);
             }
         }
-        drop(scene_sender);
+        drop(recorder.scene_sender);
 
         // We've completed sending frames; now block on their completion.
-        while let Ok(frame_number) = status_receiver.recv() {
+        while let Ok(frame_number) = recorder.status_receiver.recv() {
             drawing_progress_bar.set_position((frame_number + 1) as u64);
         }
     }
@@ -172,12 +140,74 @@ pub(crate) fn record_main(
     Ok(())
 }
 
+/// A threaded pipeline for writing one or more [`SpaceRaytracer`] renderings.
+///
+/// TODO: This may end up wanting to be split into two pipeline-end custom structs
+/// instead of just presenting the raw sender and receiver.
+///
+/// TODO: Add use of UpdatingSpaceRaytracer, which means there will be a third
+/// "return for next update" output.
+struct Recorder<K> {
+    pub scene_sender: mpsc::SyncSender<(K, Camera, SpaceRaytracer<()>)>,
+    /// Contains the successive identifiers of each frame successfully written.
+    pub status_receiver: mpsc::Receiver<K>,
+}
+
+impl<K: Send + 'static> Recorder<K> {
+    /// TODO: This is only implementing part of the RecordOptions (not the frame timing); refactor.
+    fn new(options: RecordOptions) -> Result<Self, anyhow::Error> {
+        // Set up threads. Raytracing is internally parallel using Rayon, but we want to
+        // thread everything else too so we're not alternating single-threaded and parallel
+        // operations.
+        let (scene_sender, scene_receiver) =
+            mpsc::sync_channel::<(K, Camera, SpaceRaytracer<()>)>(1);
+        let (image_data_sender, image_data_receiver) = mpsc::sync_channel(1);
+        let (mut write_status_sender, status_receiver) = mpsc::channel();
+
+        // Raytracing thread.
+        std::thread::Builder::new()
+            .name("raytracer".to_string())
+            .spawn({
+                move || {
+                    while let Ok((frame_id, camera, raytracer)) = scene_receiver.recv() {
+                        let (image_data, _info) = raytracer
+                            .trace_scene_to_image::<ColorBuf, _, Rgba>(&camera, |pixel_buf| {
+                                camera.post_process_color(Rgba::from(pixel_buf))
+                            });
+                        // TODO: Offer supersampling (multiple rays per output pixel).
+                        image_data_sender.send((frame_id, image_data)).unwrap();
+                    }
+                }
+            })?;
+
+        // Image encoding and writing thread.
+        std::thread::Builder::new()
+            .name("image encoder".to_string())
+            .spawn({
+                let file = File::create(&options.output_path)?;
+                move || {
+                    threaded_write_frames(
+                        file,
+                        options,
+                        image_data_receiver,
+                        &mut write_status_sender,
+                    )
+                }
+            })?;
+
+        Ok(Self {
+            scene_sender,
+            status_receiver,
+        })
+    }
+}
+
 /// Occupy a thread with writing a sequence of frames as (A)PNG data.
-fn threaded_write_frames(
+fn threaded_write_frames<K: Send + 'static>(
     file: File,
     options: RecordOptions,
-    image_data_receiver: mpsc::Receiver<(usize, Box<[Rgba]>)>,
-    write_status_sender: &mut mpsc::Sender<usize>,
+    image_data_receiver: mpsc::Receiver<(K, Box<[Rgba]>)>,
+    write_status_sender: &mut mpsc::Sender<K>,
 ) -> Result<(), std::io::Error> {
     let mut buf_writer = BufWriter::new(file);
     {
