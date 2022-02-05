@@ -1,0 +1,7 @@
+# Tests what happens if the output file cannot be written
+# (in this case because it's an existing directory).
+# This isn't strongly an "end-to-end" test; we're just taking advantage
+# of trycmd's ability to set up input and output files.
+bin.name = "all-is-cubes"
+args = "--no-config-files --template lighting-bench --graphics record -o obstacle-dir --display-size 120x90"
+status.code = 1
