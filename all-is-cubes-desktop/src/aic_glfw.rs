@@ -5,6 +5,7 @@
 
 use std::error::Error;
 use std::fmt;
+use std::ops::ControlFlow;
 use std::time::Instant;
 
 use glfw::{Action, Context as _, CursorMode, SwapInterval, Window, WindowEvent, WindowMode};
@@ -109,91 +110,109 @@ pub fn glfw_main_loop(
         // before the window is visible (at least on macOS).
         glfw.poll_events();
         for (_, event) in events_rx.try_iter() {
-            match event {
-                WindowEvent::Close => break 'app,
-
-                // Keyboard input
-                WindowEvent::Key(key, _, Action::Press, _) => {
-                    if let Some(key) = map_glfw_key(key) {
-                        app.input_processor.key_down(key);
-                    }
-                }
-                WindowEvent::Key(key, _, Action::Release, _) => {
-                    if let Some(key) = map_glfw_key(key) {
-                        app.input_processor.key_up(key);
-                    }
-                }
-                WindowEvent::Key(_, _, Action::Repeat, _) => {
-                    // We do not use repeat events. In the event that we add text input,
-                    // the Char events should be used instead.
-                }
-                WindowEvent::Char(..) => {}
-                WindowEvent::CharModifiers(..) => {}
-
-                // Mouse input
-                WindowEvent::CursorPos(..) => {
-                    app.input_processor.mouse_pixel_position(
-                        renderer.viewport(),
-                        Some(Point2::from(renderer.surface.window.get_cursor_pos())),
-                        true,
-                    );
-                }
-                WindowEvent::CursorEnter(true) => {
-                    app.input_processor.mouse_pixel_position(
-                        renderer.viewport(),
-                        Some(Point2::from(renderer.surface.window.get_cursor_pos())),
-                        false,
-                    );
-                }
-                WindowEvent::CursorEnter(false) => {
-                    app.input_processor
-                        .mouse_pixel_position(renderer.viewport(), None, false);
-                }
-                WindowEvent::MouseButton(button, Action::Press, _) => {
-                    app.click(map_glfw_button(button));
-                }
-                WindowEvent::MouseButton(_, Action::Release, _) => {}
-                WindowEvent::MouseButton(_, Action::Repeat, _) => {}
-                WindowEvent::Scroll(..) => {
-                    // TODO: Hook up to input processor once we have customizable bindings
-                    // or otherwise something to do with it
-                }
-
-                // Window state
-                WindowEvent::FramebufferSize(..) | WindowEvent::ContentScale(..) => {
-                    renderer
-                        .set_viewport(map_glfw_viewport(&renderer.surface.window))
-                        .unwrap();
-                }
-                WindowEvent::Focus(has_focus) => {
-                    app.input_processor.key_focus(has_focus);
-                }
-
-                WindowEvent::FileDrop(files) => {
-                    // TODO: Offer confirmation before replacing the current universe
-                    if let Some(path) = files.into_iter().next() {
-                        app.set_universe_async(async move {
-                            crate::data_files::load_universe_from_file(&path)
-                                .await
-                                .map_err(|e| {
-                                    // TODO: show error in user interface
-                                    log::error!("Failed to load file '{}':\n{}", path.display(), e);
-                                })
-                        })
-                    }
-                }
-
-                // Unused
-                WindowEvent::Pos(..) => {}
-                WindowEvent::Size(..) => {}
-                WindowEvent::Refresh => {}
-                WindowEvent::Iconify(_) => {}
-                WindowEvent::Maximize(_) => {}
+            if let ControlFlow::Break(_) = handle_glfw_event(event, &mut app, &mut renderer) {
+                break 'app;
             }
         }
     }
 
     Ok(())
+}
+
+/// Handle one GLFW event.
+///
+/// Returns [`ControlFlow::Break`] if an event indicates the application should exit.
+/// (TODO: Clarify this for possible multi-window)
+///
+/// This is separated from [`glfw_main_loop`] for the sake of readability (more overall structure
+/// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
+fn handle_glfw_event(
+    event: WindowEvent,
+    app: &mut AllIsCubesAppState,
+    renderer: &mut GLRenderer<luminance_glfw::GL33Context>,
+) -> ControlFlow<()> {
+    match event {
+        WindowEvent::Close => return ControlFlow::Break(()),
+
+        // Keyboard input
+        WindowEvent::Key(key, _, Action::Press, _) => {
+            if let Some(key) = map_glfw_key(key) {
+                app.input_processor.key_down(key);
+            }
+        }
+        WindowEvent::Key(key, _, Action::Release, _) => {
+            if let Some(key) = map_glfw_key(key) {
+                app.input_processor.key_up(key);
+            }
+        }
+        WindowEvent::Key(_, _, Action::Repeat, _) => {
+            // We do not use repeat events. In the event that we add text input,
+            // the Char events should be used instead.
+        }
+        WindowEvent::Char(..) => {}
+        WindowEvent::CharModifiers(..) => {}
+
+        // Mouse input
+        WindowEvent::CursorPos(..) => {
+            app.input_processor.mouse_pixel_position(
+                renderer.viewport(),
+                Some(Point2::from(renderer.surface.window.get_cursor_pos())),
+                true,
+            );
+        }
+        WindowEvent::CursorEnter(true) => {
+            app.input_processor.mouse_pixel_position(
+                renderer.viewport(),
+                Some(Point2::from(renderer.surface.window.get_cursor_pos())),
+                false,
+            );
+        }
+        WindowEvent::CursorEnter(false) => {
+            app.input_processor
+                .mouse_pixel_position(renderer.viewport(), None, false);
+        }
+        WindowEvent::MouseButton(button, Action::Press, _) => {
+            app.click(map_glfw_button(button));
+        }
+        WindowEvent::MouseButton(_, Action::Release, _) => {}
+        WindowEvent::MouseButton(_, Action::Repeat, _) => {}
+        WindowEvent::Scroll(..) => {
+            // TODO: Hook up to input processor once we have customizable bindings
+            // or otherwise something to do with it
+        }
+
+        // Window state
+        WindowEvent::FramebufferSize(..) | WindowEvent::ContentScale(..) => {
+            renderer
+                .set_viewport(map_glfw_viewport(&renderer.surface.window))
+                .unwrap();
+        }
+        WindowEvent::Focus(has_focus) => {
+            app.input_processor.key_focus(has_focus);
+        }
+
+        WindowEvent::FileDrop(files) => {
+            // TODO: Offer confirmation before replacing the current universe
+            if let Some(path) = files.into_iter().next() {
+                app.set_universe_async(async move {
+                    crate::data_files::load_universe_from_file(&path)
+                        .await
+                        .map_err(|e| {
+                            // TODO: show error in user interface
+                            log::error!("Failed to load file '{}':\n{}", path.display(), e);
+                        })
+                })
+            }
+        }
+
+        // Unused
+        WindowEvent::Pos(..) => {}
+        WindowEvent::Size(..) => {}
+        WindowEvent::Refresh => {}
+        WindowEvent::Iconify(_) => {}
+        WindowEvent::Maximize(_) => {}
+    }
+    ControlFlow::Continue(())
 }
 
 pub fn map_glfw_viewport(window: &Window) -> Viewport {
