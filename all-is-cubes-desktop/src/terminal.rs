@@ -12,9 +12,7 @@ use std::time::{Duration, Instant};
 
 use all_is_cubes::listen::ListenableSource;
 use crossterm::cursor::{self, MoveTo};
-use crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::QueueableCommand as _;
 use tui::layout::{Constraint, Direction, Layout, Rect};
@@ -23,7 +21,7 @@ use tui::text::{Span, Spans};
 use tui::widgets::{Borders, Paragraph};
 use tui::{backend::CrosstermBackend, Terminal};
 
-use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
+use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::cgmath::{ElementWise as _, Point2};
@@ -32,6 +30,8 @@ use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::raytracer::{
     CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RaytraceInfo, UpdatingSpaceRaytracer,
 };
+
+use crate::glue::crossterm::{event_to_key, map_mouse_button};
 
 /// Options for the terminal UI.
 ///
@@ -231,7 +231,7 @@ impl TerminalMain {
         loop {
             'input: while crossterm::event::poll(Duration::ZERO)? {
                 let event = crossterm::event::read()?;
-                if let Some(aic_event) = map_crossterm_event(&event) {
+                if let Some(aic_event) = event_to_key(&event) {
                     if self.app.input_processor.key_momentary(aic_event) {
                         // Handled by input_processor
                         continue 'input;
@@ -280,11 +280,7 @@ impl TerminalMain {
                         );
                         match kind {
                             MouseEventKind::Down(button) => {
-                                self.app.click(match button {
-                                    MouseButton::Left => 0,
-                                    MouseButton::Right => 1,
-                                    MouseButton::Middle => 2,
-                                });
+                                self.app.click(map_mouse_button(button));
                             }
                             MouseEventKind::Up(_)
                             | MouseEventKind::Drag(_)
@@ -809,23 +805,6 @@ fn fallback_measure_str(text: &str) -> u16 {
     unicode_width::UnicodeWidthStr::width(text)
         .try_into()
         .unwrap_or(u16::MAX)
-}
-
-/// Converts [`Event`] to [`Key`].
-///
-/// Returns `None` if there is no corresponding value.
-fn map_crossterm_event(event: &Event) -> Option<Key> {
-    match event {
-        Event::Key(key_event) => match (key_event.modifiers, key_event.code) {
-            (KeyModifiers::NONE, KeyCode::Char(c)) => Some(Key::Character(c.to_ascii_lowercase())),
-            (_, KeyCode::Up) => Some(Key::Up),
-            (_, KeyCode::Down) => Some(Key::Down),
-            (_, KeyCode::Left) => Some(Key::Left),
-            (_, KeyCode::Right) => Some(Key::Right),
-            _ => None,
-        },
-        _ => None,
-    }
 }
 
 /// Which type of color control sequences to use.

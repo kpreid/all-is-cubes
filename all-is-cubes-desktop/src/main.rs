@@ -27,6 +27,7 @@ mod command_options;
 use command_options::GraphicsType;
 mod config_files;
 mod data_files;
+mod glue;
 mod record;
 use record::record_main;
 mod terminal;
