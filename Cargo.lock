@@ -113,7 +113,6 @@ dependencies = [
  "glfw",
  "indicatif",
  "log",
- "luminance",
  "luminance-glfw",
  "once_cell",
  "png",
