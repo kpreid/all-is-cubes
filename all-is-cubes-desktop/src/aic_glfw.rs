@@ -15,7 +15,10 @@ use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes_gpu::GLRenderer;
 
-use crate::glue::glfw::{map_key, map_mouse_button, window_size_as_viewport};
+use crate::choose_graphical_window_size;
+use crate::glue::glfw::{
+    get_primary_workarea_size, map_key, map_mouse_button, window_size_as_viewport,
+};
 
 #[derive(Clone, Copy, Debug)]
 struct CannotCreateWindow;
@@ -35,26 +38,14 @@ pub fn glfw_main_loop(
     requested_size: Option<Vector2<u32>>,
 ) -> Result<(), anyhow::Error> {
     let glfw_start_time = Instant::now();
-    let mut glfw = glfw::init::<()>(None)?;
-
-    // Pick a window size.
-    let dim = glfw.with_primary_monitor(|_, monitor| {
-        if let Some(size) = requested_size {
-            [size.x.max(1), size.y.max(1)]
-        } else if let Some(monitor) = monitor {
-            let (_, _, width, height) = monitor.get_workarea();
-            // TODO: consider constraining the aspect ratio, setting a maximum size, and other caveats
-            [width as u32 * 7 / 10, height as u32 * 7 / 10]
-        } else {
-            [800, 600]
-        }
-    });
-
     let GlfwSurface {
         context, events_rx, ..
     } = GlfwSurface::new(|glfw| {
+        let size: Vector2<u32> = requested_size
+            .unwrap_or_else(|| choose_graphical_window_size(get_primary_workarea_size(glfw)));
+
         let (mut window, events_rx) = glfw
-            .create_window(dim[0], dim[1], window_title, WindowMode::Windowed)
+            .create_window(size.x, size.y, window_title, WindowMode::Windowed)
             .ok_or(GlfwSurfaceError::UserError(CannotCreateWindow))?;
         window.make_current();
         window.set_all_polling(true);
@@ -109,7 +100,7 @@ pub fn glfw_main_loop(
 
         // Poll for events after drawing, so that on the first loop iteration we draw
         // before the window is visible (at least on macOS).
-        glfw.poll_events();
+        renderer.surface.window.glfw.poll_events();
         for (_, event) in events_rx.try_iter() {
             if let ControlFlow::Break(_) = handle_glfw_event(event, &mut app, &mut renderer) {
                 break 'app;

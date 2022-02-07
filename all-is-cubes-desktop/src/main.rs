@@ -204,3 +204,16 @@ fn common_progress_style() -> ProgressStyle {
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
         .on_finish(ProgressFinish::AtCurrentPos)
 }
+
+/// Choose a window size (in terms of viewport size) when the user did not request one.
+///
+/// The given dimensions are of the maximum possible viewport size, if known.
+fn choose_graphical_window_size(maximum_size: Option<Vector2<u32>>) -> Vector2<u32> {
+    match maximum_size {
+        Some(maximum_size) => {
+            // TODO: consider constraining the aspect ratio, setting a maximum size, and other caveats
+            maximum_size * 7 / 10
+        }
+        None => Vector2::new(800, 600),
+    }
+}
