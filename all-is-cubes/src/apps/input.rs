@@ -290,7 +290,7 @@ impl InputProcessor {
                         character.jump_if_able();
                     }
                 })
-                .unwrap();
+                .expect("character was borrowed during apply_input()");
         }
 
         for key in self.command_buffer.drain(..) {
@@ -352,7 +352,7 @@ impl InputProcessor {
                     if let Some(character_ref) = character_opt {
                         character_ref
                             .try_modify(|c| c.set_selected_slot(1, slot))
-                            .unwrap();
+                            .expect("character was borrowed during apply_input()");
                     }
                 }
                 _ => {}
