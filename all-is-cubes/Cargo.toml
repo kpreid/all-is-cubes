@@ -63,4 +63,4 @@ thiserror = "1.0.22"
 criterion = "0.3.3"
 futures-channel = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
-pretty_assertions = "1.0.0"
+pretty_assertions = "1.1.0"
