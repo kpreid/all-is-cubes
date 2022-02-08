@@ -380,10 +380,14 @@ pub struct StandardCameras {
     /// Tracks whether the character was replaced (not whether its view changed).
     character_dirty: DirtyFlag,
     character: Option<URef<Character>>,
+    /// Cached and listenable version of character's space.
+    /// TODO: This should be in a Layers along with ui_space.
+    world_space: ListenableCell<Option<URef<Space>>>,
 
     ui_space_source: ListenableSource<Option<URef<Space>>>,
     ui_space_dirty: DirtyFlag,
     ui_space: Option<URef<Space>>,
+
     viewport_dirty: bool,
 
     cameras: Layers<Camera>,
@@ -416,7 +420,8 @@ impl StandardCameras {
 
             character_source,
             character_dirty,
-            character: None, // update() will fix this up
+            character: None, // update() will fix these up
+            world_space: ListenableCell::new(None),
 
             ui_space: ui_space_source.snapshot(),
             ui_space_source,
@@ -487,10 +492,19 @@ impl StandardCameras {
                     // TODO: Shouldn't we also grab the character's Space while we
                     // have the access? Renderers could use that.
                     self.cameras.world.set_view_transform(character.view());
+
+                    // TODO: ListenableCell should make this easier and cheaper
+                    if Option::as_ref(&*self.world_space.get()) != Some(&character.space) {
+                        self.world_space.set(Some(character.space.clone()));
+                    }
                 }
                 Err(_) => {
                     // TODO: set an error flag indicating failure to update
                 }
+            }
+        } else {
+            if *self.world_space.get() != None {
+                self.world_space.set(None);
             }
         }
     }
@@ -499,6 +513,7 @@ impl StandardCameras {
         self.cameras.world.options()
     }
 
+    /// Returns [`Camera`]s appropriate for drawing each graphical layer.
     pub fn cameras(&self) -> &Layers<Camera> {
         &self.cameras
     }
@@ -509,6 +524,18 @@ impl StandardCameras {
         self.character.as_ref()
     }
 
+    /// Returns the space that should be drawn as the game world, using `self.cameras().world`.
+    ///
+    /// This is a [`ListenableSource`] to make it simple to cache the Space rendering data and
+    /// follow space transitions.
+    /// It updates when [`Self::update()`] is called.
+    pub fn world_space(&self) -> ListenableSource<Option<URef<Space>>> {
+        self.world_space.as_source()
+    }
+
+    /// Returns the UI space, that should be drawn on top of the world using `self.cameras().ui`.
+    ///
+    /// TODO: Make this also a ListenableSource
     pub fn ui_space(&self) -> Option<&URef<Space>> {
         self.ui_space.as_ref()
     }
@@ -585,12 +612,11 @@ impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use futures_channel::oneshot;
-    use futures_executor::block_on;
-
-    use crate::apps::AllIsCubesAppState;
+    use super::*;
     use crate::space::Space;
     use crate::universe::{Name, Universe, UniverseIndex};
+    use futures_channel::oneshot;
+    use futures_executor::block_on;
 
     #[test]
     fn set_universe_async() {
@@ -623,5 +649,46 @@ mod tests {
 
         // Verify cleanup (that the next step can succeed).
         app.maybe_step_universe();
+    }
+
+    #[test]
+    fn cameras_follow_character_and_world() {
+        let mut app = block_on(AllIsCubesAppState::new());
+        let mut cameras = StandardCameras::from_app_state(&app, Viewport::ARBITRARY).unwrap();
+
+        let world_source = cameras.world_space();
+        let flag = DirtyFlag::new(false);
+        world_source.listen(flag.listener());
+        assert_eq!(world_source.snapshot().as_ref(), None);
+
+        // No redundant notification when world is absent
+        cameras.update();
+        assert!(!flag.get_and_clear());
+
+        // Create a universe with space and character
+        // TODO: This has to be a new one because there currently isn't an AppState::set_character()!
+        let mut universe = Universe::new();
+        let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+        // TODO: "character" is a special default name used for finding the character the
+        // player actually uses, and we should replace that or handle it more formally.
+        universe
+            .insert(
+                "character".into(),
+                Character::spawn_default(space_ref.clone()),
+            )
+            .unwrap();
+        app.set_universe(universe);
+
+        // Now the world_source should be reporting the new space
+        assert!(!flag.get_and_clear());
+        cameras.update();
+        assert!(flag.get_and_clear());
+        assert_eq!(world_source.snapshot().as_ref(), Some(&space_ref));
+
+        // No redundant notification when world is present
+        cameras.update();
+        assert!(!flag.get_and_clear());
+
+        // TODO: test further changes
     }
 }

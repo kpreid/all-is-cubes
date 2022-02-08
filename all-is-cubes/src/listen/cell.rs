@@ -50,6 +50,9 @@ impl<T: Sync> ListenableCell<T> {
 
     /// Sets the contained value and sends out a change notification.
     ///
+    /// Note that this does not test whether the current value is equal to avoid redundant
+    /// notifications.
+    ///
     /// Caution: While listeners are *expected* not to have immediate side effects on
     /// notification, this cannot be enforced.
     pub fn set(&self, value: impl Into<Arc<T>>) {
