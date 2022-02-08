@@ -302,6 +302,14 @@ pub struct Viewport {
 impl Viewport {
     #![allow(clippy::cast_lossless)] // lossiness depends on size of usize
 
+    /// A meaningless but valid [`Viewport`] value for use in tests which require one
+    /// but do not care about its effects.
+    #[cfg(test)]
+    pub(crate) const ARBITRARY: Viewport = Viewport {
+        nominal_size: Vector2::new(2.0, 2.0),
+        framebuffer_size: Vector2::new(2, 2),
+    };
+
     /// Calculates the aspect ratio (width divided by height) of the `nominal_size` of this
     /// viewport.
     #[inline]
@@ -365,11 +373,6 @@ pub fn eye_for_look_at(grid: Grid, direction: Vector3<FreeCoordinate>) -> Point3
 mod tests {
     use super::*;
 
-    const DUMMY_VIEWPORT: Viewport = Viewport {
-        nominal_size: Vector2::new(2.0, 2.0),
-        framebuffer_size: Vector2::new(2, 2),
-    };
-
     #[test]
     fn camera_bad_viewport_doesnt_panic() {
         Camera::new(
@@ -384,7 +387,7 @@ mod tests {
     #[test]
     fn camera_view_position() {
         // This test used to be less trivial when the transform was taken as a matrix
-        let mut camera = Camera::new(GraphicsOptions::default(), DUMMY_VIEWPORT);
+        let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
         let pos = Point3::new(1.0, 2.0, 3.0);
         camera.set_view_transform(Decomposed {
             scale: 1.0,
@@ -396,7 +399,7 @@ mod tests {
 
     #[test]
     fn post_process() {
-        let mut camera = Camera::new(GraphicsOptions::default(), DUMMY_VIEWPORT);
+        let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
 
         // A camera with all default options should pass colors unchanged.
         let color = rgba_const!(0.1, 0.2, 0.3, 0.4);

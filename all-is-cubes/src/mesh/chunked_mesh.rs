@@ -603,8 +603,6 @@ impl ChunkTodo {
 
 #[cfg(test)]
 mod tests {
-    use cgmath::Vector2;
-
     use super::*;
     use crate::block::Block;
     use crate::camera::{GraphicsOptions, TransparencyOption, Viewport};
@@ -744,14 +742,7 @@ mod tests {
             let mut universe = Universe::new();
             let space_ref = universe.insert_anonymous(space);
             let csm = ChunkedSpaceMesh::<(), BlockVertex, NoTextures, 16>::new(space_ref.clone());
-            let camera = Camera::new(
-                GraphicsOptions::default(),
-                Viewport {
-                    // These numbers should not end up relevant
-                    nominal_size: Vector2::new(10., 10.),
-                    framebuffer_size: Vector2::new(10, 10),
-                },
-            );
+            let camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
             Self {
                 universe,
                 space: space_ref,
