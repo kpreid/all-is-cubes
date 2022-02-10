@@ -4,6 +4,9 @@
 
 ### Added
 
+- `all-is-cubes` library:
+    - `math::coord::point_to_enclosing_cube()`
+
 ### Changed
 
 - `all-is-cubes` library:
