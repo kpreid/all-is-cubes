@@ -1,6 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use all_is_cubes::content::palette;
 use maze_generator::prelude::{Direction, Field, FieldType, Generator};
 use rand::{Rng, SeedableRng};
 
@@ -10,20 +11,23 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb,
+    point_to_enclosing_cube, Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint,
+    GridRotation, GridVector, Rgb,
 };
 use all_is_cubes::rgb_const;
 use all_is_cubes::space::{Grid, GridArray, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
-use crate::dungeon::{build_dungeon, d2f, maze_to_array, DungeonGrid, Theme};
+use crate::dungeon::{build_dungeon, d2f, m2gp, maze_to_array, DungeonGrid, Theme};
 use crate::{four_walls, DemoBlocks, LandscapeBlocks};
+
+const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 
 struct DemoRoom {
     // TODO: remove dependency on maze gen entirely
     maze_field: Field,
-    //windowed_faces: FaceMap<bool>,
+    windowed_faces: FaceMap<bool>,
     corridor_only: bool,
     lit: bool,
 }
@@ -37,6 +41,8 @@ struct DemoTheme {
     blocks: BlockProvider<DungeonBlocks>,
     wall_block: Block,
     lamp_block: Block,
+    /// TODO: replace window glass with openings that are too small to pass through
+    window_glass_block: Block,
 }
 
 impl DemoTheme {
@@ -55,6 +61,7 @@ impl DemoTheme {
             interior.expand(FaceMap::repeat(1)),
             |_, _, _, wall_excluding_corners| {
                 space.fill_uniform(wall_excluding_corners, wall_block)?;
+
                 Ok::<(), InGenError>(())
             },
         )?;
@@ -162,11 +169,8 @@ impl Theme<DemoRoom> for DemoTheme {
                 self.plain_room(wall_type, space, interior)?;
 
                 if room_data.lit {
-                    let top_middle = interior
-                        .abut(Face::PY, -1)
-                        .unwrap()
-                        .center()
-                        .map(|c| c as GridCoordinate);
+                    let top_middle =
+                        point_to_enclosing_cube(interior.abut(Face::PY, -1).unwrap().center());
                     space.set(
                         top_middle,
                         if room_data.corridor_only {
@@ -175,6 +179,41 @@ impl Theme<DemoRoom> for DemoTheme {
                             &self.lamp_block
                         },
                     )?;
+                }
+
+                four_walls(
+                    interior.expand(FaceMap::repeat(1)),
+                    |origin, along_wall, length, wall_excluding_corners_box| {
+                        let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
+                        if room_data.windowed_faces[wall] {
+                            let midpoint = length / 2;
+                            for step in WINDOW_PATTERN {
+                                let window_pos = origin
+                                    + along_wall.normal_vector() * (midpoint + step)
+                                    + GridVector::unit_y() * 2;
+                                if let Some(window_box) = Grid::new(window_pos, [1, 3, 1])
+                                    .intersection(wall_excluding_corners_box)
+                                {
+                                    space.fill_uniform(window_box, &self.window_glass_block)?;
+                                }
+                            }
+                        }
+                        Ok::<(), InGenError>(())
+                    },
+                )?;
+
+                // Ceiling light port (not handled by four_walls above)
+                if room_data.windowed_faces[Face::PY] {
+                    let midpoint =
+                        point_to_enclosing_cube(interior.abut(Face::PY, 1).unwrap().center());
+                    for x in WINDOW_PATTERN {
+                        for z in WINDOW_PATTERN {
+                            space.set(
+                                midpoint + GridVector::new(x, 0, z),
+                                &self.window_glass_block,
+                            )?;
+                        }
+                    }
                 }
             }
             1 => {
@@ -235,7 +274,6 @@ pub(crate) async fn demo_dungeon(
     let [blocks_progress, progress] = progress.split(0.2);
     install_dungeon_blocks(universe, blocks_progress).await?;
 
-    // TODO: reintroduce random elements separate from the maze.
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
     let dungeon_grid = DungeonGrid {
@@ -253,6 +291,7 @@ pub(crate) async fn demo_dungeon(
         // TODO: use more appropriate blocks
         wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),
         lamp_block: demo_blocks[DemoBlocks::Lamp].clone(),
+        window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
     };
 
     let mut maze_seed = [0; 32];
@@ -260,16 +299,38 @@ pub(crate) async fn demo_dungeon(
     let maze = maze_to_array(
         &maze_generator::ellers_algorithm::EllersGenerator::new(Some(maze_seed)).generate(9, 9),
     );
-    let dungeon_map = maze.map(|maze_field| DemoRoom {
-        maze_field,
-        //windowed_faces: FaceMap::repeat(rng.gen_bool(0.1)),
-        corridor_only: rng.gen_bool(0.5),
-        lit: rng.gen_bool(0.98),
+    let bounds = maze.grid();
+    let dungeon_map = maze.map(|maze_field| {
+        let corridor_only = rng.gen_bool(0.5);
+        let windowed_faces = {
+            FaceMap::from_fn(|face| {
+                // Create windows only if they look into space outside the maze
+                let adjacent = m2gp(maze_field.coordinates) + face.normal_vector();
+                if bounds.contains_cube(adjacent) || corridor_only || face == Face::NY {
+                    false
+                } else {
+                    rng.gen_bool(0.75)
+                }
+            })
+        };
+        DemoRoom {
+            windowed_faces,
+            corridor_only,
+            lit: !windowed_faces[Face::PY] && rng.gen_bool(0.75),
+            maze_field,
+        }
     });
 
-    let space_bounds = dungeon_grid.minimum_space_for_rooms(dungeon_map.grid());
-    let mut space = Space::builder(space_bounds).build_empty();
-
+    let space_bounds = dungeon_grid
+        .minimum_space_for_rooms(dungeon_map.grid())
+        .expand(FaceMap::symmetric([30, 1, 30]));
+    let mut space = Space::builder(space_bounds)
+        .sky_color(palette::DAY_SKY_COLOR * 2.0)
+        .build_empty();
+    space.fill_uniform(
+        space_bounds.abut(Face::NY, -1).unwrap(),
+        &landscape_blocks[LandscapeBlocks::Grass],
+    )?;
     build_dungeon(&mut space, &theme, &dungeon_map, progress).await?;
 
     Ok(space)

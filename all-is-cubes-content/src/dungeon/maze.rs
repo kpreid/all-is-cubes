@@ -12,12 +12,11 @@ pub fn maze_to_array(maze: &Maze) -> GridArray<Field> {
     })
 }
 
-#[allow(dead_code)]
-fn m2gp(p: maze_generator::prelude::Coordinates) -> GridPoint {
+pub fn m2gp(p: maze_generator::prelude::Coordinates) -> GridPoint {
     GridPoint::new(p.x, 0, p.y)
 }
 
-fn gp2m(p: GridPoint) -> maze_generator::prelude::Coordinates {
+pub fn gp2m(p: GridPoint) -> maze_generator::prelude::Coordinates {
     maze_generator::prelude::Coordinates { x: p.x, y: p.z }
 }
 
