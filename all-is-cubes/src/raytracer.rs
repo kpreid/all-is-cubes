@@ -21,7 +21,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{Evoxel, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
-use crate::math::{smoothstep, GridCoordinate};
+use crate::math::{point_to_enclosing_cube, smoothstep};
 use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, GridArray, PackedLight, Space, SpaceBlockData};
@@ -294,9 +294,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
         let get_light = |p: Vector3<FreeCoordinate>| {
-            self.get_packed_light(Point3::from_vec(
-                (origin + p).map(|s| s.floor() as GridCoordinate),
-            ))
+            self.get_packed_light(point_to_enclosing_cube(Point3::from_vec(origin) + p))
         };
         let lin_lo = -0.5;
         let lin_hi = 0.5;

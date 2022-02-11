@@ -31,8 +31,8 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::{draw_to_blocks, VoxelBrush, VoxelColor};
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    cube_to_midpoint, Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint,
-    GridVector,
+    cube_to_midpoint, point_to_enclosing_cube, Face, FaceMap, FreeCoordinate, GridCoordinate,
+    GridMatrix, GridPoint, GridVector,
 };
 use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space};
 
@@ -178,7 +178,7 @@ pub(crate) fn voronoi_pattern<'a>(
     let mut flood_fill_todo = HashSet::new();
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);
-        let starting_cube = region_point.map(|component| component.floor() as GridCoordinate);
+        let starting_cube = point_to_enclosing_cube(region_point);
         flood_fill_todo.insert(starting_cube);
         while let Some(cube) = flood_fill_todo.iter().next().copied() {
             flood_fill_todo.remove(&cube);

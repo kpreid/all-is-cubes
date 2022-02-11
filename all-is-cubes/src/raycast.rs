@@ -10,7 +10,7 @@
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
-use crate::math::{FreeCoordinate, Geometry, GridCoordinate, Rgba};
+use crate::math::{point_to_enclosing_cube, FreeCoordinate, Geometry, GridCoordinate, Rgba};
 use crate::space::Grid;
 
 /// Closely related types.
@@ -192,7 +192,7 @@ impl Raycaster {
         Self {
             ray: Ray::new(origin, direction),
             emit_current: true,
-            cube: origin.map(|x| x.floor() as GridCoordinate),
+            cube: point_to_enclosing_cube(origin),
             step: direction.map(signum_101),
             t_max: origin.to_vec().zip(direction, scale_to_integer_step),
             t_delta: direction.map(|x| x.abs().recip()),

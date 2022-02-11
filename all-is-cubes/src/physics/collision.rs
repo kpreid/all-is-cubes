@@ -539,7 +539,7 @@ pub(crate) fn nudge_on_ray(
 mod tests {
     use crate::block::{Block, AIR};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::GridCoordinate;
+    use crate::math::point_to_enclosing_cube;
     use crate::raytracer::print_space;
     use crate::space::Grid;
     use crate::universe::Universe;
@@ -753,9 +753,8 @@ mod tests {
 
                 let enclosing = nudged_aab.round_up_to_grid();
                 if backward {
-                    let expected_enclosing = Grid::single_cube(
-                        segment.unit_endpoint().map(|p| p.floor() as GridCoordinate),
-                    );
+                    let expected_enclosing =
+                        Grid::single_cube(point_to_enclosing_cube(segment.unit_endpoint()));
                     assert_eq!(
                         enclosing.axis_range(axis),
                         expected_enclosing.axis_range(axis),

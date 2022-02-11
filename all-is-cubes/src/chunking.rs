@@ -11,7 +11,10 @@ use std::sync::Arc;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
-use crate::math::{int_magnitude_squared, FreeCoordinate, GridCoordinate, GridPoint, GridVector};
+use crate::math::{
+    int_magnitude_squared, point_to_enclosing_cube, FreeCoordinate, GridCoordinate, GridPoint,
+    GridVector,
+};
 use crate::space::Grid;
 
 /// Type to distinguish chunk coordinates from grid coordinates.
@@ -43,7 +46,9 @@ pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(cube: GridPoint) -> Chunk
 pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
     cube: Point3<FreeCoordinate>,
 ) -> ChunkPos<CHUNK_SIZE> {
-    ChunkPos(cube.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE)).floor() as GridCoordinate))
+    ChunkPos(point_to_enclosing_cube(
+        cube.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE))),
+    ))
 }
 
 /// Precomputed information about the spherical pattern of chunks within view distance.
