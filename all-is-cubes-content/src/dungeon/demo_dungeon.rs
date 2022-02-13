@@ -2,7 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use all_is_cubes::content::palette;
-use maze_generator::prelude::{Direction, Field, FieldType, Generator};
+use maze_generator::prelude::{Direction, FieldType, Generator};
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{Block, BlockCollision, RotationPlacementRule, AIR};
@@ -26,7 +26,8 @@ const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 
 struct DemoRoom {
     // TODO: remove dependency on maze gen entirely
-    maze_field: Field,
+    maze_field_type: FieldType,
+    door_faces: FaceMap<bool>,
     windowed_faces: FaceMap<bool>,
     corridor_only: bool,
     lit: bool,
@@ -158,7 +159,7 @@ impl Theme<DemoRoom> for DemoTheme {
         let goal_wall = Block::from(rgb_const!(0.0, 0.8, 0.0));
 
         let interior = self.actual_room_box(room_position, room_data);
-        let wall_type = match room_data.maze_field.field_type {
+        let wall_type = match room_data.maze_field_type {
             FieldType::Start => Some(&start_wall),
             FieldType::Goal => Some(&goal_wall),
             FieldType::Normal => None,
@@ -222,16 +223,14 @@ impl Theme<DemoRoom> for DemoTheme {
                     let neighbor = room_position + face.normal_vector();
                     // contains_cube() check is to work around the maze generator sometimes producing
                     // out-of-bounds passages.
-                    if room_data.maze_field.has_passage(&direction)
-                        && map.grid().contains_cube(neighbor)
-                    {
+                    if room_data.door_faces[face] && map.grid().contains_cube(neighbor) {
                         self.inside_doorway(space, map, room_position, face)?;
                     }
                 }
 
                 // Set spawn.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
-                if matches!(room_data.maze_field.field_type, FieldType::Start) {
+                if matches!(room_data.maze_field_type, FieldType::Start) {
                     let mut spawn = Spawn::default_for_new_space(space.grid());
                     // TODO: There should be a way to express "spawn with feet in this block",
                     // independent of height.
@@ -249,9 +248,9 @@ impl Theme<DemoRoom> for DemoTheme {
                     ]);
 
                     // Orient towards the first room's exit.
-                    for direction in Direction::all() {
-                        if room_data.maze_field.has_passage(&direction) {
-                            spawn.set_look_direction(d2f(direction).normal_vector());
+                    for face in Face::ALL_SIX {
+                        if room_data.door_faces[face] {
+                            spawn.set_look_direction(face.normal_vector());
                             break;
                         }
                     }
@@ -302,6 +301,7 @@ pub(crate) async fn demo_dungeon(
     let bounds = maze.grid();
     let dungeon_map = maze.map(|maze_field| {
         let corridor_only = rng.gen_bool(0.5);
+
         let windowed_faces = {
             FaceMap::from_fn(|face| {
                 // Create windows only if they look into space outside the maze
@@ -313,11 +313,18 @@ pub(crate) async fn demo_dungeon(
                 }
             })
         };
+
+        let mut door_faces = FaceMap::default();
+        for direction in Direction::all() {
+            door_faces[d2f(direction)] = maze_field.has_passage(&direction);
+        }
+
         DemoRoom {
+            maze_field_type: maze_field.field_type,
+            door_faces,
             windowed_faces,
             corridor_only,
             lit: !windowed_faces[Face::PY] && rng.gen_bool(0.75),
-            maze_field,
         }
     });
 
