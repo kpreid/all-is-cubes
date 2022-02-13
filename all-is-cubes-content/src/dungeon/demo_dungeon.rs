@@ -218,12 +218,8 @@ impl Theme<DemoRoom> for DemoTheme {
                 }
             }
             1 => {
-                for direction in [Direction::East, Direction::South] {
-                    let face = d2f(direction);
-                    let neighbor = room_position + face.normal_vector();
-                    // contains_cube() check is to work around the maze generator sometimes producing
-                    // out-of-bounds passages.
-                    if room_data.door_faces[face] && map.grid().contains_cube(neighbor) {
+                for face in [Face::PX, Face::PZ] {
+                    if room_data.door_faces[face] {
                         self.inside_doorway(space, map, room_position, face)?;
                     }
                 }
@@ -300,6 +296,8 @@ pub(crate) async fn demo_dungeon(
     );
     let bounds = maze.grid();
     let dungeon_map = maze.map(|maze_field| {
+        let room_position = m2gp(maze_field.coordinates);
+
         let corridor_only = rng.gen_bool(0.5);
 
         let windowed_faces = {
@@ -316,7 +314,11 @@ pub(crate) async fn demo_dungeon(
 
         let mut door_faces = FaceMap::default();
         for direction in Direction::all() {
-            door_faces[d2f(direction)] = maze_field.has_passage(&direction);
+            let face = d2f(direction);
+            let neighbor = room_position + face.normal_vector();
+            // contains_cube() check is to work around the maze generator sometimes producing
+            // out-of-bounds passages.
+            door_faces[face] = maze_field.has_passage(&direction) && bounds.contains_cube(neighbor);
         }
 
         DemoRoom {
