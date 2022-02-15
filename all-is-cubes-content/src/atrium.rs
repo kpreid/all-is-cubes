@@ -3,7 +3,7 @@
 
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
-use all_is_cubes::util::YieldProgress;
+use exhaust::Exhaust;
 use noise::Seedable;
 
 use all_is_cubes::block::{
@@ -20,6 +20,7 @@ use all_is_cubes::math::{
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
+use all_is_cubes::util::YieldProgress;
 
 use crate::{four_walls, scale_color, Fire};
 
@@ -353,7 +354,7 @@ fn fill_space_transformed(
     Ok(())
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum AtriumBlocks {

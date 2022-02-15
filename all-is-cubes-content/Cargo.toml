@@ -22,6 +22,7 @@ arbitrary = ["arbitrary-crate", "all-is-cubes/arbitrary", "rand/std", "rand/std_
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
 arbitrary-crate = { package = "arbitrary", version = "1.0.1", optional = true, features = ["derive"] }
+exhaust = "0.1.0"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }

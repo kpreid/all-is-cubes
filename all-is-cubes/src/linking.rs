@@ -16,7 +16,8 @@ use std::error::Error;
 use std::fmt::{self, Display};
 use std::hash::Hash;
 use std::ops::Index;
-use strum::IntoEnumIterator;
+
+use exhaust::Exhaust;
 
 use crate::block::{Block, BlockDef};
 use crate::space::SetCubeError;
@@ -43,15 +44,11 @@ pub trait DefaultProvision {
 /// combining the [`namespace()`](Self::namespace) and `self.to_string()` (the
 /// [`Display`] trait implementation).
 ///
-/// Implement this trait for a fieldless enum, then use the functions of
+/// Implement this trait for an enum, then use the functions of
 /// [`BlockProvider`] to work with the described set of blocks.
 ///
-/// TODO: consider replacing Display (presumed derived by `strum`) with a special trait
-///
-/// TODO: Consider replacing `strum` entirely with something that supports enums with
-/// fields, allowing handling of sub-groups of related blocks that might be identified
-/// by other data (e.g. numbers) than a single enum variant.
-pub trait BlockModule: Display + IntoEnumIterator + Eq + Hash + Clone {
+/// TODO: consider replacing Display with a separate method so as not to presume its meaning
+pub trait BlockModule: Exhaust + Display + Eq + Hash + Clone {
     /// A namespace for the members of this module; currently, this should be a
     /// `/`-separated path with no trailing slash, but (TODO:) we should have a
     /// more rigorous namespace scheme for [`Name`]s in future versions.
@@ -62,17 +59,17 @@ pub trait BlockModule: Display + IntoEnumIterator + Eq + Hash + Clone {
 #[derive(Clone, Debug)]
 pub struct BlockProvider<E> {
     /// Guaranteed to contain an entry for every variant of `E` if `E`'s
-    /// `strum::IntoEnumIterator` implementation is accurate.
+    /// [`Exhaust`] implementation is accurate.
     map: HashMap<E, Block>,
 }
 
 impl<E> Default for BlockProvider<E>
 where
-    E: DefaultProvision + IntoEnumIterator + Eq + Hash + Clone,
+    E: DefaultProvision + Exhaust + Eq + Hash + Clone,
 {
     fn default() -> Self {
         Self {
-            map: E::iter()
+            map: E::exhaust()
                 .map(|key| {
                     let block = DefaultProvision::default(key.clone());
                     (key, block)
@@ -95,9 +92,9 @@ where
         F: FnMut(E) -> Result<B, InGenError>,
         B: Into<Block>,
     {
-        let count = E::iter().count();
+        let count = E::exhaust().count();
         let mut map = HashMap::new();
-        for (key, progress) in E::iter().zip(progress.split_evenly(count)) {
+        for (key, progress) in E::exhaust().zip(progress.split_evenly(count)) {
             let block: Block = definer(key.clone())
                 .map_err(|e| GenError::failure(e, name_in_module(&key)))?
                 .into();
@@ -108,7 +105,7 @@ where
     }
 
     pub fn install(&self, universe: &mut Universe) -> Result<BlockProvider<E>, InsertError> {
-        for key in E::iter() {
+        for key in E::exhaust() {
             // TODO: the &* mess should not be required
             universe.insert(name_in_module(&key), BlockDef::new(self[key].clone()))?;
         }
@@ -121,7 +118,7 @@ where
     {
         let mut found: HashMap<E, URef<BlockDef>> = HashMap::new();
         let mut missing = Vec::new();
-        for key in E::iter() {
+        for key in E::exhaust() {
             let name = name_in_module(&key);
             if let Some(uref) = universe.get(&name) {
                 found.insert(key, uref);
@@ -135,7 +132,7 @@ where
             });
         }
         Ok(BlockProvider {
-            map: E::iter()
+            map: E::exhaust()
                 .map(|key| {
                     let block = Block::Indirect(found.remove(&key).unwrap());
                     (key, block)

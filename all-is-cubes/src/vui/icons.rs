@@ -10,6 +10,7 @@ use embedded_graphics::primitives::{
     Circle, Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle,
     StrokeAlignment, StyledDrawable,
 };
+use exhaust::Exhaust;
 
 use crate::block::{Block, BlockCollision, Resolution, AIR, AIR_EVALUATED};
 use crate::content::palette;
@@ -30,7 +31,7 @@ use crate::util::YieldProgress;
 ///
 /// TODO: Consider splitting the tools part from the UI part, especially as tool icons may
 /// end up being game-specific?
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum Icons {

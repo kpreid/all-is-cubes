@@ -1,13 +1,14 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::content::palette;
+use exhaust::Exhaust;
 use maze_generator::prelude::{Direction, FieldType, Generator};
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{Block, BlockCollision, RotationPlacementRule, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
+use all_is_cubes::content::palette;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
@@ -345,7 +346,7 @@ pub(crate) async fn demo_dungeon(
     Ok(space)
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub(crate) enum DungeonBlocks {

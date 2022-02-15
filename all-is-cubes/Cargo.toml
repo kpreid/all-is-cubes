@@ -41,6 +41,7 @@ bytemuck = { version = "1.7.2", default-features = false }
 cgmath = "0.18.0"
 downcast-rs = "1.2.0"
 embedded-graphics = "0.7.0"
+exhaust = "0.1.0"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.17", default-features = false, features = [] }
 indoc = "1.0.3"

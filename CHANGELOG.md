@@ -11,6 +11,7 @@
 
 - `all-is-cubes` library:
     - `AllIsCubesAppState::new()` and `BlockProvider::new()` are now async functions.
+    - The `linking::BlockModule` trait now requires the [`exhaust::Exhaust`](https://docs.rs/exhaust/latest/exhaust/trait.Exhaust.html) trait in place of `strum::IntoEnumIterator`. This allows implementors to use enums with fields (or non-enums).
 
 ### Removed
 

@@ -55,6 +55,7 @@ dependencies = [
  "criterion",
  "downcast-rs",
  "embedded-graphics",
+ "exhaust",
  "futures-channel",
  "futures-core",
  "futures-executor",
@@ -83,6 +84,7 @@ version = "0.4.0"
 dependencies = [
  "all-is-cubes",
  "arbitrary",
+ "exhaust",
  "futures-core",
  "futures-executor",
  "instant",
@@ -1304,6 +1306,27 @@ dependencies = [
  "humantime 1.3.0",
  "log",
  "termcolor",
+]
+
+[[package]]
+name = "exhaust"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1ed0a3549a6699defe2c6160e899677b9d3f51107d50934692f3789a78e706c"
+dependencies = [
+ "exhaust-macros",
+]
+
+[[package]]
+name = "exhaust-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd3f788856391201ad80eed468ce519d29e24eac9babedd38867de025e48e811"
+dependencies = [
+ "itertools",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

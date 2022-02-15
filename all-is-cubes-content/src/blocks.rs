@@ -4,7 +4,7 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-use all_is_cubes::util::YieldProgress;
+use exhaust::Exhaust;
 use noise::Seedable as _;
 
 use all_is_cubes::block::{Block, BlockCollision, Resolution, RotationPlacementRule, AIR};
@@ -20,13 +20,14 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::universe::Universe;
+use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
 
 use crate::int_magnitude_squared;
 use crate::landscape::install_landscape_blocks;
 use crate::palette;
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum DemoBlocks {

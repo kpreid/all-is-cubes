@@ -1,7 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::util::YieldProgress;
+use exhaust::Exhaust;
 use noise::Seedable as _;
 use rand::{Rng as _, SeedableRng as _};
 
@@ -14,6 +14,7 @@ use all_is_cubes::math::{
 use all_is_cubes::notnan;
 use all_is_cubes::space::{Grid, SetCubeError, Space};
 use all_is_cubes::universe::Universe;
+use all_is_cubes::util::YieldProgress;
 
 use crate::voronoi_pattern;
 use crate::{blocks::scale_color, palette};
@@ -22,7 +23,7 @@ use crate::{blocks::scale_color, palette};
 ///
 /// TODO: This is probably too specific to be useful in the long term; call it a
 /// placeholder.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, strum::EnumIter)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum LandscapeBlocks {
