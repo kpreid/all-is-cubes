@@ -175,8 +175,9 @@ impl Tool {
             // TODO: InfiniteBlocks should have a different name and appearance
             Self::Block(block) | Self::InfiniteBlocks(block) => Cow::Borrowed(block),
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
-            Self::Jetpack { active: true } => Cow::Borrowed(&predefined[Icons::JetpackOn]),
-            Self::Jetpack { active: false } => Cow::Borrowed(&predefined[Icons::JetpackOff]),
+            Self::Jetpack { active } => {
+                Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
+            }
             Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
         }
     }

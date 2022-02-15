@@ -2,6 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::borrow::Cow;
+use std::fmt;
 
 use cgmath::{ElementWise, EuclideanSpace as _, InnerSpace, Vector3};
 use embedded_graphics::geometry::Point;
@@ -26,13 +27,13 @@ use crate::universe::Universe;
 #[cfg(doc)]
 use crate::inv::Tool;
 use crate::util::YieldProgress;
+use crate::vui::widgets::ToggleButtonVisualState;
 
 /// Blocks that are icons for tools or UI components.
 ///
 /// TODO: Consider splitting the tools part from the UI part, especially as tool icons may
 /// end up being game-specific?
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
-#[strum(serialize_all = "kebab-case")]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
 pub enum Icons {
     /// HUD crosshair indicating cursor position.
@@ -45,19 +46,32 @@ pub enum Icons {
     Delete,
     /// Icon for [`Tool::CopyFromSpace`].
     CopyFromSpace,
-    /// Icon for [`Tool::Jetpack`], active.
-    JetpackOn,
-    /// Icon for [`Tool::Jetpack`], inactive.
-    JetpackOff,
-    PauseButtonOn,
-    PauseButtonOff,
-    MouselookButtonOn,
-    MouselookButtonOff,
+    /// Icon for [`Tool::Jetpack`].
+    Jetpack {
+        active: bool,
+    },
+    PauseButton(ToggleButtonVisualState),
+    MouselookButton(ToggleButtonVisualState),
 }
 
 impl BlockModule for Icons {
     fn namespace() -> &'static str {
         "all-is-cubes/vui/icons"
+    }
+}
+
+impl fmt::Display for Icons {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Icons::Crosshair => write!(f, "crosshair"),
+            Icons::EmptySlot => write!(f, "empty-slot"),
+            Icons::Activate => write!(f, "activate"),
+            Icons::Delete => write!(f, "delete"),
+            Icons::CopyFromSpace => write!(f, "copy-from-space"),
+            Icons::Jetpack { active } => write!(f, "jetpack/{}", active),
+            Icons::PauseButton(state) => write!(f, "pause-button/{}", state),
+            Icons::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
+        }
     }
 }
 
@@ -198,8 +212,7 @@ impl Icons {
                     .color(Rgba::new(0., 1., 0., 1.))
                     .build(),
 
-                j @ (Icons::JetpackOff | Icons::JetpackOn) => {
-                    let active = j == Icons::JetpackOn;
+                Icons::Jetpack { active } => {
                     let shell_block = Block::from(rgb_const!(0.5, 0.5, 0.5));
                     let stripe_block = Block::from(rgb_const!(0.9, 0.1, 0.1));
                     let exhaust = if active {
@@ -267,9 +280,8 @@ impl Icons {
                         .build()
                 }
 
-                b @ (Icons::PauseButtonOff | Icons::PauseButtonOn) => {
-                    let active = b == Icons::PauseButtonOn;
-                    let mut button_builder = ButtonBuilder::new(active)?;
+                Icons::PauseButton(state) => {
+                    let mut button_builder = ButtonBuilder::new(state)?;
 
                     // Draw pause symbol
                     for x in [-3, 2] {
@@ -282,9 +294,8 @@ impl Icons {
                     button_builder.into_block(universe, "Pause")
                 }
 
-                b @ (Icons::MouselookButtonOff | Icons::MouselookButtonOn) => {
-                    let active = b == Icons::MouselookButtonOn;
-                    let mut button_builder = ButtonBuilder::new(active)?;
+                Icons::MouselookButton(state) => {
+                    let mut button_builder = ButtonBuilder::new(state)?;
 
                     // Draw crosshair
                     // TODO: Suspicious inconsistency between x and y coordinates
@@ -315,7 +326,8 @@ impl ButtonBuilder {
     pub const RESOLUTION: Resolution = 16;
     pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION as GridCoordinate;
 
-    pub fn new(active: bool) -> Result<Self, InGenError> {
+    pub fn new(state: ToggleButtonVisualState) -> Result<Self, InGenError> {
+        let active = state.value;
         let back_block = Block::from(if active {
             palette::BUTTON_ACTIVATED_BACK
         } else {

@@ -23,10 +23,12 @@ use crate::space::{Grid, Space, SpacePhysics};
 
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
-use crate::vui::layout::LayoutTree;
 use crate::vui::{
-    CrosshairController, Icons, ToggleButtonWidget, ToolbarController, TooltipController,
-    TooltipState, WidgetBehavior, WidgetController,
+    layout::LayoutTree,
+    widgets::{
+        CrosshairController, ToggleButtonWidget, ToolbarController, TooltipController, TooltipState,
+    },
+    Icons, WidgetBehavior, WidgetController,
 };
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
@@ -172,8 +174,7 @@ pub(super) fn new_hud_space(
         children: vec![
             LayoutTree::leaf(ToggleButtonWidget::new(
                 paused,
-                hud_blocks.icons[Icons::PauseButtonOff].clone(),
-                hud_blocks.icons[Icons::PauseButtonOn].clone(),
+                |state| hud_blocks.icons[Icons::PauseButton(state)].clone(),
                 {
                     let cc = control_channel.clone();
                     move || {
@@ -183,8 +184,7 @@ pub(super) fn new_hud_space(
             )),
             LayoutTree::leaf(ToggleButtonWidget::new(
                 input_processor.mouselook_mode(),
-                hud_blocks.icons[Icons::MouselookButtonOff].clone(),
-                hud_blocks.icons[Icons::MouselookButtonOn].clone(),
+                |state| hud_blocks.icons[Icons::MouselookButton(state)].clone(),
                 {
                     let cc = control_channel;
                     move || {

@@ -4,7 +4,7 @@
 //! Specific UI widgets.
 
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 use std::sync::{Arc, Mutex};
 
 use cgmath::EuclideanSpace as _;
@@ -13,6 +13,7 @@ use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::Point;
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use embedded_graphics::Drawable as _;
+use exhaust::Exhaust;
 use instant::Duration;
 use once_cell::sync::Lazy;
 
@@ -37,6 +38,7 @@ use crate::vui::{
 /// Generic widget controller that only does something initialize.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
+#[doc(hidden)] // TODO: widget API still in development and this is particularly dubious
 pub struct OneshotController(pub Option<WidgetTransaction>);
 
 impl WidgetController for OneshotController {
@@ -55,15 +57,20 @@ pub(crate) struct ToggleButtonWidget {
 }
 
 impl ToggleButtonWidget {
-    pub(crate) fn new(
+    pub(crate) fn new<BF>(
         data_source: ListenableSource<bool>,
-        off: Block,
-        on: Block,
+        mut blocks: BF,
         action: impl Fn() + Send + Sync + 'static,
-    ) -> Arc<Self> {
+    ) -> Arc<Self>
+    where
+        BF: FnMut(ToggleButtonVisualState) -> Block,
+    {
         Arc::new(Self {
             data_source,
-            states: [off, on],
+            states: [
+                blocks(ToggleButtonVisualState { value: false }),
+                blocks(ToggleButtonVisualState { value: true }),
+            ],
             action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
         })
     }
@@ -83,6 +90,29 @@ impl Widget for ToggleButtonWidget {
             position.bounds.lower_bounds(),
             self,
         ))
+    }
+}
+
+/// Possible visual states of a `ToggleButtonWidget`.
+///
+/// The [`fmt::Display`] implementation of this type produces a string form suitable for
+/// naming blocks depicting this state; the [`Exhaust`] implementation allows iterating
+/// over all possible states.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[non_exhaustive]
+pub struct ToggleButtonVisualState {
+    /// The on/off value depicted.
+    pub value: bool,
+    // TODO: add hover/press states
+}
+
+/// Represents this value as a string suitable for naming blocks depicting this state.
+impl fmt::Display for ToggleButtonVisualState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self { value: true } => write!(f, "on"),
+            Self { value: false } => write!(f, "off"),
+        }
     }
 }
 

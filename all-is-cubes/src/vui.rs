@@ -27,6 +27,7 @@ use crate::space::Space;
 use crate::time::Tick;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::YieldProgress;
+use crate::vui::widgets::TooltipState;
 
 mod hud;
 use hud::*;
@@ -38,9 +39,7 @@ pub use layout::*;
 mod widget_trait;
 #[doc(hidden)]
 pub use widget_trait::*;
-mod widgets;
-#[doc(hidden)]
-pub use widgets::*;
+pub mod widgets;
 
 /// `Vui` builds user interfaces out of voxels. It owns a `Universe` dedicated to the
 /// purpose and draws into spaces to form the HUD and menus.
