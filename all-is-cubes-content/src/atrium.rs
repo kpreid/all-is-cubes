@@ -201,18 +201,14 @@ fn map_text_block(
         b'A' => {
             let start_y = 3;
             let mirrored_half = cube.x >= 4;
-            let block = match [
-                if mirrored_half { 8 - cube.x } else { cube.x },
-                cube.y - start_y,
-            ]
-            .map(UpTo5::new)
-            {
-                [Some(x), Some(y)] => blocks[AtriumBlocks::Arch(x, y)].clone(),
-                _ => Block::builder()
-                    .color(rgba_const!(1.0, 0.01, 0.8, 1.0))
-                    .display_name(format!("Arch error {:?}", [cube.x, cube.y - start_y]))
-                    .build(),
-            };
+            let block = lookup_multiblock_2d(
+                blocks,
+                AtriumBlocks::Arch,
+                [
+                    if mirrored_half { 8 - cube.x } else { cube.x },
+                    cube.y - start_y,
+                ],
+            );
             // TODO: Coordinate systems in use aren't really consistent.
             // If we reorient the bricks so that they run along the X axis instead of the Z axis, that should help.
             block.rotate(
@@ -229,18 +225,14 @@ fn map_text_block(
             let mut cube = cube;
             cube.x = cube.x.rem_euclid(4);
             let mirrored_half = cube.x >= 3;
-            let block = match [
-                if mirrored_half { 4 - cube.x } else { cube.x },
-                cube.y - start_y,
-            ]
-            .map(UpTo5::new)
-            {
-                [Some(x), Some(y)] => blocks[AtriumBlocks::Arch(x, y)].clone(),
-                _ => Block::builder()
-                    .color(rgba_const!(1.0, 0.01, 0.8, 1.0))
-                    .display_name(format!("Arch error {:?}", [cube.x, cube.y - start_y]))
-                    .build(),
-            };
+            let block = lookup_multiblock_2d(
+                blocks,
+                AtriumBlocks::Arch, // TODO: should be an upper floor arch
+                [
+                    if mirrored_half { 4 - cube.x } else { cube.x },
+                    cube.y - start_y,
+                ],
+            );
             // TODO: Coordinate systems in use aren't really consistent.
             // If we reorient the bricks so that they run along the X axis instead of the Z axis, that should help.
             block.rotate(
@@ -632,6 +624,20 @@ async fn install_atrium_blocks(
     .await?
     .install(universe)?;
     Ok(BlockProvider::<AtriumBlocks>::using(universe)?)
+}
+
+fn lookup_multiblock_2d(
+    blocks: &BlockProvider<AtriumBlocks>,
+    ctor: fn(UpTo5, UpTo5) -> AtriumBlocks,
+    xy: [GridCoordinate; 2],
+) -> Block {
+    match xy.map(UpTo5::new) {
+        [Some(x), Some(y)] => blocks[ctor(x, y)].clone(),
+        _ => Block::builder()
+            .color(rgba_const!(1.0, 0.01, 0.8, 1.0))
+            .display_name(format!("Out of bounds {:?}", xy))
+            .build(),
+    }
 }
 
 /// Kludge to allow for representing multi-block structures in AtriumBlocks.
