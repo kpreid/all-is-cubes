@@ -203,7 +203,7 @@ fn map_text_block(
             let mirrored_half = cube.x >= 4;
             let block = lookup_multiblock_2d(
                 blocks,
-                AtriumBlocks::Arch,
+                AtriumBlocks::GroundArch,
                 [
                     if mirrored_half { 8 - cube.x } else { cube.x },
                     cube.y - start_y,
@@ -227,7 +227,7 @@ fn map_text_block(
             let mirrored_half = cube.x >= 3;
             let block = lookup_multiblock_2d(
                 blocks,
-                AtriumBlocks::Arch, // TODO: should be an upper floor arch
+                AtriumBlocks::UpperArch,
                 [
                     if mirrored_half { 4 - cube.x } else { cube.x },
                     cube.y - start_y,
@@ -339,7 +339,8 @@ enum AtriumBlocks {
     GroundFloor,
     UpperFloor,
     SolidBricks,
-    Arch(UpTo5, UpTo5),
+    GroundArch(UpTo5, UpTo5),
+    UpperArch(UpTo5, UpTo5),
     GroundColumn,
     SquareColumn,
     SmallColumn,
@@ -359,7 +360,8 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::GroundFloor => write!(f, "ground-floor"),
             AtriumBlocks::UpperFloor => write!(f, "upper-floor"),
             AtriumBlocks::SolidBricks => write!(f, "solid-bricks"),
-            AtriumBlocks::Arch(x, y) => write!(f, "arch/{x}-{y}"),
+            AtriumBlocks::GroundArch(x, y) => write!(f, "ground-arch/{x}-{y}"),
+            AtriumBlocks::UpperArch(x, y) => write!(f, "upper-arch/{x}-{y}"),
             AtriumBlocks::GroundColumn => write!(f, "ground-column"),
             AtriumBlocks::SquareColumn => write!(f, "square-column"),
             AtriumBlocks::SmallColumn => write!(f, "small-column"),
@@ -426,69 +428,10 @@ async fn install_atrium_blocks(
         }
     };
 
-    let ground_floor_arch_blocks = space_to_blocks(
-        resolution,
-        BlockAttributes {
-            display_name: "Atrium Ground Floor Arch".into(),
-            collision: BlockCollision::Recur,
-            ..BlockAttributes::default()
-        },
-        {
-            let arch_opening_width = resolution_g * 7;
-            let arch_opening_height = resolution_g * 3;
-            let arch_center_z_doubled = resolution_g * 6 /* midpoint */
-                + resolution_g * 3 /* offset by a block and a half */;
-            let mut space = Space::builder(Grid::from_lower_upper(
-                [0, 0, 0],
-                [
-                    resolution_g,
-                    arch_opening_height + resolution_g,
-                    arch_center_z_doubled + resolution_g * 3,
-                ],
-            ))
-            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-            .build_empty();
-            space.fill(space.grid(), |p| {
-                // Flip middle of first block, so that the arch to our left appears on it
-                let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {
-                    resolution_g - 1 - p.z
-                } else {
-                    p.z
-                };
-                let arch_z_doubled = z_for_arch * 2 - arch_center_z_doubled;
-                let arch_y_doubled = p.y * 2;
-                let distance_from_edge =
-                    p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
-                let r = (arch_z_doubled as f32 / arch_opening_width as f32)
-                    .hypot(arch_y_doubled as f32 / (arch_opening_height as f32 * 2.));
-                if r < 1.0 {
-                    // Empty space inside arch
-                    None
-                } else if r < 1.04 {
-                    // Beveled edge
-                    if distance_from_edge < ((1. - r) * 2.0 + 0.1) {
-                        None
-                    } else {
-                        Some(&stone_range[3])
-                    }
-                } else if r < 1.1 {
-                    // Surface
-                    Some(&stone_range[3])
-                } else if r < 1.14 {
-                    // Groove
-                    if distance_from_edge == 0. {
-                        None
-                    } else {
-                        Some(&stone_range[4])
-                    }
-                } else {
-                    // Body
-                    Some(brick_pattern(p))
-                }
-            })?;
-            universe.insert_anonymous(space)
-        },
-    )?;
+    let ground_floor_arch_blocks =
+        generate_arch(universe, &stone_range, &brick_pattern, resolution, 7, 3)?;
+    let upper_floor_arch_blocks =
+        generate_arch(universe, &stone_range, &brick_pattern, resolution, 3, 2)?;
 
     // TODO: duplicated procgen code — figure out a good toolkit of math helpers
     let one_diagonal = GridVector::new(1, 1, 1);
@@ -521,8 +464,11 @@ async fn install_atrium_blocks(
                 .display_name("Atrium Wall Bricks")
                 .voxels_fn(universe, resolution, brick_pattern)?
                 .build(),
-            AtriumBlocks::Arch(x, y) => {
+            AtriumBlocks::GroundArch(x, y) => {
                 ground_floor_arch_blocks[[0, y.to_int(), x.to_int()]].clone()
+            }
+            AtriumBlocks::UpperArch(x, y) => {
+                upper_floor_arch_blocks[[0, y.to_int(), x.to_int()]].clone()
             }
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
@@ -624,6 +570,80 @@ async fn install_atrium_blocks(
     .await?
     .install(universe)?;
     Ok(BlockProvider::<AtriumBlocks>::using(universe)?)
+}
+
+fn generate_arch<'b>(
+    universe: &mut Universe,
+    stone_range: &[Block], // TODO: clarify
+    brick_pattern: impl Fn(GridPoint) -> &'b Block,
+    resolution: u8,
+    width_blocks: GridCoordinate,
+    height_blocks: GridCoordinate,
+) -> Result<Space, SetCubeError> {
+    let resolution_g: GridCoordinate = resolution.into();
+    let space = {
+        let arch_opening_width = resolution_g * width_blocks;
+        let arch_opening_height = resolution_g * height_blocks;
+        let arch_center_z_doubled = resolution_g * (width_blocks - 1) /* midpoint assuming odd width */
+            + resolution_g * 3 /* offset by a block and a half */;
+        let mut space = Space::builder(Grid::from_lower_upper(
+            [0, 0, 0],
+            [
+                resolution_g,
+                arch_opening_height + resolution_g,
+                arch_center_z_doubled + resolution_g * 3,
+            ],
+        ))
+        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+        .build_empty();
+        space.fill(space.grid(), |p| {
+            // Flip middle of first block, so that the arch to our left appears on it
+            let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {
+                resolution_g - 1 - p.z
+            } else {
+                p.z
+            };
+            let arch_z_doubled = z_for_arch * 2 - arch_center_z_doubled;
+            let arch_y_doubled = p.y * 2;
+            let distance_from_edge = p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
+            let r = (arch_z_doubled as f32 / arch_opening_width as f32)
+                .hypot(arch_y_doubled as f32 / (arch_opening_height as f32 * 2.));
+            if r < 1.0 {
+                // Empty space inside arch
+                None
+            } else if r < 1.04 {
+                // Beveled edge
+                if distance_from_edge < ((1. - r) * 2.0 + 0.1) {
+                    None
+                } else {
+                    Some(&stone_range[3])
+                }
+            } else if r < 1.1 {
+                // Surface
+                Some(&stone_range[3])
+            } else if r < 1.14 {
+                // Groove
+                if distance_from_edge == 0. {
+                    None
+                } else {
+                    Some(&stone_range[4])
+                }
+            } else {
+                // Body
+                Some(brick_pattern(p))
+            }
+        })?;
+        universe.insert_anonymous(space)
+    };
+    space_to_blocks(
+        resolution,
+        BlockAttributes {
+            display_name: "Atrium Upper Floor Arch".into(),
+            collision: BlockCollision::Recur,
+            ..BlockAttributes::default()
+        },
+        space,
+    )
 }
 
 fn lookup_multiblock_2d(
