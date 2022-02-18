@@ -3,6 +3,8 @@
 
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
+use std::fmt;
+
 use exhaust::Exhaust;
 use noise::Seedable;
 
@@ -202,19 +204,10 @@ fn map_text_block(
             let block = match [
                 if mirrored_half { 8 - cube.x } else { cube.x },
                 cube.y - start_y,
-            ] {
-                [0, 0] => blocks[AtriumBlocks::Arch0_0].clone(),
-                [0, 1] => blocks[AtriumBlocks::Arch0_1].clone(),
-                [0, 2] => blocks[AtriumBlocks::Arch0_2].clone(),
-                [1, 0] => blocks[AtriumBlocks::Arch1_0].clone(),
-                [1, 1] => blocks[AtriumBlocks::Arch1_1].clone(),
-                [1, 2] => blocks[AtriumBlocks::Arch1_2].clone(),
-                [2, 1] => blocks[AtriumBlocks::Arch2_1].clone(),
-                [2, 2] => blocks[AtriumBlocks::Arch2_2].clone(),
-                [2, 3] => blocks[AtriumBlocks::Arch2_3].clone(),
-                [3, 2] => blocks[AtriumBlocks::Arch3_2].clone(),
-                [3, 3] => blocks[AtriumBlocks::Arch3_3].clone(),
-                [4, 3] => blocks[AtriumBlocks::Arch4_3].clone(),
+            ]
+            .map(UpTo5::new)
+            {
+                [Some(x), Some(y)] => blocks[AtriumBlocks::Arch(x, y)].clone(),
                 _ => Block::builder()
                     .color(rgba_const!(1.0, 0.01, 0.8, 1.0))
                     .display_name(format!("Arch error {:?}", [cube.x, cube.y - start_y]))
@@ -239,16 +232,10 @@ fn map_text_block(
             let block = match [
                 if mirrored_half { 4 - cube.x } else { cube.x },
                 cube.y - start_y,
-            ] {
-                [0, 0] => blocks[AtriumBlocks::Arch0_0].clone(),
-                [0, 1] => blocks[AtriumBlocks::Arch0_1].clone(),
-                [0, 2] => blocks[AtriumBlocks::Arch0_2].clone(),
-                [1, 0] => blocks[AtriumBlocks::Arch1_0].clone(),
-                [1, 1] => blocks[AtriumBlocks::Arch1_1].clone(),
-                [1, 2] => blocks[AtriumBlocks::Arch1_2].clone(),
-                [2, 1] => blocks[AtriumBlocks::Arch2_1].clone(),
-                [2, 2] => blocks[AtriumBlocks::Arch2_2].clone(),
-                [2, 3] => blocks[AtriumBlocks::Arch2_3].clone(),
+            ]
+            .map(UpTo5::new)
+            {
+                [Some(x), Some(y)] => blocks[AtriumBlocks::Arch(x, y)].clone(),
                 _ => Block::builder()
                     .color(rgba_const!(1.0, 0.01, 0.8, 1.0))
                     .display_name(format!("Arch error {:?}", [cube.x, cube.y - start_y]))
@@ -354,25 +341,13 @@ fn fill_space_transformed(
     Ok(())
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
-#[strum(serialize_all = "kebab-case")]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
-pub enum AtriumBlocks {
+enum AtriumBlocks {
     GroundFloor,
     UpperFloor,
     SolidBricks,
-    Arch0_0,
-    Arch0_1,
-    Arch0_2,
-    Arch1_0,
-    Arch1_1,
-    Arch1_2,
-    Arch2_1,
-    Arch2_2,
-    Arch2_3,
-    Arch3_2,
-    Arch3_3,
-    Arch4_3,
+    Arch(UpTo5, UpTo5),
     GroundColumn,
     SquareColumn,
     SmallColumn,
@@ -383,6 +358,23 @@ pub enum AtriumBlocks {
 impl BlockModule for AtriumBlocks {
     fn namespace() -> &'static str {
         "all-is-cubes/atrium"
+    }
+}
+impl fmt::Display for AtriumBlocks {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO: We need a better pattern than writing these out manually
+        match self {
+            AtriumBlocks::GroundFloor => write!(f, "ground-floor"),
+            AtriumBlocks::UpperFloor => write!(f, "upper-floor"),
+            AtriumBlocks::SolidBricks => write!(f, "solid-bricks"),
+            AtriumBlocks::Arch(x, y) => write!(f, "arch/{x}-{y}"),
+            AtriumBlocks::GroundColumn => write!(f, "ground-column"),
+            AtriumBlocks::SquareColumn => write!(f, "square-column"),
+            AtriumBlocks::SmallColumn => write!(f, "small-column"),
+            AtriumBlocks::Molding => write!(f, "molding"),
+            AtriumBlocks::MoldingCorner => write!(f, "molding-corner"),
+            AtriumBlocks::Firepot => write!(f, "firepot"),
+        }
     }
 }
 
@@ -537,18 +529,9 @@ async fn install_atrium_blocks(
                 .display_name("Atrium Wall Bricks")
                 .voxels_fn(universe, resolution, brick_pattern)?
                 .build(),
-            AtriumBlocks::Arch0_0 => ground_floor_arch_blocks[[0, 0, 0]].clone(),
-            AtriumBlocks::Arch0_1 => ground_floor_arch_blocks[[0, 1, 0]].clone(),
-            AtriumBlocks::Arch0_2 => ground_floor_arch_blocks[[0, 2, 0]].clone(),
-            AtriumBlocks::Arch1_0 => ground_floor_arch_blocks[[0, 0, 1]].clone(),
-            AtriumBlocks::Arch1_1 => ground_floor_arch_blocks[[0, 1, 1]].clone(),
-            AtriumBlocks::Arch1_2 => ground_floor_arch_blocks[[0, 2, 1]].clone(),
-            AtriumBlocks::Arch2_1 => ground_floor_arch_blocks[[0, 1, 2]].clone(),
-            AtriumBlocks::Arch2_2 => ground_floor_arch_blocks[[0, 2, 2]].clone(),
-            AtriumBlocks::Arch2_3 => ground_floor_arch_blocks[[0, 3, 2]].clone(),
-            AtriumBlocks::Arch3_2 => ground_floor_arch_blocks[[0, 2, 3]].clone(),
-            AtriumBlocks::Arch3_3 => ground_floor_arch_blocks[[0, 3, 3]].clone(),
-            AtriumBlocks::Arch4_3 => ground_floor_arch_blocks[[0, 3, 4]].clone(),
+            AtriumBlocks::Arch(x, y) => {
+                ground_floor_arch_blocks[[0, y.to_int(), x.to_int()]].clone()
+            }
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
                 .collision(BlockCollision::Recur)
@@ -649,4 +632,45 @@ async fn install_atrium_blocks(
     .await?
     .install(universe)?;
     Ok(BlockProvider::<AtriumBlocks>::using(universe)?)
+}
+
+/// Kludge to allow for representing multi-block structures in AtriumBlocks.
+/// This represents an integer in {0, 1, 2, 3, 4}, which is the biggest dimension
+/// we have.
+///
+/// TODO: Replace this with built-in support for multi-block structures.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
+enum UpTo5 {
+    U0,
+    U1,
+    U2,
+    U3,
+    U4,
+}
+impl UpTo5 {
+    /// Basically a TryFrom without an error type
+    fn new(input: GridCoordinate) -> Option<Self> {
+        Some(match input {
+            0 => UpTo5::U0,
+            1 => UpTo5::U1,
+            2 => UpTo5::U2,
+            3 => UpTo5::U3,
+            4 => UpTo5::U4,
+            _ => return None,
+        })
+    }
+    fn to_int(self) -> GridCoordinate {
+        match self {
+            UpTo5::U0 => 0,
+            UpTo5::U1 => 1,
+            UpTo5::U2 => 2,
+            UpTo5::U3 => 3,
+            UpTo5::U4 => 4,
+        }
+    }
+}
+impl fmt::Display for UpTo5 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_int())
+    }
 }
