@@ -140,7 +140,7 @@ impl AnyTransaction {
     fn transaction_as_debug(&self) -> &dyn Debug {
         use AnyTransaction::*;
         match self {
-            Noop => &"AnyTransaction::Noop" as &dyn Debug,
+            Noop => &"AnyTransaction::Noop",
             BlockDef(t) => &t.transaction,
             Character(t) => &t.transaction,
             Space(t) => &t.transaction,

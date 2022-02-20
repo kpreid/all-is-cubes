@@ -478,13 +478,11 @@ where
 
         // Record the block meshes we incorporated into the chunk mesh.
         self.block_dependencies.clear();
-        self.block_dependencies
-            .extend(self.mesh.blocks_used_iter().map(|index| {
-                (
-                    index as BlockIndex,
-                    block_meshes.versioning[usize::from(index)],
-                )
-            }));
+        self.block_dependencies.extend(
+            self.mesh
+                .blocks_used_iter()
+                .map(|index| (index, block_meshes.versioning[usize::from(index)])),
+        );
 
         chunk_todo.recompute_mesh = false;
     }

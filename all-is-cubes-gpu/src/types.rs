@@ -186,7 +186,7 @@ impl LumBlockVertex {
         let tdy = Vector3::new(0.0, tex_size.y, 0.0);
         let v = |p: Vector3<f32>, t: Vector3<f32>| Self {
             position: VertexPosition::new(p.into()),
-            cube: VertexCube::new(p.map(|c| c.floor() as f32).into()),
+            cube: VertexCube::new(p.map(f32::floor).into()),
             normal: VertexNormal::new(normal.into()),
             color_or_texture: VertexColorOrTexture::new(t.extend(-1.0).into()),
             clamp_min: VertexClampLow::new([0., 0., 0.]),

@@ -343,8 +343,7 @@ impl Space {
                     .insert(block.into_owned(), old_block_index);
 
                 // Side effects.
-                self.notifier
-                    .notify(SpaceChange::Number(old_block_index as BlockIndex));
+                self.notifier.notify(SpaceChange::Number(old_block_index));
                 self.side_effects_of_set(old_block_index, position, contents_index);
                 return Ok(true);
             }
