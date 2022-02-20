@@ -11,6 +11,7 @@ use crate::listen::Listener;
 /// A [`Listener`] which discards all messages and is suitable for filling
 /// listener parameters when no listener is needed.
 #[allow(clippy::exhaustive_structs)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NullListener;
 
 impl<M> Listener<M> for NullListener {

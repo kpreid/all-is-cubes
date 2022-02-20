@@ -11,6 +11,7 @@ use crate::listen::{Listener, Notifier};
 /// This may be used to drop uninteresting messages or reduce their granularity.
 ///
 /// TODO: add doc test
+#[derive(Debug)]
 pub struct Filter<F, T> {
     /// The function to transform and possibly discard each message.
     pub(super) function: F,
@@ -55,6 +56,7 @@ impl Gate {
 
 /// [`Listener`] implementation which discards messages when the corresponding [`Gate`]
 /// is dropped. Construct this using [`Listener::gate`].
+#[derive(Debug)]
 pub struct GateListener<T> {
     weak: Weak<()>,
     target: T,

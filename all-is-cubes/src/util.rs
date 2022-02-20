@@ -68,7 +68,7 @@ impl CustomFormat<Unquote> for &'_ str {
 
 /// Format type for [`CustomFormat`] which prints the name of a type.
 /// The value is a `PhantomData` to avoid requiring an actual instance of the type.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct TypeName;
 impl<T> CustomFormat<TypeName> for PhantomData<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: TypeName) -> fmt::Result {
@@ -82,7 +82,7 @@ impl<T> CustomFormat<TypeName> for PhantomData<T> {
 /// This format may be on one line despite the pretty-printing option, and may lose
 /// precision or Rust syntax in favor of a short at-a-glance representation.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ConciseDebug;
 
 impl<T: CustomFormat<ConciseDebug>, const N: usize> CustomFormat<ConciseDebug> for [T; N] {
@@ -138,7 +138,7 @@ impl<S: Debug> CustomFormat<ConciseDebug> for Vector4<S> {
 /// This format does not follow Rust [`Debug`](fmt::Debug) syntax, and when implemented
 /// for standard Rust types may have quirks. Values may have multiple lines.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StatusText;
 
 /// Makes the assumption that [`Duration`]s are per-frame timings and hence the
@@ -154,6 +154,7 @@ impl CustomFormat<StatusText> for Duration {
 ///
 /// TODO: this is only used by the wireframe debug mesh mechanism and should be reconsidered
 #[doc(hidden)] // pub to be used by all-is-cubes-gpu
+#[derive(Debug)]
 pub struct MapExtend<'a, A, B, T, F>
 where
     T: Extend<B>,
@@ -203,6 +204,15 @@ pub struct YieldProgress {
     end: f32,
     yielder: Rc<dyn Fn() -> LocalBoxFuture<'static, ()>>,
     progressor: Rc<dyn Fn(f32)>,
+}
+
+impl Debug for YieldProgress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("YieldProgress")
+            .field("start", &self.start)
+            .field("end", &self.end)
+            .finish_non_exhaustive()
+    }
 }
 
 impl YieldProgress {

@@ -685,6 +685,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Grid {
 }
 
 /// Iterator produced by [`Grid::interior_iter`].
+#[derive(Clone, Debug)]
 pub struct GridIter {
     x_range: Range<GridCoordinate>,
     y_range: Range<GridCoordinate>,

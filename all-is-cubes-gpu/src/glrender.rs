@@ -42,6 +42,7 @@ use crate::{make_cursor_tess, wireframe_vertices};
 
 /// Game world/UI renderer targeting `luminance`.
 // TODO: give this and its module a better name
+#[allow(missing_debug_implementations)]
 pub struct GLRenderer<C>
 where
     C: GraphicsContext,

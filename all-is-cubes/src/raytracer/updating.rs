@@ -11,6 +11,7 @@ use crate::universe::{RefError, URef};
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
 /// changed.
+#[derive(Debug)]
 pub struct UpdatingSpaceRaytracer<D: RtBlockData> {
     space: URef<Space>,
     graphics_options: ListenableSource<GraphicsOptions>,

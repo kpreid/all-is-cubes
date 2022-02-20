@@ -223,6 +223,7 @@ pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
 }
 
 /// Iterator type for [`UniverseIndex::iter_by_type`].
+#[derive(Clone, Debug)]
 pub struct UniverseIter<'u, T>(std::collections::btree_map::Iter<'u, Name, URootRef<T>>);
 impl<'u, T> Iterator for UniverseIter<'u, T> {
     type Item = (Name, URef<T>);

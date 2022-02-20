@@ -40,6 +40,7 @@ use crate::universe::Universe;
 ///
 /// `'s` is the lifetime of the [`Space`].
 /// `C` is the “color” type to use, which should implement [`VoxelColor`].
+#[derive(Debug)]
 pub struct DrawingPlane<'s, C> {
     space: &'s mut Space,
     /// Defines the coordinate transformation from 2D graphics to the [`Space`].

@@ -65,6 +65,15 @@ impl<'a, H: Transactional + 'static> BehaviorContext<'a, H> {
     }
 }
 
+impl<'a, H: Transactional + Debug> Debug for BehaviorContext<'a, H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // binder functions are not debuggable
+        f.debug_struct("BehaviorContext")
+            .field("host", &self.host)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Collects [`Behavior`]s and invokes them.
 ///
 /// Note: This type is public out of necessity because it is revealed elsewhere, but its details

@@ -348,6 +348,7 @@ impl AllIsCubesAppState {
 // Exhaustive: Changing this will probably be breaking anyway, until we make it a
 // more thorough abstraction.
 #[allow(clippy::exhaustive_structs)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Layers<T> {
     pub world: T,
     pub ui: T,
@@ -363,6 +364,7 @@ impl<T> Layers<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct StandardCameras {
     /// Cameras are synced with this
     graphics_options: ListenableSource<GraphicsOptions>,

@@ -15,6 +15,7 @@ use std::rc::Rc;
 /// This test utility follows the builder pattern: call methods to add test data, then
 /// finish with [`Self::test`].
 #[must_use]
+#[allow(missing_debug_implementations)]
 pub struct TransactionTester<'a, Tr, Ta> {
     transactions: Vec<TransactionAndPredicate<'a, Tr, Ta>>,
     target_factories: Vec<Box<dyn Fn() -> Ta + 'a>>,
