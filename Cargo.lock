@@ -74,7 +74,6 @@ dependencies = [
  "rand_xoshiro",
  "rayon",
  "serde",
- "strum",
  "thiserror",
 ]
 
@@ -92,7 +91,6 @@ dependencies = [
  "macro_rules_attribute",
  "maze_generator",
  "noise",
- "ordered-float",
  "paste",
  "rand 0.8.4",
  "rand_xoshiro",
@@ -150,7 +148,6 @@ dependencies = [
 name = "all-is-cubes-server"
 version = "0.4.0"
 dependencies = [
- "all-is-cubes",
  "static_dir",
  "tokio 1.15.0",
  "warp",
