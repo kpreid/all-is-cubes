@@ -3,6 +3,7 @@
 
 //! Algorithms for animating blocks.
 
+use std::f64::consts::TAU;
 use std::fmt;
 
 use instant::Duration;
@@ -11,7 +12,9 @@ use rand_xoshiro::Xoshiro256Plus;
 
 use all_is_cubes::behavior::{Behavior, BehaviorContext};
 use all_is_cubes::block::{Block, AIR};
-use all_is_cubes::math::{GridPoint, GridVector};
+use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _};
+use all_is_cubes::content::palette;
+use all_is_cubes::math::{cube_to_midpoint, GridPoint, GridVector};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Grid, GridArray, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
@@ -201,4 +204,104 @@ impl VisitRefs for Fire {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         self.blocks.visit_refs(visitor)
     }
+}
+
+/// Behavior that draws a clock face that shows the progress of time, on a
+/// a basis of whole seconds and individual frames.
+///
+/// The block must have resolution 16.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Clock {
+    /// How many [`Tick`]s we've seen.
+    ///
+    /// TODO: Revisit this data storage once we've nailed down questions of how long a tick
+    /// will ever be.
+    ticks: u64,
+}
+
+impl Clock {
+    pub(crate) fn new() -> Self {
+        Self { ticks: 0 }
+    }
+
+    fn paint(&self) -> SpaceTransaction {
+        // TODO: While these don't actually need to allocate anything, we ought to make them
+        // constants to keep the per-frame cost minial.
+        let rim = Block::from(rgba_const!(0.7, 0.7, 0.4, 1.0));
+        let marks = Block::from(palette::ALMOST_BLACK);
+        let trail = Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0));
+        let background = if self.ticks.rem_euclid(120) >= 60 {
+            Block::from(rgba_const!(0.6, 0.6, 0.6, 1.0))
+        } else {
+            Block::from(rgba_const!(1.0, 1.0, 1.0, 1.0))
+        };
+
+        let time_angle = self.ticks.rem_euclid(60) as f64 / 60.0;
+        let frame_angle = self.ticks.rem_euclid(4) as f64 / 4.0;
+
+        let mut txn = SpaceTransaction::default();
+        for x in 0..16 {
+            for y in 0..16 {
+                let cube = GridPoint::new(x, y, 0);
+                let centered_point = cube_to_midpoint(cube - GridVector::new(8, 8, 0));
+                let r = centered_point.to_vec().magnitude();
+                let block = {
+                    let base_angle = centered_point.x.atan2(centered_point.y) / TAU;
+                    if r > 8.0 {
+                        // Surrounding area — do nothing
+                        continue;
+                    } else if r > 7.0 {
+                        // Outside edge
+                        rim.clone()
+                    } else if r > 2.5 {
+                        // Big sweep hand
+                        let clock_angle = (time_angle - base_angle).rem_euclid(1.0);
+                        if clock_angle < 0.03 {
+                            marks.clone()
+                        } else if clock_angle < 0.06 {
+                            trail.clone()
+                        } else {
+                            background.clone()
+                        }
+                    } else if r > 1.5 {
+                        // Border
+                        background.clone()
+                    } else {
+                        // Advances 1 tick per frame in one of 4 patches
+                        let clock_angle = (base_angle - frame_angle).rem_euclid(1.0);
+                        if clock_angle < 0.25 {
+                            marks.clone()
+                        } else {
+                            background.clone()
+                        }
+                    }
+                };
+                txn.set(cube, None, Some(block)).unwrap();
+            }
+        }
+        txn
+    }
+}
+
+impl Behavior<Space> for Clock {
+    fn step(&self, context: &BehaviorContext<'_, Space>, _tick: Tick) -> UniverseTransaction {
+        let mut mut_self = self.clone();
+        mut_self.ticks += 1;
+        context
+            .bind_host(mut_self.paint())
+            .merge(context.replace_self(mut_self))
+            .unwrap()
+    }
+
+    fn alive(&self, _context: &BehaviorContext<'_, Space>) -> bool {
+        true
+    }
+
+    fn ephemeral(&self) -> bool {
+        false
+    }
+}
+
+impl VisitRefs for Clock {
+    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
 }

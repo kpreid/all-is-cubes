@@ -7,7 +7,9 @@
 use exhaust::Exhaust;
 use noise::Seedable as _;
 
-use all_is_cubes::block::{Block, BlockCollision, Resolution, RotationPlacementRule, AIR};
+use all_is_cubes::block::{
+    AnimationHint, Block, BlockCollision, Resolution, RotationPlacementRule, AIR,
+};
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
@@ -43,6 +45,7 @@ pub enum DemoBlocks {
     CurbCorner,
     ExhibitBackground,
     Signboard,
+    Clock,
 }
 impl BlockModule for DemoBlocks {
     fn namespace() -> &'static str {
@@ -366,6 +369,19 @@ pub async fn install_demo_blocks(
                     .display_name("Signboard")
                     .collision(BlockCollision::Recur)
                     .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                    .voxels_ref(resolution, universe.insert_anonymous(space))
+                    .build()
+            }
+
+            Clock => {
+                let resolution = 16;
+                let mut space = Space::for_block(resolution).build_empty();
+                space.add_behavior(crate::animation::Clock::new());
+                Block::builder()
+                    .display_name("Clock")
+                    .collision(BlockCollision::None)
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
+                    .animation_hint(AnimationHint::CONTINUOUS)
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
