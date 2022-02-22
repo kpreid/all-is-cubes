@@ -137,6 +137,7 @@ pub trait Merge {
     /// May panic if `check` is not the result of a previous call to
     /// `self.check_merge(&other)` or if either transaction was mutated in the intervening
     /// time.
+    #[must_use]
     fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self
     where
         Self: Sized;

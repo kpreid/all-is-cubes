@@ -24,6 +24,7 @@
 #![warn(clippy::cast_lossless)]
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
+#![warn(clippy::return_self_not_must_use)]
 #![warn(clippy::wrong_self_convention)]
 
 #[cfg(feature = "arbitrary")]

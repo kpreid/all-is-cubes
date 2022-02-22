@@ -57,6 +57,7 @@ impl Face {
     ///
     /// The numeric type is [`usize`] for convenient use in array indexing.
     #[inline]
+    #[must_use]
     pub const fn axis_number(self) -> Option<usize> {
         match self {
             Face::Within => None,
@@ -98,6 +99,7 @@ impl Face {
 
     /// Returns the opposite face (maps [`PX`](Self::PX) to [`NX`](Self::NX) and so on).
     #[inline]
+    #[must_use]
     pub const fn opposite(self) -> Face {
         match self {
             Face::Within => Face::Within,
@@ -127,6 +129,7 @@ impl Face {
     /// }
     /// ```
     #[inline]
+    #[must_use]
     pub const fn cross(self, other: Self) -> Self {
         use Face::*;
         match (self, other) {
@@ -185,6 +188,7 @@ impl Face {
     /// Returns the vector normal to this face. [`Within`](Self::Within) is assigned the
     /// zero vector.
     #[inline]
+    #[must_use]
     pub fn normal_vector<S>(self) -> Vector3<S>
     where
         S: BaseNum + std::ops::Neg<Output = S>,
@@ -213,6 +217,7 @@ impl Face {
     /// }
     /// ```
     #[inline]
+    #[must_use]
     pub fn dot<S>(self, vector: Vector3<S>) -> S
     where
         S: Zero + std::ops::Neg<Output = S>,
@@ -238,6 +243,7 @@ impl Face {
     ///
     /// To work with floating-point coordinates, use `.matrix(1).to_free()`.
     #[rustfmt::skip]
+    #[must_use]
     pub const fn matrix(self, scale: GridCoordinate) -> GridMatrix {
         match self {
             Face::Within => GridMatrix::ZERO,

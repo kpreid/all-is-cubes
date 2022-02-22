@@ -183,6 +183,7 @@ impl Raycaster {
     /// assert_eq!(next().cube_ahead(), GridPoint::new(1, 1, 0));
     /// assert_eq!(next().cube_ahead(), GridPoint::new(2, 1, 0));
     /// ```
+    #[must_use]
     pub fn new(
         origin: impl Into<Point3<FreeCoordinate>>,
         direction: impl Into<Vector3<FreeCoordinate>>,
@@ -206,6 +207,7 @@ impl Raycaster {
     ///
     /// This makes the iterator finite: [`next()`](Self::next) will return [`None`]
     /// forevermore once there are no more cubes intersecting the grid to report.
+    #[must_use]
     pub fn within_grid(mut self, grid: Grid) -> Self {
         self.set_bound(grid);
         self
@@ -982,7 +984,7 @@ mod tests {
     #[should_panic(expected = "not implemented: multiple uses of .within_grid()")]
     fn within_grid_twice() {
         let grid = Grid::new(Point3::new(2, -10, -10), [2, 20, 20]);
-        Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
+        let _ = Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
             .within_grid(grid)
             .within_grid(grid);
     }

@@ -164,6 +164,7 @@ impl Rgb {
 
     /// Clamp each component to lie within the range 0 to 1, inclusive.
     #[inline]
+    #[must_use]
     pub fn clamp(self) -> Self {
         Self(self.0.map(|c| c.clamp(NN0, NN1)))
     }
@@ -255,6 +256,7 @@ impl Rgba {
     }
 
     /// Applies a function to the RGB portion of this color.
+    #[must_use]
     pub fn map_rgb(self, f: impl FnOnce(Rgb) -> Rgb) -> Self {
         f(self.to_rgb()).with_alpha(self.alpha())
     }
@@ -304,6 +306,7 @@ impl Rgba {
 
     /// Clamp each component to lie within the range 0 to 1, inclusive.
     #[inline]
+    #[must_use]
     pub fn clamp(self) -> Self {
         Self(self.0.map(|c| c.clamp(NN0, NN1)))
     }

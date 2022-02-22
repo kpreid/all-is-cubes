@@ -458,6 +458,7 @@ impl Grid {
     ///     Grid::new((-10, 0, 0), (10, 20, 30)),
     /// );
     /// ```
+    #[must_use]
     pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
         // TODO: Must check for upper bounds overflow
         Self {
@@ -475,6 +476,7 @@ impl Grid {
     ///
     /// TODO: Fail nicely on numeric overflow.
     /// The `Option` return is not currently used.
+    #[must_use]
     pub fn transform(self, transform: GridMatrix) -> Option<Self> {
         let mut p1 = transform.transform_point(self.lower_bounds());
         let mut p2 = transform.transform_point(self.upper_bounds());
@@ -512,6 +514,7 @@ impl Grid {
     /// ```
     #[inline]
     #[track_caller]
+    #[must_use]
     pub fn divide(self, divisor: GridCoordinate) -> Self {
         assert!(
             divisor > 0,
@@ -544,6 +547,7 @@ impl Grid {
     /// ```
     #[inline]
     #[track_caller]
+    #[must_use]
     pub fn multiply(self, scale: GridCoordinate) -> Self {
         Self::new(self.lower_bounds * scale, self.sizes * scale)
     }
@@ -569,6 +573,7 @@ impl Grid {
     /// ```
     #[inline]
     #[track_caller] // TODO: better error reporting
+    #[must_use]
     pub fn expand(self, deltas: FaceMap<GridCoordinate>) -> Self {
         use Face::*;
         let l = self.lower_bounds();
@@ -846,6 +851,7 @@ impl<V> GridArray<V> {
     /// Adds to the origin of the array without affecting the contents.
     ///
     /// TODO: example
+    #[must_use]
     pub fn translate(mut self, offset: impl Into<GridVector>) -> Self {
         self.grid = self.grid.translate(offset);
         self

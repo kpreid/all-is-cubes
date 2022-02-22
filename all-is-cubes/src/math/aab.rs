@@ -188,6 +188,7 @@ impl Aab {
         )
     }
 
+    #[must_use]
     pub fn scale(self, scalar: FreeCoordinate) -> Self {
         Self::from_lower_upper(self.lower_bounds * scalar, self.upper_bounds * scalar)
     }
@@ -205,6 +206,7 @@ impl Aab {
     ///     Aab::new(0.75, 2.25, 2.75, 4.25, 4.75, 6.25)
     /// );
     /// ````
+    #[must_use]
     pub fn expand(self, distance: FreeCoordinate) -> Self {
         // We could imagine a non-uniform version of this, but the fully general one
         // looks a lot like generally constructing a new Aab.
@@ -368,13 +370,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn aab_expand_nan() {
-        Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(FreeCoordinate::NAN);
+        let _ = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(FreeCoordinate::NAN);
     }
 
     #[test]
     #[should_panic]
     fn aab_expand_negative() {
-        Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(-0.1);
+        let _ = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(-0.1);
     }
 
     #[test]

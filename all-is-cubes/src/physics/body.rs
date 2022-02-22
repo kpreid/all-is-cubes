@@ -492,6 +492,7 @@ impl Default for MoveSegment {
 ///
 /// TODO: Very incomplete.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[must_use]
 #[non_exhaustive]
 pub struct BodyTransaction {
     // TODO: Better strategy than just having public fields

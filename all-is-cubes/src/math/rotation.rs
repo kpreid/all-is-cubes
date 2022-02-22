@@ -359,6 +359,7 @@ impl GridRotation {
     ///     assert_eq!(rotation * rotation.inverse(), GridRotation::IDENTITY);
     /// }
     /// ```
+    #[must_use]
     pub fn inverse(self) -> Self {
         // TODO: Make this more efficient. Can we do it without writing out another 48-element match?
         self.iterate().last().unwrap()

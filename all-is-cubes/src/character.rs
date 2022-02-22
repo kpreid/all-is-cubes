@@ -401,6 +401,7 @@ impl Transactional for Character {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
+#[must_use]
 pub struct CharacterTransaction {
     body: BodyTransaction,
     inventory: InventoryTransaction,

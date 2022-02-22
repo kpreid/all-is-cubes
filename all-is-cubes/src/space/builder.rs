@@ -13,6 +13,7 @@ use crate::space::{Grid, LightPhysics, Space, SpacePhysics};
 ///
 /// TODO: Allow specifying behaviors and initial block contents.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[must_use]
 pub struct SpaceBuilder {
     pub(super) grid: Grid,
     pub(super) spawn: Option<Spawn>,

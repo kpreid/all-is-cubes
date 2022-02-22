@@ -22,6 +22,7 @@ impl Transactional for Space {
 }
 
 #[derive(Clone, Default, Eq, PartialEq)]
+#[must_use]
 pub struct SpaceTransaction {
     cubes: BTreeMap<[GridCoordinate; 3], CubeTransaction>,
     behaviors: BehaviorSetTransaction<Space>,

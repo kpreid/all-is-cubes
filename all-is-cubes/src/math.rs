@@ -97,6 +97,7 @@ pub trait Geometry {
     type Coord;
 
     /// Translate (move) this object by the specified offset.
+    #[must_use]
     fn translate(self, offset: impl Into<Vector3<Self::Coord>>) -> Self;
 
     /// Represent this object as a line drawing, or wireframe.

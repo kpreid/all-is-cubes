@@ -298,6 +298,7 @@ impl StackLimit {
 /// The output type is the change notification which should be passed on after commit,
 /// if any change is made.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[must_use]
 pub struct InventoryTransaction {
     replace: BTreeMap<usize, (Slot, Slot)>,
     insert: Vec<Slot>,

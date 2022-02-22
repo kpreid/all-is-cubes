@@ -114,6 +114,7 @@ impl Block {
     /// // AIR is never rotated
     /// assert_eq!(AIR, AIR.rotate(clockwise));
     /// ```
+    #[must_use]
     pub fn rotate(self, rotation: GridRotation) -> Self {
         match self {
             // TODO: Just checking for Block::Atom doesn't help when the atom
@@ -148,6 +149,7 @@ impl Block {
     /// assert_eq!(block, rotated.clone().unspecialize());
     /// assert_eq!(block, rotated.clone().unspecialize().unspecialize());
     /// ```
+    #[must_use]
     pub fn unspecialize(self) -> Self {
         match self {
             Block::Rotated(_rotation, boxed_block) => *boxed_block,

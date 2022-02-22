@@ -62,6 +62,7 @@ pub struct GraphicsOptions {
 
 impl GraphicsOptions {
     /// Constrain fields to valid/practical values.
+    #[must_use]
     pub fn repair(mut self) -> Self {
         self.fov_y = self.fov_y.max(NotNan::from(1)).min(NotNan::from(189));
         self.view_distance = self

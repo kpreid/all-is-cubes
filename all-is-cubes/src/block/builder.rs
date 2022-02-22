@@ -35,6 +35,7 @@ use crate::universe::{Name, URef, Universe, UniverseIndex};
 /// );
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[must_use]
 pub struct BlockBuilder<C> {
     attributes: BlockAttributes,
     content: C,
