@@ -291,7 +291,9 @@ exhibit! {
     const ANIMATION,
     name: "Animation",
     (_this, universe) {
-        let footprint = Grid::new([0, 0, 0], [3, 1, 2]);
+        let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+
+        let footprint = Grid::new([0, 0, -1], [3, 2, 3]);
         let mut space = Space::empty(footprint);
 
         let sweep_block = {
@@ -346,6 +348,7 @@ exhibit! {
 
         space.set([0, 0, 0], sweep_block)?;
         space.set([2, 0, 0], fire_block)?;
+        space.set([1, 1, -1], &demo_blocks[DemoBlocks::Clock])?;
 
         Ok(space)
     }
