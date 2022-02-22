@@ -214,6 +214,8 @@ pub(crate) fn parse_universe_source(
 
 #[cfg(test)]
 mod tests {
+    use clap::error::ContextValue;
+
     use super::*;
 
     fn parse(args: &[&str]) -> clap::Result<AicDesktopArgs> {
@@ -255,16 +257,28 @@ mod tests {
     #[test]
     fn record_options_missing_file() {
         let e = parse(&["-g", "record"]).unwrap_err();
-        assert!(e.to_string().contains("required arguments"), "{}", e);
+        assert_eq!(e.kind(), clap::ErrorKind::MissingRequiredArgument);
+        assert_eq!(
+            e.context()
+                .find(|&(k, _)| k == clap::error::ContextKind::InvalidArg),
+            Some((
+                clap::error::ContextKind::InvalidArg,
+                &ContextValue::Strings(vec![String::from("--output <FILE>")])
+            ))
+        );
     }
 
     #[test]
     fn record_options_invalid_duration() {
         let e = parse(&["-g", "record", "-o", "o.png", "--duration", "X"]).unwrap_err();
-        assert!(
-            e.to_string().contains("Invalid value for '--duration"),
-            "{}",
-            e
+        assert_eq!(e.kind(), clap::ErrorKind::ValueValidation);
+        assert_eq!(
+            e.context()
+                .find(|&(k, _)| k == clap::error::ContextKind::InvalidArg),
+            Some((
+                clap::error::ContextKind::InvalidArg,
+                &ContextValue::String(String::from("--duration <SECONDS>"))
+            ))
         );
     }
 
@@ -307,7 +321,7 @@ mod tests {
         assert_eq!(
             parse_universe_test(&["--template", "demo-city", "foo"])
                 .unwrap_err()
-                .kind,
+                .kind(),
             clap::ErrorKind::ArgumentConflict
         );
     }
@@ -317,7 +331,7 @@ mod tests {
         assert_eq!(
             parse_universe_test(&["--template", "foo"])
                 .unwrap_err()
-                .kind,
+                .kind(),
             clap::ErrorKind::InvalidValue
         );
     }
