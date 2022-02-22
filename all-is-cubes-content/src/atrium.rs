@@ -416,7 +416,7 @@ async fn install_atrium_blocks(
         if p.y == 0 {
             &grout_base
         } else {
-            &stone_base_pattern(p)
+            stone_base_pattern(p)
         }
     };
     let molding_fn = |p: GridPoint| {

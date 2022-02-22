@@ -271,7 +271,7 @@ impl Icons {
                                 {
                                     &stripe_block
                                 } else {
-                                    &block
+                                    block
                                 }
                             } else {
                                 &AIR
