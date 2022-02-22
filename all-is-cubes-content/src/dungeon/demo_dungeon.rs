@@ -398,11 +398,11 @@ pub async fn install_dungeon_blocks(
                 .voxels_fn(universe, resolution, |cube| {
                     let edges = cube
                         .to_vec()
-                        .map(|c| (c == 0 || c == resolution_g - 1) as u8)
+                        .map(|c| u8::from(c == 0 || c == resolution_g - 1))
                         .dot(Vector3::new(1, 1, 1));
                     let bottom_edges = cube
                         .to_vec()
-                        .map(|c| (c == 0) as u8)
+                        .map(|c| u8::from(c == 0))
                         .dot(Vector3::new(1, 1, 1));
                     if edges >= 2 && bottom_edges > 0 {
                         &stone_grout_1

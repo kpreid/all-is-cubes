@@ -75,7 +75,7 @@ where
     } else {
         let size_of_next_level: GridCoordinate = 3_i32.pow((level - 1).into());
         for which_section in Grid::for_block(3).interior_iter() {
-            let Point3 { x, y, z } = which_section.map(|c| (c.rem_euclid(2) == 1) as u8);
+            let Point3 { x, y, z } = which_section.map(|c| u8::from(c.rem_euclid(2) == 1));
             if x + y + z <= 1 {
                 let section_corner = lower_corner + which_section.to_vec() * size_of_next_level;
                 visit_menger_sponge_points(level - 1, section_corner, function)?;

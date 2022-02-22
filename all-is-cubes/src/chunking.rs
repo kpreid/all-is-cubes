@@ -259,7 +259,7 @@ impl Iterator for AxisMirrorIter {
     }
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let count = self.has_mirrored as usize + self.has_original as usize;
+        let count = usize::from(self.has_mirrored) + usize::from(self.has_original);
         (count, Some(count))
     }
 }

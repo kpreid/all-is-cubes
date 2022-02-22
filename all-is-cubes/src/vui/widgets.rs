@@ -152,7 +152,8 @@ impl WidgetController for ToggleButtonController {
                 self.position,
                 None,
                 Some(
-                    self.definition.states[self.definition.data_source.snapshot() as usize].clone(),
+                    self.definition.states[usize::from(self.definition.data_source.snapshot())]
+                        .clone(),
                 ),
             )
         } else {
@@ -334,11 +335,12 @@ impl ToolbarController {
             // TODO: magic number in how many selections we display
             let this_slot_selected_mask: usize = (0..2_usize)
                 .map(|sel| {
-                    (selected_slots
-                        .get(sel)
-                        .map(|&i| i == index)
-                        .unwrap_or(false) as usize)
-                        << sel
+                    usize::from(
+                        selected_slots
+                            .get(sel)
+                            .map(|&i| i == index)
+                            .unwrap_or(false),
+                    ) << sel
                 })
                 .sum();
             let brush: &VoxelBrush<'_> = &self.hud_blocks.toolbar_pointer[this_slot_selected_mask];
