@@ -118,6 +118,7 @@ fn convert_dot_vox_model(
             i32::from(v.z),
             (model.size.y as i32) - 1 - i32::from(v.y),
         );
+        #[allow(clippy::unnecessary_lazy_evaluations)] // dubious positive
         let block = palette_blocks.get(v.i as usize).ok_or_else(|| {
             DotVoxConversionError::PaletteTooShort {
                 len: palette_blocks.len(),
