@@ -105,7 +105,7 @@ dependencies = [
  "all-is-cubes-content",
  "all-is-cubes-gpu",
  "anyhow",
- "clap 3.0.8",
+ "clap 3.1.1",
  "crossterm",
  "directories-next",
  "dot_vox",
@@ -509,9 +509,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.0.8"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31b34190c12bd1d613deba77e1cc13e68eaf4a0d51e389dbd485b7bfe15a47c0"
+checksum = "6d76c22c9b9b215eeb8d016ad3a90417bd13cb24cf8142756e6472445876cab7"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -524,9 +524,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "3.0.6"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "517358c28fcef6607bf6f76108e02afad7e82297d132a6b846dcc1fc3efcd153"
+checksum = "5fd1122e63869df2cb309f449da1ad54a7c6dfeb7c7e6ccd8e0825d9eb93bb72"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -4827,7 +4827,7 @@ checksum = "4916a4a3cad759e499a3620523bf9545cc162d7a06163727dde97ce9aaa4cf39"
 name = "xtask"
 version = "0.1.0"
 dependencies = [
- "clap 3.0.8",
+ "clap 3.1.1",
  "toml_edit 0.13.3",
  "xaction",
 ]
