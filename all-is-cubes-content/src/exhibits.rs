@@ -716,12 +716,10 @@ exhibit! {
             )?;
 
             // Separator between different light areas
-            if true || i > 0  {
-                if i % 2 == 0 {
-                    space.fill_uniform(Grid::new([room_width - separator_width, 0, z], [separator_width, room_height, 1]), &wall_block)?;
-                } else {
-                    space.fill_uniform(Grid::new([0, 0, z], [separator_width, room_height, 1]), &wall_block)?;
-                }
+            if i % 2 == 0 {
+                space.fill_uniform(Grid::new([room_width - separator_width, 0, z], [separator_width, room_height, 1]), &wall_block)?;
+            } else {
+                space.fill_uniform(Grid::new([0, 0, z], [separator_width, room_height, 1]), &wall_block)?;
             }
         }
 
