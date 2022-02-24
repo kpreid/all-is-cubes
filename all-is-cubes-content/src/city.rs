@@ -81,7 +81,11 @@ pub(crate) async fn demo_city(
         .spawn({
             // TODO: Add incremental spawn configuration to SpaceBuilder?
             let mut spawn = Spawn::default_for_new_space(grid);
-            spawn.set_eye_position(grid.center() + Vector3::new(0.5, 2.91, 8.5));
+            spawn.set_bounds(Grid::from_lower_upper(
+                [-road_radius, 1, 0],
+                [road_radius + 1, sky_height, 17],
+            ));
+            //spawn.set_eye_position(grid.center() + Vector3::new(0.5, 2.91, 8.5));
             // Initial inventory contents. TODO: Make a better list.
             let mut inventory = vec![
                 Tool::RemoveBlock { keep: true }.into(),
