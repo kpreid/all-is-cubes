@@ -7,11 +7,11 @@ use std::fmt::{self, Debug, Display};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::AddAssign;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
-use futures_core::future::LocalBoxFuture;
+use futures_core::future::BoxFuture;
 use instant::Instant;
 
 /// Generic extension to [`std::fmt`'s set of formatting traits](std::fmt#formatting-traits).
@@ -202,8 +202,8 @@ where
 pub struct YieldProgress {
     start: f32,
     end: f32,
-    yielder: Rc<dyn Fn() -> LocalBoxFuture<'static, ()>>,
-    progressor: Rc<dyn Fn(f32)>,
+    yielder: Arc<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>,
+    progressor: Arc<dyn Fn(f32) + Send + Sync>,
 }
 
 impl Debug for YieldProgress {
@@ -218,15 +218,15 @@ impl Debug for YieldProgress {
 impl YieldProgress {
     pub fn new<Y, YFut, P>(yielder: Y, progressor: P) -> Self
     where
-        Y: Fn() -> YFut + 'static,
-        YFut: Future<Output = ()> + 'static,
-        P: Fn(f32) + 'static,
+        Y: Fn() -> YFut + Send + Sync + 'static,
+        YFut: Future<Output = ()> + Send + 'static,
+        P: Fn(f32) + Send + Sync + 'static,
     {
         Self {
             start: 0.0,
             end: 1.0,
-            yielder: Rc::new(move || Box::pin(yielder())),
-            progressor: Rc::new(progressor),
+            yielder: Arc::new(move || Box::pin(yielder())),
+            progressor: Arc::new(progressor),
         }
     }
 
@@ -267,8 +267,8 @@ impl YieldProgress {
         Self {
             start,
             end,
-            yielder: Rc::clone(&self.yielder),
-            progressor: Rc::clone(&self.progressor),
+            yielder: Arc::clone(&self.yielder),
+            progressor: Arc::clone(&self.progressor),
         }
     }
 
@@ -377,5 +377,11 @@ mod tests {
         }
         assert_eq!("Foo", format!("{:?}", Foo));
         assert_eq!("<Foo>", format!("{:?}", Foo.custom_format(ConciseDebug)));
+    }
+
+    fn _yield_progress_is_sync()
+    where
+        YieldProgress: Send + Sync,
+    {
     }
 }
