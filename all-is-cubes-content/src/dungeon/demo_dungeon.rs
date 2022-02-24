@@ -12,8 +12,8 @@ use all_is_cubes::content::palette;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    point_to_enclosing_cube, Face, FaceMap, FreeCoordinate, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Rgb,
+    point_to_enclosing_cube, Face, FaceMap, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Rgb,
 };
 use all_is_cubes::rgb_const;
 use all_is_cubes::space::{Grid, GridArray, Space};
@@ -229,16 +229,7 @@ impl Theme<DemoRoom> for DemoTheme {
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
                 if matches!(room_data.maze_field_type, FieldType::Start) {
                     let mut spawn = Spawn::default_for_new_space(space.grid());
-                    // TODO: There should be a way to express "spawn with feet in this block",
-                    // independent of height.
-                    spawn.set_eye_position(
-                        interior
-                            .abut(Face::NY, 0)
-                            .unwrap()
-                            .center()
-                            .map(FreeCoordinate::from)
-                            + Vector3::new(0., 2.0, 0.),
-                    );
+                    spawn.set_bounds(interior);
                     spawn.set_inventory(vec![
                         Tool::RemoveBlock { keep: true }.into(),
                         Tool::Jetpack { active: false }.into(),
