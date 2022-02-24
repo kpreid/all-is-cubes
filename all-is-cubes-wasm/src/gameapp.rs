@@ -5,32 +5,26 @@ use std::cell::{BorrowMutError, RefCell};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 
-use gloo_timers::future::TimeoutFuture;
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
 use rand::{thread_rng, Rng as _};
 use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
-    console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement, HtmlProgressElement,
-    KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
+    console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,
+    HtmlProgressElement, KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
 };
+use send_wrapper::SendWrapper;
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
-use all_is_cubes_gpu::GLRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes_gpu::GLRenderer;
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl};
-use crate::web_glue::{add_event_listener, get_mandatory_element};
-
-/// Yield to the event loop to ensure responsiveness while we're initializing.
-async fn yield_arbitrary() {
-    // TODO: setTimeout is a lousy way to yield because it has minimum delays. Build a better one.
-    TimeoutFuture::new(1).await;
-}
+use crate::web_glue::{add_event_listener, get_mandatory_element, yield_to_event_loop};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
@@ -56,8 +50,8 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         list.add_1("state-loading").unwrap();
     }
 
-    let progress = YieldProgress::new(yield_arbitrary, {
-        let progress_bar = static_dom.progress_bar.clone();
+    let progress = YieldProgress::new(yield_to_event_loop, {
+        let progress_bar = SendWrapper::new(static_dom.progress_bar.clone());
         move |fraction| progress_bar.set_value(fraction.into())
     });
     let [app_progress, progress] = progress.split(0.1);
