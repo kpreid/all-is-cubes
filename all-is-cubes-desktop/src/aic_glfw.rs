@@ -13,6 +13,7 @@ use luminance_glfw::{GlfwSurface, GlfwSurfaceError};
 
 use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
+use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::GLRenderer;
 
 use crate::choose_graphical_window_size;
@@ -187,7 +188,7 @@ fn handle_glfw_event(
             // TODO: Offer confirmation before replacing the current universe
             if let Some(path) = files.into_iter().next() {
                 app.set_universe_async(async move {
-                    crate::data_files::load_universe_from_file(&path)
+                    crate::data_files::load_universe_from_file(YieldProgress::noop(), &path)
                         .await
                         .map_err(|e| {
                             // TODO: show error in user interface

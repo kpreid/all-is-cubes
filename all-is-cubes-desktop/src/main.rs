@@ -126,7 +126,9 @@ fn main() -> Result<(), anyhow::Error> {
                 .build(yield_progress, thread_rng().gen())
                 .await
                 .map_err(anyhow::Error::from),
-            UniverseSource::File(path) => data_files::load_universe_from_file(&path).await,
+            UniverseSource::File(path) => {
+                data_files::load_universe_from_file(yield_progress, &path).await
+            }
         }
     })?;
     app.set_universe(universe);

@@ -9,25 +9,29 @@
 //! that it can be used in other situations. I'd make it another crate but I'm not sure
 //! what the crate should be named.
 
-use all_is_cubes::linking::InGenError;
 use anyhow::Context;
 use std::path::Path;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::character::{Character, Spawn};
+use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{GridPoint, Rgb, Rgba};
 use all_is_cubes::space::{Grid, LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{Name, Universe, UniverseIndex};
+use all_is_cubes::util::YieldProgress;
 use all_is_cubes_content::free_editing_starter_inventory;
 
 /// Load a [`Universe`] described by the given file (of guessed format).
 ///
 /// TODO: Define what errors it returns.
-pub(crate) async fn load_universe_from_file(path: &Path) -> Result<Universe, anyhow::Error> {
+pub(crate) async fn load_universe_from_file(
+    progress: YieldProgress,
+    path: &Path,
+) -> Result<Universe, anyhow::Error> {
     let bytes = std::fs::read(path)
         .with_context(|| format!("Could not read the file '{}'", path.display()))?;
-    load_dot_vox(&bytes).with_context(|| {
+    load_dot_vox(progress, &bytes).await.with_context(|| {
         format!(
             "Could not load '{}' as a MagicaVoxel .vox file",
             path.display()
@@ -35,7 +39,7 @@ pub(crate) async fn load_universe_from_file(path: &Path) -> Result<Universe, any
     })
 }
 
-fn load_dot_vox(bytes: &[u8]) -> Result<Universe, DotVoxConversionError> {
+async fn load_dot_vox(p: YieldProgress, bytes: &[u8]) -> Result<Universe, DotVoxConversionError> {
     let dot_vox::DotVoxData {
         version,
         models,
@@ -49,11 +53,15 @@ fn load_dot_vox(bytes: &[u8]) -> Result<Universe, DotVoxConversionError> {
         models.len(),
         materials.len(),
     );
+    p.progress(0.15).await;
+
     let palette = convert_dot_vox_palette(&palette);
+    let p = p.finish_and_cut(0.3).await;
 
     let mut universe = Universe::new();
 
-    for (i, model) in models.into_iter().enumerate() {
+    let models_progress = p.split_evenly(models.len());
+    for ((i, model), model_progress) in models.into_iter().enumerate().zip(models_progress) {
         let mut space = convert_dot_vox_model(&palette, model)?;
         space.fast_evaluate_light();
 
@@ -67,6 +75,8 @@ fn load_dot_vox(bytes: &[u8]) -> Result<Universe, DotVoxConversionError> {
                 .insert("character".into(), Character::spawn_default(space_ref))
                 .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
         }
+
+        model_progress.progress(1.0).await;
     }
 
     Ok(universe)
