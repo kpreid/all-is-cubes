@@ -172,6 +172,7 @@ dependencies = [
  "luminance",
  "luminance-web-sys",
  "luminance-webgl",
+ "once_cell",
  "rand 0.8.5",
  "resource",
  "send_wrapper",
