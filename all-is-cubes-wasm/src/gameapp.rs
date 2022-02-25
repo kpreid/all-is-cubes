@@ -8,13 +8,13 @@ use std::time::Duration;
 use js_sys::Error;
 use luminance_web_sys::WebSysWebGL2Surface;
 use rand::{thread_rng, Rng as _};
+use send_wrapper::SendWrapper;
 use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
     console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,
     HtmlProgressElement, KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
 };
-use send_wrapper::SendWrapper;
 
 use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
@@ -83,10 +83,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     app_progress.progress(1.0).await;
 
     let universe = template
-        .build(
-            universe_progress,
-            thread_rng().gen(),
-        )
+        .build(universe_progress, thread_rng().gen())
         .await
         .expect("universe template error");
 
