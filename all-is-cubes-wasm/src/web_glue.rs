@@ -46,6 +46,7 @@ pub fn add_event_listener<E, F>(
     closure.forget(); // TODO: Instead return the closure or some other kind of handle
 }
 
+/// Yield to the browser's event loop (if significant time has passed since the last call).
 pub(crate) async fn yield_to_event_loop() {
     // Check whether it's worth yielding.
     {
