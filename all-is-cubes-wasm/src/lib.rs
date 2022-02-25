@@ -6,6 +6,8 @@
 //! If this documentation looks strangely blank, it's because non-wasm builds have
 //! most of the modules excluded from compilation.
 
+// unused_unit false positives from wasm-bindgen (as of Rust 1.59.0)
+#![allow(clippy::unused_unit)]
 #![deny(rust_2018_idioms)]
 #![warn(unused_extern_crates)]
 #![warn(clippy::cast_lossless)]
