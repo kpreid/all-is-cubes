@@ -49,24 +49,40 @@ impl WidgetController for OneshotController {
     // TODO: Arrange somehow for this controller to be deleted since it doesn't need to be step()ped
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct ToggleButtonWidget {
+/// A single-block button that displays a boolean state derived from a
+/// [`ListenableSource`].
+#[derive(Clone)]
+pub(crate) struct ToggleButtonWidget<D> {
     states: [Block; 2],
-    data_source: ListenableSource<bool>,
+    data_source: ListenableSource<D>,
+    projection: Arc<dyn Fn(&D) -> bool + Send + Sync>,
     action: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 
-impl ToggleButtonWidget {
-    pub(crate) fn new<BF>(
-        data_source: ListenableSource<bool>,
-        mut blocks: BF,
+impl<D: Clone + Sync + Debug> Debug for ToggleButtonWidget<D> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ToggleButtonWidget")
+            .field("states", &self.states)
+            .field("data_source", &self.data_source)
+            .field(
+                "projection(data_source)",
+                &(self.projection)(&self.data_source.snapshot()),
+            )
+            .field("action", &self.action)
+            .finish()
+    }
+}
+
+impl<D> ToggleButtonWidget<D> {
+    pub(crate) fn new(
+        data_source: ListenableSource<D>,
+        projection: impl Fn(&D) -> bool + Send + Sync + 'static,
+        mut blocks: impl FnMut(ToggleButtonVisualState) -> Block,
         action: impl Fn() + Send + Sync + 'static,
-    ) -> Arc<Self>
-    where
-        BF: FnMut(ToggleButtonVisualState) -> Block,
-    {
+    ) -> Arc<Self> {
         Arc::new(Self {
             data_source,
+            projection: Arc::new(projection),
             states: [
                 blocks(ToggleButtonVisualState { value: false }),
                 blocks(ToggleButtonVisualState { value: true }),
@@ -76,7 +92,7 @@ impl ToggleButtonWidget {
     }
 }
 
-impl Layoutable for ToggleButtonWidget {
+impl<D> Layoutable for ToggleButtonWidget<D> {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
             minimum: GridVector::new(1, 1, 1),
@@ -84,7 +100,9 @@ impl Layoutable for ToggleButtonWidget {
     }
 }
 
-impl Widget for ToggleButtonWidget {
+// TODO: Mess of generic bounds due to the combination of Widget and ListenableSource
+// requirements -- should we make a trait alias for these?
+impl<D: Clone + Debug + Send + Sync + 'static> Widget for ToggleButtonWidget<D> {
     fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
         Box::new(ToggleButtonController::new(
             position.bounds.lower_bounds(),
@@ -116,16 +134,16 @@ impl fmt::Display for ToggleButtonVisualState {
     }
 }
 
-/// Manages a single-block toggle button.
+/// [`WidgetController`] for [`ToggleButtonWidget`].
 #[derive(Debug)]
-pub(crate) struct ToggleButtonController {
-    definition: Arc<ToggleButtonWidget>,
+pub(crate) struct ToggleButtonController<D: Clone + Send + Sync> {
+    definition: Arc<ToggleButtonWidget<D>>,
     position: GridPoint,
     todo: DirtyFlag,
 }
 
-impl ToggleButtonController {
-    pub(crate) fn new(position: GridPoint, definition: Arc<ToggleButtonWidget>) -> Self {
+impl<D: Clone + Debug + Send + Sync + 'static> ToggleButtonController<D> {
+    pub(crate) fn new(position: GridPoint, definition: Arc<ToggleButtonWidget<D>>) -> Self {
         let todo = DirtyFlag::new(true);
         definition.data_source.listen(todo.listener());
         Self {
@@ -136,7 +154,7 @@ impl ToggleButtonController {
     }
 }
 
-impl WidgetController for ToggleButtonController {
+impl<D: Clone + Debug + Send + Sync + 'static> WidgetController for ToggleButtonController<D> {
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             Arc::new(ActivatableRegion {
@@ -148,13 +166,11 @@ impl WidgetController for ToggleButtonController {
 
     fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         Ok(if self.todo.get_and_clear() {
+            let value = (self.definition.projection)(&self.definition.data_source.get());
             SpaceTransaction::set_cube(
                 self.position,
                 None,
-                Some(
-                    self.definition.states[usize::from(self.definition.data_source.snapshot())]
-                        .clone(),
-                ),
+                Some(self.definition.states[usize::from(value)].clone()),
             )
         } else {
             SpaceTransaction::default()

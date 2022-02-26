@@ -174,6 +174,7 @@ pub(super) fn new_hud_space(
         children: vec![
             LayoutTree::leaf(ToggleButtonWidget::new(
                 paused,
+                |&value| value,
                 |state| hud_blocks.icons[Icons::PauseButton(state)].clone(),
                 {
                     let cc = control_channel.clone();
@@ -184,6 +185,7 @@ pub(super) fn new_hud_space(
             )),
             LayoutTree::leaf(ToggleButtonWidget::new(
                 input_processor.mouselook_mode(),
+                |&value| value,
                 |state| hud_blocks.icons[Icons::MouselookButton(state)].clone(),
                 {
                     let cc = control_channel;
