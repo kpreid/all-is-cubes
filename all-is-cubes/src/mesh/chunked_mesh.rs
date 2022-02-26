@@ -18,7 +18,7 @@ use crate::math::{GridCoordinate, GridPoint};
 use crate::mesh::{
     triangulate_block, BlockMesh, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
 };
-use crate::space::{BlockIndex, Grid, Space, SpaceChange};
+use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText, TimeStats};
 
@@ -417,7 +417,7 @@ pub struct ChunkMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
     Tex: TextureAllocator,
 {
-    bounds: Grid,
+    position: ChunkPos<CHUNK_SIZE>,
     mesh: SpaceMesh<Vert, Tex::Tile>,
     pub render_data: D,
     block_dependencies: Vec<(BlockIndex, u32)>,
@@ -429,9 +429,9 @@ where
     Vert: GfxVertex,
     Tex: TextureAllocator,
 {
-    fn new(chunk_pos: ChunkPos<CHUNK_SIZE>) -> Self {
+    fn new(position: ChunkPos<CHUNK_SIZE>) -> Self {
         Self {
-            bounds: chunk_pos.grid(),
+            position,
             mesh: SpaceMesh::new(),
             render_data: D::default(),
             block_dependencies: Vec::new(),
@@ -450,14 +450,15 @@ where
         block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>,
     ) {
         let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
+        let bounds = self.position.grid();
         self.mesh
-            .compute(space, self.bounds, options, &*block_meshes.meshes);
+            .compute(space, bounds, options, &*block_meshes.meshes);
 
         // Logging
         if let Some(start) = compute_start {
             let duration_ms = Instant::now().duration_since(start).as_secs_f32() * 1000.0;
 
-            let chunk_origin = self.bounds.lower_bounds();
+            let chunk_origin = bounds.lower_bounds();
             let vertices = self.mesh.vertices().len();
             if vertices == 0 {
                 log::trace!(
