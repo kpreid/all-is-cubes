@@ -32,10 +32,11 @@ use all_is_cubes::space::{Grid, LightPhysics, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
-use crate::clouds::clouds;
 use crate::{
-    draw_text_in_blocks, logo_text, logo_text_extent, space_to_space_copy, wavy_landscape,
-    DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
+    clouds::clouds,
+    draw_text_in_blocks,
+    logo::{logo_text, logo_text_extent},
+    space_to_space_copy, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
 };
 
 pub(crate) async fn demo_city(

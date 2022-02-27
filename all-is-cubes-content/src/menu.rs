@@ -17,7 +17,9 @@ use all_is_cubes::universe::Universe;
 use strum::IntoEnumIterator;
 
 use crate::{
-    draw_text_in_blocks, logo_text, logo_text_extent, space_to_space_copy, UniverseTemplate,
+    draw_text_in_blocks,
+    logo::{logo_text, logo_text_extent},
+    space_to_space_copy, UniverseTemplate,
 };
 
 pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError> {
