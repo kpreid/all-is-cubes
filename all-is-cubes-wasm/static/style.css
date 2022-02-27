@@ -19,6 +19,7 @@ html, body {
   margin: 0 0;
   display: table;
   pointer-events: none;
+  user-select: none; /* prevents selection-like clicking *through* the overlay from applying */
 }
 .overlay p, .overlay pre {
   margin: 0;
