@@ -72,6 +72,8 @@ impl<T: ?Sized + Layoutable> Layoutable for Arc<T> {
 pub enum LayoutTree<W> {
     /// A single widget.
     Leaf(W),
+    /// An space laid out like a widget but left empty.
+    Spacer(LayoutRequest),
     /// Fill the available space with the children, in order in the given direction.
     Stack {
         // TODO: We should have a 6-valued Face type so that this cannot fail
@@ -94,6 +96,10 @@ impl<W> LayoutTree<W> {
         Arc::new(Self::Leaf(widget_value))
     }
 
+    pub fn spacer(requirements: LayoutRequest) -> Arc<Self> {
+        Arc::new(Self::Spacer(requirements))
+    }
+
     pub fn leaves<'s>(&'s self) -> impl Iterator<Item = &'s W> + Clone {
         let mut leaves: Vec<&'s W> = Vec::new();
         self.for_each_leaf(&mut |leaf| leaves.push(leaf));
@@ -106,6 +112,7 @@ impl<W> LayoutTree<W> {
     {
         match self {
             LayoutTree::Leaf(value) => function(value),
+            LayoutTree::Spacer(_) => {}
             LayoutTree::Stack {
                 direction: _,
                 children,
@@ -134,6 +141,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 value: W::clone(w),
                 position: LayoutGrant { bounds },
             }),
+            LayoutTree::Spacer(ref r) => LayoutTree::Spacer(r.clone()),
             LayoutTree::Stack {
                 direction,
                 ref children,
@@ -189,6 +197,7 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
     fn requirements(&self) -> LayoutRequest {
         match *self {
             LayoutTree::Leaf(ref w) => w.requirements(),
+            LayoutTree::Spacer(ref requirements) => requirements.clone(),
             LayoutTree::Stack {
                 direction,
                 ref children,
@@ -274,6 +283,40 @@ mod tests {
                     value: LT::new("c", [1, 1, 1]),
                     position: LayoutGrant {
                         bounds: Grid::new([12, 10, 10], [1, 10, 10])
+                    },
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn spacer() {
+        let tree = LayoutTree::Stack {
+            direction: Face::PX,
+            children: vec![
+                LayoutTree::leaf(LT::new("a", [1, 1, 1])),
+                LayoutTree::spacer(LayoutRequest {
+                    minimum: GridVector::new(3, 1, 1),
+                }),
+                LayoutTree::leaf(LT::new("b", [1, 1, 1])),
+            ],
+        };
+        assert_eq!(
+            tree.perform_layout(Grid::new([10, 10, 10], [10, 10, 10]))
+                .unwrap()
+                .leaves()
+                .collect::<Vec<_>>(),
+            vec![
+                &Positioned {
+                    value: LT::new("a", [1, 1, 1]),
+                    position: LayoutGrant {
+                        bounds: Grid::new([10, 10, 10], [1, 10, 10])
+                    },
+                },
+                &Positioned {
+                    value: LT::new("b", [1, 1, 1]),
+                    position: LayoutGrant {
+                        bounds: Grid::new([14, 10, 10], [1, 10, 10])
                     },
                 }
             ]
