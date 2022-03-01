@@ -175,7 +175,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
     }
 }
 
-impl<W: ?Sized + Widget> LayoutTree<Positioned<Arc<W>>> {
+impl LayoutTree<Positioned<Arc<dyn Widget>>> {
     /// Creates a transaction which will install all of the widgets in this tree.
     ///
     /// Returns an error if the widgets conflict with each other.
@@ -185,11 +185,35 @@ impl<W: ?Sized + Widget> LayoutTree<Positioned<Arc<W>>> {
             let widget = value.clone();
             let controller_installation =
                 WidgetBehavior::installation(widget.controller(position))?;
+            validate_widget_transaction(value, &controller_installation, position)?;
             txn = txn
                 .merge(controller_installation)
                 .map_err(|error| InstallVuiError::Conflict { error })?;
         }
         Ok(txn)
+    }
+}
+
+fn validate_widget_transaction(
+    widget: &Arc<dyn Widget>,
+    transaction: &SpaceTransaction,
+    grant: &LayoutGrant,
+) -> Result<(), InstallVuiError> {
+    match transaction.bounds() {
+        None => Ok(()),
+        Some(txn_bounds) => {
+            if grant.bounds.contains_grid(txn_bounds) {
+                Ok(())
+            } else {
+                // TODO: This being InstallVuiError isn't great if we might want to validate
+                // transactions happening after installation.
+                Err(InstallVuiError::OutOfBounds {
+                    widget: widget.clone(),
+                    grant: *grant,
+                    erroneous: txn_bounds,
+                })
+            }
+        }
     }
 }
 

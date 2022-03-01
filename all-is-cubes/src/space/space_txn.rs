@@ -11,7 +11,7 @@ use super::Space;
 use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::math::{GridCoordinate, GridPoint};
-use crate::space::SetCubeError;
+use crate::space::{Grid, SetCubeError};
 use crate::transaction::{CommitError, Merge, PreconditionFailed};
 use crate::transaction::{Transaction, TransactionConflict, Transactional};
 use crate::util::{ConciseDebug, CustomFormat as _};
@@ -137,6 +137,32 @@ impl SpaceTransaction {
 
     pub(crate) fn activate_block(cube: GridPoint) -> Self {
         Self::single(cube, CubeTransaction::ACTIVATE)
+    }
+
+    /// Computes the region affected by this transaction.
+    ///
+    /// TODO: This does not currently report behaviors but it should, once they have
+    /// formalized regions of attachment.
+    ///
+    /// TODO: Handle the case where the total volume is too large. (Maybe Grid should lose
+    /// that restriction.)
+    pub(crate) fn bounds(&self) -> Option<Grid> {
+        // Destructuring to statically check that we consider all fields.
+        let Self {
+            cubes,
+            behaviors: _,
+        } = self;
+
+        let mut bounds: Option<Grid> = None;
+        for &cube_array in cubes.keys() {
+            let cube = GridPoint::from(cube_array);
+            if let Some(bounds) = &mut bounds {
+                *bounds = (*bounds).union(Grid::single_cube(cube)).unwrap();
+            } else {
+                bounds = Some(Grid::single_cube(cube));
+            }
+        }
+        bounds
     }
 }
 
@@ -353,6 +379,7 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
+    use crate::block::AIR;
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
     use crate::space::Grid;
@@ -590,5 +617,28 @@ mod tests {
             })
             // TODO: more spaces
             .test();
+    }
+
+    #[test]
+    fn bounds_empty() {
+        assert_eq!(SpaceTransaction::default().bounds(), None);
+    }
+
+    #[test]
+    fn bounds_single_cube() {
+        assert_eq!(
+            SpaceTransaction::set_cube([-7, 3, 5], None, Some(AIR)).bounds(),
+            Some(Grid::single_cube(GridPoint::new(-7, 3, 5)))
+        );
+    }
+
+    #[test]
+    fn bounds_multi_cube() {
+        let t1 = SpaceTransaction::set_cube([-7, 3, 5], None, Some(AIR));
+        let t2 = SpaceTransaction::set_cube([10, 3, 5], None, Some(AIR));
+        assert_eq!(
+            t1.merge(t2).unwrap().bounds(),
+            Some(Grid::from_lower_upper([-7, 3, 5], [11, 4, 6]))
+        );
     }
 }

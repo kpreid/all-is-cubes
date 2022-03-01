@@ -30,7 +30,7 @@ pub type WidgetTransaction = SpaceTransaction;
 /// TODO: Explain expectations about interior mutability and sharing.
 ///
 /// [`LayoutTree`]: crate::vui::LayoutTree
-pub trait Widget: Layoutable + Debug {
+pub trait Widget: Layoutable + Debug + Send + Sync {
     fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController>;
 }
 
@@ -145,13 +145,33 @@ pub enum InstallVuiError {
         #[source]
         error: Box<InstallVuiError>,
     },
-    //// A transaction conflict arose between two widgets or parts of a widget's installation.
+
+    /// A transaction conflict arose between two widgets or parts of a widget's installation.
     #[error("transaction conflict involving a widget")]
     Conflict {
         // TODO: Include the widget(s) involved, once `Arc<dyn Widget>` is piped around everywhere
         // and not just sometimes Widget or sometimes WidgetController.
         #[source]
         error: TransactionConflict,
+    },
+
+    /// The widget attempted to modify space outside its assigned bounds.
+    #[error(
+        "widget attempted to write out of bounds\n\
+        widget: {widget:?}\n\
+        grant: {grant:?}\n\
+        attempted write: {erroneous:?}\n\
+    "
+    )]
+    OutOfBounds {
+        /// The widget.
+        widget: Arc<dyn Widget>,
+
+        /// The region given to the widget.
+        grant: LayoutGrant,
+
+        /// The region the widget attempted to modify.
+        erroneous: Grid,
     },
 }
 
@@ -197,6 +217,11 @@ impl VisitRefs for ActivatableRegion {
 mod tests {
     use super::*;
 
+    fn _assert_error_is_sync()
+    where
+        InstallVuiError: Send + Sync,
+    {
+    }
     fn _assert_widget_trait_is_object_safe(_: &dyn Widget) {}
     fn _assert_controller_trait_is_object_safe(_: &dyn WidgetController) {}
 }
