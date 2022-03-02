@@ -22,6 +22,7 @@ name = "gpu-test"
 harness = false
 
 [features]
+wgpu = ["dep:wgpu"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }

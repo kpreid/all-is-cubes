@@ -34,3 +34,9 @@ mod common;
 pub use common::*;
 
 pub mod in_luminance;
+
+/// Re-export the version of the `wgpu` crate we're using.
+#[cfg(feature = "wgpu")]
+pub use wgpu;
+#[cfg(feature = "wgpu")]
+pub mod in_wgpu;
