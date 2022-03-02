@@ -297,10 +297,12 @@ impl LayoutTree<Positioned<Arc<dyn Widget>>> {
     /// Returns an error if the widgets conflict with each other.
     pub fn installation(&self) -> Result<SpaceTransaction, InstallVuiError> {
         let mut txn = SpaceTransaction::default();
-        for Positioned { value, position } in self.leaves() {
+        for positioned_widget @ Positioned { value, position } in self.leaves() {
             let widget = value.clone();
-            let controller_installation =
-                WidgetBehavior::installation(widget.controller(position))?;
+            let controller_installation = WidgetBehavior::installation(
+                positioned_widget.clone(),
+                widget.controller(position),
+            )?;
             validate_widget_transaction(value, &controller_installation, position)?;
             txn = txn
                 .merge(controller_installation)
@@ -310,7 +312,7 @@ impl LayoutTree<Positioned<Arc<dyn Widget>>> {
     }
 }
 
-fn validate_widget_transaction(
+pub(super) fn validate_widget_transaction(
     widget: &Arc<dyn Widget>,
     transaction: &SpaceTransaction,
     grant: &LayoutGrant,

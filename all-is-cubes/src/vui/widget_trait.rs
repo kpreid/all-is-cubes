@@ -14,7 +14,7 @@ use crate::time::Tick;
 use crate::transaction::{Merge as _, TransactionConflict};
 use crate::universe::{RefVisitor, VisitRefs};
 use crate::vui::layout::Layoutable;
-use crate::vui::LayoutGrant;
+use crate::vui::{validate_widget_transaction, LayoutGrant, Positioned};
 
 /// Transaction type produced by [`WidgetController`]s.
 /// Placeholder for likely wanting to change this later.
@@ -71,6 +71,8 @@ impl WidgetController for Box<dyn WidgetController> {
 // transactions might be lost, but that might be as good as anything.
 #[derive(Debug)]
 pub(super) struct WidgetBehavior {
+    /// Original widget -- not used directly but for error reporting
+    widget: Positioned<Arc<dyn Widget>>,
     controller: Mutex<Box<dyn WidgetController>>,
 }
 
@@ -78,6 +80,7 @@ impl WidgetBehavior {
     /// Returns a transaction which adds the given widget controller to the space,
     /// or an error if the controller's `initialize()` fails.
     pub(crate) fn installation(
+        widget: Positioned<Arc<dyn Widget>>,
         mut controller: Box<dyn WidgetController>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
         let init_txn = match controller.initialize() {
@@ -90,6 +93,7 @@ impl WidgetBehavior {
             }
         };
         let add_txn = BehaviorSetTransaction::insert(Arc::new(WidgetBehavior {
+            widget,
             controller: Mutex::new(controller),
         }));
         init_txn
@@ -110,13 +114,15 @@ impl Behavior<Space> for WidgetBehavior {
         context: &BehaviorContext<'_, Space>,
         tick: Tick,
     ) -> crate::universe::UniverseTransaction {
-        context.bind_host(
-            self.controller
-                .lock()
-                .unwrap()
-                .step(tick)
-                .expect("TODO: behaviors should have an error reporting path"),
-        )
+        let txn = self
+            .controller
+            .lock()
+            .unwrap()
+            .step(tick)
+            .expect("TODO: behaviors should have an error reporting path");
+        validate_widget_transaction(&self.widget.value, &txn, &self.widget.position)
+            .expect("transaction validation failed");
+        context.bind_host(txn)
     }
 
     fn alive(&self, _: &BehaviorContext<'_, Space>) -> bool {
