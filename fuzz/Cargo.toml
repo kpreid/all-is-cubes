@@ -17,7 +17,7 @@ futures-executor = { version = "0.3.17", default-features = false, features = ["
 libfuzzer-sys = "0.4"
 
 [dependencies.all-is-cubes]
-path = ".."
+path = "../all-is-cubes/"
 features = ["arbitrary"]
 
 [[bin]]

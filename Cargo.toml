@@ -13,7 +13,7 @@ members = [
   # so doing this causes test failures in thise circumstances.
   # As a substitute, I've included explicitly building the fuzz targets in the `xtask` build process.
   # 
-  # "all-is-cubes/fuzz",
+  # "fuzz",
 ]
 
 [profile.dev]

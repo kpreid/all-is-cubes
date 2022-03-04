@@ -214,7 +214,7 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), xactio
 
     // Build fuzz targets that are not in the workspace
     {
-        let _pushd = xaction::pushd("all-is-cubes/fuzz");
+        let _pushd = xaction::pushd("fuzz");
         cargo().arg(CHECK_SUBCMD).run()?;
     }
 
