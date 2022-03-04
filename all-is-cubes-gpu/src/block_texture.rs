@@ -9,19 +9,17 @@ use luminance::pipeline::BoundTexture;
 use luminance::pixel::SRGBA8UI;
 use luminance::tess::{Mode, Tess};
 use luminance::texture::{
-    Dim3, Dimensionable, MagFilter, MinFilter, Sampler, TexelUpload, Texture, TextureError, Wrap,
+    Dim3, MagFilter, MinFilter, Sampler, TexelUpload, Texture, TextureError, Wrap,
 };
-use std::convert::TryInto;
 use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
 use all_is_cubes::cgmath::Vector3;
-use all_is_cubes::intalloc::IntAllocator;
-use all_is_cubes::math::GridCoordinate;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 use all_is_cubes::space::Grid;
 use all_is_cubes::util::{CustomFormat, StatusText};
 
+use crate::octree_alloc::{Alloctree, AlloctreeHandle};
 use crate::types::{AicLumBackend, LumBlockVertex};
 
 /// Alias for the concrete type of the block texture.
@@ -38,7 +36,6 @@ where
     Backend: AicLumBackend,
 {
     pub texture: BlockTexture<Backend>,
-    layout: AtlasLayout,
     /// Note on lock ordering: Do not attempt to acquire this lock while a tile's lock is held.
     backing: Arc<Mutex<AllocatorBacking>>,
     in_use: Vec<Weak<Mutex<TileBacking>>>,
@@ -65,11 +62,11 @@ pub struct LumAtlasTile {
 }
 #[derive(Debug)]
 struct TileBacking {
-    /// Index in the linear ordering of the texture atlas.
-    index: u32,
-    /// Region of the atlas texture which this tile owns;
-    /// `self.atlas_grid.volume() == self.data.len()`.
-    atlas_grid: Grid,
+    /// Allocator information, and the region of the atlas texture which this tile owns.
+    ///
+    /// Property: `self.handle.unwrap().allocation.volume() == self.data.len()`.
+    handle: Option<AlloctreeHandle>,
+    /// Texture data (that might not be sent to the GPU yet).
     data: Option<Box<[Texel]>>,
     /// Whether the data has changed so that we need to send it to the GPU on next
     /// [`LumAtlasAllocator::flush`].
@@ -83,7 +80,7 @@ struct TileBacking {
 struct AllocatorBacking {
     /// Whether flush needs to do anything.
     dirty: bool,
-    index_allocator: IntAllocator<u32>,
+    alloctree: Alloctree,
 }
 
 impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
@@ -92,13 +89,10 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
         C: GraphicsContext<Backend = Backend>,
         Backend: AicLumBackend,
     {
-        let layout = AtlasLayout {
-            resolution: 16,
-            row_length: 16,
-        };
+        let alloctree = Alloctree::new(8);
 
         let texture = context.new_texture(
-            layout.dimensions(),
+            alloctree.bounds().unsigned_size().into(),
             Sampler {
                 wrap_s: Wrap::ClampToEdge,
                 wrap_t: Wrap::ClampToEdge,
@@ -113,10 +107,9 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
 
         Ok(Self {
             texture,
-            layout,
             backing: Arc::new(Mutex::new(AllocatorBacking {
                 dirty: false,
-                index_allocator: IntAllocator::new(),
+                alloctree,
             })),
             in_use: Vec::new(),
         })
@@ -127,12 +120,13 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
     /// If any errors prevent complete flushing, it will be attempted again on the next
     /// call.
     pub fn flush(&mut self) -> Result<AtlasFlushInfo, TextureError> {
-        let dirty = &mut self.backing.lock().unwrap().dirty;
-        if !*dirty {
+        let mut allocator_backing = self.backing.lock().unwrap();
+        if !allocator_backing.dirty {
             return Ok(AtlasFlushInfo {
                 flushed: 0,
-                in_use: self.in_use.len(),
-                capacity: self.layout.tile_count() as usize,
+                in_use_tiles: self.in_use.len(),
+                in_use_texels: allocator_backing.alloctree.occupied_volume(),
+                capacity_texels: allocator_backing.alloctree.bounds().volume(),
             });
         }
 
@@ -148,9 +142,14 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
                 let backing: &mut TileBacking = &mut strong_backing.lock().unwrap();
                 if backing.dirty && error.is_none() {
                     if let Some(data) = backing.data.as_ref() {
+                        let region: Grid = backing
+                            .handle
+                            .as_ref()
+                            .expect("can't happen: dead TileBacking")
+                            .allocation;
                         match texture.upload_part(
-                            backing.atlas_grid.lower_bounds().map(|c| c as u32).into(),
-                            backing.atlas_grid.size().map(|c| c as u32).into(),
+                            region.lower_bounds().map(|c| c as u32).into(),
+                            region.size().map(|c| c as u32).into(),
                             TexelUpload::levels(&[data]),
                         ) {
                             Ok(()) => {
@@ -170,11 +169,12 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
             return Err(error);
         }
 
-        *dirty = false;
+        allocator_backing.dirty = false;
         Ok(AtlasFlushInfo {
             flushed: count_written,
-            in_use: self.in_use.len(),
-            capacity: self.layout.tile_count() as usize,
+            in_use_tiles: self.in_use.len(),
+            in_use_texels: allocator_backing.alloctree.occupied_volume(),
+            capacity_texels: allocator_backing.alloctree.bounds().volume(),
         })
     }
 
@@ -208,27 +208,13 @@ impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
     type Tile = LumAtlasTile;
 
     fn allocate(&mut self, requested_grid: Grid) -> Option<LumAtlasTile> {
-        if !Grid::for_block(self.layout.resolution.try_into().ok()?).contains_grid(requested_grid) {
-            return None;
-        }
-
-        let index_allocator = &mut self.backing.lock().unwrap().index_allocator;
-        let index = index_allocator.allocate().unwrap();
-        if index >= self.layout.tile_count() {
-            // TODO: Attempt expansion of the atlas.
-            index_allocator.free(index);
-            return None;
-        }
-        let offset = self
-            .layout
-            .index_to_location(index)
-            .map(|c| GridCoordinate::from(c * self.layout.resolution));
+        let alloctree = &mut self.backing.lock().unwrap().alloctree;
+        let handle = alloctree.allocate(requested_grid)?;
         let result = LumAtlasTile {
-            offset: offset.map(|c| c as TextureCoordinate),
-            scale: (self.layout.texel_edge_length() as TextureCoordinate).recip(),
+            offset: handle.offset.map(|c| c as TextureCoordinate),
+            scale: (alloctree.bounds().size().x as TextureCoordinate).recip(),
             backing: Arc::new(Mutex::new(TileBacking {
-                index,
-                atlas_grid: requested_grid.translate(offset),
+                handle: Some(handle),
                 data: None,
                 dirty: false,
                 allocator: Arc::downgrade(&self.backing),
@@ -289,7 +275,9 @@ impl Eq for LumAtlasTile {}
 impl Drop for TileBacking {
     fn drop(&mut self) {
         if let Some(ab) = self.allocator.upgrade() {
-            ab.lock().unwrap().index_allocator.free(self.index);
+            if let Some(handle) = self.handle.take() {
+                ab.lock().unwrap().alloctree.free(handle);
+            }
         }
     }
 }
@@ -297,114 +285,20 @@ impl Drop for TileBacking {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AtlasFlushInfo {
     flushed: usize,
-    in_use: usize,
-    capacity: usize,
+    in_use_tiles: usize,
+    in_use_texels: usize,
+    capacity_texels: usize,
 }
 
 impl CustomFormat<StatusText> for AtlasFlushInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         write!(
             fmt,
-            "Textures: {}/{} ({}%) used, {:2} flushed",
-            self.in_use,
-            self.capacity,
-            (self.in_use as f32 / self.capacity as f32).ceil() as usize,
+            "Textures: {} tiles, {} texels ({}%) used, {:2} flushed",
+            self.in_use_tiles,
+            self.in_use_texels,
+            (self.in_use_texels as f32 / self.capacity_texels as f32 * 100.0).ceil() as usize,
             self.flushed,
         )
-    }
-}
-
-/// Does the coordinate math for a texture atlas of uniform 3D tiles.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct AtlasLayout {
-    /// Edge length of a tile.
-    resolution: AtlasCoord,
-    /// Number of tiles in texture atlas along one edge (cube root of total tiles).
-    row_length: AtlasCoord,
-}
-
-/// Type of texel indices (coordinates) and single-row (-column/-layer) tile positions.
-///
-/// Values are stored as [`u16`] because this is all that is necessary for typical GPU
-/// limits, and doing so gives lets us use guaranteed lossless numeric conversions in the
-/// arithmetic (whereas e.g. [`u32`] to [`f32`] is not).
-type AtlasCoord = u16;
-/// Type of linear tile indices. (Maybe it should be [`usize`]?)
-type AtlasIndex = u32; // TODO: Review whether this will be more convenient as usize
-
-impl AtlasLayout {
-    // TODO: Add a constructor which sanity checks the size parameters.
-
-    /// Texture size in the format used by [`luminance`].
-    fn dimensions(&self) -> <Dim3 as Dimensionable>::Size {
-        let texel_edge_length = self.texel_edge_length();
-        [texel_edge_length, texel_edge_length, texel_edge_length]
-    }
-
-    #[inline]
-    fn tile_count(&self) -> AtlasIndex {
-        AtlasIndex::from(self.row_length).saturating_pow(3)
-    }
-
-    #[inline]
-    fn texel_edge_length(&self) -> u32 {
-        u32::from(self.row_length) * u32::from(self.resolution)
-    }
-
-    // unused now, might be handy later ...
-    fn _texel_count(&self) -> usize {
-        let [x, y, z] = self.dimensions();
-        x as usize * y as usize * z as usize
-    }
-
-    /// Compute location in the atlas of a tile. Units are tiles, not texels.
-    ///
-    /// Panics if `index >= self.tile_count()`.
-    /// TODO: Return Option instead, which the caller can handle as choosing a missing-texture
-    /// tile, so data mismatches are only graphical glitches.
-    #[inline]
-    fn index_to_location(&self, index: AtlasIndex) -> Vector3<AtlasCoord> {
-        let row_length: AtlasIndex = self.row_length.into();
-        let column = index % row_length;
-        let row_and_layer = index / row_length;
-        let row = row_and_layer % row_length;
-        let layer = row_and_layer / row_length;
-        assert!(
-            layer <= AtlasIndex::from(self.row_length),
-            "Atlas tile index {} out of range",
-            index
-        );
-        // Given the above modulos and assert, these conversions can't be lossy
-        // because the bounds themselves fit in AtlasCoord.
-        Vector3::new(column as AtlasCoord, row as AtlasCoord, layer as AtlasCoord)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// This shouldn't happen, but if it does, this is how we handle it.
-    #[test]
-    fn atlas_layout_no_overflow() {
-        let layout = AtlasLayout {
-            resolution: 0xFFFF,
-            row_length: 0xFFFF,
-        };
-        assert_eq!(0xFFFFFFFF, layout.tile_count());
-
-        // Do the arithmetic with plenty of bits, to compare with the internal result.
-        let row_length_large: u64 = 0xFFFF;
-        let layer_length_large: u64 = 0xFFFF * row_length_large;
-        let large_index: AtlasIndex = 0xFFFFFFFF;
-        let large_index_large: u64 = large_index.into();
-        assert_eq!(
-            Vector3::new(
-                u16::try_from(large_index_large % row_length_large).unwrap(),
-                u16::try_from(large_index_large % layer_length_large / row_length_large).unwrap(),
-                u16::try_from(large_index_large / layer_length_large).unwrap(),
-            ),
-            layout.index_to_location(large_index)
-        );
     }
 }
