@@ -131,7 +131,7 @@ exhibit! {
             .build();
 
         let window_block = {
-            let window_pane_resolution = 16;
+            let window_pane_resolution = 32;
             let depth = 3;
             let window_frame_block = Block::from(palette::ALMOST_BLACK);
             let window_glass_surface_block = Block::from(rgba_const!(0.5, 0.72, 0.5, 0.6));
@@ -195,10 +195,11 @@ exhibit! {
     name: "Knot",
     (this, universe) {
         let footprint = Grid::new([-2, -2, -1], [5, 5, 3]);
-        let resolution = 16;
-        let toroidal_radius = 24.;
-        let knot_split_radius = 9.;
-        let strand_radius = 4.;
+        let resolution = 32;
+        let resf = FreeCoordinate::from(resolution);
+        let toroidal_radius = resf * 1.5;
+        let knot_split_radius = resf * 0.5625;
+        let strand_radius = resf * 0.25;
         let twists = 2.5;
 
         let mut drawing_space = Space::builder(footprint.multiply(resolution))
@@ -251,7 +252,7 @@ exhibit! {
             }
         })?;
         let space = space_to_blocks(
-            16,
+            resolution as u8,
             BlockAttributes {
                 display_name: this.name.into(),
                 collision: BlockCollision::Recur,
