@@ -4,6 +4,9 @@
 
 ### Added
 
+- Graphics:
+    - The `all-is-cubes-gpu` renderer now fully supports blocks with a resolution greater than 16.
+
 - `all-is-cubes` library:
     - `math::coord::point_to_enclosing_cube()`
 
