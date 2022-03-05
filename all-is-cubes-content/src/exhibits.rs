@@ -356,7 +356,7 @@ exhibit! {
 
 exhibit! {
     const COLLISION,
-    name: "Collision WIP",
+    name: "Collision",
     (_this, universe) {
         let half_block = make_slab(universe, 2, 4);
 
