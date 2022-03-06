@@ -18,7 +18,7 @@
 #![warn(noop_method_call)]
 #![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
-#![warn(unused_crate_dependencies)]
+// #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 #![warn(unused_extern_crates)]
 #![warn(unused_lifetimes)]
 #![warn(clippy::cast_lossless)]

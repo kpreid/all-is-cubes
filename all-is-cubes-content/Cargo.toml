@@ -14,6 +14,10 @@ categories = ["games"]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
 
+[[bench]]
+name = "gen_bench"
+harness = false
+
 [features]
 # Enables `UniverseTemplate::Random`.
 # rand features are for `rand::thread_rng()`.
@@ -35,6 +39,7 @@ rand_xoshiro = "0.6.0"
 strum = { version = "0.24.0", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
+criterion = { version = "0.3.3", features = ["async_futures"] }
 # Note: This is a executor for tests and does not imply any more general requirement
 # for using `futures-executor` with All is Cubes.
 futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
