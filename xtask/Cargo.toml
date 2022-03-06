@@ -8,6 +8,8 @@ publish = false
 name = "xtask"
 # Rename main file so that the workspace only has one main.rs
 path = "src/xtask.rs"
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
 
 [dependencies]
 clap = { version = "3.0.8", default-features = false, features = ["derive", "std", "suggestions"] }
