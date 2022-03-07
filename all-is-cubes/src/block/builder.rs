@@ -5,10 +5,11 @@
 
 use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use crate::block::{
-    AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, Resolution,
-    RotationPlacementRule,
+    AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
+    Modifier, Primitive, Resolution, RotationPlacementRule,
 };
 use crate::math::{GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
@@ -36,23 +37,25 @@ use crate::universe::{Name, URef, Universe, UniverseIndex};
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
-pub struct BlockBuilder<C> {
+pub struct BlockBuilder<P> {
     attributes: BlockAttributes,
-    content: C,
+    primitive_builder: P,
+    modifiers: Vec<Modifier>,
 }
 
-impl Default for BlockBuilder<NeedsColorOrVoxels> {
+impl Default for BlockBuilder<NeedsPrimitive> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BlockBuilder<NeedsColorOrVoxels> {
+impl BlockBuilder<NeedsPrimitive> {
     /// Common implementation of [`Block::builder`] and [`Default::default`]; use one of those to call this.
-    pub(super) const fn new() -> BlockBuilder<NeedsColorOrVoxels> {
+    pub(super) const fn new() -> BlockBuilder<NeedsPrimitive> {
         BlockBuilder {
             attributes: BlockAttributes::default(),
-            content: NeedsColorOrVoxels,
+            primitive_builder: NeedsPrimitive,
+            modifiers: Vec::new(),
         }
     }
 }
@@ -107,17 +110,24 @@ impl<C> BlockBuilder<C> {
         self
     }
 
-    /// Sets the color value for building a [`Block::Atom`].
+    pub fn modifier(mut self, modifier: Modifier) -> Self {
+        // TODO: implement a modifier canonicalization procedure here
+        self.modifiers.push(modifier);
+        self
+    }
+
+    /// Sets the color value for building a [`Primitive::Atom`].
     ///
     /// This will replace any previous color **or voxels.**
     pub fn color(self, color: impl Into<Rgba>) -> BlockBuilder<Rgba> {
         BlockBuilder {
             attributes: self.attributes,
-            content: color.into(),
+            primitive_builder: color.into(),
+            modifiers: Vec::new(),
         }
     }
 
-    /// Sets the space for building a [`Block::Recur`].
+    /// Sets the space for building a [`Primitive::Recur`].
     ///
     /// This will replace any previous voxels **or color.**
     pub fn voxels_ref(
@@ -127,15 +137,16 @@ impl<C> BlockBuilder<C> {
     ) -> BlockBuilder<BlockBuilderVoxels> {
         BlockBuilder {
             attributes: self.attributes,
-            content: BlockBuilderVoxels {
+            primitive_builder: BlockBuilderVoxels {
                 space,
                 resolution,
                 offset: GridPoint::origin(),
             },
+            modifiers: Vec::new(),
         }
     }
 
-    /// Constructs a `Space` for building a [`Block::Recur`], and calls
+    /// Constructs a `Space` for building a [`Primitive::Recur`], and calls
     /// the given function to fill it with blocks, in the manner of [`Space::fill`].
     ///
     /// Note that the resulting builder is cloned, all clones will share the same
@@ -163,14 +174,17 @@ impl<C> BlockBuilder<C> {
     /// Converts this builder into a block value.
     pub fn build(self) -> Block
     where
-        C: BuilderContentIndependent,
+        C: BuildPrimitiveIndependent,
     {
-        self.content.build_i(self.attributes)
+        Block(BlockPtr::Owned(Arc::new(BlockParts {
+            primitive: self.primitive_builder.build_i(self.attributes),
+            modifiers: self.modifiers,
+        })))
     }
 
     /// Converts this builder into a block value and stores it as a [`BlockDef`] in
-    /// the given [`Universe`] with the given name, then returns a [`Block::Indirect`]
-    /// referring to it.
+    /// the given [`Universe`] with the given name, then returns a [`Primitive::Indirect`]
+    /// block referring to it.
     // TODO: This is not being used, because most named block definitions use BlockProvider,
     // and complicates the builder unnecessarily. Remove it or figure out how it aligns with
     // BlockProvider.
@@ -180,21 +194,24 @@ impl<C> BlockBuilder<C> {
         name: impl Into<Name>,
     ) -> Result<Block, crate::universe::InsertError>
     where
-        C: BuilderContentInUniverse,
+        C: BuildPrimitiveInUniverse,
     {
-        let block = self.content.build_u(self.attributes, universe);
+        let block = Block(BlockPtr::Owned(Arc::new(BlockParts {
+            primitive: self.primitive_builder.build_u(self.attributes, universe),
+            modifiers: self.modifiers,
+        })));
         let def_ref = universe.insert(name.into(), BlockDef::new(block))?;
-        Ok(Block::Indirect(def_ref))
+        Ok(Block::from_primitive(Primitive::Indirect(def_ref)))
     }
 }
 
 /// Voxel-specific builder methods.
 impl BlockBuilder<BlockBuilderVoxels> {
-    /// Sets the coordinate offset for building a [`Block::Recur`]:
+    /// Sets the coordinate offset for building a [`Primitive::Recur`]:
     /// the lower-bound corner of the region of the [`Space`]
     /// which will be used for block voxels. The default is zero.
     pub fn offset(mut self, offset: GridPoint) -> Self {
-        self.content.offset = offset;
+        self.primitive_builder.offset = offset;
         self
     }
 
@@ -203,7 +220,7 @@ impl BlockBuilder<BlockBuilderVoxels> {
 }
 
 /// Allows implicitly converting `BlockBuilder` to the block it would build.
-impl<C: BuilderContentIndependent> From<BlockBuilder<C>> for Block {
+impl<C: BuildPrimitiveIndependent> From<BlockBuilder<C>> for Block {
     fn from(builder: BlockBuilder<C>) -> Self {
         builder.build()
     }
@@ -225,25 +242,27 @@ impl From<Rgb> for BlockBuilder<Rgba> {
 /// cannot create an actual block until this is replaced.
 #[allow(clippy::exhaustive_structs)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct NeedsColorOrVoxels;
-/// Content of a [`BlockBuilder`] that can build a block without a [`Universe`].
-pub trait BuilderContentIndependent {
-    fn build_i(self, attributes: BlockAttributes) -> Block;
+pub struct NeedsPrimitive;
+
+/// Primitive-builder of a [`BlockBuilder`] that can build a block without a [`Universe`].
+pub trait BuildPrimitiveIndependent {
+    fn build_i(self, attributes: BlockAttributes) -> Primitive;
 }
-/// Content of a [`BlockBuilder`] that can only build a block with a [`Universe`].
-pub trait BuilderContentInUniverse {
-    fn build_u(self, attributes: BlockAttributes, universe: &mut Universe) -> Block;
+/// Primitive-builder of a [`BlockBuilder`] that can only build a block with a [`Universe`].
+pub trait BuildPrimitiveInUniverse {
+    fn build_u(self, attributes: BlockAttributes, universe: &mut Universe) -> Primitive;
 }
-/// Every `BuilderContentIndependent` can act as `BuilderContentInUniverse`.
-impl<T: BuilderContentIndependent> BuilderContentInUniverse for T {
-    fn build_u(self, attributes: BlockAttributes, _: &mut Universe) -> Block {
+/// Every [`BuildPrimitiveIndependent`] can act as [`BuildPrimitiveInUniverse`].
+impl<T: BuildPrimitiveIndependent> BuildPrimitiveInUniverse for T {
+    fn build_u(self, attributes: BlockAttributes, _: &mut Universe) -> Primitive {
         self.build_i(attributes)
     }
 }
+
 /// Used by [`BlockBuilder::color`].
-impl BuilderContentIndependent for Rgba {
-    fn build_i(self, attributes: BlockAttributes) -> Block {
-        Block::Atom(attributes, self)
+impl BuildPrimitiveIndependent for Rgba {
+    fn build_i(self, attributes: BlockAttributes) -> Primitive {
+        Primitive::Atom(attributes, self)
     }
 }
 
@@ -253,9 +272,9 @@ pub struct BlockBuilderVoxels {
     resolution: Resolution,
     offset: GridPoint,
 }
-impl BuilderContentIndependent for BlockBuilderVoxels {
-    fn build_i(self, attributes: BlockAttributes) -> Block {
-        Block::Recur {
+impl BuildPrimitiveIndependent for BlockBuilderVoxels {
+    fn build_i(self, attributes: BlockAttributes) -> Primitive {
+        Primitive::Recur {
             attributes,
             offset: self.offset,
             resolution: self.resolution,

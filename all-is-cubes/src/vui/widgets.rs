@@ -18,7 +18,9 @@ use instant::Duration;
 use once_cell::sync::Lazy;
 
 use crate::behavior::BehaviorSetTransaction;
-use crate::block::{space_to_blocks, AnimationHint, Block, BlockAttributes, Resolution, AIR};
+use crate::block::{
+    space_to_blocks, AnimationHint, Block, BlockAttributes, Primitive, Resolution, AIR,
+};
 use crate::character::{Character, CharacterChange};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
@@ -408,7 +410,7 @@ impl WidgetController for ToolbarController {
         for index in 0..self.slot_count {
             txn.set_overwrite(
                 self.slot_position(index) + GridVector::new(-1, 0, 0),
-                Block::Recur {
+                Block::from_primitive(Primitive::Recur {
                     attributes: BlockAttributes::default(),
                     offset: GridPoint::new(
                         index as GridCoordinate * GridCoordinate::from(self.slot_text_resolution),
@@ -417,7 +419,7 @@ impl WidgetController for ToolbarController {
                     ),
                     resolution: self.slot_text_resolution,
                     space: self.slot_text_space.clone(),
-                },
+                }),
             );
         }
         Ok(txn)

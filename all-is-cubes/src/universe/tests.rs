@@ -1,7 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use crate::block::{Block, BlockDef, BlockDefTransaction, AIR};
+use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, AIR};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
@@ -97,7 +97,7 @@ fn visit_refs_block_def_indirect() {
     let mut u = Universe::new();
     let b1 = BlockDef::new(AIR);
     let b1_ref = u.insert("destination".into(), b1).unwrap();
-    let b2 = BlockDef::new(Block::Indirect(b1_ref));
+    let b2 = BlockDef::new(Block::from_primitive(Primitive::Indirect(b1_ref)));
     let b2_ref = u.insert("has_refs".into(), b2).unwrap();
     assert_eq!(ListRefs::list(&b2_ref), vec!["destination".into()]);
 }
@@ -115,9 +115,9 @@ fn visit_refs_character() {
 
     // A block reference in inventory.
     let block_ref = u.insert("block".into(), BlockDef::new(AIR)).unwrap();
-    CharacterTransaction::inventory(InventoryTransaction::insert(Tool::Block(Block::Indirect(
-        block_ref,
-    ))))
+    CharacterTransaction::inventory(InventoryTransaction::insert(Tool::Block(
+        Block::from_primitive(Primitive::Indirect(block_ref)),
+    )))
     .execute(&mut character)
     .unwrap();
 

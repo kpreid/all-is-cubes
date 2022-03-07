@@ -354,14 +354,10 @@ impl Debug for UniverseTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use std::collections::HashMap;
-
-    use indoc::indoc;
-
     use crate::content::make_some_blocks;
     use crate::space::SpaceTransaction;
-    use crate::util::{CustomFormat, Unquote};
+    use indoc::indoc;
+    use std::collections::HashMap;
 
     #[test]
     fn has_default() {
@@ -376,27 +372,28 @@ mod tests {
 
     #[test]
     fn debug() {
-        use pretty_assertions::assert_eq;
         let [block] = make_some_blocks();
         let mut u = Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let transaction = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
 
         println!("{:#?}", transaction);
-        assert_eq!(
-            format!("{:#?}\n", transaction).custom_format(Unquote),
+        pretty_assertions::assert_str_eq!(
+            format!("{:#?}\n", transaction),
             indoc! {"
             UniverseTransaction {
                 [anonymous #0]: SpaceTransaction {
                     (+0, +0, +0): CubeTransaction {
                         old: None,
                         new: Some(
-                            Atom(
-                                BlockAttributes {
-                                    display_name: \"0\",
-                                },
-                                Rgba(0.5, 0.5, 0.5, 1.0),
-                            ),
+                            Block {
+                                primitive: Atom(
+                                    BlockAttributes {
+                                        display_name: \"0\",
+                                    },
+                                    Rgba(0.5, 0.5, 0.5, 1.0),
+                                ),
+                            },
                         ),
                         conserved: true,
                         activate: false,
@@ -405,7 +402,6 @@ mod tests {
             }
             "}
             .to_string()
-            .custom_format(Unquote)
         );
     }
 

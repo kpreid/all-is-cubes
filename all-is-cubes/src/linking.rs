@@ -19,7 +19,7 @@ use std::ops::Index;
 
 use exhaust::Exhaust;
 
-use crate::block::{Block, BlockDef};
+use crate::block::{Block, BlockDef, Primitive};
 use crate::space::SetCubeError;
 use crate::universe::{InsertError, Name, URef, Universe, UniverseIndex};
 use crate::util::YieldProgress;
@@ -134,7 +134,8 @@ where
         Ok(BlockProvider {
             map: E::exhaust()
                 .map(|key| {
-                    let block = Block::Indirect(found.remove(&key).unwrap());
+                    let block =
+                        Block::from_primitive(Primitive::Indirect(found.remove(&key).unwrap()));
                     (key, block)
                 })
                 .collect(),

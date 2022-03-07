@@ -397,6 +397,7 @@ impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaq
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::Primitive;
     use crate::character::cursor_raycast;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::inv::Slot;
@@ -641,9 +642,9 @@ mod tests {
 
         // Make a block with a rotation rule
         let [mut tool_block] = make_some_voxel_blocks(&mut tester.universe);
-        if let Block::Recur {
+        if let Primitive::Recur {
             ref mut attributes, ..
-        } = tool_block
+        } = tool_block.primitive_mut()
         {
             attributes.rotation_rule = RotationPlacementRule::Attach { by: Face::NZ };
         } else {

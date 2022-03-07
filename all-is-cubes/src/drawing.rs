@@ -371,6 +371,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block;
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
     use crate::raytracer::print_space;
@@ -472,15 +473,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
-        if let Block::Recur {
-            space: block_space_ref,
+        if let &block::Primitive::Recur {
+            space: ref block_space_ref,
             offset,
             ..
-        } = &space[(0, -1, 0)]
+        } = space[(0, -1, 0)].primitive()
         {
             // TODO: This printing does not produce a useful result; fix it.
             print_space(&*block_space_ref.borrow(), (0., 0., -1.));
-            assert_eq!(*offset, GridPoint::new(0, -resolution, 0));
+            assert_eq!(offset, GridPoint::new(0, -resolution, 0));
             assert_eq!(
                 block_space_ref.borrow()[(0, -2, z)].color(),
                 a_primitive_color()
@@ -507,11 +508,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
-        if let Block::Recur {
+        if let block::Primitive::Recur {
             space: block_space_ref,
             offset,
             ..
-        } = &space[(-1, 0, 0)]
+        } = space[(-1, 0, 0)].primitive()
         {
             print_space(&*block_space_ref.borrow(), (0., 0., -1.));
             assert_eq!(*offset, GridPoint::new(-resolution, 0, 0));

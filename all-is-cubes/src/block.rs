@@ -6,6 +6,7 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::sync::Arc;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector4, Zero as _};
 
@@ -39,6 +40,10 @@ mod tests;
 /// of 255 would mean 16 million voxels — more than we want to work with.
 pub type Resolution = u8;
 
+// --- Block type declarations ---
+// File organization: This is a series of closely related type definitions together before
+// any of their `impl`s, so the types can be understood in context.
+
 /// A `Block` is something that can exist in the grid of a [`Space`]; it occupies one unit
 /// cube of space and has a specified appearance and behavior.
 ///
@@ -49,10 +54,31 @@ pub type Resolution = u8;
 ///
 /// To obtain the concrete appearance and behavior of a block, use [`Block::evaluate`] to
 /// obtain an [`EvaluatedBlock`] value, preferably with caching.
+#[derive(Clone)]
+pub struct Block(BlockPtr);
+
+/// Pointer to data of a [`Block`] value.
+///
+/// This is a separate type so that the enum variants are not exposed.
+/// It does not implement Eq and Hash, but Block does through it.
+#[derive(Clone, Debug)]
+enum BlockPtr {
+    Static(&'static Primitive),
+    Owned(Arc<BlockParts>),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct BlockParts {
+    primitive: Primitive,
+    /// Modifiers are stored in innermost-first order.
+    modifiers: Vec<Modifier>,
+}
+
+/// The possible fundamental representations of a [`Block`]'s shape.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 //#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
-pub enum Block {
+pub enum Primitive {
     /// A block whose definition is stored in a [`Universe`](crate::universe::Universe).
     Indirect(URef<BlockDef>),
 
@@ -71,31 +97,119 @@ pub enum Block {
         resolution: u8,
         space: URef<Space>,
     },
+}
 
-    /// Identical to another block, but with rotated coordinates.
-    ///
-    /// Specifically, the given rotation specifies how the contained block's coordinate
-    /// system is rotated into this block's.
-    // TODO: Hmm, it'd be nice if this common case wasn't another allocation — should we
-    // have an outer struct with a rotation field instead??
-    Rotated(GridRotation, Box<Block>),
+/// Modifiers can be applied to a [`Block`] to change the result of
+/// [`evaluate()`](Block::evaluate)ing it.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum Modifier {
+    /// Rotate the block about its cube center by the given rotation.
+    Rotate(GridRotation),
+}
+
+// --- End of type declarations, beginning of impls ---
+
+impl fmt::Debug for Block {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("Block");
+        s.field("primitive", self.primitive());
+        let modifiers = self.modifiers();
+        if !modifiers.is_empty() {
+            s.field("modifiers", &self.modifiers());
+        }
+        s.finish()
+    }
 }
 
 impl Block {
     /// Returns a new [`BlockBuilder`] which may be used to construct a [`Block`] value
     /// from various inputs with convenient syntax.
-    pub const fn builder() -> BlockBuilder<builder::NeedsColorOrVoxels> {
-        BlockBuilder::<builder::NeedsColorOrVoxels>::new()
+    pub const fn builder() -> BlockBuilder<builder::NeedsPrimitive> {
+        BlockBuilder::<builder::NeedsPrimitive>::new()
+    }
+
+    /// Construct a [`Block`] from a [`Primitive`] value.
+    // TODO: Decide whether this should go away as temporary from refactoring.
+    pub fn from_primitive(p: Primitive) -> Self {
+        Block(BlockPtr::Owned(Arc::new(BlockParts {
+            primitive: p,
+            modifiers: vec![],
+        })))
+    }
+
+    /// Construct a [`Block`] from a [`Primitive`] constant.
+    #[cfg(test)] // only used in tests for now
+    pub(crate) const fn from_static_primitive(r: &'static Primitive) -> Self {
+        Block(BlockPtr::Static(r))
+    }
+
+    /// Returns the [`Primitive`] which defines this block before any
+    /// [`Modifier`]s are applied.
+    pub fn primitive(&self) -> &Primitive {
+        match self.0 {
+            BlockPtr::Static(primitive) => primitive,
+            BlockPtr::Owned(ref arc) => &arc.primitive,
+        }
+    }
+
+    /// Returns a mutable reference to the [`Primitive`] which defines this block before
+    /// any [`Modifier`]s are applied.
+    ///
+    /// This may cause part or all of the block's data to stop sharing storage with other
+    /// blocks.
+    pub fn primitive_mut(&mut self) -> &mut Primitive {
+        &mut self.make_parts_mut().primitive
+    }
+
+    /// Returns all the modifiers of this block.
+    ///
+    /// Modifiers are arranged in order of their application to the primitive,
+    /// or “innermost” to “outermost”.
+    ///
+    /// Note that this does not necessarily return all modifiers involved in its
+    /// definition; modifiers on the far end of a [`Primitive::Indirect`] are
+    /// not reported here, even though they take effect when evaluated.
+    pub fn modifiers(&self) -> &[Modifier] {
+        match self.0 {
+            BlockPtr::Static(_) => &[],
+            BlockPtr::Owned(ref arc_parts) => &arc_parts.modifiers,
+        }
+    }
+
+    /// Returns a mutable reference to the vector of [`Modifier`]s on this block.
+    ///
+    /// This may cause part or all of the block's data to stop sharing storage with other
+    /// blocks.
+    // TODO: This nails down our representation a bit much
+    pub fn modifiers_mut(&mut self) -> &mut Vec<Modifier> {
+        &mut self.make_parts_mut().modifiers
+    }
+
+    fn make_parts_mut(&mut self) -> &mut BlockParts {
+        match self.0 {
+            BlockPtr::Static(static_primitive) => {
+                *self = Block::from_primitive(static_primitive.clone());
+                match self.0 {
+                    BlockPtr::Owned(ref mut arc_repr) => Arc::make_mut(arc_repr),
+                    _ => unreachable!(),
+                }
+            }
+            BlockPtr::Owned(ref mut arc_repr) => Arc::make_mut(arc_repr),
+        }
     }
 
     /// Rotates this block by the specified rotation.
     ///
-    /// Compared to direct use of the [`Block::Rotated`] variant, this will:
-    /// * Avoid constructing chains of `Block::Rotated(Block::Rotated(...))`.
+    /// Compared to direct use of [`Modifier::Rotate`], this will:
+    ///
+    /// * Avoid constructing chains of redundant modifiers.
     /// * Not rotate blocks that should never appear rotated (including atom blocks).
     ///
+    /// (TODO: This should be replaced with an `add_modifier()` with general rules)
+    ///
     /// ```
-    /// use all_is_cubes::block::{AIR, Block};
+    /// use all_is_cubes::block::{AIR, Block, Modifier};
     /// use all_is_cubes::content::make_some_voxel_blocks;
     /// use all_is_cubes::math::{Face::*, GridRotation};
     /// use all_is_cubes::universe::Universe;
@@ -106,28 +220,34 @@ impl Block {
     ///
     /// // Basic rotation
     /// let rotated = block.clone().rotate(clockwise);
-    /// assert_eq!(rotated, Block::Rotated(clockwise, Box::new(block.clone())));
+    /// assert_eq!(rotated.modifiers(), &[Modifier::Rotate(clockwise)]);
     ///
     /// // Multiple rotations are combined
     /// let double = rotated.clone().rotate(clockwise);
-    /// assert_eq!(double, Block::Rotated(clockwise * clockwise, Box::new(block.clone())));
+    /// assert_eq!(double.modifiers(), &[Modifier::Rotate(clockwise * clockwise)]);
+    ///
     /// // AIR is never rotated
     /// assert_eq!(AIR, AIR.rotate(clockwise));
     /// ```
     #[must_use]
-    pub fn rotate(self, rotation: GridRotation) -> Self {
-        match self {
-            // TODO: Just checking for Block::Atom doesn't help when the atom
-            // is hidden behind Block::Indirect. In general, we need to evaluate()
+    pub fn rotate(mut self, rotation: GridRotation) -> Self {
+        if matches!(self.primitive(), Primitive::Atom(..)) {
+            // TODO: Just checking for Primitive::Atom doesn't help when the atom
+            // is hidden behind Primitive::Indirect. In general, we need to evaluate()
             // (which suggests that this perhaps should be at least available
             // as a function that takes Block + EvaluatedBlock).
-            Block::Atom(..) => self,
-            Block::Rotated(existing_rotation, boxed_block) => {
-                // TODO: If the combined rotation is the identity, simplify
-                Block::Rotated(rotation * existing_rotation, boxed_block)
-            }
-            _ => Block::Rotated(rotation, Box::new(self)),
+            return self;
         }
+
+        let parts = self.make_parts_mut();
+        match parts.modifiers.last_mut() {
+            // TODO: If the combined rotation is the identity, discard the modifier
+            Some(Modifier::Rotate(existing_rotation)) => {
+                *existing_rotation = rotation * *existing_rotation;
+            }
+            None => parts.modifiers.push(Modifier::Rotate(rotation)),
+        }
+        self
     }
 
     /// Standardizes any characteristics of this block which may be presumed to be
@@ -150,11 +270,18 @@ impl Block {
     /// assert_eq!(block, rotated.clone().unspecialize().unspecialize());
     /// ```
     #[must_use]
-    pub fn unspecialize(self) -> Self {
-        match self {
-            Block::Rotated(_rotation, boxed_block) => *boxed_block,
-            other => other,
+    pub fn unspecialize(mut self) -> Self {
+        if self.modifiers().is_empty() {
+            // No need to reify the modifier list if it doesn't exist already.
+            return self;
         }
+
+        let modifiers = &mut self.make_parts_mut().modifiers;
+        while let Some(Modifier::Rotate(_)) = modifiers.last() {
+            modifiers.pop();
+        }
+
+        self
     }
 
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
@@ -166,10 +293,12 @@ impl Block {
 
     #[inline]
     fn evaluate_impl(&self, depth: u8) -> Result<EvaluatedBlock, EvalBlockError> {
-        match self {
-            Block::Indirect(def_ref) => def_ref.try_borrow()?.evaluate_impl(next_depth(depth)?),
+        let mut value: EvaluatedBlock = match *self.primitive() {
+            Primitive::Indirect(ref def_ref) => {
+                def_ref.try_borrow()?.evaluate_impl(next_depth(depth)?)?
+            }
 
-            &Block::Atom(ref attributes, color) => Ok(EvaluatedBlock {
+            Primitive::Atom(ref attributes, color) => EvaluatedBlock {
                 attributes: attributes.clone(),
                 color,
                 voxels: None,
@@ -184,9 +313,9 @@ impl Block {
                             .unwrap(),
                     )
                 },
-            }),
+            },
 
-            &Block::Recur {
+            Primitive::Recur {
                 ref attributes,
                 offset,
                 resolution,
@@ -225,51 +354,50 @@ impl Block {
                     )
                     .translate(-offset.to_vec());
 
-                Ok(EvaluatedBlock::from_voxels(
-                    attributes.clone(),
-                    resolution,
-                    voxels,
-                ))
+                EvaluatedBlock::from_voxels(attributes.clone(), resolution, voxels)
             }
+        };
 
-            // TODO: this has no unit tests
-            Block::Rotated(rotation, block) => {
-                let base = block.evaluate()?;
-                if base.voxels.is_none() && base.voxel_opacity_mask.is_none() {
-                    // Skip computation of transforms
-                    return Ok(base);
+        for modifier in self.modifiers() {
+            match *modifier {
+                Modifier::Rotate(rotation) => {
+                    if value.voxels.is_none() && value.voxel_opacity_mask.is_none() {
+                        // Skip computation of transforms
+                    } else {
+                        // TODO: Add a shuffle-in-place rotation operation to GridArray and try implementing this using that, which should have less arithmetic involved than these matrix ops
+                        let resolution = value.resolution;
+                        let inner_to_outer = rotation.to_positive_octant_matrix(resolution.into());
+                        let outer_to_inner = rotation
+                            .inverse()
+                            .to_positive_octant_matrix(resolution.into());
+
+                        value = EvaluatedBlock {
+                            voxels: value.voxels.map(|voxels| {
+                                GridArray::from_fn(
+                                    voxels.grid().transform(inner_to_outer).unwrap(),
+                                    |cube| voxels[outer_to_inner.transform_cube(cube)],
+                                )
+                            }),
+                            voxel_opacity_mask: value.voxel_opacity_mask.map(|mask| {
+                                GridArray::from_fn(
+                                    mask.grid().transform(inner_to_outer).unwrap(),
+                                    |cube| mask[outer_to_inner.transform_cube(cube)],
+                                )
+                            }),
+
+                            // Unaffected
+                            attributes: value.attributes,
+                            color: value.color,
+                            resolution,
+                            opaque: value.opaque,
+                            visible: value.visible,
+                        };
+                    }
                 }
-
-                // TODO: Add a shuffle-in-place rotation operation to GridArray and try implementing this using that, which should have less arithmetic involved than these matrix ops
-                let resolution = base.resolution;
-                let inner_to_outer = rotation.to_positive_octant_matrix(resolution.into());
-                let outer_to_inner = rotation
-                    .inverse()
-                    .to_positive_octant_matrix(resolution.into());
-
-                Ok(EvaluatedBlock {
-                    voxels: base.voxels.map(|voxels| {
-                        GridArray::from_fn(
-                            voxels.grid().transform(inner_to_outer).unwrap(),
-                            |cube| voxels[outer_to_inner.transform_cube(cube)],
-                        )
-                    }),
-                    voxel_opacity_mask: base.voxel_opacity_mask.map(|mask| {
-                        GridArray::from_fn(mask.grid().transform(inner_to_outer).unwrap(), |cube| {
-                            mask[outer_to_inner.transform_cube(cube)]
-                        })
-                    }),
-
-                    // Unaffected
-                    attributes: base.attributes,
-                    color: base.color,
-                    resolution,
-                    opaque: base.opaque,
-                    visible: base.visible,
-                })
             }
         }
-        // TODO: need to track which things we need change notifications on
+
+        Ok(value)
     }
 
     /// Registers a listener for mutations of any data sources which may affect this
@@ -294,24 +422,24 @@ impl Block {
         listener: impl Listener<BlockChange> + Send + Sync + 'static,
         _depth: u8,
     ) -> Result<(), EvalBlockError> {
-        match self {
-            Block::Indirect(def_ref) => {
+        match *self.primitive() {
+            Primitive::Indirect(ref def_ref) => {
                 // Note: This does not pass the recursion depth because BlockDef provides
                 // its own internal listening and thus this does not recurse.
                 def_ref.try_borrow()?.listen(listener)?;
             }
-            Block::Atom(_, _) => {
+            Primitive::Atom(_, _) => {
                 // Atoms don't refer to anything external and thus cannot change other
                 // than being directly overwritten, which is out of the scope of this
                 // operation.
             }
-            Block::Recur {
+            Primitive::Recur {
                 resolution,
                 offset,
-                space: space_ref,
+                space: ref space_ref,
                 ..
             } => {
-                let relevant_cubes = Grid::for_block(*resolution).translate(offset.to_vec());
+                let relevant_cubes = Grid::for_block(resolution).translate(offset.to_vec());
                 space_ref.try_borrow()?.listen(listener.filter(move |msg| {
                     match msg {
                         SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
@@ -328,8 +456,10 @@ impl Block {
                     }
                 }));
             }
-            Block::Rotated(_, base) => {
-                base.listen(listener)?;
+        }
+        for modifier in self.modifiers() {
+            match modifier {
+                Modifier::Rotate(_) => {}
             }
         }
         Ok(())
@@ -339,8 +469,8 @@ impl Block {
     /// single color. For use in tests only.
     #[cfg(test)]
     pub fn color(&self) -> Rgba {
-        match self {
-            Block::Atom(_, c) => *c,
+        match *self.primitive() {
+            Primitive::Atom(_, c) => c,
             _ => panic!("Block::color not defined for non-atom blocks"),
         }
     }
@@ -355,9 +485,37 @@ fn next_depth(depth: u8) -> Result<u8, EvalBlockError> {
     }
 }
 
+// Manual implementations of Eq and Hash ensure that the [`BlockPtr`] storage
+// choices do not affect equality.
+impl PartialEq for Block {
+    fn eq(&self, other: &Self) -> bool {
+        self.primitive() == other.primitive() && self.modifiers() == other.modifiers()
+    }
+}
+impl Eq for Block {}
+impl std::hash::Hash for Block {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.primitive().hash(state);
+        self.modifiers().hash(state);
+    }
+}
+
+impl From<&'static Primitive> for Block {
+    fn from(r: &'static Primitive) -> Self {
+        Block(BlockPtr::Static(r))
+    }
+}
+
+impl From<Primitive> for Block {
+    fn from(primitive: Primitive) -> Self {
+        Block::from_primitive(primitive)
+    }
+}
+
 // Implementing conversions to `Cow` allow various functions to accept either an owned
 // or borrowed `Block`. The motivation for this is to avoid unnecessary cloning
 // (in case an individual block has large data).
+// TODO: Eliminate these given the new Block-is-a-pointer world.
 
 impl From<Block> for Cow<'_, Block> {
     fn from(block: Block) -> Self {
@@ -378,7 +536,7 @@ impl From<Rgb> for Block {
 /// Convert a color to a block with default attributes.
 impl From<Rgba> for Block {
     fn from(color: Rgba) -> Self {
-        Block::Atom(BlockAttributes::default(), color)
+        Block::from_primitive(Primitive::Atom(BlockAttributes::default(), color))
     }
 }
 /// Convert a color to a block with default attributes.
@@ -397,7 +555,10 @@ impl From<Rgba> for Cow<'_, Block> {
 /// Generic 'empty'/'null' block. It is used by [`Space`] to respond to out-of-bounds requests.
 ///
 /// See also [`AIR_EVALUATED`].
-pub const AIR: Block = Block::Atom(AIR_ATTRIBUTES, Rgba::TRANSPARENT);
+pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Atom(
+    AIR_ATTRIBUTES,
+    Rgba::TRANSPARENT,
+)));
 
 /// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
 /// This may be used when an [`EvaluatedBlock`] value is needed but there is no block
@@ -577,7 +738,7 @@ impl Evoxel {
 
     /// Construct an [`Evoxel`] which represents the given evaluated block.
     ///
-    /// This is the same operation as is used for each block/voxel in a [`Block::Recur`].
+    /// This is the same operation as is used for each block/voxel in a [`Primitive::Recur`].
     pub fn from_block(block: &EvaluatedBlock) -> Self {
         Self {
             color: block.color,
@@ -647,7 +808,7 @@ impl BlockChange {
     }
 }
 
-/// Construct a set of [`Block::Recur`] that form a miniature of the given `space`.
+/// Construct a set of [`Primitive::Recur`] blocks that form a miniature of the given `space`.
 /// The returned [`Space`] contains each of the blocks; its coordinates will correspond to
 /// those of the input, scaled down by `resolution`.
 ///
@@ -671,12 +832,12 @@ pub fn space_to_blocks(
 
     let mut destination_space = Space::empty(destination_grid);
     destination_space.fill(destination_grid, move |cube| {
-        Some(Block::Recur {
+        Some(Block::from_primitive(Primitive::Recur {
             attributes: attributes.clone(),
             offset: GridPoint::from_vec(cube.to_vec() * resolution_g),
             resolution,
             space: space_ref.clone(),
-        })
+        }))
     })?;
     Ok(destination_space)
 }

@@ -29,7 +29,7 @@ pub mod palette;
 #[doc(hidden)]
 pub mod testing;
 
-/// Generate a set of distinct [`Block::Atom`] blocks for use in tests.
+/// Generate a set of distinct [`Primitive::Atom`] blocks for use in tests.
 /// They will have distinct colors and names, and all other attributes default.
 /// They will be fully opaque.
 ///
@@ -43,6 +43,8 @@ pub mod testing;
 /// assert_ne!(blocks[1], blocks[2]);
 /// assert_eq!(blocks[0].evaluate().unwrap().voxels, None);
 /// ```
+///
+/// [`Primitive::Atom`]: crate::block::Primitive::Atom
 pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
     color_sequence_for_make_blocks(COUNT)
         .map(|(i, color)| {
@@ -56,7 +58,7 @@ pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
         .unwrap()
 }
 
-/// Generate a set of distinct [`Block::Recur`] blocks for use in tests.
+/// Generate a set of distinct [`Primitive::Recur`] blocks for use in tests.
 /// They will have distinct appearances and names, and all other attributes default.
 /// They will be fully opaque.
 ///
@@ -72,6 +74,8 @@ pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
 /// assert_ne!(blocks[1], blocks[2]);
 /// assert_eq!(blocks[0].evaluate().unwrap().resolution, 16);
 /// ```
+///
+/// [`Primitive::Recur`]: crate::block::Primitive::Recur
 pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [Block; COUNT] {
     let resolution = 16;
     color_sequence_for_make_blocks(COUNT)
@@ -214,7 +218,7 @@ pub fn free_editing_starter_inventory(flying: bool) -> Vec<Slot> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::BlockAttributes;
+    use crate::block::{BlockAttributes, Primitive};
 
     #[test]
     fn make_some_blocks_0() {
@@ -226,13 +230,13 @@ mod tests {
         // Should succeed even though the normal range would be division-by-zero.
         assert_eq!(
             make_some_blocks::<1>(),
-            [Block::Atom(
+            [Block::from_primitive(Primitive::Atom(
                 BlockAttributes {
                     display_name: "0".into(),
                     ..BlockAttributes::default()
                 },
                 Rgba::new(0.5, 0.5, 0.5, 1.0)
-            )]
+            ))]
         );
     }
 
@@ -241,20 +245,20 @@ mod tests {
         assert_eq!(
             make_some_blocks::<2>(),
             [
-                Block::Atom(
+                Block::from_primitive(Primitive::Atom(
                     BlockAttributes {
                         display_name: "0".into(),
                         ..BlockAttributes::default()
                     },
                     Rgba::new(0.0, 0.0, 0.0, 1.0)
-                ),
-                Block::Atom(
+                )),
+                Block::from_primitive(Primitive::Atom(
                     BlockAttributes {
                         display_name: "1".into(),
                         ..BlockAttributes::default()
                     },
                     Rgba::new(1.0, 1.0, 1.0, 1.0)
-                )
+                ))
             ]
         );
     }

@@ -305,7 +305,7 @@ fn listens_to_block_changes() {
     // Set up indirect block
     let mut universe = Universe::new();
     let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let indirect = Block::Indirect(block_def_ref.clone());
+    let indirect = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
 
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);
@@ -332,14 +332,13 @@ fn listens_to_block_changes() {
 
 #[test]
 fn space_debug() {
-    use pretty_assertions::assert_eq;
     let mut space = Space::empty_positive(1, 1, 1);
     space.set_physics(SpacePhysics {
         light: LightPhysics::None,
         ..SpacePhysics::default()
     });
     println!("{:#?}", space);
-    assert_eq!(
+    pretty_assertions::assert_str_eq!(
         format!("{:#?}\n", space),
         indoc! {"
             Space {
@@ -351,14 +350,16 @@ fn space_debug() {
                 block_data: [
                     SpaceBlockData {
                         count: 1,
-                        block: Atom(
-                            BlockAttributes {
-                                display_name: \"<air>\",
-                                selectable: false,
-                                collision: None,
-                            },
-                            Rgba(0.0, 0.0, 0.0, 0.0),
-                        ),
+                        block: Block {
+                            primitive: Atom(
+                                BlockAttributes {
+                                    display_name: \"<air>\",
+                                    selectable: false,
+                                    collision: None,
+                                },
+                                Rgba(0.0, 0.0, 0.0, 0.0),
+                            ),
+                        },
                         ..
                     },
                 ],

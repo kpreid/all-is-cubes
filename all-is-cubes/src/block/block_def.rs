@@ -4,7 +4,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::block::{Block, BlockChange};
+use crate::block::{Block, BlockChange, Modifier, Primitive};
 use crate::listen::{Gate, Listener, Notifier};
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
@@ -12,7 +12,7 @@ use crate::transaction::{
 use crate::universe::{RefError, RefVisitor, VisitRefs};
 
 /// Contains a [`Block`] and can be stored in a [`Universe`](crate::universe::Universe).
-/// Together with [`Block::Indirect`], this allows mutation of a block definition such
+/// Together with [`Primitive::Indirect`], this allows mutation of a block definition such
 /// that all its usages follow.
 ///
 /// It is a distinct type from [`Block`] in order to ensure that change notifications
@@ -75,11 +75,27 @@ impl VisitRefs for BlockDef {
 
 impl VisitRefs for Block {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        self.primitive().visit_refs(visitor);
+        for modifier in self.modifiers() {
+            modifier.visit_refs(visitor)
+        }
+    }
+}
+
+impl VisitRefs for Primitive {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         match self {
-            Block::Indirect(block_ref) => visitor.visit(block_ref),
-            Block::Atom(_, _) => {}
-            Block::Recur { space, .. } => visitor.visit(space),
-            Block::Rotated(_, block) => block.visit_refs(visitor),
+            Primitive::Indirect(block_ref) => visitor.visit(block_ref),
+            Primitive::Atom(_, _) => {}
+            Primitive::Recur { space, .. } => visitor.visit(space),
+        }
+    }
+}
+
+impl VisitRefs for Modifier {
+    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {
+        match self {
+            Modifier::Rotate(..) => {}
         }
     }
 }

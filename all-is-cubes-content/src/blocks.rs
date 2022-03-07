@@ -8,7 +8,7 @@ use exhaust::Exhaust;
 use noise::Seedable as _;
 
 use all_is_cubes::block::{
-    AnimationHint, Block, BlockCollision, Resolution, RotationPlacementRule, AIR,
+    AnimationHint, Block, BlockCollision, Primitive, Resolution, RotationPlacementRule, AIR,
 };
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
@@ -393,7 +393,7 @@ pub async fn install_demo_blocks(
     Ok(())
 }
 
-/// Generate a copy of a [`Block::Atom`] with its color scaled by the given scalar.
+/// Generate a copy of a [`Primitive::Atom`] block with its color scaled by the given scalar.
 ///
 /// The scalar is rounded to steps of `quantization`, to reduce the number of distinct
 /// block types generated.
@@ -401,12 +401,12 @@ pub async fn install_demo_blocks(
 /// If the computation is NaN or the block is not an atom, it is returned unchanged.
 pub(crate) fn scale_color(block: Block, scalar: f64, quantization: f64) -> Block {
     let scalar = (scalar / quantization).round() * quantization;
-    match (block, NotNan::new(scalar as f32)) {
-        (Block::Atom(attributes, color), Ok(scalar)) => Block::Atom(
-            attributes,
+    match (block.primitive(), NotNan::new(scalar as f32)) {
+        (Primitive::Atom(attributes, color), Ok(scalar)) => Block::from_primitive(Primitive::Atom(
+            attributes.clone(),
             (color.to_rgb() * scalar).with_alpha(color.alpha()),
-        ),
-        (block, _) => block,
+        )),
+        _ => block,
     }
 }
 

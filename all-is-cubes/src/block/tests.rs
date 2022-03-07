@@ -10,8 +10,8 @@ use pretty_assertions::assert_eq;
 
 use crate::block::{
     builder, AnimationHint, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef,
-    BlockDefTransaction, EvalBlockError, EvaluatedBlock, Evoxel, Resolution, RotationPlacementRule,
-    AIR, AIR_EVALUATED,
+    BlockDefTransaction, EvalBlockError, EvaluatedBlock, Evoxel, Modifier, Primitive, Resolution,
+    RotationPlacementRule, AIR, AIR_EVALUATED,
 };
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::listen::{NullListener, Sink};
@@ -19,6 +19,54 @@ use crate::math::{GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgb
 use crate::raycast::Face;
 use crate::space::{Grid, GridArray, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
+
+#[test]
+fn block_is_approximately_a_pointer() {
+    let block_size = std::mem::size_of::<Block>();
+    let ptr_size = std::mem::size_of::<*const ()>();
+    assert!(
+        ptr_size < block_size && block_size <= 2 * ptr_size,
+        "unexpected size: {block_size}",
+    );
+}
+
+#[test]
+fn block_static_eq_to_non_static() {
+    let foo = AIR;
+    let bar = Block::from_primitive(foo.primitive().clone());
+    assert_eq!(foo, bar);
+}
+
+#[test]
+fn block_debug_air() {
+    assert_eq!(
+        &format!("{:?}", &AIR),
+        "Block { primitive: Atom(\
+            BlockAttributes { display_name: \"<air>\", selectable: false, collision: None }, \
+            Rgba(0.0, 0.0, 0.0, 0.0)) }"
+    );
+}
+
+#[test]
+fn block_debug_with_modifiers() {
+    assert_eq!(
+        &format!(
+            "{:?}",
+            &Block::builder()
+                .color(Rgba::new(1.0, 0.5, 0.0, 1.0))
+                // TODO: When we have more modifiers, pick a different one, that isn't
+                // essentially irrelevant to Primitive::Atom
+                .modifier(Modifier::Rotate(GridRotation::Rxyz))
+                .build()
+        ),
+        "Block { \
+            primitive: Atom(\
+                BlockAttributes {}, \
+                Rgba(1.0, 0.5, 0.0, 1.0)), \
+            modifiers: [Rotate(Rxyz)] \
+        }"
+    );
+}
 
 #[test]
 fn evaluate_air_consistent() {
@@ -35,7 +83,7 @@ fn evaluate_opaque_atom_and_attributes() {
         light_emission: Rgb::ONE,
         ..BlockAttributes::default()
     };
-    let block = Block::Atom(attributes.clone(), color);
+    let block = Block::from_primitive(Primitive::Atom(attributes.clone(), color));
     let e = block.evaluate().unwrap();
     assert_eq!(e.attributes, attributes);
     assert_eq!(e.color, block.color());
@@ -52,7 +100,7 @@ fn evaluate_opaque_atom_and_attributes() {
 #[test]
 fn evaluate_transparent_atom() {
     let color = Rgba::new(1.0, 2.0, 3.0, 0.5);
-    let block = Block::Atom(BlockAttributes::default(), color);
+    let block = Block::from_primitive(Primitive::Atom(BlockAttributes::default(), color));
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, block.color());
     assert!(e.voxels.is_none());
@@ -66,7 +114,10 @@ fn evaluate_transparent_atom() {
 
 #[test]
 fn evaluate_invisible_atom() {
-    let block = Block::Atom(BlockAttributes::default(), Rgba::TRANSPARENT);
+    let block = Block::from_primitive(Primitive::Atom(
+        BlockAttributes::default(),
+        Rgba::TRANSPARENT,
+    ));
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, Rgba::TRANSPARENT);
     assert!(e.voxels.is_none());
@@ -281,7 +332,7 @@ fn evaluate_rotated() {
     );
 }
 
-/// Tests that the `offset` field of `Block::Recur` is respected.
+/// Tests that the `offset` field of `Primitive::Recur` is respected.
 #[test]
 fn recur_with_offset() {
     let resolution = 4;
@@ -291,19 +342,16 @@ fn recur_with_offset() {
     space
         .fill(space.grid(), |point| {
             let point = point.cast::<f32>().unwrap();
-            Some(Block::Atom(
-                BlockAttributes::default(),
-                Rgba::new(point.x, point.y, point.z, 1.0),
-            ))
+            Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
         })
         .unwrap();
     let space_ref = universe.insert_anonymous(space);
-    let block_at_offset = Block::Recur {
+    let block_at_offset = Block::from_primitive(Primitive::Recur {
         attributes: BlockAttributes::default(),
         offset: GridPoint::from_vec(offset),
         resolution: resolution as Resolution,
         space: space_ref.clone(),
-    };
+    });
 
     let e = block_at_offset.evaluate().unwrap();
     assert_eq!(
@@ -351,17 +399,17 @@ fn indirect_equivalence() {
 fn rotate_rotated_consistency() {
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
-    assert!(matches!(block, Block::Recur { .. }));
+    assert!(matches!(block.primitive(), Primitive::Recur { .. }));
 
     // Two rotations not in the same plane, so they are not commutative.
     let rotation_1 = GridRotation::RyXZ;
     let rotation_2 = GridRotation::RXyZ;
 
     let rotated_twice = block.clone().rotate(rotation_1).rotate(rotation_2);
-    let two_rotations = Block::Rotated(
-        rotation_2,
-        Box::new(Block::Rotated(rotation_1, Box::new(block))),
-    );
+    let mut two_rotations = block.clone();
+    two_rotations
+        .modifiers_mut()
+        .extend([Modifier::Rotate(rotation_1), Modifier::Rotate(rotation_2)]);
     assert_ne!(rotated_twice, two_rotations, "Oops; test is ineffective");
 
     assert_eq!(
@@ -383,7 +431,7 @@ fn listen_atom() {
 fn listen_indirect_atom() {
     let mut universe = Universe::new();
     let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let indirect = Block::Indirect(block_def_ref.clone());
+    let indirect = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
     let sink = Sink::new();
     indirect.listen(sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
@@ -401,9 +449,10 @@ fn listen_indirect_atom() {
 fn listen_indirect_double() {
     let mut universe = Universe::new();
     let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let block_def_ref2 =
-        universe.insert_anonymous(BlockDef::new(Block::Indirect(block_def_ref1.clone())));
-    let indirect2 = Block::Indirect(block_def_ref2.clone());
+    let block_def_ref2 = universe.insert_anonymous(BlockDef::new(Block::from_primitive(
+        Primitive::Indirect(block_def_ref1.clone()),
+    )));
+    let indirect2 = Block::from_primitive(Primitive::Indirect(block_def_ref2.clone()));
     let sink = Sink::new();
     indirect2.listen(sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
@@ -459,7 +508,7 @@ fn builder_defaults() {
     let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
     assert_eq!(
         Block::builder().color(color).build(),
-        Block::Atom(BlockAttributes::default(), color),
+        Block::from_primitive(Primitive::Atom(BlockAttributes::default(), color)),
     );
 }
 
@@ -478,7 +527,7 @@ fn builder_every_field() {
             .light_emission(light_emission)
             .animation_hint(AnimationHint::TEMPORARY)
             .build(),
-        Block::Atom(
+        Block::from_primitive(Primitive::Atom(
             BlockAttributes {
                 display_name: "hello world".into(),
                 collision: BlockCollision::Recur,
@@ -488,7 +537,7 @@ fn builder_every_field() {
                 animation_hint: AnimationHint::TEMPORARY,
             },
             color
-        ),
+        )),
     );
 }
 
@@ -502,7 +551,7 @@ fn builder_voxels_from_space() {
             .display_name("hello world")
             .voxels_ref(2, space_ref.clone())
             .build(),
-        Block::Recur {
+        Block::from_primitive(Primitive::Recur {
             attributes: BlockAttributes {
                 display_name: "hello world".into(),
                 ..BlockAttributes::default()
@@ -510,7 +559,7 @@ fn builder_voxels_from_space() {
             offset: GridPoint::origin(),
             resolution: 2, // not same as space size
             space: space_ref
-        },
+        }),
     );
 }
 
@@ -526,7 +575,7 @@ fn builder_voxels_from_fn() {
         .build();
 
     // Extract the implicitly constructed space reference
-    let space_ref = if let Block::Recur { ref space, .. } = block {
+    let space_ref = if let Primitive::Recur { space, .. } = block.primitive() {
         space.clone()
     } else {
         panic!("expected Recur, found {:?}", block);
@@ -534,7 +583,7 @@ fn builder_voxels_from_fn() {
 
     assert_eq!(
         block,
-        Block::Recur {
+        Block::from_primitive(Primitive::Recur {
             attributes: BlockAttributes {
                 display_name: "hello world".into(),
                 ..BlockAttributes::default()
@@ -542,7 +591,7 @@ fn builder_voxels_from_fn() {
             offset: GridPoint::origin(),
             resolution,
             space: space_ref.clone()
-        },
+        }),
     );
 
     // Check the space's characteristics
@@ -558,8 +607,8 @@ fn builder_voxels_from_fn() {
 #[test]
 fn builder_default_equivalent() {
     assert_eq!(
-        BlockBuilder::<builder::NeedsColorOrVoxels>::default(),
-        <BlockBuilder<builder::NeedsColorOrVoxels> as Default>::default()
+        BlockBuilder::<builder::NeedsPrimitive>::default(),
+        <BlockBuilder<builder::NeedsPrimitive> as Default>::default()
     );
 }
 
@@ -573,7 +622,6 @@ fn attributes_default_equivalent() {
 
 #[test]
 fn attributes_debug() {
-    use pretty_assertions::assert_eq;
     let default = BlockAttributes::default;
     fn debug(a: BlockAttributes) -> String {
         format!("{:?}", a)
@@ -637,9 +685,9 @@ fn overflow_evaluate() {
 fn overflow_listen() {
     let mut universe = Universe::new();
     let block = self_referential_block(&mut universe);
-    // This does *not* produce an error, because Block::Indirect manages its own listening.
-    // TODO: Probably Block::Indirect needs a recursion limit inside that so it doesn't
-    // fire an infinite cycle of listening...? Or perhaps we need to make it difficult to
+    // This does *not* produce an error, because BlockDef manages its own listening.
+    // TODO: Probably Primitive::Indirect needs a recursion limit inside that so it doesn't
+    // fire an infinite cycle of notifications...? Or perhaps we need to make it difficult to
     // create recursion at all.
     assert_eq!(block.listen(NullListener), Ok(()));
 }
@@ -647,7 +695,7 @@ fn overflow_listen() {
 /// Helper for overflow_ tests
 fn self_referential_block(universe: &mut Universe) -> Block {
     let block_def = universe.insert_anonymous(BlockDef::new(AIR));
-    let indirect = Block::Indirect(block_def.clone());
+    let indirect = Block::from_primitive(Primitive::Indirect(block_def.clone()));
     block_def
         .execute(&BlockDefTransaction::overwrite(indirect.clone()))
         .unwrap();
@@ -662,11 +710,12 @@ mod txn {
 
     #[test]
     fn causes_notification() {
-        // We're using a Block::Indirect in addition to the BlockDef to test a more realistic scenario
+        // We're using a Primitive::Indirect in addition to the BlockDef to test a more
+        // realistic scenario
         let [b1, b2] = make_some_blocks();
         let mut universe = Universe::new();
         let block_def_ref = universe.insert_anonymous(BlockDef::new(b1));
-        let indirect = Block::Indirect(block_def_ref.clone());
+        let indirect = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
         let sink = Sink::new();
         indirect.listen(sink.listener()).unwrap();
         assert_eq!(sink.drain(), vec![]);

@@ -7,7 +7,7 @@ use cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 use pretty_assertions::assert_eq;
 
 use super::*;
-use crate::block::{Block, BlockAttributes, AIR};
+use crate::block::{Block, BlockAttributes, Primitive, AIR};
 use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
 use crate::math::{Face, GridRotation};
@@ -81,9 +81,14 @@ fn triangulate_blocks_and_space(
 }
 
 fn non_uniform_fill(cube: GridPoint) -> &'static Block {
+    // TODO: This should be simple to write, such as by having a simple owned const constructor from colors
+    const C1: &Primitive =
+        &Primitive::Atom(BlockAttributes::default(), rgba_const!(1., 1., 1., 1.));
+    const C2: &Primitive =
+        &Primitive::Atom(BlockAttributes::default(), rgba_const!(0., 0., 0., 1.));
     const BLOCKS: &[Block] = &[
-        Block::Atom(BlockAttributes::default(), rgba_const!(1., 1., 1., 1.)),
-        Block::Atom(BlockAttributes::default(), rgba_const!(0., 0., 0., 1.)),
+        Block::from_static_primitive(C1),
+        Block::from_static_primitive(C2),
     ];
     &BLOCKS[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
 }
