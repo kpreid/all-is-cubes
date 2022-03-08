@@ -33,7 +33,7 @@ glfw = "0.43.0"
 indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
 luminance-glfw = "0.18.0"
-once_cell = "1.4.1"
+once_cell = "1.10.0"
 png = "0.17.0"
 rand = { version = "0.8.2", default-features = false, features = ["std", "std_rng"] }
 serde = { version = "1.0.126", default-features = false }
