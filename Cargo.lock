@@ -1138,12 +1138,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e25ea47919b1560c4e3b7fe0aaab9becf5b84a10325ddf7db0f0ba5e1026499"
 
 [[package]]
-name = "difflib"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
-
-[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3716,6 +3710,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "similar"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e24979f63a11545f5f2c60141afe249d4f19f84581ea2138065e400941d83d3"
+
+[[package]]
 name = "simplelog"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3752,6 +3752,31 @@ name = "smallvec"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
+
+[[package]]
+name = "snapbox"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39245697032574df764f27e9736fc318f52c1665be3672f791967a06ca84e4f6"
+dependencies = [
+ "concolor",
+ "content_inspector",
+ "dunce",
+ "normalize-line-endings",
+ "os_pipe",
+ "similar",
+ "snapbox-macros",
+ "tempfile 3.3.0",
+ "wait-timeout",
+ "walkdir",
+ "yansi",
+]
+
+[[package]]
+name = "snapbox-macros"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0610ac343332c8f59b7b97a6b7c28bd7dd8cd4e82764d78cc8da98ecd3f7d48"
 
 [[package]]
 name = "socket2"
@@ -4249,19 +4274,6 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.12.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94217a6d6a89fb646cbc9f28283cf4745f77eb0b04c4f680c4b3ae4450e3a473"
-dependencies = [
- "combine",
- "indexmap",
- "itertools",
- "kstring",
- "serde",
-]
-
-[[package]]
-name = "toml_edit"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "744e9ed5b352340aa47ce033716991b5589e23781acb97cad37d4ea70560f55b"
@@ -4270,6 +4282,7 @@ dependencies = [
  "indexmap",
  "itertools",
  "kstring",
+ "serde",
 ]
 
 [[package]]
@@ -4316,27 +4329,18 @@ dependencies = [
 
 [[package]]
 name = "trycmd"
-version = "0.12.2"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "170d4db4fe81231f42ba55a50675f72590153d3c6ede8ae979bf3084bf2d8ae7"
+checksum = "ba2397a4c6c098e3237dbcf7acab1d4151af36e7be1d59d7caeee5d489c7eb01"
 dependencies = [
- "concolor",
- "content_inspector",
- "difflib",
- "dunce",
  "glob 0.3.0",
  "humantime 2.1.0",
  "humantime-serde",
- "normalize-line-endings",
- "os_pipe",
  "rayon",
  "serde",
  "shlex",
- "tempfile 3.3.0",
- "toml_edit 0.12.6",
- "wait-timeout",
- "walkdir",
- "yansi",
+ "snapbox",
+ "toml_edit",
 ]
 
 [[package]]
@@ -4923,7 +4927,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "clap 3.1.1",
- "toml_edit 0.13.4",
+ "toml_edit",
  "xaction",
 ]
 
