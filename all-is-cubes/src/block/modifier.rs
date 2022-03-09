@@ -5,6 +5,10 @@ use crate::block::{EvalBlockError, EvaluatedBlock};
 use crate::math::GridRotation;
 use crate::space::GridArray;
 
+// Things mentioned in doc comments only
+#[cfg(doc)]
+use super::Block;
+
 /// Modifiers can be applied to a [`Block`] to change the result of
 /// [`evaluate()`](Block::evaluate)ing it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

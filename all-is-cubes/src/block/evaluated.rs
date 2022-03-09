@@ -13,6 +13,10 @@ use crate::space::{Grid, GridArray};
 use crate::universe::RefError;
 use crate::util::{ConciseDebug, CustomFormat};
 
+// Things mentioned in doc comments only
+#[cfg(doc)]
+use super::{Block, Primitive, URef, AIR, AIR_EVALUATED};
+
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`URef`]s or unbounded computation.
 #[derive(Clone, Debug, Eq, PartialEq)]
