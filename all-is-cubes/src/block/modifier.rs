@@ -1,15 +1,11 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use crate::block::{BlockChange, EvalBlockError, EvaluatedBlock};
+use crate::block::{Block, BlockChange, EvalBlockError, EvaluatedBlock};
 use crate::listen::Listener;
 use crate::math::{GridRotation, Rgb};
 use crate::space::GridArray;
 use crate::universe::{RefVisitor, VisitRefs};
-
-// Things mentioned in doc comments only
-#[cfg(doc)]
-use super::Block;
 
 /// Modifiers can be applied to a [`Block`] to change the result of
 /// [`evaluate()`](Block::evaluate)ing it.
@@ -31,6 +27,12 @@ pub enum Modifier {
 }
 
 impl Modifier {
+    /// Return the given `block` with `self` added as the outermost modifier.
+    pub fn attach(self, mut block: Block) -> Block {
+        block.modifiers_mut().push(self);
+        block
+    }
+
     pub(crate) fn apply(
         &self,
         mut value: EvaluatedBlock,

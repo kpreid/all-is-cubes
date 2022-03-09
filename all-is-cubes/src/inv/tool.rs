@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use crate::block::{Block, RotationPlacementRule, AIR};
+use crate::block::{Block, Modifier, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
@@ -171,9 +171,11 @@ impl Tool {
             Self::Activate => Cow::Borrowed(&predefined[Icons::Activate]),
             // TODO: Give Remove different icons
             Self::RemoveBlock { keep: _ } => Cow::Borrowed(&predefined[Icons::Delete]),
-            // TODO: Once blocks have behaviors, we need to defuse them for this use.
             // TODO: InfiniteBlocks should have a different name and appearance
-            Self::Block(block) | Self::InfiniteBlocks(block) => Cow::Borrowed(block),
+            // (or maybe that distinction should appear in the quantity-text field)
+            Self::Block(block) | Self::InfiniteBlocks(block) => {
+                Cow::Owned(Modifier::Quote { ambient: false }.attach(block.clone()))
+            }
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
             Self::Jetpack { active } => {
                 Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
@@ -588,7 +590,7 @@ mod tests {
         let [block] = make_some_blocks();
         assert_eq!(
             *Tool::InfiniteBlocks(block.clone()).icon(&dummy_icons),
-            block
+            Modifier::Quote { ambient: false }.attach(block),
         );
     }
 
