@@ -854,7 +854,7 @@ impl SpaceBlockData {
 
     fn new(
         block: Block,
-        listener: impl Listener<BlockChange> + Send + Sync + 'static,
+        listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
     ) -> Result<Self, SetCubeError> {
         // TODO: double ref error check suggests that maybe evaluate() and listen() should be one combined operation.
         let evaluated = block.evaluate().map_err(SetCubeError::EvalBlock)?;

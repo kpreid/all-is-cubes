@@ -1,7 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use crate::block::{EvalBlockError, EvaluatedBlock};
+use crate::block::{BlockChange, EvalBlockError, EvaluatedBlock};
+use crate::listen::Listener;
 use crate::math::GridRotation;
 use crate::space::GridArray;
 
@@ -61,5 +62,17 @@ impl Modifier {
                 }
             }
         })
+    }
+
+    /// Called by [`Block::listen()`]; not designed to be used otherwise.
+    pub(crate) fn listen_impl(
+        &self,
+        _listener: &(impl Listener<BlockChange> + Clone + Send + Sync),
+        _depth: u8,
+    ) -> Result<(), EvalBlockError> {
+        match self {
+            Modifier::Rotate(_) => {}
+        }
+        Ok(())
     }
 }

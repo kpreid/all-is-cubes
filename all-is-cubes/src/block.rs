@@ -372,16 +372,21 @@ impl Block {
     /// handle this separately.
     pub fn listen(
         &self,
-        listener: impl Listener<BlockChange> + Send + Sync + 'static,
+        listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
     ) -> Result<(), EvalBlockError> {
         self.listen_impl(listener, 0)
     }
 
     fn listen_impl(
         &self,
-        listener: impl Listener<BlockChange> + Send + Sync + 'static,
-        _depth: u8,
+        listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
+        depth: u8,
     ) -> Result<(), EvalBlockError> {
+        // Do the modifiers first to avoid a likely-unnecessary clone() of the listener.
+        for modifier in self.modifiers() {
+            modifier.listen_impl(&listener, depth)?;
+        }
+
         match *self.primitive() {
             Primitive::Indirect(ref def_ref) => {
                 // Note: This does not pass the recursion depth because BlockDef provides
@@ -415,12 +420,6 @@ impl Block {
                         SpaceChange::Number(_) => None,
                     }
                 }));
-            }
-        }
-        for modifier in self.modifiers() {
-            // TODO: We're going to be in trouble if this is ever needed, because most Listeners don't implement Clone (but probably should?)
-            match modifier {
-                Modifier::Rotate(_) => {}
             }
         }
         Ok(())
