@@ -1,6 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+//! [`EvaluatedBlock`] and [`Evoxel`].
+
 use std::fmt;
 
 use cgmath::{Vector4, Zero as _};
@@ -11,17 +13,19 @@ use crate::space::{Grid, GridArray};
 use crate::universe::RefError;
 use crate::util::{ConciseDebug, CustomFormat};
 
-/// A “flattened” and snapshotted form of [`Block`] which contains all information needed
-/// for rendering and physics, and does not require dereferencing [`URef`]s.
+/// A snapshotted form of [`Block`] which contains all information needed for rendering
+/// and physics, and does not require dereferencing [`URef`]s or unbounded computation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct EvaluatedBlock {
     /// The block's attributes.
     pub attributes: BlockAttributes,
+
     /// The block's color; if made of multiple voxels, then an average or representative
     /// color.
     pub color: Rgba,
+
     /// The voxels making up the block, if any; if [`None`], then [`Self::color`]
     /// should be used as a uniform color value.
     ///
@@ -29,21 +33,25 @@ pub struct EvaluatedBlock {
     /// in which case the out-of-bounds space should be treated as [`Evoxel::AIR`].
     /// The logical bounds are always the cube computed by [`Grid::for_block`].
     pub voxels: Option<GridArray<Evoxel>>,
+
     /// If [`Self::voxels`] is present, then this is the voxel resolution (number of
     /// voxels along an edge) of the block.
     ///
     /// If [`Self::voxels`] is [`None`], then this value is irrelevant and should be set
     /// to 1.
     pub resolution: Resolution,
+
     /// Whether the block is known to be completely opaque to light on all six faces.
     ///
     /// Currently, this is defined to be that each of the surfaces of the block are
     /// fully opaque, but in the future it might be refined to permit concave surfaces.
     // TODO: generalize opaque to multiple faces and partial opacity, for better light transport
     pub opaque: bool,
+
     /// Whether the block has any voxels/color at all that make it visible; that is, this
     /// is false if the block is completely transparent.
     pub visible: bool,
+
     /// The opacity of all voxels. This is redundant with the data  [`Self::voxels`],
     /// and is provided as a pre-computed convenience that can be cheaply compared with
     /// other values of the same type.
