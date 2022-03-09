@@ -9,6 +9,7 @@
 
 - `all-is-cubes` library:
     - `math::coord::point_to_enclosing_cube()`
+    - Most `Listener` implementations now also implement `Clone` and `Debug`. This allows taking a listener and registering it with more than one `Notifier`. Relatedly, some uses of `-> impl Listener` have been replaced with concrete types.
 
 ### Changed
 

@@ -79,7 +79,7 @@ impl<M: Clone + Send> Notifier<M> {
     /// notifier_1.notify("a");
     /// assert!(sink.drain().is_empty());
     /// ```
-    pub fn forwarder(this: Weak<Self>) -> impl Listener<M> {
+    pub fn forwarder(this: Weak<Self>) -> NotifierForwarder<M> {
         NotifierForwarder(this)
     }
 
@@ -121,6 +121,10 @@ impl<M> fmt::Debug for Notifier<M> {
 
 /// A receiver of messages which can indicate when it is no longer interested in
 /// them (typically because the associated recipient has been dropped).
+///
+/// Implementors should also implement [`Clone`] whenever possible; this allows
+/// for a "listen" operation to be implemented in terms of delegating to several others.
+/// This is not required, so that the `Listener` trait remains object-safe.
 pub trait Listener<M> {
     /// Process and store a message.
     ///

@@ -548,6 +548,7 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
 }
 
 /// [`Listener`] adapter for [`CsmTodo`].
+#[derive(Clone, Debug)]
 struct TodoListener<const CHUNK_SIZE: GridCoordinate>(Weak<Mutex<CsmTodo<CHUNK_SIZE>>>);
 
 impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CHUNK_SIZE> {

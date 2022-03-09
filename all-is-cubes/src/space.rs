@@ -1081,11 +1081,12 @@ impl CustomFormat<StatusText> for SpaceStepInfo {
 /// Currently this is responsible for counting block changes.
 /// In the future it might be used for side effects in the world, or we might
 /// want to handle that differently.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct SpaceTodo {
     blocks: HashSet<BlockIndex>,
 }
 
+#[derive(Clone, Debug)]
 struct SpaceBlockChangeListener {
     todo: Weak<Mutex<SpaceTodo>>,
     index: BlockIndex,

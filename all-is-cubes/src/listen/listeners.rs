@@ -59,7 +59,10 @@ where
 pub struct Sink<M> {
     messages: Arc<RwLock<VecDeque<M>>>,
 }
-struct SinkListener<M> {
+
+/// [`Sink::listener()`] implementation.
+#[derive(Debug)]
+pub struct SinkListener<M> {
     weak_messages: Weak<RwLock<VecDeque<M>>>,
 }
 
@@ -72,7 +75,7 @@ impl<M> Sink<M> {
     }
 
     /// Returns a [`Listener`] which records the messages it receives in this Sink.
-    pub fn listener(&self) -> impl Listener<M> {
+    pub fn listener(&self) -> SinkListener<M> {
         SinkListener {
             weak_messages: Arc::downgrade(&self.messages),
         }
@@ -137,6 +140,14 @@ impl<M> Listener<M> for SinkListener<M> {
     }
 }
 
+impl<M> Clone for SinkListener<M> {
+    fn clone(&self) -> Self {
+        Self {
+            weak_messages: self.weak_messages.clone(),
+        }
+    }
+}
+
 impl<M> Default for Sink<M>
 where
     M: Send + Sync,
@@ -161,9 +172,12 @@ impl fmt::Debug for DirtyFlag {
     }
 }
 
-struct DirtyFlagListener {
+/// [`DirtyFlag::listener()`] implementation.
+#[derive(Clone, Debug)]
+pub struct DirtyFlagListener {
     weak_flag: Weak<AtomicBool>,
 }
+
 impl DirtyFlag {
     /// Constructs a new [`DirtyFlag`] with the given initial value.
     pub fn new(value: bool) -> Self {
@@ -174,7 +188,7 @@ impl DirtyFlag {
 
     /// Returns a [`Listener`] which will set this flag to [`true`] when it receives any
     /// message.
-    pub fn listener<M>(&self) -> impl Listener<M> {
+    pub fn listener(&self) -> DirtyFlagListener {
         DirtyFlagListener {
             weak_flag: Arc::downgrade(&self.flag),
         }

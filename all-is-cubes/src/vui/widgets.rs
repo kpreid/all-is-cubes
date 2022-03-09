@@ -25,7 +25,7 @@ use crate::character::{Character, CharacterChange};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::{EphemeralOpaque, Slot};
-use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener as _};
+use crate::listen::{DirtyFlag, FnListener, Gate, ListenableSource, Listener};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
@@ -257,7 +257,8 @@ impl ToolbarController {
         character_source.listen(todo_change_character.listener());
         let character = character_source.snapshot();
 
-        let (character_listener_gate, character_listener) = todo_inventory.listener().gate();
+        let (character_listener_gate, character_listener) =
+            Listener::<()>::gate(todo_inventory.listener());
         if let Some(character) = &character {
             character.borrow().listen(character_listener);
         }
@@ -429,7 +430,7 @@ impl WidgetController for ToolbarController {
         if self.todo_change_character.get_and_clear() {
             self.character = self.character_source.snapshot();
 
-            let (gate, listener) = self.todo_inventory.listener().gate();
+            let (gate, listener) = Listener::<()>::gate(self.todo_inventory.listener());
             if let Some(character) = &self.character {
                 character.borrow().listen(listener);
             }

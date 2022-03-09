@@ -521,6 +521,7 @@ struct SpaceRendererTodo {
 }
 
 /// [`Listener`] adapter for [`SpaceRendererTodo`].
+#[derive(Clone, Debug)]
 struct TodoListener(Weak<Mutex<SpaceRendererTodo>>);
 
 impl Listener<SpaceChange> for TodoListener {

@@ -55,8 +55,8 @@ impl Gate {
 }
 
 /// [`Listener`] implementation which discards messages when the corresponding [`Gate`]
-/// is dropped. Construct this using [`Listener::gate`].
-#[derive(Debug)]
+/// is dropped. Construct this using [`Listener::gate()`].
+#[derive(Clone, Debug)]
 pub struct GateListener<T> {
     weak: Weak<()>,
     target: T,
@@ -75,10 +75,11 @@ where
     }
 }
 
-/// A [`Listener`] which forwards messages through a [`Notifier`].
-/// Constructed by [`Notifier::forwarder`].
+/// A [`Listener`] which forwards messages through a [`Notifier`] to its listeners.
+/// Constructed by [`Notifier::forwarder()`].
 #[derive(Debug)]
-pub(super) struct NotifierForwarder<M>(pub(super) Weak<Notifier<M>>);
+pub struct NotifierForwarder<M>(pub(super) Weak<Notifier<M>>);
+
 impl<M: Clone + Send> Listener<M> for NotifierForwarder<M> {
     fn receive(&self, message: M) {
         if let Some(notifier) = self.0.upgrade() {
@@ -87,6 +88,12 @@ impl<M: Clone + Send> Listener<M> for NotifierForwarder<M> {
     }
     fn alive(&self) -> bool {
         self.0.strong_count() > 0
+    }
+}
+
+impl<M> Clone for NotifierForwarder<M> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 
