@@ -4,7 +4,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::block::{Block, BlockChange, Modifier, Primitive};
+use crate::block::{Block, BlockChange, Primitive};
 use crate::listen::{Gate, Listener, Notifier};
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
@@ -88,14 +88,6 @@ impl VisitRefs for Primitive {
             Primitive::Indirect(block_ref) => visitor.visit(block_ref),
             Primitive::Atom(_, _) => {}
             Primitive::Recur { space, .. } => visitor.visit(space),
-        }
-    }
-}
-
-impl VisitRefs for Modifier {
-    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {
-        match self {
-            Modifier::Rotate(..) => {}
         }
     }
 }

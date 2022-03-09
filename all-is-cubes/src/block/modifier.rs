@@ -3,8 +3,9 @@
 
 use crate::block::{BlockChange, EvalBlockError, EvaluatedBlock};
 use crate::listen::Listener;
-use crate::math::GridRotation;
+use crate::math::{GridRotation, Rgb};
 use crate::space::GridArray;
+use crate::universe::{RefVisitor, VisitRefs};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
@@ -15,6 +16,16 @@ use super::Block;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Modifier {
+    /// Suppresses all behaviors of the [`Block`] that might affect the space around it,
+    /// (or itself).
+    // TODO: figure out how to publicly construct this given that we want to still have
+    // the option to add variants
+    #[non_exhaustive]
+    Quote {
+        /// If true, also suppress light and sound effects.
+        ambient: bool,
+    },
+
     /// Rotate the block about its cube center by the given rotation.
     Rotate(GridRotation),
 }
@@ -22,10 +33,17 @@ pub enum Modifier {
 impl Modifier {
     pub(crate) fn apply(
         &self,
-        value: EvaluatedBlock,
+        mut value: EvaluatedBlock,
         _depth: u8,
     ) -> Result<EvaluatedBlock, EvalBlockError> {
         Ok(match *self {
+            Modifier::Quote { ambient } => {
+                if ambient {
+                    value.attributes.light_emission = Rgb::ZERO;
+                }
+                value
+            }
+
             Modifier::Rotate(rotation) => {
                 if value.voxels.is_none() && value.voxel_opacity_mask.is_none() {
                     // Skip computation of transforms
@@ -71,8 +89,18 @@ impl Modifier {
         _depth: u8,
     ) -> Result<(), EvalBlockError> {
         match self {
+            Modifier::Quote { .. } => {}
             Modifier::Rotate(_) => {}
         }
         Ok(())
+    }
+}
+
+impl VisitRefs for Modifier {
+    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {
+        match self {
+            Modifier::Quote { .. } => {}
+            Modifier::Rotate(..) => {}
+        }
     }
 }

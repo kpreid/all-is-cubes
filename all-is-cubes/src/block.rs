@@ -239,7 +239,7 @@ impl Block {
             Some(Modifier::Rotate(existing_rotation)) => {
                 *existing_rotation = rotation * *existing_rotation;
             }
-            None => parts.modifiers.push(Modifier::Rotate(rotation)),
+            None | Some(_) => parts.modifiers.push(Modifier::Rotate(rotation)),
         }
         self
     }

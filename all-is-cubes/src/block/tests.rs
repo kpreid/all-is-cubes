@@ -332,6 +332,23 @@ fn evaluate_rotated() {
     );
 }
 
+#[test]
+fn evaluate_quote() {
+    let l = Rgb::new(1.0, 2.0, 3.0);
+    let mut block = Block::builder()
+        .light_emission(l)
+        .color(Rgba::WHITE)
+        .build();
+    assert_eq!(block.evaluate().unwrap().attributes.light_emission, l);
+    block
+        .modifiers_mut()
+        .push(Modifier::Quote { ambient: true });
+    assert_eq!(
+        block.evaluate().unwrap().attributes.light_emission,
+        Rgb::ZERO
+    );
+}
+
 /// Tests that the `offset` field of `Primitive::Recur` is respected.
 #[test]
 fn recur_with_offset() {
