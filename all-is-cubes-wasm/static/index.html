@@ -21,18 +21,10 @@
   <div id="scene-info-overlay" class="overlay">
     <pre>Move: WS AD EC — Turn: ←→ ↑↓ or L for mouselook — Delete: left click — Place: right click — Select items: 0-9.</pre>
     <progress id="loading-progress-bar" value="0.0" min="0.0" max="1.0"></progress>
-    <pre id="scene-info-text">JavaScript not loaded...</pre>
+    <pre id="loading-log">JavaScript not loaded...</pre>
+    <pre id="scene-info-text"></pre>
   </div>
   <div id="world-overlays"></div>
-  <!-- TODO: Reimplement this feature
-    <div id="menu-container">
-      <div id="menu">
-        <button class="menu-button menu-expand-button" onclick="main.input.editBlockset();">Edit blockset</button>
-        <div id="blockset-all"></div>
-        <div id="quick-bar"></div>
-      </div>
-    </div>
-  -->
   <div id="toggles">
     <!-- TODO: Reimplement this feature
       <button id="save-button" onclick="main.save(); document.getElementById('view-canvas').focus(); return false;">Save</button>

@@ -3,11 +3,11 @@
 
 // This file is the non-module entry point which will be loaded from HTML.
 
-document.getElementById('scene-info-text').innerText = 'Loading code...';
+document.getElementById('loading-log').innerText = 'Loading code...';
 import("../js/bootstrap.js").then(module => {
   module.bootstrap();
 }).catch(error => {
-  document.getElementById('scene-info-text').innerText +=
+  document.getElementById('loading-log').innerText +=
     '\nError during initial loading! Check console for details.';
   if (String(error) !== 'RuntimeError: unreachable') {
     // Only log errors that aren't Rust's panics because those are logged separately.

@@ -1,6 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+//! DOM and JS environment manipulation that isn't application-specific.
+
 use std::sync::Mutex;
 
 use instant::{Duration, Instant};
@@ -8,7 +10,7 @@ use js_sys::{Error, Function};
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast; // dyn_into()
-use web_sys::{AddEventListenerOptions, Document, Event, EventTarget};
+use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text};
 
 pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -> Result<E, Error> {
     document
@@ -22,6 +24,17 @@ pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -
                 std::any::type_name::<E>()
             ))
         })
+}
+
+pub fn replace_children_with_one_text_node(element: Element) -> Text {
+    let existing_string: Option<String> = element.text_content();
+    let text = Text::new().unwrap();
+    if let Some(s) = existing_string {
+        text.set_data(&s);
+    }
+    element.set_text_content(None);
+    element.append_child(text.as_ref()).unwrap();
+    text
 }
 
 pub fn add_event_listener<E, F>(
@@ -87,4 +100,5 @@ pub(crate) async fn yield_to_event_loop() {
 }
 
 /// Time used by [`yield_to_event_loop`] to decude whether to actually yield.
+/// TODO: A thread-local would be a better expression of intent here.
 static NEXT_YIELD_INSTANT: Lazy<Mutex<Instant>> = Lazy::new(|| Mutex::new(Instant::now()));

@@ -24,7 +24,7 @@ use all_is_cubes_gpu::GLRenderer;
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl};
-use crate::web_glue::{add_event_listener, get_mandatory_element, yield_to_event_loop};
+use crate::web_glue::{add_event_listener, get_mandatory_element, yield_to_event_loop, replace_children_with_one_text_node};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
@@ -70,7 +70,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     );
 
     static_dom
-        .scene_info_text_node
+        .loading_log
         .append_data("\nInitializing application...")?;
     app_progress.progress(0.05).await;
     // The main cost of this is constructing the `Vui` instance.
@@ -78,7 +78,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let mut app = AllIsCubesAppState::new().await;
 
     static_dom
-        .scene_info_text_node
+        .loading_log
         .append_data("\nConstructing universe...")?;
     app_progress.progress(1.0).await;
 
@@ -91,7 +91,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     app.graphics_options_mut().set(graphics_options);
 
     static_dom
-        .scene_info_text_node
+        .loading_log
         .append_data("\nInitializing WebGL...")?;
     final_progress.progress(0.1).await;
     let surface = WebSysWebGL2Surface::from_canvas_with_params(
@@ -104,9 +104,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     )
     .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
 
-    static_dom
-        .scene_info_text_node
-        .append_data("\nLoading shaders...")?;
+    static_dom.loading_log.append_data("\nLoading shaders...")?;
     final_progress.progress(0.5).await;
     let renderer = GLRenderer::new(
         surface,
@@ -115,7 +113,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
 
     static_dom
-        .scene_info_text_node
+        .loading_log
         .append_data("\nFinal initialization...")?;
     final_progress.progress(1.0).await;
 
@@ -125,13 +123,14 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         list.remove_1("state-loading").unwrap();
         list.add_1("state-fully-loaded").unwrap();
     }
-    let root = WebGameRoot::new(gui_helpers, static_dom, app, renderer);
+    let root = WebGameRoot::new(gui_helpers, static_dom.clone(), app, renderer);
 
     root.borrow().start_loop();
     // Explicitly keep the game loop alive.
     Box::leak(Box::new(root));
 
     console::log_1(&JsValue::from_str("start_game() completed."));
+    static_dom.loading_log.set_data("");
     Ok(())
 }
 
@@ -433,29 +432,29 @@ impl WebGameRoot {
     }
 }
 
+#[derive(Clone, Debug)]
 struct StaticDom {
     /// The highest-level element we're supposed to touch, used for setting CSS classes.
     /// Usually the document element.
     app_root: HtmlElement,
     progress_bar: HtmlProgressElement,
+    loading_log: Text,
     scene_info_text_node: Text,
 }
 
 impl StaticDom {
     fn new(document: &Document) -> Result<Self, Error> {
-        let scene_info_element: HtmlElement = get_mandatory_element(document, "scene-info-text")?;
-        // Ensure element has exactly one text node child.
-        scene_info_element.set_text_content(scene_info_element.text_content().as_deref());
-        let scene_info_text_node = scene_info_element
-            .first_child()
-            .unwrap()
-            .dyn_into()
-            .unwrap();
-
         Ok(Self {
             app_root: get_mandatory_element(document, "app-root")?,
             progress_bar: get_mandatory_element(document, "loading-progress-bar")?,
-            scene_info_text_node,
+            loading_log: replace_children_with_one_text_node(get_mandatory_element(
+                document,
+                "loading-log",
+            )?),
+            scene_info_text_node: replace_children_with_one_text_node(get_mandatory_element(
+                document,
+                "scene-info-text",
+            )?),
         })
     }
 }
