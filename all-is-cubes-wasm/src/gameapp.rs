@@ -24,7 +24,10 @@ use all_is_cubes_gpu::GLRenderer;
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl};
-use crate::web_glue::{add_event_listener, get_mandatory_element, yield_to_event_loop, replace_children_with_one_text_node};
+use crate::web_glue::{
+    add_event_listener, get_mandatory_element, replace_children_with_one_text_node,
+    yield_to_event_loop,
+};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
@@ -55,7 +58,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         move |fraction| progress_bar.set_value(fraction.into())
     });
     let [app_progress, progress] = progress.split(0.1);
-    let [universe_progress, final_progress] = progress.split(0.75);
+    let [universe_progress, post_universe_progress] = progress.split(0.98);
 
     let OptionsInUrl {
         template,
@@ -72,28 +75,16 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     static_dom
         .loading_log
         .append_data("\nInitializing application...")?;
-    app_progress.progress(0.05).await;
+    app_progress.progress(0.2).await;
     // The main cost of this is constructing the `Vui` instance.
     // TODO: pipe in YieldProgress
-    let mut app = AllIsCubesAppState::new().await;
-
-    static_dom
-        .loading_log
-        .append_data("\nConstructing universe...")?;
-    app_progress.progress(1.0).await;
-
-    let universe = template
-        .build(universe_progress, thread_rng().gen())
-        .await
-        .expect("universe template error");
-
-    app.set_universe(universe);
+    let app = AllIsCubesAppState::new().await;
     app.graphics_options_mut().set(graphics_options);
 
     static_dom
         .loading_log
         .append_data("\nInitializing WebGL...")?;
-    final_progress.progress(0.1).await;
+    app_progress.progress(0.4).await;
     let surface = WebSysWebGL2Surface::from_canvas_with_params(
         web_sys::window().unwrap(), // TODO messy
         document,
@@ -105,7 +96,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
 
     static_dom.loading_log.append_data("\nLoading shaders...")?;
-    final_progress.progress(0.5).await;
+    app_progress.progress(0.6).await;
     let renderer = GLRenderer::new(
         surface,
         StandardCameras::from_app_state(&app, gui_helpers.canvas_helper().viewport()).unwrap(),
@@ -114,21 +105,32 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     static_dom
         .loading_log
-        .append_data("\nFinal initialization...")?;
-    final_progress.progress(1.0).await;
+        .append_data("\nStarting game loop...")?;
+    app_progress.progress(0.8).await;
+    let root = WebGameRoot::new(gui_helpers, static_dom.clone(), app, renderer);
+    root.borrow().start_loop();
 
+    static_dom
+        .loading_log
+        .append_data("\nConstructing universe...")?;
+    app_progress.progress(1.0).await;
+    let universe = template
+        .build(universe_progress, thread_rng().gen())
+        .await
+        .expect("universe template error");
+    root.borrow_mut().app.set_universe(universe);
+
+    // Explicitly keep the game loop alive.
+    Box::leak(Box::new(root));
+
+    // Do the final UI cleanup going from "loading" to "running".
+    post_universe_progress.progress(1.0).await;
     {
         // TODO: make this part the WebGameRoot's responsibility? Move the class list manip to StaticDom?
         let list = static_dom.app_root.class_list();
         list.remove_1("state-loading").unwrap();
         list.add_1("state-fully-loaded").unwrap();
     }
-    let root = WebGameRoot::new(gui_helpers, static_dom.clone(), app, renderer);
-
-    root.borrow().start_loop();
-    // Explicitly keep the game loop alive.
-    Box::leak(Box::new(root));
-
     console::log_1(&JsValue::from_str("start_game() completed."));
     static_dom.loading_log.set_data("");
     Ok(())
