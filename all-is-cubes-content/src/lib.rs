@@ -233,7 +233,7 @@ fn space_to_space_copy(
 }
 
 /// As [`space_to_space_copy`], but producing a transaction.
-pub fn space_to_transaction_copy(
+pub(crate) fn space_to_transaction_copy(
     src: &Space,
     src_grid: Grid,
     src_to_dst_transform: GridMatrix,
