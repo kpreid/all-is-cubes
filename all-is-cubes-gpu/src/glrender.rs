@@ -6,10 +6,9 @@
 use std::fmt;
 use std::time::Duration;
 
-use instant::Instant; // wasm-compatible replacement for std::time::Instant
-use luminance::blending::Blending;
-use luminance::blending::Equation;
-use luminance::blending::Factor;
+use instant::Instant;
+use luminance::backend::{color_slot::ColorSlot, depth_stencil_slot::DepthStencilSlot};
+use luminance::blending::{Blending, Equation, Factor};
 use luminance::context::GraphicsContext;
 use luminance::depth_stencil::Write;
 use luminance::framebuffer::Framebuffer;
@@ -200,12 +199,17 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
     }
 
     /// Draw a frame, excluding info text overlay.
-    pub fn render_frame<C: GraphicsContext<Backend = Backend>>(
+    pub fn render_frame<C, CS, DS>(
         &mut self,
         context: &mut C,
-        framebuffer: &Framebuffer<C::Backend, Dim2, (), ()>,
+        framebuffer: &Framebuffer<Backend, Dim2, CS, DS>,
         cursor_result: &Option<Cursor>,
-    ) -> Result<RenderInfo, GraphicsResourceError> {
+    ) -> Result<RenderInfo, GraphicsResourceError>
+    where
+        C: GraphicsContext<Backend = Backend>,
+        CS: ColorSlot<Backend, Dim2>,
+        DS: DepthStencilSlot<Backend, Dim2>,
+    {
         let mut info = RenderInfo::default();
         let start_frame_time = Instant::now();
 
@@ -411,12 +415,17 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         Ok(info)
     }
 
-    pub fn add_info_text<C: GraphicsContext<Backend = Backend>>(
+    pub fn add_info_text<C, CS, DS>(
         &mut self,
         context: &mut C,
-        framebuffer: &Framebuffer<C::Backend, Dim2, (), ()>,
+        framebuffer: &Framebuffer<C::Backend, Dim2, CS, DS>,
         text: &str,
-    ) -> Result<(), GraphicsResourceError> {
+    ) -> Result<(), GraphicsResourceError>
+    where
+        C: GraphicsContext<Backend = Backend>,
+        CS: ColorSlot<Backend, Dim2>,
+        DS: DepthStencilSlot<Backend, Dim2>,
+    {
         if !self.cameras.cameras().world.options().debug_info_text {
             // TODO: Avoid computing the text, not just drawing it
             return Ok(());
