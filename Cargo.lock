@@ -135,9 +135,12 @@ name = "all-is-cubes-gpu"
 version = "0.4.0"
 dependencies = [
  "all-is-cubes",
+ "futures-executor",
+ "glfw",
  "instant",
  "log",
  "luminance",
+ "luminance-glfw",
  "once_cell",
  "rand 0.8.5",
  "rand_xoshiro",
