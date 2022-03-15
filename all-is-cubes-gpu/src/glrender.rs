@@ -18,23 +18,25 @@ use luminance::render_state::RenderState;
 use luminance::tess::Mode;
 use luminance::texture::{Dim2, MagFilter, MinFilter};
 
+use all_is_cubes::apps::{Layers, StandardCameras};
+use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::{Matrix4, SquareMatrix};
+use all_is_cubes::character::{Character, Cursor};
+use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{iso_8859_1::FONT_7X13_BOLD, MonoTextStyle},
     pixelcolor::Rgb888,
     prelude::{Drawable, Point},
     text::{Baseline, Text},
 };
-
-use all_is_cubes::apps::{Layers, StandardCameras};
-use all_is_cubes::camera::{Camera, Viewport};
-use all_is_cubes::character::{Character, Cursor};
-use all_is_cubes::content::palette;
 use all_is_cubes::math::{Aab, Rgba};
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::URef;
 use all_is_cubes::util::{CustomFormat, StatusText};
 
 use crate::frame_texture::{FullFramePainter, FullFrameTexture};
 use crate::shading::{prepare_lines_program, BlockPrograms, LinesProgram, ShaderConstants};
+use crate::space::SpaceRendererOutput;
 use crate::space::{SpaceRenderInfo, SpaceRenderer};
 use crate::types::{AicLumBackend, LinesVertex};
 use crate::GraphicsResourceError;
@@ -181,25 +183,27 @@ where
 
         let surface = &mut self.surface;
 
-        let character: &Character = &*(if let Some(character_ref) = self.cameras.character() {
-            character_ref.borrow()
+        // We may or may not have a character's viewpoint to draw, but we want to be able to continue
+        // drawing the UI in either case.
+        let character_borrow;
+        let character: Option<&Character> = if let Some(character_ref) = self.cameras.character() {
+            character_borrow = character_ref.borrow();
+            Some(&*character_borrow)
         } else {
-            // Nothing to draw; clear screen and exit
-            surface
-                .new_pipeline_gate()
-                .pipeline(&self.back_buffer, &PipelineState::default(), |_, _| Ok(()))
-                .assume()
-                .into_result()?;
-            return Ok(info);
-        });
+            None
+        };
+        let world_space: Option<&URef<Space>> = character.map(|c| &c.space);
 
         // Prepare Tess and Texture for space.
         let start_prepare_time = Instant::now();
-        if self.world_renderer.as_ref().map(|sr| sr.space()) != Some(&character.space) {
-            self.world_renderer = Some(SpaceRenderer::new(character.space.clone()));
+        if self.world_renderer.as_ref().map(|sr| sr.space()) != world_space {
+            self.world_renderer = world_space.cloned().map(SpaceRenderer::new);
         }
-        let world_renderer = self.world_renderer.as_mut().unwrap();
-        let world_output = world_renderer.prepare_frame(surface, &self.cameras.cameras().world)?;
+        let world_output: Option<SpaceRendererOutput<'_, C::Backend>> = self
+            .world_renderer
+            .as_mut()
+            .map(|r| r.prepare_frame(surface, &self.cameras.cameras().world))
+            .transpose()?;
 
         let ui_output = if let Some(ui_renderer) = &mut self.ui_renderer {
             Some(ui_renderer.prepare_frame(surface, &self.cameras.cameras().ui)?)
@@ -212,39 +216,46 @@ where
         let debug_lines_tess = {
             let mut v: Vec<LinesVertex> = Vec::new();
 
-            if graphics_options.debug_collision_boxes {
-                // Character collision box
-                wireframe_vertices(
-                    &mut v,
-                    palette::DEBUG_COLLISION_BOX,
-                    character.body.collision_box_abs(),
-                );
-                // What it collided with
-                for contact in &character.colliding_cubes {
-                    wireframe_vertices(&mut v, palette::DEBUG_COLLISION_CUBES, *contact);
+            // All of these debug visualizations depend on the character
+            if let Some(character) = character {
+                if graphics_options.debug_collision_boxes {
+                    // Character collision box
+                    wireframe_vertices(
+                        &mut v,
+                        palette::DEBUG_COLLISION_BOX,
+                        character.body.collision_box_abs(),
+                    );
+                    // What it collided with
+                    for contact in &character.colliding_cubes {
+                        wireframe_vertices(&mut v, palette::DEBUG_COLLISION_CUBES, *contact);
+                    }
                 }
-            }
 
-            // Show light update debug info.
-            // This is enabled/disabled inside the lighting algorithm, not as a graphics
-            // option.
-            for cube in character.space.borrow().last_light_updates.iter().copied() {
-                wireframe_vertices(
-                    &mut v,
-                    Rgba::new(1.0, 1.0, 0.0, 1.0),
-                    Aab::from_cube(cube).expand(0.005),
-                );
-            }
+                // Show light update debug info.
+                // This is enabled/disabled inside the lighting algorithm, not as a graphics
+                // option.
+                for cube in character.space.borrow().last_light_updates.iter().copied() {
+                    wireframe_vertices(
+                        &mut v,
+                        Rgba::new(1.0, 1.0, 0.0, 1.0),
+                        Aab::from_cube(cube).expand(0.005),
+                    );
+                }
 
-            // Lighting trace at cursor
-            if graphics_options.debug_light_rays_at_cursor {
-                if let Some(cursor) = cursor_result {
-                    // TODO: We should be able to draw wireframes in the UI space too, and when we do that will enable supporting this.
-                    if cursor.space == character.space {
-                        let space = character.space.borrow();
-                        let (_, _, _, lighting_info) =
-                            space.compute_lighting(cursor.place.adjacent());
-                        wireframe_vertices(&mut v, Rgba::new(0.8, 0.8, 1.0, 1.0), lighting_info);
+                // Lighting trace at cursor
+                if graphics_options.debug_light_rays_at_cursor {
+                    if let Some(cursor) = cursor_result {
+                        // TODO: We should be able to draw wireframes in the UI space too, and when we do that will enable supporting this.
+                        if cursor.space == character.space {
+                            let space = character.space.borrow();
+                            let (_, _, _, lighting_info) =
+                                space.compute_lighting(cursor.place.adjacent());
+                            wireframe_vertices(
+                                &mut v,
+                                Rgba::new(0.8, 0.8, 1.0, 1.0),
+                                lighting_info,
+                            );
+                        }
                     }
                 }
             }
@@ -267,44 +278,55 @@ where
         let cursor_tess = make_cursor_tess(surface, cursor_result)?;
 
         let start_draw_world_time = Instant::now();
+        let clear_color = match world_output.as_ref() {
+            Some(o) => o.data.clear_color(),
+            None => Rgba::BLACK, // TODO: take from palette or config
+        }
+        .to_srgb_float();
         surface
             .new_pipeline_gate()
             .pipeline(
                 &self.back_buffer,
                 // TODO: port skybox cube map code
-                &PipelineState::default()
-                    .set_clear_color(Some(world_output.data.clear_color().to_srgb_float())),
+                &PipelineState::default().set_clear_color(Some(clear_color)),
                 |pipeline, mut shading_gate| {
-                    let world_output_bound = world_output.bind(&pipeline)?;
-                    // Space
-                    info.space = world_output_bound.render(
-                        &mut shading_gate,
-                        &mut block_programs.world,
-                        &mut self.lines_program,
-                    )?;
+                    if let Some(world_output) = world_output {
+                        let world_output_bound = world_output.bind(&pipeline)?;
+                        // Space
+                        info.space = world_output_bound.render(
+                            &mut shading_gate,
+                            &mut block_programs.world,
+                            &mut self.lines_program,
+                        )?;
 
-                    // Cursor and debug info
-                    // Note: This will fall on top of transparent world content due to draw order.
-                    shading_gate.shade(
-                        &mut self.lines_program,
-                        |ref mut program_iface, u, mut render_gate| {
-                            u.initialize(program_iface, &world_output_bound, Matrix4::identity());
-                            render_gate.render(&RenderState::default(), |mut tess_gate| {
-                                // Draw cursor only if it's in the same space.
-                                if matches!(cursor_result, Some(c) if c.space == character.space) {
-                                    if let Some(tess) = &cursor_tess {
+                        // Cursor and debug info
+                        // Note: This will fall on top of transparent world content due to draw order.
+                        shading_gate.shade(
+                            &mut self.lines_program,
+                            |ref mut program_iface, u, mut render_gate| {
+                                u.initialize(
+                                    program_iface,
+                                    &world_output_bound,
+                                    Matrix4::identity(),
+                                );
+                                render_gate.render(&RenderState::default(), |mut tess_gate| {
+                                    // Draw cursor only if it's in the same space.
+                                    if cursor_result.as_ref().map(|c| &c.space) == world_space {
+                                        if let Some(tess) = &cursor_tess {
+                                            tess_gate.render(tess)?;
+                                        }
+                                    }
+
+                                    if let Some(tess) = &debug_lines_tess {
                                         tess_gate.render(tess)?;
                                     }
-                                }
-
-                                if let Some(tess) = &debug_lines_tess {
-                                    tess_gate.render(tess)?;
-                                }
+                                    Ok(())
+                                })?;
                                 Ok(())
-                            })?;
-                            Ok(())
-                        },
-                    )
+                            },
+                        )?;
+                    }
+                    Ok(())
                 },
             )
             .assume()
