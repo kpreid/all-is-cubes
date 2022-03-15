@@ -346,8 +346,8 @@ impl WebGameRoot {
             self.renderer
                 .set_viewport(self.gui_helpers.canvas_helper().viewport())
                 .unwrap();
-            self.renderer.update_world_camera();
-            self.app.update_cursor(self.renderer.cameras());
+            self.renderer.objects.update_world_camera();
+            self.app.update_cursor(self.renderer.objects.cameras());
 
             // Do graphics
             let render_info = self
@@ -358,6 +358,7 @@ impl WebGameRoot {
             // Update info text
             if self
                 .renderer
+                .objects
                 .cameras()
                 .cameras()
                 .world

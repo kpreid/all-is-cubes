@@ -43,26 +43,17 @@ use crate::GraphicsResourceError;
 use crate::{make_cursor_tess, wireframe_vertices};
 
 /// Game world/UI renderer targeting `luminance`.
-// TODO: give this and its module a better name
+///
+/// TODO: give this and its module a better name
 #[allow(missing_debug_implementations)]
 pub struct GLRenderer<C>
 where
     C: GraphicsContext,
     C::Backend: AicLumBackend + Sized,
 {
-    cameras: StandardCameras,
-
-    // Graphics objects
     pub surface: C,
+    pub objects: EverythingRenderer<C::Backend>,
     back_buffer: Framebuffer<C::Backend, Dim2, (), ()>,
-    block_programs: Layers<BlockPrograms<C::Backend>>,
-    lines_program: LinesProgram<C::Backend>,
-    info_text_texture: FullFrameTexture<C::Backend>,
-
-    // Rendering state
-    // TODO: use Layers for this
-    world_renderer: Option<SpaceRenderer<C::Backend>>,
-    ui_renderer: Option<SpaceRenderer<C::Backend>>,
 }
 
 impl<C> GLRenderer<C>
@@ -72,30 +63,91 @@ where
 {
     /// Constructs `GLRenderer` for the given camera configuration.
     ///
-    /// Returns any shader compilation errors or warnings.
+    /// May return errors due to failure to allocate GPU resources or to compile shaders.
     pub fn new(mut surface: C, cameras: StandardCameras) -> Result<Self, GraphicsResourceError> {
+        Ok(Self {
+            // TODO: duplicated code with set_viewport()
+            back_buffer: luminance::framebuffer::Framebuffer::back_buffer(
+                &mut surface,
+                cameras.viewport().framebuffer_size.into(),
+            )?,
+            objects: EverythingRenderer::new(&mut surface, cameras)?,
+            surface,
+        })
+    }
+
+    /// Returns the last [`Viewport`] provided.
+    pub fn viewport(&self) -> Viewport {
+        self.objects.cameras.viewport()
+    }
+
+    /// Sets the expected viewport dimensions. Use in case of window resizing.
+    pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), GraphicsResourceError> {
+        self.objects.set_viewport(&mut self.surface, viewport)?;
+
+        // TODO: If this somehow fails, it should be "warning, not error"
+        self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
+            &mut self.surface,
+            viewport.framebuffer_size.into(),
+        )?;
+
+        Ok(())
+    }
+
+    /// Draw a frame, excluding info text overlay.
+    pub fn render_frame(
+        &mut self,
+        cursor_result: &Option<Cursor>,
+    ) -> Result<RenderInfo, GraphicsResourceError> {
+        self.objects
+            .render_frame(&mut self.surface, &self.back_buffer, cursor_result)
+    }
+
+    pub fn add_info_text(&mut self, text: &str) -> Result<(), GraphicsResourceError> {
+        self.objects
+            .add_info_text(&mut self.surface, &self.back_buffer, text)
+    }
+}
+
+/// All the state, both CPU and GPU-side, that is needed for drawing a complete
+/// scene and UI, but not the [`GraphicsContext`] or the [`Framebuffer`].
+///
+/// (This particular subdivision of responsibility is intended to support writing
+/// tests against this code, which will want to use an alternate framebuffer and
+/// a reused context.)
+#[allow(missing_debug_implementations)]
+pub struct EverythingRenderer<Backend: AicLumBackend> {
+    // Shader programs
+    block_programs: Layers<BlockPrograms<Backend>>,
+    lines_program: LinesProgram<Backend>,
+
+    /// Debug overlay text is uploaded via this texture
+    info_text_texture: FullFrameTexture<Backend>,
+
+    cameras: StandardCameras,
+    space_renderers: Layers<Option<SpaceRenderer<Backend>>>,
+}
+
+impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
+    pub fn new<C: GraphicsContext<Backend = Backend>>(
+        context: &mut C,
+        cameras: StandardCameras,
+    ) -> Result<Self, GraphicsResourceError> {
         let block_programs = cameras
             .cameras()
-            .try_map_ref(|camera| BlockPrograms::compile(&mut surface, camera.options().into()))?;
+            .try_map_ref(|camera| BlockPrograms::compile(context, camera.options().into()))?;
         // TODO: lines_program is not updated on changed options (and this code should be deduplicated)
         let lines_program =
-            prepare_lines_program(&mut surface, cameras.cameras().world.options().into())?;
+            prepare_lines_program(context, cameras.cameras().world.options().into())?;
 
-        let back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
-            &mut surface,
-            cameras.viewport().framebuffer_size.into(),
-        )?;
-
-        let full_frame = FullFramePainter::new(
-            &mut surface,
-            include_str!("shaders/info-text-fragment.glsl"),
-        )?;
+        let full_frame =
+            FullFramePainter::new(context, include_str!("shaders/info-text-fragment.glsl"))?;
 
         let mut info_text_texture = full_frame.new_texture();
         // TODO: this is duplicated code with set_viewport
         info_text_texture
             .resize(
-                &mut surface,
+                context,
                 cameras.viewport(),
                 info_text_size_policy,
                 (MagFilter::Nearest, MinFilter::Linear),
@@ -103,34 +155,28 @@ where
             .unwrap(); // TODO: texture allocation can fail; handle this gracefully
 
         Ok(Self {
-            surface,
-            back_buffer,
             block_programs,
             lines_program,
             info_text_texture,
-            world_renderer: None,
-            ui_renderer: cameras.ui_space().cloned().map(SpaceRenderer::new),
+            space_renderers: Layers {
+                world: None,
+                ui: cameras.ui_space().cloned().map(SpaceRenderer::new),
+            },
             cameras,
         })
     }
 
-    /// Returns the last [`Viewport`] provided.
-    pub fn viewport(&self) -> Viewport {
-        self.cameras.viewport()
-    }
-
-    /// Sets the expected viewport dimensions. Use in case of window resizing.
-    pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), GraphicsResourceError> {
+    /// Sets the expected viewport dimensions to use for the next frame.
+    pub fn set_viewport<C: GraphicsContext<Backend = Backend>>(
+        &mut self,
+        context: &mut C,
+        viewport: Viewport,
+    ) -> Result<(), GraphicsResourceError> {
         self.cameras.set_viewport(viewport);
-
-        self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
-            &mut self.surface,
-            viewport.framebuffer_size.into(),
-        )?;
 
         // TODO: If this fails, it should be "warning, not error"
         self.info_text_texture.resize(
-            &mut self.surface,
+            context,
             viewport,
             info_text_size_policy,
             (MagFilter::Nearest, MinFilter::Linear),
@@ -141,7 +187,10 @@ where
 
     /// Sync camera to character state. This is used so that cursor raycasts can be up-to-date
     /// to the same frame of input.
-    #[doc(hidden)] // TODO: design better interface that doesn't need to call this
+    ///
+    /// TODO: This is a kludge which ought to be replaced with some architecture that
+    /// doesn't require a very specific "do this before this"...
+    #[doc(hidden)]
     pub fn update_world_camera(&mut self) {
         self.cameras.update();
     }
@@ -151,8 +200,10 @@ where
     }
 
     /// Draw a frame, excluding info text overlay.
-    pub fn render_frame(
+    pub fn render_frame<C: GraphicsContext<Backend = Backend>>(
         &mut self,
+        context: &mut C,
+        framebuffer: &Framebuffer<C::Backend, Dim2, (), ()>,
         cursor_result: &Option<Cursor>,
     ) -> Result<RenderInfo, GraphicsResourceError> {
         let mut info = RenderInfo::default();
@@ -167,7 +218,7 @@ where
         let mut update_program = |programs: &mut BlockPrograms<_>, camera: &Camera| {
             let shader_constants: ShaderConstants = camera.options().into();
             if shader_constants != programs.constants {
-                match BlockPrograms::compile(&mut self.surface, shader_constants) {
+                match BlockPrograms::compile(context, shader_constants) {
                     Ok(p) => *programs = p,
                     Err(e) => log::error!("Failed to recompile shaders: {}", e),
                 }
@@ -180,8 +231,6 @@ where
         update_program(&mut self.block_programs.ui, &self.cameras.cameras().ui);
 
         let block_programs = &mut self.block_programs;
-
-        let surface = &mut self.surface;
 
         // We may or may not have a character's viewpoint to draw, but we want to be able to continue
         // drawing the UI in either case.
@@ -196,17 +245,18 @@ where
 
         // Prepare Tess and Texture for space.
         let start_prepare_time = Instant::now();
-        if self.world_renderer.as_ref().map(|sr| sr.space()) != world_space {
-            self.world_renderer = world_space.cloned().map(SpaceRenderer::new);
+        if self.space_renderers.world.as_ref().map(|sr| sr.space()) != world_space {
+            self.space_renderers.world = world_space.cloned().map(SpaceRenderer::new);
         }
         let world_output: Option<SpaceRendererOutput<'_, C::Backend>> = self
-            .world_renderer
+            .space_renderers
+            .world
             .as_mut()
-            .map(|r| r.prepare_frame(surface, &self.cameras.cameras().world))
+            .map(|r| r.prepare_frame(context, &self.cameras.cameras().world))
             .transpose()?;
 
-        let ui_output = if let Some(ui_renderer) = &mut self.ui_renderer {
-            Some(ui_renderer.prepare_frame(surface, &self.cameras.cameras().ui)?)
+        let ui_output = if let Some(ui_renderer) = &mut self.space_renderers.ui {
+            Some(ui_renderer.prepare_frame(context, &self.cameras.cameras().ui)?)
         } else {
             None
         };
@@ -265,7 +315,7 @@ where
                 None
             } else {
                 Some(
-                    surface
+                    context
                         .new_tess()
                         .set_vertices(v)
                         .set_mode(Mode::Line)
@@ -275,7 +325,7 @@ where
         };
 
         // TODO: cache
-        let cursor_tess = make_cursor_tess(surface, cursor_result)?;
+        let cursor_tess = make_cursor_tess(context, cursor_result)?;
 
         let start_draw_world_time = Instant::now();
         let clear_color = match world_output.as_ref() {
@@ -283,10 +333,10 @@ where
             None => Rgba::BLACK, // TODO: take from palette or config
         }
         .to_srgb_float();
-        surface
+        context
             .new_pipeline_gate()
             .pipeline(
-                &self.back_buffer,
+                framebuffer,
                 // TODO: port skybox cube map code
                 &PipelineState::default().set_clear_color(Some(clear_color)),
                 |pipeline, mut shading_gate| {
@@ -333,10 +383,10 @@ where
             .into_result()?;
 
         let start_draw_ui_time = Instant::now();
-        surface
+        context
             .new_pipeline_gate()
             .pipeline(
-                &self.back_buffer,
+                framebuffer,
                 // TODO: port skybox cube map code
                 &PipelineState::default().set_clear_color(None),
                 |ref pipeline, ref mut shading_gate| {
@@ -361,7 +411,12 @@ where
         Ok(info)
     }
 
-    pub fn add_info_text(&mut self, text: &str) -> Result<(), GraphicsResourceError> {
+    pub fn add_info_text<C: GraphicsContext<Backend = Backend>>(
+        &mut self,
+        context: &mut C,
+        framebuffer: &Framebuffer<C::Backend, Dim2, (), ()>,
+        text: &str,
+    ) -> Result<(), GraphicsResourceError> {
         if !self.cameras.cameras().world.options().debug_info_text {
             // TODO: Avoid computing the text, not just drawing it
             return Ok(());
@@ -379,10 +434,10 @@ where
         .unwrap(); // TODO: use .into_ok() when stable
         info_text_texture.upload()?;
 
-        self.surface
+        context
             .new_pipeline_gate()
             .pipeline(
-                &self.back_buffer,
+                framebuffer,
                 &PipelineState::default().set_clear_color(None),
                 |ref pipeline, ref mut shading_gate| -> Result<(), GraphicsResourceError> {
                     let success = info_text_texture.render(
