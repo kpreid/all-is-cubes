@@ -55,14 +55,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     # Do this only if we are pushing to main, not to pull requests.
     # (Or if we're on a special 'pages-alt' branch, so we can experiment with
     # deployment before pushing to main.)
-    if: |
-      ${{
-        github.event_name == 'push'
-        && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/pages-alt')
-      }}
+    #
+    # Caution: GitHub's parsing is weird around multiline expressions so just don't.
+    # https://github.community/t/how-to-write-multi-line-condition-in-if/128477
+    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/pages-alt' }}
 
     steps:
     - name: Download wasm dist artifact
