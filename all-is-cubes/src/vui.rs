@@ -3,6 +3,7 @@
 //! We've got all this rendering and interaction code, so let's reuse it for the
 //! GUI as well as the game.
 
+use std::sync::mpsc::TryRecvError;
 use std::sync::{mpsc, Arc, Mutex};
 
 use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
@@ -63,7 +64,11 @@ pub(crate) struct Vui {
 
     hud_page: PageInst,
     paused_page: PageInst,
+    about_page: PageInst,
 
+    /// Receiving internal messages from widgets for controlling the UI itself
+    /// (changing `state`, etc).
+    control_channel: mpsc::Receiver<VuiMessage>,
     character_source: ListenableSource<Option<URef<Character>>>,
     changed_character: DirtyFlag,
     tooltip_state: Arc<Mutex<TooltipState>>,
@@ -85,12 +90,15 @@ impl Vui {
         character_source: ListenableSource<Option<URef<Character>>>,
         paused: ListenableSource<bool>,
         graphics_options: ListenableSource<GraphicsOptions>,
-        control_channel: mpsc::SyncSender<ControlMessage>,
+        app_control_channel: mpsc::SyncSender<ControlMessage>,
         viewport_source: ListenableSource<Viewport>,
     ) -> Self {
         let mut universe = Universe::new();
         // TODO: take YieldProgress as a parameter
         let hud_blocks = Arc::new(HudBlocks::new(&mut universe, YieldProgress::noop(), R16).await);
+
+        let (control_send, control_recv) = mpsc::sync_channel(100);
+        let state = ListenableCell::new(VuiPageState::Hud);
 
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
@@ -100,14 +108,16 @@ impl Vui {
         let hud_layout = HudLayout::new(viewport_source.snapshot());
         let hud_inputs = HudInputs {
             hud_blocks,
-            control_channel,
             cue_channel: cue_channel.clone(),
+            vui_control_channel: control_send,
+            app_control_channel,
             graphics_options,
             paused,
             mouselook_mode: input_processor.mouselook_mode(),
         };
         let hud_widget_tree = new_hud_widget_tree(
             character_source.clone(),
+            state.as_source(),
             &hud_inputs,
             &hud_layout,
             &mut universe,
@@ -115,6 +125,7 @@ impl Vui {
         );
 
         let paused_widget_tree = pages::new_paused_widget_tree(&hud_inputs);
+        let about_widget_tree = pages::new_about_widget_tree(&mut universe).unwrap();
 
         let mut new_self = Self {
             universe,
@@ -128,7 +139,9 @@ impl Vui {
 
             hud_page: PageInst::new(hud_widget_tree),
             paused_page: PageInst::new(paused_widget_tree),
+            about_page: PageInst::new(about_widget_tree),
 
+            control_channel: control_recv,
             changed_character: DirtyFlag::listening(false, |l| character_source.listen(l)),
             character_source,
             tooltip_state,
@@ -157,6 +170,7 @@ impl Vui {
         let next_space: Option<URef<Space>> = match &*self.state.get() {
             VuiPageState::Hud => Some(self.hud_page.get_or_create_space(layout, universe)),
             VuiPageState::Paused => Some(self.paused_page.get_or_create_space(layout, universe)),
+            VuiPageState::AboutText => Some(self.about_page.get_or_create_space(layout, universe)),
         };
 
         if next_space.as_ref() != Option::as_ref(&self.current_space.get()) {
@@ -216,6 +230,22 @@ impl Vui {
         if self.changed_character.get_and_clear() {
             if let Some(character_ref) = &*self.character_source.get() {
                 TooltipState::bind_to_character(&self.tooltip_state, character_ref.clone());
+            }
+        }
+
+        // Drain the control channel.
+        loop {
+            match self.control_channel.try_recv() {
+                Ok(msg) => match msg {
+                    VuiMessage::About => {
+                        // TODO: States should be stackable somehow, and this should not totally overwrite the previous state.
+                        self.set_state(VuiPageState::AboutText);
+                    }
+                },
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    // Lack of whatever control sources is non-fatal.
+                }
             }
         }
 
@@ -292,7 +322,7 @@ impl Vui {
                     // (there should be some simple way to do that).
                     // TODO: We should have a "set paused state" message instead of toggle.
                     self.hud_inputs
-                        .control_channel
+                        .app_control_channel
                         .send(ControlMessage::TogglePause)
                         .unwrap();
                 }
@@ -301,12 +331,15 @@ impl Vui {
                 if *self.hud_inputs.paused.get() {
                     // Unpause
                     self.hud_inputs
-                        .control_channel
+                        .app_control_channel
                         .send(ControlMessage::TogglePause)
                         .unwrap();
                 }
-
-                // self.set_state(VuiPageState::Hud)
+            }
+            VuiPageState::AboutText => {
+                // The next step will decide whether we should be paused or unpaused.
+                // TODO: Instead check right now, but in a reusable fashion.
+                self.set_state(VuiPageState::Hud);
             }
         }
     }
@@ -321,6 +354,14 @@ pub(crate) enum VuiPageState {
     /// Report the paused (or lost-focus) state and offer a button to unpause
     /// and reactivate mouselook.
     Paused,
+    AboutText,
+}
+
+/// Message indicating a UI action that affects the UI itself
+#[derive(Clone, Debug)]
+pub(crate) enum VuiMessage {
+    /// Open [`VuiPageState::AboutText`].
+    About,
 }
 
 /// Channel for broadcasting, from session to widgets, various user interface responses

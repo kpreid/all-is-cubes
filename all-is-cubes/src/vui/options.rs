@@ -48,7 +48,7 @@ fn graphics_toggle_button(
         getter,
         |state| hud_inputs.hud_blocks.blocks[icon_ctor(state)].clone(),
         {
-            let cc = hud_inputs.control_channel.clone();
+            let cc = hud_inputs.app_control_channel.clone();
             move || {
                 let _ignore_errors = cc.send(ControlMessage::ModifyGraphicsOptions(Box::new(
                     move |mut g| {
@@ -68,7 +68,7 @@ pub(crate) fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
         |&value| value,
         |state| hud_inputs.hud_blocks.blocks[UiBlocks::PauseButton(state)].clone(),
         {
-            let cc = hud_inputs.control_channel.clone();
+            let cc = hud_inputs.app_control_channel.clone();
             move || {
                 let _ignore_errors = cc.send(ControlMessage::TogglePause);
             }

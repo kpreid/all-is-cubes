@@ -3,7 +3,7 @@ use std::fmt;
 
 use embedded_graphics::geometry::Point;
 use embedded_graphics::image::Image as EgImage;
-use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
+use embedded_graphics::mono_font::{iso_8859_1 as font, MonoFont, MonoTextStyle};
 use embedded_graphics::prelude::{Dimensions, Drawable, PixelColor, Primitive, Size};
 use embedded_graphics::primitives::{
     PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment,
@@ -40,6 +40,7 @@ pub enum UiBlocks {
     ToolbarPointer([ToolbarButtonState; TOOL_SELECTIONS]),
 
     // TODO: Should we do a `Button(ButtonLabel, ToggleButtonVisualState)` variant instead?
+    AboutButton(ToggleButtonVisualState),
     PauseButton(ToggleButtonVisualState),
     MouselookButton(ToggleButtonVisualState),
     DebugInfoTextButton(ToggleButtonVisualState),
@@ -61,6 +62,7 @@ impl fmt::Display for UiBlocks {
             UiBlocks::ToolbarPointer([b0, b1, b2]) => {
                 write!(f, "toolbar-pointer/{b0}-{b1}-{b2}")
             }
+            UiBlocks::AboutButton(state) => write!(f, "about-button/{}", state),
             UiBlocks::PauseButton(state) => write!(f, "pause-button/{}", state),
             UiBlocks::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
             UiBlocks::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{}", state),
@@ -113,6 +115,12 @@ impl UiBlocks {
                         )?),
                     )
                     .build(),
+
+                UiBlocks::AboutButton(state) => {
+                    let mut button_builder = ButtonBuilder::new(state)?;
+                    button_builder.draw_text(&font::FONT_10X20, "?")?;
+                    button_builder.into_block(universe, "About")
+                }
 
                 UiBlocks::PauseButton(state) => {
                     let mut button_builder = ButtonBuilder::new(state)?;

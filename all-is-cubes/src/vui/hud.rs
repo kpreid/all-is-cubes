@@ -22,7 +22,9 @@ use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
 use crate::vui::widgets::{
     Crosshair, FrameWidget, ToggleButtonWidget, Toolbar, TooltipState, TooltipWidget,
 };
-use crate::vui::{CueNotifier, Icons, LayoutTree, UiBlocks, Widget, WidgetTree};
+use crate::vui::{
+    CueNotifier, Icons, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree,
+};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -105,8 +107,9 @@ impl HudLayout {
 #[derive(Debug)]
 pub(crate) struct HudInputs {
     pub hud_blocks: Arc<HudBlocks>,
-    pub control_channel: mpsc::SyncSender<ControlMessage>,
     pub cue_channel: CueNotifier,
+    pub vui_control_channel: mpsc::SyncSender<VuiMessage>,
+    pub app_control_channel: mpsc::SyncSender<ControlMessage>,
     pub graphics_options: ListenableSource<GraphicsOptions>,
     pub paused: ListenableSource<bool>,
     pub mouselook_mode: ListenableSource<bool>,
@@ -116,6 +119,7 @@ pub(crate) struct HudInputs {
 pub(super) fn new_hud_widget_tree(
     // TODO: terrible mess of tightly coupled parameters
     character_source: ListenableSource<Option<URef<Character>>>,
+    page_state_source: ListenableSource<VuiPageState>,
     hud_inputs: &HudInputs,
     hud_layout: &HudLayout,
     // TODO: stop mutating the universe in widget construction
@@ -130,13 +134,24 @@ pub(super) fn new_hud_widget_tree(
                 direction: Face6::NX,
                 children: graphics_options_widgets(hud_inputs),
             }),
+            LayoutTree::leaf(ToggleButtonWidget::new(
+                page_state_source,
+                |page_state| matches!(page_state, VuiPageState::AboutText),
+                |state| hud_inputs.hud_blocks.blocks[UiBlocks::AboutButton(state)].clone(),
+                {
+                    let cc = hud_inputs.vui_control_channel.clone();
+                    move || {
+                        let _ignore_errors = cc.send(VuiMessage::About);
+                    }
+                },
+            )),
             LayoutTree::leaf(pause_toggle_button(hud_inputs)),
             LayoutTree::leaf(ToggleButtonWidget::new(
                 hud_inputs.mouselook_mode.clone(),
                 |&value| value,
                 |state| hud_inputs.hud_blocks.blocks[UiBlocks::MouselookButton(state)].clone(),
                 {
-                    let cc = hud_inputs.control_channel.clone();
+                    let cc = hud_inputs.app_control_channel.clone();
                     move || {
                         let _ignore_errors = cc.send(ControlMessage::ToggleMouselook);
                     }
