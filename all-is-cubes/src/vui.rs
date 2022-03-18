@@ -21,7 +21,7 @@ use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::ToolError;
-use crate::listen::{DirtyFlag, ListenableSource};
+use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::Space;
 use crate::time::Tick;
@@ -45,8 +45,11 @@ pub mod widgets;
 /// purpose and draws into spaces to form the HUD and menus.
 #[derive(Debug)] // TODO: probably not very informative Debug as derived
 pub(crate) struct Vui {
+    /// Universe used for storing VUI elements.
     universe: Universe,
-    current_space: URef<Space>,
+
+    /// The space that should be displayed to the user, drawn on top of the world.
+    current_space: ListenableCell<Option<URef<Space>>>,
 
     #[allow(dead_code)] // TODO: not used but probably will be when we have more dynamic UI
     hud_blocks: Arc<HudBlocks>,
@@ -98,7 +101,8 @@ impl Vui {
 
         Self {
             universe,
-            current_space: hud_space.clone(),
+            current_space: ListenableCell::new(Some(hud_space.clone())),
+
             hud_blocks,
             hud_space,
 
@@ -108,9 +112,10 @@ impl Vui {
         }
     }
 
-    // TODO: It'd be more encapsulating if we could provide a _read-only_ reference...
-    pub fn current_space(&self) -> &URef<Space> {
-        &self.current_space
+    /// The space that should be displayed to the user, drawn on top of the world.
+    // TODO: It'd be more encapsulating if we could provide a _read-only_ URef...
+    pub fn current_space(&self) -> ListenableSource<Option<URef<Space>>> {
+        self.current_space.as_source()
     }
 
     /// Computes a [`ViewTransform`] that should be used to view the [`Vui::current_space`].

@@ -172,7 +172,7 @@ impl AllIsCubesAppState {
         &mut self.game_universe
     }
 
-    pub fn ui_space(&self) -> &URef<Space> {
+    pub fn ui_space(&self) -> ListenableSource<Option<URef<Space>>> {
         self.ui.current_space()
     }
 
@@ -299,7 +299,7 @@ impl AllIsCubesAppState {
     /// TODO: This function needs tests.
     fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
         let cursor_space = self.cursor_result.as_ref().map(|c| &c.space);
-        if cursor_space == Some(self.ui_space()) {
+        if cursor_space == Option::as_ref(&self.ui_space().get()) {
             // Clicks on UI use `Tool::Activate`.
             // TODO: We'll probably want to distinguish buttons eventually.
             // TODO: It should be easier to use a tool
@@ -381,6 +381,8 @@ pub struct StandardCameras {
     character_dirty: DirtyFlag,
     character: Option<URef<Character>>,
 
+    ui_space_source: ListenableSource<Option<URef<Space>>>,
+    ui_space_dirty: DirtyFlag,
     ui_space: Option<URef<Space>>,
     viewport_dirty: bool,
 
@@ -392,6 +394,9 @@ impl StandardCameras {
         app_state: &AllIsCubesAppState,
         viewport: Viewport,
     ) -> Result<Self, std::convert::Infallible> {
+        // TODO: Add a unit test that each of these listeners works as intended.
+        // TODO: This is also an awful lot of repetitive code; we should design a pattern
+        // to not have it (some kind of "following cell")?
         let graphics_options = app_state.graphics_options();
         let graphics_options_dirty = DirtyFlag::new(false);
         graphics_options.listen(graphics_options_dirty.listener());
@@ -401,6 +406,10 @@ impl StandardCameras {
         let character_dirty = DirtyFlag::new(true);
         character_source.listen(character_dirty.listener());
 
+        let ui_space_source = app_state.ui_space();
+        let ui_space_dirty = DirtyFlag::new(true);
+        ui_space_source.listen(ui_space_dirty.listener());
+
         let mut this = Self {
             graphics_options,
             graphics_options_dirty,
@@ -408,7 +417,10 @@ impl StandardCameras {
             character_source,
             character_dirty,
             character: None, // update() will fix this up
-            ui_space: Some(app_state.ui_space().clone()),
+
+            ui_space: ui_space_source.snapshot(),
+            ui_space_source,
+            ui_space_dirty,
 
             viewport_dirty: true,
 
@@ -436,9 +448,19 @@ impl StandardCameras {
                 .set_options(Vui::graphics_options(current_options));
         }
 
+        let ui_space_dirty = self.ui_space_dirty.get_and_clear();
+        if ui_space_dirty {
+            self.ui_space = self.ui_space_source.snapshot();
+            if self.ui_space.is_none() {
+                // Reset transform so it isn't a *stale* transform.
+                // TODO: set an error flag saying that nothing should be drawn
+                self.cameras.ui.set_view_transform(One::one());
+            }
+        }
+
         // Update UI view if the FOV changed or the viewport did
         let viewport_dirty = mem::take(&mut self.viewport_dirty);
-        if options_dirty || viewport_dirty {
+        if options_dirty || viewport_dirty || ui_space_dirty {
             if let Some(space_ref) = &self.ui_space {
                 // TODO: try_borrow()
                 // TODO: ...or just skip the whole idea
@@ -452,6 +474,7 @@ impl StandardCameras {
         if self.character_dirty.get_and_clear() {
             self.character = self.character_source.snapshot();
             if self.character.is_none() {
+                // Reset transform so it isn't a *stale* transform.
                 // TODO: set an error flag saying that nothing should be drawn
                 self.cameras.world.set_view_transform(One::one());
             }
@@ -461,6 +484,8 @@ impl StandardCameras {
             #[allow(clippy::single_match)]
             match character_ref.try_borrow() {
                 Ok(character) => {
+                    // TODO: Shouldn't we also grab the character's Space while we
+                    // have the access? Renderers could use that.
                     self.cameras.world.set_view_transform(character.view());
                 }
                 Err(_) => {
