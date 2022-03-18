@@ -159,7 +159,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             info_text_texture,
             space_renderers: Layers {
                 world: None,
-                ui: cameras.ui_space().cloned().map(SpaceRenderer::new),
+                ui: None,
             },
             cameras,
         })
@@ -247,18 +247,25 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         };
         let world_space: Option<&URef<Space>> = character.map(|c| &c.space);
 
-        // Prepare Tess and Texture for space.
+        // Now we get into the meat of the space-renderer computation.
         let start_prepare_time = Instant::now();
+
+        // Make sure we're rendering the right spaces.
+        // TODO: we should be able to express this as something like "Layers::for_each_zip()"
         if self.space_renderers.world.as_ref().map(|sr| sr.space()) != world_space {
             self.space_renderers.world = world_space.cloned().map(SpaceRenderer::new);
         }
+        if self.space_renderers.ui.as_ref().map(|sr| sr.space()) != self.cameras.ui_space() {
+            self.space_renderers.ui = self.cameras.ui_space().cloned().map(SpaceRenderer::new);
+        }
+
+        // Get SpaceRendererOutput (per-frame ready to draw data)
         let world_output: Option<SpaceRendererOutput<'_, C::Backend>> = self
             .space_renderers
             .world
             .as_mut()
             .map(|r| r.prepare_frame(context, &self.cameras.cameras().world))
             .transpose()?;
-
         let ui_output = if let Some(ui_renderer) = &mut self.space_renderers.ui {
             Some(ui_renderer.prepare_frame(context, &self.cameras.cameras().ui)?)
         } else {
