@@ -53,6 +53,13 @@ where
         }
     }
 
+    /// Returns the [`Space`] this is synchronized with.
+    pub fn space(&self) -> &URef<Space> {
+        &self.space
+    }
+
+    /// Returns the [`SpaceRaytracer`] that may be used for tracing.
+    /// Its contents are current as of the last [`UpdatingSpaceRaytracer::update()`].
     pub fn get(&self) -> &SpaceRaytracer<D> {
         &self.state
     }
