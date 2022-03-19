@@ -23,6 +23,8 @@ pub struct Tick {
     // (2) have a standard subdivision for slower-than-every-frame events
     pub(crate) delta_t: Duration,
 
+    /// Whether game time is paused, and `delta_t` should not be considered
+    /// as an amount of game time passing. See [`Self::paused()`] for details.
     paused: bool,
 }
 
@@ -67,6 +69,9 @@ impl Tick {
     /// not perform any changes that reflect "in-game" time passing. They should still
     /// take care of the side effects of other mutations/transactions, particularly where
     /// not doing so might lead to a stale or inconsistent view.
+    ///
+    /// Note that functions which propagate ticks to subordinate game objects are free to
+    /// not propagate paused ticks. TODO: The exact policies are not yet settled.
     pub fn paused(&self) -> bool {
         self.paused
     }
