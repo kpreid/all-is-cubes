@@ -52,7 +52,7 @@ noise = { version = "0.7.0", default-features = false }
 num-traits = "0.2.12"
 once_cell = "1.4.1"
 ordered-float = { version = "2.10.0", features = ["serde", "arbitrary"] }
-ouroboros = "0.14.0"
+ouroboros = "0.15.0"
 rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
 rayon = { version = "1.3.1", optional = true }
@@ -63,4 +63,4 @@ thiserror = "1.0.22"
 criterion = "0.3.3"
 futures-channel = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
-pretty_assertions = "1.0.0"
+pretty_assertions = "1.2.0"
