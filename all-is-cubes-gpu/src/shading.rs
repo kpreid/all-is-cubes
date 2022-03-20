@@ -100,20 +100,13 @@ impl<Backend: AicLumBackend> BlockPrograms<Backend> {
     where
         C: GraphicsContext<Backend = Backend>,
     {
-        let base_defines: Vec<(&str, &str)> = constants.to_defines();
         Ok(BlockPrograms {
-            opaque: prepare_block_program(
-                context,
-                &(&constants, "opaque"),
-                base_defines.iter().copied(),
-            )?,
+            opaque: prepare_block_program(context, &(&constants, "opaque"), &constants, false)?,
             transparent: prepare_block_program(
                 context,
                 &(&constants, "transparent"),
-                base_defines
-                    .iter()
-                    .chain([("ALLOW_TRANSPARENCY", "1")].iter())
-                    .copied(),
+                &constants,
+                true,
             )?,
             constants,
         })
@@ -121,30 +114,20 @@ impl<Backend: AicLumBackend> BlockPrograms<Backend> {
 }
 
 /// Compile the block shader program for the given [`GraphicsContext`].
-fn prepare_block_program<'a, C>(
+fn prepare_block_program<C>(
     context: &mut C,
     description: &dyn Debug,
-    defines: impl IntoIterator<Item = (&'a str, &'a str)>,
+    constants: &ShaderConstants,
+    transparent: bool,
 ) -> Result<BlockProgram<C::Backend>, GraphicsResourceError>
 where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
 {
-    let defines_glsl = glsl_defines(defines);
-
-    let sources = SHADER_SOURCES.lock().unwrap();
-    let concatenated_vertex_shader: String = defines_glsl.clone()
-        + "\n#line 1 0\n"
-        + sources.common.as_ref()
-        + "\n#line 1 1\n"
-        + sources.common_vertex.as_ref()
-        + "\n#line 1 2\n"
-        + sources.block_vertex.as_ref();
-    let concatenated_fragment_shader: String = defines_glsl
-        + "\n#line 1 0\n"
-        + sources.common.as_ref()
-        + "#line 1 1\n"
-        + sources.block_fragment.as_ref();
+    let (concatenated_vertex_shader, concatenated_fragment_shader) = SHADER_SOURCES
+        .lock()
+        .unwrap()
+        .block_program_sources(constants, transparent);
 
     let start_compile_time = Instant::now();
     let result = map_shader_result(
@@ -159,7 +142,7 @@ where
             ),
     );
     log::trace!(
-        "Shader compilation took {:.3} s",
+        "Shader compilation ({description:?}) took {:.3} s",
         Instant::now()
             .duration_since(start_compile_time)
             .as_secs_f32()
@@ -170,28 +153,16 @@ where
 /// Compile the block shader program for the given [`GraphicsContext`].
 pub(crate) fn prepare_lines_program<C>(
     context: &mut C,
-    constants: ShaderConstants,
+    constants: &ShaderConstants,
 ) -> Result<LinesProgram<C::Backend>, GraphicsResourceError>
 where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
 {
-    let defines_glsl = glsl_defines(constants.to_defines());
-
-    // TODO: repeated code — write a helper for concatenating GLSL
-    let sources = SHADER_SOURCES.lock().unwrap();
-    let concatenated_vertex_shader: String = defines_glsl.clone()
-        + "\n#line 1 0\n"
-        + sources.common.as_ref()
-        + "\n#line 1 1\n"
-        + sources.common_vertex.as_ref()
-        + "\n#line 1 2\n"
-        + sources.lines_vertex.as_ref();
-    let concatenated_fragment_shader: String = defines_glsl
-        + "\n#line 1 0\n"
-        + sources.common.as_ref()
-        + "#line 1 1\n"
-        + sources.lines_fragment.as_ref();
+    let (concatenated_vertex_shader, concatenated_fragment_shader) = SHADER_SOURCES
+        .lock()
+        .unwrap()
+        .lines_program_sources(constants);
 
     map_shader_result(
         &"LinesProgram",
@@ -243,6 +214,58 @@ struct ShaderSources {
 }
 
 impl ShaderSources {
+    /// Prepare source text for the block shader program.
+    ///
+    /// Return value is (vertex shader, fragment shader).
+    fn block_program_sources(
+        &self,
+        constants: &ShaderConstants,
+        transparent: bool,
+    ) -> (String, String) {
+        let mut defines = constants.to_defines();
+        if transparent {
+            defines.push(("ALLOW_TRANSPARENCY", "1"));
+        }
+        let defines_glsl = glsl_defines(defines);
+
+        let concatenated_vertex_shader: String = defines_glsl.clone()
+            + "\n#line 1 0\n"
+            + self.common.as_ref()
+            + "\n#line 1 1\n"
+            + self.common_vertex.as_ref()
+            + "\n#line 1 2\n"
+            + self.block_vertex.as_ref();
+        let concatenated_fragment_shader: String = defines_glsl
+            + "\n#line 1 0\n"
+            + self.common.as_ref()
+            + "#line 1 1\n"
+            + self.block_fragment.as_ref();
+
+        (concatenated_vertex_shader, concatenated_fragment_shader)
+    }
+
+    /// Prepare source text for the debug-lines shader program.
+    ///
+    /// Return value is (vertex shader, fragment shader).
+    fn lines_program_sources(&self, constants: &ShaderConstants) -> (String, String) {
+        // TODO: repeated code — write a helper for concatenating GLSL
+        let defines_glsl = glsl_defines(constants.to_defines());
+        (
+            defines_glsl.clone()
+                + "\n#line 1 0\n"
+                + self.common.as_ref()
+                + "\n#line 1 1\n"
+                + self.common_vertex.as_ref()
+                + "\n#line 1 2\n"
+                + self.lines_vertex.as_ref(),
+            defines_glsl
+                + "\n#line 1 0\n"
+                + self.common.as_ref()
+                + "#line 1 1\n"
+                + self.lines_fragment.as_ref(),
+        )
+    }
+
     fn reload_if_changed(&mut self) -> bool {
         let mut changed = false;
         changed |= self.common.reload_if_changed();

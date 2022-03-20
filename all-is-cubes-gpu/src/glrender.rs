@@ -137,7 +137,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             .try_map_ref(|camera| BlockPrograms::compile(context, camera.options().into()))?;
         // TODO: lines_program is not updated on changed options (and this code should be deduplicated)
         let lines_program =
-            prepare_lines_program(context, cameras.cameras().world.options().into())?;
+            prepare_lines_program(context, &cameras.cameras().world.options().into())?;
 
         let full_frame =
             FullFramePainter::new(context, include_str!("shaders/info-text-fragment.glsl"))?;
