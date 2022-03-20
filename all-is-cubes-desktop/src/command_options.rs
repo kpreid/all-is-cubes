@@ -137,7 +137,7 @@ static GRAPHICS_HELP_LONG: Lazy<String> = Lazy::new(|| {
             text,
             "\n* {:max_width$} — {}",
             pv.get_name(),
-            pv.get_help().unwrap()
+            pv.get_help().unwrap_or_default()
         )
         .unwrap();
     }
