@@ -7,7 +7,6 @@
 use luminance::context::GraphicsContext;
 use luminance::pipeline::BoundTexture;
 use luminance::pixel::SRGBA8UI;
-use luminance::tess::{Mode, Tess};
 use luminance::texture::{
     Dim3, MagFilter, MinFilter, Sampler, TexelUpload, Texture, TextureError, Wrap,
 };
@@ -20,7 +19,7 @@ use all_is_cubes::space::Grid;
 use all_is_cubes::util::{CustomFormat, StatusText};
 
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
-use crate::types::{AicLumBackend, LumBlockVertex};
+use crate::types::AicLumBackend;
 
 /// Alias for the concrete type of the block texture.
 pub type BlockTexture<Backend> = Texture<Backend, Dim3, SRGBA8UI>;
@@ -176,31 +175,6 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
             in_use_texels: allocator_backing.alloctree.occupied_volume(),
             capacity_texels: allocator_backing.alloctree.bounds().volume(),
         })
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn debug_atlas_tess<C>(&self, context: &mut C) -> Tess<Backend, LumBlockVertex>
-    where
-        C: GraphicsContext<Backend = Backend>,
-    {
-        let mut vertices = Vec::new();
-        //for layer in 0..self.layer_count {
-        let layer = 0;
-        vertices.extend(&*LumBlockVertex::rectangle(
-            // position
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 1.0, 0.0),
-            // texture
-            Vector3::new(0.0, 0.0, layer as TextureCoordinate),
-            Vector3::new(1.0, 1.0, layer as TextureCoordinate),
-        ));
-        //}
-        context
-            .new_tess()
-            .set_vertices(vertices)
-            .set_mode(Mode::Triangle)
-            .build()
-            .expect("failed to construct debug tess")
     }
 }
 
