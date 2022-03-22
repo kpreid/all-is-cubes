@@ -283,9 +283,11 @@ pub(crate) async fn demo_dungeon(
 
     let mut maze_seed = [0; 32];
     maze_seed[0..8].copy_from_slice(&seed.to_le_bytes());
-    let maze = maze_to_array(
-        &maze_generator::ellers_algorithm::EllersGenerator::new(Some(maze_seed)).generate(9, 9),
-    );
+    let maze = maze_generator::ellers_algorithm::EllersGenerator::new(Some(maze_seed))
+        .generate(9, 9)
+        .map_err(|e| InGenError::Other(e.into()))?;
+
+    let maze = maze_to_array(&maze);
     let bounds = maze.grid();
     let dungeon_map = maze.map(|maze_field| {
         let room_position = m2gp(maze_field.coordinates);

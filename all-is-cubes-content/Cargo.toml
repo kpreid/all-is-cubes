@@ -31,7 +31,7 @@ futures-core = { version = "0.3.17", default-features = false, features = ["allo
 instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }
 macro_rules_attribute = "0.0.2"
-maze_generator = "1.1.1"
+maze_generator = "2.0.0"
 noise = { version = "0.7.0", default-features = false }
 paste = "1.0.5"
 rand = { version = "0.8.2", default-features = false }

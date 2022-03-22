@@ -2248,13 +2248,15 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "maze_generator"
-version = "1.2.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "163c1a3dc37e6820bfcedf904c6f658e534c44ddb4205bcecde071bd754ead73"
+checksum = "a458fa8b54f6962fc1ef1c1edc5f074762ee9e73bed75f82b23c5ab9401ded60"
 dependencies = [
+ "anyhow",
  "petgraph",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
+ "thiserror",
 ]
 
 [[package]]
