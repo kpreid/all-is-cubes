@@ -16,6 +16,10 @@ members = [
   # "fuzz",
 ]
 
+# Use feature resolver version 2 (latest). (This must be specified explicitly
+# in a workspace, but would be implicit in a single package with edition="2021".)
+resolver = "2"
+
 [profile.dev]
 # Enable some optimization to improve interactive performance in manual testing/experimenting.
 # In particular, inlining is crucial.
