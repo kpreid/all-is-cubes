@@ -11,7 +11,8 @@ use all_is_cubes::block::{Block, BlockCollision, Resolution, AIR};
 use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
-    Aab, FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _, Rgb,
+    cube_to_midpoint, Aab, FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _,
+    Rgb,
 };
 use all_is_cubes::notnan;
 use all_is_cubes::space::{Grid, SetCubeError, Space};
@@ -206,7 +207,31 @@ pub async fn install_landscape_blocks(
 
             Trunk => colors[Trunk].clone(),
 
-            Leaves => colors[Leaves].clone(),
+            Leaves => Block::builder()
+                .attributes(
+                    colors[Leaves]
+                        .evaluate()
+                        .map_err(InGenError::other)?
+                        .attributes,
+                )
+                .voxels_fn(universe, resolution, |cube| {
+                    // TODO: we should have standard math for "how close to the edge
+                    // of a box is this point", since it comes up a bunch.
+                    let unit_radius_point = cube_to_midpoint(cube)
+                        .map(|c| c / (FreeCoordinate::from(resolution) / 2.0) - 1.0);
+                    let boxy_radius = unit_radius_point
+                        .x
+                        .abs()
+                        .max(unit_radius_point.y.abs())
+                        .max(unit_radius_point.z.abs());
+
+                    if rng.gen_bool(boxy_radius / 2.0) {
+                        &colors[Leaves]
+                    } else {
+                        &AIR
+                    }
+                })?
+                .build(),
         })
     })
     .await?
