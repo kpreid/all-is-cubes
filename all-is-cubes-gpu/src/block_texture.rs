@@ -4,14 +4,17 @@
 //! Block texture atlas management: provides [`LumAtlasAllocator`], the
 //! [`TextureAllocator`] implementation for use with [`luminance`].
 
+use std::fmt;
+use std::sync::{Arc, Mutex, Weak};
+
+use instant::{Duration, Instant};
+
 use luminance::context::GraphicsContext;
 use luminance::pipeline::BoundTexture;
 use luminance::pixel::SRGBA8UI;
 use luminance::texture::{
     Dim3, MagFilter, MinFilter, Sampler, TexelUpload, Texture, TextureError, Wrap,
 };
-use std::fmt;
-use std::sync::{Arc, Mutex, Weak};
 
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
@@ -119,10 +122,12 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
     /// If any errors prevent complete flushing, it will be attempted again on the next
     /// call.
     pub fn flush(&mut self) -> Result<AtlasFlushInfo, TextureError> {
+        let start_time = Instant::now();
         let mut allocator_backing = self.backing.lock().unwrap();
         if !allocator_backing.dirty {
             return Ok(AtlasFlushInfo {
                 flushed: 0,
+                flush_time: Instant::now().duration_since(start_time),
                 in_use_tiles: self.in_use.len(),
                 in_use_texels: allocator_backing.alloctree.occupied_volume(),
                 capacity_texels: allocator_backing.alloctree.bounds().volume(),
@@ -171,6 +176,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
         allocator_backing.dirty = false;
         Ok(AtlasFlushInfo {
             flushed: count_written,
+            flush_time: Instant::now().duration_since(start_time),
             in_use_tiles: self.in_use.len(),
             in_use_texels: allocator_backing.alloctree.occupied_volume(),
             capacity_texels: allocator_backing.alloctree.bounds().volume(),
@@ -256,23 +262,37 @@ impl Drop for TileBacking {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AtlasFlushInfo {
     flushed: usize,
+    flush_time: Duration,
     in_use_tiles: usize,
     in_use_texels: usize,
     capacity_texels: usize,
 }
 
+impl Default for AtlasFlushInfo {
+    fn default() -> Self {
+        AtlasFlushInfo {
+            flushed: 0,
+            flush_time: Duration::ZERO,
+            in_use_tiles: 0,
+            in_use_texels: 0,
+            capacity_texels: 0,
+        }
+    }
+}
+
 impl CustomFormat<StatusText> for AtlasFlushInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
         write!(
             fmt,
-            "Textures: {} tiles, {} texels ({}%) used, {:2} flushed",
+            "Textures: {} tiles, {} texels ({}%) used, {:2} flushed in {}",
             self.in_use_tiles,
             self.in_use_texels,
             (self.in_use_texels as f32 / self.capacity_texels as f32 * 100.0).ceil() as usize,
             self.flushed,
+            self.flush_time.custom_format(format_type)
         )
     }
 }

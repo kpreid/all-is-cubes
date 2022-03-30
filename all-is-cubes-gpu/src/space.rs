@@ -8,6 +8,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3};
+use instant::{Duration, Instant};
 use luminance::blending::{Blending, Equation, Factor};
 use luminance::context::GraphicsContext;
 use luminance::depth_stencil::Write;
@@ -118,15 +119,20 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         let light_texture = self.light_texture.as_mut().unwrap();
 
         // Update light texture
+        let start_light_update = Instant::now();
+        let mut light_update_count = 0;
         if let Some(set) = &mut todo.light {
             // TODO: work in larger, ahem, chunks
             for cube in set.drain() {
                 light_texture.update(space, Grid::new(cube, [1, 1, 1]))?;
+                light_update_count += 1;
             }
         } else {
             light_texture.update_all(space)?;
+            light_update_count += space.grid().volume();
             todo.light = Some(HashSet::new());
         }
+        let end_light_update = Instant::now();
 
         // Update chunks
         let (csm_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
@@ -203,6 +209,8 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
                 view_chunk,
                 info: SpaceRenderInfo {
+                    light_update_time: end_light_update.duration_since(start_light_update),
+                    light_update_count,
                     chunk_info: csm_info,
                     chunks_drawn: 0,  // filled later
                     squares_drawn: 0, // filled later
@@ -383,7 +391,8 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
 }
 
 /// Performance info from a [`SpaceRenderer`] drawing one frame.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SpaceRenderInfo {
     /// Status of the block and chunk meshes.
     pub chunk_info: CsmUpdateInfo,
@@ -393,17 +402,45 @@ pub struct SpaceRenderInfo {
     pub squares_drawn: usize,
     /// Status of the texture atlas.
     pub texture_info: AtlasFlushInfo,
+    /// Time taken to upload light data.
+    pub light_update_time: Duration,
+    /// Number of light cubes updated
+    pub light_update_count: usize,
+}
+
+impl Default for SpaceRenderInfo {
+    fn default() -> Self {
+        Self {
+            chunk_info: Default::default(),
+            chunks_drawn: 0,
+            squares_drawn: 0,
+            texture_info: Default::default(),
+            light_update_time: Duration::ZERO,
+            light_update_count: 0,
+        }
+    }
 }
 
 impl CustomFormat<StatusText> for SpaceRenderInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
-        writeln!(fmt, "{}", self.chunk_info.custom_format(StatusText))?;
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
+        let Self {
+            chunk_info,
+            chunks_drawn,
+            squares_drawn,
+            texture_info,
+            light_update_time,
+            light_update_count,
+        } = self;
+
+        let light_update_time = light_update_time.custom_format(format_type);
+
+        writeln!(fmt, "{}", chunk_info.custom_format(format_type))?;
         writeln!(
             fmt,
-            "Chunks drawn: {:3} Quads drawn: {:3}",
-            self.chunks_drawn, self.squares_drawn,
+            "Chunks drawn: {chunks_drawn:3} Quads drawn: {squares_drawn:7}  \
+            Light: {light_update_count:3} cubes in {light_update_time}",
         )?;
-        write!(fmt, "{:#?}", self.texture_info.custom_format(StatusText))?;
+        write!(fmt, "{:#?}", texture_info.custom_format(StatusText))?;
         Ok(())
     }
 }
