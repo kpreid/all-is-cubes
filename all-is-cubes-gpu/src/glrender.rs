@@ -210,7 +210,6 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         CS: ColorSlot<Backend, Dim2>,
         DS: DepthStencilSlot<Backend, Dim2>,
     {
-        let mut info = RenderInfo::default();
         let start_frame_time = Instant::now();
 
         // This updates camera matrices and graphics options
@@ -272,7 +271,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             None
         };
 
-        info.prepare_time = Instant::now().duration_since(start_prepare_time);
+        let prepare_time = Instant::now().duration_since(start_prepare_time);
 
         let debug_lines_tess = {
             let mut v: Vec<LinesVertex> = Vec::new();
@@ -344,6 +343,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             None => Rgba::BLACK, // TODO: take from palette or config
         }
         .to_srgb_float();
+        let mut world_info = SpaceRenderInfo::default(); // can't return a value from pipeline()
         context
             .new_pipeline_gate()
             .pipeline(
@@ -354,7 +354,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                     if let Some(world_output) = world_output {
                         let world_output_bound = world_output.bind(&pipeline)?;
                         // Space
-                        info.space = world_output_bound.render(
+                        world_info = world_output_bound.render(
                             &mut shading_gate,
                             &mut block_programs.world,
                             &mut self.lines_program,
@@ -394,6 +394,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             .into_result()?;
 
         let start_draw_ui_time = Instant::now();
+        let mut ui_info = SpaceRenderInfo::default();
         context
             .new_pipeline_gate()
             .pipeline(
@@ -402,8 +403,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                 &PipelineState::default().set_clear_color(None),
                 |ref pipeline, ref mut shading_gate| {
                     if let Some(ui_output) = ui_output {
-                        // TODO: Ignoring info
-                        ui_output.bind(pipeline)?.render(
+                        ui_info = ui_output.bind(pipeline)?.render(
                             shading_gate,
                             &mut block_programs.ui,
                             &mut self.lines_program,
@@ -416,10 +416,18 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             .into_result()?;
 
         let end_time = Instant::now();
-        info.draw_world_time = start_draw_ui_time.duration_since(start_draw_world_time);
-        info.draw_ui_time = end_time.duration_since(start_draw_ui_time);
-        info.frame_time = end_time.duration_since(start_frame_time);
-        Ok(info)
+        Ok(RenderInfo {
+            frame_time: end_time.duration_since(start_frame_time),
+            prepare_time,
+            draw_time: Layers {
+                world: start_draw_ui_time.duration_since(start_draw_world_time),
+                ui: end_time.duration_since(start_draw_ui_time),
+            },
+            draw_info: Layers {
+                world: world_info,
+                ui: ui_info,
+            },
+        })
     }
 
     pub fn add_info_text<C, CS, DS>(
@@ -482,22 +490,26 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
 pub struct RenderInfo {
     frame_time: Duration,
     prepare_time: Duration,
-    draw_world_time: Duration,
-    draw_ui_time: Duration,
-    space: SpaceRenderInfo,
+    draw_time: Layers<Duration>,
+    draw_info: Layers<SpaceRenderInfo>,
 }
 
 impl CustomFormat<StatusText> for RenderInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
-        writeln!(
+        write!(
             fmt,
-            "Frame time: {} (prep {}, draw world {}, ui {})",
+            "Frame time: {} (prep {}, draw world {}, ui {})\n\n",
             self.frame_time.custom_format(StatusText),
             self.prepare_time.custom_format(StatusText),
-            self.draw_world_time.custom_format(StatusText),
-            self.draw_ui_time.custom_format(StatusText),
+            self.draw_time.world.custom_format(StatusText),
+            self.draw_time.ui.custom_format(StatusText),
         )?;
-        write!(fmt, "{}", self.space.custom_format(StatusText))?;
+        write!(
+            fmt,
+            "WORLD:\n{}\n\n",
+            self.draw_info.world.custom_format(StatusText)
+        )?;
+        write!(fmt, "UI:\n{}", self.draw_info.ui.custom_format(StatusText))?;
         Ok(())
     }
 }
