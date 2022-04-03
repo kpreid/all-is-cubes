@@ -8,7 +8,8 @@
     - The `all-is-cubes-gpu` renderer now fully supports blocks with a resolution greater than 16.
 
 - `all-is-cubes` library:
-    - `math::coord::point_to_enclosing_cube()`
+    - `math::point_to_enclosing_cube()`
+    - `StandardCameras::world_space()`
     - Most `Listener` implementations now also implement `Clone` and `Debug`. This allows taking a listener and registering it with more than one `Notifier`. Relatedly, some uses of `-> impl Listener` have been replaced with concrete types.
 
 ### Changed
