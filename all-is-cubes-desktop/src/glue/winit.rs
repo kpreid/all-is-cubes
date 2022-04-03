@@ -7,11 +7,12 @@ use all_is_cubes::apps::InputProcessor;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 
-pub fn physical_size_to_viewport(size: PhysicalSize<u32>) -> Viewport {
+pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {
     let size: [u32; 2] = size.into();
     Viewport {
-        nominal_size: Vector2::from(size).map(|s| s.into()),
-        framebuffer_size: Vector2::from(size),
+        nominal_size: Vector2::from(size).map(|c| f64::from(c) / scale_factor),
+        // max(1) because wgpu likes nonzero viewports
+        framebuffer_size: Vector2::from(size).map(|c| c.max(1)),
     }
 }
 
