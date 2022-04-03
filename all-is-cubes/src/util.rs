@@ -52,6 +52,12 @@ impl<'a, F: Copy, T: CustomFormat<F>> Display for CustomFormatWrapper<'a, F, T> 
     }
 }
 
+impl<F: Copy, T: CustomFormat<F>> CustomFormat<F> for &'_ T {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: F) -> fmt::Result {
+        <T as CustomFormat<F>>::fmt(&**self, fmt, format_type)
+    }
+}
+
 /// Format type for [`CustomFormat`] which forces a string to be unquoted when [`Debug`]ged.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub(crate) struct Unquote;
