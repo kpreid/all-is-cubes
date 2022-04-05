@@ -27,9 +27,6 @@
 #![warn(clippy::return_self_not_must_use)]
 #![warn(clippy::wrong_self_convention)]
 
-#[cfg(feature = "arbitrary")]
-extern crate arbitrary_crate as arbitrary;
-
 use std::collections::HashSet;
 
 use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution, AIR};
