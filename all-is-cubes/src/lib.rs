@@ -141,6 +141,7 @@
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::needless_update)]
+#![allow(clippy::single_match)] // I like using match on Result/Option with comments
 #![deny(rust_2018_idioms)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(explicit_outlives_requirements)]

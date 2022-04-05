@@ -486,7 +486,6 @@ impl StandardCameras {
         }
 
         if let Some(character_ref) = &self.character {
-            #[allow(clippy::single_match)]
             match character_ref.try_borrow() {
                 Ok(character) => {
                     // TODO: Shouldn't we also grab the character's Space while we
