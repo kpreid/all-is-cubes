@@ -4295,6 +4295,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml_edit"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86e793cd7300306ebefde30a6282a9016899b7bad63799511253d95518a62bcd"
+dependencies = [
+ "combine",
+ "indexmap",
+ "itertools",
+]
+
+[[package]]
 name = "tower-service"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4349,7 +4360,7 @@ dependencies = [
  "serde",
  "shlex",
  "snapbox",
- "toml_edit",
+ "toml_edit 0.13.4",
 ]
 
 [[package]]
@@ -4942,7 +4953,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "clap 3.1.6",
- "toml_edit",
+ "toml_edit 0.14.2",
  "xaction",
 ]
 

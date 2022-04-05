@@ -14,5 +14,5 @@ bench = false
 
 [dependencies]
 clap = { version = "3.0.8", default-features = false, features = ["derive", "std", "suggestions"] }
-toml_edit = { version = "0.13.3" }
+toml_edit = { version = "0.14.2" }
 xaction = "0.2.4"
