@@ -4859,15 +4859,18 @@ dependencies = [
  "lazy_static 1.4.0",
  "libc",
  "log",
+ "mio 0.8.2",
  "ndk",
  "ndk-glue",
  "ndk-sys",
  "objc",
  "parking_lot 0.11.2",
+ "percent-encoding 2.1.0",
  "raw-window-handle",
  "wasm-bindgen",
  "web-sys",
  "winapi 0.3.9",
+ "x11-dl",
 ]
 
 [[package]]
@@ -4896,6 +4899,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30b31594f29d27036c383b53b59ed3476874d518f0efb151b27a4c275141390e"
 dependencies = [
  "tap",
+]
+
+[[package]]
+name = "x11-dl"
+version = "2.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea26926b4ce81a6f5d9d0f3a0bc401e5a37c6ae14a1bfaa8ff6099ca80038c59"
+dependencies = [
+ "lazy_static 1.4.0",
+ "libc",
+ "pkg-config",
 ]
 
 [[package]]
