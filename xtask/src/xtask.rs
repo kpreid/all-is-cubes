@@ -27,8 +27,11 @@ struct XtaskArgs {
 
 #[derive(Debug, clap::Subcommand)]
 enum XtaskCommand {
-    /// Run all tests (and some builds without tests).
+    /// Run all tests (and some builds without tests) with default features.
     Test,
+
+    /// Run tests exercising more combinations of features.
+    TestMore,
 
     /// Compile and report warnings without testing.
     Lint,
@@ -57,14 +60,15 @@ enum XtaskCommand {
 fn main() -> Result<(), xaction::Error> {
     let XtaskArgs { command } = <XtaskArgs as clap::Parser>::parse();
 
-    let features = Features::Default;
-
     match command {
         XtaskCommand::Test => {
-            do_for_all_packages(TestOrCheck::Test, features)?;
+            do_for_all_packages(TestOrCheck::Test, Features::Default)?;
+        }
+        XtaskCommand::TestMore => {
+            exhaustive_test()?;
         }
         XtaskCommand::Lint => {
-            do_for_all_packages(TestOrCheck::Lint, features)?;
+            do_for_all_packages(TestOrCheck::Lint, Features::Default)?;
             // Build docs to verify that there are no broken doc links.
             cargo().arg("doc").run()?;
         }
@@ -158,9 +162,10 @@ const ALL_NONTEST_PACKAGES: [&str; 6] = [
 const CHECK_SUBCMD: &str = "clippy";
 const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 
+// Test all combinations of situations (that we've bothered to program test
+// setup for).
 fn exhaustive_test() -> Result<(), xaction::Error> {
-    // TODO: This should be a more exhaustive test and lint procedure
-    do_for_all_packages(TestOrCheck::Test, Features::Default)?;
+    do_for_all_packages(TestOrCheck::Test, Features::AllAndNothing)?;
     Ok(())
 }
 
@@ -198,7 +203,23 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), xactio
     // Test everything we can with default features and target.
     // But if we're linting, then the below --all-targets run will handle that.
     if op != TestOrCheck::Lint {
-        op.cargo_cmd().args(features.cargo_flags()).run()?;
+        match features {
+            Features::Default => {
+                op.cargo_cmd().run()?;
+            }
+
+            Features::AllAndNothing => {
+                op.cargo_cmd().arg("--all-features").run()?;
+
+                // To test with limited features, we need to run commands separately for each
+                // package, as otherwise they will enable dependencies' features.
+                for package_name in ALL_NONTEST_PACKAGES {
+                    op.cargo_cmd()
+                        .args(["--package", package_name, "--no-default-features"])
+                        .run()?;
+                }
+            }
+        }
     }
 
     // Check wasm-only code.
@@ -245,20 +266,12 @@ impl TestOrCheck {
 }
 
 /// Which features we want to test building with.
-/// This will need to become more combinatorial.
 enum Features {
+    /// Test with default features only
     Default,
-    // NoDefault,
-}
 
-impl Features {
-    // TODO: this needs to be package-specific
-    fn cargo_flags(self) -> impl IntoIterator<Item = &'static str> {
-        match self {
-            Self::Default => vec![],
-            // Self::NoDefault => vec!["--no-default-features"],
-        }
-    }
+    /// Test each package with all features enabled and with all features disabled.
+    AllAndNothing,
 }
 
 /// Start a [`Cmd`] with the cargo command we should use.

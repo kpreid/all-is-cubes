@@ -41,7 +41,7 @@ jobs:
     - name: Build and lint
       run: cargo xtask lint
     - name: Run tests
-      run: cargo xtask test
+      run: cargo xtask test-more
     
     # Save wasm build so that we can optionally deploy it without rebuilding
     - name: Save wasm dist artifact
