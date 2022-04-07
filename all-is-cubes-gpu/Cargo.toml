@@ -21,8 +21,11 @@ bench = false
 name = "gpu-test"
 harness = false
 
+[features]
+
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
+bytemuck = { version = "1.7.2", default-features = false, features = ["derive"] }
 instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }
 luminance = { version = "0.46.0" }
@@ -31,6 +34,10 @@ rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
 resource = "0.5.0"
 thiserror = "1.0.22"
+wgpu = { version = "0.12.0", optional = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wgpu = { version = "0.12.0", optional = true, features = ["webgl"] }
 
 [dev-dependencies]
 # These dependencies are used to set up a context for running tests

@@ -5,6 +5,8 @@ All is Cubes is a “voxel game” where each block is made out of smaller block
 
 This particular library package contains algorithms for rendering All is Cubes content using the [`luminance`] graphics library. It is generic and may be used with any platform `luminance` backend.
 
+Additionally, experimental `wgpu` support is being added. In either case, the API is fairly unstable and primarily intended to serve the needs of the existing desktop and web “app” crates.
+
 [`luminance`]: https://github.com/phaazon/luminance-rs/
 
 License
