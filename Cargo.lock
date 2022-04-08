@@ -121,7 +121,7 @@ dependencies = [
  "crossterm",
  "directories-next",
  "dot_vox",
- "futures-executor",
+ "futures 0.3.21",
  "glfw",
  "indicatif",
  "log",

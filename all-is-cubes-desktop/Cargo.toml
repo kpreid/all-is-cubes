@@ -20,7 +20,7 @@ bench = false
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
-all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0" }
+all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 anyhow = "1.0"
 clap = { version = "3.1.1", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }
@@ -28,7 +28,7 @@ clap = { version = "3.1.1", default-features = false, features = ["cargo", "deri
 crossterm = "0.22.0"
 directories-next = "2.0.0"
 dot_vox = "4.1.0" # TODO: belongs in a separate import/export lib
-futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
+futures = { version = "0.3.17", default-features = false, features = ["std", "executor"] }
 glfw = "0.43.0"
 indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
@@ -45,9 +45,8 @@ thiserror = "1.0.22"
 # Note: keep tui in sync with crossterm.
 tui = { version = "0.17.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
-# Note: Use of winit is experimental and enabling it does not yet do anything.
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
-winit = { version = "0.26.1", optional = true, default-features = false, features = ["x11"] }
+winit = { version = "0.26.1", default-features = false, features = ["x11"] }
 
 [dev-dependencies]
 trycmd = "0.13.1"

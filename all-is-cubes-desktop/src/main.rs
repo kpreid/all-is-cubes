@@ -21,6 +21,7 @@
 use std::time::{Duration, Instant};
 
 use clap::Parser as _;
+use futures::executor::block_on;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rand::{thread_rng, Rng};
 
@@ -32,6 +33,8 @@ use all_is_cubes::util::YieldProgress;
 
 mod aic_glfw;
 use aic_glfw::glfw_main_loop;
+mod aic_winit;
+use aic_winit::winit_main_loop;
 mod command_options;
 use command_options::GraphicsType;
 mod config_files;
@@ -86,6 +89,7 @@ fn main() -> Result<(), anyhow::Error> {
             simplelog::ConfigBuilder::new()
                 .set_target_level(Off)
                 .set_location_level(Off)
+                .add_filter_ignore_str("wgpu")
                 .build(),
             simplelog::TerminalMode::Stderr,
             simplelog::ColorChoice::Auto,
@@ -99,7 +103,7 @@ fn main() -> Result<(), anyhow::Error> {
     };
 
     let start_app_time = Instant::now();
-    let mut app = futures_executor::block_on(AllIsCubesAppState::new());
+    let mut app = block_on(AllIsCubesAppState::new());
     app.graphics_options_mut().set(graphics_options);
     let app_done_time = Instant::now();
     log::debug!(
@@ -120,7 +124,7 @@ fn main() -> Result<(), anyhow::Error> {
             move |fraction| universe_progress_bar.set_position((fraction * 100.0) as u64),
         )
     };
-    let universe = futures_executor::block_on(async {
+    let universe = block_on(async {
         match input_source.clone() {
             UniverseSource::Template(template) => template
                 .build(yield_progress, thread_rng().gen())
@@ -154,6 +158,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     match graphics_type {
         GraphicsType::Window => glfw_main_loop(app, &title_and_version(), display_size),
+        GraphicsType::WindowWgpu => winit_main_loop(app, &title_and_version(), display_size),
         GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
         GraphicsType::Record => record_main(app, options.record_options()),
         GraphicsType::Print => terminal_print_once(

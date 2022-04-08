@@ -153,6 +153,8 @@ pub enum GraphicsType {
     // These variants are sorted for the benefit of the help text presentation.
     #[clap(help = "Open a window (uses OpenGL)")]
     Window,
+    #[clap(help = "EXPERIMENTAL: Open a window (uses `wgpu` for GPU)")]
+    WindowWgpu,
     #[clap(help = "Colored text in this terminal (uses raytracing)")]
     Terminal,
     #[clap(help = "Non-interactive; don't draw anything but only simulates")]

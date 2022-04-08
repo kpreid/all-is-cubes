@@ -29,11 +29,12 @@ OPTIONS:
     -g, --graphics <mode>
             Graphics/UI mode; one of the following keywords:
             
-            * window   — Open a window (uses OpenGL)
-            * terminal — Colored text in this terminal (uses raytracing)
-            * headless — Non-interactive; don't draw anything but only simulates
-            * record   — Non-interactive; save an image or video (uses raytracing)
-            * print    — Non-interactive; print one frame like 'terminal' mode then exit
+            * window      — Open a window (uses OpenGL)
+            * window-wgpu — EXPERIMENTAL: Open a window (uses `wgpu` for GPU)
+            * terminal    — Colored text in this terminal (uses raytracing)
+            * headless    — Non-interactive; don't draw anything but only simulates
+            * record      — Non-interactive; save an image or video (uses raytracing)
+            * print       — Non-interactive; print one frame like 'terminal' mode then exit
             
             [default: window]
 

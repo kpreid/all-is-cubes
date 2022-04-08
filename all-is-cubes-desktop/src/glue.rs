@@ -8,6 +8,4 @@
 
 pub(crate) mod crossterm;
 pub(crate) mod glfw;
-#[cfg(feature = "winit")]
-#[allow(dead_code)] // TODO: remove this when winit glue is actually in use
 pub(crate) mod winit;
