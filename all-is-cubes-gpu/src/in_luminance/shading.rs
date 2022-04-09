@@ -23,8 +23,8 @@ use all_is_cubes::camera::{
 use all_is_cubes::cgmath::Matrix4;
 use all_is_cubes::math::FreeCoordinate;
 
-use crate::space::SpaceRendererBound;
-use crate::types::{AicLumBackend, VertexSemantics};
+use crate::in_luminance::space::SpaceRendererBound;
+use crate::in_luminance::types::{AicLumBackend, VertexSemantics};
 use crate::GraphicsResourceError;
 
 /// Subset of [`GraphicsOptions`] that requires shader recompilation if changed.
@@ -295,12 +295,12 @@ static SHADER_SOURCES: Lazy<Arc<Mutex<ShaderSources>>> = Lazy::new(|| {
 
     Arc::new(Mutex::new(ShaderSources {
         version: 0,
-        common: resource_str!("src/shaders/common.glsl"),
-        common_vertex: resource_str!("src/shaders/common-vertex.glsl"),
-        block_vertex: resource_str!("src/shaders/block-vertex.glsl"),
-        block_fragment: resource_str!("src/shaders/block-fragment.glsl"),
-        lines_vertex: resource_str!("src/shaders/lines-vertex.glsl"),
-        lines_fragment: resource_str!("src/shaders/lines-fragment.glsl"),
+        common: resource_str!("src/in_luminance/shaders/common.glsl"),
+        common_vertex: resource_str!("src/in_luminance/shaders/common-vertex.glsl"),
+        block_vertex: resource_str!("src/in_luminance/shaders/block-vertex.glsl"),
+        block_fragment: resource_str!("src/in_luminance/shaders/block-fragment.glsl"),
+        lines_vertex: resource_str!("src/in_luminance/shaders/lines-vertex.glsl"),
+        lines_fragment: resource_str!("src/in_luminance/shaders/lines-fragment.glsl"),
     }))
 });
 

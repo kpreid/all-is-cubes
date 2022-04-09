@@ -3,9 +3,6 @@
 
 //! Top level of the `luminance`-based renderer.
 
-use std::fmt;
-use std::time::Duration;
-
 use instant::Instant;
 use luminance::backend::{color_slot::ColorSlot, depth_stencil_slot::DepthStencilSlot};
 use luminance::blending::{Blending, Equation, Factor};
@@ -31,21 +28,23 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::math::{Aab, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
-use all_is_cubes::util::{CustomFormat, StatusText};
 
-use crate::frame_texture::{FullFramePainter, FullFrameTexture};
-use crate::shading::{prepare_lines_program, BlockPrograms, LinesProgram, ShaderConstants};
-use crate::space::SpaceRendererOutput;
-use crate::space::{SpaceRenderInfo, SpaceRenderer};
-use crate::types::{AicLumBackend, LinesVertex};
-use crate::GraphicsResourceError;
-use crate::{make_cursor_tess, wireframe_vertices};
+use crate::in_luminance::{
+    frame_texture::{FullFramePainter, FullFrameTexture},
+    make_cursor_tess,
+    shading::{prepare_lines_program, BlockPrograms, LinesProgram, ShaderConstants},
+    space::{SpaceRenderer, SpaceRendererOutput},
+    types::{AicLumBackend, LinesVertex},
+    wireframe_vertices,
+};
+use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
-/// Game world/UI renderer targeting `luminance`.
+/// Top-level renderer.
+/// Owns the [`GraphicsContext`] and an [`EverythingRenderer`] to draw with it.
 ///
-/// TODO: give this and its module a better name
+/// TODO: give this a better name?
 #[allow(missing_debug_implementations)]
-pub struct GLRenderer<C>
+pub struct SurfaceRenderer<C>
 where
     C: GraphicsContext,
     C::Backend: AicLumBackend + Sized,
@@ -55,12 +54,12 @@ where
     back_buffer: Framebuffer<C::Backend, Dim2, (), ()>,
 }
 
-impl<C> GLRenderer<C>
+impl<C> SurfaceRenderer<C>
 where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
 {
-    /// Constructs `GLRenderer` for the given camera configuration.
+    /// Constructs [`SurfaceRenderer`] for the given camera configuration.
     ///
     /// May return errors due to failure to allocate GPU resources or to compile shaders.
     pub fn new(mut surface: C, cameras: StandardCameras) -> Result<Self, GraphicsResourceError> {
@@ -481,35 +480,6 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                 },
             )
             .into_result()?;
-        Ok(())
-    }
-}
-
-/// Information about render performance.
-#[derive(Clone, Debug, Default)]
-pub struct RenderInfo {
-    frame_time: Duration,
-    prepare_time: Duration,
-    draw_time: Layers<Duration>,
-    draw_info: Layers<SpaceRenderInfo>,
-}
-
-impl CustomFormat<StatusText> for RenderInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
-        write!(
-            fmt,
-            "Frame time: {} (prep {}, draw world {}, ui {})\n\n",
-            self.frame_time.custom_format(StatusText),
-            self.prepare_time.custom_format(StatusText),
-            self.draw_time.world.custom_format(StatusText),
-            self.draw_time.ui.custom_format(StatusText),
-        )?;
-        write!(
-            fmt,
-            "WORLD:\n{}\n\n",
-            self.draw_info.world.custom_format(StatusText)
-        )?;
-        write!(fmt, "UI:\n{}", self.draw_info.ui.custom_format(StatusText))?;
         Ok(())
     }
 }

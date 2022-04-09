@@ -23,7 +23,7 @@ use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes_gpu::EverythingRenderer;
+use all_is_cubes_gpu::in_luminance::EverythingRenderer;
 
 const VIEWPORT: Viewport = Viewport {
     nominal_size: Vector2::new(100., 100.),

@@ -4,11 +4,9 @@
 //! Get from [`Space`] to [`Tess`].
 
 use std::collections::HashSet;
-use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
-use all_is_cubes::cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3};
-use instant::{Duration, Instant};
+use instant::Instant;
 use luminance::blending::{Blending, Equation, Factor};
 use luminance::context::GraphicsContext;
 use luminance::depth_stencil::Write;
@@ -23,22 +21,24 @@ use luminance::tess_gate::TessGate;
 use luminance::texture::{Dim3, Sampler, TexelUpload, Texture, TextureError};
 
 use all_is_cubes::camera::Camera;
+use all_is_cubes::cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::Listener;
 use all_is_cubes::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
-use all_is_cubes::mesh::chunked_mesh::{ChunkMesh, ChunkedSpaceMesh, CsmUpdateInfo};
+use all_is_cubes::mesh::chunked_mesh::{ChunkMesh, ChunkedSpaceMesh};
 use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
 use all_is_cubes::raycast::Face;
 use all_is_cubes::space::{Grid, Space, SpaceChange};
 use all_is_cubes::universe::URef;
-use all_is_cubes::util::{CustomFormat, StatusText};
 
-use crate::block_texture::AtlasFlushInfo;
-use crate::block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile};
-use crate::shading::{BlockPrograms, LinesProgram};
-use crate::types::{AicLumBackend, LinesVertex, LumBlockVertex};
-use crate::{wireframe_vertices, GraphicsResourceError};
+use crate::in_luminance::{
+    block_texture::{BlockTexture, BoundBlockTexture, LumAtlasAllocator, LumAtlasTile},
+    shading::{BlockPrograms, LinesProgram},
+    types::{AicLumBackend, LinesVertex, LumBlockVertex},
+    wireframe_vertices,
+};
+use crate::{GraphicsResourceError, SpaceRenderInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -387,61 +387,6 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
             squares_drawn,
             ..self.data.info.clone()
         })
-    }
-}
-
-/// Performance info from a [`SpaceRenderer`] drawing one frame.
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
-pub struct SpaceRenderInfo {
-    /// Status of the block and chunk meshes.
-    pub chunk_info: CsmUpdateInfo,
-    pub chunks_drawn: usize,
-    /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
-    /// to draw this frame.
-    pub squares_drawn: usize,
-    /// Status of the texture atlas.
-    pub texture_info: AtlasFlushInfo,
-    /// Time taken to upload light data.
-    pub light_update_time: Duration,
-    /// Number of light cubes updated
-    pub light_update_count: usize,
-}
-
-impl Default for SpaceRenderInfo {
-    fn default() -> Self {
-        Self {
-            chunk_info: Default::default(),
-            chunks_drawn: 0,
-            squares_drawn: 0,
-            texture_info: Default::default(),
-            light_update_time: Duration::ZERO,
-            light_update_count: 0,
-        }
-    }
-}
-
-impl CustomFormat<StatusText> for SpaceRenderInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
-        let Self {
-            chunk_info,
-            chunks_drawn,
-            squares_drawn,
-            texture_info,
-            light_update_time,
-            light_update_count,
-        } = self;
-
-        let light_update_time = light_update_time.custom_format(format_type);
-
-        writeln!(fmt, "{}", chunk_info.custom_format(format_type))?;
-        writeln!(
-            fmt,
-            "Chunks drawn: {chunks_drawn:3} Quads drawn: {squares_drawn:7}  \
-            Light: {light_update_count:3} cubes in {light_update_time}",
-        )?;
-        write!(fmt, "{:#?}", texture_info.custom_format(StatusText))?;
-        Ok(())
     }
 }
 

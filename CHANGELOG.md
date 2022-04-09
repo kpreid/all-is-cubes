@@ -26,6 +26,11 @@
     - `AllIsCubesAppState::new()` and `BlockProvider::new()` are now async functions.
     - The `linking::BlockModule` trait now requires the [`exhaust::Exhaust`](https://docs.rs/exhaust/latest/exhaust/trait.Exhaust.html) trait in place of `strum::IntoEnumIterator`. This allows implementors to use enums with fields (or non-enums).
 
+- `all-is-cubes-gpu` library:
+    - To allow for working with alternative GPU APIs, everything specific to `luminance` has been moved into a submodule `in_luminance`.
+      Some non-specific types have remained at the top level.
+    - `GLRenderer` has been renamed to `SurfaceRenderer`.
+
 ### Removed
 
 ## 0.4.0 (2022-01-29)

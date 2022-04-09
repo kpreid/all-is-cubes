@@ -14,7 +14,7 @@ use luminance_glfw::{GlfwSurface, GlfwSurfaceError};
 use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_gpu::GLRenderer;
+use all_is_cubes_gpu::in_luminance::SurfaceRenderer;
 
 use crate::choose_graphical_window_size;
 use crate::glue::glfw::{
@@ -54,7 +54,8 @@ pub fn glfw_main_loop(
         Ok((window, events_rx))
     })?;
     let viewport = window_size_as_viewport(&context.window);
-    let mut renderer = GLRenderer::new(context, StandardCameras::from_app_state(&app, viewport)?)?;
+    let mut renderer =
+        SurfaceRenderer::new(context, StandardCameras::from_app_state(&app, viewport)?)?;
 
     let ready_time = Instant::now();
     log::debug!(
@@ -122,7 +123,7 @@ pub fn glfw_main_loop(
 fn handle_glfw_event(
     event: WindowEvent,
     app: &mut AllIsCubesAppState,
-    renderer: &mut GLRenderer<luminance_glfw::GL33Context>,
+    renderer: &mut SurfaceRenderer<luminance_glfw::GL33Context>,
 ) -> ControlFlow<()> {
     match event {
         WindowEvent::Close => return ControlFlow::Break(()),

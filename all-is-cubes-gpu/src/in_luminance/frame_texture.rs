@@ -26,8 +26,8 @@ use luminance::UniformInterface;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::space::Grid;
 
-use crate::shading::map_shader_result;
-use crate::types::AicLumBackend;
+use crate::in_luminance::shading::map_shader_result;
+use crate::in_luminance::types::AicLumBackend;
 use crate::GraphicsResourceError;
 
 /// Resources for drawing a texture onto the entire framebuffer.

@@ -20,7 +20,7 @@ use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_gpu::GLRenderer;
+use all_is_cubes_gpu::in_luminance::SurfaceRenderer;
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl};
@@ -97,7 +97,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     static_dom.loading_log.append_data("\nLoading shaders...")?;
     app_progress.progress(0.6).await;
-    let renderer = GLRenderer::new(
+    let renderer = SurfaceRenderer::new(
         surface,
         StandardCameras::from_app_state(&app, gui_helpers.canvas_helper().viewport()).unwrap(),
     )
@@ -148,7 +148,7 @@ struct WebGameRoot {
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
     app: AllIsCubesAppState,
-    renderer: GLRenderer<WebSysWebGL2Surface>,
+    renderer: SurfaceRenderer<WebSysWebGL2Surface>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
     step_callback_scheduled: bool,
@@ -161,7 +161,7 @@ impl WebGameRoot {
         gui_helpers: GuiHelpers,
         static_dom: StaticDom,
         app: AllIsCubesAppState,
-        renderer: GLRenderer<WebSysWebGL2Surface>,
+        renderer: SurfaceRenderer<WebSysWebGL2Surface>,
     ) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {

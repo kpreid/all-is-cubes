@@ -27,8 +27,8 @@ use all_is_cubes::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
 
-use crate::frame_texture::{FullFramePainter, FullFrameTexture};
-use crate::types::AicLumBackend;
+use crate::in_luminance::frame_texture::{FullFramePainter, FullFrameTexture};
+use crate::in_luminance::types::AicLumBackend;
 use crate::GraphicsResourceError;
 
 pub(crate) struct RaytraceToTexture<Backend: AicLumBackend> {
