@@ -17,6 +17,20 @@ use all_is_cubes_content::UniverseTemplate;
 pub struct OptionsInUrl {
     pub template: UniverseTemplate,
     pub graphics_options: GraphicsOptions,
+    pub renderer: RendererOption,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum RendererOption {
+    Luminance,
+    Wgpu,
+}
+
+impl Default for RendererOption {
+    fn default() -> Self {
+        // TODO: change to Wgpu when that works better
+        Self::Luminance
+    }
 }
 
 /// Parse the given URL query string (without leading "?") to obtain configuration parameters.
@@ -44,6 +58,20 @@ where
             })
             .unwrap_or_default(),
         graphics_options: GraphicsOptions::default(), // TODO: offer graphics options
+        renderer: params
+            .get("renderer")
+            .and_then(|s| {
+                let s = s.borrow();
+                match s {
+                    "luminance" => Some(RendererOption::Luminance),
+                    "wgpu" => Some(RendererOption::Wgpu),
+                    _ => {
+                        log::warn!("Unrecognized value for renderer=: {:?}", s);
+                        None
+                    }
+                }
+            })
+            .unwrap_or_default(),
     }
 }
 
@@ -58,6 +86,7 @@ mod tests {
             OptionsInUrl {
                 template: UniverseTemplate::default(),
                 graphics_options: GraphicsOptions::default(),
+                renderer: RendererOption::Luminance,
             },
         )
     }
@@ -67,6 +96,14 @@ mod tests {
         assert_eq!(
             options_from_query_string(b"template=cornell-box").template,
             UniverseTemplate::CornellBox,
+        )
+    }
+
+    #[test]
+    fn parse_specified_renderer() {
+        assert_eq!(
+            options_from_query_string(b"renderer=wgpu").renderer,
+            RendererOption::Wgpu,
         )
     }
 }

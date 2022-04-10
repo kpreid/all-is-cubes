@@ -176,11 +176,14 @@ dependencies = [
  "luminance-webgl",
  "once_cell",
  "rand 0.8.5",
+ "raw-window-handle",
  "send_wrapper",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-sys",
+ "wgpu",
+ "winit",
 ]
 
 [[package]]

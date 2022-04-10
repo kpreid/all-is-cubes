@@ -47,6 +47,8 @@ export class CanvasHelper {
       this.viewportPx = Object.freeze([layoutPixelWidth, layoutPixelHeight]);
       this.viewportDev = Object.freeze([canvas.width, canvas.height]);
     };
+    this.updateViewport = updateViewport; // allow explicit calls
+
     updateViewport();
 
     const resizeObserver = new ResizeObserver(_entries => {

@@ -17,6 +17,8 @@ extern "C" {
     pub fn canvas_helper(this: &GuiHelpers) -> CanvasHelper;
 
     pub type CanvasHelper;
+    #[wasm_bindgen(method, js_name = updateViewport)]
+    pub fn update_viewport(this: &CanvasHelper);
     #[wasm_bindgen(method, getter)]
     pub fn canvas(this: &CanvasHelper) -> HtmlCanvasElement;
     #[wasm_bindgen(method, getter, js_name = viewportPx)]
