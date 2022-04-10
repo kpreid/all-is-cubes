@@ -36,6 +36,9 @@ enum XtaskCommand {
     /// Compile and report warnings without testing.
     Lint,
 
+    /// Format code (as `cargo fmt` but covering all packages)
+    Fmt,
+
     /// Run webpack dev server (for testing `all-is-cubes-wasm`).
     RunDev,
 
@@ -71,6 +74,12 @@ fn main() -> Result<(), xaction::Error> {
             do_for_all_packages(TestOrCheck::Lint, Features::Default)?;
             // Build docs to verify that there are no broken doc links.
             cargo().arg("doc").run()?;
+        }
+        XtaskCommand::Fmt => {
+            do_for_all_workspaces::<xaction::Error, _>(|| {
+                cargo().arg("fmt").run()?;
+                Ok(())
+            })?;
         }
         XtaskCommand::RunDev => {
             let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
@@ -149,7 +158,9 @@ fn main() -> Result<(), xaction::Error> {
     Ok(())
 }
 
-// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
+/// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
+///
+/// See also [`do_for_all_workspaces`].
 const ALL_NONTEST_PACKAGES: [&str; 6] = [
     "all-is-cubes",
     "all-is-cubes-gpu",
@@ -239,6 +250,24 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), xactio
         cargo().arg(CHECK_SUBCMD).run()?;
     }
 
+    Ok(())
+}
+
+/// cd into each workspace and do something.
+///
+/// do_for_all_packages doesn't use this because it has more specialized handling
+fn do_for_all_workspaces<E, F>(mut f: F) -> Result<(), E>
+where
+    E: From<xshell::Error>,
+    F: FnMut() -> Result<(), E>,
+{
+    // main workspace
+    f()?;
+
+    {
+        let _pushd: Pushd = xaction::pushd("fuzz")?;
+        f()?;
+    }
     Ok(())
 }
 
