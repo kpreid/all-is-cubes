@@ -125,6 +125,8 @@ enum UpdateTo {
 ///
 /// This is used to allow splitting the work to different CI jobs, and not having them
 /// duplicate each other's work and cache data.
+///
+/// TODO: Add wasm workspace as a separate scope (and break it out in CI).
 #[derive(Clone, Copy, Debug, PartialEq, clap::ValueEnum)]
 enum Scope {
     /// Default for interactive use — build/check/test everything.
@@ -362,6 +364,12 @@ impl Config {
         // main workspace
         if self.scope.includes_main_workspace() {
             f()?;
+
+            // TODO: split out wasm as a Scope
+            {
+                let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
+                f()?;
+            }
         }
 
         if self.scope.includes_fuzz_workspace() {
@@ -431,7 +439,7 @@ fn update_server_static(config: &Config, time_log: &mut Vec<Timing>) -> Result<(
     // Note: This must use the same profile as thfe wasm-pack command is! (Both are dev for now)
     cargo()
         .arg("build")
-        .arg("--package=all-is-cubes-wasm")
+        .arg("--manifest-path=all-is-cubes-wasm/Cargo.toml")
         .arg(TARGET_WASM)
         .run()?;
 
@@ -439,7 +447,7 @@ fn update_server_static(config: &Config, time_log: &mut Vec<Timing>) -> Result<(
     // This is because it unconditionally runs `wasm-opt` which is slow and also means
     // the files will be touched unnecessarily.
     if newer_than(
-        ["target/wasm32-unknown-unknown/debug/all_is_cubes_wasm.wasm"],
+        ["all-is-cubes-wasm/target/wasm32-unknown-unknown/debug/all_is_cubes_wasm.wasm"],
         ["all-is-cubes-wasm/pkg/all_is_cubes_wasm.js"],
     ) {
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
@@ -558,13 +566,21 @@ fn do_for_all_packages(
     // Run wasm tests.
     if config.scope.includes_main_workspace() {
         let _t = CaptureTime::new(time_log, format!("{op:?} all-is-cubes-wasm"));
-        let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
+
         match op {
             TestOrCheck::Test => {
+                // Run host-size tests (which exist because they're cheaper and because I made them
+                // first).
+                cmd!("cargo test --manifest-path=all-is-cubes-wasm/Cargo.toml").run()?;
+
+                let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
+
                 // TODO: control over choice of browser
+                cmd!("wasm-pack test --headless --firefox").run()?;
                 cmd!("wasm-pack test --headless --firefox").run()?;
             }
             TestOrCheck::BuildTests | TestOrCheck::Lint => {
+                let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
                 op.cargo_cmd(config).arg(TARGET_WASM).run()?;
             }
         }
@@ -650,11 +666,12 @@ fn ensure_wasm_tools_installed(
     // TODO: check that wasm-pack is installed
 
     // Generate combined license file for the wasm build.
+    let web_ws_path = PROJECT_DIR.join("all-is-cubes-wasm");
     let license_html_path = PROJECT_DIR.join("all-is-cubes-wasm/static/third-party-licenses.html");
     let license_template_path = PROJECT_DIR.join("tools/about.hbs");
     let config_path = PROJECT_DIR.join("tools/about.toml");
     if newer_than(
-        [&PROJECT_DIR.join("Cargo.lock"), &license_template_path],
+        [&web_ws_path.join("Cargo.lock"), &license_template_path],
         [&license_html_path],
     ) {
         let _t = CaptureTime::new(time_log, "cargo about generate");
@@ -669,6 +686,8 @@ fn ensure_wasm_tools_installed(
                 license_template_path.to_str().unwrap(),
                 "-o",
                 license_html_path.to_str().unwrap(),
+                "--manifest-path",
+                web_ws_path.join("Cargo.toml").to_str().unwrap(),
             ])
             .run()?;
     }

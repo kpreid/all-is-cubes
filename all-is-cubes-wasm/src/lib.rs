@@ -18,7 +18,7 @@ mod init;
 pub mod js_bindings;
 #[cfg(any(target_family = "wasm", test))]
 mod url_params;
-#[cfg(target_family = "wasm")]
+#[cfg_attr(not(target_family = "wasm"), allow(unused))]
 mod web_glue;
 
 /// Wrapper to implement [`all_is_cubes::time::Instant`] for [`instant::Instant`].

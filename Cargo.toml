@@ -6,10 +6,22 @@ members = [
   "all-is-cubes-mesh",
   "all-is-cubes-server",
   "all-is-cubes-ui",
-  "all-is-cubes-wasm",
   "test-renderers",
   "tools/xtask",
 
+  # Workspaces generally expect to be able to compile everything for the same target,
+  # but all-is-cubes-wasm only compiles on wasm and all-is-cubes-desktop doesn't.
+  # Specific advantages:
+  # * The wasm workspace has Cargo config telling it to be built for wasm32-unknown-unknown,
+  #   which rust-analyzer picks up, so all IDE assistance works.
+  # 
+  # Disadvantages, or advantages of the alternative of merely `cfg`-disabling all the wasm-only
+  # code:
+  # * `cargo fmt`, `cargo tree`, etc. don't work on this code (but `xtask` provides
+  #   all-workspaces commands).
+  #
+  # "all-is-cubes-wasm",
+  
   # Including this makes the fuzz targets automatically built so we know they aren't broken.
   # But, `cargo test` sometimes ignores `[[bin]] test = false` directives,
   #     https://github.com/rust-lang/cargo/issues/8338
@@ -85,6 +97,7 @@ wasm-bindgen-futures = "0.4.34"
 wgpu = { version = "0.18.0", features = ["expose-ids"] }
 yield-progress = { version = "0.1.4", default-features = false }
 
+# Note: Lints are also necessarily redefined in the workspaces other than this one.
 [workspace.lints]
 rust.rust_2018_idioms = "deny"
 rust.unsafe_op_in_unsafe_fn = "deny"

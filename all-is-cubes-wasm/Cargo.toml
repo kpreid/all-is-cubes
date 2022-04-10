@@ -1,3 +1,6 @@
+[workspace]
+# Excludes this from containing workspace; see top-level Cargo.toml for explanation
+
 [package]
 name = "all-is-cubes-wasm"
 version = "0.6.0"
@@ -37,17 +40,18 @@ futures-channel = "0.3.28"
 getrandom = { version = "0.2.7", features = ["js"] }
 # Feature enabling for indirect dependency all-is-cubes-content → maze_generator → rand → getrandom
 getrandom_old = { package = "getrandom", version = "0.1.16", features = ["wasm-bindgen"] }
-instant = { workspace = true, features = ["wasm-bindgen"] }
+# Feature enabling for indirect dependency all-is-cubes → instant
+instant = { version = "0.1.12", features = ["wasm-bindgen"] }
 js-sys = "0.3.64"
-log = { workspace = true }
-once_cell = { workspace = true }
-rand = { workspace = true, features = ["std", "std_rng"] }
+log = { version = "0.4.17", default-features = false }
+once_cell = "1.18.0"
+rand = { version = "0.8.2", default-features = false, features = ["std", "std_rng"] }
 send_wrapper = "0.6.0"
 wasm-bindgen = "0.2.87"
-wasm-bindgen-futures = { workspace = true }
-wgpu = { workspace = true, features = ["webgl"] }
-# Enable the log_hiccups feature
-yield-progress = { workspace = true, features = ["log_hiccups"] }
+wasm-bindgen-futures = "0.4.34"
+wgpu = { version = "0.18.0", features = ["webgl"] }
+# Feature enabling
+yield-progress = { version = "0.1.4", features = ["log_hiccups"] }
 
 [dependencies.web-sys]
 version = "0.3.64"
@@ -79,4 +83,62 @@ features = [
 wasm-bindgen-test = "0.3"
 
 [lints]
-workspace = true
+rust.rust_2018_idioms = "deny"
+rust.unsafe_op_in_unsafe_fn = "deny"
+
+rust.explicit_outlives_requirements = "warn"
+rust.missing_debug_implementations = "warn"
+rust.missing_docs = "warn"
+rust.noop_method_call = "warn"
+rust.trivial_casts = "warn"
+rust.trivial_numeric_casts = "warn"
+rust.unused_extern_crates = "warn"
+rust.unused_lifetimes = "warn"
+rust.unused_qualifications = "warn"
+# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
+# rust.unused_crate_dependencies = "warn"
+
+clippy.collapsible_else_if = "allow"
+clippy.collapsible_if = "allow"
+clippy.needless_update = "allow"
+clippy.single_match = "allow"
+
+clippy.cast_lossless = "warn"
+clippy.doc_markdown = "warn"
+clippy.exhaustive_enums = "warn"
+clippy.exhaustive_structs = "warn"
+clippy.modulo_arithmetic = "warn"
+clippy.return_self_not_must_use = "warn"
+clippy.should_panic_without_expect = "deny"
+clippy.suboptimal_flops = "warn"
+clippy.undocumented_unsafe_blocks = "warn"
+clippy.uninlined_format_args = "warn"
+clippy.unnecessary_self_imports = "warn"
+clippy.unused_async = "warn"
+clippy.wrong_self_convention = "warn"
+
+# wasm-specific config
+clippy.arc_with_non_send_sync = "allow"
+
+[profile.dev]
+# Enable some optimization to improve interactive performance in manual testing/experimenting.
+# In particular, inlining is crucial.
+opt-level = 2
+# Yes, this is the default for dev, but I want to be precise here: overflow checks are enabled
+# for ALL profiles. (Because not catching overflows in release mode is unwise when this is
+# precisely where the program is *likely to encounter bigger numbers than in testing*.)
+overflow-checks = true
+# Faster builds at the cost of pathname-sensitive debug info.
+split-debuginfo = "unpacked"
+
+# For packages whose code is not as performance-critical, spend less time optimizing
+package.all-is-cubes-content.opt-level = 1
+package.all-is-cubes-port.opt-level = 1
+package.all-is-cubes-ui.opt-level = 1
+
+[profile.release]
+# TODO: review recommended options for wasm releases
+overflow-checks = true
+
+[profile.test]
+overflow-checks = true

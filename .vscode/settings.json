@@ -10,5 +10,6 @@
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
         "fuzz/Cargo.toml",
-    ],
+        "all-is-cubes-wasm/Cargo.toml",
+    ]
 }
