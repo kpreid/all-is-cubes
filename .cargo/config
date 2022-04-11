@@ -1,6 +1,2 @@
 [alias]
 xtask = "run --quiet --package xtask --"
-
-[build]
-# Enable access to WebGPU API for wgpu.
-rustflags = "--cfg=web_sys_unstable_apis"
