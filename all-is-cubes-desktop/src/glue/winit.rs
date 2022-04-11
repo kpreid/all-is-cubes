@@ -2,6 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use winit::dpi::{LogicalSize, PhysicalSize};
+use winit::monitor::MonitorHandle;
 
 use all_is_cubes::apps::InputProcessor;
 use all_is_cubes::camera::Viewport;
@@ -21,6 +22,13 @@ pub fn logical_size_from_vec(size: Vector2<u32>) -> LogicalSize<u32> {
         width: size.x,
         height: size.y,
     }
+}
+
+pub fn monitor_size_for_window(monitor: MonitorHandle) -> Vector2<u32> {
+    // TODO: monitor.size() doesn't specify whether it's the usable-area or the outer size
+    physical_size_to_viewport(monitor.scale_factor(), monitor.size())
+        .nominal_size
+        .map(|c| c as u32)
 }
 
 pub fn map_mouse_button(button: winit::event::MouseButton) -> usize {

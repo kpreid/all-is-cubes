@@ -9,7 +9,6 @@ use std::time::Instant;
 
 use futures::executor::block_on;
 use futures::task::noop_waker_ref;
-use winit::dpi::LogicalSize;
 use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
@@ -19,8 +18,10 @@ use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
 
+use crate::choose_graphical_window_size;
 use crate::glue::winit::{
-    logical_size_from_vec, map_key, map_mouse_button, physical_size_to_viewport, sync_cursor_grab,
+    logical_size_from_vec, map_key, map_mouse_button, monitor_size_for_window,
+    physical_size_to_viewport, sync_cursor_grab,
 };
 
 /// Run Winit/wgpu-based rendering and event loop.
@@ -33,18 +34,22 @@ pub fn winit_main_loop(
 ) -> Result<(), anyhow::Error> {
     let init_start_time = Instant::now();
 
+    let event_loop = EventLoop::new();
+
     // Pick a window size.
-    // TODO: Add screen-size-based window size logic
     let inner_size = if let Some(size) = requested_size {
         logical_size_from_vec(size)
     } else {
-        LogicalSize {
-            width: 800,
-            height: 600,
-        }
+        // TODO: Does this strategy actually best reflect what monitor the window is
+        // going to appear on?
+        let maybe_monitor = event_loop
+            .primary_monitor()
+            .or_else(|| event_loop.available_monitors().next());
+        logical_size_from_vec(choose_graphical_window_size(
+            maybe_monitor.map(monitor_size_for_window),
+        ))
     };
 
-    let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_inner_size(inner_size)
         .with_title(window_title)
