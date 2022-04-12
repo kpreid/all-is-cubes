@@ -466,7 +466,7 @@ impl EverythingRenderer {
         output: &wgpu::SurfaceTexture,
         text: &str,
     ) {
-        if !self.cameras.cameras().world.options().debug_info_text {
+        if text.is_empty() || !self.cameras.cameras().world.options().debug_info_text {
             // TODO: Avoid computing the text, not just drawing it
             return;
         }

@@ -440,7 +440,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         CS: ColorSlot<Backend, Dim2>,
         DS: DepthStencilSlot<Backend, Dim2>,
     {
-        if !self.cameras.cameras().world.options().debug_info_text {
+        if text.is_empty() || !self.cameras.cameras().world.options().debug_info_text {
             // TODO: Avoid computing the text, not just drawing it
             return Ok(());
         }
