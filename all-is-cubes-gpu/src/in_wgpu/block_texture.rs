@@ -155,6 +155,7 @@ impl AtlasAllocator {
                                 .allocation;
 
                             write_texture_by_grid(queue, &self.texture, region, data);
+                            backing.dirty = false;
                             count_written += 1;
                         }
                     }
