@@ -5,31 +5,28 @@
 
 // Mirrors `struct ShaderPostprocessCamera` on the Rust side.
 struct ShaderPostprocessCamera {
-    [[location(0)]] tone_mapping_id: i32;
-    [[location(1)]] scene_texture_valid: i32;
+    @location(0) tone_mapping_id: i32,
+    @location(1) scene_texture_valid: i32,
+    @location(2) _padding: vec2<i32>,
 };
 
 
 // This group is named postprocess_bind_group_layout in the code.
-[[group(0), binding(0)]]
-var text_texture: texture_2d<f32>;
-[[group(0), binding(1)]]
-var text_sampler: sampler;
-[[group(0), binding(2)]]
-var linear_scene_texture: texture_2d<f32>;
-[[group(0), binding(3)]]
-var<uniform> camera: ShaderPostprocessCamera;
+@group(0) @binding(0) var text_texture: texture_2d<f32>;
+@group(0) @binding(1) var text_sampler: sampler;
+@group(0) @binding(2) var linear_scene_texture: texture_2d<f32>;
+@group(0) @binding(3) var<uniform> camera: ShaderPostprocessCamera;
 
 // --- Vertex shader -----------------------------------------------------------
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] tc: vec4<f32>;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) tc: vec4<f32>,
 };
 
-[[stage(vertex)]]
+@vertex
 fn postprocess_vertex(
-    [[builtin(vertex_index)]] in_vertex_index: u32,
+    @builtin(vertex_index) in_vertex_index: u32,
 ) -> VertexOutput {
     /// Full-screen triangle
     let position = vec4<f32>(
@@ -48,12 +45,12 @@ fn luminance(linear_rgb: vec3<f32>) -> f32 {
 }
 
 fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
-    switch (camera.tone_mapping_id) {
-        default: { // or case 0
+    switch camera.tone_mapping_id {
+        default { // or case 0
             // Clamp (implicitly)
             return linear_rgb;
         }
-        case 1: {
+        case 1 {
             // Reinhard
             // TODO: Explain exactly which Reinhard, citation, etc
             return linear_rgb / (1.0 + luminance(linear_rgb));
@@ -61,8 +58,8 @@ fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
     }
 }
 
-[[stage(fragment)]]
-fn postprocess_fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // scale clip coordinates to 0.1 coordinates and flip Y
     let texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
 

@@ -72,7 +72,7 @@ pub(crate) fn create_wgsl_module_from_reloadable(
     r: &Reloadable,
 ) -> wgpu::ShaderModule {
     let current_source: Arc<str> = r.as_source().snapshot();
-    device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+    device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some(label),
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*current_source)),
     })

@@ -34,7 +34,7 @@ getrandom = { version = "0.2.3", features = ["js"] }
 getrandom_old = { package = "getrandom", version = "0.1.16", features = ["wasm-bindgen"] }
 # Feature enabling for indirect dependency all-is-cubes → instant
 instant = { version = "0.1.9", features = ["wasm-bindgen"] }
-js-sys = "0.3.47"
+js-sys = "0.3.58"
 log = { version = "0.4.14", default-features = false }
 luminance = "0.47.0"
 luminance-web-sys = "0.5.0"
@@ -45,7 +45,7 @@ raw-window-handle = { version = "0.4.3" }
 send_wrapper = "0.5.0"
 wasm-bindgen = "0.2.70"
 wasm-bindgen-futures =  "0.4.28"
-wgpu = { version = "0.12.0", features = ["webgl"] }
+wgpu = { version = "0.13.0", features = ["webgl"] }
 # Using winit to provide an canvas window-handle only, not events (for now).
 # Note: "x11" feature specified ("wayland" is an alternative) so that the package will
 # not refuse to build on unix (which we use for running some unit tests).

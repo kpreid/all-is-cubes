@@ -131,11 +131,11 @@ impl Pipelines {
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: "block_fragment_opaque",
-                    targets: &[wgpu::ColorTargetState {
+                    targets: &[Some(wgpu::ColorTargetState {
                         format: surface_format,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
-                    }],
+                    })],
                 }),
                 primitive: block_primitive_state,
                 depth_stencil: Some(wgpu::DepthStencilState {
@@ -161,7 +161,7 @@ impl Pipelines {
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: "block_fragment_transparent",
-                    targets: &[wgpu::ColorTargetState {
+                    targets: &[Some(wgpu::ColorTargetState {
                         format: surface_format,
                         // Note that this blending configuration is for premultiplied alpha.
                         // The fragment shader is responsible for producing premultiplied alpha outputs.
@@ -176,7 +176,7 @@ impl Pipelines {
                         // Write only to color channels -- we are not attempting to support transparent
                         // framebuffers (yet).
                         write_mask: wgpu::ColorWrites::COLOR,
-                    }],
+                    })],
                 }),
                 primitive: block_primitive_state,
                 depth_stencil: Some(wgpu::DepthStencilState {
@@ -212,11 +212,11 @@ impl Pipelines {
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: "lines_fragment",
-                    targets: &[wgpu::ColorTargetState {
+                    targets: &[Some(wgpu::ColorTargetState {
                         format: surface_format,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
-                    }],
+                    })],
                 }),
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::LineList,

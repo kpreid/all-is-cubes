@@ -6,14 +6,8 @@
 //! TODO: This code is experimental and not feature-complete.
 
 use std::mem;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Context;
 
-use futures_core::future::BoxFuture;
-use futures_core::stream::Stream as _;
-use futures_util::stream::FuturesUnordered;
-use futures_util::task::noop_waker_ref;
 use instant::Instant;
 use once_cell::sync::Lazy;
 
@@ -85,7 +79,7 @@ impl SurfaceRenderer {
         let everything = EverythingRenderer::new(
             device.clone(),
             cameras,
-            surface.get_preferred_format(adapter).unwrap(),
+            surface.get_supported_formats(adapter)[0],
         );
 
         Ok(Self {
@@ -160,10 +154,6 @@ pub struct EverythingRenderer {
     device: Arc<wgpu::Device>,
 
     staging_belt: wgpu::util::StagingBelt,
-    /// Future(s) that do the work of `staging_belt.recall()` has completed and it can be reused.
-    /// We don't need to await these but we do need to poll them.
-    /// TODO: When Rust has type_alias_impl_trait we can use that here instead of boxing.
-    staging_belt_recallers: Pin<Box<FuturesUnordered<BoxFuture<'static, ()>>>>,
 
     cameras: StandardCameras,
 
@@ -282,7 +272,6 @@ impl EverythingRenderer {
                 // TODO: wild guess at good size
                 std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
             ),
-            staging_belt_recallers: Box::pin(FuturesUnordered::new()),
 
             linear_scene_texture_view: linear_scene_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
@@ -371,11 +360,11 @@ impl EverythingRenderer {
             fragment: Some(wgpu::FragmentState {
                 module: &postprocess_shader,
                 entry_point: "postprocess_fragment",
-                targets: &[wgpu::ColorTargetState {
+                targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
                     blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
-                }],
+                })],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -489,13 +478,6 @@ impl EverythingRenderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("EverythingRenderer::update()"),
             });
-
-        // Poll the staging belt recall future(s) to reclaim previously used buffers.
-        // We don't need to await them but we do need to poll them in order to not leak memory.
-        let _: std::task::Poll<Option<()>> = self
-            .staging_belt_recallers
-            .as_mut()
-            .poll_next(&mut Context::from_waker(noop_waker_ref()));
 
         let mut bwp = BeltWritingParts {
             device: &*self.device,
@@ -633,14 +615,14 @@ impl EverythingRenderer {
         if let (Some(sr), 1..) = (&self.space_renderers.world, self.lines_vertex_count) {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("debug lines"),
-                color_attachments: &[wgpu::RenderPassColorAttachment {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: output_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: true,
                     },
-                }],
+                })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: depth_texture_view,
                     depth_ops: Some(wgpu::Operations {
@@ -693,14 +675,7 @@ impl EverythingRenderer {
         );
 
         queue.submit(std::iter::once(encoder.finish()));
-
-        // Note: It doesn't actually matter when the recall completes.
-        // If we render another frame before it does, all that happens is that the belt
-        // allocates more buffers, which is OK and better than delaying the next frame.
-        // However, it is important that the future gets polled in order to get that to
-        // happen eventually.
-        self.staging_belt_recallers
-            .push(Box::pin(self.staging_belt.recall()));
+        self.staging_belt.recall();
 
         let end_time = Instant::now();
         Ok(DrawInfo {
@@ -749,14 +724,14 @@ impl EverythingRenderer {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("add_info_text_and_postprocess() pass"),
-                color_attachments: &[wgpu::RenderPassColorAttachment {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &output_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: true,
                     },
-                }],
+                })],
                 depth_stencil_attachment: None,
             });
 

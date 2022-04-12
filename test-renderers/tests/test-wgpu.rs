@@ -232,11 +232,19 @@ async fn get_pixels_from_gpu(
     }
 
     let bytes = {
-        let dst_buffer_slice = temp_buffer.slice(..);
-        let map_future = dst_buffer_slice.map_async(wgpu::MapMode::Read);
-        device.poll(wgpu::Maintain::Wait); // TODO: abstract over needing to do this
-        map_future.await.expect("mapping failed");
-        dst_buffer_slice.get_mapped_range().to_vec()
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        temp_buffer
+            .slice(..)
+            .map_async(wgpu::MapMode::Read, |result| {
+                let _ = sender.send(result);
+            });
+        tokio::task::yield_now().await;
+        device.poll(wgpu::Maintain::Wait); // TODO: poll in the background instead of blocking
+        receiver
+            .await
+            .expect("communication failed")
+            .expect("buffer reading failed");
+        temp_buffer.slice(..).get_mapped_range().to_vec()
     };
 
     RgbaImage::from_raw(size.x, size.y, bytes).expect("image copy buffer was incorrectly sized")

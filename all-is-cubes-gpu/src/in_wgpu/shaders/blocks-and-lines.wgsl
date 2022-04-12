@@ -5,43 +5,40 @@
 
 // Mirrors `struct ShaderSpaceCamera` on the Rust side.
 struct ShaderSpaceCamera {
-    [[location(0)]] projection: mat4x4<f32>;
-    [[location(1)]] view_matrix: mat4x4<f32>;
-    [[location(2)]] view_position: vec3<f32>;
-    [[location(3)]] light_lookup_offset_and_option: vec4<i32>;
-    [[location(4)]] fog_color: vec3<f32>;
-    [[location(5)]] fog_mode_blend: f32;
-    [[location(6)]] fog_distance: f32;
-    [[location(7)]] exposure: f32;
+    @location(0) projection: mat4x4<f32>,
+    @location(1) view_matrix: mat4x4<f32>,
+    @location(2) view_position: vec3<f32>,
+    @location(3) light_lookup_offset_and_option: vec4<i32>,
+    @location(4) fog_color: vec3<f32>,
+    @location(5) fog_mode_blend: f32,
+    @location(6) fog_distance: f32,
+    @location(7) exposure: f32,
+    @location(8) _padding: f32,
 };
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
 struct WgpuBlockVertex {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] cube: vec3<f32>;
-    [[location(2)]] normal_face: u32;
-    [[location(3)]] color_or_texture: vec4<f32>;
-    [[location(4)]] clamp_min: vec3<f32>;
-    [[location(5)]] clamp_max: vec3<f32>;
+    @location(0) position: vec3<f32>,
+    @location(1) cube: vec3<f32>,
+    @location(2) normal_face: u32,
+    @location(3) color_or_texture: vec4<f32>,
+    @location(4) clamp_min: vec3<f32>,
+    @location(5) clamp_max: vec3<f32>,
 };
 
 // Mirrors `struct WgpuLinesVertex` on the Rust side.
 struct WgpuLinesVertex {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] color: vec4<f32>;
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec4<f32>,
 };
 
 // This group is named camera_bind_group_layout in the code.
-[[group(0), binding(0)]]
-var<uniform> camera: ShaderSpaceCamera;
+@group(0) @binding(0) var<uniform> camera: ShaderSpaceCamera;
 
 // This group is named space_texture_bind_group_layout in the code.
-[[group(1), binding(0)]]
-var block_texture: texture_3d<f32>;
-[[group(1), binding(1)]]
-var block_sampler: sampler;
-[[group(1), binding(2)]]
-var light_texture: texture_3d<u32>;
+@group(1) @binding(0) var block_texture: texture_3d<f32>;
+@group(1) @binding(1) var block_sampler: sampler;
+@group(1) @binding(2) var light_texture: texture_3d<u32>;
 
 // --- Fog computation --------------------------------------------------------
 
@@ -89,29 +86,29 @@ fn compute_fog(world_position: vec3<f32>) -> f32 {
 
 // Vertex-to-fragment data for blocks
 struct BlockFragmentInput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec3<f32>;
-    [[location(1)]] cube: vec3<f32>;
-    [[location(2)]] normal: vec3<f32>;
-    [[location(3)]] color_or_texture: vec4<f32>;
-    [[location(4)]] clamp_min: vec3<f32>;
-    [[location(5)]] clamp_max: vec3<f32>;
-    [[location(6)]] fog_mix: f32;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec3<f32>,
+    @location(1) cube: vec3<f32>,
+    @location(2) normal: vec3<f32>,
+    @location(3) color_or_texture: vec4<f32>,
+    @location(4) clamp_min: vec3<f32>,
+    @location(5) clamp_max: vec3<f32>,
+    @location(6) fog_mix: f32,
 };
 
-[[stage(vertex)]]
+@vertex
 fn block_vertex_main(
     input: WgpuBlockVertex,
 ) -> BlockFragmentInput {
     var normal = vec3<f32>(1.0);
-    switch (input.normal_face) {
-        case 1u: { normal = vec3<f32>(-1.0, 0.0, 0.0); }
-        case 2u: { normal = vec3<f32>(0.0, -1.0, 0.0); }
-        case 3u: { normal = vec3<f32>(0.0, 0.0, -1.0); }
-        case 4u: { normal = vec3<f32>(1.0, 0.0, 0.0); }
-        case 5u: { normal = vec3<f32>(0.0, 1.0, 0.0); }
-        case 6u: { normal = vec3<f32>(0.0, 0.0, 1.0); }
-        default: {}
+    switch input.normal_face {
+        case 1u { normal = vec3<f32>(-1.0, 0.0, 0.0); }
+        case 2u { normal = vec3<f32>(0.0, -1.0, 0.0); }
+        case 3u { normal = vec3<f32>(0.0, 0.0, -1.0); }
+        case 4u { normal = vec3<f32>(1.0, 0.0, 0.0); }
+        case 5u { normal = vec3<f32>(0.0, 1.0, 0.0); }
+        case 6u { normal = vec3<f32>(0.0, 0.0, 1.0); }
+        default {}
     }
 
     return BlockFragmentInput(
@@ -282,21 +279,21 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
 
 // Compute light intensity applying to the fragment.
 fn lighting(in: BlockFragmentInput) -> vec3<f32> {
-    switch (camera.light_lookup_offset_and_option.w) {
+    switch camera.light_lookup_offset_and_option.w {
         // LightingOption::None or fallback: no lighting
-        default: {
+        default {
             return vec3<f32>(1.0);
         }
         
         // LightingOption::Flat
-        case 1: {
+        case 1 {
             let origin = in.cube + in.normal + vec3<f32>(0.5);
             let local_light = light_texture_fetch(origin).rgb;
             return fixed_directional_lighting(in.normal) * local_light;
         }
 
         // LightingOption::Smooth
-        case 2: {
+        case 2 {
             return fixed_directional_lighting(in.normal) * interpolated_space_light(in);
         }
     }
@@ -317,8 +314,8 @@ fn get_diffuse_color(in: BlockFragmentInput) -> vec4<f32> {
     }
 }
 
-[[stage(fragment)]]
-fn block_fragment_opaque(in: BlockFragmentInput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let diffuse_color: vec4<f32> = get_diffuse_color(in);
     
     // Lighting
@@ -333,8 +330,8 @@ fn block_fragment_opaque(in: BlockFragmentInput) -> [[location(0)]] vec4<f32> {
     return exposed_color;
 }
 
-[[stage(fragment)]]
-fn block_fragment_transparent(in: BlockFragmentInput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn block_fragment_transparent(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let diffuse_color: vec4<f32> = get_diffuse_color(in);
     
     // Lighting
@@ -357,12 +354,12 @@ fn block_fragment_transparent(in: BlockFragmentInput) -> [[location(0)]] vec4<f3
 
 // Vertex-to-fragment data for lines
 struct LinesFragmentInput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] color: vec4<f32>;
-    [[location(1)]] fog_mix: f32;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec4<f32>,
+    @location(1) fog_mix: f32,
 };
 
-[[stage(vertex)]]
+@vertex
 fn lines_vertex(
     input: WgpuLinesVertex,
 ) -> LinesFragmentInput {
@@ -373,8 +370,8 @@ fn lines_vertex(
     );
 }
 
-[[stage(fragment)]]
-fn lines_fragment(input: LinesFragmentInput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn lines_fragment(input: LinesFragmentInput) -> @location(0) vec4<f32> {
     let color = input.color;
     
     // Fog
