@@ -5,6 +5,7 @@
 //!
 //! This code is experimental and not feature-complete.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use all_is_cubes::drawing::embedded_graphics::{
@@ -20,8 +21,13 @@ use all_is_cubes::apps::{Layers, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
+use all_is_cubes::listen::DirtyFlag;
+use once_cell::sync::Lazy;
 
-use crate::in_wgpu::{glue::BeltWritingParts, space::BlockRenderStuff, vertex::WgpuBlockVertex};
+use crate::{
+    in_wgpu::{glue::BeltWritingParts, space::BlockRenderStuff, vertex::WgpuBlockVertex},
+    reloadable::{reloadable_str, Reloadable},
+};
 use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
 mod camera;
@@ -188,6 +194,7 @@ pub struct EverythingRenderer {
     info_text_bind_group: Option<wgpu::BindGroup>,
     info_text_bind_group_layout: wgpu::BindGroupLayout,
     info_text_sampler: wgpu::Sampler,
+    info_text_shader_dirty: DirtyFlag,
 }
 
 impl EverythingRenderer {
@@ -204,12 +211,6 @@ impl EverythingRenderer {
             height: viewport.framebuffer_size.y,
             present_mode: wgpu::PresentMode::Fifo,
         };
-
-        let info_text_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: Some("EverythingRenderer::info_text_shader"),
-            // TODO: shader live-reloading
-            source: wgpu::ShaderSource::Wgsl(include_str!("in_wgpu/shaders/info-text.wgsl").into()),
-        });
 
         let info_text_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -234,65 +235,28 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::info_text_bind_group_layout"),
             });
 
-        let info_text_render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("EverythingRenderer::info_text_render_pipeline_layout"),
-                bind_group_layouts: &[&info_text_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let info_text_render_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("EverythingRenderer::info_text_render_pipeline"),
-                layout: Some(&info_text_render_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &info_text_shader,
-                    entry_point: "vs_main",
-                    buffers: &[],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &info_text_shader,
-                    entry_point: "fs_main",
-                    targets: &[wgpu::ColorTargetState {
-                        format: config.format,
-                        blend: Some(wgpu::BlendState {
-                            color: wgpu::BlendComponent {
-                                operation: wgpu::BlendOperation::Add,
-                                src_factor: wgpu::BlendFactor::One,
-                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            },
-                            // TODO: this probably isn't correct but it doesn't matter until such
-                            // time as we get into transparent framebuffers
-                            alpha: wgpu::BlendComponent::REPLACE,
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: Some(wgpu::Face::Back),
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    unclipped_depth: false,
-                    conservative: false,
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(), // default = off
-                multiview: None,
-            });
-
         EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
                 // TODO: wild guess at good size
                 std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
             ),
-            block_render_stuff: BlockRenderStuff::new(&device, &config),
+            block_render_stuff: BlockRenderStuff::new(&device, config.format),
             space_renderers: Default::default(),
+
+            info_text_shader_dirty: {
+                // TODO: this is a common pattern which should get a helper method
+                let flag = DirtyFlag::new(false);
+                INFO_TEXT_SHADER.as_source().listen(flag.listener());
+                flag
+            },
             info_text_texture: DrawableTexture::new(),
             info_text_bind_group: None,
+            info_text_render_pipeline: Self::create_info_text_pipeline(
+                &device,
+                &info_text_bind_group_layout,
+                config.format,
+            ),
             info_text_bind_group_layout,
-            info_text_render_pipeline,
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 address_mode_u: wgpu::AddressMode::ClampToEdge,
                 address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -307,6 +271,66 @@ impl EverythingRenderer {
             config,
             cameras,
         }
+    }
+
+    /// Read info text shader and create the info text render pipeline.
+    fn create_info_text_pipeline(
+        device: &wgpu::Device,
+        info_text_bind_group_layout: &wgpu::BindGroupLayout,
+        surface_format: wgpu::TextureFormat,
+    ) -> wgpu::RenderPipeline {
+        let source = INFO_TEXT_SHADER.as_source().snapshot();
+        let info_text_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("EverythingRenderer::info_text_shader"),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*source)),
+        });
+
+        let info_text_render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("EverythingRenderer::info_text_render_pipeline_layout"),
+                bind_group_layouts: &[info_text_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("EverythingRenderer::info_text_render_pipeline"),
+            layout: Some(&info_text_render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &info_text_shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &info_text_shader,
+                entry_point: "fs_main",
+                targets: &[wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent {
+                            operation: wgpu::BlendOperation::Add,
+                            src_factor: wgpu::BlendFactor::One,
+                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        },
+                        // TODO: this probably isn't correct but it doesn't matter until such
+                        // time as we get into transparent framebuffers
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(), // default = off
+            multiview: None,
+        })
     }
 
     /// Returns the last [`Viewport`] provided.
@@ -351,7 +375,17 @@ impl EverythingRenderer {
         // This updates camera matrices and graphics options
         self.cameras.update();
 
-        // TODO: Recompile shaders if needed.
+        // Recompile shaders if needed.
+        // TODO: Recompile block shaders
+        if self.info_text_shader_dirty.get_and_clear() {
+            self.info_text_render_pipeline = Self::create_info_text_pipeline(
+                &self.device,
+                &self.info_text_bind_group_layout,
+                self.config.format,
+            );
+        }
+        self.block_render_stuff
+            .recompile_if_changed(&self.device, self.config.format);
 
         let output_view = output
             .texture
@@ -553,3 +587,6 @@ fn create_depth_texture(device: &wgpu::Device, everything: &EverythingRenderer) 
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
     })
 }
+
+static INFO_TEXT_SHADER: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/info-text.wgsl"));

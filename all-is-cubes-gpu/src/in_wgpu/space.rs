@@ -3,8 +3,10 @@
 
 //! Manages meshes for rendering a [`Space`].
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 
+use all_is_cubes::listen::DirtyFlag;
 use instant::Instant;
 
 use all_is_cubes::camera::Camera;
@@ -14,6 +16,7 @@ use all_is_cubes::mesh::chunked_mesh::ChunkedSpaceMesh;
 use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
+use once_cell::sync::Lazy;
 
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
@@ -21,6 +24,7 @@ use crate::in_wgpu::{
     glue::{to_wgpu_color, to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
+use crate::reloadable::{reloadable_str, Reloadable};
 use crate::{GraphicsResourceError, SpaceRenderInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
@@ -380,6 +384,7 @@ fn update_chunk_buffers(
 /// TODO: better name
 #[derive(Debug)]
 pub(crate) struct BlockRenderStuff {
+    shader_dirty: DirtyFlag,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     space_texture_bind_group_layout: wgpu::BindGroupLayout,
     opaque_render_pipeline: wgpu::RenderPipeline,
@@ -388,11 +393,11 @@ pub(crate) struct BlockRenderStuff {
 
 impl BlockRenderStuff {
     // TODO: wants graphics options to configure shader?
-    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
+    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+        let source = BLOCK_SHADER.as_source().snapshot();
         let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: Some("BlockRenderStuff::shader"),
-            // TODO: shader live-reloading
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/block.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*source)),
         });
 
         let space_texture_bind_group_layout =
@@ -464,7 +469,7 @@ impl BlockRenderStuff {
                     module: &shader,
                     entry_point: "fs_main_opaque",
                     targets: &[wgpu::ColorTargetState {
-                        format: config.format,
+                        format: surface_format,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }],
@@ -494,7 +499,7 @@ impl BlockRenderStuff {
                     module: &shader,
                     entry_point: "fs_main_transparent",
                     targets: &[wgpu::ColorTargetState {
-                        format: config.format,
+                        format: surface_format,
                         // Note that this blending configuration is for premultiplied alpha.
                         // The fragment shader is responsible for producing premultiplied alpha outputs.
                         blend: Some(wgpu::BlendState {
@@ -523,10 +528,30 @@ impl BlockRenderStuff {
             });
 
         Self {
+            shader_dirty: {
+                // TODO: this is a common pattern which should get a helper method
+                let flag = DirtyFlag::new(false);
+                BLOCK_SHADER.as_source().listen(flag.listener());
+                flag
+            },
             camera_bind_group_layout,
             space_texture_bind_group_layout,
             opaque_render_pipeline,
             transparent_render_pipeline,
         }
     }
+
+    pub(crate) fn recompile_if_changed(
+        &mut self,
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+    ) {
+        if self.shader_dirty.get_and_clear() {
+            // TODO: slightly less efficient than it could be since it rebuilds the layouts too
+            *self = Self::new(device, surface_format);
+        }
+    }
 }
+
+static BLOCK_SHADER: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/block.wgsl"));
