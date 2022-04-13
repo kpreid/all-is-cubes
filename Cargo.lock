@@ -191,7 +191,6 @@ dependencies = [
  "luminance-webgl",
  "once_cell",
  "rand 0.8.5",
- "resource",
  "send_wrapper",
  "wasm-bindgen",
  "wasm-bindgen-futures",
