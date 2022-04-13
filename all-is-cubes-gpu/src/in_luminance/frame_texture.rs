@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use all_is_cubes::drawing::embedded_graphics::{
     self,
@@ -24,6 +25,7 @@ use luminance::texture::{Dim2, MagFilter, MinFilter, Sampler, Texture, Wrap};
 use luminance::UniformInterface;
 
 use all_is_cubes::camera::Viewport;
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::space::Grid;
 
 use crate::in_luminance::shading::map_shader_result;
@@ -37,6 +39,8 @@ pub(crate) struct FullFramePainter<Backend>
 where
     Backend: AicLumBackend,
 {
+    fragment_shader_text: ListenableSource<Arc<str>>,
+    fragment_shader_dirty: DirtyFlag,
     /// Using a `Program` requires `&mut`.
     program: RefCell<Program<Backend, (), (), FullFrameUniformInterface>>,
     tess: Tess<Backend, ()>,
@@ -49,19 +53,15 @@ where
     /// Construct a [`FullFramePainter`] with the default vertex shader and given fragment shader.
     pub fn new<C: GraphicsContext<Backend = Backend>>(
         context: &mut C,
-        fragment_shader: &str,
+        fragment_shader: ListenableSource<Arc<str>>,
     ) -> Result<Rc<Self>, GraphicsResourceError> {
-        let program = map_shader_result(
-            &("FullFramePainter", fragment_shader), // debug info
-            context.new_shader_program().from_strings(
-                include_str!("shaders/full-frame-vertex.glsl"),
-                None,
-                None,
-                fragment_shader,
-            ),
-        )?;
+        let fragment_shader_dirty = DirtyFlag::new(false);
+        fragment_shader.listen(fragment_shader_dirty.listener());
+        let program = compile_full_frame_program(&fragment_shader.get(), context)?;
 
         Ok(Rc::new(FullFramePainter {
+            fragment_shader_text: fragment_shader,
+            fragment_shader_dirty,
             program: RefCell::new(program),
             tess: context
                 .new_tess()
@@ -78,6 +78,16 @@ where
             scaled_viewport: None,
             local_data: Box::new([]),
             texture_is_valid: false,
+        }
+    }
+
+    pub fn reload_shader_if_changed<C: GraphicsContext<Backend = Backend>>(&self, context: &mut C) {
+        // Update shader
+        if self.fragment_shader_dirty.get_and_clear() {
+            match compile_full_frame_program(&self.fragment_shader_text.get(), context) {
+                Ok(p) => *self.program.borrow_mut() = p,
+                Err(e) => log::error!("Failed to recompile fullframe shader: {}", e),
+            }
         }
     }
 
@@ -104,6 +114,24 @@ where
             },
         )
     }
+}
+
+fn compile_full_frame_program<C: GraphicsContext>(
+    fragment_shader_text: &str,
+    context: &mut C,
+) -> Result<Program<C::Backend, (), (), FullFrameUniformInterface>, GraphicsResourceError>
+where
+    C::Backend: AicLumBackend,
+{
+    map_shader_result(
+        &("FullFramePainter", fragment_shader_text), // debug info
+        context.new_shader_program().from_strings(
+            include_str!("shaders/full-frame-vertex.glsl"),
+            None,
+            None,
+            fragment_shader_text,
+        ),
+    )
 }
 
 pub(crate) struct FullFrameTexture<Backend>
@@ -183,6 +211,10 @@ where
             .upload_raw(TexelUpload::base_level(&self.local_data, 0))?;
         self.texture_is_valid = true;
         Ok(())
+    }
+
+    pub fn reload_shader_if_changed<C: GraphicsContext<Backend = Backend>>(&self, context: &mut C) {
+        self.ff.reload_shader_if_changed(context);
     }
 
     /// Returns whether there was actually anything to draw.

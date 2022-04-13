@@ -29,6 +29,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::math::{Aab, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
+use once_cell::sync::Lazy;
 
 use crate::in_luminance::{
     frame_texture::{FullFramePainter, FullFrameTexture},
@@ -38,6 +39,7 @@ use crate::in_luminance::{
     types::{AicLumBackend, LinesVertex},
     wireframe_vertices,
 };
+use crate::reloadable::{reloadable_str, Reloadable};
 use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
 /// Top-level renderer.
@@ -142,8 +144,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         let lines_program =
             prepare_lines_program(context, &cameras.cameras().world.options().into())?;
 
-        let full_frame =
-            FullFramePainter::new(context, include_str!("shaders/info-text-fragment.glsl"))?;
+        let full_frame = FullFramePainter::new(context, INFO_TEXT_FRAGMENT_SHADER.as_source())?;
 
         let mut info_text_texture = full_frame.new_texture();
         // TODO: this is duplicated code with set_viewport
@@ -451,6 +452,8 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             return Ok(());
         }
 
+        self.info_text_texture.reload_shader_if_changed(context);
+
         let info_text_texture = &mut self.info_text_texture;
         info_text_texture.data().fill(0);
         Text::with_baseline(
@@ -489,6 +492,9 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         Ok(())
     }
 }
+
+static INFO_TEXT_FRAGMENT_SHADER: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_luminance/shaders/info-text-fragment.glsl"));
 
 fn info_text_size_policy(mut viewport: Viewport) -> Viewport {
     viewport.framebuffer_size = viewport.nominal_size.map(|c| c.round() as u32);
