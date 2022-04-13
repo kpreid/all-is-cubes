@@ -90,6 +90,7 @@ fn main() -> Result<(), anyhow::Error> {
                 .set_target_level(Off)
                 .set_location_level(Off)
                 .add_filter_ignore_str("wgpu")
+                .add_filter_ignore_str("naga")
                 .build(),
             simplelog::TerminalMode::Stderr,
             simplelog::ColorChoice::Auto,
