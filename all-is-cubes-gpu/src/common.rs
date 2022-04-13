@@ -11,6 +11,8 @@ pub use info::*;
 #[doc(hidden)] // Exported only for use by fuzz_octree
 pub mod octree_alloc;
 
+pub(crate) mod reloadable;
+
 /// Error arising when GPU/platform resources could not be obtained, or there is a bug
 /// or incompatibility, and the requested graphics initialization or drawing could not be
 /// completed.

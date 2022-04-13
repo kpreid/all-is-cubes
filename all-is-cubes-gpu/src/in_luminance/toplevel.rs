@@ -3,6 +3,7 @@
 
 //! Top level of the `luminance`-based renderer.
 
+use all_is_cubes::listen::DirtyFlag;
 use instant::Instant;
 use luminance::backend::{color_slot::ColorSlot, depth_stencil_slot::DepthStencilSlot};
 use luminance::blending::{Blending, Equation, Factor};
@@ -118,6 +119,7 @@ pub struct EverythingRenderer<Backend: AicLumBackend> {
     // Shader programs
     block_programs: Layers<BlockPrograms<Backend>>,
     lines_program: LinesProgram<Backend>,
+    shader_programs_dirty: DirtyFlag,
 
     /// Debug overlay text is uploaded via this texture
     info_text_texture: FullFrameTexture<Backend>,
@@ -131,6 +133,8 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         context: &mut C,
         cameras: StandardCameras,
     ) -> Result<Self, GraphicsResourceError> {
+        let shader_programs_dirty = DirtyFlag::new(false);
+        BlockPrograms::<Backend>::listen(shader_programs_dirty.listener()); // TODO: wrong choice of namespace
         let block_programs = cameras
             .cameras()
             .try_map_ref(|camera| BlockPrograms::compile(context, camera.options().into()))?;
@@ -156,6 +160,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             block_programs,
             lines_program,
             info_text_texture,
+            shader_programs_dirty,
             space_renderers: Layers {
                 world: None,
                 ui: None,
@@ -216,10 +221,11 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         let graphics_options = self.cameras.graphics_options();
 
         // Recompile shaders if needed
+        let sources_changed = self.shader_programs_dirty.get_and_clear();
         // TODO: Layers should have methods to help with this
         let mut update_program = |programs: &mut BlockPrograms<_>, camera: &Camera| {
             let shader_constants: ShaderConstants = camera.options().into();
-            if shader_constants != programs.constants {
+            if shader_constants != programs.constants || sources_changed {
                 match BlockPrograms::compile(context, shader_constants) {
                     Ok(p) => *programs = p,
                     Err(e) => log::error!("Failed to recompile shaders: {}", e),

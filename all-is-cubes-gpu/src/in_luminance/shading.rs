@@ -4,9 +4,8 @@
 //! Shaders, uniforms, etc.
 
 use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
 
-use instant::{Duration, Instant};
+use instant::Instant;
 use luminance::context::GraphicsContext;
 use luminance::pipeline::TextureBinding;
 use luminance::pixel::NormUnsigned;
@@ -15,16 +14,17 @@ use luminance::shader::{BuiltProgram, Program, ProgramError, ProgramInterface, U
 use luminance::texture::Dim3;
 use luminance::UniformInterface;
 use once_cell::sync::Lazy;
-use resource::{resource_str, Resource};
 
 use all_is_cubes::camera::{
     FogOption, GraphicsOptions, LightingOption, ToneMappingOperator, TransparencyOption,
 };
 use all_is_cubes::cgmath::Matrix4;
+use all_is_cubes::listen::Listener;
 use all_is_cubes::math::FreeCoordinate;
 
 use crate::in_luminance::space::SpaceRendererBound;
 use crate::in_luminance::types::{AicLumBackend, VertexSemantics};
+use crate::reloadable::{reloadable_str, Reloadable};
 use crate::GraphicsResourceError;
 
 /// Subset of [`GraphicsOptions`] that requires shader recompilation if changed.
@@ -33,8 +33,6 @@ pub(crate) struct ShaderConstants {
     lighting_display: LightingOption,
     volumetric_transparency: bool,
     tone_mapping: ToneMappingOperator,
-    /// Embedded to recognize inequality
-    shader_version: u64,
 }
 
 impl ShaderConstants {
@@ -71,9 +69,6 @@ impl From<&GraphicsOptions> for ShaderConstants {
                 _ => false,
             },
             tone_mapping: options.tone_mapping.clone(),
-            /// Embed the latest version number so that if there is a new version it is a motive for
-            /// recompiling.
-            shader_version: SHADER_SOURCES.lock().unwrap().version,
         }
     }
 }
@@ -93,6 +88,10 @@ pub(crate) struct BlockPrograms<Backend: AicLumBackend> {
 }
 
 impl<Backend: AicLumBackend> BlockPrograms<Backend> {
+    pub(crate) fn listen(listener: impl Listener<()> + Send + Sync + Clone + 'static) {
+        SHADER_SOURCES.listen(listener)
+    }
+
     pub(crate) fn compile<C>(
         context: &mut C,
         constants: ShaderConstants,
@@ -124,10 +123,8 @@ where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
 {
-    let (concatenated_vertex_shader, concatenated_fragment_shader) = SHADER_SOURCES
-        .lock()
-        .unwrap()
-        .block_program_sources(constants, transparent);
+    let (concatenated_vertex_shader, concatenated_fragment_shader) =
+        SHADER_SOURCES.block_program_sources(constants, transparent);
 
     let start_compile_time = Instant::now();
     let result = map_shader_result(
@@ -159,10 +156,8 @@ where
     C: GraphicsContext,
     C::Backend: AicLumBackend,
 {
-    let (concatenated_vertex_shader, concatenated_fragment_shader) = SHADER_SOURCES
-        .lock()
-        .unwrap()
-        .lines_program_sources(constants);
+    let (concatenated_vertex_shader, concatenated_fragment_shader) =
+        SHADER_SOURCES.lines_program_sources(constants);
 
     map_shader_result(
         &"LinesProgram",
@@ -204,13 +199,12 @@ where
 }
 
 struct ShaderSources {
-    version: u64,
-    common: Resource<str>,
-    common_vertex: Resource<str>,
-    block_vertex: Resource<str>,
-    block_fragment: Resource<str>,
-    lines_vertex: Resource<str>,
-    lines_fragment: Resource<str>,
+    common: Reloadable,
+    common_vertex: Reloadable,
+    block_vertex: Reloadable,
+    block_fragment: Reloadable,
+    lines_vertex: Reloadable,
+    lines_fragment: Reloadable,
 }
 
 impl ShaderSources {
@@ -230,16 +224,16 @@ impl ShaderSources {
 
         let concatenated_vertex_shader: String = defines_glsl.clone()
             + "\n#line 1 0\n"
-            + self.common.as_ref()
+            + &*self.common.get()
             + "\n#line 1 1\n"
-            + self.common_vertex.as_ref()
+            + &*self.common_vertex.get()
             + "\n#line 1 2\n"
-            + self.block_vertex.as_ref();
+            + &*self.block_vertex.get();
         let concatenated_fragment_shader: String = defines_glsl
             + "\n#line 1 0\n"
-            + self.common.as_ref()
+            + &*self.common.get()
             + "#line 1 1\n"
-            + self.block_fragment.as_ref();
+            + &*self.block_fragment.get();
 
         (concatenated_vertex_shader, concatenated_fragment_shader)
     }
@@ -253,62 +247,39 @@ impl ShaderSources {
         (
             defines_glsl.clone()
                 + "\n#line 1 0\n"
-                + self.common.as_ref()
+                + &*self.common.get()
                 + "\n#line 1 1\n"
-                + self.common_vertex.as_ref()
+                + &*self.common_vertex.get()
                 + "\n#line 1 2\n"
-                + self.lines_vertex.as_ref(),
+                + &*self.lines_vertex.get(),
             defines_glsl
                 + "\n#line 1 0\n"
-                + self.common.as_ref()
+                + &*self.common.get()
                 + "#line 1 1\n"
-                + self.lines_fragment.as_ref(),
+                + &*self.lines_fragment.get(),
         )
     }
 
-    fn reload_if_changed(&mut self) -> bool {
-        let mut changed = false;
-        changed |= self.common.reload_if_changed();
-        changed |= self.common_vertex.reload_if_changed();
-        changed |= self.block_vertex.reload_if_changed();
-        changed |= self.block_fragment.reload_if_changed();
-        changed |= self.lines_vertex.reload_if_changed();
-        changed |= self.lines_fragment.reload_if_changed();
-        if changed {
-            self.version += 1;
-        }
-        changed
+    pub(crate) fn listen(&self, listener: impl Listener<()> + Clone + Send + Sync + 'static) {
+        self.common.as_source().listen(listener.clone());
+        self.common_vertex.as_source().listen(listener.clone());
+        self.block_vertex.as_source().listen(listener.clone());
+        self.block_fragment.as_source().listen(listener.clone());
+        self.lines_vertex.as_source().listen(listener.clone());
+        self.lines_fragment.as_source().listen(listener);
     }
 }
 
 /// GLSL shader source code.
 ///
-/// This is in a [`Mutex`] so that it can be live-reloaded using [`Resource::reload_if_changed`].
-///
-static SHADER_SOURCES: Lazy<Arc<Mutex<ShaderSources>>> = Lazy::new(|| {
-    if cfg!(all(not(target_family = "wasm"), debug_assertions)) {
-        std::thread::spawn(|| loop {
-            std::thread::sleep(Duration::from_secs(1));
-            reload_shaders_if_changed();
-        });
-    }
-
-    Arc::new(Mutex::new(ShaderSources {
-        version: 0,
-        common: resource_str!("src/in_luminance/shaders/common.glsl"),
-        common_vertex: resource_str!("src/in_luminance/shaders/common-vertex.glsl"),
-        block_vertex: resource_str!("src/in_luminance/shaders/block-vertex.glsl"),
-        block_fragment: resource_str!("src/in_luminance/shaders/block-fragment.glsl"),
-        lines_vertex: resource_str!("src/in_luminance/shaders/lines-vertex.glsl"),
-        lines_fragment: resource_str!("src/in_luminance/shaders/lines-fragment.glsl"),
-    }))
+static SHADER_SOURCES: Lazy<ShaderSources> = Lazy::new(|| ShaderSources {
+    common: reloadable_str!("src/in_luminance/shaders/common.glsl"),
+    common_vertex: reloadable_str!("src/in_luminance/shaders/common-vertex.glsl"),
+    block_vertex: reloadable_str!("src/in_luminance/shaders/block-vertex.glsl"),
+    block_fragment: reloadable_str!("src/in_luminance/shaders/block-fragment.glsl"),
+    lines_vertex: reloadable_str!("src/in_luminance/shaders/lines-vertex.glsl"),
+    lines_fragment: reloadable_str!("src/in_luminance/shaders/lines-fragment.glsl"),
 });
-
-/// Reload shaders, if the project was compiled with debug assertions and
-/// the files have actually changed.
-pub fn reload_shaders_if_changed() -> bool {
-    SHADER_SOURCES.lock().unwrap().reload_if_changed()
-}
 
 /// Uniform interface for [`BlockProgram`]
 #[derive(Debug, UniformInterface)]
