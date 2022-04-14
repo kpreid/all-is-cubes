@@ -285,10 +285,11 @@ impl<'a> SpaceRendererOutput<'a> {
             .chunk_chart()
             .chunks(self.view_chunk, view_direction_mask)
         {
-            if self.cull(p) {
-                continue;
-            }
+            // Chunk existence lookup is faster than the frustum culling test, so we do that first.
             if let Some(chunk) = csm.chunk(p) {
+                if self.cull(p) {
+                    continue;
+                }
                 final_info.chunks_drawn += 1;
 
                 if let Some(buffers) = &chunk.render_data {
@@ -312,10 +313,11 @@ impl<'a> SpaceRendererOutput<'a> {
                 .chunks(self.view_chunk, view_direction_mask)
                 .rev()
             {
-                if self.cull(p) {
-                    continue;
-                }
+                // Chunk existence lookup is faster than the frustum culling test, so we do that first.
                 if let Some(chunk) = csm.chunk(p) {
+                    if self.cull(p) {
+                        continue;
+                    }
                     if let Some(buffers) = &chunk.render_data {
                         let range = chunk.mesh().transparent_range(
                             // TODO: avoid adding and then subtracting view_chunk
