@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
 
-use instant::Instant;
+use instant::{Duration, Instant};
 use luminance::blending::{Blending, Equation, Factor};
 use luminance::context::GraphicsContext;
 use luminance::depth_stencil::Write;
@@ -212,9 +212,8 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                     light_update_time: end_light_update.duration_since(start_light_update),
                     light_update_count,
                     chunk_info: csm_info,
-                    chunks_drawn: 0,  // filled later
-                    squares_drawn: 0, // filled later
                     texture_info,
+                    ..SpaceRenderInfo::default() // other fields filled later
                 },
                 sky_color: space.physics().sky_color,
             },
@@ -303,6 +302,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
 
         // These two blocks are *almost* identical but the iteration order is reversed,
         // the shader is different, and we only count the chunks once.
+        let start_opaque_draw_time = Instant::now();
         shading_gate.shade(
             &mut block_programs.opaque,
             |ref mut program_iface, u, mut render_gate| {
@@ -326,6 +326,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
             },
         )?;
 
+        let start_debug_draw_time = Instant::now();
         if let Some(debug_tess) = self.data.debug_chunk_boxes_tess {
             shading_gate.shade(
                 lines_program,
@@ -347,6 +348,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
             )?;
         }
 
+        let start_transparent_draw_time = Instant::now();
         if self.data.camera.options().transparency.will_output_alpha() {
             shading_gate.shade(
                 &mut block_programs.transparent,
@@ -382,9 +384,15 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
             )?;
         }
 
+        let end_time = Instant::now();
+
         Ok(SpaceRenderInfo {
             chunks_drawn,
             squares_drawn,
+            draw_init_time: Duration::ZERO, // nothing to do in this graphics API
+            // TODO: report debug lines time
+            draw_opaque_time: start_debug_draw_time.duration_since(start_opaque_draw_time),
+            draw_transparent_time: end_time.duration_since(start_transparent_draw_time),
             ..self.data.info.clone()
         })
     }

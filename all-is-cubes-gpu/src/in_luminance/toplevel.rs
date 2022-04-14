@@ -433,6 +433,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                 world: world_info,
                 ui: ui_info,
             },
+            submit_time: None,
         })
     }
 

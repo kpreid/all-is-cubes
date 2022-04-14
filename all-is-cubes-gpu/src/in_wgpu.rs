@@ -459,7 +459,9 @@ impl EverythingRenderer {
 
         // TODO: Prepare debug lines mesh.
 
+        //let start_staging_time = Instant::now();
         self.staging_belt.finish();
+        //let end_staging_time = Instant::now();
 
         // Done with general preparation (and everything that will write onto the staging belt);
         // move on to draw calls.
@@ -475,6 +477,7 @@ impl EverythingRenderer {
         } else {
             SpaceRenderInfo::default()
         };
+        let ui_to_submit_time = Instant::now();
 
         queue.submit(std::iter::once(encoder.finish()));
         self.staging_belt.recall().await;
@@ -485,12 +488,13 @@ impl EverythingRenderer {
             prepare_time: world_to_ui_time.duration_since(end_prepare_time),
             draw_time: Layers {
                 world: world_to_ui_time.duration_since(end_prepare_time),
-                ui: end_time.duration_since(world_to_ui_time),
+                ui: ui_to_submit_time.duration_since(world_to_ui_time),
             },
             draw_info: Layers {
                 world: world_render_info,
                 ui: ui_render_info,
             },
+            submit_time: Some(end_time.duration_since(ui_to_submit_time)), // also counting recall()
         })
     }
 

@@ -19,24 +19,35 @@ pub struct RenderInfo {
     pub(crate) prepare_time: Duration,
     pub(crate) draw_time: Layers<Duration>,
     pub(crate) draw_info: Layers<SpaceRenderInfo>,
+    pub(crate) submit_time: Option<Duration>,
 }
 
 impl CustomFormat<StatusText> for RenderInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        let Self {
+            frame_time,
+            prepare_time,
+            draw_time,
+            draw_info,
+            submit_time,
+        } = self;
         write!(
             fmt,
-            "Frame time: {} (prep {}, draw world {}, ui {})\n\n",
-            self.frame_time.custom_format(StatusText),
-            self.prepare_time.custom_format(StatusText),
-            self.draw_time.world.custom_format(StatusText),
-            self.draw_time.ui.custom_format(StatusText),
+            "Frame time: {} (prep {}, draw world {}, ui {}",
+            frame_time.custom_format(StatusText),
+            prepare_time.custom_format(StatusText),
+            draw_time.world.custom_format(StatusText),
+            draw_time.ui.custom_format(StatusText),
         )?;
+        if let Some(t) = submit_time {
+            write!(fmt, ", submit {}", t.custom_format(StatusText))?;
+        }
         write!(
             fmt,
-            "WORLD:\n{}\n\n",
-            self.draw_info.world.custom_format(StatusText)
+            ")\n\nWORLD:\n{}\n\n",
+            draw_info.world.custom_format(StatusText)
         )?;
-        write!(fmt, "UI:\n{}", self.draw_info.ui.custom_format(StatusText))?;
+        write!(fmt, "UI:\n{}", draw_info.ui.custom_format(StatusText))?;
         Ok(())
     }
 }
@@ -51,17 +62,29 @@ impl CustomFormat<StatusText> for RenderInfo {
 #[non_exhaustive]
 pub struct SpaceRenderInfo {
     /// Status of the block and chunk meshes.
-    pub chunk_info: CsmUpdateInfo,
-    pub chunks_drawn: usize,
+    pub(crate) chunk_info: CsmUpdateInfo,
+    /// Status of the texture atlas.
+    pub(crate) texture_info: BlockTextureInfo,
+
+    /// Time taken to upload light data.
+    pub(crate) light_update_time: Duration,
+    /// Number of light cubes updated
+    pub(crate) light_update_count: usize,
+
+    /// Time taken to set up for drawing the space.
+    pub(crate) draw_init_time: Duration,
+    /// Time taken to draw chunks' opaque geometry
+    /// (and determine if they are visible to be drawn).
+    pub(crate) draw_opaque_time: Duration,
+    /// Time taken to draw chunks' transparent geometry
+    /// (and determine if they are visible to be drawn).
+    pub(crate) draw_transparent_time: Duration,
+
+    /// Number of chunk meshes drawn.
+    pub(crate) chunks_drawn: usize,
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
     /// to draw this frame.
-    pub squares_drawn: usize,
-    /// Status of the texture atlas.
-    pub texture_info: BlockTextureInfo,
-    /// Time taken to upload light data.
-    pub light_update_time: Duration,
-    /// Number of light cubes updated
-    pub light_update_count: usize,
+    pub(crate) squares_drawn: usize,
 }
 
 impl Default for SpaceRenderInfo {
@@ -73,6 +96,9 @@ impl Default for SpaceRenderInfo {
             texture_info: Default::default(),
             light_update_time: Duration::ZERO,
             light_update_count: 0,
+            draw_init_time: Duration::ZERO,
+            draw_opaque_time: Duration::ZERO,
+            draw_transparent_time: Duration::ZERO,
         }
     }
 }
@@ -86,11 +112,21 @@ impl CustomFormat<StatusText> for SpaceRenderInfo {
             texture_info,
             light_update_time,
             light_update_count,
+            draw_init_time,
+            draw_opaque_time,
+            draw_transparent_time,
         } = self;
 
         let light_update_time = light_update_time.custom_format(format_type);
+        let draw_init_time = draw_init_time.custom_format(format_type);
+        let draw_opaque_time = draw_opaque_time.custom_format(format_type);
+        let draw_transparent_time = draw_transparent_time.custom_format(format_type);
 
         writeln!(fmt, "{}", chunk_info.custom_format(format_type))?;
+        writeln!(
+            fmt,
+            "Draw init: {draw_init_time}  opaque: {draw_opaque_time}  transparent: {draw_transparent_time}",
+        )?;
         writeln!(
             fmt,
             "Chunks drawn: {chunks_drawn:3} Quads drawn: {squares_drawn:7}  \

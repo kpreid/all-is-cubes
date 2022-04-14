@@ -193,9 +193,8 @@ impl SpaceRenderer {
                 light_update_time: end_light_update.duration_since(start_light_update),
                 light_update_count,
                 chunk_info: csm_info,
-                chunks_drawn: 0,  // filled later
-                squares_drawn: 0, // filled later
                 texture_info,
+                ..SpaceRenderInfo::default() // other fields filled later
             },
             sky_color: space.physics().sky_color,
             // block_texture: &mut block_texture_allocator.texture,
@@ -236,6 +235,8 @@ impl<'a> SpaceRendererOutput<'a> {
         encoder: &mut wgpu::CommandEncoder,
         should_clear: bool,
     ) -> Result<SpaceRenderInfo, GraphicsResourceError> {
+        let start_time = Instant::now();
+
         let mut final_info = self.info.clone();
         let csm = &self.r.csm;
 
@@ -277,6 +278,7 @@ impl<'a> SpaceRendererOutput<'a> {
         render_pass.set_bind_group(1, &self.r.space_bind_group, &[]);
 
         // Opaque geometry first, in front-to-back order
+        let start_opaque_draw_time = Instant::now();
         render_pass.set_pipeline(&self.stuff.opaque_render_pipeline);
         for p in csm.chunk_chart().chunks(self.view_chunk) {
             if self.cull(p) {
@@ -298,6 +300,7 @@ impl<'a> SpaceRendererOutput<'a> {
         }
 
         // Transparent geometry after opaque geometry, in back-to-front order
+        let start_draw_transparent_time = Instant::now();
         if self.camera.options().transparency.will_output_alpha() {
             render_pass.set_pipeline(&self.stuff.transparent_render_pipeline);
             for p in csm.chunk_chart().chunks(self.view_chunk).rev() {
@@ -319,8 +322,14 @@ impl<'a> SpaceRendererOutput<'a> {
                 }
             }
         }
+        let end_time = Instant::now();
 
-        Ok(final_info)
+        Ok(SpaceRenderInfo {
+            draw_init_time: start_opaque_draw_time.duration_since(start_time),
+            draw_opaque_time: start_draw_transparent_time.duration_since(start_opaque_draw_time),
+            draw_transparent_time: end_time.duration_since(start_draw_transparent_time),
+            ..final_info
+        })
     }
 }
 
