@@ -16,6 +16,10 @@ categories = ["games", "graphics", "rendering::engine"]
 bench = false
 
 [[bench]]
+name = "chunk_bench"
+harness = false
+
+[[bench]]
 name = "lighting_bench"
 harness = false
 
