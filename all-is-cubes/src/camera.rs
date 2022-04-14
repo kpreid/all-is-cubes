@@ -179,30 +179,34 @@ impl Camera {
 
     /// Determine whether the given `Aab` is visible in this projection+view.
     pub fn aab_in_view(&self, aab: Aab) -> bool {
-        // Check for the AAB being outside the viewport, using the separating axis theorem.
-        // First, check if the view frustum's corner points lie outside the AAB. This is
-        // the simpler case since it is axis-aligned.
-        for &axis in &[Vector3::unit_x(), Vector3::unit_y(), Vector3::unit_z()] {
-            if Self::separated_along(
-                self.view_frustum_corners.iter().copied(),
-                aab.corner_points(),
-                axis,
-            ) {
-                return false;
-            }
-        }
+        // This algorithm uses the separating axis theorem, which states that for two
+        // convex objects (here, an AAB and a frustum), if there is some axis for which
+        // projecting the objects' points onto that axis produces non-overlapping ranges,
+        // the objects do not intersect.
+        //
+        // The separation axes which we test are the face normals of each object.
+        // This is technically not sufficient (see e.g.
+        //     https://gamedev.stackexchange.com/a/44501/9825
+        // ), but false intersections are okay here since we're trying to do view culling,
+        // not collision detection.
 
-        // Now use the viewport's projected planes to try more separation axes.
-        // TODO: The correctness of this depends on Aab::corner_points's point ordering,
+        // Test the view frustum's face normals.
+        // (Benchmarking has shown testing this first to be better, though not shown that
+        // it is better for all possible view orientations.)
+        //
+        // TODO: The correctness of this code depends on Aab::corner_points's point ordering,
+        // (which becomes the ordering of self.view_frustum_corners)
         // which is not yet nailed down.
+        //
+        // Note that testing against the near plane (lbn, ltn, rtn) is not necessary
+        // since it is always parallel to the far plane, and we are testing ranges on
+        // the axis, not “is this object on the far side of this plane”.
         let [lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn] = self.view_frustum_corners;
         for &(p1, p2, p3) in &[
             (lbn, lbf, ltf), // left
             (rtn, rtf, rbf), // right
             (ltn, ltf, rtf), // top
             (rbn, rbf, lbf), // bottom
-            // Testing against the near plane (lbn, ltn, rtn) is not worthwhile since the
-            // frustum is nearly a pyramid — the volume removed is less than a single cube.
             (lbf, rbf, ltf), // far
         ] {
             let normal = (p2 - p1).cross(p3 - p1);
@@ -214,11 +218,25 @@ impl Camera {
                 return false;
             }
         }
+
+        // Test the AAB's face normals (i.e. the coordinate axes).
+        // We only need 3 tests, not 6, since there are only 3 axes.
+        for axis in [Vector3::unit_x(), Vector3::unit_y(), Vector3::unit_z()] {
+            if Self::separated_along(
+                self.view_frustum_corners.iter().copied(),
+                aab.corner_points(),
+                axis,
+            ) {
+                return false;
+            }
+        }
+
         true
     }
 
     /// Helper for aab_in_view; finds if two sets of points' projections onto a line intersect.
-    #[inline]
+    ///
+    /// Note: NOT #[inline] because profiling shows that to have a negative effect.
     fn separated_along(
         points1: impl IntoIterator<Item = Point3<FreeCoordinate>>,
         points2: impl IntoIterator<Item = Point3<FreeCoordinate>>,
@@ -232,7 +250,7 @@ impl Camera {
     }
 
     /// Helper for aab_in_view; projects a set of points onto a line.
-    #[inline]
+    #[inline(always)]
     fn projected_range(
         points: impl IntoIterator<Item = Point3<FreeCoordinate>>,
         axis: Vector3<FreeCoordinate>,
