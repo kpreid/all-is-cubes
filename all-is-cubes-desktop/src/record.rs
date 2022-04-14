@@ -20,7 +20,7 @@ use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Character;
-use all_is_cubes::math::{FreeCoordinate, NotNan, Rgba};
+use all_is_cubes::math::{NotNan, Rgba};
 use all_is_cubes::raytracer::{ColorBuf, SpaceRaytracer};
 use all_is_cubes::universe::URef;
 
@@ -40,10 +40,7 @@ pub struct RecordAnimationOptions {
 
 impl RecordOptions {
     fn viewport(&self) -> Viewport {
-        Viewport {
-            nominal_size: self.image_size.map(FreeCoordinate::from),
-            framebuffer_size: self.image_size,
-        }
+        Viewport::with_scale(1.0, self.image_size)
     }
 
     fn frame_range(&self) -> RangeInclusive<usize> {

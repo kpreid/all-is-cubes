@@ -189,10 +189,7 @@ impl TerminalMain {
                         } else {
                             // No world to render; return dummy output
                             let _ = render_thread_out.send(FrameOutput {
-                                viewport: Viewport {
-                                    nominal_size: [0., 0.].into(),
-                                    framebuffer_size: [0, 0].into(),
-                                },
+                                viewport: Viewport::with_scale(1.0, [0, 0].into()),
                                 options,
                                 image: Default::default(),
                                 info: RaytraceInfo::default(),

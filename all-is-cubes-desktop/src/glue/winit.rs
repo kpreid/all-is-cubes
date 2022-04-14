@@ -9,12 +9,9 @@ use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 
 pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {
-    let size: [u32; 2] = size.into();
-    Viewport {
-        nominal_size: Vector2::from(size).map(|c| f64::from(c) / scale_factor),
-        // max(1) because wgpu likes nonzero viewports
-        framebuffer_size: Vector2::from(size).map(|c| c.max(1)),
-    }
+    let size: Vector2<u32> = Vector2::<u32>::from(<[u32; 2]>::from(size));
+    // max(1) because wgpu wants guaranteed nonzero viewports
+    Viewport::with_scale(scale_factor, size.map(|c| c.max(1)))
 }
 
 pub fn logical_size_from_vec(size: Vector2<u32>) -> LogicalSize<u32> {

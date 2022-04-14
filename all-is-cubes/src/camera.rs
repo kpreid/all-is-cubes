@@ -302,6 +302,17 @@ pub struct Viewport {
 impl Viewport {
     #![allow(clippy::cast_lossless)] // lossiness depends on size of usize
 
+    /// Construct a Viewport from a pixel count and a scale factor.
+    ///
+    /// The `nominal_size` will be the given `framebuffer_size` divided by the given
+    /// `scale_factor`.
+    pub fn with_scale(scale_factor: f64, framebuffer_size: Vector2<u32>) -> Self {
+        Self {
+            framebuffer_size,
+            nominal_size: framebuffer_size.map(f64::from) / scale_factor,
+        }
+    }
+
     /// A meaningless but valid [`Viewport`] value for use in tests which require one
     /// but do not care about its effects.
     #[cfg(test)]

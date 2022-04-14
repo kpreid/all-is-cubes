@@ -49,13 +49,7 @@ where
             graphics_options: ListenableCellWithLocal::new(GraphicsOptions::default()),
             raytracer: None,
             render_target: fp.new_texture(),
-            pixel_picker: PixelPicker::new(
-                Viewport {
-                    nominal_size: Vector2::new(1., 1.),
-                    framebuffer_size: Vector2::new(1, 1),
-                },
-                false,
-            ),
+            pixel_picker: PixelPicker::new(Viewport::with_scale(1.0, Vector2::new(1, 1)), false),
             rays_per_frame: 50000,
         })
     }
