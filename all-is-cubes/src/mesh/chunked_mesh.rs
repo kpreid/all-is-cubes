@@ -12,7 +12,7 @@ use instant::{Duration, Instant};
 
 use crate::block::EvaluatedBlock;
 use crate::camera::Camera;
-use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
+use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use crate::listen::Listener;
 use crate::math::{GridCoordinate, GridPoint};
 use crate::mesh::{
@@ -170,7 +170,7 @@ where
         let mut chunk_mesh_callback_times = TimeStats::default();
         let mut chunks_are_missing = false;
         let chunk_scan_start_time = Instant::now();
-        for p in self.chunk_chart.chunks(view_chunk) {
+        for p in self.chunk_chart.chunks(view_chunk, OctantMask::ALL) {
             if !chunk_grid.contains_cube(p.0) {
                 // Chunk not in the Space
                 continue;

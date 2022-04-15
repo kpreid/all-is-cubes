@@ -6,17 +6,17 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 
-use all_is_cubes::listen::DirtyFlag;
 use instant::Instant;
+use once_cell::sync::Lazy;
 
 use all_is_cubes::camera::Camera;
-use all_is_cubes::chunking::ChunkPos;
+use all_is_cubes::chunking::{ChunkPos, OctantMask};
+use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::math::{GridCoordinate, Rgb};
 use all_is_cubes::mesh::chunked_mesh::ChunkedSpaceMesh;
 use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
-use once_cell::sync::Lazy;
 
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
@@ -280,7 +280,7 @@ impl<'a> SpaceRendererOutput<'a> {
         // Opaque geometry first, in front-to-back order
         let start_opaque_draw_time = Instant::now();
         render_pass.set_pipeline(&self.stuff.opaque_render_pipeline);
-        for p in csm.chunk_chart().chunks(self.view_chunk) {
+        for p in csm.chunk_chart().chunks(self.view_chunk, OctantMask::ALL) {
             if self.cull(p) {
                 continue;
             }
@@ -303,7 +303,11 @@ impl<'a> SpaceRendererOutput<'a> {
         let start_draw_transparent_time = Instant::now();
         if self.camera.options().transparency.will_output_alpha() {
             render_pass.set_pipeline(&self.stuff.transparent_render_pipeline);
-            for p in csm.chunk_chart().chunks(self.view_chunk).rev() {
+            for p in csm
+                .chunk_chart()
+                .chunks(self.view_chunk, OctantMask::ALL)
+                .rev()
+            {
                 if self.cull(p) {
                     continue;
                 }

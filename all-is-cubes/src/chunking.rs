@@ -21,9 +21,16 @@ use crate::space::Grid;
 ///
 /// Parameter `CHUNK_SIZE` is the number of cubes along the edge of a chunk.
 /// The consequences are unspecified if it is not positive.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub GridPoint);
+
+impl<const CHUNK_SIZE: GridCoordinate> std::fmt::Debug for ChunkPos<CHUNK_SIZE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(Point3 { x, y, z }) = *self;
+        write!(f, "ChunkPos<{CHUNK_SIZE}>({x}, {y}, {z})")
+    }
+}
 
 impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     /// Construct a ChunkPos from chunk coordinates
@@ -126,13 +133,12 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     pub fn chunks(
         &self,
         origin: ChunkPos<CHUNK_SIZE>,
+        mask: OctantMask,
     ) -> impl Iterator<Item = ChunkPos<CHUNK_SIZE>> + DoubleEndedIterator + FusedIterator + '_ {
         self.octant_chunks[self.octant_range]
             .iter()
             .copied()
-            .flat_map(AxisMirrorIter::for_axis(0))
-            .flat_map(AxisMirrorIter::for_axis(1))
-            .flat_map(AxisMirrorIter::for_axis(2))
+            .flat_map(move |v| AxisMirrorIter::new(v, mask))
             .map(move |v| ChunkPos(origin.0 + v))
     }
 
@@ -161,7 +167,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
             .display_name("Mirrored octant chunk")
             .color(Rgba::new(0.6, 0.6, 0.6, 1.0))
             .build();
-        for ChunkPos(pos) in self.chunks(ChunkPos::new(0, 0, 0)) {
+        for ChunkPos(pos) in self.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL) {
             let px = pos.x >= 0;
             let py = pos.y >= 0;
             let pz = pos.z >= 0;
@@ -212,61 +218,154 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
     octant_chunks.into()
 }
 
-/// An iterator that returns a vector and its opposite in the specified axis.
+/// A specification of which octants to include in [`ChunkChart::chunks()`].
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct OctantMask {
+    /// A bit-mask of octants, where the bit positions are, LSB first, [-X-Y-Z, -X-Y+Z, ..., +X+Y+Z]
+    flags: u8,
+}
+
+impl std::fmt::Debug for OctantMask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OctantMask[")?;
+        let mut first = true;
+        for i in 0..8 {
+            if self.flags & (1 << i) != 0 {
+                if !first {
+                    write!(f, ", ")?;
+                }
+                first = false;
+                write!(
+                    f,
+                    "{}",
+                    match i {
+                        0 => "-X-Y-Z",
+                        1 => "-X-Y+Z",
+                        2 => "-X+Y-Z",
+                        3 => "-X+Y+Z",
+                        4 => "+X-Y-Z",
+                        5 => "+X-Y+Z",
+                        6 => "+X+Y-Z",
+                        7 => "+X+Y+Z",
+                        _ => unreachable!(),
+                    }
+                )?;
+            }
+        }
+        write!(f, "]")?;
+        Ok(())
+    }
+}
+
+impl OctantMask {
+    /// The mask including all octants.
+    pub const ALL: Self = Self { flags: 0xFF };
+
+    #[inline(always)]
+    fn count(self) -> usize {
+        self.flags.count_ones() as usize
+    }
+
+    /// Returns the index of the first octant included in the mask.
+    ///
+    /// Here “first” means the arbitrary ordering [`ChunkChart`] uses, which corresponds
+    /// to the binary-counting ordering with X as MSB and Z as LSB:
+    ///
+    /// ```text
+    /// 0 = -X -Y -Z
+    /// 1 = -X -Y +Z
+    /// 2 = -X +Y -Z
+    /// 3 = -X +Y +Z
+    /// 4 = +X -Y -Z
+    /// 5 = +X -Y +Z
+    /// 6 = +X +Y -Z
+    /// 7 = +X +Y +Z
+    /// ```
+    #[inline(always)]
+    fn first(self) -> Option<u8> {
+        let tz = self.flags.trailing_zeros();
+        if tz >= u8::BITS {
+            None
+        } else {
+            Some(tz as u8)
+        }
+    }
+
+    /// As [`Self::first()`], but the opposite ordering.
+    #[inline(always)]
+    fn last(self) -> Option<u8> {
+        let lz = self.flags.leading_zeros();
+        if lz >= u8::BITS {
+            None
+        } else {
+            Some((7 - lz) as u8)
+        }
+    }
+}
+
+/// An iterator that returns a vector and its opposite in the specified axis,
+///
 /// Part of the implementation of [`ChunkChart`].
 struct AxisMirrorIter {
     v: GridVector,
-    axis: u8,
-    has_mirrored: bool,
-    has_original: bool,
+    /// Which copies are yet to be emitted.
+    todo: OctantMask,
 }
 impl AxisMirrorIter {
     #[inline]
-    fn for_axis(axis: u8) -> impl Fn(GridVector) -> Self {
-        move |v| Self {
-            v,
-            axis,
-            has_mirrored: v[usize::from(axis)] != 0,
-            has_original: true,
+    fn new(v: GridVector, mask: OctantMask) -> Self {
+        // For each axis whose value is zero, collapse the mask into being one-sided on that axis
+        // Note that it is critical that each of these reads the preceding stage; otherwise multiple
+        // axes won't combine the effects of collapsing properly.
+        let mut todo = mask;
+        if v.x == 0 {
+            todo.flags = (todo.flags & 0b00001111) | ((todo.flags & 0b11110000) >> 4);
         }
+        if v.y == 0 {
+            todo.flags = (todo.flags & 0b00110011) | ((todo.flags & 0b11001100) >> 2);
+        }
+        if v.z == 0 {
+            todo.flags = (todo.flags & 0b01010101) | ((todo.flags & 0b10101010) >> 1);
+        }
+        Self { v, todo }
     }
-    #[inline]
-    fn take_mirrored(&mut self) -> Option<GridVector> {
-        if self.has_mirrored {
-            self.has_mirrored = false;
-            let mut v = self.v;
-            v[usize::from(self.axis)] *= -1;
-            Some(v)
-        } else {
-            None
+
+    fn generate_and_clear(&mut self, octant_index: u8) -> GridVector {
+        self.todo.flags &= !(1 << octant_index);
+        let mut result = self.v;
+        if octant_index & 0b100 == 0 {
+            // mirrored x
+            result.x *= -1;
         }
-    }
-    #[inline]
-    fn take_original(&mut self) -> Option<GridVector> {
-        if self.has_original {
-            self.has_original = false;
-            Some(self.v)
-        } else {
-            None
+        if octant_index & 0b10 == 0 {
+            // mirrored y
+            result.y *= -1;
         }
+        if octant_index & 0b1 == 0 {
+            // mirrored z
+            result.z *= -1;
+        }
+        result
     }
 }
 impl Iterator for AxisMirrorIter {
     type Item = GridVector;
     #[inline]
     fn next(&mut self) -> Option<GridVector> {
-        self.take_mirrored().or_else(|| self.take_original())
+        self.todo
+            .first()
+            .map(|index| self.generate_and_clear(index))
     }
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let count = usize::from(self.has_mirrored) + usize::from(self.has_original);
+        let count = self.todo.count();
         (count, Some(count))
     }
 }
 impl DoubleEndedIterator for AxisMirrorIter {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.take_original().or_else(|| self.take_mirrored())
+        self.todo.last().map(|index| self.generate_and_clear(index))
     }
 }
 impl ExactSizeIterator for AxisMirrorIter {}
@@ -274,10 +373,10 @@ impl FusedIterator for AxisMirrorIter {}
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use super::*;
     use crate::raytracer::print_space;
+    use pretty_assertions::assert_eq;
+    use std::collections::HashSet;
 
     #[test]
     fn chunk_consistency() {
@@ -295,7 +394,10 @@ mod tests {
     fn chunk_chart_zero_size() {
         let chart = ChunkChart::<16>::new(0.0);
         let chunk = ChunkPos::new(1, 2, 3);
-        assert_eq!(chart.chunks(chunk).collect::<Vec<_>>(), vec![chunk]);
+        assert_eq!(
+            chart.chunks(chunk, OctantMask::ALL).collect::<Vec<_>>(),
+            vec![chunk]
+        );
     }
 
     /// If we look a tiny bit outside the origin chunk, there are 9³ - 1 neighbors.
@@ -303,7 +405,9 @@ mod tests {
     fn chunk_chart_epsilon_size() {
         let chart = ChunkChart::<16>::new(0.00001);
         assert_eq!(
-            chart.chunks(ChunkPos::new(0, 0, 0)).collect::<Vec<_>>(),
+            chart
+                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
+                .collect::<Vec<_>>(),
             vec![
                 ChunkPos::new(0, 0, 0),
                 // Face meetings.
@@ -339,6 +443,46 @@ mod tests {
         )
     }
 
+    /// As [`chunk_chart_epsilon_size()`], but exercise the octant mask.
+    #[test]
+    fn chunk_chart_masked() {
+        let chart = ChunkChart::<16>::new(0.00001);
+        assert_eq!(
+            chart
+                .chunks(
+                    ChunkPos::new(0, 0, 0),
+                    // Include three octants: [+x +y +z], [+x, +y, -z], and [+x, -y, -z]
+                    OctantMask { flags: 0b11010000 }
+                )
+                .collect::<Vec<_>>(),
+            vec![
+                ChunkPos::new(0, 0, 0),
+                // Face meetings. No -X for this mask.
+                ChunkPos::new(0, 0, -1),
+                ChunkPos::new(0, 0, 1),
+                ChunkPos::new(0, -1, 0),
+                ChunkPos::new(0, 1, 0),
+                ChunkPos::new(1, 0, 0),
+                // Edge meetings.
+                ChunkPos::new(0, -1, -1),
+                //ChunkPos::new(0, -1, 1),
+                ChunkPos::new(0, 1, -1),
+                ChunkPos::new(0, 1, 1),
+                //ChunkPos::new(-1, 0, -1),
+                //ChunkPos::new(-1, 0, 1),
+                ChunkPos::new(1, 0, -1),
+                ChunkPos::new(1, 0, 1),
+                //ChunkPos::new(-1, -1, 0),
+                //ChunkPos::new(-1, 1, 0),
+                ChunkPos::new(1, -1, 0),
+                ChunkPos::new(1, 1, 0),
+                // Corner meetings. This includes only the chosen octants.
+                ChunkPos::new(1, -1, -1),
+                ChunkPos::new(1, 1, -1),
+                ChunkPos::new(1, 1, 1),
+            ]
+        )
+    }
     #[test]
     fn chunk_chart_radius_break_points() {
         fn assert_count(distance_in_chunks: FreeCoordinate, count: usize) {
@@ -347,7 +491,9 @@ mod tests {
             println!("distance {}, expected count {}", distance_in_chunks, count);
             print_space(&chart.visualization(), (1., 1., 1.));
 
-            let chunks: Vec<_> = chart.chunks(ChunkPos::new(0, 0, 0)).collect();
+            let chunks: Vec<_> = chart
+                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
+                .collect();
             assert_eq!(
                 chunks.len(),
                 count,
@@ -374,8 +520,8 @@ mod tests {
     fn chunk_chart_reverse_iteration() {
         let chart = ChunkChart::<16>::new(7. * 16.);
         let p = ChunkPos::new(10, 3, 100);
-        let forward = chart.chunks(p).collect::<Vec<_>>();
-        let mut reverse = chart.chunks(p).rev().collect::<Vec<_>>();
+        let forward = chart.chunks(p, OctantMask::ALL).collect::<Vec<_>>();
+        let mut reverse = chart.chunks(p, OctantMask::ALL).rev().collect::<Vec<_>>();
         reverse.reverse();
         assert_eq!(forward, reverse);
     }
@@ -387,7 +533,7 @@ mod tests {
         println!("{:?}", chart);
 
         let mut seen: HashSet<GridPoint> = HashSet::new();
-        for ChunkPos(p) in chart.chunks(ChunkPos::new(0, 0, 0)) {
+        for ChunkPos(p) in chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL) {
             for &q in &seen {
                 assert!(
                     // Either it's the same point mirrored,
@@ -411,8 +557,12 @@ mod tests {
         let mut chart2 = ChunkChart::new(300.0);
         chart2.resize_if_needed(200.0);
         assert_eq!(
-            chart1.chunks(ChunkPos::new(0, 0, 0)).collect::<Vec<_>>(),
-            chart2.chunks(ChunkPos::new(0, 0, 0)).collect::<Vec<_>>()
+            chart1
+                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
+                .collect::<Vec<_>>(),
+            chart2
+                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
+                .collect::<Vec<_>>()
         );
     }
 }

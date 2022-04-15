@@ -22,7 +22,7 @@ use luminance::texture::{Dim3, Sampler, TexelUpload, Texture, TextureError};
 
 use all_is_cubes::camera::Camera;
 use all_is_cubes::cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3};
-use all_is_cubes::chunking::ChunkPos;
+use all_is_cubes::chunking::{ChunkPos, OctantMask};
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::Listener;
 use all_is_cubes::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
@@ -164,7 +164,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         if graphics_options.debug_chunk_boxes {
             if self.debug_chunk_boxes_tess.is_none() {
                 let mut v = Vec::new();
-                for chunk in self.csm.chunk_chart().chunks(view_chunk) {
+                for chunk in self.csm.chunk_chart().chunks(view_chunk, OctantMask::ALL) {
                     wireframe_vertices(&mut v, palette::DEBUG_CHUNK_MAJOR, Aab::from(chunk.grid()));
                 }
 
@@ -309,7 +309,12 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
                 u.initialize(program_iface, self);
                 let pass = SpaceRendererPass::Opaque;
                 render_gate.render(&pass.render_state(), |mut tess_gate| {
-                    for p in self.data.csm.chunk_chart().chunks(self.data.view_chunk) {
+                    for p in self
+                        .data
+                        .csm
+                        .chunk_chart()
+                        .chunks(self.data.view_chunk, OctantMask::ALL)
+                    {
                         if let Some(chunk) = self.data.csm.chunk(p) {
                             if self.data.cull(p) {
                                 continue;
@@ -360,7 +365,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
                             .data
                             .csm
                             .chunk_chart()
-                            .chunks(self.data.view_chunk)
+                            .chunks(self.data.view_chunk, OctantMask::ALL)
                             .rev()
                         {
                             if let Some(chunk) = self.data.csm.chunk(p) {
