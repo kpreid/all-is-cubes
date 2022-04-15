@@ -11,6 +11,7 @@ use cgmath::{
 use itertools::Itertools as _;
 use ordered_float::NotNan;
 
+use crate::chunking::OctantMask;
 use crate::math::{Aab, FreeCoordinate, Rgba};
 use crate::raycast::Ray;
 use crate::space::Grid;
@@ -157,6 +158,37 @@ impl Camera {
     /// Returns the eye position in world coordinates, as set by [`Camera::set_view_transform()`].
     pub fn view_position(&self) -> Point3<FreeCoordinate> {
         self.view_position
+    }
+
+    /// Returns an [`OctantMask`] including all directions this camera's field of view includes.
+    pub fn view_direction_mask(&self) -> OctantMask {
+        #[rustfmt::skip]
+        let FrustumPoints { lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn } = self.view_frustum;
+
+        let mut mask = OctantMask::NONE;
+        // Fill the mask with 9 representative rays from the camera.
+        // Nine should be sufficient because the FOV cannot exceed 180°.
+        // (TODO: Wait, that's 2D reasoning...)
+        // Corner points
+        let lb = lbf - lbn;
+        let lt = ltf - ltn;
+        let rb = rbf - rbn;
+        let rt = rtf - rtn;
+        mask.set_octant_of(lb);
+        mask.set_octant_of(lt);
+        mask.set_octant_of(rb);
+        mask.set_octant_of(rt);
+        // Midpoints
+        let lmid = lb + lt;
+        let rmid = rb + rt;
+        mask.set_octant_of(lmid);
+        mask.set_octant_of(rmid);
+        mask.set_octant_of(lt + rt);
+        mask.set_octant_of(lb + rb);
+        // Center line
+        mask.set_octant_of(lmid + rmid);
+
+        mask
     }
 
     /// Converts a screen position in normalized device coordinates (as produced by

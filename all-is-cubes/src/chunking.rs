@@ -260,6 +260,16 @@ impl std::fmt::Debug for OctantMask {
 impl OctantMask {
     /// The mask including all octants.
     pub const ALL: Self = Self { flags: 0xFF };
+    /// The mask including no octants.
+    pub const NONE: Self = Self { flags: 0x00 };
+
+    /// Set the flat for the octant the given vector occupies.
+    pub(crate) fn set_octant_of(&mut self, vector: Vector3<FreeCoordinate>) {
+        let index = u8::from(vector.x >= 0.) << 2
+            | u8::from(vector.y >= 0.) << 1
+            | u8::from(vector.z >= 0.);
+        self.flags |= 1 << index;
+    }
 
     #[inline(always)]
     fn count(self) -> usize {
