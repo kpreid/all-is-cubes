@@ -22,7 +22,7 @@ use luminance::texture::{Dim3, Sampler, TexelUpload, Texture, TextureError};
 
 use all_is_cubes::camera::Camera;
 use all_is_cubes::cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _, Vector3};
-use all_is_cubes::chunking::{ChunkPos, OctantMask};
+use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::Listener;
 use all_is_cubes::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
@@ -156,6 +156,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 }
             },
         );
+        let view_direction_mask = camera.view_direction_mask();
 
         // Flush all texture updates to GPU.
         // This must happen after `csm.update_blocks_and_some_chunks`.
@@ -164,7 +165,11 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         if graphics_options.debug_chunk_boxes {
             if self.debug_chunk_boxes_tess.is_none() {
                 let mut v = Vec::new();
-                for chunk in self.csm.chunk_chart().chunks(view_chunk, OctantMask::ALL) {
+                for chunk in self
+                    .csm
+                    .chunk_chart()
+                    .chunks(view_chunk, view_direction_mask)
+                {
                     wireframe_vertices(&mut v, palette::DEBUG_CHUNK_MAJOR, Aab::from(chunk.grid()));
                 }
 
@@ -297,6 +302,8 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
         block_programs: &mut BlockPrograms<Backend>,
         lines_program: &mut LinesProgram<Backend>,
     ) -> Result<SpaceRenderInfo, E> {
+        let view_direction_mask = self.data.camera.view_direction_mask();
+
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
 
@@ -313,7 +320,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
                         .data
                         .csm
                         .chunk_chart()
-                        .chunks(self.data.view_chunk, OctantMask::ALL)
+                        .chunks(self.data.view_chunk, view_direction_mask)
                     {
                         if let Some(chunk) = self.data.csm.chunk(p) {
                             if self.data.cull(p) {
@@ -365,7 +372,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
                             .data
                             .csm
                             .chunk_chart()
-                            .chunks(self.data.view_chunk, OctantMask::ALL)
+                            .chunks(self.data.view_chunk, view_direction_mask)
                             .rev()
                         {
                             if let Some(chunk) = self.data.csm.chunk(p) {

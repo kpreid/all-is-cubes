@@ -10,7 +10,7 @@ use instant::Instant;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::camera::Camera;
-use all_is_cubes::chunking::{ChunkPos, OctantMask};
+use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::math::{GridCoordinate, Rgb};
 use all_is_cubes::mesh::chunked_mesh::ChunkedSpaceMesh;
@@ -239,6 +239,7 @@ impl<'a> SpaceRendererOutput<'a> {
 
         let mut final_info = self.info.clone();
         let csm = &self.r.csm;
+        let view_direction_mask = self.camera.view_direction_mask();
 
         queue.write_buffer(
             &self.r.camera_buffer,
@@ -280,7 +281,10 @@ impl<'a> SpaceRendererOutput<'a> {
         // Opaque geometry first, in front-to-back order
         let start_opaque_draw_time = Instant::now();
         render_pass.set_pipeline(&self.stuff.opaque_render_pipeline);
-        for p in csm.chunk_chart().chunks(self.view_chunk, OctantMask::ALL) {
+        for p in csm
+            .chunk_chart()
+            .chunks(self.view_chunk, view_direction_mask)
+        {
             if self.cull(p) {
                 continue;
             }
@@ -305,7 +309,7 @@ impl<'a> SpaceRendererOutput<'a> {
             render_pass.set_pipeline(&self.stuff.transparent_render_pipeline);
             for p in csm
                 .chunk_chart()
-                .chunks(self.view_chunk, OctantMask::ALL)
+                .chunks(self.view_chunk, view_direction_mask)
                 .rev()
             {
                 if self.cull(p) {
