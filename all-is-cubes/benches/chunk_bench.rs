@@ -73,6 +73,38 @@ pub fn cull_bench(c: &mut Criterion) {
             matched
         })
     });
+
+    c.bench_function("mask-frustum-bounds", |b| {
+        b.iter(|| {
+            let mut matched = 0;
+            for p in chart
+                .chunks(ChunkPos(Point3::new(0, 0, 0)), camera.view_direction_mask())
+                .rev()
+            {
+                if camera.aab_in_view(p.grid().into()) && chunked_bounds.contains_cube(p.0) {
+                    matched += 1;
+                }
+            }
+            assert_eq!(matched, 280);
+            matched
+        })
+    });
+
+    c.bench_function("mask-bounds-frustum", |b| {
+        b.iter(|| {
+            let mut matched = 0;
+            for p in chart
+                .chunks(ChunkPos(Point3::new(0, 0, 0)), camera.view_direction_mask())
+                .rev()
+            {
+                if chunked_bounds.contains_cube(p.0) && camera.aab_in_view(p.grid().into()) {
+                    matched += 1;
+                }
+            }
+            assert_eq!(matched, 280);
+            matched
+        })
+    });
 }
 
 criterion_group!(benches, cull_bench);
