@@ -6,13 +6,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use all_is_cubes::drawing::embedded_graphics::{
-    self,
-    draw_target::DrawTarget,
-    pixelcolor::Rgb888,
-    prelude::{OriginDimensions, RgbColor, Size},
-    Pixel,
-};
+use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 use luminance::context::GraphicsContext;
 use luminance::pipeline::{Pipeline, TextureBinding};
 use luminance::pixel::{NormRGBA8UI, NormUnsigned};
@@ -26,10 +20,10 @@ use luminance::UniformInterface;
 
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::space::Grid;
 
 use crate::in_luminance::shading::map_shader_result;
 use crate::in_luminance::types::AicLumBackend;
+use crate::EgFramebuffer;
 use crate::GraphicsResourceError;
 
 /// Resources for drawing a texture onto the entire framebuffer.
@@ -76,7 +70,7 @@ where
             ff: self.clone(),
             texture: None,
             scaled_viewport: None,
-            local_data: Box::new([]),
+            local_buffer: EgFramebuffer::new(Size::zero()),
             texture_is_valid: false,
         }
     }
@@ -143,7 +137,7 @@ where
     texture: Option<Texture<Backend, Dim2, NormRGBA8UI>>,
     /// Viewport whose `framebuffer_size` is the size of our texture.
     scaled_viewport: Option<Viewport>,
-    local_data: Box<[u8]>,
+    local_buffer: EgFramebuffer,
     texture_is_valid: bool,
 }
 
@@ -176,7 +170,10 @@ where
         self.scaled_viewport = None;
 
         // TODO: systematic overflow checks
-        self.local_data = vec![0; (size.x as usize) * (size.y as usize) * 4].into_boxed_slice();
+        self.local_buffer = EgFramebuffer::new(Size {
+            width: size.x,
+            height: size.y,
+        });
         self.texture_is_valid = false;
         self.texture = Some(context.new_texture(
             [size.x, size.y],
@@ -200,16 +197,36 @@ where
         self.scaled_viewport
     }
 
-    pub fn data(&mut self) -> &mut [u8] {
-        &mut self.local_data
+    pub fn draw_target(&mut self) -> &mut EgFramebuffer {
+        &mut self.local_buffer
     }
 
     pub fn upload(&mut self) -> Result<(), GraphicsResourceError> {
-        self.texture
-            .as_mut()
-            .expect("upload() without resize()")
-            .upload_raw(TexelUpload::base_level(&self.local_data, 0))?;
-        self.texture_is_valid = true;
+        if !self.texture_is_valid {
+            self.texture
+                .as_mut()
+                .expect("upload() without resize()")
+                .upload(TexelUpload::base_level(self.local_buffer.data(), 0))?;
+            self.texture_is_valid = true;
+        }
+        let dirty_rect = self.local_buffer.dirty_rect();
+        if !dirty_rect.is_zero_sized() {
+            let width = self.local_buffer.size().width;
+            self.texture
+                .as_mut()
+                .expect("upload() without resize()")
+                .upload_part(
+                    // We can't specify stride, but we can specify a contiguous Y span
+                    [0, dirty_rect.top_left.y as u32],
+                    [width, dirty_rect.bottom_right().unwrap().y as u32 + 1],
+                    TexelUpload::base_level(
+                        &self.local_buffer.data()
+                            [width as usize * dirty_rect.top_left.y as usize..],
+                        0,
+                    ),
+                )?;
+            self.local_buffer.mark_not_dirty();
+        }
         Ok(())
     }
 
@@ -243,62 +260,9 @@ where
         f.debug_struct("FullFrameTexture")
             // Skipping .ff because it can't be usefully printed
             .field("texture", &self.texture.is_some())
-            // Skipping .local_data because it's a large image
+            // Skipping .local_buffer because it's a large image
             .field("texture_is_valid", &self.texture_is_valid)
             .finish()
-    }
-}
-
-impl<Backend> DrawTarget for FullFrameTexture<Backend>
-where
-    Backend: AicLumBackend,
-{
-    type Color = Rgb888;
-    type Error = std::convert::Infallible;
-
-    #[inline]
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where
-        I: IntoIterator<Item = embedded_graphics::Pixel<Self::Color>>,
-    {
-        if let Some(texture) = &self.texture {
-            // Borrow Grid's indexing logic to do our 2D indexing (and set up for a Y flip)
-            let [width, height] = texture.size();
-            let grid = Grid::new(
-                [0, (1 - height as i32), 0],
-                [1, height as i32, width as i32],
-            );
-
-            for Pixel(point, color) in pixels.into_iter() {
-                if let Some(index) = grid.index([0, -point.y, point.x]) {
-                    let index = index * 4; // four channels
-                    self.local_data[index] = color.r();
-                    self.local_data[index + 1] = color.g();
-                    self.local_data[index + 2] = color.b();
-                    self.local_data[index + 3] = 255;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-impl<Backend> OriginDimensions for FullFrameTexture<Backend>
-where
-    Backend: AicLumBackend,
-{
-    fn size(&self) -> Size {
-        if let Some(v) = self.scaled_viewport {
-            Size {
-                width: v.framebuffer_size.x,
-                height: v.framebuffer_size.y,
-            }
-        } else {
-            Size {
-                width: 0,
-                height: 0,
-            }
-        }
     }
 }
 

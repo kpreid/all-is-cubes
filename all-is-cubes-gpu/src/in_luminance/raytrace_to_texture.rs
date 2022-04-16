@@ -128,7 +128,7 @@ where
                 }
             }
 
-            self.render_target.draw_iter(traces).unwrap();
+            self.render_target.draw_target().draw_iter(traces).unwrap();
             self.render_target.upload()?;
         }
 

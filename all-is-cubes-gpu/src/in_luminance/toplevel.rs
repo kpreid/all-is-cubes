@@ -456,14 +456,14 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         self.info_text_texture.reload_shader_if_changed(context);
 
         let info_text_texture = &mut self.info_text_texture;
-        info_text_texture.data().fill(0);
+        info_text_texture.draw_target().clear_transparent();
         Text::with_baseline(
             text,
             Point::new(5, 5),
             MonoTextStyle::new(&FONT_7X13_BOLD, Rgb888::new(0, 0, 0)),
             Baseline::Top,
         )
-        .draw(info_text_texture)
+        .draw(info_text_texture.draw_target())
         .unwrap(); // TODO: use .into_ok() when stable
         info_text_texture.upload()?;
 
