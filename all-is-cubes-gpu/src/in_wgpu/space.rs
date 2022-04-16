@@ -33,6 +33,10 @@ const CHUNK_SIZE: GridCoordinate = 16;
 /// following its changes.
 #[derive(Debug)]
 pub(crate) struct SpaceRenderer {
+    /// A debugging label for the space's render pass.
+    /// (Derived from space_label)
+    render_pass_label: String,
+
     /// Note that `self.csm` has its own todo listener.
     /// todo: Arc<Mutex<SpaceRendererTodo>>,
     block_texture: AtlasAllocator,
@@ -59,6 +63,7 @@ const INDEX_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
 impl SpaceRenderer {
     pub fn new(
         space: URef<Space>,
+        space_label: String,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         stuff: &BlockRenderStuff,
@@ -77,11 +82,11 @@ impl SpaceRenderer {
                     resource: wgpu::BindingResource::Sampler(&block_texture.sampler),
                 },
             ],
-            label: Some("SpaceRenderer.bind_group"),
+            label: Some(&format!("{space_label} space_bind_group")),
         });
 
         let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("EverythingRenderer::camera_buffer"),
+            label: Some(&format!("{space_label} camera_buffer")),
             size: std::mem::size_of::<WgpuCamera>().try_into().unwrap(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -93,10 +98,11 @@ impl SpaceRenderer {
                 binding: 0,
                 resource: camera_buffer.as_entire_binding(),
             }],
-            label: Some("camera_bind_group"),
+            label: Some(&format!("{space_label} camera_bind_group")),
         });
 
         Ok(SpaceRenderer {
+            render_pass_label: format!("{space_label} render_pass"),
             block_texture,
             space_bind_group,
             camera_buffer,
@@ -253,7 +259,7 @@ impl<'a> SpaceRendererOutput<'a> {
         );
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Space opaque-geometry render pass"),
+            label: Some(&self.r.render_pass_label),
             color_attachments: &[wgpu::RenderPassColorAttachment {
                 view: output_view,
                 resolve_target: None,
@@ -381,6 +387,7 @@ fn update_chunk_buffers(
     buffers.vertex_buf.write_with_resizing(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
+            // TODO: Get the space's label and chunk coordinates here (cheaply)
             label: Some("Chunk vertex buffer"),
             contents: new_vertices_data,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,

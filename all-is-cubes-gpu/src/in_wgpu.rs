@@ -399,20 +399,34 @@ impl EverythingRenderer {
 
         // Make sure we're rendering the right spaces.
         // TODO: we should be able to express this as something like "Layers::for_each_zip()"
-        let new_space_renderer =
-            |space| SpaceRenderer::new(space, &self.device, queue, &self.block_render_stuff);
         if self.space_renderers.world.as_ref().map(|sr| sr.space()) != spaces_to_render.world {
             self.space_renderers.world = spaces_to_render
                 .world
                 .cloned()
-                .map(new_space_renderer)
+                .map(|space| {
+                    SpaceRenderer::new(
+                        space,
+                        String::from("world"),
+                        &self.device,
+                        queue,
+                        &self.block_render_stuff,
+                    )
+                })
                 .transpose()?;
         }
         if self.space_renderers.ui.as_ref().map(|sr| sr.space()) != spaces_to_render.ui {
             self.space_renderers.ui = spaces_to_render
                 .ui
                 .cloned()
-                .map(new_space_renderer)
+                .map(|space| {
+                    SpaceRenderer::new(
+                        space,
+                        String::from("ui"),
+                        &self.device,
+                        queue,
+                        &self.block_render_stuff,
+                    )
+                })
                 .transpose()?;
         }
 
