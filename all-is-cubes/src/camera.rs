@@ -61,7 +61,9 @@ pub struct Camera {
     /// Calculated by [`Self::compute_matrices`].
     inverse_projection_view: M,
 
-    view_frustum_corners: [Point3<FreeCoordinate>; 8],
+    /// Bounds of the visible area in world space.
+    /// Calculated by [`Self::compute_matrices`].
+    view_frustum: FrustumPoints,
 }
 
 #[allow(clippy::cast_lossless)]
@@ -78,7 +80,7 @@ impl Camera {
             projection: M::identity(),
             view_position: Point3::origin(),
             inverse_projection_view: M::identity(),
-            view_frustum_corners: [Point3::origin(); 8],
+            view_frustum: Default::default(),
         };
         new_self.compute_matrices();
         new_self
@@ -194,14 +196,11 @@ impl Camera {
         // (Benchmarking has shown testing this first to be better, though not shown that
         // it is better for all possible view orientations.)
         //
-        // TODO: The correctness of this code depends on Aab::corner_points's point ordering,
-        // (which becomes the ordering of self.view_frustum_corners)
-        // which is not yet nailed down.
-        //
         // Note that testing against the near plane (lbn, ltn, rtn) is not necessary
         // since it is always parallel to the far plane, and we are testing ranges on
         // the axis, not “is this object on the far side of this plane”.
-        let [lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn] = self.view_frustum_corners;
+        #[rustfmt::skip]
+        let FrustumPoints { lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn } = self.view_frustum;
         for &(p1, p2, p3) in &[
             (lbn, lbf, ltf), // left
             (rtn, rtf, rbf), // right
@@ -210,11 +209,7 @@ impl Camera {
             (lbf, rbf, ltf), // far
         ] {
             let normal = (p2 - p1).cross(p3 - p1);
-            if Self::separated_along(
-                self.view_frustum_corners.iter().copied(),
-                aab.corner_points(),
-                normal,
-            ) {
+            if Self::separated_along(self.view_frustum.iter(), aab.corner_points(), normal) {
                 return false;
             }
         }
@@ -222,11 +217,7 @@ impl Camera {
         // Test the AAB's face normals (i.e. the coordinate axes).
         // We only need 3 tests, not 6, since there are only 3 axes.
         for axis in [Vector3::unit_x(), Vector3::unit_y(), Vector3::unit_z()] {
-            if Self::separated_along(
-                self.view_frustum_corners.iter().copied(),
-                aab.corner_points(),
-                axis,
-            ) {
+            if Self::separated_along(self.view_frustum.iter(), aab.corner_points(), axis) {
                 return false;
             }
         }
@@ -291,16 +282,18 @@ impl Camera {
             .inverse_transform()
             .expect("projection and view matrix was not invertible");
 
-        // Compute the view frustum's corner points.
-        let mut view_frustum_corners: [Point3<FreeCoordinate>; 8] = [Point3::origin(); 8];
-        for (i, point) in Aab::new(-1., 1., -1., 1., -1., 1.)
-            .corner_points()
-            .map(|p| self.project_point_into_world(p))
-            .enumerate()
-        {
-            view_frustum_corners[i] = point;
-        }
-        self.view_frustum_corners = view_frustum_corners;
+        // Compute the view frustum's corner points,
+        // by unprojecting the corners of clip space.
+        self.view_frustum = FrustumPoints {
+            lbn: self.project_point_into_world(Point3::new(-1., -1., -1.)),
+            rbn: self.project_point_into_world(Point3::new(1., -1., -1.)),
+            ltn: self.project_point_into_world(Point3::new(-1., 1., -1.)),
+            rtn: self.project_point_into_world(Point3::new(1., 1., -1.)),
+            lbf: self.project_point_into_world(Point3::new(-1., -1., 1.)),
+            rbf: self.project_point_into_world(Point3::new(1., -1., 1.)),
+            ltf: self.project_point_into_world(Point3::new(-1., 1., 1.)),
+            rtf: self.project_point_into_world(Point3::new(1., 1., 1.)),
+        };
     }
 }
 
@@ -398,9 +391,48 @@ pub fn eye_for_look_at(grid: Grid, direction: Vector3<FreeCoordinate>) -> Point3
     grid.center() + direction.normalize() * space_radius // TODO: allow for camera FoV
 }
 
+/// A view frustum, represented by its corner points.
+/// This is an underconstrained representation, but one that is useful to precompute.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FrustumPoints {
+    lbf: Point3<FreeCoordinate>,
+    rbf: Point3<FreeCoordinate>,
+    ltf: Point3<FreeCoordinate>,
+    rtf: Point3<FreeCoordinate>,
+    lbn: Point3<FreeCoordinate>,
+    rbn: Point3<FreeCoordinate>,
+    ltn: Point3<FreeCoordinate>,
+    rtn: Point3<FreeCoordinate>,
+}
+
+impl Default for FrustumPoints {
+    fn default() -> Self {
+        Self {
+            lbf: Point3::origin(),
+            rbf: Point3::origin(),
+            ltf: Point3::origin(),
+            rtf: Point3::origin(),
+            lbn: Point3::origin(),
+            rbn: Point3::origin(),
+            ltn: Point3::origin(),
+            rtn: Point3::origin(),
+        }
+    }
+}
+
+impl FrustumPoints {
+    fn iter(self) -> impl Iterator<Item = Point3<FreeCoordinate>> {
+        [
+            self.lbf, self.rbf, self.ltf, self.rtf, self.lbn, self.rbn, self.ltn, self.rtn,
+        ]
+        .into_iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn camera_bad_viewport_doesnt_panic() {
@@ -424,6 +456,38 @@ mod tests {
             disp: pos.to_vec(),
         });
         assert_eq!(camera.view_position(), pos);
+    }
+
+    #[test]
+    fn view_frustum() {
+        let camera = Camera::new(
+            GraphicsOptions {
+                view_distance: NotNan::new(10.0_f64.powi(2)).unwrap(),
+                fov_y: notnan!(90.0),
+                ..GraphicsOptions::default()
+            },
+            Viewport::with_scale(1.0, Vector2::new(10, 5)),
+        );
+        // TODO: approximate comparison instead of equals
+        let x_near = 0.062499999999999986;
+        let y_near = 0.031249999999999993;
+        let z_near = -0.03125;
+        let x_far = 199.99999999996868;
+        let y_far = 99.99999999998434;
+        let z_far = -99.99999999998437;
+        assert_eq!(
+            camera.view_frustum,
+            FrustumPoints {
+                lbn: Point3::new(-x_near, -y_near, z_near),
+                ltn: Point3::new(-x_near, y_near, z_near),
+                rbn: Point3::new(x_near, -y_near, z_near),
+                rtn: Point3::new(x_near, y_near, z_near),
+                lbf: Point3::new(-x_far, -y_far, z_far),
+                ltf: Point3::new(-x_far, y_far, z_far),
+                rbf: Point3::new(x_far, -y_far, z_far),
+                rtf: Point3::new(x_far, y_far, z_far),
+            }
+        );
     }
 
     #[test]
