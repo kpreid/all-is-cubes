@@ -544,7 +544,10 @@ impl BlockRenderStuff {
                 primitive: primitive_state,
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: super::DEPTH_FORMAT,
-                    depth_write_enabled: true,
+                    // Transparent geometry is written sorted back-to-front, so writing the
+                    // depth buffer is not useful, but we do *compare* depth so that existing
+                    // opaque geometry obscures all transparent geometry behind it.
+                    depth_write_enabled: false,
                     depth_compare: wgpu::CompareFunction::Less,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
