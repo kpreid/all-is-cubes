@@ -5,6 +5,9 @@
 
 use std::error::Error;
 
+mod draw_to_texture;
+pub(crate) use draw_to_texture::*;
+
 mod info;
 pub use info::*;
 
