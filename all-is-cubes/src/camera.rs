@@ -163,7 +163,7 @@ impl Camera {
     /// Returns an [`OctantMask`] including all directions this camera's field of view includes.
     pub fn view_direction_mask(&self) -> OctantMask {
         #[rustfmt::skip]
-        let FrustumPoints { lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn } = self.view_frustum;
+        let FrustumPoints { lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn, .. } = self.view_frustum;
 
         let mut mask = OctantMask::NONE;
         // Fill the mask with 9 representative rays from the camera.
@@ -224,6 +224,13 @@ impl Camera {
         // ), but false intersections are okay here since we're trying to do view culling,
         // not collision detection.
 
+        // Test the AAB's face normals (i.e. the coordinate axes).
+        // To save some arithmetic, we've precomputed the frustum's axis-aligned bounding
+        // box, so we can use that instead of the general separated_along().
+        if !aab.intersects(self.view_frustum.bounds) {
+            return false;
+        }
+
         // Test the view frustum's face normals.
         // (Benchmarking has shown testing this first to be better, though not shown that
         // it is better for all possible view orientations.)
@@ -232,7 +239,7 @@ impl Camera {
         // since it is always parallel to the far plane, and we are testing ranges on
         // the axis, not “is this object on the far side of this plane”.
         #[rustfmt::skip]
-        let FrustumPoints { lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn } = self.view_frustum;
+        let FrustumPoints { lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn, .. } = self.view_frustum;
         for &(p1, p2, p3) in &[
             (lbn, lbf, ltf), // left
             (rtn, rtf, rbf), // right
@@ -242,14 +249,6 @@ impl Camera {
         ] {
             let normal = (p2 - p1).cross(p3 - p1);
             if Self::separated_along(self.view_frustum.iter(), aab.corner_points(), normal) {
-                return false;
-            }
-        }
-
-        // Test the AAB's face normals (i.e. the coordinate axes).
-        // We only need 3 tests, not 6, since there are only 3 axes.
-        for axis in [Vector3::unit_x(), Vector3::unit_y(), Vector3::unit_z()] {
-            if Self::separated_along(self.view_frustum.iter(), aab.corner_points(), axis) {
                 return false;
             }
         }
@@ -265,25 +264,11 @@ impl Camera {
         points2: impl IntoIterator<Item = Point3<FreeCoordinate>>,
         axis: Vector3<FreeCoordinate>,
     ) -> bool {
-        let (min1, max1) = Self::projected_range(points1, axis);
-        let (min2, max2) = Self::projected_range(points2, axis);
+        let (min1, max1) = projected_range(points1, axis);
+        let (min2, max2) = projected_range(points2, axis);
         let intersection_min = min1.max(min2);
         let intersection_max = max1.min(max2);
         intersection_max < intersection_min
-    }
-
-    /// Helper for aab_in_view; projects a set of points onto a line.
-    #[inline(always)]
-    fn projected_range(
-        points: impl IntoIterator<Item = Point3<FreeCoordinate>>,
-        axis: Vector3<FreeCoordinate>,
-    ) -> (FreeCoordinate, FreeCoordinate) {
-        points
-            .into_iter()
-            .map(|p| p.to_vec().dot(axis))
-            .minmax()
-            .into_option()
-            .unwrap()
     }
 
     /// Apply postprocessing steps determined by this camera to convert a HDR “scene”
@@ -325,7 +310,9 @@ impl Camera {
             rbf: self.project_point_into_world(Point3::new(1., -1., 1.)),
             ltf: self.project_point_into_world(Point3::new(-1., 1., 1.)),
             rtf: self.project_point_into_world(Point3::new(1., 1., 1.)),
+            bounds: Aab::ZERO,
         };
+        self.view_frustum.compute_bounds();
     }
 }
 
@@ -366,9 +353,18 @@ impl Viewport {
 
     /// Calculates the aspect ratio (width divided by height) of the `nominal_size` of this
     /// viewport.
+    ///
+    /// If the result would naturally be infinite or undefined then it is reported as 1
+    /// instead. This is intended to aid in robust handling of degenerate viewports which
+    /// contain no pixels.
     #[inline]
     pub fn nominal_aspect_ratio(&self) -> FreeCoordinate {
-        self.nominal_size.x / self.nominal_size.y
+        let ratio = self.nominal_size.x / self.nominal_size.y;
+        if ratio.is_finite() {
+            ratio
+        } else {
+            1.0
+        }
     }
 
     /// Convert an *x* coordinate from the range `0..self.framebuffer_size.x` (upper exclusive)
@@ -435,6 +431,7 @@ struct FrustumPoints {
     rbn: Point3<FreeCoordinate>,
     ltn: Point3<FreeCoordinate>,
     rtn: Point3<FreeCoordinate>,
+    bounds: Aab,
 }
 
 impl Default for FrustumPoints {
@@ -448,6 +445,7 @@ impl Default for FrustumPoints {
             rbn: Point3::origin(),
             ltn: Point3::origin(),
             rtn: Point3::origin(),
+            bounds: Aab::new(0., 0., 0., 0., 0., 0.),
         }
     }
 }
@@ -459,6 +457,28 @@ impl FrustumPoints {
         ]
         .into_iter()
     }
+
+    fn compute_bounds(&mut self) {
+        let (xl, xh) = projected_range(self.iter(), Vector3::unit_x());
+        let (yl, yh) = projected_range(self.iter(), Vector3::unit_y());
+        let (zl, zh) = projected_range(self.iter(), Vector3::unit_z());
+        self.bounds = Aab::from_lower_upper([xl, yl, zl], [xh, yh, zh]);
+    }
+}
+
+/// Projects a set of points onto an axis and returns the least and greatest dot product
+/// with the axis vector.
+#[inline(always)]
+fn projected_range(
+    points: impl IntoIterator<Item = Point3<FreeCoordinate>>,
+    axis: Vector3<FreeCoordinate>,
+) -> (FreeCoordinate, FreeCoordinate) {
+    points
+        .into_iter()
+        .map(|p| p.to_vec().dot(axis))
+        .minmax()
+        .into_option()
+        .unwrap()
 }
 
 #[cfg(test)]
@@ -518,6 +538,7 @@ mod tests {
                 ltf: Point3::new(-x_far, y_far, z_far),
                 rbf: Point3::new(x_far, -y_far, z_far),
                 rtf: Point3::new(x_far, y_far, z_far),
+                bounds: Aab::new(-x_far, x_far, -y_far, y_far, z_far, z_near),
             }
         );
     }

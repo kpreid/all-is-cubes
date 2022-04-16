@@ -1,6 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::cmp::Ordering;
 use std::fmt;
 use std::iter::FusedIterator;
 
@@ -173,6 +174,21 @@ impl Aab {
         for axis in 0..3 {
             if !(self.lower_bounds[axis] <= point[axis] && point[axis] <= self.upper_bounds[axis]) {
                 return false;
+            }
+        }
+        true
+    }
+
+    /// Returns whether this AAB, including the boundary, intersects the other AAB.
+    ///
+    /// TODO: example + tests
+    pub fn intersects(&self, other: Aab) -> bool {
+        for axis in 0..3 {
+            let intersection_min = self.lower_bounds[axis].max(other.lower_bounds[axis]);
+            let intersection_max = self.upper_bounds[axis].min(other.upper_bounds[axis]);
+            match intersection_min.partial_cmp(&intersection_max) {
+                Some(Ordering::Less | Ordering::Equal) => {}
+                _ => return false,
             }
         }
         true
