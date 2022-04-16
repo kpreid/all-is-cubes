@@ -3,27 +3,17 @@
 
 use std::fmt;
 
-use all_is_cubes::{
-    cgmath::Vector2,
-    drawing::embedded_graphics::{
-        self,
-        draw_target::DrawTarget,
-        pixelcolor::Rgb888,
-        prelude::{OriginDimensions, RgbColor, Size},
-        Pixel,
-    },
-};
+use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 
-use all_is_cubes::space::Grid;
-
-use crate::in_wgpu::glue::write_texture_by_grid;
+use crate::EgFramebuffer;
 
 /// A RGBA [`wgpu::Texture`] with a local buffer that can be drawn on.
 pub(crate) struct DrawableTexture {
     texture: Option<wgpu::Texture>,
     texture_view: Option<wgpu::TextureView>,
     size: wgpu::Extent3d,
-    local_data: Box<[[u8; 4]]>,
+    local_buffer: EgFramebuffer,
 }
 
 impl DrawableTexture {
@@ -36,7 +26,7 @@ impl DrawableTexture {
                 height: 0,
                 depth_or_array_layers: 1,
             },
-            local_data: Box::new([]),
+            local_buffer: EgFramebuffer::new(Size::zero()),
         }
     }
 
@@ -65,16 +55,18 @@ impl DrawableTexture {
         });
 
         *self = Self {
-            // TODO: systematic overflow checks
-            local_data: vec![[0; 4]; (size.x as usize) * (size.y as usize)].into_boxed_slice(),
+            local_buffer: EgFramebuffer::new(Size {
+                width: new_extent.width,
+                height: new_extent.height,
+            }),
             texture_view: Some(texture.create_view(&wgpu::TextureViewDescriptor::default())),
             texture: Some(texture),
             size: new_extent,
         };
     }
 
-    pub fn data(&mut self) -> &mut [[u8; 4]] {
-        &mut self.local_data
+    pub fn draw_target(&mut self) -> &mut EgFramebuffer {
+        &mut self.local_buffer
     }
 
     pub fn view(&self) -> Option<&wgpu::TextureView> {
@@ -82,18 +74,40 @@ impl DrawableTexture {
     }
 
     pub fn upload(&mut self, queue: &wgpu::Queue) {
-        if let Some(texture) = &self.texture {
-            // wrte_texture_by_grid isn't exactly meant for this but it saves us computing byte lengths
-            write_texture_by_grid(
-                queue,
-                texture,
-                // TODO: we shouldn't be recomputing this but cache it
-                Grid::new(
-                    [0, 0, 0],
-                    [self.size.width as i32, self.size.height as i32, 1],
-                ),
-                &*self.local_data,
-            );
+        let dirty_rect = self.local_buffer.dirty_rect();
+        if !dirty_rect.is_zero_sized() {
+            if let Some(texture) = &self.texture {
+                let full_width = self.local_buffer.size().width;
+                queue.write_texture(
+                    wgpu::ImageCopyTexture {
+                        texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d {
+                            x: dirty_rect.top_left.x as u32,
+                            y: dirty_rect.top_left.y as u32,
+                            z: 0,
+                        },
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    bytemuck::cast_slice(
+                        &self.local_buffer.data()[full_width as usize
+                            * dirty_rect.top_left.y as usize
+                            + dirty_rect.top_left.x as usize..],
+                    ),
+                    wgpu::ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: std::num::NonZeroU32::new(4 * full_width),
+                        rows_per_image: None,
+                    },
+                    wgpu::Extent3d {
+                        width: dirty_rect.size.width,
+                        height: dirty_rect.size.height,
+                        depth_or_array_layers: 1,
+                    },
+                );
+
+                self.local_buffer.mark_not_dirty();
+            }
         }
     }
 }
@@ -105,31 +119,6 @@ impl fmt::Debug for DrawableTexture {
             .field("size", &self.size)
             // Skipping .local_data because it's a large image
             .finish_non_exhaustive()
-    }
-}
-
-impl DrawTarget for DrawableTexture {
-    type Color = Rgb888;
-    type Error = std::convert::Infallible;
-
-    #[inline]
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where
-        I: IntoIterator<Item = embedded_graphics::Pixel<Self::Color>>,
-    {
-        // Borrow Grid's indexing logic to do our 2D indexing (and set up for a Y flip)
-        let wgpu::Extent3d { width, height, .. } = self.size;
-        let grid = Grid::new(
-            [0, (1 - height as i32), 0],
-            [1, height as i32, width as i32],
-        );
-
-        for Pixel(point, color) in pixels.into_iter() {
-            if let Some(index) = grid.index([0, -point.y, point.x]) {
-                self.local_data[index] = [color.r(), color.g(), color.b(), 255];
-            }
-        }
-        Ok(())
     }
 }
 

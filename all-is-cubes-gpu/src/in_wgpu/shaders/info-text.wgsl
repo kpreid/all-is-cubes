@@ -27,7 +27,9 @@ fn vs_main(
 
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    var texcoord: vec2<f32> = (in.tc.xy + 1.0) * 0.5;
+    // scale clip coordinates to 0.1 coordinates and flip Y
+    var texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
+
     var derivatives = vec2<f32>(dpdx(texcoord.x), dpdy(texcoord.y));
 
     var shadowing: f32 = 0.0;
