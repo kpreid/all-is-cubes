@@ -36,11 +36,7 @@ const ALL_RAYS_COUNT: usize = RAY_CUBE_EDGE.pow(3) - (RAY_CUBE_EDGE - 2).pow(3);
 /// TODO: This should be an option configured for the Universe/Space, so that it is
 /// both adjustable and deterministic/platform-independent.
 /// For now, tweaked in a "works okay on my machine" way.
-const MAXIMUM_LIGHT_COMPUTATION_COST: usize = if cfg!(target_family = "wasm") {
-    100_000
-} else {
-    400_000
-};
+const MAXIMUM_LIGHT_COMPUTATION_COST: usize = 100_000;
 
 #[derive(Debug)]
 struct LightRayData {
