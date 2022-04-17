@@ -353,16 +353,18 @@ impl Display for TimeStats {
         match self.min {
             None => write!(
                 f,
-                "-------- .. {} for {:3}",
+                "(-------- .. {}) for {:3}, total {}",
                 self.max.custom_format(StatusText),
-                self.count
+                self.count,
+                self.sum.custom_format(StatusText),
             ),
             Some(min) => write!(
                 f,
-                "{} .. {} for {:3}",
+                "({} .. {}) for {:3}, total {}",
                 min.custom_format(StatusText),
                 self.max.custom_format(StatusText),
-                self.count
+                self.count,
+                self.sum.custom_format(StatusText),
             ),
         }
     }
