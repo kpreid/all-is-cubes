@@ -12,7 +12,7 @@ var text_texture: texture_2d<f32>;
 var text_sampler: sampler;
 
 [[stage(vertex)]]
-fn vs_main(
+fn info_text_vertex(
     [[builtin(vertex_index)]] in_vertex_index: u32,
 ) -> VertexOutput {
     /// Full-screen triangle
@@ -26,7 +26,7 @@ fn vs_main(
 }
 
 [[stage(fragment)]]
-fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+fn info_text_fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     // scale clip coordinates to 0.1 coordinates and flip Y
     var texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
 

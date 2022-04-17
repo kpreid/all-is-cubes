@@ -297,12 +297,12 @@ impl EverythingRenderer {
             layout: Some(&info_text_render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &info_text_shader,
-                entry_point: "vs_main",
+                entry_point: "info_text_vertex",
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &info_text_shader,
-                entry_point: "fs_main",
+                entry_point: "info_text_fragment",
                 targets: &[wgpu::ColorTargetState {
                     format: surface_format,
                     blend: Some(wgpu::BlendState {

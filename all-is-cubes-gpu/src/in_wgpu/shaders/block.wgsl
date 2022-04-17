@@ -38,7 +38,7 @@ var block_texture: texture_3d<f32>;
 var block_sampler: sampler;
 
 [[stage(vertex)]]
-fn vs_main(
+fn block_vertex_main(
     input: WgpuBlockVertex,
 ) -> VertexOutput {
     var out: VertexOutput;
@@ -73,7 +73,7 @@ fn get_diffuse_color(in: VertexOutput) -> vec4<f32> {
 }
 
 [[stage(fragment)]]
-fn fs_main_opaque(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+fn block_fragment_opaque(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     var diffuse_color: vec4<f32> = get_diffuse_color(in);
     
     // Exposure/eye adaptation
@@ -83,7 +83,7 @@ fn fs_main_opaque(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 }
 
 [[stage(fragment)]]
-fn fs_main_transparent(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+fn block_fragment_transparent(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     var diffuse_color: vec4<f32> = get_diffuse_color(in);
 
     // Exposure/eye adaptation

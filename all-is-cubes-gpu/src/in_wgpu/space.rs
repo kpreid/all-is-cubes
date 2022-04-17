@@ -488,12 +488,12 @@ impl BlockRenderStuff {
                 layout: Some(&render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: "vs_main",
+                    entry_point: "block_vertex_main",
                     buffers: &[WgpuBlockVertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
-                    entry_point: "fs_main_opaque",
+                    entry_point: "block_fragment_opaque",
                     targets: &[wgpu::ColorTargetState {
                         format: surface_format,
                         blend: None,
@@ -518,12 +518,12 @@ impl BlockRenderStuff {
                 layout: Some(&render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: "vs_main",
+                    entry_point: "block_vertex_main",
                     buffers: &[WgpuBlockVertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
-                    entry_point: "fs_main_transparent",
+                    entry_point: "block_fragment_transparent",
                     targets: &[wgpu::ColorTargetState {
                         format: surface_format,
                         // Note that this blending configuration is for premultiplied alpha.
