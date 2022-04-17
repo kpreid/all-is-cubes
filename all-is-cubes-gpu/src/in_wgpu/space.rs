@@ -68,7 +68,7 @@ impl SpaceRenderer {
         queue: &wgpu::Queue,
         stuff: &BlockRenderStuff,
     ) -> Result<Self, GraphicsResourceError> {
-        let block_texture = AtlasAllocator::new(device, queue)?;
+        let block_texture = AtlasAllocator::new(&space_label, device, queue)?;
 
         let space_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &stuff.space_texture_bind_group_layout,

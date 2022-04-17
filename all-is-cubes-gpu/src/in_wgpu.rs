@@ -258,6 +258,7 @@ impl EverythingRenderer {
             ),
             info_text_bind_group_layout,
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("EverythingRenderer::info_text_sampler"),
                 address_mode_u: wgpu::AddressMode::ClampToEdge,
                 address_mode_v: wgpu::AddressMode::ClampToEdge,
                 address_mode_w: wgpu::AddressMode::ClampToEdge,
