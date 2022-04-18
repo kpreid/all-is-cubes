@@ -36,11 +36,6 @@ pub struct GraphicsOptions {
     /// Method/fidelity to use for transparency.
     pub transparency: TransparencyOption,
 
-    /// Number of space chunks (16³ groups of blocks) to redraw if needed, per frame.
-    ///
-    /// Does not apply to raytracing.
-    pub chunks_per_frame: u16,
-
     /// Whether to use frustum culling for drawing only in-view chunks and objects.
     ///
     /// This option is for debugging and performance testing and should not have any
@@ -83,7 +78,6 @@ impl Default for GraphicsOptions {
             view_distance: NotNan::from(200),
             lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
-            chunks_per_frame: 4,
             use_frustum_culling: true,
             debug_info_text: true,
             debug_chunk_boxes: false,

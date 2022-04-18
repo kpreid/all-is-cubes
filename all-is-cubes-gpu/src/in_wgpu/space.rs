@@ -25,7 +25,7 @@ use crate::in_wgpu::{
     vertex::WgpuBlockVertex,
 };
 use crate::reloadable::{reloadable_str, Reloadable};
-use crate::{GraphicsResourceError, SpaceRenderInfo};
+use crate::{time_budgets, GraphicsResourceError, SpaceRenderInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -158,6 +158,7 @@ impl SpaceRenderer {
         let (csm_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
             camera,
             &mut self.block_texture,
+            end_light_update + time_budgets::UPDATE_MESHES,
             |mesh, render_data| {
                 update_chunk_buffers(rcbwp.borrow_mut().reborrow(), mesh, render_data);
             },

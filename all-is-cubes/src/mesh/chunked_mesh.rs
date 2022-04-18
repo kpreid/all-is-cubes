@@ -106,6 +106,7 @@ where
     /// Re-triangulate all blocks that need it, and the nearest chunks that need it.
     ///
     /// * `camera`'s view position is used to choose what to update and for depth ordering; its graphics options are used for triangulation and view distance.
+    /// * `deadline` is the approximate time at which this should stop.
     /// * `chunk_render_updater` is called for every retriangulated chunk.
     /// * `indices_only_updater` is called when a chunk's indices, only, have been
     ///    reordered.
@@ -115,6 +116,7 @@ where
         &mut self,
         camera: &Camera,
         block_texture_allocator: &mut Tex,
+        deadline: Instant,
         mut chunk_render_updater: CF,
         mut indices_only_updater: IF,
     ) -> (CsmUpdateInfo, ChunkPos<CHUNK_SIZE>)
@@ -124,7 +126,6 @@ where
     {
         let graphics_options = camera.options();
         let mesh_options = MeshOptions::new(graphics_options);
-        let max_updates = graphics_options.chunks_per_frame.into();
         let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
 
@@ -157,6 +158,8 @@ where
             space,
             block_texture_allocator,
             mesh_options,
+            // TODO: don't hardcode this figure here, let the caller specify it
+            deadline - Duration::from_micros(500),
         );
 
         // We are now done with todo preparation, and block mesh updates,
@@ -176,8 +179,8 @@ where
                 continue;
             }
 
-            // TODO: tune max update count dynamically / use time instead of count?
-            if chunk_mesh_generation_times.count >= max_updates {
+            let this_chunk_start_time = Instant::now();
+            if this_chunk_start_time > deadline {
                 break;
             }
 
@@ -194,7 +197,7 @@ where
                     chunk_entry,
                     Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes))
             {
-                let compute_start = Instant::now();
+                //let compute_start = Instant::now();
                 let chunk = chunk_entry.or_insert_with(|| {
                     // Chunk is missing. Note this for update planning.
                     chunks_are_missing = true;
@@ -213,7 +216,7 @@ where
                 chunk_render_updater(&chunk.mesh, &mut chunk.render_data);
 
                 chunk_mesh_generation_times +=
-                    TimeStats::one(compute_end_update_start.duration_since(compute_start));
+                    TimeStats::one(compute_end_update_start.duration_since(this_chunk_start_time));
                 chunk_mesh_callback_times +=
                     TimeStats::one(Instant::now().duration_since(compute_end_update_start));
             }
@@ -324,7 +327,8 @@ where
     /// Update block meshes based on the given [`Space`].
     ///
     /// After this method returns, `self.meshes.len()` and `self.versioning.len()` will
-    /// always equal `space.block_data().len()`.
+    /// always equal `space.block_data().len()`. They may not be fully updated yet, but
+    /// they will be the correct length.
     ///
     /// TODO: Missing handling for mesh_options changing.
     fn update<A>(
@@ -333,6 +337,7 @@ where
         space: &Space,
         block_texture_allocator: &mut A,
         mesh_options: &MeshOptions,
+        deadline: Instant,
     ) -> TimeStats
     where
         A: TextureAllocator<Tile = Tile>,
@@ -366,8 +371,7 @@ where
         // Update individual meshes.
         let mut last_start_time = Instant::now();
         let mut stats = TimeStats::default();
-        let mut cost = 0;
-        while cost < 100000 && !todo.is_empty() {
+        while last_start_time < deadline && !todo.is_empty() {
             let index: BlockIndex = todo.iter().next().copied().unwrap();
             todo.remove(&index);
             let index: usize = index.into();
@@ -375,10 +379,12 @@ where
             let new_evaluated_block: &EvaluatedBlock = block_data[index].evaluated();
             let current_mesh: &mut BlockMesh<_, _> = &mut self.meshes[index];
 
-            cost += match &new_evaluated_block.voxels {
-                Some(voxels) => voxels.grid().volume(),
-                None => 1,
-            };
+            // TODO: Consider re-introducing approximate cost measurement
+            // to hit the deadline better.
+            // cost += match &new_evaluated_block.voxels {
+            //     Some(voxels) => voxels.grid().volume(),
+            //     None => 1,
+            // };
 
             if current_mesh.try_update_texture_only(new_evaluated_block) {
                 // Updated the texture in-place. No need for mesh updates.
@@ -764,6 +770,9 @@ mod tests {
             self.csm.update_blocks_and_some_chunks(
                 &self.camera,
                 &mut NoTextures,
+                // In theory we should have a “fake time source” for testing purposes,
+                // but this will do until we have tests of the actual timing logic.
+                Instant::now() + Duration::from_secs(1_000_000),
                 chunk_render_updater,
                 indices_only_updater,
             )

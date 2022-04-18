@@ -38,7 +38,7 @@ use crate::in_luminance::{
     types::{AicLumBackend, LinesVertex, LumBlockVertex},
     wireframe_vertices,
 };
-use crate::{GraphicsResourceError, SpaceRenderInfo};
+use crate::{time_budgets, GraphicsResourceError, SpaceRenderInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -138,6 +138,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         let (csm_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
             camera,
             block_texture_allocator,
+            end_light_update + time_budgets::UPDATE_MESHES,
             |mesh, render_data| {
                 update_chunk_tess(context, mesh, render_data);
             },

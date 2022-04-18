@@ -36,6 +36,18 @@ impl GraphicsResourceError {
     }
 }
 
+/// Timing parameters for how much deferrable work to do per frame.
+///
+/// * TODO: Make this configurable maybe.
+/// * TODO: Budget the costs of the entire process explicitly.
+pub(crate) mod time_budgets {
+    use instant::Duration;
+
+    /// Time spent on [`ChunkedSpaceMesh`] performing updates.
+    /// Note that each frame does this twice (the world space mesh and UI space mesh).
+    pub(crate) const UPDATE_MESHES: Duration = Duration::from_millis(4);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
