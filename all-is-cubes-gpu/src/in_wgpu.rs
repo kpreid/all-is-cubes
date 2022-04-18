@@ -500,7 +500,7 @@ impl EverythingRenderer {
         let end_time = Instant::now();
         Ok(RenderInfo {
             frame_time: end_time.duration_since(start_frame_time),
-            prepare_time: world_to_ui_time.duration_since(end_prepare_time),
+            prepare_time: end_prepare_time.duration_since(start_frame_time),
             draw_time: Layers {
                 world: world_to_ui_time.duration_since(end_prepare_time),
                 ui: ui_to_submit_time.duration_since(world_to_ui_time),
