@@ -270,9 +270,9 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
         self.consistency_check();
     }
 
-    /// Given the indices of vertices of transparent triangles, copy them in various
-    /// depth-sorted permutations into `self.indices` and record the array-index ranges
-    /// which contain each of the orderings.
+    /// Given the indices of vertices of transparent quads (triangle pairs), copy them in
+    /// various depth-sorted permutations into `self.indices` and record the array-index
+    /// ranges which contain each of the orderings.
     ///
     /// The orderings are identified by [`GridRotation`] values, in the following way:
     /// each rotation defines three basis vectors which we usually think of as “rotated
@@ -303,22 +303,24 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 *range = 0..0;
             }
         } else {
-            // Precompute midpoints (as sort keys) of all of the transparent triangles.
-            struct TriWithMid<S> {
-                indices: [u32; 3],
+            // Precompute midpoints (as sort keys) of all of the transparent quads.
+            // This does assume that the input `BlockMesh`es contain strictly quads
+            // and no other polygons, though.
+            struct QuadWithMid<S> {
+                indices: [u32; 6],
                 midpoint: Point3<S>,
             }
-            let triangles: &[[u32; 3]] = bytemuck::cast_slice(&*transparent_indices);
-            let mut sortable_triangles: Vec<TriWithMid<V::Coordinate>> = triangles
+            let quads: &[[u32; 6]] = bytemuck::cast_slice(&*transparent_indices);
+            let mut sortable_quads: Vec<QuadWithMid<V::Coordinate>> = quads
                 .iter()
-                .map(|&indices| TriWithMid {
+                .map(|&indices| QuadWithMid {
                     indices,
                     midpoint: Self::midpoint(&self.vertices, indices),
                 })
                 .collect();
 
             for (i, range) in self.transparent_ranges.iter_mut().enumerate() {
-                // Sort the triangles by this ordering.
+                // Sort the quads by this ordering.
                 match DepthOrdering::from_index(i) {
                     DepthOrdering::Direction(rot) => {
                         // This inverse() is because the rotation is defined as
@@ -328,9 +330,9 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 
                         // Note: Benchmarks show that `sort_by_key` is fastest
                         // (not `sort_unstable_by_key`).
-                        sortable_triangles.sort_by_key(|tri| -> [OrderedFloat<V::Coordinate>; 3] {
+                        sortable_quads.sort_by_key(|quad| -> [OrderedFloat<V::Coordinate>; 3] {
                             basis
-                                .map(|f| OrderedFloat(-f.dot(tri.midpoint.to_vec())))
+                                .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vec())))
                                 .into()
                         });
                     }
@@ -343,7 +345,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 // Copy the sorted indices into the main array.
                 let start = self.indices.len();
                 self.indices
-                    .extend(sortable_triangles.iter().flat_map(|tri| tri.indices));
+                    .extend(sortable_quads.iter().flat_map(|tri| tri.indices));
                 *range = start..self.indices.len();
             }
         }
@@ -361,14 +363,14 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// reordering occurred, unless there is nothing to sort. This may be improved in the future.
     pub fn depth_sort_for_view(&mut self, view_position: Point3<V::Coordinate>) -> bool {
         let range = self.transparent_range(DepthOrdering::Within);
-        if range.len() < 6 {
-            // No point in sorting unless there's at least two triangles.
+        if range.len() < 12 {
+            // No point in sorting unless there's at least two quads.
             return false;
         }
 
         let slice: &mut [u32] = &mut self.indices[range];
         // We want to sort the triangles, so we reinterpret the slice as groups of 3 indices.
-        let slice: &mut [[u32; 3]] = bytemuck::cast_slice_mut(slice);
+        let slice: &mut [[u32; 6]] = bytemuck::cast_slice_mut(slice);
         let vertices = &self.vertices; // borrow for closure
         slice.sort_unstable_by_key(|indices| {
             -OrderedFloat(view_position.distance2(Self::midpoint(vertices, *indices)))
@@ -377,9 +379,9 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
         true
     }
 
-    /// Compute quad midpoint from triangle vertices, for depth sorting.
+    /// Compute quad midpoint from quad vertices, for depth sorting.
     #[inline]
-    fn midpoint(vertices: &[V], indices: [u32; 3]) -> Point3<V::Coordinate> {
+    fn midpoint(vertices: &[V], indices: [u32; 6]) -> Point3<V::Coordinate> {
         let one_half = <V::Coordinate as num_traits::NumCast>::from(0.5f32).unwrap();
         let v0 = vertices[indices[0] as usize].position();
         let v1 = vertices[indices[1] as usize].position();
