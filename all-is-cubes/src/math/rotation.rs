@@ -57,6 +57,22 @@ impl GridRotation {
         ]
     };
 
+    /// All possible rotations that are not reflections.
+    ///
+    /// Warning: TODO: The ordering of these rotations is not yet stable.
+    #[rustfmt::skip]
+    pub const ALL_BUT_REFLECTIONS: [Self; 24] = {
+        use GridRotation::*;
+        [
+            RXYZ, RXyz, RxYz, RxyZ,
+            RXZy, RXzY, RxZY, Rxzy,
+            RYXz, RYxZ, RyXZ, Ryxz,
+            RYZX, RYzx, RyZx, RyzX,
+            RZXY, RZxy, RzXy, RzxY,
+            RZYx, RZyX, RzYX, Rzyx,
+        ]
+    };
+
     pub const IDENTITY: Self = Self::RXYZ;
 
     /// The rotation that is clockwise in our Y-up right-handed coordinate system.
@@ -499,11 +515,27 @@ mod tests {
     #[test]
     fn enumeration() {
         let mut set = HashSet::new();
-        for &rot in &GridRotation::ALL {
+        for rot in GridRotation::ALL {
             set.insert(rot);
         }
         assert_eq!(set.len(), GridRotation::ALL.len());
         assert_eq!(48, GridRotation::ALL.len());
+    }
+
+    /// Test that `GridRotation::ALL_BUT_REFLECTIONS` is complete.
+    #[test]
+    fn all_but_reflections() {
+        let mut set = HashSet::new();
+        for rot in GridRotation::ALL_BUT_REFLECTIONS {
+            assert!(!rot.is_reflection(), "{:?} is a reflection", rot);
+            set.insert(rot);
+        }
+        assert_eq!(set.len(), GridRotation::ALL_BUT_REFLECTIONS.len());
+        // Half of all possible axis transformations have no reflection
+        assert_eq!(
+            GridRotation::ALL.len(),
+            GridRotation::ALL_BUT_REFLECTIONS.len() * 2,
+        );
     }
 
     /// The set of possible inputs is small enough to test its properties exhaustively
