@@ -29,9 +29,11 @@ struct VertexOutput {
     [[location(2)]] clamp_max: vec3<f32>;
 };
 
+// This group is named camera_bind_group_layout in the code.
 [[group(0), binding(0)]]
 var<uniform> camera: WgpuCamera;
 
+// This group is named space_texture_bind_group_layout in the code.
 [[group(1), binding(0)]]
 var block_texture: texture_3d<f32>;
 [[group(1), binding(1)]]
@@ -41,20 +43,12 @@ var block_sampler: sampler;
 fn block_vertex_main(
     input: WgpuBlockVertex,
 ) -> VertexOutput {
-    var out: VertexOutput;
-    out.color_or_texture = input.color_or_texture;
-    out.clamp_min = input.clamp_min;
-    out.clamp_max = input.clamp_max;
-
-    if (true) {
-        out.clip_position = camera.projection * camera.view_matrix * vec4<f32>(input.position, 1.0);
-    } else {
-        // TODO: Old placeholder projection code preserved to reproduce a bug
-        // consistently: <https://github.com/gfx-rs/wgpu/issues/2556>
-        out.clip_position = vec4<f32>(input.position * vec3<f32>(0.05, 0.05, 0.01), 1.0);
-    }
-
-    return out;
+    return VertexOutput(
+        camera.projection * camera.view_matrix * vec4<f32>(input.position, 1.0),
+        input.color_or_texture,
+        input.clamp_min,
+        input.clamp_max,
+    );
 }
 
 // Get the vertex color or texel value to display
