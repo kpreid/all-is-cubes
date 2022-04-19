@@ -52,7 +52,9 @@ pub struct SpaceMesh<V, T> {
     opaque_range: Range<usize>,
 
     /// Ranges of `indices` for all partially-transparent triangles, sorted by depth
-    /// as documented in [`Self::transparent_range`].
+    /// as documented in [`Self::transparent_range()`].
+    ///
+    /// The indices of this array are those produced by [`DepthOrdering::to_index()`].
     transparent_ranges: [Range<usize>; DepthOrdering::COUNT],
 
     /// Set of all [`BlockIndex`]es whose meshes were incorporated into this mesh.
@@ -131,7 +133,9 @@ impl<V, T> SpaceMesh<V, T> {
         for &rot in &GridRotation::ALL {
             assert_eq!(
                 self.transparent_range(DepthOrdering::Direction(rot)).len(),
-                len_transparent
+                len_transparent,
+                "transparent range {rot:?} does not have the same \
+                    length ({len_transparent}) as others"
             );
         }
         assert_eq!(self.opaque_range().end % 3, 0);
@@ -272,7 +276,8 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 
     /// Given the indices of vertices of transparent quads (triangle pairs), copy them in
     /// various depth-sorted permutations into `self.indices` and record the array-index
-    /// ranges which contain each of the orderings.
+    /// ranges which contain each of the orderings in `self.opaque_range` and
+    /// `self.transparent_ranges`.
     ///
     /// The orderings are identified by [`GridRotation`] values, in the following way:
     /// each rotation defines three basis vectors which we usually think of as “rotated
@@ -319,34 +324,45 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 })
                 .collect();
 
-            for (i, range) in self.transparent_ranges.iter_mut().enumerate() {
-                // Sort the quads by this ordering.
-                match DepthOrdering::from_index(i) {
-                    DepthOrdering::Direction(rot) => {
-                        // This inverse() is because the rotation is defined as
-                        // "rotate the view direction to a fixed orientation",
-                        // but we're doing "rotate the geometry" instead.
-                        let basis = rot.inverse().to_basis();
+            // Copy unsorted indices into the main array, for later dynamic sorting.
+            self.transparent_ranges[DepthOrdering::Within.to_index()] =
+                extend_giving_range(&mut self.indices, transparent_indices);
 
-                        // Note: Benchmarks show that `sort_by_key` is fastest
-                        // (not `sort_unstable_by_key`).
-                        sortable_quads.sort_by_key(|quad| -> [OrderedFloat<V::Coordinate>; 3] {
-                            basis
-                                .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vec())))
-                                .into()
-                        });
-                    }
-                    DepthOrdering::Within => {
-                        // Will be sorted dynamically later.
-                    }
-                    o => panic!("unexpected ordering value {:?}", o),
-                }
+            // Perform sorting by each possible ordering.
+            // Note that half of the orderings are mirror images of each other,
+            // so do not require independent sorting; instead we copy the previous sorted
+            // result in reverse.
+            for rot in GridRotation::ALL_BUT_REFLECTIONS {
+                let ordering = DepthOrdering::Direction(rot);
 
-                // Copy the sorted indices into the main array.
-                let start = self.indices.len();
-                self.indices
-                    .extend(sortable_quads.iter().flat_map(|tri| tri.indices));
-                *range = start..self.indices.len();
+                // This inverse() is because the rotation is defined as
+                // "rotate the view direction to a fixed orientation",
+                // but we're doing "rotate the geometry" instead.
+                let basis = rot.inverse().to_basis();
+
+                // Note: Benchmarks show that `sort_by_key` is fastest
+                // (not `sort_unstable_by_key`).
+                sortable_quads.sort_by_key(|quad| -> [OrderedFloat<V::Coordinate>; 3] {
+                    basis
+                        .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vec())))
+                        .into()
+                });
+
+                // Copy the sorted indices into the main array, and set the corresponding
+                // range.
+                self.transparent_ranges[ordering.to_index()] = extend_giving_range(
+                    &mut self.indices,
+                    sortable_quads.iter().flat_map(|tri| tri.indices),
+                );
+
+                // Store a mirrored copy of the ordering.
+                // (We could save some memory by reusing the coinciding last quad which is
+                // this ordering's first quad, but that doesn't currently feel worth
+                // implementing.)
+                self.transparent_ranges[ordering.rev().to_index()] = extend_giving_range(
+                    &mut self.indices,
+                    sortable_quads.iter().rev().flat_map(|tri| tri.indices),
+                );
             }
         }
     }
@@ -416,6 +432,17 @@ fn bitset_set_and_get(v: &mut BitVec, index: usize) -> bool {
     previous
 }
 
+/// `storage.extend(items)` plus reporting the added range of items
+fn extend_giving_range<T>(
+    storage: &mut Vec<T>,
+    items: impl IntoIterator<Item = T>,
+) -> Range<usize> {
+    let start = storage.len();
+    storage.extend(items);
+    let end = storage.len();
+    start..end
+}
+
 /// Source of [`BlockMesh`] values for [`SpaceMesh::compute`].
 ///
 /// This trait allows the caller of [`SpaceMesh::compute`] to provide an
@@ -459,6 +486,7 @@ impl DepthOrdering {
     const ROT_COUNT: usize = GridRotation::ALL.len();
     const COUNT: usize = Self::ROT_COUNT + 1;
 
+    #[allow(dead_code)] // TODO: not currently used but should it be in tests?
     fn from_index(index: usize) -> Self {
         const LAST_ROT: usize = DepthOrdering::ROT_COUNT - 1;
         match index {
@@ -528,5 +556,12 @@ impl DepthOrdering {
 
         // Compose the transformations.
         DepthOrdering::Direction(permutation.inverse() * flips)
+    }
+
+    fn rev(self) -> Self {
+        match self {
+            DepthOrdering::Any | DepthOrdering::Within => self,
+            DepthOrdering::Direction(rot) => DepthOrdering::Direction(rot * GridRotation::Rxyz),
+        }
     }
 }
