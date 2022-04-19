@@ -5,19 +5,23 @@
 
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex, Weak};
 
+use all_is_cubes::cgmath::{EuclideanSpace, Vector3};
 use instant::Instant;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::camera::Camera;
 use all_is_cubes::chunking::ChunkPos;
-use all_is_cubes::listen::DirtyFlag;
-use all_is_cubes::math::{GridCoordinate, Rgb};
+use all_is_cubes::listen::{DirtyFlag, Listener};
+use all_is_cubes::math::{FaceMap, GridCoordinate, GridPoint, Rgb};
 use all_is_cubes::mesh::chunked_mesh::ChunkedSpaceMesh;
 use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{Grid, Space, SpaceChange};
 use all_is_cubes::universe::URef;
 
+use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
     camera::WgpuCamera,
@@ -38,9 +42,11 @@ pub(crate) struct SpaceRenderer {
     render_pass_label: String,
 
     /// Note that `self.csm` has its own todo listener.
-    /// todo: Arc<Mutex<SpaceRendererTodo>>,
+    todo: Arc<Mutex<SpaceRendererTodo>>,
+
     block_texture: AtlasAllocator,
-    //TODO: light_texture: Option<SpaceLightTexture>,
+    light_texture: SpaceLightTexture,
+
     /// Buffer containing the [`WgpuCamera`] configured for this Space.
     camera_buffer: wgpu::Buffer,
     /// Bind group for camera_buffer.
@@ -68,7 +74,10 @@ impl SpaceRenderer {
         queue: &wgpu::Queue,
         stuff: &BlockRenderStuff,
     ) -> Result<Self, GraphicsResourceError> {
+        let space_borrowed = space.borrow();
+
         let block_texture = AtlasAllocator::new(&space_label, device, queue)?;
+        let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.grid());
 
         let space_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &stuff.space_texture_bind_group_layout,
@@ -80,6 +89,10 @@ impl SpaceRenderer {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&block_texture.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&light_texture.texture_view),
                 },
             ],
             label: Some(&format!("{space_label} space_bind_group")),
@@ -101,9 +114,15 @@ impl SpaceRenderer {
             label: Some(&format!("{space_label} camera_bind_group")),
         });
 
+        let todo = SpaceRendererTodo::default();
+        let todo_rc = Arc::new(Mutex::new(todo));
+        space_borrowed.listen(TodoListener(Arc::downgrade(&todo_rc)));
+
         Ok(SpaceRenderer {
+            todo: todo_rc,
             render_pass_label: format!("{space_label} render_pass"),
             block_texture,
+            light_texture,
             space_bind_group,
             camera_buffer,
             camera_bind_group,
@@ -123,7 +142,7 @@ impl SpaceRenderer {
         stuff: &'a BlockRenderStuff,
         bwp: BeltWritingParts<'_, '_>,
     ) -> Result<SpaceRendererOutput<'a>, GraphicsResourceError> {
-        // let mut todo = self.todo.lock().unwrap();
+        let mut todo = self.todo.lock().unwrap();
 
         let space = &*self
             .csm
@@ -131,24 +150,19 @@ impl SpaceRenderer {
             .try_borrow()
             .expect("TODO: return a trivial result instead of panic.");
 
-        // if self.light_texture.is_none() {
-        //     todo.light = None; // signal to update everything
-        //     self.light_texture = Some(SpaceLightTexture::new(context, space.grid())?);
-        // }
-        // let light_texture = self.light_texture.as_mut().unwrap();
-
         // Update light texture
         let start_light_update = Instant::now();
         let light_update_count = 0;
-        // if let Some(set) = &mut todo.light {
-        //     // TODO: work in larger, ahem, chunks
-        //     for cube in set.drain() {
-        //         light_texture.update(space, Grid::new(cube, [1, 1, 1]))?;
-        //     }
-        // } else {
-        //     light_texture.update_all(space)?;
-        //     todo.light = Some(HashSet::new());
-        // }
+        if let Some(set) = &mut todo.light {
+            // TODO: work in larger, ahem, chunks
+            for cube in set.drain() {
+                self.light_texture
+                    .update(queue, space, Grid::new(cube, [1, 1, 1]));
+            }
+        } else {
+            self.light_texture.update_all(queue, space);
+            todo.light = Some(HashSet::new());
+        }
         let end_light_update = Instant::now();
 
         // TODO: kludge; refactor to avoid needing it
@@ -256,6 +270,7 @@ impl<'a> SpaceRendererOutput<'a> {
             bytemuck::cast_slice::<WgpuCamera, u8>(&[WgpuCamera::new(
                 &self.camera,
                 self.sky_color,
+                self.r.light_texture.light_lookup_offset(),
             )]),
         );
 
@@ -404,6 +419,121 @@ fn update_chunk_buffers(
     );
 }
 
+/// [`SpaceRenderer`]'s set of things that need recomputing.
+#[derive(Debug, Default)]
+struct SpaceRendererTodo {
+    /// Blocks whose light texels should be updated.
+    /// None means do a full space reupload.
+    ///
+    /// TODO: experiment with different granularities of light invalidation (chunks, dirty rects, etc.)
+    light: Option<HashSet<GridPoint>>,
+}
+
+/// [`Listener`] adapter for [`SpaceRendererTodo`].
+#[derive(Clone, Debug)]
+struct TodoListener(Weak<Mutex<SpaceRendererTodo>>);
+
+impl Listener<SpaceChange> for TodoListener {
+    fn receive(&self, message: SpaceChange) {
+        if let Some(cell) = self.0.upgrade() {
+            if let Ok(mut todo) = cell.lock() {
+                match message {
+                    SpaceChange::EveryBlock => {
+                        todo.light = None;
+                    }
+                    SpaceChange::Lighting(p) => {
+                        // None means we're already at "update everything"
+                        if let Some(set) = &mut todo.light {
+                            set.insert(p);
+                        }
+                    }
+                    SpaceChange::Block(..) => {}
+                    SpaceChange::Number(..) => {}
+                    SpaceChange::BlockValue(..) => {}
+                }
+            }
+        }
+    }
+
+    fn alive(&self) -> bool {
+        self.0.strong_count() > 0
+    }
+}
+
+/// Keeps a 3D [`Texture`] up to date with the light data from a [`Space`].
+///
+/// The texels are in [`PackedLight`] form.
+#[derive(Debug)]
+struct SpaceLightTexture {
+    texture: wgpu::Texture,
+    texture_view: wgpu::TextureView,
+    /// The region of cube coordinates for which there are valid texels.
+    texture_grid: Grid,
+}
+
+impl SpaceLightTexture {
+    /// Construct a new `SpaceLightTexture` for the specified size of [`Space`],
+    /// with no data.
+    pub fn new(label_prefix: &str, device: &wgpu::Device, grid: Grid) -> Self {
+        // Boundary of 1 extra cube automatically captures sky light.
+        let texture_grid = grid.expand(FaceMap {
+            px: 1,
+            py: 1,
+            pz: 1,
+            nx: 0,
+            ny: 0,
+            nz: 0,
+            within: 0,
+        });
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: size_vector_to_extent(texture_grid.size()),
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: wgpu::TextureFormat::Rgba8Uint,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            label: Some(&format!("{label_prefix} space light")),
+        });
+        Self {
+            texture_view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
+            texture,
+            texture_grid,
+        }
+    }
+
+    /// Copy the specified region of light data.
+    pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: Grid) {
+        let mut data: Vec<[u8; 4]> = Vec::with_capacity(region.volume());
+        // TODO: Enable circular operation and eliminate the need for the offset of the
+        // coordinates (texture_grid.lower_bounds() and light_offset in the shader)
+        // by doing a coordinate wrap-around -- the shader and the Space will agree
+        // on coordinates modulo the texture size, and this upload will need to be broken
+        // into up to 8 pieces.
+        for z in region.z_range() {
+            for y in region.y_range() {
+                for x in region.x_range() {
+                    data.push(space.get_lighting([x, y, z]).as_texel());
+                }
+            }
+        }
+
+        write_texture_by_grid(
+            queue,
+            &self.texture,
+            region.translate(self.light_lookup_offset()),
+            &data,
+        );
+    }
+
+    pub fn update_all(&mut self, queue: &wgpu::Queue, space: &Space) {
+        self.update(queue, space, self.texture_grid)
+    }
+
+    fn light_lookup_offset(&self) -> Vector3<i32> {
+        -self.texture_grid.lower_bounds().to_vec()
+    }
+}
+
 /// All the resources a [`SpaceRenderer`] needs that aren't actually specific to
 /// a single [`Space`] and don't need to be modified (except when graphics options change).
 /// Thus, this can be shared among all [`SpaceRenderer`]s.
@@ -444,6 +574,16 @@ impl BlockRenderStuff {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D3,
+                            sample_type: wgpu::TextureSampleType::Uint,
+                        },
                         count: None,
                     },
                 ],

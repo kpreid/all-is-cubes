@@ -7,16 +7,25 @@ use all_is_cubes::math::Rgb;
 
 use crate::in_wgpu::glue::PaddedVec3;
 
+/// Information corresponding to [`Camera`] but in a form
+/// suitable for passing in a uniform buffer. Also includes some miscellaneous
+/// data for rendering [`Space`], which hasn't yet demonstrated enough distinction
+/// to be worth putting in a separate buffer yet.
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-/// Information corresponding to [`Camera`] but in a form
-/// suitable for passing in a uniform buffer.
 pub(crate) struct WgpuCamera {
     projection_matrix: [[f32; 4]; 4],
     view_matrix: [[f32; 4]; 4],
     /// Eye position in world coordinates. Used for computing distance
     /// in volumetric rendering.
     view_position: PaddedVec3,
+
+    /// Translation which converts mesh cube coordinates to `light_texture` texel
+    /// coordinates.
+    ///
+    /// This is not strictly part of the [`Camera`], but it is expected to change under
+    /// the same sort of conditions.
+    light_lookup_offset: [i32; 4], // padded from 3 to 4
 
     /// Color for the fog.
     fog_color: PaddedVec3,
@@ -33,7 +42,7 @@ pub(crate) struct WgpuCamera {
 }
 
 impl WgpuCamera {
-    pub fn new(camera: &Camera, sky_color: Rgb) -> Self {
+    pub fn new(camera: &Camera, sky_color: Rgb, light_lookup_offset: Vector3<i32>) -> Self {
         let options = camera.options();
         let view_distance = camera.view_distance() as f32;
         let (fog_mode_blend, fog_distance) = match options.fog {
@@ -47,6 +56,8 @@ impl WgpuCamera {
             projection_matrix: convert_matrix(OPENGL_TO_WGPU_PROJECTION * camera.projection()),
             view_matrix: convert_matrix(camera.view_matrix()),
             view_position: camera.view_position().map(|s| s as f32).to_vec().into(),
+
+            light_lookup_offset: light_lookup_offset.extend(0).into(),
 
             fog_color: Vector3::<f32>::from(sky_color).into(),
             fog_mode_blend,
