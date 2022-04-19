@@ -93,8 +93,6 @@ impl AtlasAllocator {
 
         // TODO: How do we check for insufficient memory?
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            // All textures are stored as 3D, we represent our 2D texture
-            // by setting depth to 1.
             size: size_vector_to_extent(alloctree.bounds().size()),
             mip_level_count: 1,
             sample_count: 1,
