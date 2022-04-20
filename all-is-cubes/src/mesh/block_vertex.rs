@@ -154,10 +154,12 @@ impl GfxVertex for BlockVertex {
         cube.to_vec().map(FreeCoordinate::from)
     }
 
+    #[inline]
     fn instantiate_vertex(&mut self, offset: Self::BlockInst, _lighting: PackedLight) {
         self.position += offset;
     }
 
+    #[inline]
     fn face(&self) -> Face {
         self.face
     }
