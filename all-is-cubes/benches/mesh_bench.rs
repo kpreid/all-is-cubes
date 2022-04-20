@@ -14,10 +14,10 @@ use all_is_cubes::mesh::{
 };
 use all_is_cubes::space::{Grid, Space};
 
-pub fn triangulator_bench(c: &mut Criterion) {
+fn mesh_benches(c: &mut Criterion) {
     let options = &MeshOptions::new(&GraphicsOptions::default(), false);
 
-    c.bench_function("triangulate_space: checkerboard, new buffer", |b| {
+    c.bench_function("space, checkerboard, new buffer", |b| {
         b.iter_batched(
             || checkerboard_setup(options, false),
             |(space, block_meshes)| {
@@ -27,7 +27,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("triangulate_space: checkerboard, reused buffer", |b| {
+    c.bench_function("space, checkerboard, reused buffer", |b| {
         b.iter_batched(
             || {
                 let (space, block_meshes) = checkerboard_setup(options, false);
@@ -52,7 +52,7 @@ pub fn triangulator_bench(c: &mut Criterion) {
     let mut slow_group = c.benchmark_group("slow");
     slow_group.sample_size(10);
 
-    slow_group.bench_function("triangulate_space: transparent, new buffer", |b| {
+    slow_group.bench_function("space, transparent checkerboard, new buffer", |b| {
         b.iter_batched(
             || checkerboard_setup(options, true),
             |(space, block_meshes)| {
@@ -90,5 +90,5 @@ fn checkerboard_setup(
     (space, block_meshes)
 }
 
-criterion_group!(benches, triangulator_bench);
+criterion_group!(benches, mesh_benches);
 criterion_main!(benches);

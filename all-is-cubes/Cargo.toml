@@ -24,15 +24,15 @@ name = "lighting_bench"
 harness = false
 
 [[bench]]
+name = "mesh_bench"
+harness = false
+
+[[bench]]
 name = "raycast_bench"
 harness = false
 
 [[bench]]
 name = "space_bench"
-harness = false
-
-[[bench]]
-name = "triangulator_bench"
 harness = false
 
 [features]
