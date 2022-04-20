@@ -89,8 +89,9 @@ fn main() -> Result<(), anyhow::Error> {
             simplelog::ConfigBuilder::new()
                 .set_target_level(Off)
                 .set_location_level(Off)
-                .add_filter_ignore_str("wgpu")
-                .add_filter_ignore_str("naga")
+                .add_filter_ignore_str("wgpu") // noisy
+                .add_filter_ignore_str("naga") // noisy
+                .add_filter_ignore_str("winit") // noisy at Trace level only
                 .build(),
             simplelog::TerminalMode::Stderr,
             simplelog::ColorChoice::Auto,
