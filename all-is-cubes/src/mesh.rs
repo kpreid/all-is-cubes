@@ -49,13 +49,17 @@ pub struct MeshOptions {
 
 impl MeshOptions {
     /// Take the options relevant to mesh generation from the given [`GraphicsOptions`].
-    pub fn new(graphics_options: &GraphicsOptions) -> Self {
+    pub fn new(graphics_options: &GraphicsOptions, vertex_will_use_space_light: bool) -> Self {
         Self {
             transparency: graphics_options.transparency.clone(),
-            use_space_light: match graphics_options.lighting_display {
-                LightingOption::None => false,
-                LightingOption::Flat | LightingOption::Smooth => true,
-            },
+
+            // use_space_light should only be true if the information is going to be used, which
+            // is determined by both GraphicsOptions and the vertex type.
+            use_space_light: vertex_will_use_space_light
+                && match graphics_options.lighting_display {
+                    LightingOption::None => false,
+                    LightingOption::Flat | LightingOption::Smooth => true,
+                },
         }
     }
 

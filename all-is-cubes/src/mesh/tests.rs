@@ -72,7 +72,7 @@ fn triangulate_blocks_and_space(
     BlockMeshes<BlockVertex, TestTextureTile>,
     SpaceMesh<BlockVertex, TestTextureTile>,
 ) {
-    let options = &MeshOptions::new(&GraphicsOptions::default());
+    let options = &MeshOptions::new(&GraphicsOptions::default(), true);
     let mut tex = TestTextureAllocator::new();
     let block_meshes = triangulate_blocks(space, &mut tex, options);
     let space_mesh: SpaceMesh<BlockVertex, TestTextureTile> =

@@ -15,7 +15,7 @@ use all_is_cubes::mesh::{
 use all_is_cubes::space::{Grid, Space};
 
 pub fn triangulator_bench(c: &mut Criterion) {
-    let options = &MeshOptions::new(&GraphicsOptions::default());
+    let options = &MeshOptions::new(&GraphicsOptions::default(), false);
 
     c.bench_function("triangulate_space: checkerboard, new buffer", |b| {
         b.iter_batched(

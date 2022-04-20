@@ -125,7 +125,7 @@ where
         IF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
     {
         let graphics_options = camera.options();
-        let mesh_options = MeshOptions::new(graphics_options);
+        let mesh_options = MeshOptions::new(graphics_options, Vert::WANTS_LIGHT);
         let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
 
