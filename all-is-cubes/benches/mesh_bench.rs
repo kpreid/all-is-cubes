@@ -18,26 +18,30 @@ fn mesh_benches(c: &mut Criterion) {
     let options = &MeshOptions::new(&GraphicsOptions::default(), false);
 
     c.bench_function("space, checkerboard, new buffer", |b| {
-        b.iter_batched(
-            || checkerboard_setup(options, false),
-            |(space, block_meshes)| {
-                triangulate_space(&space, space.grid(), options, &*block_meshes)
-            },
+        // The Space and block meshes are not mutated, so we can construct them once.
+        // This also ensures we're not timing dropping them.
+        let (space, block_meshes) = checkerboard_setup(options, false);
+        // This benchmark actually has no use for iter_batched_ref -- it could be
+        // iter_with_large_drop -- but I want to make sure any quirks of the measurement
+        // are shared between all cases.
+        b.iter_batched_ref(
+            || (),
+            |()| triangulate_space(&space, space.grid(), options, &*block_meshes),
             BatchSize::SmallInput,
         );
     });
 
     c.bench_function("space, checkerboard, reused buffer", |b| {
-        b.iter_batched(
+        let (space, block_meshes) = checkerboard_setup(options, false);
+        b.iter_batched_ref(
             || {
-                let (space, block_meshes) = checkerboard_setup(options, false);
                 let mut buffer = SpaceMesh::new();
                 buffer.compute(&space, space.grid(), options, &*block_meshes);
                 // Sanity check that we're actually rendering as much as we expect.
                 assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
-                (space, block_meshes, buffer)
+                buffer
             },
-            |(space, block_meshes, mut buffer)| {
+            |buffer: &mut SpaceMesh<BlockVertex, TestTextureTile>| {
                 // As of this writing, this benchmark is really just "what if we don't allocate
                 // a new Vec". Later, the buffers will hopefully become cleverer and we'll be
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
@@ -53,11 +57,10 @@ fn mesh_benches(c: &mut Criterion) {
     slow_group.sample_size(10);
 
     slow_group.bench_function("space, transparent checkerboard, new buffer", |b| {
-        b.iter_batched(
-            || checkerboard_setup(options, true),
-            |(space, block_meshes)| {
-                triangulate_space(&space, space.grid(), options, &*block_meshes)
-            },
+        let (space, block_meshes) = checkerboard_setup(options, true);
+        b.iter_batched_ref(
+            || (),
+            |()| triangulate_space(&space, space.grid(), options, &*block_meshes),
             BatchSize::SmallInput,
         );
     });
