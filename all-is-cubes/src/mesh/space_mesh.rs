@@ -127,6 +127,7 @@ impl<V, T> SpaceMesh<V, T> {
         self.block_indices_used.iter_ones().map(|i| i as BlockIndex)
     }
 
+    #[allow(dead_code)] // used conditionally
     fn consistency_check(&self) {
         assert_eq!(self.opaque_range().start, 0);
         let len_transparent = self.transparent_range(DepthOrdering::Any).len();
@@ -270,7 +271,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 
         self.sort_and_store_transparent_indices(transparent_indices);
 
-        // #[cfg(debug_assertions)]
+        #[cfg(debug_assertions)]
         self.consistency_check();
     }
 
