@@ -325,15 +325,21 @@ impl TimeStats {
         }
     }
 
+    /// Record an event based on the given previous time and current time, then update
+    /// the previous time value.
+    ///
+    /// Returns the duration that was recorded.
     pub(crate) fn record_consecutive_interval(
         &mut self,
         last_marked_instant: &mut Instant,
         now: Instant,
-    ) {
+    ) -> Duration {
         let previous = *last_marked_instant;
         *last_marked_instant = now;
 
-        *self += Self::one(now.duration_since(previous));
+        let duration = now.duration_since(previous);
+        *self += Self::one(duration);
+        duration
     }
 }
 

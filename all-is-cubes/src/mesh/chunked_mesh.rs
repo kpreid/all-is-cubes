@@ -376,7 +376,8 @@ where
             todo.remove(&index);
             let index: usize = index.into();
 
-            let new_evaluated_block: &EvaluatedBlock = block_data[index].evaluated();
+            let bd = &block_data[index];
+            let new_evaluated_block: &EvaluatedBlock = bd.evaluated();
             let current_mesh: &mut BlockMesh<_, _> = &mut self.meshes[index];
 
             // TODO: Consider re-introducing approximate cost measurement
@@ -409,7 +410,15 @@ where
                     // the chunks.
                 }
             }
-            stats.record_consecutive_interval(&mut last_start_time, Instant::now());
+            let duration = stats.record_consecutive_interval(&mut last_start_time, Instant::now());
+            if duration > Duration::from_millis(4) {
+                log::trace!(
+                    "Block mesh took {}: {:?} {:?}",
+                    duration.custom_format(StatusText),
+                    new_evaluated_block.attributes.display_name,
+                    bd.block(),
+                );
+            }
         }
 
         stats
