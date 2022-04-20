@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::camera::{Camera, FogOption};
+use all_is_cubes::camera::{Camera, FogOption, LightingOption};
 use all_is_cubes::cgmath::{EuclideanSpace, Matrix4, Vector3};
 use all_is_cubes::math::Rgb;
 
@@ -25,7 +25,9 @@ pub(crate) struct WgpuCamera {
     ///
     /// This is not strictly part of the [`Camera`], but it is expected to change under
     /// the same sort of conditions.
-    light_lookup_offset: [i32; 4], // padded from 3 to 4
+    light_lookup_offset: [i32; 3], // next field functions as the required 4th component/padding
+    /// Light rendering style to use; a copy of [`GraphicsOptions::lighting_display`].
+    light_option: i32,
 
     /// Color for the fog.
     fog_color: PaddedVec3,
@@ -57,7 +59,16 @@ impl WgpuCamera {
             view_matrix: convert_matrix(camera.view_matrix()),
             view_position: camera.view_position().map(|s| s as f32).to_vec().into(),
 
-            light_lookup_offset: light_lookup_offset.extend(0).into(),
+            light_lookup_offset: light_lookup_offset.into(),
+            light_option: match options.lighting_display {
+                LightingOption::None => 0,
+                LightingOption::Flat => 1,
+                LightingOption::Smooth => 2,
+                _ => unreachable!(
+                    "Unhandled LightingOption value {:?}",
+                    options.lighting_display
+                ),
+            },
 
             fog_color: Vector3::<f32>::from(sky_color).into(),
             fog_mode_blend,

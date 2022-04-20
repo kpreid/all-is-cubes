@@ -129,6 +129,9 @@ impl ToneMappingOperator {
     }
 }
 
+/// How to display light in a [`Space`].
+///
+/// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum LightingOption {

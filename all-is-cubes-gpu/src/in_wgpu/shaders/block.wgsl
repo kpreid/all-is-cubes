@@ -6,7 +6,7 @@ struct WgpuCamera {
     [[location(0)]] projection: mat4x4<f32>;
     [[location(1)]] view_matrix: mat4x4<f32>;
     [[location(2)]] view_position: vec3<f32>;
-    [[location(3)]] light_lookup_offset: vec3<i32>;
+    [[location(3)]] light_lookup_offset_and_option: vec4<i32>;
     [[location(4)]] fog_color: vec3<f32>;
     [[location(5)]] fog_mode_blend: f32;
     [[location(6)]] fog_distance: f32;
@@ -75,7 +75,7 @@ fn block_vertex_main(
 // excluding opaque blocks, while the -1 value indicates values that should be
 // truly ignored.
 fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
-    var lookup_position = vec3<i32>(floor(fragment_position)) + camera.light_lookup_offset;
+    var lookup_position = vec3<i32>(floor(fragment_position)) + camera.light_lookup_offset_and_option.xyz;
     
     // Implement wrapping (not automatic since we're not using a sampler).
     // Wrapping is used to handle sky light and in the future will be used for
@@ -113,10 +113,21 @@ fn fixed_directional_lighting(normal: vec3<f32>) -> f32 {
 
 // Compute light intensity applying to the fragment.
 fn lighting(in: VertexOutput) -> vec3<f32> {
-    // TODO: implement different lighting options
-    var origin = in.cube + in.normal + vec3<f32>(0.5);
-    var local_light = light_texture_fetch(origin).rgb;
-    return fixed_directional_lighting(in.normal) * local_light;
+    switch (camera.light_lookup_offset_and_option.w) {
+        // LightingOption::None or fallback: no lighting
+        default: {
+            return vec3<f32>(1.0);
+        }
+        
+        // LightingOption::Flat
+        case 1: {
+            var origin = in.cube + in.normal + vec3<f32>(0.5);
+            var local_light = light_texture_fetch(origin).rgb;
+            return fixed_directional_lighting(in.normal) * local_light;
+        }
+        
+        // TODO: implement case 2 = LightingOption::Smooth
+    }
 }
 
 // Get the vertex color or texel value to display
