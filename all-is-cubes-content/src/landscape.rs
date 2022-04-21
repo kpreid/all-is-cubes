@@ -1,6 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::fmt;
+
 use exhaust::Exhaust;
 use noise::Seedable as _;
 use rand::{Rng as _, SeedableRng as _};
@@ -23,17 +25,35 @@ use crate::{blocks::scale_color, palette};
 ///
 /// TODO: This is probably too specific to be useful in the long term; call it a
 /// placeholder.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
-#[strum(serialize_all = "kebab-case")]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
 pub enum LandscapeBlocks {
     Grass,
-    GrassBlades1,
-    GrassBlades2,
+    GrassBlades { variant: bool },
     Dirt,
     Stone,
     Trunk,
     Leaves,
+}
+
+impl fmt::Display for LandscapeBlocks {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LandscapeBlocks::Grass => write!(f, "grass"),
+            LandscapeBlocks::GrassBlades { variant } => write!(
+                f,
+                "grass-blades/{}",
+                match variant {
+                    false => 1,
+                    true => 2,
+                }
+            ),
+            LandscapeBlocks::Dirt => write!(f, "dirt"),
+            LandscapeBlocks::Stone => write!(f, "stone"),
+            LandscapeBlocks::Trunk => write!(f, "trunk"),
+            LandscapeBlocks::Leaves => write!(f, "leaves"),
+        }
+    }
 }
 
 impl BlockModule for LandscapeBlocks {
@@ -63,8 +83,7 @@ impl DefaultProvision for LandscapeBlocks {
         use LandscapeBlocks::*;
         match self {
             Grass => color_and_name(palette::GRASS, "Grass"),
-            GrassBlades1 => blades(),
-            GrassBlades2 => blades(),
+            GrassBlades { variant: _ } => blades(),
             Dirt => color_and_name(palette::DIRT, "Dirt"),
             Stone => color_and_name(palette::STONE, "Stone"),
             Trunk => color_and_name(palette::TREE_BARK, "Wood"),
@@ -123,7 +142,7 @@ pub async fn install_landscape_blocks(
         let grass_blades = |universe, index: GridCoordinate| -> Result<Block, InGenError> {
             Ok(Block::builder()
                 .attributes(
-                    colors[GrassBlades1]
+                    colors[GrassBlades { variant: false }]
                         .evaluate()
                         .map_err(InGenError::other)?
                         .attributes,
@@ -173,8 +192,7 @@ pub async fn install_landscape_blocks(
                 })?
                 .build(),
 
-            GrassBlades1 => grass_blades(universe, 0)?,
-            GrassBlades2 => grass_blades(universe, 1)?,
+            GrassBlades { variant } => grass_blades(universe, variant.into())?,
 
             Dirt => Block::builder()
                 .attributes(
@@ -245,9 +263,9 @@ pub fn wavy_landscape(
                     continue;
                 } else if altitude == 1 {
                     if placement_noise.at_cube(cube) > grass_threshold * 2. {
-                        &blocks[GrassBlades2]
+                        &blocks[GrassBlades { variant: true }]
                     } else if placement_noise.at_cube(cube) > grass_threshold {
-                        &blocks[GrassBlades1]
+                        &blocks[GrassBlades { variant: false }]
                     } else {
                         &AIR
                     }

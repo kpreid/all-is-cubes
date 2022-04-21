@@ -128,9 +128,9 @@ pub(crate) async fn demo_city(
                 return None;
             }
             if grass_noise.at_cube(cube) > grass_threshold * 2. {
-                Some(&landscape_blocks[GrassBlades2])
+                Some(&landscape_blocks[GrassBlades { variant: true }])
             } else if grass_noise.at_cube(cube) > grass_threshold {
-                Some(&landscape_blocks[GrassBlades1])
+                Some(&landscape_blocks[GrassBlades { variant: false }])
             } else {
                 None
             }
