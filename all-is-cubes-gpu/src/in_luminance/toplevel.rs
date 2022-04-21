@@ -3,7 +3,6 @@
 
 //! Top level of the `luminance`-based renderer.
 
-use all_is_cubes::listen::DirtyFlag;
 use instant::Instant;
 use luminance::backend::{color_slot::ColorSlot, depth_stencil_slot::DepthStencilSlot};
 use luminance::blending::{Blending, Equation, Factor};
@@ -14,22 +13,22 @@ use luminance::pipeline::PipelineState;
 use luminance::render_state::RenderState;
 use luminance::tess::Mode;
 use luminance::texture::{Dim2, MagFilter, MinFilter};
+use once_cell::sync::Lazy;
 
 use all_is_cubes::apps::{Layers, StandardCameras};
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::{Matrix4, SquareMatrix};
 use all_is_cubes::character::{Character, Cursor};
-use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{iso_8859_1::FONT_7X13_BOLD, MonoTextStyle},
     pixelcolor::Rgb888,
     prelude::{Drawable, Point},
     text::{Baseline, Text},
 };
-use all_is_cubes::math::{Aab, Rgba};
+use all_is_cubes::listen::DirtyFlag;
+use all_is_cubes::math::Rgba;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
-use once_cell::sync::Lazy;
 
 use crate::in_luminance::{
     frame_texture::{FullFramePainter, FullFrameTexture},
@@ -37,10 +36,9 @@ use crate::in_luminance::{
     shading::{prepare_lines_program, BlockPrograms, LinesProgram, ShaderConstants},
     space::{SpaceRenderer, SpaceRendererOutput},
     types::{AicLumBackend, LinesVertex},
-    wireframe_vertices,
 };
 use crate::reloadable::{reloadable_str, Reloadable};
-use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
+use crate::{gather_debug_lines, GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
 /// Top-level renderer.
 /// Owns the [`GraphicsContext`] and an [`EverythingRenderer`] to draw with it.
@@ -281,51 +279,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
 
         let debug_lines_tess = {
             let mut v: Vec<LinesVertex> = Vec::new();
-
-            // All of these debug visualizations depend on the character
-            if let Some(character) = character {
-                if graphics_options.debug_collision_boxes {
-                    // Character collision box
-                    wireframe_vertices(
-                        &mut v,
-                        palette::DEBUG_COLLISION_BOX,
-                        character.body.collision_box_abs(),
-                    );
-                    // What it collided with
-                    for contact in &character.colliding_cubes {
-                        wireframe_vertices(&mut v, palette::DEBUG_COLLISION_CUBES, *contact);
-                    }
-                }
-
-                // Show light update debug info.
-                // This is enabled/disabled inside the lighting algorithm, not as a graphics
-                // option.
-                for cube in character.space.borrow().last_light_updates.iter().copied() {
-                    wireframe_vertices(
-                        &mut v,
-                        Rgba::new(1.0, 1.0, 0.0, 1.0),
-                        Aab::from_cube(cube).expand(0.005),
-                    );
-                }
-
-                // Lighting trace at cursor
-                if graphics_options.debug_light_rays_at_cursor {
-                    if let Some(cursor) = cursor_result {
-                        // TODO: We should be able to draw wireframes in the UI space too, and when we do that will enable supporting this.
-                        if cursor.space == character.space {
-                            let space = character.space.borrow();
-                            let (_, _, _, lighting_info) =
-                                space.compute_lighting(cursor.place.adjacent());
-                            wireframe_vertices(
-                                &mut v,
-                                Rgba::new(0.8, 0.8, 1.0, 1.0),
-                                lighting_info,
-                            );
-                        }
-                    }
-                }
-            }
-
+            gather_debug_lines(character, graphics_options, &mut v, cursor_result);
             // If we have vertices, draw them
             if v.is_empty() {
                 None

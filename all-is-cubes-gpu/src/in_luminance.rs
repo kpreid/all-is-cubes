@@ -28,8 +28,7 @@ mod types;
 pub use types::AicLumBackend;
 use types::LinesVertex;
 
-use crate::in_luminance::glue::wireframe_vertices;
-use crate::GraphicsResourceError;
+use crate::{wireframe_vertices, GraphicsResourceError};
 
 /// Creates a [`Tess`] to draw a [`Cursor`] as a wireframe cube.
 /// Caller must set up the camera for the cursor's space.
@@ -45,9 +44,9 @@ where
         // Compute an approximate offset that will prevent Z-fighting.
         let offset_from_surface = 0.001 * cursor.distance;
 
-        let mut vertices = Vec::new();
+        let mut vertices: Vec<LinesVertex> = Vec::new();
         // TODO: Maybe highlight the selected face's rectangle
-        wireframe_vertices(
+        wireframe_vertices::<LinesVertex, _, _>(
             &mut vertices,
             palette::CURSOR_OUTLINE,
             Aab::from_cube(cursor.place.cube).expand(offset_from_surface),

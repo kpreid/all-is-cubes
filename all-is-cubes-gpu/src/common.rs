@@ -5,6 +5,9 @@
 
 use std::error::Error;
 
+mod debug_lines;
+pub(crate) use debug_lines::*;
+
 mod draw_to_texture;
 pub(crate) use draw_to_texture::*;
 

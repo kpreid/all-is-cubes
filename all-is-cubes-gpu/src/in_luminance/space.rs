@@ -171,7 +171,11 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                     .chunk_chart()
                     .chunks(view_chunk, view_direction_mask)
                 {
-                    wireframe_vertices(&mut v, palette::DEBUG_CHUNK_MAJOR, Aab::from(chunk.grid()));
+                    wireframe_vertices::<LinesVertex, _, _>(
+                        &mut v,
+                        palette::DEBUG_CHUNK_MAJOR,
+                        Aab::from(chunk.grid()),
+                    );
                 }
 
                 // Frame the nearest chunk in detail
