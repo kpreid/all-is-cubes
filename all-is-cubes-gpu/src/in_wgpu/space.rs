@@ -698,12 +698,7 @@ impl BlockRenderStuff {
             });
 
         Self {
-            shader_dirty: {
-                // TODO: this is a common pattern which should get a helper method
-                let flag = DirtyFlag::new(false);
-                BLOCK_SHADER.as_source().listen(flag.listener());
-                flag
-            },
+            shader_dirty: DirtyFlag::listening(false, |l| BLOCK_SHADER.as_source().listen(l)),
             camera_bind_group_layout,
             space_texture_bind_group_layout,
             opaque_render_pipeline,

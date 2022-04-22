@@ -186,6 +186,16 @@ impl DirtyFlag {
         }
     }
 
+    /// Constructs a new [`DirtyFlag`] with the given initial value
+    /// and provides its [`Listener`] to the given function to be installed.
+    ///
+    /// This is a convenience for calling `new()` followed by `listener()`.
+    pub fn listening(value: bool, listener_acceptor: impl FnOnce(DirtyFlagListener)) -> Self {
+        let new_self = Self::new(value);
+        listener_acceptor(new_self.listener());
+        new_self
+    }
+
     /// Returns a [`Listener`] which will set this flag to [`true`] when it receives any
     /// message.
     pub fn listener(&self) -> DirtyFlagListener {

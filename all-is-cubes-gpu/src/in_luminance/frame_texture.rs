@@ -49,8 +49,7 @@ where
         context: &mut C,
         fragment_shader: ListenableSource<Arc<str>>,
     ) -> Result<Rc<Self>, GraphicsResourceError> {
-        let fragment_shader_dirty = DirtyFlag::new(false);
-        fragment_shader.listen(fragment_shader_dirty.listener());
+        let fragment_shader_dirty = DirtyFlag::listening(false, |l| fragment_shader.listen(l));
         let program = compile_full_frame_program(&fragment_shader.get(), context)?;
 
         Ok(Rc::new(FullFramePainter {

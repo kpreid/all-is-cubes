@@ -245,12 +245,9 @@ impl EverythingRenderer {
             block_render_stuff: BlockRenderStuff::new(&device, config.format),
             space_renderers: Default::default(),
 
-            info_text_shader_dirty: {
-                // TODO: this is a common pattern which should get a helper method
-                let flag = DirtyFlag::new(false);
-                INFO_TEXT_SHADER.as_source().listen(flag.listener());
-                flag
-            },
+            info_text_shader_dirty: DirtyFlag::listening(false, |l| {
+                INFO_TEXT_SHADER.as_source().listen(l)
+            }),
             info_text_texture: DrawableTexture::new(),
             info_text_bind_group: None,
             info_text_render_pipeline: Self::create_info_text_pipeline(

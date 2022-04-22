@@ -146,12 +146,10 @@ pub(crate) struct ToggleButtonController<D: Clone + Send + Sync> {
 
 impl<D: Clone + Debug + Send + Sync + 'static> ToggleButtonController<D> {
     pub(crate) fn new(position: GridPoint, definition: Arc<ToggleButtonWidget<D>>) -> Self {
-        let todo = DirtyFlag::new(true);
-        definition.data_source.listen(todo.listener());
         Self {
+            todo: DirtyFlag::listening(true, |l| definition.data_source.listen(l)),
             position,
             definition,
-            todo,
         }
     }
 }
@@ -191,11 +189,9 @@ pub(crate) struct CrosshairController {
 
 impl CrosshairController {
     pub fn new(position: GridPoint, icon: Block, mouselook_mode: ListenableSource<bool>) -> Self {
-        let todo = DirtyFlag::new(false);
-        mouselook_mode.listen(todo.listener());
         Self {
             icon,
-            todo,
+            todo: DirtyFlag::listening(false, |l| mouselook_mode.listen(l)),
             position,
             mouselook_mode,
         }
@@ -251,10 +247,9 @@ impl ToolbarController {
     ) -> Self {
         let slot_count = layout.toolbar_positions;
 
-        let todo_change_character = DirtyFlag::new(false);
+        let todo_change_character = DirtyFlag::listening(false, |l| character_source.listen(l));
         let todo_inventory = DirtyFlag::new(true);
 
-        character_source.listen(todo_change_character.listener());
         let character = character_source.snapshot();
 
         let (character_listener_gate, character_listener) =

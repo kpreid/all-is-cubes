@@ -133,8 +133,10 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         context: &mut C,
         cameras: StandardCameras,
     ) -> Result<Self, GraphicsResourceError> {
-        let shader_programs_dirty = DirtyFlag::new(false);
-        BlockPrograms::<Backend>::listen(shader_programs_dirty.listener()); // TODO: wrong choice of namespace
+        let shader_programs_dirty = DirtyFlag::listening(false, |l| {
+            // TODO: wrong choice of namespace
+            BlockPrograms::<Backend>::listen(l)
+        });
         let block_programs = cameras
             .cameras()
             .try_map_ref(|camera| BlockPrograms::compile(context, camera.options().into()))?;

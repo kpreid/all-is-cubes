@@ -424,30 +424,24 @@ impl StandardCameras {
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
         // to not have it (some kind of "following cell")?
         let graphics_options = app_state.graphics_options();
-        let graphics_options_dirty = DirtyFlag::new(false);
-        graphics_options.listen(graphics_options_dirty.listener());
+        let graphics_options_dirty = DirtyFlag::listening(false, |l| graphics_options.listen(l));
         let initial_options = &*graphics_options.get();
 
         let character_source = app_state.character();
-        let character_dirty = DirtyFlag::new(true);
-        character_source.listen(character_dirty.listener());
-
         let ui_space_source = app_state.ui_space();
-        let ui_space_dirty = DirtyFlag::new(true);
-        ui_space_source.listen(ui_space_dirty.listener());
 
         let mut this = Self {
             graphics_options,
             graphics_options_dirty,
 
+            character_dirty: DirtyFlag::listening(true, |l| character_source.listen(l)),
             character_source,
-            character_dirty,
             character: None, // update() will fix these up
             world_space: ListenableCell::new(None),
 
             ui_space: ui_space_source.snapshot(),
+            ui_space_dirty: DirtyFlag::listening(true, |l| ui_space_source.listen(l)),
             ui_space_source,
-            ui_space_dirty,
 
             viewport_dirty: true,
 
@@ -678,8 +672,7 @@ mod tests {
         let mut cameras = StandardCameras::from_app_state(&app, Viewport::ARBITRARY).unwrap();
 
         let world_source = cameras.world_space();
-        let flag = DirtyFlag::new(false);
-        world_source.listen(flag.listener());
+        let flag = DirtyFlag::listening(false, |l| world_source.listen(l));
         assert_eq!(world_source.snapshot().as_ref(), None);
 
         // No redundant notification when world is absent

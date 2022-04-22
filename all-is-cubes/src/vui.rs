@@ -80,9 +80,6 @@ impl Vui {
         // TODO: take YieldProgress as a parameter
         let hud_blocks = Arc::new(HudBlocks::new(&mut universe, YieldProgress::noop(), 16).await);
 
-        let changed_character = DirtyFlag::new(false);
-        character_source.listen(changed_character.listener());
-
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
 
         // TODO: terrible mess of tightly coupled parameters
@@ -106,8 +103,8 @@ impl Vui {
             hud_blocks,
             hud_space,
 
+            changed_character: DirtyFlag::listening(false, |l| character_source.listen(l)),
             character_source,
-            changed_character,
             tooltip_state,
         }
     }
