@@ -1,6 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+// --- Interface declarations --------------------------------------------------
+
 // Mirrors `struct WgpuCamera` on the Rust side.
 struct WgpuCamera {
     [[location(0)]] projection: mat4x4<f32>;
@@ -23,15 +25,10 @@ struct WgpuBlockVertex {
     [[location(5)]] clamp_max: vec3<f32>;
 };
 
-// Communication from vertex to fragment stage
-struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec3<f32>;
-    [[location(1)]] cube: vec3<f32>;
-    [[location(2)]] normal: vec3<f32>;
-    [[location(3)]] color_or_texture: vec4<f32>;
-    [[location(4)]] clamp_min: vec3<f32>;
-    [[location(5)]] clamp_max: vec3<f32>;
+// Mirrors `struct WgpuLinesVertex` on the Rust side.
+struct WgpuLinesVertex {
+    [[location(0)]] position: vec3<f32>;
+    [[location(1)]] color: vec4<f32>;
 };
 
 // This group is named camera_bind_group_layout in the code.
@@ -46,12 +43,24 @@ var block_sampler: sampler;
 [[group(1), binding(2)]]
 var light_texture: texture_3d<u32>;
 
+// --- Block vertex shader ----------------------------------------------------
+
+// Vertex-to-fragment data for blocks
+struct BlockFragmentInput {
+    [[builtin(position)]] clip_position: vec4<f32>;
+    [[location(0)]] world_position: vec3<f32>;
+    [[location(1)]] cube: vec3<f32>;
+    [[location(2)]] normal: vec3<f32>;
+    [[location(3)]] color_or_texture: vec4<f32>;
+    [[location(4)]] clamp_min: vec3<f32>;
+    [[location(5)]] clamp_max: vec3<f32>;
+};
 
 [[stage(vertex)]]
 fn block_vertex_main(
     input: WgpuBlockVertex,
-) -> VertexOutput {
-    return VertexOutput(
+) -> BlockFragmentInput {
+    return BlockFragmentInput(
         camera.projection * camera.view_matrix * vec4<f32>(input.position, 1.0),
         input.position,
         input.cube,
@@ -62,7 +71,7 @@ fn block_vertex_main(
     );
 }
 
-// --- Fragment shading stuff --------------------------------------------------
+// --- Block fragment shader ---------------------------------------------------
 
 // Modulo, not remainder (matches GLSL builtin mod())
 fn mod(a: f32, b: f32) -> f32 {
@@ -138,7 +147,7 @@ fn ao_fudge(light_value: vec4<f32>) -> vec4<f32> {
 
 // Compute the interpolated ('smooth') light for the surface from light_texture.
 // This implementation is duplicated in Rust at all-is-cubes/src/raytracer.rs
-fn interpolated_space_light(in: VertexOutput) -> vec3<f32> {
+fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
     // Choose two vectors that are perpendicular to each other and the normal,
     // and in the positive direction on that axis.
     // Assumes in.normal is an axis-aligned unit vector.
@@ -217,7 +226,7 @@ fn interpolated_space_light(in: VertexOutput) -> vec3<f32> {
 }
 
 // Compute light intensity applying to the fragment.
-fn lighting(in: VertexOutput) -> vec3<f32> {
+fn lighting(in: BlockFragmentInput) -> vec3<f32> {
     switch (camera.light_lookup_offset_and_option.w) {
         // LightingOption::None or fallback: no lighting
         default: {
@@ -239,7 +248,7 @@ fn lighting(in: VertexOutput) -> vec3<f32> {
 }
 
 // Get the vertex color or texel value to display
-fn get_diffuse_color(in: VertexOutput) -> vec4<f32> {
+fn get_diffuse_color(in: BlockFragmentInput) -> vec4<f32> {
     if (in.color_or_texture[3] < -0.5) {
         // Texture coordinates.
         var texcoord: vec3<f32> =
@@ -254,7 +263,7 @@ fn get_diffuse_color(in: VertexOutput) -> vec4<f32> {
 }
 
 [[stage(fragment)]]
-fn block_fragment_opaque(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+fn block_fragment_opaque(in: BlockFragmentInput) -> [[location(0)]] vec4<f32> {
     var diffuse_color: vec4<f32> = get_diffuse_color(in);
     
     // Lighting
@@ -267,7 +276,7 @@ fn block_fragment_opaque(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 }
 
 [[stage(fragment)]]
-fn block_fragment_transparent(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+fn block_fragment_transparent(in: BlockFragmentInput) -> [[location(0)]] vec4<f32> {
     var diffuse_color: vec4<f32> = get_diffuse_color(in);
     
     // Lighting
@@ -278,4 +287,30 @@ fn block_fragment_transparent(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 
     // Multiply color channels by alpha because our blend function choice is premultiplied alpha.
     return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
+}
+
+// --- Lines shader ------------------------------------------------------------
+//
+// This is in the same shader source file as the block shader so that it can share
+// the camera struct and uniform.
+
+// Vertex-to-fragment data for lines
+struct LinesFragmentInput {
+    [[builtin(position)]] clip_position: vec4<f32>;
+    [[location(0)]] color: vec4<f32>;
+};
+
+[[stage(vertex)]]
+fn lines_vertex(
+    input: WgpuLinesVertex,
+) -> LinesFragmentInput {
+    return LinesFragmentInput(
+        camera.projection * camera.view_matrix * vec4<f32>(input.position, 1.0),
+        input.color,
+    );
+}
+
+[[stage(fragment)]]
+fn lines_fragment(input: LinesFragmentInput) -> [[location(0)]] vec4<f32> {
+    return input.color;
 }

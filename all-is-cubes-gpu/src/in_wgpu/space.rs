@@ -23,6 +23,7 @@ use all_is_cubes::universe::URef;
 use crate::in_wgpu::glue::{
     create_wgsl_module_from_reloadable, size_vector_to_extent, write_texture_by_grid,
 };
+use crate::in_wgpu::vertex::WgpuLinesVertex;
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
     camera::WgpuCamera,
@@ -364,6 +365,11 @@ impl<'a> SpaceRendererOutput<'a> {
             ..final_info
         })
     }
+
+    /// Returns the camera, to allow additional drawing in the same coordinate system.
+    pub(crate) fn camera_bind_group(&self) -> &wgpu::BindGroup {
+        &self.r.camera_bind_group
+    }
 }
 
 fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuffers) {
@@ -539,11 +545,17 @@ impl SpaceLightTexture {
 /// a single [`Space`] and don't need to be modified (except when graphics options change).
 /// Thus, this can be shared among all [`SpaceRenderer`]s.
 ///
+/// Some of these ingredients are also used for the "lines" rendering (cursor and 3D debug
+/// information).
+///
 /// TODO: better name
 #[derive(Debug)]
 pub(crate) struct BlockRenderStuff {
     shader_dirty: DirtyFlag,
-    camera_bind_group_layout: wgpu::BindGroupLayout,
+    pub(crate) camera_bind_group_layout: wgpu::BindGroupLayout,
+
+    pub(crate) lines_render_pipeline: wgpu::RenderPipeline,
+
     space_texture_bind_group_layout: wgpu::BindGroupLayout,
     opaque_render_pipeline: wgpu::RenderPipeline,
     transparent_render_pipeline: wgpu::RenderPipeline,
@@ -552,8 +564,11 @@ pub(crate) struct BlockRenderStuff {
 impl BlockRenderStuff {
     // TODO: wants graphics options to configure shader?
     pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
-        let shader =
-            create_wgsl_module_from_reloadable(device, "BlockRenderStuff::shader", &*BLOCK_SHADER);
+        let shader = create_wgsl_module_from_reloadable(
+            device,
+            "BlockRenderStuff::shader",
+            &*BLOCKS_AND_LINES_SHADER,
+        );
 
         let space_texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -603,15 +618,15 @@ impl BlockRenderStuff {
                 label: Some("BlockRenderStuff::camera_bind_group_layout"),
             });
 
-        let render_pipeline_layout =
+        let block_render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("BlockRenderStuff::render_pipeline_layout"),
+                label: Some("BlockRenderStuff::block_render_pipeline_layout"),
                 bind_group_layouts: &[&camera_bind_group_layout, &space_texture_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
         // Parts of the render pipeline shared between opaque and transparent passes
-        let primitive_state = wgpu::PrimitiveState {
+        let block_primitive_state = wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
             strip_index_format: None,
             front_face: wgpu::FrontFace::Ccw,
@@ -624,7 +639,7 @@ impl BlockRenderStuff {
         let opaque_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("BlockRenderStuff::opaque_render_pipeline"),
-                layout: Some(&render_pipeline_layout),
+                layout: Some(&block_render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: "block_vertex_main",
@@ -639,7 +654,7 @@ impl BlockRenderStuff {
                         write_mask: wgpu::ColorWrites::ALL,
                     }],
                 }),
-                primitive: primitive_state,
+                primitive: block_primitive_state,
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: super::DEPTH_FORMAT,
                     depth_write_enabled: true,
@@ -654,7 +669,7 @@ impl BlockRenderStuff {
         let transparent_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("BlockRenderStuff::transparent_render_pipeline"),
-                layout: Some(&render_pipeline_layout),
+                layout: Some(&block_render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: "block_vertex_main",
@@ -680,7 +695,7 @@ impl BlockRenderStuff {
                         write_mask: wgpu::ColorWrites::ALL,
                     }],
                 }),
-                primitive: primitive_state,
+                primitive: block_primitive_state,
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: super::DEPTH_FORMAT,
                     // Transparent geometry is written sorted back-to-front, so writing the
@@ -695,12 +710,56 @@ impl BlockRenderStuff {
                 multiview: None,
             });
 
+        let lines_render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("BlockRenderStuff::lines_render_pipeline_layout"),
+                bind_group_layouts: &[&camera_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let lines_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("BlockRenderStuff::lines_render_pipeline"),
+                layout: Some(&lines_render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: "lines_vertex",
+                    buffers: &[WgpuLinesVertex::desc()],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: "lines_fragment",
+                    targets: &[wgpu::ColorTargetState {
+                        format: surface_format,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::LineList,
+                    ..<_>::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: super::DEPTH_FORMAT,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(), // default = off
+                multiview: None,
+            });
+
         Self {
-            shader_dirty: DirtyFlag::listening(false, |l| BLOCK_SHADER.as_source().listen(l)),
+            shader_dirty: DirtyFlag::listening(false, |l| {
+                BLOCKS_AND_LINES_SHADER.as_source().listen(l)
+            }),
             camera_bind_group_layout,
             space_texture_bind_group_layout,
             opaque_render_pipeline,
             transparent_render_pipeline,
+
+            lines_render_pipeline,
         }
     }
 
@@ -716,5 +775,5 @@ impl BlockRenderStuff {
     }
 }
 
-static BLOCK_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/block.wgsl"));
+static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));

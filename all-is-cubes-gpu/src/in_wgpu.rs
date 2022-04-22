@@ -21,15 +21,18 @@ use all_is_cubes::apps::{Layers, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
+use all_is_cubes::content::palette;
 use all_is_cubes::listen::DirtyFlag;
 
 use crate::{
+    gather_debug_lines,
     in_wgpu::{
-        glue::{create_wgsl_module_from_reloadable, BeltWritingParts},
+        glue::{create_wgsl_module_from_reloadable, BeltWritingParts, ResizingBuffer},
         space::BlockRenderStuff,
-        vertex::WgpuBlockVertex,
+        vertex::{WgpuBlockVertex, WgpuLinesVertex},
     },
     reloadable::{reloadable_str, Reloadable},
+    wireframe_vertices,
 };
 use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
@@ -179,7 +182,9 @@ pub struct EverythingRenderer {
     block_render_stuff: BlockRenderStuff,
     space_renderers: Layers<Option<SpaceRenderer>>,
 
-    // TODO: shader for debug lines
+    /// Cursor and debug lines are written to this buffer.
+    lines_buffer: ResizingBuffer,
+
     /// Debug overlay text is uploaded via this texture
     info_text_texture: DrawableTexture,
 
@@ -240,13 +245,16 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::info_text_bind_group_layout"),
             });
 
+        let block_render_stuff = BlockRenderStuff::new(&device, config.format);
+
         EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
                 // TODO: wild guess at good size
                 std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
             ),
-            block_render_stuff: BlockRenderStuff::new(&device, config.format),
             space_renderers: Default::default(),
+
+            lines_buffer: ResizingBuffer::default(),
 
             info_text_shader_dirty: DirtyFlag::listening(false, |l| {
                 INFO_TEXT_SHADER.as_source().listen(l)
@@ -273,6 +281,7 @@ impl EverythingRenderer {
             device,
             config,
             cameras,
+            block_render_stuff,
         }
     }
 
@@ -368,7 +377,7 @@ impl EverythingRenderer {
 
     pub async fn render_frame(
         &mut self,
-        _cursor_result: &Option<Cursor>,
+        cursor_result: &Option<Cursor>,
         queue: &wgpu::Queue,
         output: &wgpu::Texture,
         depth_texture_view: &wgpu::TextureView,
@@ -379,7 +388,6 @@ impl EverythingRenderer {
         self.cameras.update();
 
         // Recompile shaders if needed.
-        // TODO: Recompile block shaders
         if self.info_text_shader_dirty.get_and_clear() {
             self.info_text_render_pipeline = Self::create_info_text_pipeline(
                 &self.device,
@@ -466,13 +474,40 @@ impl EverythingRenderer {
                         queue,
                         &self.cameras.cameras().ui,
                         &self.block_render_stuff,
-                        bwp,
+                        bwp.reborrow(),
                     )
                 })
                 .transpose()?,
         };
 
-        // TODO: Prepare debug lines mesh.
+        // Prepare cursor and debug lines.
+        let lines_vertex_count = {
+            let mut v: Vec<WgpuLinesVertex> = Vec::new();
+
+            if let Some(cursor) = cursor_result {
+                wireframe_vertices::<WgpuLinesVertex, _, _>(
+                    &mut v,
+                    palette::CURSOR_OUTLINE,
+                    cursor,
+                );
+            }
+            gather_debug_lines(
+                self.cameras.character().map(|c| c.borrow()).as_deref(),
+                self.cameras.graphics_options(),
+                &mut v,
+                cursor_result,
+            );
+
+            self.lines_buffer.write_with_resizing(
+                bwp.reborrow(),
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("EverythingRenderer::lines_buffer"),
+                    contents: bytemuck::cast_slice(&*v),
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                },
+            );
+            v.len() as u32
+        };
 
         //let start_staging_time = Instant::now();
         self.staging_belt.finish();
@@ -481,12 +516,47 @@ impl EverythingRenderer {
         // Done with general preparation (and everything that will write onto the staging belt);
         // move on to draw calls.
         let end_prepare_time = Instant::now();
-        let world_render_info = if let Some(so) = outputs.world {
+        let world_render_info = if let Some(so) = &outputs.world {
             so.draw(&output_view, depth_texture_view, queue, &mut encoder, true)?
         } else {
             SpaceRenderInfo::default()
         };
-        let world_to_ui_time = Instant::now();
+        let world_to_lines_time = Instant::now();
+
+        // Lines pass (if there are any lines)
+        if let (Some(so), 1..) = (&outputs.world, lines_vertex_count) {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("debug lines"),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &output_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: depth_texture_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
+            render_pass.set_pipeline(&self.block_render_stuff.lines_render_pipeline);
+            render_pass.set_bind_group(0, so.camera_bind_group(), &[]);
+            render_pass.set_vertex_buffer(
+                0,
+                self.lines_buffer
+                    .get()
+                    .expect("missing lines buffer!")
+                    .slice(..),
+            );
+            render_pass.draw(0..lines_vertex_count, 0..1);
+        }
+
+        let lines_to_ui_time = Instant::now();
         let ui_render_info = if let Some(so) = outputs.ui {
             so.draw(&output_view, depth_texture_view, queue, &mut encoder, false)?
         } else {
@@ -502,8 +572,8 @@ impl EverythingRenderer {
             frame_time: end_time.duration_since(start_frame_time),
             prepare_time: end_prepare_time.duration_since(start_frame_time),
             draw_time: Layers {
-                world: world_to_ui_time.duration_since(end_prepare_time),
-                ui: ui_to_submit_time.duration_since(world_to_ui_time),
+                world: world_to_lines_time.duration_since(end_prepare_time),
+                ui: ui_to_submit_time.duration_since(lines_to_ui_time),
             },
             draw_info: Layers {
                 world: world_render_info,

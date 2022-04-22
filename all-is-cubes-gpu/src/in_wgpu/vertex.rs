@@ -6,6 +6,8 @@ use all_is_cubes::math::{Face, GridCoordinate, GridPoint, GridVector};
 use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
 use all_is_cubes::space::PackedLight;
 
+use crate::DebugLineVertex;
+
 /// Triangle mesh vertex type that is used for rendering [blocks].
 ///
 /// [blocks]: all_is_cubes::block::Block
@@ -24,7 +26,7 @@ pub(crate) struct WgpuBlockVertex {
     /// TODO: Try storing this as an enum
     normal: [f32; 3],
     /// Packed format:
-    /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a solid RGBA color.
+    /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
     /// * If `[3]` is -1.0, then the first three components are 3D texture coordinates.
     color_or_texture: [f32; 4],
     /// Interpolated texture coordinates are clamped to be ≥ this value, to avoid bleeding.
@@ -45,7 +47,7 @@ impl WgpuBlockVertex {
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: Self::ATTRIBUTE_LAYOUT,
         }
@@ -116,5 +118,40 @@ impl GfxVertex for WgpuBlockVertex {
     fn face(&self) -> Face {
         let normal: GridVector = Vector3::from(self.normal).map(|c| c as GridCoordinate);
         Face::try_from(normal).unwrap_or(Face::Within)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub(crate) struct WgpuLinesVertex {
+    position: [f32; 3],
+    /// Linear RGBA color.
+    color: [f32; 4],
+}
+
+impl WgpuLinesVertex {
+    const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
+        0 => Float32x3,
+        1 => Float32x2,
+    ];
+
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: Self::ATTRIBUTE_LAYOUT,
+        }
+    }
+}
+
+impl DebugLineVertex for WgpuLinesVertex {
+    fn from_position_color(
+        position: Point3<all_is_cubes::math::FreeCoordinate>,
+        color: all_is_cubes::math::Rgba,
+    ) -> Self {
+        Self {
+            position: position.map(|c| c as f32).into(),
+            color: color.into(),
+        }
     }
 }
