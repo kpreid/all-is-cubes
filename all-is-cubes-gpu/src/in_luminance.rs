@@ -10,11 +10,8 @@
 use luminance::context::GraphicsContext;
 use luminance::tess::{Mode, Tess};
 
-use all_is_cubes::cgmath::Transform as _;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
-use all_is_cubes::math::Aab;
-use all_is_cubes::raycast::Face;
 
 mod block_texture;
 mod frame_texture;
@@ -41,37 +38,8 @@ where
     C::Backend: AicLumBackend,
 {
     if let Some(cursor) = cursor_result {
-        // Compute an approximate offset that will prevent Z-fighting.
-        let offset_from_surface = 0.001 * cursor.distance;
-
         let mut vertices: Vec<LinesVertex> = Vec::new();
-        // TODO: Maybe highlight the selected face's rectangle
-        wireframe_vertices::<LinesVertex, _, _>(
-            &mut vertices,
-            palette::CURSOR_OUTLINE,
-            Aab::from_cube(cursor.place.cube).expand(offset_from_surface),
-        );
-
-        // Frame the cursor intersection point with a diamond.
-        // TODO: This addition is experimental and we may or may not want to keep it.
-        // For now, it visualizes the intersection and face information.
-        let face_frame = cursor.place.face.matrix(0).to_free();
-        for f in [
-            Face::PX,
-            Face::PY,
-            Face::PY,
-            Face::NX,
-            Face::NX,
-            Face::NY,
-            Face::NY,
-            Face::PX,
-        ] {
-            let p = cursor.point
-                + cursor.place.face.normal_vector() * offset_from_surface
-                + face_frame.transform_vector(f.normal_vector() * (1.0 / 32.0));
-            vertices.push(LinesVertex::new_basic(p, palette::CURSOR_OUTLINE));
-        }
-
+        wireframe_vertices::<LinesVertex, _, _>(&mut vertices, palette::CURSOR_OUTLINE, cursor);
         Ok(Some(
             context
                 .new_tess()

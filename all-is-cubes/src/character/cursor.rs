@@ -7,14 +7,17 @@
 
 use std::fmt;
 
-use cgmath::{InnerSpace as _, Point3};
+use cgmath::{InnerSpace as _, Point3, Transform};
 
 use crate::block::{recursive_raycast, Block, EvaluatedBlock};
-use crate::math::FreeCoordinate;
-use crate::raycast::{CubeFace, Ray};
+use crate::content::palette;
+use crate::math::{
+    Aab, CubeFace, Face, FreeCoordinate, Geometry, GridCoordinate, GridVector, Rgba,
+};
+use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::URef;
-use crate::util::{ConciseDebug, CustomFormat as _};
+use crate::util::{ConciseDebug, CustomFormat as _, MapExtend};
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck within the distance limit.
@@ -93,5 +96,55 @@ impl fmt::Display for Cursor {
             self.lighting_ahead,
             self.lighting_behind,
         )
+    }
+}
+
+/// TODO: This implementation exists because it was convenient to support drawing;
+/// eventually we will probably want cursor rendering to be its own more elaborate
+/// thing.
+impl Geometry for Cursor {
+    type Coord = GridCoordinate;
+
+    fn translate(mut self, offset: impl Into<GridVector>) -> Self {
+        let offset = offset.into();
+        self.place.cube += offset;
+        self.point += offset.map(FreeCoordinate::from);
+        self
+    }
+
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<(Point3<FreeCoordinate>, Option<crate::math::Rgba>)>,
+    {
+        // Compute an approximate offset that will prevent Z-fighting.
+        let offset_from_surface = 0.001 * self.distance;
+
+        // TODO: Maybe highlight the selected face's rectangle
+        Aab::from_cube(self.place.cube)
+            .expand(offset_from_surface)
+            .wireframe_points(&mut MapExtend::new(
+                output,
+                |(p, _): (Point3<FreeCoordinate>, Option<Rgba>)| (p, Some(palette::CURSOR_OUTLINE)),
+            ));
+
+        // Frame the cursor intersection point with a diamond.
+        // TODO: This addition is experimental and we may or may not want to keep it.
+        // For now, it visualizes the intersection and face information.
+        let face_frame = self.place.face.matrix(0).to_free();
+        for f in [
+            Face::PX,
+            Face::PY,
+            Face::PY,
+            Face::NX,
+            Face::NX,
+            Face::NY,
+            Face::NY,
+            Face::PX,
+        ] {
+            let p = self.point
+                + self.place.face.normal_vector() * offset_from_surface
+                + face_frame.transform_vector(f.normal_vector() * (1.0 / 32.0));
+            output.extend([(p, Some(palette::CURSOR_OUTLINE))]);
+        }
     }
 }
