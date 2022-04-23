@@ -19,7 +19,7 @@ doc = false # Do not overwrite library crate's documentation
 bench = false
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["rayon"] }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 anyhow = "1.0"
