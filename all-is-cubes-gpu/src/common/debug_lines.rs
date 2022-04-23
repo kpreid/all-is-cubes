@@ -26,11 +26,11 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
             wireframe_vertices(
                 v,
                 palette::DEBUG_COLLISION_BOX,
-                character.body.collision_box_abs(),
+                &character.body.collision_box_abs(),
             );
             // What it collided with
             for contact in &character.colliding_cubes {
-                wireframe_vertices(v, palette::DEBUG_COLLISION_CUBES, *contact);
+                wireframe_vertices(v, palette::DEBUG_COLLISION_CUBES, contact);
             }
         }
 
@@ -41,7 +41,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
             wireframe_vertices(
                 v,
                 Rgba::new(1.0, 1.0, 0.0, 1.0),
-                Aab::from_cube(cube).expand(0.005),
+                &Aab::from_cube(cube).expand(0.005),
             );
         }
 
@@ -52,7 +52,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
                 if cursor.space == character.space {
                     let space = character.space.borrow();
                     let (_, _, _, lighting_info) = space.compute_lighting(cursor.place.adjacent());
-                    wireframe_vertices(v, Rgba::new(0.8, 0.8, 1.0, 1.0), lighting_info);
+                    wireframe_vertices(v, Rgba::new(0.8, 0.8, 1.0, 1.0), &lighting_info);
                 }
             }
         }
@@ -61,7 +61,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
 
 /// Add the wireframe of `geometry` to `vertices` (to be drawn in [`Line`](Mode::Line)
 /// mode) with the given `color`.
-pub(crate) fn wireframe_vertices<V, E, G>(vertices: &mut E, color: Rgba, geometry: G)
+pub(crate) fn wireframe_vertices<V, E, G>(vertices: &mut E, color: Rgba, geometry: &G)
 where
     E: Extend<V>,
     V: DebugLineVertex,

@@ -174,7 +174,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                     wireframe_vertices::<LinesVertex, _, _>(
                         &mut v,
                         palette::DEBUG_CHUNK_MAJOR,
-                        Aab::from(chunk.grid()),
+                        &Aab::from(chunk.grid()),
                     );
                 }
 
