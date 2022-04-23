@@ -3,7 +3,6 @@
 
 //! Manages meshes for rendering a [`Space`].
 
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
@@ -21,7 +20,9 @@ use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
 use all_is_cubes::space::{Grid, Space, SpaceChange};
 use all_is_cubes::universe::URef;
 
-use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};
+use crate::in_wgpu::glue::{
+    create_wgsl_module_from_reloadable, size_vector_to_extent, write_texture_by_grid,
+};
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
     camera::WgpuCamera,
@@ -551,11 +552,8 @@ pub(crate) struct BlockRenderStuff {
 impl BlockRenderStuff {
     // TODO: wants graphics options to configure shader?
     pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
-        let source = BLOCK_SHADER.as_source().snapshot();
-        let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: Some("BlockRenderStuff::shader"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*source)),
-        });
+        let shader =
+            create_wgsl_module_from_reloadable(device, "BlockRenderStuff::shader", &*BLOCK_SHADER);
 
         let space_texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

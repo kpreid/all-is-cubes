@@ -3,8 +3,10 @@
 
 //! Miscellaneous conversion functions and trait impls for [`wgpu`].
 
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::ops::Range;
+use std::sync::Arc;
 
 use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
@@ -13,6 +15,7 @@ use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::{GridCoordinate, Rgba};
 use all_is_cubes::space::Grid;
 
+use crate::reloadable::Reloadable;
 use crate::GraphicsResourceError;
 
 /// TODO: Revisit whether this generic conversion is appropriate;
@@ -61,6 +64,18 @@ pub fn to_wgpu_color(color: Rgba) -> wgpu::Color {
 
 pub fn to_wgpu_index_range(range: Range<usize>) -> Range<u32> {
     range.start.try_into().unwrap()..range.end.try_into().unwrap()
+}
+
+pub(crate) fn create_wgsl_module_from_reloadable(
+    device: &wgpu::Device,
+    label: &str,
+    r: &Reloadable,
+) -> wgpu::ShaderModule {
+    let current_source: Arc<str> = r.as_source().snapshot();
+    device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        label: Some(label),
+        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*current_source)),
+    })
 }
 
 /// Write to a texture, with the region written specified by a [`Grid`].

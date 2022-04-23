@@ -3,9 +3,8 @@
 
 //! Rendering via the [`wgpu`] WebGPU-in-Rust graphics library.
 //!
-//! This code is experimental and not feature-complete.
+//! TODO: This code is experimental and not feature-complete.
 
-use std::borrow::Cow;
 use std::sync::Arc;
 
 use all_is_cubes::drawing::embedded_graphics::{
@@ -16,16 +15,20 @@ use all_is_cubes::drawing::embedded_graphics::{
     Drawable,
 };
 use instant::Instant;
+use once_cell::sync::Lazy;
 
 use all_is_cubes::apps::{Layers, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::DirtyFlag;
-use once_cell::sync::Lazy;
 
 use crate::{
-    in_wgpu::{glue::BeltWritingParts, space::BlockRenderStuff, vertex::WgpuBlockVertex},
+    in_wgpu::{
+        glue::{create_wgsl_module_from_reloadable, BeltWritingParts},
+        space::BlockRenderStuff,
+        vertex::WgpuBlockVertex,
+    },
     reloadable::{reloadable_str, Reloadable},
 };
 use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
@@ -279,11 +282,11 @@ impl EverythingRenderer {
         info_text_bind_group_layout: &wgpu::BindGroupLayout,
         surface_format: wgpu::TextureFormat,
     ) -> wgpu::RenderPipeline {
-        let source = INFO_TEXT_SHADER.as_source().snapshot();
-        let info_text_shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: Some("EverythingRenderer::info_text_shader"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*source)),
-        });
+        let info_text_shader = create_wgsl_module_from_reloadable(
+            device,
+            "EverythingRenderer::info_text_shader",
+            &*INFO_TEXT_SHADER,
+        );
 
         let info_text_render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
