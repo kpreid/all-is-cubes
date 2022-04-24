@@ -43,6 +43,48 @@ var block_sampler: sampler;
 [[group(1), binding(2)]]
 var light_texture: texture_3d<u32>;
 
+// --- Fog computation --------------------------------------------------------
+
+// Physically realistic fog, but doesn't ever reach 1 (fully opaque).
+fn fog_exponential(distance: f32) -> f32 {
+    let fog_density = 1.6;
+    return 1.0 - exp(-fog_density * distance);
+}
+
+// Fog that goes all the way from fully transparent to fully opaque.
+// The correction is smaller the denser the fog.
+fn fog_exp_fudged(distance: f32) -> f32 {
+    return fog_exponential(distance) / fog_exponential(1.0);
+}
+
+fn fog_combo(distance: f32) -> f32 {
+    // Combination of realistic exponential (constant density) fog,
+    // and slower-starting fog so nearby stuff is clearer.
+    return mix(fog_exp_fudged(distance), pow(distance, 4.0), camera.fog_mode_blend);
+}
+
+// Returns the opacity (0 to 1) of the fog.
+//
+// Note: This function is run in the vertex shader, to reduce the cost of the
+// computation. This is an approximation that works on the assumption that fog
+// is locally close-to-linear on the scale of the largest triangles we draw.
+// This assumption will need to be revisited if we start using triangles larger
+// than a block.
+fn compute_fog(world_position: vec3<f32>) -> f32 {
+    // Camera-relative position not transformed by projection.
+    let eye_vertex_position = camera.view_matrix * vec4<f32>(world_position, 1.0);
+    let distance_from_eye: f32 = length(eye_vertex_position.xyz);
+
+    // TODO: When we implement volumetric transparency, that's another use
+    // for the distance_from_eye value, which we will want to pass out (in a struct)
+
+    // Distance in range 0 (camera position) to 1 (opaque fog position/far clip position).
+    let normalized_distance: f32 = distance_from_eye / camera.fog_distance;
+    let fog_mix = clamp(fog_combo(normalized_distance), 0.0, 1.0);
+
+    return fog_mix;
+}
+
 // --- Block vertex shader ----------------------------------------------------
 
 // Vertex-to-fragment data for blocks
@@ -54,6 +96,7 @@ struct BlockFragmentInput {
     [[location(3)]] color_or_texture: vec4<f32>;
     [[location(4)]] clamp_min: vec3<f32>;
     [[location(5)]] clamp_max: vec3<f32>;
+    [[location(6)]] fog_mix: f32;
 };
 
 [[stage(vertex)]]
@@ -68,6 +111,7 @@ fn block_vertex_main(
         input.color_or_texture,
         input.clamp_min,
         input.clamp_max,
+        compute_fog(input.position),
     );
 }
 
@@ -269,8 +313,11 @@ fn block_fragment_opaque(in: BlockFragmentInput) -> [[location(0)]] vec4<f32> {
     // Lighting
     var lit_color = diffuse_color * vec4<f32>(lighting(in), 1.0);
 
+    // Fog
+    var fogged_color = vec4<f32>(mix(lit_color.rgb, camera.fog_color, in.fog_mix), lit_color.a);
+
     // Exposure/eye adaptation
-    var exposed_color = vec4<f32>(lit_color.rgb * camera.exposure, lit_color.a);
+    var exposed_color = vec4<f32>(fogged_color.rgb * camera.exposure, fogged_color.a);
 
     return exposed_color;
 }
@@ -282,8 +329,11 @@ fn block_fragment_transparent(in: BlockFragmentInput) -> [[location(0)]] vec4<f3
     // Lighting
     var lit_color = diffuse_color * vec4<f32>(lighting(in), 1.0);
 
+    // Fog
+    var fogged_color = vec4<f32>(mix(lit_color.rgb, camera.fog_color, in.fog_mix), lit_color.a);
+
     // Exposure/eye adaptation
-    var exposed_color = vec4<f32>(lit_color.rgb * camera.exposure, lit_color.a);
+    var exposed_color = vec4<f32>(fogged_color.rgb * camera.exposure, fogged_color.a);
 
     // Multiply color channels by alpha because our blend function choice is premultiplied alpha.
     return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
@@ -298,6 +348,7 @@ fn block_fragment_transparent(in: BlockFragmentInput) -> [[location(0)]] vec4<f3
 struct LinesFragmentInput {
     [[builtin(position)]] clip_position: vec4<f32>;
     [[location(0)]] color: vec4<f32>;
+    [[location(1)]] fog_mix: f32;
 };
 
 [[stage(vertex)]]
@@ -307,10 +358,16 @@ fn lines_vertex(
     return LinesFragmentInput(
         camera.projection * camera.view_matrix * vec4<f32>(input.position, 1.0),
         input.color,
+        compute_fog(input.position),
     );
 }
 
 [[stage(fragment)]]
 fn lines_fragment(input: LinesFragmentInput) -> [[location(0)]] vec4<f32> {
-    return input.color;
+    let color = input.color;
+    
+    // Fog
+    let fogged_color = vec4<f32>(mix(color.rgb, camera.fog_color, input.fog_mix), color.a);
+
+    return fogged_color;
 }
