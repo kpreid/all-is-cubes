@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 use std::f64::consts::PI;
 
 use all_is_cubes::block::{
-    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Resolution,
+    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Modifier, Resolution,
     RotationPlacementRule, AIR,
 };
 use all_is_cubes::cgmath::{
@@ -52,6 +52,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     RESOLUTIONS,
     ANIMATION,
     MAKE_SOME_BLOCKS,
+    MOVED_BLOCKS,
     ROTATIONS,
     COLOR_LIGHTS,
     CHUNK_CHART,
@@ -497,6 +498,47 @@ exhibit! {
             )?;
         }
 
+        Ok(space)
+    }
+}
+
+exhibit! {
+    const MOVED_BLOCKS,
+    name: "Moved Blocks",
+    (_this, universe) {
+        let mut space = Space::empty(Grid::from_lower_upper([0, 0, -3], [16, 2, 3]));
+
+        let blocks: [Block; 16] = make_some_voxel_blocks(universe);
+        for x in 0..8 {
+            for z in 0..2 {
+                let i = x + z * 8;
+                let distance = (i * 16).try_into().unwrap();
+                let move_out = Modifier::Move {
+                    direction: Face::PY,
+                    distance,
+                };
+                let move_in = Modifier::Move {
+                    direction: Face::NY,
+                    distance: (256 - distance),
+                };
+                // TODO: there should be a routine to generate these pairs
+                // (and Move should be able to spawn a "tail" on its own when animated)
+                space.set([x * 2, 0, (1 - z) * 2], move_out.attach(blocks[i as usize].clone()))?;
+                space.set([x * 2, 1, (1 - z) * 2], move_in.attach(blocks[i as usize].clone()))?;
+
+                // Horizontal
+                let move_out = Modifier::Move {
+                    direction: Face::PZ,
+                    distance,
+                };
+                let move_in = Modifier::Move {
+                    direction: Face::NZ,
+                    distance: (256 - distance),
+                };
+                space.set([i, 0, -2], move_out.attach(blocks[i as usize].clone()))?;
+                space.set([i, 0, -1], move_in.attach(blocks[i as usize].clone()))?;
+            }
+        }
         Ok(space)
     }
 }
