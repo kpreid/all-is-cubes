@@ -28,7 +28,7 @@ use crate::{
     gather_debug_lines,
     in_wgpu::{
         glue::{create_wgsl_module_from_reloadable, BeltWritingParts, ResizingBuffer},
-        space::BlockRenderStuff,
+        pipelines::Pipelines,
         vertex::{WgpuBlockVertex, WgpuLinesVertex},
     },
     reloadable::{reloadable_str, Reloadable},
@@ -36,18 +36,14 @@ use crate::{
 };
 use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
-mod camera;
-
 mod block_texture;
-
+mod camera;
 mod frame_texture;
 use frame_texture::DrawableTexture;
-
 mod glue;
-
+mod pipelines;
 mod space;
 use space::SpaceRenderer;
-
 mod vertex;
 
 pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -179,7 +175,9 @@ pub struct EverythingRenderer {
     /// Surface configuration maintained to match the viewport.
     config: wgpu::SurfaceConfiguration,
 
-    block_render_stuff: BlockRenderStuff,
+    /// Pipelines and layouts for rendering Space content
+    pipelines: Pipelines,
+
     space_renderers: Layers<Option<SpaceRenderer>>,
 
     /// Cursor and debug lines are written to this buffer.
@@ -245,7 +243,7 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::info_text_bind_group_layout"),
             });
 
-        let block_render_stuff = BlockRenderStuff::new(&device, config.format);
+        let pipelines = Pipelines::new(&device, config.format);
 
         EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
@@ -281,7 +279,7 @@ impl EverythingRenderer {
             device,
             config,
             cameras,
-            block_render_stuff,
+            pipelines,
         }
     }
 
@@ -395,7 +393,7 @@ impl EverythingRenderer {
                 self.config.format,
             );
         }
-        self.block_render_stuff
+        self.pipelines
             .recompile_if_changed(&self.device, self.config.format);
 
         let output_view = output.create_view(&wgpu::TextureViewDescriptor::default());
@@ -418,7 +416,7 @@ impl EverythingRenderer {
                         String::from("world"),
                         &self.device,
                         queue,
-                        &self.block_render_stuff,
+                        &self.pipelines,
                     )
                 })
                 .transpose()?;
@@ -433,7 +431,7 @@ impl EverythingRenderer {
                         String::from("ui"),
                         &self.device,
                         queue,
-                        &self.block_render_stuff,
+                        &self.pipelines,
                     )
                 })
                 .transpose()?;
@@ -460,7 +458,7 @@ impl EverythingRenderer {
                     sr.prepare_frame(
                         queue,
                         &self.cameras.cameras().world,
-                        &self.block_render_stuff,
+                        &self.pipelines,
                         bwp.reborrow(),
                     )
                 })
@@ -473,7 +471,7 @@ impl EverythingRenderer {
                     sr.prepare_frame(
                         queue,
                         &self.cameras.cameras().ui,
-                        &self.block_render_stuff,
+                        &self.pipelines,
                         bwp.reborrow(),
                     )
                 })
@@ -544,7 +542,7 @@ impl EverythingRenderer {
                     stencil_ops: None,
                 }),
             });
-            render_pass.set_pipeline(&self.block_render_stuff.lines_render_pipeline);
+            render_pass.set_pipeline(&self.pipelines.lines_render_pipeline);
             render_pass.set_bind_group(0, so.camera_bind_group(), &[]);
             render_pass.set_vertex_buffer(
                 0,

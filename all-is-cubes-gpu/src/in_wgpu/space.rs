@@ -9,28 +9,24 @@ use std::sync::{Arc, Mutex, Weak};
 
 use all_is_cubes::cgmath::{EuclideanSpace, Vector3};
 use instant::Instant;
-use once_cell::sync::Lazy;
 
 use all_is_cubes::camera::Camera;
 use all_is_cubes::chunking::ChunkPos;
-use all_is_cubes::listen::{DirtyFlag, Listener};
+use all_is_cubes::listen::Listener;
 use all_is_cubes::math::{FaceMap, GridCoordinate, GridPoint, Rgb};
 use all_is_cubes::mesh::chunked_mesh::ChunkedSpaceMesh;
 use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
 use all_is_cubes::space::{Grid, Space, SpaceChange};
 use all_is_cubes::universe::URef;
 
-use crate::in_wgpu::glue::{
-    create_wgsl_module_from_reloadable, size_vector_to_extent, write_texture_by_grid,
-};
-use crate::in_wgpu::vertex::WgpuLinesVertex;
+use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};
+use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
     camera::WgpuCamera,
     glue::{to_wgpu_color, to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
-use crate::reloadable::{reloadable_str, Reloadable};
 use crate::{time_budgets, GraphicsResourceError, SpaceRenderInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
@@ -74,7 +70,7 @@ impl SpaceRenderer {
         space_label: String,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        stuff: &BlockRenderStuff,
+        pipelines: &Pipelines,
     ) -> Result<Self, GraphicsResourceError> {
         let space_borrowed = space.borrow();
 
@@ -82,7 +78,7 @@ impl SpaceRenderer {
         let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.grid());
 
         let space_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &stuff.space_texture_bind_group_layout,
+            layout: &pipelines.space_texture_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -108,7 +104,7 @@ impl SpaceRenderer {
         });
 
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &stuff.camera_bind_group_layout,
+            layout: &pipelines.camera_bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: camera_buffer.as_entire_binding(),
@@ -141,7 +137,7 @@ impl SpaceRenderer {
         &'a mut self,
         queue: &wgpu::Queue,
         camera: &Camera,
-        stuff: &'a BlockRenderStuff,
+        pipelines: &'a Pipelines,
         bwp: BeltWritingParts<'_, '_>,
     ) -> Result<SpaceRendererOutput<'a>, GraphicsResourceError> {
         let mut todo = self.todo.lock().unwrap();
@@ -208,7 +204,7 @@ impl SpaceRenderer {
 
         Ok(SpaceRendererOutput {
             r: self,
-            stuff,
+            pipelines,
             camera: camera.clone(),
             //debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
             view_chunk,
@@ -230,7 +226,7 @@ impl SpaceRenderer {
 /// [`SpaceRenderer::prepare_frame`].
 pub(crate) struct SpaceRendererOutput<'a> {
     r: &'a SpaceRenderer,
-    stuff: &'a BlockRenderStuff,
+    pipelines: &'a Pipelines,
 
     pub(super) camera: Camera,
     // debug_chunk_boxes: &'a wgpu::Buffer,
@@ -304,7 +300,7 @@ impl<'a> SpaceRendererOutput<'a> {
 
         // Opaque geometry first, in front-to-back order
         let start_opaque_draw_time = Instant::now();
-        render_pass.set_pipeline(&self.stuff.opaque_render_pipeline);
+        render_pass.set_pipeline(&self.pipelines.opaque_render_pipeline);
         for p in csm
             .chunk_chart()
             .chunks(self.view_chunk, view_direction_mask)
@@ -331,7 +327,7 @@ impl<'a> SpaceRendererOutput<'a> {
         // Transparent geometry after opaque geometry, in back-to-front order
         let start_draw_transparent_time = Instant::now();
         if self.camera.options().transparency.will_output_alpha() {
-            render_pass.set_pipeline(&self.stuff.transparent_render_pipeline);
+            render_pass.set_pipeline(&self.pipelines.transparent_render_pipeline);
             for p in csm
                 .chunk_chart()
                 .chunks(self.view_chunk, view_direction_mask)
@@ -540,240 +536,3 @@ impl SpaceLightTexture {
         -self.texture_grid.lower_bounds().to_vec()
     }
 }
-
-/// All the resources a [`SpaceRenderer`] needs that aren't actually specific to
-/// a single [`Space`] and don't need to be modified (except when graphics options change).
-/// Thus, this can be shared among all [`SpaceRenderer`]s.
-///
-/// Some of these ingredients are also used for the "lines" rendering (cursor and 3D debug
-/// information).
-///
-/// TODO: better name
-#[derive(Debug)]
-pub(crate) struct BlockRenderStuff {
-    shader_dirty: DirtyFlag,
-    pub(crate) camera_bind_group_layout: wgpu::BindGroupLayout,
-
-    pub(crate) lines_render_pipeline: wgpu::RenderPipeline,
-
-    space_texture_bind_group_layout: wgpu::BindGroupLayout,
-    opaque_render_pipeline: wgpu::RenderPipeline,
-    transparent_render_pipeline: wgpu::RenderPipeline,
-}
-
-impl BlockRenderStuff {
-    // TODO: wants graphics options to configure shader?
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
-        let shader = create_wgsl_module_from_reloadable(
-            device,
-            "BlockRenderStuff::shader",
-            &*BLOCKS_AND_LINES_SHADER,
-        );
-
-        let space_texture_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D3,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D3,
-                            sample_type: wgpu::TextureSampleType::Uint,
-                        },
-                        count: None,
-                    },
-                ],
-                label: Some("BlockRenderStuff::space_texture_bind_group_layout"),
-            });
-
-        let camera_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("BlockRenderStuff::camera_bind_group_layout"),
-            });
-
-        let block_render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("BlockRenderStuff::block_render_pipeline_layout"),
-                bind_group_layouts: &[&camera_bind_group_layout, &space_texture_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        // Parts of the render pipeline shared between opaque and transparent passes
-        let block_primitive_state = wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: Some(wgpu::Face::Back),
-            polygon_mode: wgpu::PolygonMode::Fill,
-            unclipped_depth: false,
-            conservative: false,
-        };
-
-        let opaque_render_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("BlockRenderStuff::opaque_render_pipeline"),
-                layout: Some(&block_render_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: "block_vertex_main",
-                    buffers: &[WgpuBlockVertex::desc()],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: "block_fragment_opaque",
-                    targets: &[wgpu::ColorTargetState {
-                        format: surface_format,
-                        blend: None,
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }],
-                }),
-                primitive: block_primitive_state,
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: super::DEPTH_FORMAT,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
-                multisample: wgpu::MultisampleState::default(), // default = off
-                multiview: None,
-            });
-
-        let transparent_render_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("BlockRenderStuff::transparent_render_pipeline"),
-                layout: Some(&block_render_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: "block_vertex_main",
-                    buffers: &[WgpuBlockVertex::desc()],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: "block_fragment_transparent",
-                    targets: &[wgpu::ColorTargetState {
-                        format: surface_format,
-                        // Note that this blending configuration is for premultiplied alpha.
-                        // The fragment shader is responsible for producing premultiplied alpha outputs.
-                        blend: Some(wgpu::BlendState {
-                            color: wgpu::BlendComponent {
-                                operation: wgpu::BlendOperation::Add,
-                                src_factor: wgpu::BlendFactor::One,
-                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            },
-                            // TODO: this probably isn't correct but it doesn't matter until such
-                            // time as we get into transparent framebuffers
-                            alpha: wgpu::BlendComponent::REPLACE,
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }],
-                }),
-                primitive: block_primitive_state,
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: super::DEPTH_FORMAT,
-                    // Transparent geometry is written sorted back-to-front, so writing the
-                    // depth buffer is not useful, but we do *compare* depth so that existing
-                    // opaque geometry obscures all transparent geometry behind it.
-                    depth_write_enabled: false,
-                    depth_compare: wgpu::CompareFunction::Less,
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
-                multisample: wgpu::MultisampleState::default(), // default = off
-                multiview: None,
-            });
-
-        let lines_render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("BlockRenderStuff::lines_render_pipeline_layout"),
-                bind_group_layouts: &[&camera_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let lines_render_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("BlockRenderStuff::lines_render_pipeline"),
-                layout: Some(&lines_render_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: "lines_vertex",
-                    buffers: &[WgpuLinesVertex::desc()],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: "lines_fragment",
-                    targets: &[wgpu::ColorTargetState {
-                        format: surface_format,
-                        blend: None,
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::LineList,
-                    ..<_>::default()
-                },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: super::DEPTH_FORMAT,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
-                multisample: wgpu::MultisampleState::default(), // default = off
-                multiview: None,
-            });
-
-        Self {
-            shader_dirty: DirtyFlag::listening(false, |l| {
-                BLOCKS_AND_LINES_SHADER.as_source().listen(l)
-            }),
-            camera_bind_group_layout,
-            space_texture_bind_group_layout,
-            opaque_render_pipeline,
-            transparent_render_pipeline,
-
-            lines_render_pipeline,
-        }
-    }
-
-    pub(crate) fn recompile_if_changed(
-        &mut self,
-        device: &wgpu::Device,
-        surface_format: wgpu::TextureFormat,
-    ) {
-        if self.shader_dirty.get_and_clear() {
-            // TODO: slightly less efficient than it could be since it rebuilds the layouts too
-            *self = Self::new(device, surface_format);
-        }
-    }
-}
-
-static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
