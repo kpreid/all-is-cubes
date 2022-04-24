@@ -25,7 +25,7 @@ all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 anyhow = "1.0"
 clap = { version = "3.1.1", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }
 # Note: keep crossterm in sync with tui's crossterm dependency.
-crossterm = "0.22.0"
+crossterm = "0.23.2"
 directories-next = "2.0.0"
 dot_vox = "4.1.0" # TODO: belongs in a separate import/export lib
 futures = { version = "0.3.17", default-features = false, features = ["std", "executor"] }
@@ -42,8 +42,7 @@ simplelog = "0.11.1"
 strum = { version = "0.24.0", default-features = false, features = ["derive", "std"] }
 termion = "1.5.5" # TODO: Only used for ANSI color table. Remove?
 thiserror = "1.0.22"
-# Note: keep tui in sync with crossterm.
-tui = { version = "0.17.0", default-features = false, features = ["crossterm"] }
+tui = { version = "0.18.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
 winit = { version = "0.26.1", default-features = false, features = ["x11"] }
