@@ -28,29 +28,29 @@ fn info_text_vertex(
 [[stage(fragment)]]
 fn info_text_fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     // scale clip coordinates to 0.1 coordinates and flip Y
-    var texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
+    let texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
 
-    var derivatives = vec2<f32>(dpdx(texcoord.x), dpdy(texcoord.y));
+    let derivatives = vec2<f32>(dpdx(texcoord.x), dpdy(texcoord.y));
 
     var shadowing: f32 = 0.0;
-    var radius: i32 = 2;
+    let radius: i32 = 2;
     for (var dx: i32 = -radius; dx <= radius; dx = dx + 1) {
         for (var dy: i32 = -radius; dy <= radius; dy = dy + 1) {
-            var offset: vec2<f32> = vec2<f32>(vec2<i32>(dx, dy));
-            var offset_alpha: f32 = textureSampleLevel(
+            let offset: vec2<f32> = vec2<f32>(vec2<i32>(dx, dy));
+            let offset_alpha: f32 = textureSampleLevel(
                 text_texture,
                 text_sampler,
                 texcoord + offset * derivatives,
                 0.0
             ).a;
-            var weight: f32 = 0.2 / max(1.0, length(offset));
+            let weight: f32 = 0.2 / max(1.0, length(offset));
             shadowing = shadowing + offset_alpha * weight;
         }
     }
     shadowing = clamp(shadowing, 0.0, 0.5);
     shadowing = pow(shadowing, 0.45);  // TODO: kludge for gamma, or sensible visual tweak?
 
-    var foreground_texel = textureSampleLevel(text_texture, text_sampler, texcoord, 0.0);
+    let foreground_texel = textureSampleLevel(text_texture, text_sampler, texcoord, 0.0);
 
     // Shadow layer
     var color: vec4<f32> = mix(vec4<f32>(0.0), vec4<f32>(vec3<f32>(0.0), 1.0), shadowing);
