@@ -1,10 +1,13 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use crate::block::{Block, BlockChange, EvalBlockError, EvaluatedBlock};
+use crate::block::{
+    Block, BlockAttributes, BlockChange, BlockCollision, EvalBlockError, EvaluatedBlock, Evoxel,
+};
 use crate::listen::Listener;
-use crate::math::{GridRotation, Rgb};
-use crate::space::GridArray;
+use crate::math::{GridCoordinate, GridRotation, Rgb, Rgba};
+use crate::raycast::Face;
+use crate::space::{Grid, GridArray};
 use crate::universe::{RefVisitor, VisitRefs};
 
 /// Modifiers can be applied to a [`Block`] to change the result of
@@ -24,6 +27,15 @@ pub enum Modifier {
 
     /// Rotate the block about its cube center by the given rotation.
     Rotate(GridRotation),
+
+    /// Displace the block out of the grid, cropping it. A pair of `Move`s can depict a
+    /// block moving between two cubes.
+    Move {
+        /// The direction in which the block is displaced.
+        direction: Face,
+        /// The distance, in 1/256ths, by which it is displaced.
+        distance: u16,
+    },
 }
 
 impl Modifier {
@@ -36,7 +48,7 @@ impl Modifier {
     pub(crate) fn apply(
         &self,
         mut value: EvaluatedBlock,
-        _depth: u8,
+        depth: u8,
     ) -> Result<EvaluatedBlock, EvalBlockError> {
         Ok(match *self {
             Modifier::Quote { ambient } => {
@@ -82,6 +94,76 @@ impl Modifier {
                     }
                 }
             }
+
+            Modifier::Move {
+                direction,
+                distance,
+            } => {
+                // Apply Quote to ensure that the block's own `tick_action` and other effects
+                // don't interfere with movement or cause duplication.
+                // (In the future we may want a more nuanced policy that allows internal changes,
+                // but that will probably involve refining tick_action processing.)
+                value = Modifier::Quote { ambient: false }.apply(value, depth)?;
+
+                let (original_bounds, effective_resolution) = match value.voxels.as_ref() {
+                    Some(array) => (array.grid(), value.resolution),
+                    // Treat color blocks as having a resolution of 16. TODO: Improve on this hardcoded constant.
+                    None => (Grid::for_block(16), 16),
+                };
+
+                // For now, our strategy is to work in units of the block's resolution.
+                let distance_in_res = GridCoordinate::from(distance)
+                    * GridCoordinate::from(effective_resolution)
+                    / 256;
+                let translation_in_res = direction.normal_vector() * distance_in_res;
+
+                // This will be None if the displacement puts the block entirely out of view.
+                let displaced_bounds: Option<Grid> = original_bounds
+                    .translate(translation_in_res)
+                    .intersection(Grid::for_block(effective_resolution));
+
+                // Used by the solid color case; we have to do this before we move `attributes`
+                // out of `value`.
+                let voxel = Evoxel::from_block(&value);
+
+                let attributes = BlockAttributes {
+                    // Switch to `Recur` collision so that the displacement collides as expected.
+                    // TODO: If the collision was `Hard` then we may need to edit the collision
+                    // values of the individual voxels to preserve expected behavior.
+                    collision: match value.attributes.collision {
+                        BlockCollision::None => BlockCollision::None,
+                        BlockCollision::Hard | BlockCollision::Recur => {
+                            if displaced_bounds.is_some() {
+                                BlockCollision::Recur
+                            } else {
+                                // Recur treats no-voxels as Hard, which is not what we want
+                                BlockCollision::None
+                            }
+                        }
+                    },
+                    ..value.attributes
+                };
+
+                match displaced_bounds {
+                    Some(displaced_bounds) => {
+                        let displaced_voxels = match value.voxels.as_ref() {
+                            Some(voxels) => GridArray::from_fn(displaced_bounds, |cube| {
+                                voxels[cube - translation_in_res]
+                            }),
+                            None => {
+                                // Input block is a solid color; synthesize voxels.
+                                GridArray::from_fn(displaced_bounds, |_| voxel)
+                            }
+                        };
+                        EvaluatedBlock::from_voxels(
+                            attributes,
+                            effective_resolution,
+                            displaced_voxels,
+                        )
+                    }
+                    None => EvaluatedBlock::from_color(attributes, Rgba::TRANSPARENT),
+                }
+            }
         })
     }
 
@@ -94,6 +176,7 @@ impl Modifier {
         match self {
             Modifier::Quote { .. } => {}
             Modifier::Rotate(_) => {}
+            Modifier::Move { .. } => {}
         }
         Ok(())
     }
@@ -104,19 +187,24 @@ impl VisitRefs for Modifier {
         match self {
             Modifier::Quote { .. } => {}
             Modifier::Rotate(..) => {}
+            Modifier::Move {
+                direction: _,
+                distance: _,
+            } => {}
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{BlockAttributes, BlockCollision, Evoxel, Primitive};
+    use super::*;
+    use crate::block::{BlockAttributes, BlockCollision, Evoxel, Primitive, AIR};
     use crate::content::make_some_voxel_blocks;
+    use crate::drawing::VoxelBrush;
     use crate::math::{GridPoint, OpacityCategory, Rgba};
     use crate::space::Grid;
     use crate::universe::Universe;
-
-    use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn quote_evaluation() {
@@ -215,5 +303,100 @@ mod tests {
             rotated_twice.evaluate().unwrap(),
             two_rotations.evaluate().unwrap()
         );
+    }
+
+    #[test]
+    fn move_atom_block_evaluation() {
+        let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
+        let original = Block::from(color);
+        let modifier = Modifier::Move {
+            direction: Face::PY,
+            distance: 128, // distance 1/2 block × scale factor of 256
+        };
+        let moved = modifier.attach(original.clone());
+
+        let expected_bounds = Grid::new([0, 8, 0], [16, 8, 16]);
+
+        let ev_original = original.evaluate().unwrap();
+        assert_eq!(
+            moved.evaluate().unwrap(),
+            EvaluatedBlock {
+                attributes: BlockAttributes {
+                    collision: BlockCollision::Recur,
+                    ..ev_original.attributes.clone()
+                },
+                color: color.to_rgb().with_alpha(notnan!(0.5)),
+                voxels: GridArray::from_elements(
+                    expected_bounds,
+                    vec![Evoxel::from_block(&ev_original); expected_bounds.volume()]
+                ),
+                resolution: 16,
+                opaque: false,
+                visible: true,
+                voxel_opacity_mask: GridArray::from_elements(
+                    expected_bounds,
+                    vec![OpacityCategory::Opaque; expected_bounds.volume()]
+                ),
+            }
+        );
+    }
+
+    #[test]
+    fn move_voxel_block_evaluation() {
+        let mut universe = Universe::new();
+        let resolution = 2;
+        let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
+        let original = Block::builder()
+            .voxels_fn(&mut universe, resolution, |_| Block::from(color))
+            .unwrap()
+            .build();
+
+        let modifier = Modifier::Move {
+            direction: Face::PY,
+            distance: 128, // distance 1/2 block × scale factor of 256
+        };
+        let moved = modifier.attach(original.clone());
+
+        let expected_bounds = Grid::new([0, 1, 0], [2, 1, 2]);
+
+        let ev_original = original.evaluate().unwrap();
+        assert_eq!(
+            moved.evaluate().unwrap(),
+            EvaluatedBlock {
+                attributes: BlockAttributes {
+                    collision: BlockCollision::Recur,
+                    ..ev_original.attributes.clone()
+                },
+                color: color.to_rgb().with_alpha(notnan!(0.5)),
+                voxels: GridArray::from_elements(
+                    expected_bounds,
+                    vec![Evoxel::from_block(&ev_original); expected_bounds.volume()]
+                ),
+                resolution,
+                opaque: false,
+                visible: true,
+                voxel_opacity_mask: GridArray::from_elements(
+                    expected_bounds,
+                    vec![OpacityCategory::Opaque; expected_bounds.volume()]
+                ),
+            }
+        );
+    }
+
+    /// [`Modifier::Move`] incorporates [`Modifier::Quote`] to ensure that no conflicting
+    /// effects happen.
+    #[test]
+    fn move_also_quotes() {
+        let original = Block::builder()
+            .color(Rgba::WHITE)
+            .tick_action(Some(VoxelBrush::single(AIR)))
+            .build();
+        let moved = Modifier::Move {
+            direction: Face::PY,
+            distance: 128,
+        }
+        .attach(original);
+
+        assert_eq!(moved.evaluate().unwrap().attributes.tick_action, None);
     }
 }

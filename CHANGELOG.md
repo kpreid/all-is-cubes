@@ -8,6 +8,7 @@
     - The `all-is-cubes-gpu` renderer now fully supports blocks with a resolution greater than 16.
 
 - `all-is-cubes` library:
+    - `block::Modifier::Move`, for drawing blocks in motion or off the grid.
     - `math::point_to_enclosing_cube()`
     - `DirtyFlag::listening()` which simplifies typical usage.
     - `GridRotation::ALL_BUT_REFLECTIONS`, as `GridRotation::ALL` but excluding reflections.
