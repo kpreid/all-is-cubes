@@ -1,9 +1,13 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use cgmath::Zero;
+
 use crate::block::{
     Block, BlockAttributes, BlockChange, BlockCollision, EvalBlockError, EvaluatedBlock, Evoxel,
+    AIR,
 };
+use crate::drawing::VoxelBrush;
 use crate::listen::Listener;
 use crate::math::{Face6, GridCoordinate, GridRotation, Rgb, Rgba};
 use crate::space::{Grid, GridArray};
@@ -29,11 +33,23 @@ pub enum Modifier {
 
     /// Displace the block out of the grid, cropping it. A pair of `Move`s can depict a
     /// block moving between two cubes.
+    ///
+    /// **Animation:**
+    ///
+    /// * If the `distance` is zero then the modifier will remove itself, if possible,
+    ///   on the next tick.
+    /// * If the `distance` and `velocity` are such that the block is out of view and will
+    ///   never strt being in view, the block will be replaced with [`AIR`].
+    ///
+    /// (TODO: Define the conditions for “if possible”.)
+    // #[non_exhaustive] // TODO: needs a constructor
     Move {
         /// The direction in which the block is displaced.
         direction: Face6,
         /// The distance, in 1/256ths, by which it is displaced.
         distance: u16,
+        /// The velocity **per tick** with which this block is moving in the given direction.
+        velocity: i8,
     },
 }
 
@@ -107,6 +123,7 @@ impl Modifier {
             Modifier::Move {
                 direction,
                 distance,
+                velocity,
             } => {
                 // Apply Quote to ensure that the block's own `tick_action` and other effects
                 // don't interfere with movement or cause duplication.
@@ -136,6 +153,37 @@ impl Modifier {
                     .translate(translation_in_res)
                     .intersection(Grid::for_block(effective_resolution));
 
+                let animation_action = if displaced_bounds.is_none() && velocity >= 0 {
+                    // Displaced to invisibility; turn into just plain air.
+                    Some(VoxelBrush::single(AIR))
+                } else if translation_in_res.is_zero() && velocity == 0
+                    || distance == 0 && velocity < 0
+                {
+                    // Either a stationary displacement which is invisible, or an animated one which has finished its work.
+                    assert_eq!(&block.modifiers()[this_modifier_index], self);
+                    let mut new_block = block.clone();
+                    new_block.modifiers_mut().remove(this_modifier_index); // TODO: What if other modifiers want to do things?
+                    Some(VoxelBrush::single(new_block))
+                } else if velocity != 0 {
+                    // Movement in progress.
+                    assert_eq!(&block.modifiers()[this_modifier_index], self);
+                    let mut new_block = block.clone();
+                    if let Modifier::Move {
+                        distance, velocity, ..
+                    } = &mut new_block.modifiers_mut()[this_modifier_index]
+                    {
+                        *distance = i32::from(*distance)
+                            .saturating_add(i32::from(*velocity))
+                            .clamp(0, i32::from(u16::MAX))
+                            .try_into()
+                            .unwrap(/* clamped to range */);
+                    }
+                    Some(VoxelBrush::single(new_block))
+                } else {
+                    // Stationary displacement; take no action
+                    None
+                };
+
                 // Used by the solid color case; we have to do this before we move `attributes`
                 // out of `value`.
                 let voxel = Evoxel::from_block(&value);
@@ -155,6 +203,7 @@ impl Modifier {
                             }
                         }
                     },
+                    tick_action: animation_action,
                     ..value.attributes
                 };
 
@@ -194,6 +243,27 @@ impl Modifier {
         }
         Ok(())
     }
+
+    /// Create a pair of [`Modifier::Move`]s to displace a block.
+    /// The first goes on the block being moved and the second on the air
+    /// it's moving into.
+    ///
+    /// TODO: This is going to need to change again in order to support
+    /// moving one block in and another out at the same time.
+    pub fn paired_move(direction: Face6, distance: u16, velocity: i8) -> [Modifier; 2] {
+        [
+            Modifier::Move {
+                direction,
+                distance,
+                velocity,
+            },
+            Modifier::Move {
+                direction: direction.opposite(),
+                distance: 256 - distance,
+                velocity: -velocity,
+            },
+        ]
+    }
 }
 
 impl VisitRefs for Modifier {
@@ -204,6 +274,7 @@ impl VisitRefs for Modifier {
             Modifier::Move {
                 direction: _,
                 distance: _,
+                velocity: _,
             } => {}
         }
     }
@@ -326,6 +397,7 @@ mod tests {
         let modifier = Modifier::Move {
             direction: Face6::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
+            velocity: 0,
         };
         let moved = modifier.attach(original.clone());
 
@@ -368,6 +440,7 @@ mod tests {
         let modifier = Modifier::Move {
             direction: Face6::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
+            velocity: 0,
         };
         let moved = modifier.attach(original.clone());
 
@@ -408,6 +481,7 @@ mod tests {
         let moved = Modifier::Move {
             direction: Face6::PY,
             distance: 128,
+            velocity: 0,
         }
         .attach(original);
 

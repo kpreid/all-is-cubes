@@ -514,30 +514,16 @@ exhibit! {
             for z in 0..2 {
                 let i = x + z * 8;
                 let distance = (i * 16).try_into().unwrap();
-                let move_out = Modifier::Move {
-                    direction: Face6::PY,
-                    distance,
-                };
-                let move_in = Modifier::Move {
-                    direction: Face6::NY,
-                    distance: (256 - distance),
-                };
-                // TODO: there should be a routine to generate these pairs
-                // (and Move should be able to spawn a "tail" on its own when animated)
-                space.set([x * 2, 0, (1 - z) * 2], move_out.attach(blocks[i as usize].clone()))?;
-                space.set([x * 2, 1, (1 - z) * 2], move_in.attach(blocks[i as usize].clone()))?;
+                let block = &blocks[i as usize];
+                let [move_out, move_in] = Modifier::paired_move(Face6::PY, distance, 0);
+                // TODO: Move should be able to spawn a "tail" on its own when animated?
+                space.set([x * 2, 0, (1 - z) * 2], move_out.attach(block.clone()))?;
+                space.set([x * 2, 1, (1 - z) * 2], move_in.attach(block.clone()))?;
 
                 // Horizontal
-                let move_out = Modifier::Move {
-                    direction: Face6::PZ,
-                    distance,
-                };
-                let move_in = Modifier::Move {
-                    direction: Face6::NZ,
-                    distance: (256 - distance),
-                };
-                space.set([i, 0, -2], move_out.attach(blocks[i as usize].clone()))?;
-                space.set([i, 0, -1], move_in.attach(blocks[i as usize].clone()))?;
+                let [move_out, move_in] = Modifier::paired_move(Face6::PZ, distance, 0);
+                space.set([i, 0, -2], move_out.attach(block.clone()))?;
+                space.set([i, 0, -1], move_in.attach(block.clone()))?;
             }
         }
         Ok(space)
