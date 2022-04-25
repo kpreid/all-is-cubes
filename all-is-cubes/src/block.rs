@@ -13,7 +13,7 @@ use cgmath::{EuclideanSpace as _, Point3};
 use crate::listen::Listener;
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
-use crate::space::{Grid, GridArray, SetCubeError, Space, SpaceChange};
+use crate::space::{Grid, SetCubeError, Space, SpaceChange};
 use crate::universe::URef;
 
 mod attributes;
@@ -292,22 +292,9 @@ impl Block {
                 def_ref.try_borrow()?.evaluate_impl(next_depth(depth)?)?
             }
 
-            Primitive::Atom(ref attributes, color) => EvaluatedBlock {
-                attributes: attributes.clone(),
-                color,
-                voxels: None,
-                resolution: 1,
-                opaque: color.fully_opaque(),
-                visible: !color.fully_transparent(),
-                voxel_opacity_mask: if color.fully_transparent() {
-                    None
-                } else {
-                    Some(
-                        GridArray::from_elements(Grid::for_block(1), [color.opacity_category()])
-                            .unwrap(),
-                    )
-                },
-            },
+            Primitive::Atom(ref attributes, color) => {
+                EvaluatedBlock::from_color(attributes.clone(), color)
+            }
 
             Primitive::Recur {
                 ref attributes,

@@ -83,6 +83,26 @@ impl CustomFormat<ConciseDebug> for EvaluatedBlock {
 }
 
 impl EvaluatedBlock {
+    /// Computes the derived values of a single-color block.
+    pub(crate) fn from_color(attributes: BlockAttributes, color: Rgba) -> EvaluatedBlock {
+        EvaluatedBlock {
+            attributes,
+            color,
+            voxels: None,
+            resolution: 1,
+            opaque: color.fully_opaque(),
+            visible: !color.fully_transparent(),
+            voxel_opacity_mask: if color.fully_transparent() {
+                None
+            } else {
+                Some(
+                    GridArray::from_elements(Grid::for_block(1), [color.opacity_category()])
+                        .unwrap(),
+                )
+            },
+        }
+    }
+
     /// Computes the derived values of a voxel block.
     pub(crate) fn from_voxels(
         attributes: BlockAttributes,
