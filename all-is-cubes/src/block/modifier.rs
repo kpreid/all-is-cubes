@@ -44,8 +44,18 @@ impl Modifier {
         block
     }
 
-    pub(crate) fn apply(
+    /// Compute the effect of this modifier.
+    ///
+    /// * `block` is the original block value (modifiers do not alter it).
+    /// * `this_modifier_index` is the index in `block.modifiers()` of `self`.
+    /// * `value` is the output of the preceding modifier or primitive, which is what the
+    ///   current modifier should be applied to.
+    /// * `depth` is the current block evaluation recursion depth (which is *not*
+    ///   incremented by modifiers; TODO: define a computation limit strategy).
+    pub(crate) fn evaluate(
         &self,
+        block: &Block,
+        this_modifier_index: usize,
         mut value: EvaluatedBlock,
         depth: u8,
     ) -> Result<EvaluatedBlock, EvalBlockError> {
@@ -102,7 +112,12 @@ impl Modifier {
                 // don't interfere with movement or cause duplication.
                 // (In the future we may want a more nuanced policy that allows internal changes,
                 // but that will probably involve refining tick_action processing.)
-                value = Modifier::Quote { ambient: false }.apply(value, depth)?;
+                value = Modifier::Quote { ambient: false }.evaluate(
+                    block,
+                    this_modifier_index,
+                    value,
+                    depth,
+                )?;
 
                 let (original_bounds, effective_resolution) = match value.voxels.as_ref() {
                     Some(array) => (array.grid(), value.resolution),

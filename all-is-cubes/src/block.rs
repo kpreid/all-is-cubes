@@ -339,9 +339,9 @@ impl Block {
             }
         };
 
-        for modifier in self.modifiers() {
+        for (index, modifier) in self.modifiers().iter().enumerate() {
             // TODO: Extend recursion depth model to catch stacking up lots of modifiers
-            value = modifier.apply(value, depth)?;
+            value = modifier.evaluate(self, index, value, depth)?;
         }
 
         Ok(value)
