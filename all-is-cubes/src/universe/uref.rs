@@ -71,7 +71,15 @@ impl<T: 'static> URef<T> {
 
     /// Apply the given function to the `&mut T` inside.
     ///
-    /// TODO: If possible, replace this operation with transactions, to ensure change notification integrity.
+    /// **Warning:** Misusing this operation can disrupt connections between objects in
+    /// the [`Universe`]; prefer [`URef::execute()`] if the desired mutation can be
+    /// expressed as a [`Transaction`]. If you must use this, the requirement for
+    /// correctness is that you must not replace the referent with a different value;
+    /// only use the mutation operations provided by `T`.
+    ///
+    /// TODO: If possible, completely replace this operation with transactions.
+    /// If not possible, consider the overkill approach of using [`std::pin::Pin`] to
+    /// enforce no swapping.
     pub fn try_modify<F, Out>(&self, function: F) -> Result<Out, RefError>
     where
         F: FnOnce(&mut T) -> Out,
@@ -96,7 +104,11 @@ impl<T: 'static> URef<T> {
         })
     }
 
-    /// Shortcut for executing a transaction.
+    /// Execute the given transaction on the referent.
+    ///
+    /// Returns an error if the transaction's preconditions were not met, if the
+    /// referent was already borrowed, or if the transaction encountered an unexpected
+    /// error. TODO: Distinguish these cases.
     pub fn execute(
         &self,
         transaction: &<T as Transactional>::Transaction,
@@ -136,8 +148,8 @@ impl<T> hash::Hash for URef<T> {
     }
 }
 
-/// Manual implementation of Clone that does not require T to be Clone.
 impl<T> Clone for URef<T> {
+    /// Cloning a [`URef`] clones the reference only.
     fn clone(&self) -> Self {
         URef {
             weak_ref: self.weak_ref.clone(),
