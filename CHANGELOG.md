@@ -26,8 +26,11 @@
         - It internally uses reference counting to be predictably cheap to `clone()`; this is intended to help use cases such as transactions which mean that even a block which only exists once in the universe is frequently cloned.
         - Many changes to the functions, associated methods, and `BlockBuilder` were made to support this new structure.
 
-    - `AllIsCubesAppState::new()` and `BlockProvider::new()` are now async functions.
+    - `apps::Session::new()` (formerly `AllIsCubesAppState::new()`) is now an async function.
+    - `linking::BlockProvider::new()` is now an async function.
     - The `linking::BlockModule` trait now requires the [`exhaust::Exhaust`](https://docs.rs/exhaust/latest/exhaust/trait.Exhaust.html) trait in place of `strum::IntoEnumIterator`. This allows implementors to use enums with fields (or non-enums).
+
+    - Renamed: `apps::AllIsCubesAppState` to `apps::Session`.
 
 - `all-is-cubes-gpu` library:
     - To allow for working with alternative GPU APIs, everything specific to `luminance` has been moved into a submodule `in_luminance`.

@@ -15,7 +15,7 @@ use anyhow::anyhow;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::{chunk::ChunkType, Encoder};
 
-use all_is_cubes::apps::AllIsCubesAppState;
+use all_is_cubes::apps::Session;
 use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::Vector2;
@@ -58,7 +58,7 @@ impl RecordAnimationOptions {
 }
 
 pub(crate) fn record_main(
-    mut app: AllIsCubesAppState,
+    mut session: Session,
     options: RecordOptions,
 ) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
@@ -68,11 +68,11 @@ pub(crate) fn record_main(
     let mut stderr = std::io::stderr();
 
     let viewport = options.viewport();
-    let mut camera = Camera::new(app.graphics_options().snapshot(), viewport);
+    let mut camera = Camera::new(session.graphics_options().snapshot(), viewport);
 
     // Get character or fail.
     // (We could instead try to render a blank scene, but that is probably not wanted.)
-    let character_ref: URef<Character> = app
+    let character_ref: URef<Character> = session
         .character()
         .snapshot()
         .ok_or_else(|| anyhow!("Character not found"))?;
@@ -103,7 +103,7 @@ pub(crate) fn record_main(
             camera.set_view_transform(character_ref.borrow().view());
             let scene = SpaceRaytracer::<()>::new(
                 &*space_ref.borrow(),
-                app.graphics_options().snapshot(),
+                session.graphics_options().snapshot(),
                 (),
             );
             recorder
@@ -113,9 +113,9 @@ pub(crate) fn record_main(
 
             // Advance time for next frame.
             if let Some(anim) = &options.animation {
-                let _ = app.frame_clock.request_frame(anim.frame_period);
+                let _ = session.frame_clock.request_frame(anim.frame_period);
                 // TODO: maybe_step_universe has a catch-up time cap, which we should disable for this.
-                while app.maybe_step_universe().is_some() {}
+                while session.maybe_step_universe().is_some() {}
             }
 
             // Update progress bar.

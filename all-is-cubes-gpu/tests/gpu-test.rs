@@ -20,7 +20,7 @@ use luminance::pixel::{Depth32F, RGBA32F};
 use luminance::texture::{Dim2, Sampler};
 use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 
-use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
+use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes_gpu::in_luminance::EverythingRenderer;
@@ -116,10 +116,10 @@ fn renderer_smoke_test(context: &mut GL33Context) {
         .new_framebuffer::<Dim2, RGBA32F, Depth32F>([100, 100], 0, Sampler::default())
         .unwrap();
 
-    let app = block_on(AllIsCubesAppState::new());
+    let session = block_on(Session::new());
     let mut renderer = EverythingRenderer::new(
         context,
-        StandardCameras::from_app_state(&app, VIEWPORT).unwrap(),
+        StandardCameras::from_session(&session, VIEWPORT).unwrap(),
     )
     .unwrap();
     renderer

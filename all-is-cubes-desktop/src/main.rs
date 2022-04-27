@@ -25,7 +25,7 @@ use futures::executor::block_on;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rand::{thread_rng, Rng};
 
-use all_is_cubes::apps::AllIsCubesAppState;
+use all_is_cubes::apps::Session;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
@@ -104,13 +104,15 @@ fn main() -> Result<(), anyhow::Error> {
         config_files::load_config().expect("Error loading configuration files")
     };
 
-    let start_app_time = Instant::now();
-    let mut app = block_on(AllIsCubesAppState::new());
-    app.graphics_options_mut().set(graphics_options);
-    let app_done_time = Instant::now();
+    let start_session_time = Instant::now();
+    let mut session = block_on(Session::new());
+    session.graphics_options_mut().set(graphics_options);
+    let session_done_time = Instant::now();
     log::debug!(
-        "Initialized app state ({:.3} s)",
-        app_done_time.duration_since(start_app_time).as_secs_f32()
+        "Initialized session ({:.3} s)",
+        session_done_time
+            .duration_since(start_session_time)
+            .as_secs_f32()
     );
 
     let universe_progress_bar = ProgressBar::new(100)
@@ -137,19 +139,20 @@ fn main() -> Result<(), anyhow::Error> {
             }
         }
     })?;
-    app.set_universe(universe);
+    session.set_universe(universe);
     universe_progress_bar.finish();
     let universe_done_time = Instant::now();
     log::debug!(
         "Initialized game state with {:?} ({:.3} s)",
         input_source,
         universe_done_time
-            .duration_since(app_done_time)
+            .duration_since(session_done_time)
             .as_secs_f32()
     );
 
     if precompute_light || graphics_type == GraphicsType::Record {
-        app.character()
+        session
+            .character()
             .snapshot()
             .expect("no character to record the viewpoint of")
             .borrow()
@@ -159,12 +162,12 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     match graphics_type {
-        GraphicsType::Window => glfw_main_loop(app, &title_and_version(), display_size),
-        GraphicsType::WindowWgpu => winit_main_loop(app, &title_and_version(), display_size),
-        GraphicsType::Terminal => terminal_main_loop(app, TerminalOptions::default()),
-        GraphicsType::Record => record_main(app, options.record_options()),
+        GraphicsType::Window => glfw_main_loop(session, &title_and_version(), display_size),
+        GraphicsType::WindowWgpu => winit_main_loop(session, &title_and_version(), display_size),
+        GraphicsType::Terminal => terminal_main_loop(session, TerminalOptions::default()),
+        GraphicsType::Record => record_main(session, options.record_options()),
         GraphicsType::Print => terminal_print_once(
-            app,
+            session,
             TerminalOptions::default(),
             // TODO: Default display size should be based on terminal width
             // (but not necessarily the full height)
@@ -181,11 +184,11 @@ fn main() -> Result<(), anyhow::Error> {
 
             let t0 = Instant::now();
             loop {
-                // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.
+                // TODO: sleep instead of spinning, and maybe put a general version of this in Session.
                 // TODO: Offer a faster-than-real-time option. (Right now, FrameClock bakes in a slowdown policy that would need adjustment.)
                 let t = Instant::now();
-                app.frame_clock.advance_to(t);
-                app.maybe_step_universe();
+                session.frame_clock.advance_to(t);
+                session.maybe_step_universe();
 
                 if duration.map(|d| t.duration_since(t0) > d).unwrap_or(false) {
                     break;

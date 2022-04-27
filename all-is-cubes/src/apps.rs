@@ -33,17 +33,18 @@ pub use time::*;
 
 const LOG_FIRST_FRAMES: bool = false;
 
-/// Everything that a game application needs regardless of platform.
+/// A game session; a bundle of a [`Universe`] and supporting elements such as
+/// a [`FrameClock`] and UI state.
 ///
 /// Once we have multiplayer / client-server support, this will become the client-side
 /// structure.
-pub struct AllIsCubesAppState {
+pub struct Session {
     /// Determines the timing of simulation and drawing. The caller must arrange
     /// to advance time in the clock.
     pub frame_clock: FrameClock,
 
     /// Handles (some) user input. The caller must provide input events/state;
-    /// `AllIsCubesAppState` will handle calling [`InputProcessor::apply_input`].
+    /// [`Session`] will handle calling [`InputProcessor::apply_input`].
     pub input_processor: InputProcessor,
 
     graphics_options: ListenableCell<GraphicsOptions>,
@@ -76,9 +77,9 @@ pub struct AllIsCubesAppState {
     // When adding fields, remember to update the `Debug` impl.
 }
 
-impl fmt::Debug for AllIsCubesAppState {
+impl fmt::Debug for Session {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AllIsCubesAppState")
+        f.debug_struct("Session")
             .field("frame_clock", &self.frame_clock)
             .field("input_processor", &self.input_processor)
             .field("graphics_options", &self.graphics_options)
@@ -97,11 +98,12 @@ impl fmt::Debug for AllIsCubesAppState {
     }
 }
 
-impl AllIsCubesAppState {
-    /// Construct a new `AllIsCubesAppState` with an empty [`Universe`].
+impl Session {
+    /// Construct a new [`Session`] with an empty [`Universe`].
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
-    /// multitasking. It may be blocked on from a synchronous context.
+    /// multitasking, while constructing the initial state. It may safely be blocked on
+    /// from a synchronous context.
     #[allow(clippy::new_without_default)]
     pub async fn new() -> Self {
         let game_universe = Universe::new();
@@ -362,7 +364,10 @@ impl AllIsCubesAppState {
             )
         }
 
-        InfoText { app: self, render }
+        InfoText {
+            session: self,
+            render,
+        }
     }
 
     #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
@@ -416,19 +421,19 @@ pub struct StandardCameras {
 }
 
 impl StandardCameras {
-    pub fn from_app_state(
-        app_state: &AllIsCubesAppState,
+    pub fn from_session(
+        session: &Session,
         viewport: Viewport,
     ) -> Result<Self, std::convert::Infallible> {
         // TODO: Add a unit test that each of these listeners works as intended.
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
         // to not have it (some kind of "following cell")?
-        let graphics_options = app_state.graphics_options();
+        let graphics_options = session.graphics_options();
         let graphics_options_dirty = DirtyFlag::listening(false, |l| graphics_options.listen(l));
         let initial_options = &*graphics_options.get();
 
-        let character_source = app_state.character();
-        let ui_space_source = app_state.ui_space();
+        let character_source = session.character();
+        let ui_space_source = session.ui_space();
 
         let mut this = Self {
             graphics_options,
@@ -589,7 +594,7 @@ impl StandardCameras {
     }
 }
 
-/// A message sent to the [`AllIsCubesAppState`], such as from a user interface element.
+/// A message sent to the [`Session`], such as from a user interface element.
 // TODO: make public if this proves to be a good approach
 #[non_exhaustive]
 pub(crate) enum ControlMessage {
@@ -601,23 +606,26 @@ pub(crate) enum ControlMessage {
 
 #[derive(Copy, Clone, Debug)]
 pub struct InfoText<'a, T> {
-    app: &'a AllIsCubesAppState,
+    session: &'a Session,
     render: T,
 }
 
 impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(character_ref) = self.app.game_character.borrow() {
+        if let Some(character_ref) = self.session.game_character.borrow() {
             write!(f, "{}", character_ref.borrow().custom_format(StatusText)).unwrap();
         }
         write!(
             f,
             "\n\n{:#?}\n\nFPS: {:2.1}\n{:#?}\n\n",
-            self.app.last_step_info.custom_format(StatusText),
-            self.app.frame_clock.draw_fps_counter().frames_per_second(),
+            self.session.last_step_info.custom_format(StatusText),
+            self.session
+                .frame_clock
+                .draw_fps_counter()
+                .frames_per_second(),
             self.render.custom_format(StatusText),
         )?;
-        match self.app.cursor_result() {
+        match self.session.cursor_result() {
             Some(cursor) => write!(f, "{}", cursor),
             None => write!(f, "No block"),
         }?;
@@ -637,18 +645,19 @@ mod tests {
     fn set_universe_async() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
-        let mut app = block_on(AllIsCubesAppState::new());
-        app.universe_mut()
+        let mut session = block_on(Session::new());
+        session
+            .universe_mut()
             .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))
             .unwrap();
 
         // Set up async loading but don't deliver anything yet
         let (send, recv) = oneshot::channel();
-        app.set_universe_async(async { recv.await.unwrap() });
+        session.set_universe_async(async { recv.await.unwrap() });
 
         // Existing universe should still be present.
-        app.maybe_step_universe();
-        assert!(UniverseIndex::<Space>::get(app.universe_mut(), &old_marker).is_some());
+        session.maybe_step_universe();
+        assert!(UniverseIndex::<Space>::get(session.universe_mut(), &old_marker).is_some());
 
         // Deliver new universe.
         let mut new_universe = Universe::new();
@@ -658,18 +667,18 @@ mod tests {
         send.send(Ok(new_universe)).unwrap();
 
         // Receive it.
-        app.maybe_step_universe();
-        assert!(UniverseIndex::<Space>::get(app.universe_mut(), &new_marker).is_some());
-        assert!(UniverseIndex::<Space>::get(app.universe_mut(), &old_marker).is_none());
+        session.maybe_step_universe();
+        assert!(UniverseIndex::<Space>::get(session.universe_mut(), &new_marker).is_some());
+        assert!(UniverseIndex::<Space>::get(session.universe_mut(), &old_marker).is_none());
 
         // Verify cleanup (that the next step can succeed).
-        app.maybe_step_universe();
+        session.maybe_step_universe();
     }
 
     #[test]
     fn cameras_follow_character_and_world() {
-        let mut app = block_on(AllIsCubesAppState::new());
-        let mut cameras = StandardCameras::from_app_state(&app, Viewport::ARBITRARY).unwrap();
+        let mut session = block_on(Session::new());
+        let mut cameras = StandardCameras::from_session(&session, Viewport::ARBITRARY).unwrap();
 
         let world_source = cameras.world_space();
         let flag = DirtyFlag::listening(false, |l| world_source.listen(l));
@@ -680,7 +689,7 @@ mod tests {
         assert!(!flag.get_and_clear());
 
         // Create a universe with space and character
-        // TODO: This has to be a new one because there currently isn't an AppState::set_character()!
+        // TODO: This has to be a new one because there currently isn't an Session::set_character()!
         let mut universe = Universe::new();
         let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
         // TODO: "character" is a special default name used for finding the character the
@@ -691,7 +700,7 @@ mod tests {
                 Character::spawn_default(space_ref.clone()),
             )
             .unwrap();
-        app.set_universe(universe);
+        session.set_universe(universe);
 
         // Now the world_source should be reporting the new space
         assert!(!flag.get_and_clear());

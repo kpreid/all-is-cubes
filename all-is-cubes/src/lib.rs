@@ -84,12 +84,12 @@
 //!
 //! This crate does not provide any platform bindings, but it does contain components for
 //! the platform-independent components of the complete interactive game application.
-//! If you create an [`AllIsCubesAppState`], it will manage the [`Universe`], the
-//! [UI](crate::vui), and user input; you need to provide:
+//! If you create a [`Session`], it will manage the [`Universe`], the [UI](crate::vui),
+//! and user input; you need to provide:
 //!
 //! * A renderer, possibly using the [`all-is-cubes-gpu`](https://docs.rs/all-is-cubes-gpu),
 //!   [the software raytracer](crate::raytracer), or your own code.
-//! * Deliver input events to [`AllIsCubesAppState::input_processor`].
+//! * Deliver input events to [`Session::input_processor`].
 //!
 //! It is also possible to ignore the provided application structure entirely and use the
 //! [`Universe`] and rendering functions as you see fit.
@@ -123,12 +123,12 @@
 //! * [`ordered_float`] (as `all_is_cubes::math::NotNan`).
 //! * [`embedded_graphics`] (as `all_is_cubes::drawing::embedded_graphics`).
 //!
-//! [`AllIsCubesAppState`]: crate::apps::AllIsCubesAppState
-//! [`AllIsCubesAppState::input_processor`]: crate::apps::AllIsCubesAppState::input_processor
 //! [`Behavior`]: crate::behavior::Behavior
 //! [`Block`]: crate::block::Block
 //! [`Body`]: crate::physics::Body
 //! [`Character`]: crate::character::Character
+//! [`Session`]: crate::apps::Session
+//! [`Session::input_processor`]: crate::apps::Session::input_processor
 //! [`Space`]: crate::space::Space
 //! [`SpacePhysics`]: crate::space::SpacePhysics
 //! [`Tool`]: crate::inv::Tool

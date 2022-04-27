@@ -23,7 +23,7 @@ use tui::text::{Span, Spans};
 use tui::widgets::{Borders, Paragraph};
 use tui::{backend::CrosstermBackend, Terminal};
 
-use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
+use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::cgmath::{ElementWise as _, Point2};
@@ -77,11 +77,8 @@ impl Default for TerminalOptions {
     }
 }
 
-pub fn terminal_main_loop(
-    app: AllIsCubesAppState,
-    options: TerminalOptions,
-) -> Result<(), anyhow::Error> {
-    let mut main = TerminalMain::new(app, options)?;
+pub fn terminal_main_loop(session: Session, options: TerminalOptions) -> Result<(), anyhow::Error> {
+    let mut main = TerminalMain::new(session, options)?;
     main.run()?;
     main.clean_up_terminal()?; // note this is _also_ run on drop
     Ok(())
@@ -89,21 +86,21 @@ pub fn terminal_main_loop(
 
 /// Print the scene to stdout and return, instead of starting any interaction.
 ///
-/// TODO: This shouldn't need to take ownership of the `app`; it does so because it is
+/// TODO: This shouldn't need to take ownership of the `session`; it does so because it is
 /// built on the same components as [`terminal_main_loop`].
 pub fn terminal_print_once(
-    app: AllIsCubesAppState,
+    session: Session,
     options: TerminalOptions,
     display_size: Vector2<u16>,
 ) -> Result<(), anyhow::Error> {
-    let mut main = TerminalMain::new(app, options)?;
+    let mut main = TerminalMain::new(session, options)?;
     main.print_once(display_size)?;
     main.clean_up_terminal()?; // note this is _also_ run on drop
     Ok(())
 }
 
 struct TerminalMain {
-    app: AllIsCubesAppState,
+    session: Session,
     cameras: StandardCameras,
 
     options: TerminalOptions,
@@ -141,12 +138,12 @@ struct FrameOutput {
 }
 
 impl TerminalMain {
-    fn new(app: AllIsCubesAppState, options: TerminalOptions) -> crossterm::Result<Self> {
+    fn new(session: Session, options: TerminalOptions) -> crossterm::Result<Self> {
         crossterm::terminal::enable_raw_mode()?;
 
         let viewport_position = Rect::default();
         let viewport = options.viewport_from_terminal_size(rect_size(viewport_position));
-        let cameras = StandardCameras::from_app_state(&app, viewport).unwrap();
+        let cameras = StandardCameras::from_session(&session, viewport).unwrap();
 
         // Generate reusable buffers for scene.
         // They are recirculated through the channels so that one can be updated while another is being raytraced.
@@ -202,7 +199,7 @@ impl TerminalMain {
 
         Ok(Self {
             cameras,
-            app,
+            session,
             options,
             tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
             viewport_position,
@@ -238,7 +235,7 @@ impl TerminalMain {
             'input: while crossterm::event::poll(Duration::ZERO)? {
                 let event = crossterm::event::read()?;
                 if let Some(aic_event) = event_to_key(&event) {
-                    if self.app.input_processor.key_momentary(aic_event) {
+                    if self.session.input_processor.key_momentary(aic_event) {
                         // Handled by input_processor
                         continue 'input;
                     }
@@ -279,14 +276,14 @@ impl TerminalMain {
                         // system. Define a version of mouse_pixel_position which takes sizes directly?
                         let position =
                             Point2::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
-                        self.app.input_processor.mouse_pixel_position(
+                        self.session.input_processor.mouse_pixel_position(
                             self.cameras.viewport(),
                             Some(position),
                             true,
                         );
                         match kind {
                             MouseEventKind::Down(button) => {
-                                self.app.click(map_mouse_button(button));
+                                self.session.click(map_mouse_button(button));
                             }
                             MouseEventKind::Up(_)
                             | MouseEventKind::Drag(_)
@@ -298,9 +295,9 @@ impl TerminalMain {
                 }
             }
 
-            // TODO: sleep instead of spinning, and maybe put a general version of this in AllIsCubesAppState.
-            self.app.frame_clock.advance_to(Instant::now());
-            self.app.maybe_step_universe();
+            // TODO: sleep instead of spinning, and maybe put a general version of this in Session.
+            self.session.frame_clock.advance_to(Instant::now());
+            self.session.maybe_step_universe();
 
             match self.render_pipe_out.try_recv() {
                 Ok(frame) => {
@@ -312,8 +309,8 @@ impl TerminalMain {
                 Err(mpsc::TryRecvError::Disconnected) => panic!("render thread died"),
             }
 
-            if self.app.frame_clock.should_draw() {
-                self.app.update_cursor(&self.cameras); // TODO: wrong UI camera ...
+            if self.session.frame_clock.should_draw() {
+                self.session.update_cursor(&self.cameras); // TODO: wrong UI camera ...
                 self.send_frame_to_render();
             } else {
                 std::thread::yield_now();
@@ -355,7 +352,7 @@ impl TerminalMain {
             (Some(t), Some(s)) if t.space() == s => Some(t),
             (_, Some(s)) => Some(UpdatingSpaceRaytracer::new(
                 s.clone(),
-                self.app.graphics_options(),
+                self.session.graphics_options(),
                 ListenableSource::constant(()),
             )),
             (_, None) => None,
@@ -372,7 +369,7 @@ impl TerminalMain {
             scene: tracer,
         }) {
             Ok(()) => {
-                self.app.frame_clock.did_draw();
+                self.session.frame_clock.did_draw();
             }
             Err(TrySendError::Disconnected(_)) => {
                 // Ignore send errors as they should be detected on the receive side
@@ -444,7 +441,7 @@ impl TerminalMain {
                     .constraints([Constraint::Ratio(1, SLOTS as u32); SLOTS])
                     .split(toolbar_rect);
 
-                if let Some(character_ref) = self.app.character().snapshot() {
+                if let Some(character_ref) = self.session.character().snapshot() {
                     let character = character_ref.borrow();
                     let selected_slots = character.selected_slots();
                     let slots = &character.inventory().slots;
@@ -508,7 +505,7 @@ impl TerminalMain {
                 f.render_widget(
                     Paragraph::new(format!(
                         "{:5.1} FPS",
-                        self.app.draw_fps_counter().frames_per_second()
+                        self.session.draw_fps_counter().frames_per_second()
                     )),
                     frame_info_rect,
                 );
@@ -526,7 +523,7 @@ impl TerminalMain {
 
             // Cursor info
             f.render_widget(
-                if let Some(cursor) = self.app.cursor_result() {
+                if let Some(cursor) = self.session.cursor_result() {
                     // TODO: design good formatting for cursor data
                     Paragraph::new(format!(
                         "{:?} : {}",

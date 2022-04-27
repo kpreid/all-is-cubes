@@ -16,7 +16,7 @@ use web_sys::{
     HtmlProgressElement, KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
 };
 
-use all_is_cubes::apps::{AllIsCubesAppState, Key, StandardCameras};
+use all_is_cubes::apps::{Key, Session, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
@@ -78,8 +78,8 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     app_progress.progress(0.2).await;
     // The main cost of this is constructing the `Vui` instance.
     // TODO: pipe in YieldProgress
-    let app = AllIsCubesAppState::new().await;
-    app.graphics_options_mut().set(graphics_options);
+    let session = Session::new().await;
+    session.graphics_options_mut().set(graphics_options);
 
     static_dom
         .loading_log
@@ -99,7 +99,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     app_progress.progress(0.6).await;
     let renderer = SurfaceRenderer::new(
         surface,
-        StandardCameras::from_app_state(&app, gui_helpers.canvas_helper().viewport()).unwrap(),
+        StandardCameras::from_session(&session, gui_helpers.canvas_helper().viewport()).unwrap(),
     )
     .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
 
@@ -107,7 +107,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .loading_log
         .append_data("\nStarting game loop...")?;
     app_progress.progress(0.8).await;
-    let root = WebGameRoot::new(gui_helpers, static_dom.clone(), app, renderer);
+    let root = WebGameRoot::new(gui_helpers, static_dom.clone(), session, renderer);
     root.borrow().start_loop();
 
     static_dom
@@ -118,7 +118,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .build(universe_progress, thread_rng().gen())
         .await
         .expect("universe template error");
-    root.borrow_mut().app.set_universe(universe);
+    root.borrow_mut().session.set_universe(universe);
 
     // Explicitly keep the game loop alive.
     Box::leak(Box::new(root));
@@ -147,7 +147,7 @@ struct WebGameRoot {
 
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
-    app: AllIsCubesAppState,
+    session: Session,
     renderer: SurfaceRenderer<WebSysWebGL2Surface>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
@@ -160,7 +160,7 @@ impl WebGameRoot {
     pub fn new(
         gui_helpers: GuiHelpers,
         static_dom: StaticDom,
-        app: AllIsCubesAppState,
+        session: Session,
         renderer: SurfaceRenderer<WebSysWebGL2Surface>,
     ) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
@@ -169,7 +169,7 @@ impl WebGameRoot {
 
             gui_helpers,
             static_dom,
-            app,
+            session,
             renderer,
             raf_callback: Closure::wrap(Box::new(|_| { /* dummy no-op for initialization */ })),
             step_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
@@ -208,7 +208,7 @@ impl WebGameRoot {
             false,
             move |this, event: KeyboardEvent| {
                 if let Some(key) = map_keyboard_event(&event) {
-                    this.app.input_processor.key_down(key);
+                    this.session.input_processor.key_down(key);
 
                     // TODO: return for keys we don't bind
                     let event: &Event = event.as_ref();
@@ -223,7 +223,7 @@ impl WebGameRoot {
             false,
             move |this, event: KeyboardEvent| {
                 if let Some(key) = map_keyboard_event(&event) {
-                    this.app.input_processor.key_up(key);
+                    this.session.input_processor.key_up(key);
 
                     // TODO: return for keys we don't bind
                     let event: &Event = event.as_ref();
@@ -234,12 +234,12 @@ impl WebGameRoot {
         );
 
         self.add_canvas_to_self_event_listener("focus", true, move |this, _: FocusEvent| {
-            this.app.input_processor.key_focus(true);
+            this.session.input_processor.key_focus(true);
         });
 
         self.add_canvas_to_self_event_listener("blur", true, move |this, _: FocusEvent| {
-            this.app.input_processor.key_focus(false);
-            this.app.input_processor.mouse_ndc_position(None);
+            this.session.input_processor.key_focus(false);
+            this.session.input_processor.mouse_ndc_position(None);
         });
 
         self.add_canvas_to_self_event_listener(
@@ -259,7 +259,7 @@ impl WebGameRoot {
         );
 
         self.add_canvas_to_self_event_listener("mouseout", true, move |this, _: MouseEvent| {
-            this.app.input_processor.mouse_ndc_position(None);
+            this.session.input_processor.mouse_ndc_position(None);
         });
 
         self.add_canvas_to_self_event_listener(
@@ -275,7 +275,7 @@ impl WebGameRoot {
                     1 => 2,
                     x => x as usize,
                 };
-                this.app.click(mapped_button);
+                this.session.click(mapped_button);
             },
         );
 
@@ -339,7 +339,7 @@ impl WebGameRoot {
     fn raf_callback_impl(&mut self, dom_timestamp: f64) {
         let delta = Duration::from_secs_f64((dom_timestamp - self.last_raf_timestamp) / 1000.0);
         self.last_raf_timestamp = dom_timestamp;
-        let should_draw = self.app.frame_clock.request_frame(delta);
+        let should_draw = self.session.frame_clock.request_frame(delta);
 
         if should_draw {
             // TODO do projection updates only when needed
@@ -347,12 +347,12 @@ impl WebGameRoot {
                 .set_viewport(self.gui_helpers.canvas_helper().viewport())
                 .unwrap();
             self.renderer.objects.update_world_camera();
-            self.app.update_cursor(self.renderer.objects.cameras());
+            self.session.update_cursor(self.renderer.objects.cameras());
 
             // Do graphics
             let render_info = self
                 .renderer
-                .render_frame(self.app.cursor_result())
+                .render_frame(self.session.cursor_result())
                 .expect("error in render_frame");
 
             // Update info text
@@ -367,13 +367,13 @@ impl WebGameRoot {
             {
                 self.static_dom
                     .scene_info_text_node
-                    .set_data(&format!("{}", self.app.info_text(render_info)));
+                    .set_data(&format!("{}", self.session.info_text(render_info)));
             } else {
                 self.static_dom.scene_info_text_node.set_data("");
             }
         }
 
-        if self.app.frame_clock.should_step() && !self.step_callback_scheduled {
+        if self.session.frame_clock.should_step() && !self.step_callback_scheduled {
             self.step_callback_scheduled = true;
             web_sys::window()
                 .unwrap()
@@ -385,7 +385,7 @@ impl WebGameRoot {
         }
 
         // Sync pointer lock state
-        let wants = self.app.input_processor.wants_pointer_lock();
+        let wants = self.session.input_processor.wants_pointer_lock();
         let has = self.check_pointer_lock();
         if wants != has {
             let canvas = self.gui_helpers.canvas_helper().canvas();
@@ -402,7 +402,7 @@ impl WebGameRoot {
 
     fn step_callback_impl(&mut self) {
         self.step_callback_scheduled = false;
-        if let Some(universe_step_info) = self.app.maybe_step_universe() {
+        if let Some(universe_step_info) = self.session.maybe_step_universe() {
             self.last_step_info = universe_step_info;
         }
     }
@@ -410,7 +410,7 @@ impl WebGameRoot {
     fn update_mouse_position(&mut self, event: &MouseEvent) {
         let lock = self.check_pointer_lock();
 
-        let i = &mut self.app.input_processor;
+        let i = &mut self.session.input_processor;
         i.mouselook_delta(Vector2::new(
             event.movement_x().into(),
             event.movement_y().into(),

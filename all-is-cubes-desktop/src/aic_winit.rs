@@ -13,7 +13,7 @@ use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent}
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
-use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
+use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
@@ -28,7 +28,7 @@ use crate::glue::winit::{
 ///
 /// Returns when the user closes the window/app.
 pub fn winit_main_loop(
-    mut app: AllIsCubesAppState,
+    mut session: Session,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
 ) -> Result<(), anyhow::Error> {
@@ -69,7 +69,7 @@ pub fn winit_main_loop(
     }))
     .ok_or_else(|| anyhow::format_err!("Could not request suitable graphics adapter"))?;
     let mut renderer = block_on(SurfaceRenderer::new(
-        StandardCameras::from_app_state(&app, viewport)?,
+        StandardCameras::from_session(&session, viewport)?,
         surface,
         &adapter,
     ))?;
@@ -91,7 +91,7 @@ pub fn winit_main_loop(
         }
 
         // Sync UI state back to window
-        sync_cursor_grab(&window, &mut app.input_processor);
+        sync_cursor_grab(&window, &mut session.input_processor);
 
         match event {
             Event::NewEvents(_) => {}
@@ -113,10 +113,10 @@ pub fn winit_main_loop(
                         if let Some(key) = virtual_keycode.and_then(map_key) {
                             match state {
                                 ElementState::Pressed => {
-                                    app.input_processor.key_down(key);
+                                    session.input_processor.key_down(key);
                                 }
                                 ElementState::Released => {
-                                    app.input_processor.key_up(key);
+                                    session.input_processor.key_up(key);
                                 }
                             }
                         }
@@ -127,7 +127,7 @@ pub fn winit_main_loop(
                     // Mouse input
                     WindowEvent::CursorMoved { position, .. } => {
                         let position: [f64; 2] = position.into();
-                        app.input_processor.mouse_pixel_position(
+                        session.input_processor.mouse_pixel_position(
                             renderer.viewport(),
                             Some(Point2::from(position) / window.scale_factor()),
                             false,
@@ -137,12 +137,15 @@ pub fn winit_main_loop(
                         // CursorEntered doesn't tell us position, so ignore
                     }
                     WindowEvent::CursorLeft { .. } => {
-                        app.input_processor
-                            .mouse_pixel_position(renderer.viewport(), None, false);
+                        session.input_processor.mouse_pixel_position(
+                            renderer.viewport(),
+                            None,
+                            false,
+                        );
                     }
                     WindowEvent::MouseInput { button, state, .. } => match state {
                         ElementState::Pressed => {
-                            app.click(map_mouse_button(button));
+                            session.click(map_mouse_button(button));
                         }
                         ElementState::Released => {}
                     },
@@ -167,7 +170,7 @@ pub fn winit_main_loop(
                         .set_viewport(physical_size_to_viewport(scale_factor, *new_inner_size))
                         .unwrap(),
                     WindowEvent::Focused(has_focus) => {
-                        app.input_processor.key_focus(has_focus);
+                        session.input_processor.key_focus(has_focus);
                     }
 
                     // Unused
@@ -187,7 +190,7 @@ pub fn winit_main_loop(
                 event,
             } => match event {
                 DeviceEvent::MouseMotion { delta } => {
-                    app.input_processor.mouselook_delta(delta.into())
+                    session.input_processor.mouselook_delta(delta.into())
                 }
 
                 // Unused
@@ -205,23 +208,24 @@ pub fn winit_main_loop(
 
             Event::MainEventsCleared => {
                 // Run simulation if it's time
-                app.frame_clock.advance_to(Instant::now());
-                app.maybe_step_universe();
-                if app.frame_clock.should_draw() {
+                session.frame_clock.advance_to(Instant::now());
+                session.maybe_step_universe();
+                if session.frame_clock.should_draw() {
                     window.request_redraw();
                 }
             }
 
             Event::RedrawRequested(id) if id == window.id() => {
                 renderer.update_world_camera();
-                app.update_cursor(renderer.cameras());
+                session.update_cursor(renderer.cameras());
 
                 {
                     let device = renderer.device().clone();
-                    let mut done_rendering_future =
-                        Box::pin(renderer.render_frame(app.cursor_result(), |render_info| {
-                            format!("{}", app.info_text(render_info))
-                        }));
+                    let mut done_rendering_future = Box::pin(
+                        renderer.render_frame(session.cursor_result(), |render_info| {
+                            format!("{}", session.info_text(render_info))
+                        }),
+                    );
                     // TODO: integrate into event loop
                     let _info = loop {
                         device.poll(wgpu::Maintain::Poll);
@@ -235,7 +239,7 @@ pub fn winit_main_loop(
                     };
                 }
 
-                app.frame_clock.did_draw();
+                session.frame_clock.did_draw();
             }
             e @ Event::RedrawRequested(_) => {
                 log::error!("event for a window we aren't managing: {:?}", e)

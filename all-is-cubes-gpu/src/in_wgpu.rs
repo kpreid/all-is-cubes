@@ -681,7 +681,7 @@ static INFO_TEXT_SHADER: Lazy<Reloadable> =
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::apps::AllIsCubesAppState;
+    use all_is_cubes::apps::Session;
     use futures_executor::block_on;
 
     /// Run a renderer headless for one frame and see if it succeeds.
@@ -701,7 +701,7 @@ mod tests {
             })
             .await
         {
-            let app = AllIsCubesAppState::new().await;
+            let session = Session::new().await;
             let viewport = Viewport::with_scale(1.0, Vector2::new(200, 100));
 
             let (device, queue) = adapter
@@ -712,7 +712,7 @@ mod tests {
 
             let mut everything = EverythingRenderer::new(
                 device.clone(),
-                StandardCameras::from_app_state(&app, viewport).unwrap(),
+                StandardCameras::from_session(&session, viewport).unwrap(),
                 wgpu::TextureFormat::Rgba8UnormSrgb,
             );
 

@@ -11,7 +11,7 @@ use std::time::Instant;
 use glfw::{Action, Context as _, CursorMode, SwapInterval, WindowEvent, WindowMode};
 use luminance_glfw::{GlfwSurface, GlfwSurfaceError};
 
-use all_is_cubes::apps::{AllIsCubesAppState, StandardCameras};
+use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_luminance::SurfaceRenderer;
@@ -34,7 +34,7 @@ impl Error for CannotCreateWindow {}
 ///
 /// Returns when the user closes the window/app.
 pub fn glfw_main_loop(
-    mut app: AllIsCubesAppState,
+    mut session: Session,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
 ) -> Result<(), anyhow::Error> {
@@ -55,7 +55,7 @@ pub fn glfw_main_loop(
     })?;
     let viewport = window_size_as_viewport(&context.window);
     let mut renderer =
-        SurfaceRenderer::new(context, StandardCameras::from_app_state(&app, viewport)?)?;
+        SurfaceRenderer::new(context, StandardCameras::from_session(&session, viewport)?)?;
 
     let ready_time = Instant::now();
     log::debug!(
@@ -64,18 +64,18 @@ pub fn glfw_main_loop(
     );
 
     let mut first_frame = true;
-    'app: loop {
-        app.frame_clock.advance_to(Instant::now());
-        app.maybe_step_universe();
-        if app.frame_clock.should_draw() {
+    'event_loop: loop {
+        session.frame_clock.advance_to(Instant::now());
+        session.maybe_step_universe();
+        if session.frame_clock.should_draw() {
             renderer.objects.update_world_camera();
-            app.update_cursor(renderer.objects.cameras());
-            let render_info = renderer.render_frame(app.cursor_result()).unwrap();
+            session.update_cursor(renderer.objects.cameras());
+            let render_info = renderer.render_frame(session.cursor_result()).unwrap();
             renderer
-                .add_info_text(&format!("{}", app.info_text(render_info)))
+                .add_info_text(&format!("{}", session.info_text(render_info)))
                 .unwrap();
             renderer.surface.window.swap_buffers();
-            app.frame_clock.did_draw();
+            session.frame_clock.did_draw();
         } else {
             std::thread::yield_now();
         }
@@ -92,20 +92,21 @@ pub fn glfw_main_loop(
         renderer
             .surface
             .window
-            .set_cursor_mode(if app.input_processor.wants_pointer_lock() {
+            .set_cursor_mode(if session.input_processor.wants_pointer_lock() {
                 CursorMode::Disabled
             } else {
                 CursorMode::Normal
             });
-        app.input_processor
+        session
+            .input_processor
             .has_pointer_lock(renderer.surface.window.get_cursor_mode() == CursorMode::Disabled);
 
         // Poll for events after drawing, so that on the first loop iteration we draw
         // before the window is visible (at least on macOS).
         renderer.surface.window.glfw.poll_events();
         for (_, event) in events_rx.try_iter() {
-            if let ControlFlow::Break(_) = handle_glfw_event(event, &mut app, &mut renderer) {
-                break 'app;
+            if let ControlFlow::Break(_) = handle_glfw_event(event, &mut session, &mut renderer) {
+                break 'event_loop;
             }
         }
     }
@@ -122,7 +123,7 @@ pub fn glfw_main_loop(
 /// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
 fn handle_glfw_event(
     event: WindowEvent,
-    app: &mut AllIsCubesAppState,
+    session: &mut Session,
     renderer: &mut SurfaceRenderer<luminance_glfw::GL33Context>,
 ) -> ControlFlow<()> {
     match event {
@@ -131,12 +132,12 @@ fn handle_glfw_event(
         // Keyboard input
         WindowEvent::Key(key, _, Action::Press, _) => {
             if let Some(key) = map_key(key) {
-                app.input_processor.key_down(key);
+                session.input_processor.key_down(key);
             }
         }
         WindowEvent::Key(key, _, Action::Release, _) => {
             if let Some(key) = map_key(key) {
-                app.input_processor.key_up(key);
+                session.input_processor.key_up(key);
             }
         }
         WindowEvent::Key(_, _, Action::Repeat, _) => {
@@ -148,25 +149,26 @@ fn handle_glfw_event(
 
         // Mouse input
         WindowEvent::CursorPos(..) => {
-            app.input_processor.mouse_pixel_position(
+            session.input_processor.mouse_pixel_position(
                 renderer.viewport(),
                 Some(Point2::from(renderer.surface.window.get_cursor_pos())),
                 true,
             );
         }
         WindowEvent::CursorEnter(true) => {
-            app.input_processor.mouse_pixel_position(
+            session.input_processor.mouse_pixel_position(
                 renderer.viewport(),
                 Some(Point2::from(renderer.surface.window.get_cursor_pos())),
                 false,
             );
         }
         WindowEvent::CursorEnter(false) => {
-            app.input_processor
+            session
+                .input_processor
                 .mouse_pixel_position(renderer.viewport(), None, false);
         }
         WindowEvent::MouseButton(button, Action::Press, _) => {
-            app.click(map_mouse_button(button));
+            session.click(map_mouse_button(button));
         }
         WindowEvent::MouseButton(_, Action::Release, _) => {}
         WindowEvent::MouseButton(_, Action::Repeat, _) => {}
@@ -182,13 +184,13 @@ fn handle_glfw_event(
                 .unwrap();
         }
         WindowEvent::Focus(has_focus) => {
-            app.input_processor.key_focus(has_focus);
+            session.input_processor.key_focus(has_focus);
         }
 
         WindowEvent::FileDrop(files) => {
             // TODO: Offer confirmation before replacing the current universe
             if let Some(path) = files.into_iter().next() {
-                app.set_universe_async(async move {
+                session.set_universe_async(async move {
                     crate::data_files::load_universe_from_file(YieldProgress::noop(), &path)
                         .await
                         .map_err(|e| {
