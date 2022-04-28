@@ -224,11 +224,13 @@ pub async fn install_landscape_blocks(
                         .abs()
                         .max(unit_radius_point.y.abs())
                         .max(unit_radius_point.z.abs());
+                    let distance_from_edge = 1.0 - boxy_radius;
 
-                    if rng.gen_bool(boxy_radius / 2.0) {
-                        &colors[Leaves]
-                    } else {
+                    if rng.gen_bool(((distance_from_edge * 4.0).powi(2) / 2.0 + 0.5).clamp(0., 1.))
+                    {
                         &AIR
+                    } else {
+                        &colors[Leaves]
                     }
                 })?
                 .build(),
