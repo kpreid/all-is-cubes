@@ -22,7 +22,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use crate::block::{Evoxel, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::{point_to_enclosing_cube, smoothstep};
-use crate::math::{Face, FreeCoordinate, GridPoint, Rgb, Rgba};
+use crate::math::{Face7, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, GridArray, PackedLight, Space, SpaceBlockData};
 
@@ -254,7 +254,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             .unwrap_or(self.sky_color)
     }
 
-    fn get_interpolated_light(&self, point: Point3<FreeCoordinate>, face: Face) -> Rgb {
+    fn get_interpolated_light(&self, point: Point3<FreeCoordinate>, face: Face7) -> Rgb {
         // This implementation is duplicated in GLSL at all-is-cubes-gpu/src/shaders/fragment.glsl
 
         // About half the size of the smallest permissible voxel.

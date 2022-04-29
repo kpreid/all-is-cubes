@@ -18,8 +18,7 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
-use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
-use crate::raycast::Face;
+use crate::math::{Face6, GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
 use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
@@ -181,10 +180,10 @@ pub(super) fn new_hud_space(
 
     // Widgets laid out in top-right corner
     let top_right_buttons: LayoutTree<Arc<dyn Widget>> = LayoutTree::Stack {
-        direction: Face::NX,
+        direction: Face6::NX,
         children: vec![
             Arc::new(LayoutTree::Stack {
-                direction: Face::NX,
+                direction: Face6::NX,
                 children: graphics_options_widgets(hud_inputs),
             }),
             LayoutTree::leaf(ToggleButtonWidget::new(

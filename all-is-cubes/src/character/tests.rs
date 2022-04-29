@@ -9,7 +9,7 @@ use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool};
 use crate::listen::Sink;
-use crate::math::{Aab, Face, Rgb};
+use crate::math::{Aab, Face6, Rgb};
 use crate::physics::BodyTransaction;
 use crate::space::{Grid, Space};
 use crate::time::Tick;
@@ -37,8 +37,8 @@ fn spawn_inferred_position() {
     let cbox = character.body.collision_box_abs();
     dbg!(character.body.position, cbox);
     assert_eq!(
-        Aab::from(bounds).face_coordinate(Face::NY),
-        cbox.face_coordinate(Face::NY)
+        Aab::from(bounds).face_coordinate(Face6::NY),
+        cbox.face_coordinate(Face6::NY)
     );
 }
 
@@ -178,7 +178,7 @@ fn no_superjumping() {
     let mut character = Character::spawn_default(space);
     character.body.position = Point3::new(
         0.,
-        character.body.collision_box.face_coordinate(Face::NY) + 1.1,
+        character.body.collision_box.face_coordinate(Face6::NY) + 1.1,
         0.,
     );
     let _ = character.step(None, Tick::from_seconds(1.0)); // initial settling

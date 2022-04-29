@@ -24,8 +24,8 @@ use all_is_cubes::inv::Slot;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
-    NoiseFnExt as _, Rgb,
+    Face6, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    GridVector, NoiseFnExt as _, Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{Grid, LightPhysics, Space, SpacePhysics};
@@ -139,12 +139,12 @@ pub(crate) async fn demo_city(
     p.progress(0.3).await;
 
     // Roads and lamps
-    for &face in &[Face::PX, Face::NX, Face::PZ, Face::NZ] {
+    for face in [Face6::PX, Face6::NX, Face6::PZ, Face6::NZ] {
         let forward: GridVector = face.normal_vector();
         let perpendicular: GridVector = GridRotation::CLOCKWISE.transform(face).normal_vector();
-        let road_aligned_rotation = GridRotation::from_to(Face::NZ, face, Face::PY).unwrap();
+        let road_aligned_rotation = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
         let other_side_of_road =
-            GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]) * road_aligned_rotation;
+            GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
         let rotations = [other_side_of_road, road_aligned_rotation];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within_grid(space.grid());

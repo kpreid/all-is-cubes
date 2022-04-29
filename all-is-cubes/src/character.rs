@@ -17,7 +17,7 @@ use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listener, Notifier};
-use crate::math::{Aab, Face, FreeCoordinate};
+use crate::math::{Aab, Face6, Face7, FreeCoordinate};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::space::Space;
 use crate::time::Tick;
@@ -168,8 +168,8 @@ impl Character {
                 // Stand on the floor of the spawn bounds.
                 // TODO: Account for different gravity.
                 let mut pos = spawn.bounds.center();
-                pos.y = collision_box.face_coordinate(Face::NY)
-                    - Aab::from(spawn.bounds).face_coordinate(Face::NY);
+                pos.y = collision_box.face_coordinate(Face6::NY)
+                    - Aab::from(spawn.bounds).face_coordinate(Face6::NY);
                 pos
             }
         };
@@ -386,7 +386,7 @@ impl Character {
             && self
                 .colliding_cubes
                 .iter()
-                .any(|contact| contact.normal() == Face::PY)
+                .any(|contact| contact.normal() == Face7::PY)
     }
 }
 

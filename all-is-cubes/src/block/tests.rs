@@ -21,8 +21,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::{NullListener, Sink};
-use crate::math::{GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba};
-use crate::raycast::Face;
+use crate::math::{Face6, GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba};
 use crate::space::{Grid, GridArray, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
@@ -440,7 +439,7 @@ fn builder_defaults() {
 fn builder_every_field() {
     let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
     let light_emission = Rgb::new(0.1, 3.0, 0.1);
-    let rotation_rule = RotationPlacementRule::Attach { by: Face::NZ };
+    let rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
     let tick_action = Some(VoxelBrush::single(AIR));
     assert_eq!(
         Block::builder()

@@ -10,7 +10,7 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3};
 use once_cell::sync::Lazy;
 
 use crate::block::EvaluatedBlock;
-use crate::math::{Aab, Face, FaceMap, FreeCoordinate, Geometry, GridPoint, NotNan, Rgb, Rgba};
+use crate::math::{Aab, Face6, FaceMap, FreeCoordinate, Geometry, GridPoint, NotNan, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{
     Grid, LightPhysics, LightUpdateRequest, PackedLight, PackedLightScalar, Space, SpaceChange,
@@ -378,7 +378,7 @@ impl Space {
                         PackedLight::OPAQUE
                     } else {
                         if this_cube_evaluated.visible_or_animated()
-                            || Face::ALL_SIX.into_iter().any(|face| {
+                            || Face6::ALL.into_iter().any(|face| {
                                 self.get_evaluated(cube + face.normal_vector())
                                     .visible_or_animated()
                             })

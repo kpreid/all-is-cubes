@@ -5,7 +5,7 @@ use cgmath::{Point3, Vector3};
 
 use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
-use crate::math::{Face, FreeCoordinate, NotNan};
+use crate::math::{Face6, FreeCoordinate, NotNan};
 use crate::space::Grid;
 use crate::universe::{RefVisitor, VisitRefs};
 
@@ -42,7 +42,7 @@ impl Spawn {
     /// necessarily mandating a specification.
     pub fn default_for_new_space(grid: Grid) -> Self {
         Spawn {
-            bounds: grid.abut(Face::PZ, 40).unwrap_or(grid),
+            bounds: grid.abut(Face6::PZ, 40).unwrap_or(grid),
             eye_position: None,
             look_direction: Vector3::new(notnan!(0.), notnan!(0.), notnan!(-1.)),
             inventory: vec![],

@@ -19,8 +19,8 @@ use embedded_graphics::text::TextStyleBuilder;
 
 use crate::block::{Block, BlockCollision, Resolution, RotationPlacementRule, AIR};
 use crate::inv::{Slot, Tool};
-use crate::math::{FreeCoordinate, GridCoordinate, Rgb, Rgba};
-use crate::raycast::{Face, Raycaster};
+use crate::math::{Face6, FreeCoordinate, GridCoordinate, Rgb, Rgba};
+use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
 use crate::universe::Universe;
 
@@ -85,7 +85,7 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
                 .fill_uniform(block_space.grid(), Block::from(color))
                 .unwrap();
             axes(&mut block_space).unwrap();
-            for face in Face::ALL_SIX {
+            for face in Face6::ALL {
                 Text::with_text_style(
                     &i.to_string(),
                     Point::new(i32::from(resolution / 2), i32::from(resolution / 2)),
@@ -138,7 +138,7 @@ pub fn make_slab(universe: &mut Universe, numerator: Resolution, denominator: Re
     Block::builder()
         .display_name(format!("Slab {}/{}", numerator, denominator))
         .collision(BlockCollision::Recur)
-        .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+        .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
         .voxels_fn(universe, denominator, |cube| {
             if cube.y >= numerator.into() {
                 &AIR
@@ -169,8 +169,8 @@ pub fn make_slab(universe: &mut Universe, numerator: Resolution, denominator: Re
 /// assert_ne!(space[(0, 0, -10)], AIR);
 /// ```
 pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
-    for face in Face::ALL_SIX {
-        let axis = face.axis_number().unwrap();
+    for face in Face6::ALL {
+        let axis = face.axis_number();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within_grid(space.grid());

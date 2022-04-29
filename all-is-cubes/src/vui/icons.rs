@@ -21,8 +21,8 @@ use crate::content::palette;
 use crate::drawing::{DrawingPlane, VoxelBrush};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{
-    cube_to_midpoint, Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb,
-    Rgba,
+    cube_to_midpoint, Face7, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
+    Rgb, Rgba,
 };
 use crate::space::{GridArray, Space, SpacePhysics};
 use crate::universe::Universe;
@@ -113,7 +113,7 @@ impl Icons {
                     let line_block_1 = Block::from(rgba_const!(0.1, 0.1, 0.1, 1.0));
                     let line_block_2 = line_block_1.clone(); // TODO: experiment with patterning
                     for i in 5..8 {
-                        for &direction in &[Face::PX, Face::PY, Face::NX, Face::NY] {
+                        for &direction in &[Face7::PX, Face7::PY, Face7::NX, Face7::NY] {
                             let position_x2 = center_x2 + i * direction.normal_vector() * 2;
                             space.set(
                                 position_x2 / 2,
@@ -192,9 +192,9 @@ impl Icons {
                     let mut space = Space::for_block(resolution).build_empty();
                     let display = &mut space.draw_target(GridMatrix::from_origin(
                         GridPoint::new(1, 1, 1) * GridCoordinate::from(resolution / 2),
-                        Face::PX,
-                        Face::NY,
-                        Face::PZ,
+                        Face7::PX,
+                        Face7::NY,
+                        Face7::PZ,
                     ));
 
                     // Draw X on circle

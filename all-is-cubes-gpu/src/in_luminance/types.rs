@@ -6,7 +6,7 @@
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use luminance::{Semantics, Vertex};
 
-use all_is_cubes::math::{Face, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
+use all_is_cubes::math::{Face7, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
 use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
 use all_is_cubes::space::PackedLight;
 
@@ -266,9 +266,9 @@ impl GfxVertex for LumBlockVertex {
     }
 
     #[inline]
-    fn face(&self) -> Face {
+    fn face(&self) -> Face7 {
         let normal: GridVector = Vector3::from(self.normal.repr).map(|c| c as GridCoordinate);
-        Face::try_from(normal).unwrap_or(Face::Within)
+        Face7::try_from(normal).unwrap_or(Face7::Within)
     }
 }
 
@@ -304,7 +304,7 @@ impl DebugLineVertex for LinesVertex {
 mod tests {
     use super::*;
     use all_is_cubes::cgmath::Vector3;
-    use all_is_cubes::math::{Face, Rgb};
+    use all_is_cubes::math::{Face6, Rgb};
 
     #[test]
     fn vertex_dummy() {
@@ -328,7 +328,7 @@ mod tests {
     fn vertex_from_block_vertex() {
         let block_vertex = BlockVertex {
             position: Point3::new(1.0, 2.1, 3.0),
-            face: Face::PX,
+            face: Face6::PX,
             coloring: Coloring::Solid(Rgba::new(7.0, 8.0, 9.0, 0.5)),
         };
         let mut vertex = LumBlockVertex::from(block_vertex);

@@ -16,8 +16,8 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
-    NoiseFnExt as _, Rgb,
+    Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    GridVector, NoiseFnExt as _, Rgb,
 };
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
@@ -58,7 +58,7 @@ pub(crate) async fn atrium(
     let top_floor_pos = GridVector::new(0, (ceiling_height + WALL) * 2, 0);
 
     let space_grid = outer_walls_footprint.expand(FaceMap::from_fn(|f| {
-        GridCoordinate::from(f == Face::PY) * ceiling_height * floor_count
+        GridCoordinate::from(f == Face7::PY) * ceiling_height * floor_count
     }));
 
     let floor_with_cutout = |mut p: GridPoint| {
@@ -93,7 +93,7 @@ pub(crate) async fn atrium(
                 wall_excluding_corners,
                 blocks[AtriumBlocks::GroundFloor]
                     .clone()
-                    .rotate(GridRotation::from_to(Face::PZ, direction, Face::PY).unwrap()),
+                    .rotate(GridRotation::from_to(Face6::PZ, direction, Face6::PY).unwrap()),
             )?;
             Ok(())
         },
@@ -113,7 +113,7 @@ pub(crate) async fn atrium(
         outer_walls_footprint
             .translate(top_floor_pos)
             .expand(FaceMap::from_fn(|f| {
-                GridCoordinate::from(f == Face::PY) * ceiling_height
+                GridCoordinate::from(f == Face7::PY) * ceiling_height
             })),
         floor_with_cutout,
     )?;
@@ -289,11 +289,11 @@ fn arch_row(
     first_column_base: GridPoint,
     section_length: GridCoordinate,
     section_count: GridCoordinate,
-    parallel: Face,
+    parallel: Face6,
     pattern: &GridArray<u8>,
 ) -> Result<(), InGenError> {
     let offset = parallel.normal_vector() * section_length;
-    let rotation = GridRotation::from_to(Face::NX, parallel, Face::PY).unwrap();
+    let rotation = GridRotation::from_to(Face6::NX, parallel, Face6::PY).unwrap();
     for i in 0..section_count {
         let column_base = first_column_base + offset * (i + 1);
 
@@ -473,7 +473,7 @@ async fn install_atrium_blocks(
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x + mid.z < resolution_g * 6 / 4 {
@@ -486,7 +486,7 @@ async fn install_atrium_blocks(
             AtriumBlocks::SquareColumn => Block::builder()
                 .display_name("Square Atrium Column")
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.max(p.z) < resolution_g * 6 / 4 {
@@ -499,7 +499,7 @@ async fn install_atrium_blocks(
             AtriumBlocks::SmallColumn => Block::builder()
                 .display_name("Round Atrium Column")
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.pow(2) + mid.z.pow(2) < (resolution_g * 3 / 4).pow(2) {

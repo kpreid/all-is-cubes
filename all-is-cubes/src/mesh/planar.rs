@@ -10,7 +10,7 @@ use cgmath::{
     Zero as _,
 };
 
-use crate::math::{Face, FreeCoordinate, GridCoordinate, Rgba};
+use crate::math::{Face6, FreeCoordinate, GridCoordinate, Rgba};
 use crate::mesh::{BlockVertex, Coloring, TextureCoordinate, TextureTile};
 
 /// Data structure for the state and components of the "greedy meshing" algorithm.
@@ -156,7 +156,7 @@ pub(super) enum QuadColoring<'a, T> {
 pub(super) fn push_quad<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
     indices: &mut Vec<u32>,
-    face: Face,
+    face: Face6,
     depth: FreeCoordinate,
     low_corner: Point2<FreeCoordinate>,
     high_corner: Point2<FreeCoordinate>,
@@ -240,7 +240,7 @@ const QUAD_VERTICES: &[Vector2<FreeCoordinate>; 4] = &[
     // Note that looked at from a X-right Y-up view, these triangles are
     // clockwise, but they're properly counterclockwise from the perspective
     // that we're drawing the face _facing towards negative Z_ (into the screen),
-    // which is how cube faces as implicitly defined by Face::matrix work.
+    // which is how cube faces as implicitly defined by Face6::matrix work.
     Vector2::new(0.0, 0.0),
     Vector2::new(0.0, 1.0),
     Vector2::new(1.0, 0.0),

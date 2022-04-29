@@ -5,7 +5,7 @@ use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::block::{recursive_ray, Evoxel};
 use crate::camera::LightingOption;
-use crate::math::{Face, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
+use crate::math::{Face7, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::GridArray;
@@ -25,7 +25,7 @@ pub(crate) struct Surface<'a, D> {
     pub t_distance: FreeCoordinate,
     /// The point in the [`Space`]'s coordinate system where the ray intersected the surface.
     intersection_point: Point3<FreeCoordinate>,
-    pub normal: Face,
+    pub normal: Face7,
 }
 
 impl<D: RtBlockData> Surface<'_, D> {
@@ -64,7 +64,7 @@ impl<D: RtBlockData> Surface<'_, D> {
 
 /// Simple directional lighting used to give corners extra definition.
 /// Note that this algorithm is also implemented in the fragment shader for GPU rendering.
-fn fixed_directional_lighting(face: Face) -> f32 {
+fn fixed_directional_lighting(face: Face7) -> f32 {
     const LIGHT_1_DIRECTION: Vector3<f32> = Vector3::new(0.4, -0.1, 0.0);
     const LIGHT_2_DIRECTION: Vector3<f32> = Vector3::new(-0.4, 0.35, 0.25);
     (1.0 - 1.0 / 16.0)
@@ -361,7 +361,7 @@ mod tests {
                     cube: GridPoint::new(0, 1, 0),
                     t_distance: 1.5, // half-block starting point + 1 empty block
                     intersection_point: Point3::new(0.5, 1.0, 0.5),
-                    normal: Face::NY
+                    normal: Face7::NY
                 }),
                 EnterBlock { t_distance: 2.5 },
                 EnterSurface(Surface {
@@ -370,7 +370,7 @@ mod tests {
                     cube: GridPoint::new(0, 2, 0),
                     t_distance: 2.5,
                     intersection_point: Point3::new(0.5, 2.0, 0.5),
-                    normal: Face::NY
+                    normal: Face7::NY
                 }),
                 // Second layer of slab.
                 // TODO: Make this test not dependent on make_slab's colors,
@@ -381,7 +381,7 @@ mod tests {
                     cube: GridPoint::new(0, 2, 0),
                     t_distance: 2.75, // previous surface + 1/4 block of depth
                     intersection_point: Point3::new(0.5, 2.25, 0.5),
-                    normal: Face::NY
+                    normal: Face7::NY
                 }),
                 // Two top layers of slab.
                 Invisible { t_distance: 3.0 },
@@ -413,7 +413,7 @@ mod tests {
                     cube: GridPoint::new(0, 0, 0),
                     t_distance: 0.5, // half-block starting point
                     intersection_point: Point3::new(0.0, 0.5, 0.5),
-                    normal: Face::NX
+                    normal: Face7::NX
                 }),
                 // Exit block -- this is the critical step that we're checking for.
                 Invisible { t_distance: 1.5 },

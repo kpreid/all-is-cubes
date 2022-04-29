@@ -12,7 +12,7 @@ use cgmath::{InnerSpace as _, Point3, Transform};
 use crate::block::{recursive_raycast, Block, EvaluatedBlock};
 use crate::content::palette;
 use crate::math::{
-    Aab, CubeFace, Face, FreeCoordinate, Geometry, GridCoordinate, GridVector, Rgba,
+    Aab, CubeFace, Face7, FreeCoordinate, Geometry, GridCoordinate, GridVector, Rgba,
 };
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
@@ -132,14 +132,14 @@ impl Geometry for Cursor {
         // For now, it visualizes the intersection and face information.
         let face_frame = self.place.face.matrix(0).to_free();
         for f in [
-            Face::PX,
-            Face::PY,
-            Face::PY,
-            Face::NX,
-            Face::NX,
-            Face::NY,
-            Face::NY,
-            Face::PX,
+            Face7::PX,
+            Face7::PY,
+            Face7::PY,
+            Face7::NX,
+            Face7::NX,
+            Face7::NY,
+            Face7::NY,
+            Face7::PX,
         ] {
             let p = self.point
                 + self.place.face.normal_vector() * offset_from_surface

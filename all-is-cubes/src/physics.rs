@@ -18,7 +18,7 @@ mod tests {
     use super::*;
     use crate::block::{Resolution, AIR};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::{Aab, CubeFace, Face, Geometry, GridPoint};
+    use crate::math::{Aab, CubeFace, Face7, Geometry, GridPoint};
     use crate::space::{Grid, Space, SpacePhysics};
     use crate::time::Tick;
     use crate::universe::Universe;
@@ -99,7 +99,7 @@ mod tests {
         assert!((body.position.y - 1.5).abs() < 1e-6, "{:?}", body.position);
         assert_eq!(
             contacts,
-            vec![Contact::Block(CubeFace::new((0, 0, 0), Face::PY))]
+            vec![Contact::Block(CubeFace::new((0, 0, 0), Face7::PY))]
         );
     }
 
@@ -139,7 +139,7 @@ mod tests {
                     resolution: RES,
                     voxel: CubeFace {
                         cube: _,
-                        face: Face::PY
+                        face: Face7::PY
                     },
                 }
             ),
@@ -181,7 +181,7 @@ mod tests {
         assert_eq!(body.position, Point3::new(1.5 + POSITION_EPSILON, 0.5, 0.5));
         assert_eq!(body.velocity, Vector3::zero());
         // TODO: push out should create report contacts just like normal collision
-        // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face::PY)]);
+        // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face7::PY)]);
     }
 
     #[test]

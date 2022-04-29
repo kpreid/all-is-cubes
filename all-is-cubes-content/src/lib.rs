@@ -39,7 +39,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::{draw_to_blocks, VoxelColor};
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    cube_to_midpoint, point_to_enclosing_cube, Face, FaceMap, FreeCoordinate, GridCoordinate,
+    cube_to_midpoint, point_to_enclosing_cube, Face6, FaceMap, FreeCoordinate, GridCoordinate,
     GridMatrix, GridPoint, GridVector,
 };
 use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpaceTransaction};
@@ -151,7 +151,7 @@ pub(crate) fn voronoi_pattern<'a>(
 
             if distance_squared < pattern[cube_wrapped].0 {
                 pattern[cube_wrapped] = (distance_squared, block);
-                for direction in Face::ALL_SIX {
+                for direction in Face6::ALL {
                     // TODO: I tried filtering to
                     //    direction.normal_vector().dot(offset) >= 0.0
                     // which should be an optimization but it changed the results.
@@ -180,30 +180,30 @@ pub(crate) fn voronoi_pattern<'a>(
 /// TODO: Change the callback value to a struct
 pub(crate) fn four_walls<F, E>(bounding_box: Grid, mut f: F) -> Result<(), E>
 where
-    F: FnMut(GridPoint, Face, GridCoordinate, Grid) -> Result<(), E>,
+    F: FnMut(GridPoint, Face6, GridCoordinate, Grid) -> Result<(), E>,
 {
     let interior = bounding_box.expand(FaceMap::symmetric([-1, 0, -1]));
     let low = bounding_box.lower_bounds();
     let high = bounding_box.upper_bounds() - GridVector::new(1, 1, 1);
     let size = bounding_box.size();
-    f(low, Face::PZ, size.z, interior.abut(Face::NX, 1).unwrap())?;
+    f(low, Face6::PZ, size.z, interior.abut(Face6::NX, 1).unwrap())?;
     f(
         GridPoint::new(low.x, low.y, high.z),
-        Face::PX,
+        Face6::PX,
         size.x,
-        interior.abut(Face::PZ, 1).unwrap(),
+        interior.abut(Face6::PZ, 1).unwrap(),
     )?;
     f(
         GridPoint::new(high.x, low.y, high.z),
-        Face::NZ,
+        Face6::NZ,
         size.z,
-        interior.abut(Face::PX, 1).unwrap(),
+        interior.abut(Face6::PX, 1).unwrap(),
     )?;
     f(
         GridPoint::new(high.x, low.y, low.z),
-        Face::NX,
+        Face6::NX,
         size.x,
-        interior.abut(Face::NZ, 1).unwrap(),
+        interior.abut(Face6::NZ, 1).unwrap(),
     )?;
     Ok(())
 }

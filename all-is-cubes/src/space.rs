@@ -11,12 +11,14 @@ use std::sync::{Arc, Mutex, Weak};
 use cgmath::Vector3;
 
 use crate::behavior::{Behavior, BehaviorSet};
-use crate::block::*;
+use crate::block::{
+    Block, BlockChange, EvalBlockError, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED,
+};
 use crate::character::Spawn;
 use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
-use crate::math::*;
+use crate::math::{Face6, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, NotNan, Rgb};
 use crate::time::Tick;
 use crate::transaction::{Merge, Transaction as _, UniverseTransaction};
 use crate::universe::{RefVisitor, URef, VisitRefs};
@@ -410,7 +412,7 @@ impl Space {
             } else {
                 self.light_needs_update(position, PackedLightScalar::MAX);
             }
-            for face in Face::ALL_SIX {
+            for face in Face6::ALL {
                 let neighbor = position + face.normal_vector();
                 // Skip neighbor light updates in the definitely-black-inside case.
                 if !self.get_evaluated(neighbor).opaque {

@@ -7,7 +7,7 @@ use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::math::{Face, FaceMap, GridCoordinate, GridRotation};
+use crate::math::{Face7, FaceMap, GridCoordinate, GridRotation};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 use crate::space::{BlockIndex, Grid, PackedLight, Space};
 
@@ -221,7 +221,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 FaceMap::repeat(PackedLight::ONE)
             };
 
-            for face in Face::ALL_SEVEN {
+            for face in Face7::ALL {
                 let face_mesh = &block_mesh.faces[face];
                 if face_mesh.is_empty() {
                     // Nothing to do; skip adjacent_cube lookup.

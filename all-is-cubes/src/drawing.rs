@@ -31,7 +31,7 @@ use std::ops::{Range, RangeInclusive};
 pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
-use crate::math::{Face, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
+use crate::math::{Face7, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Grid, SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
@@ -354,9 +354,9 @@ where
         .build_empty();
     object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
         [0, 0, z],
-        Face::PX,
-        Face::NY,
-        Face::PZ,
+        Face7::PX,
+        Face7::NY,
+        Face7::PZ,
     )))?;
 
     Ok(space_to_blocks(

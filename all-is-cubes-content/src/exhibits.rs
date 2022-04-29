@@ -31,8 +31,8 @@ use all_is_cubes::drawing::{
 };
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
-    NotNan, Rgb, Rgba,
+    Face6, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Grid, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
@@ -141,7 +141,7 @@ exhibit! {
 
             Block::builder()
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                 .voxels_fn(universe, window_pane_resolution, |p| {
                     if p.z >= depth {
                         return &AIR;
@@ -168,7 +168,7 @@ exhibit! {
                 space.fill_uniform(
                     wall_excluding_corners,
                     window_block.clone().rotate(
-                        GridRotation::from_to(Face::PX, direction, Face::PY).unwrap()
+                        GridRotation::from_to(Face6::PX, direction, Face6::PY).unwrap()
                     )
                 )?;
                 Ok::<(), InGenError>(())
@@ -176,11 +176,11 @@ exhibit! {
         )?;
 
         space.fill_uniform(
-            pool.abut(Face::NY, 0).unwrap().abut(Face::PY, 1).unwrap(),
+            pool.abut(Face6::NY, 0).unwrap().abut(Face6::PY, 1).unwrap(),
             &water_voxel,
         )?;
         space.fill_uniform(
-            pool.abut(Face::PY, -1).unwrap(),
+            pool.abut(Face6::PY, -1).unwrap(),
             &water_surface_block,
         )?;
 
@@ -371,9 +371,10 @@ exhibit! {
                 space.set(
                     GridPoint::new(1, 0, 1) + offset,
                     // Rotate block so its +Y is towards the offset vector
-                    half_block.clone().rotate(match Face::try_from(offset) {
-                        Ok(face) => GridRotation::from_to(Face::PY, face, face.cross(Face::PY))
-                            .unwrap_or(GridRotation::RXyZ),
+                    half_block.clone().rotate(match Face6::try_from(offset) {
+                        Ok(face) => GridRotation::from_to(Face6::PY, face, face.cross(Face6::PY).try_into().unwrap())
+                            .unwrap(),
+                        Err(GridVector { x: 0, y: 0, z: 0 }) => GridRotation::RXyZ,
                         Err(_) => GridRotation::IDENTITY,
                     }),
                 )?;
@@ -491,10 +492,10 @@ exhibit! {
                 Ok(())
             };
 
-        for face in [Face::PX, Face::PZ, Face::NX, Face::NZ] {
+        for face in [Face6::PX, Face6::PZ, Face6::NX, Face6::NZ] {
             place_rotated_arrow(
                 center + face.normal_vector() * 2,
-                GridRotation::from_to(Face::NZ, face.opposite(), Face::PY).unwrap(),
+                GridRotation::from_to(Face6::NZ, face.opposite(), Face6::PY).unwrap(),
             )?;
         }
 
@@ -514,11 +515,11 @@ exhibit! {
                 let i = x + z * 8;
                 let distance = (i * 16).try_into().unwrap();
                 let move_out = Modifier::Move {
-                    direction: Face::PY,
+                    direction: Face6::PY,
                     distance,
                 };
                 let move_in = Modifier::Move {
-                    direction: Face::NY,
+                    direction: Face6::NY,
                     distance: (256 - distance),
                 };
                 // TODO: there should be a routine to generate these pairs
@@ -528,11 +529,11 @@ exhibit! {
 
                 // Horizontal
                 let move_out = Modifier::Move {
-                    direction: Face::PZ,
+                    direction: Face6::PZ,
                     distance,
                 };
                 let move_in = Modifier::Move {
-                    direction: Face::NZ,
+                    direction: Face6::NZ,
                     distance: (256 - distance),
                 };
                 space.set([i, 0, -2], move_out.attach(blocks[i as usize].clone()))?;
@@ -685,7 +686,7 @@ exhibit! {
         // Wall corner
         let corner = Block::builder()
             .display_name("Color room wall corner")
-            .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ }) // TODO: more specific
+            .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ }) // TODO: more specific
             .voxels_fn(universe, wall_resolution, |p| {
                 if p.x.pow(2) + p.z.pow(2) < GridCoordinate::from(wall_resolution).pow(2) {
                     &wall_color_block
@@ -697,9 +698,9 @@ exhibit! {
 
         // Construct room.
         // Floor
-        space.fill_uniform(interior.abut(Face::NY, 1).unwrap(), &wall_block)?;
+        space.fill_uniform(interior.abut(Face6::NY, 1).unwrap(), &wall_block)?;
         // Ceiling
-        space.fill_uniform(interior.abut(Face::PY, 1).unwrap(), &wall_block)?;
+        space.fill_uniform(interior.abut(Face6::PY, 1).unwrap(), &wall_block)?;
         // Walls
         four_walls(
             space.grid(),
@@ -709,7 +710,7 @@ exhibit! {
                     Grid::new(origin + GridVector::unit_y(), [1, room_height + 1, 1]),
                     corner
                         .clone()
-                        .rotate(GridRotation::from_to(Face::NZ, direction, Face::PY).unwrap()),
+                        .rotate(GridRotation::from_to(Face6::NZ, direction, Face6::PY).unwrap()),
                 )?;
                 // Wall face
                 space.fill_uniform(wall_excluding_corners, &wall_block)?;

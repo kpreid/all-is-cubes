@@ -10,6 +10,7 @@
 - `all-is-cubes` library:
     - `block::Modifier::Move`, for drawing blocks in motion or off the grid.
     - `math::point_to_enclosing_cube()`
+    - `math::Face6`, which is like `math::Face` (now) `Face7` but without the `Within` variant.
     - `DirtyFlag::listening()` which simplifies typical usage.
     - `GridRotation::ALL_BUT_REFLECTIONS`, as `GridRotation::ALL` but excluding reflections.
     - `StandardCameras::world_space()`, so that clients don't need to consult the `Character` each frame.
@@ -26,10 +27,11 @@
         - It internally uses reference counting to be predictably cheap to `clone()`; this is intended to help use cases such as transactions which mean that even a block which only exists once in the universe is frequently cloned.
         - Many changes to the functions, associated methods, and `BlockBuilder` were made to support this new structure.
 
-    - `apps::Session::new()` (formerly `AllIsCubesAppState::new()`) is now an async function.
-    - `linking::BlockProvider::new()` is now an async function.
-    - The `linking::BlockModule` trait now requires the [`exhaust::Exhaust`](https://docs.rs/exhaust/latest/exhaust/trait.Exhaust.html) trait in place of `strum::IntoEnumIterator`. This allows implementors to use enums with fields (or non-enums).
+    - Breaking: `apps::Session::new()` (formerly `AllIsCubesAppState::new()`) is now an async function.
+    - Breaking: `linking::BlockProvider::new()` is now an async function.
+    - Breaking: The `linking::BlockModule` trait now requires the [`exhaust::Exhaust`](https://docs.rs/exhaust/latest/exhaust/trait.Exhaust.html) trait in place of `strum::IntoEnumIterator`. This allows implementors to use enums with fields (or non-enums).
 
+    - Renamed: `math::Face` is now `math::Face7`.
     - Renamed: `apps::AllIsCubesAppState` to `apps::Session`.
 
 - `all-is-cubes-gpu` library:

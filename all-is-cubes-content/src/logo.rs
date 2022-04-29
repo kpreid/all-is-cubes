@@ -14,7 +14,7 @@ use all_is_cubes::{
         },
         VoxelBrush,
     },
-    math::{Face, FaceMap, GridMatrix},
+    math::{Face7, FaceMap, GridMatrix},
     space::{Grid, SetCubeError, Space},
     vui::{
         widgets::OneshotController, LayoutGrant, LayoutRequest, Layoutable, Widget,
@@ -70,7 +70,9 @@ pub fn logo_text_extent() -> Grid {
         )
         .expand(FaceMap::from_fn(|f| {
             // Expand horizontally due to the VoxelBrush's size. TODO: We should be able to ask the brush to do this.
-            [Face::PX, Face::PY, Face::NX, Face::NY].contains(&f).into()
+            [Face7::PX, Face7::PY, Face7::NX, Face7::NY]
+                .contains(&f)
+                .into()
         }))
     })
 }

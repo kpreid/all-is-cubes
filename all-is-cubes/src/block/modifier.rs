@@ -5,8 +5,7 @@ use crate::block::{
     Block, BlockAttributes, BlockChange, BlockCollision, EvalBlockError, EvaluatedBlock, Evoxel,
 };
 use crate::listen::Listener;
-use crate::math::{GridCoordinate, GridRotation, Rgb, Rgba};
-use crate::raycast::Face;
+use crate::math::{Face6, GridCoordinate, GridRotation, Rgb, Rgba};
 use crate::space::{Grid, GridArray};
 use crate::universe::{RefVisitor, VisitRefs};
 
@@ -32,7 +31,7 @@ pub enum Modifier {
     /// block moving between two cubes.
     Move {
         /// The direction in which the block is displaced.
-        direction: Face,
+        direction: Face6,
         /// The distance, in 1/256ths, by which it is displaced.
         distance: u16,
     },
@@ -310,7 +309,7 @@ mod tests {
         let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
         let original = Block::from(color);
         let modifier = Modifier::Move {
-            direction: Face::PY,
+            direction: Face6::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
         };
         let moved = modifier.attach(original.clone());
@@ -352,7 +351,7 @@ mod tests {
             .build();
 
         let modifier = Modifier::Move {
-            direction: Face::PY,
+            direction: Face6::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
         };
         let moved = modifier.attach(original.clone());
@@ -392,7 +391,7 @@ mod tests {
             .tick_action(Some(VoxelBrush::single(AIR)))
             .build();
         let moved = Modifier::Move {
-            direction: Face::PY,
+            direction: Face6::PY,
             distance: 128,
         }
         .attach(original);

@@ -205,7 +205,7 @@ impl Block {
     /// ```
     /// use all_is_cubes::block::{AIR, Block, Modifier};
     /// use all_is_cubes::content::make_some_voxel_blocks;
-    /// use all_is_cubes::math::{Face::*, GridRotation};
+    /// use all_is_cubes::math::GridRotation;
     /// use all_is_cubes::universe::Universe;
     ///
     /// let mut universe = Universe::new();
@@ -252,7 +252,7 @@ impl Block {
     /// ```
     /// use all_is_cubes::block::Block;
     /// use all_is_cubes::content::make_some_voxel_blocks;
-    /// use all_is_cubes::math::{Face::*, GridRotation};
+    /// use all_is_cubes::math::{Face6::*, GridRotation};
     /// use all_is_cubes::universe::Universe;
     ///
     /// let mut universe = Universe::new();

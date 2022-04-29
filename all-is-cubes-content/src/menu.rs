@@ -20,7 +20,7 @@ use all_is_cubes::{
     },
     inv::Tool,
     linking::InGenError,
-    math::{Face, GridMatrix, GridVector},
+    math::{Face6, GridMatrix, GridVector},
     space::{Grid, Space, SpacePhysics, SpaceTransaction},
     transaction::{Merge, Transaction as _},
     universe::Universe,
@@ -95,8 +95,8 @@ impl vui::WidgetController for TemplateButtonController {
 
         // TODO: propagate error
         let bounds = &mut self.position.bounds;
-        let background_bounds = bounds.abut(Face::NZ, -1).unwrap();
-        let text_bounds = bounds.abut(Face::PZ, -1).unwrap();
+        let background_bounds = bounds.abut(Face6::NZ, -1).unwrap();
+        let text_bounds = bounds.abut(Face6::PZ, -1).unwrap();
 
         // Fill background
         // TODO: give SpaceTransaction a fill_uniform() analogue
@@ -137,7 +137,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         )?)));
     }
     let tree: LayoutTree<Arc<dyn Widget>> = LayoutTree::Stack {
-        direction: Face::NY,
+        direction: Face6::NY,
         children: vertical_widgets,
     };
 

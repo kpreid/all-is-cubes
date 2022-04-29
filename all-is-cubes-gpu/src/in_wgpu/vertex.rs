@@ -2,7 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
-use all_is_cubes::math::{Face, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{Face7, GridCoordinate, GridPoint, GridVector};
 use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
 use all_is_cubes::space::PackedLight;
 
@@ -115,9 +115,9 @@ impl GfxVertex for WgpuBlockVertex {
     }
 
     #[inline]
-    fn face(&self) -> Face {
+    fn face(&self) -> Face7 {
         let normal: GridVector = Vector3::from(self.normal).map(|c| c as GridCoordinate);
-        Face::try_from(normal).unwrap_or(Face::Within)
+        Face7::try_from(normal).unwrap_or(Face7::Within)
     }
 }
 

@@ -11,7 +11,7 @@ use crate::block::{Block, Modifier, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
-use crate::math::{Face, GridPoint, GridRotation};
+use crate::math::{Face6, GridPoint, GridRotation};
 use crate::space::{Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction, UniverseTransaction};
 use crate::universe::{RefError, RefVisitor, URef, VisitRefs};
@@ -293,14 +293,12 @@ impl ToolInput {
         {
             RotationPlacementRule::Never => GridRotation::IDENTITY,
             RotationPlacementRule::Attach { by: attached_face } => {
+                let world_cube_face: Face6 =
+                    cursor.place.face.opposite().try_into().unwrap_or(Face6::NZ);
                 // TODO: RotationPlacementRule should control the "up" axis choices
-                GridRotation::from_to(attached_face, cursor.place.face.opposite(), Face::PY)
-                    .or_else(|| {
-                        GridRotation::from_to(attached_face, cursor.place.face.opposite(), Face::PX)
-                    })
-                    .or_else(|| {
-                        GridRotation::from_to(attached_face, cursor.place.face.opposite(), Face::PZ)
-                    })
+                GridRotation::from_to(attached_face, world_cube_face, Face6::PY)
+                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face6::PX))
+                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face6::PZ))
                     .unwrap_or(GridRotation::IDENTITY)
             }
         };
@@ -674,7 +672,7 @@ mod tests {
             ref mut attributes, ..
         } = tool_block.primitive_mut()
         {
-            attributes.rotation_rule = RotationPlacementRule::Attach { by: Face::NZ };
+            attributes.rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
         } else {
             unreachable!();
         }

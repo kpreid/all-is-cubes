@@ -21,7 +21,7 @@ use crate::math::*;
 ///
 /// See also:
 ///
-/// * [`Face`] is less general, in that it specifies a single axis but not
+/// * [`Face6`] is less general, in that it specifies a single axis but not
 ///   rotation about that axis.
 /// * [`GridMatrix`] is more general, specifying an affine transformation.
 #[rustfmt::skip]
@@ -78,7 +78,7 @@ impl GridRotation {
     /// The rotation that is clockwise in our Y-up right-handed coordinate system.
     ///
     /// ```
-    /// use all_is_cubes::math::{Face::*, GridRotation};
+    /// use all_is_cubes::math::{Face6::*, GridRotation};
     ///
     /// assert_eq!(GridRotation::CLOCKWISE.transform(PX), PZ);
     /// assert_eq!(GridRotation::CLOCKWISE.transform(PZ), NX);
@@ -92,7 +92,7 @@ impl GridRotation {
     /// The rotation that is counterclockwise in our Y-up right-handed coordinate system.
     ///
     /// ```
-    /// use all_is_cubes::math::{Face::*, GridRotation};
+    /// use all_is_cubes::math::{Face6::*, GridRotation};
     ///
     /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PX), NZ);
     /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(NZ), NX);
@@ -108,10 +108,10 @@ impl GridRotation {
     ///
     /// Panics if the three provided axes are not mutually perpendicular.
     #[inline]
-    pub fn from_basis(basis: impl Into<Vector3<Face>>) -> Self {
-        let basis: Vector3<Face> = basis.into();
-        let basis: [Face; 3] = basis.into(); // for concise matching
-        use {Face::*, GridRotation::*};
+    pub fn from_basis(basis: impl Into<Vector3<Face6>>) -> Self {
+        let basis: Vector3<Face6> = basis.into();
+        let basis: [Face6; 3] = basis.into(); // for concise matching
+        use {Face6::*, GridRotation::*};
         match basis {
             [PX, PY, PZ] => RXYZ,
             [PX, PZ, PY] => RXZY,
@@ -181,17 +181,11 @@ impl GridRotation {
     ///
     /// If it is not possible to leave `up` unaffected, returns [`None`]. (Trying two
     /// perpendicular `up` directions will always succeed.)
-    ///
-    /// If any of the arguments is [`Face::Within`], returns [`None`].
-    pub fn from_to(source: Face, destination: Face, up: Face) -> Option<Self> {
-        use Face::*;
+    pub fn from_to(source: Face6, destination: Face6, up: Face6) -> Option<Self> {
         let perpendicular = source.cross(up);
         if source == destination {
             Some(Self::IDENTITY)
-        } else if perpendicular == Within {
-            // up was parallel to source, or one of them was Within.
-            None
-        } else {
+        } else if let Ok(perpendicular) = Face6::try_from(perpendicular) {
             // Find rotation from the frame source=NZ up=PY to the actual given one.
             let canonical_to_given = Self::from_basis([perpendicular, up, source.opposite()]);
             let given_to_canonical = canonical_to_given.inverse();
@@ -200,9 +194,10 @@ impl GridRotation {
             // The destination expressed in that frame.
             let canonical_destination = given_to_canonical.transform(destination);
             // Find which of the four rotations in a plane matches.
+            use Face6::*;
             let canonical_rotation = match canonical_destination {
-                Within | NY | PY => {
-                    // Tried to rotate into the up vector or into Within.
+                NY | PY => {
+                    // Tried to rotate into the up vector.
                     return None;
                 }
                 NZ => Self::IDENTITY,
@@ -212,14 +207,18 @@ impl GridRotation {
             };
             // Transform that rotation into the given frame.
             Some(canonical_to_given * canonical_rotation * given_to_canonical)
+        } else {
+            // perpendicular == Face7::Within, therefore
+            // up was parallel to source, or one of them was Within.
+            None
         }
     }
 
     // TODO: public? do we want this to be our API? should this also be a From impl?
     #[inline]
     #[rustfmt::skip] // dense data layout
-    pub(crate) const fn to_basis(self) -> Vector3<Face> {
-        use {Face::*, GridRotation::*};
+    pub(crate) const fn to_basis(self) -> Vector3<Face6> {
+        use {Face6::*, GridRotation::*};
         match self {
             RXYZ => Vector3 { x: PX, y: PY, z: PZ },
             RXZY => Vector3 { x: PX, y: PZ, z: PY },
@@ -307,7 +306,7 @@ impl GridRotation {
     ///
     // TODO: add tests
     pub fn to_positive_octant_matrix(self, size: GridCoordinate) -> GridMatrix {
-        fn offset(face: Face, size: GridCoordinate) -> GridVector {
+        fn offset(face: Face6, size: GridCoordinate) -> GridVector {
             if face.is_positive() {
                 GridVector::zero()
             } else {
@@ -331,26 +330,21 @@ impl GridRotation {
 
     // TODO: test equivalence with matrix
     #[inline]
-    pub fn transform(self, face: Face) -> Face {
+    pub fn transform(self, face: Face6) -> Face6 {
         // TODO: there ought to be a much cleaner way to express this
         // ... and it should be a const fn, too
-        match face.axis_number() {
-            None => face,
-            Some(axis_number) => {
-                let p = self.to_basis()[axis_number];
-                if face.is_negative() {
-                    p.opposite()
-                } else {
-                    p
-                }
-            }
+        let p = self.to_basis()[face.axis_number()];
+        if face.is_negative() {
+            p.opposite()
+        } else {
+            p
         }
     }
 
     /// Returns whether this is a reflection.
     ///
     /// ```
-    /// use all_is_cubes::math::{GridRotation, Face::*};
+    /// use all_is_cubes::math::{GridRotation, Face6::*};
     ///
     /// assert!(!GridRotation::IDENTITY.is_reflection());
     /// assert!(!GridRotation::from_basis([PX, PZ, NY]).is_reflection());
@@ -389,7 +383,7 @@ impl GridRotation {
     /// just before it would produce the identity again.
     ///
     /// ```
-    /// use all_is_cubes::math::Face::*;
+    /// use all_is_cubes::math::Face6::*;
     /// use all_is_cubes::math::GridRotation;
     ///
     /// assert_eq!(
@@ -449,13 +443,13 @@ impl Mul<Self> for GridRotation {
     /// Multiplication is concatenation: `self * rhs` is equivalent to
     /// applying `rhs` and then applying `self`.
     /// ```
-    /// use all_is_cubes::math::{Face, Face::*, GridRotation, GridPoint};
+    /// use all_is_cubes::math::{Face6, Face6::*, GridRotation, GridPoint};
     ///
     /// let transform_1 = GridRotation::from_basis([NY, PX, PZ]);
     /// let transform_2 = GridRotation::from_basis([PY, PZ, PX]);
     ///
     /// // Demonstrate the directionality of concatenation.
-    /// for face in Face::ALL_SEVEN {
+    /// for face in Face6::ALL {
     ///     assert_eq!(
     ///         (transform_1 * transform_2).transform(face),
     ///         transform_1.transform(transform_2.transform(face)),
@@ -475,7 +469,7 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use Face::*;
+    use Face6::*;
 
     #[test]
     fn identity() {
@@ -541,9 +535,9 @@ mod tests {
     /// The set of possible inputs is small enough to test its properties exhaustively
     #[test]
     fn from_to_exhaustive() {
-        for from_face in Face::ALL_SEVEN {
-            for to_face in Face::ALL_SEVEN {
-                for up_face in Face::ALL_SEVEN {
+        for from_face in Face6::ALL {
+            for to_face in Face6::ALL {
+                for up_face in Face6::ALL {
                     let result = GridRotation::from_to(from_face, to_face, up_face);
                     let info = (from_face, to_face, up_face, result);
                     match result {
@@ -564,10 +558,7 @@ mod tests {
                         }
                         None => {
                             assert!(
-                                from_face == Within
-                                    || to_face == Within
-                                    || up_face == Within
-                                    || up_face.axis_number() == from_face.axis_number()
+                                up_face.axis_number() == from_face.axis_number()
                                     || up_face.axis_number() == to_face.axis_number(),
                                 "returned None incorrectly: {:?}",
                                 info

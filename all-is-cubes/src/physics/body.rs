@@ -9,7 +9,7 @@ use super::collision::{
     aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
 };
 use crate::block::BlockCollision;
-use crate::math::{Aab, Face, FreeCoordinate, Geometry as _};
+use crate::math::{Aab, Face7, FreeCoordinate, Geometry as _};
 use crate::physics::{StopAt, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;
@@ -141,7 +141,7 @@ impl Body {
         let mut already_colliding = None;
 
         let mut collision_callback = |contact: Contact| {
-            if contact.normal() == Face::Within {
+            if contact.normal() == Face7::Within {
                 already_colliding = Some(contact);
             }
             collision_callback(contact);
@@ -244,7 +244,7 @@ impl Body {
                 .contact
                 .normal()
                 .axis_number()
-                .expect("Face::Within collisions should not reach here");
+                .expect("Face7::Within collisions should not reach here");
             // Advance however much straight-line distance is available.
             // But a little bit back from that, to avoid floating point error pushing us
             // into being already colliding next frame.

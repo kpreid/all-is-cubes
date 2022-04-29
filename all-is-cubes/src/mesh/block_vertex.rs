@@ -7,7 +7,7 @@ use std::fmt;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
-use crate::math::{Face, FreeCoordinate, GridPoint, Rgba};
+use crate::math::{Face6, Face7, FreeCoordinate, GridPoint, Rgba};
 use crate::space::PackedLight;
 use crate::util::{ConciseDebug, CustomFormat as _};
 
@@ -25,7 +25,7 @@ pub struct BlockVertex {
     /// Vertex position.
     pub position: Point3<FreeCoordinate>,
     /// Vertex normal, always axis-aligned.
-    pub face: Face,
+    pub face: Face6,
     /// Surface color or texture coordinate.
     pub coloring: Coloring,
 }
@@ -135,8 +135,9 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
     /// Note: This is used to perform depth sorting for transparent vertices.
     fn position(&self) -> Point3<Self::Coordinate>;
 
-    /// Returns the normal of this vertex, expressed as a [`Face`].
-    fn face(&self) -> Face;
+    /// Returns the normal of this vertex, expressed as a [`Face7`],
+    /// with [`Face7::Within`] representing any error cases.
+    fn face(&self) -> Face7;
 }
 
 /// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
@@ -160,7 +161,7 @@ impl GfxVertex for BlockVertex {
     }
 
     #[inline]
-    fn face(&self) -> Face {
-        self.face
+    fn face(&self) -> Face7 {
+        self.face.into()
     }
 }

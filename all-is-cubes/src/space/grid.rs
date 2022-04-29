@@ -12,7 +12,7 @@ use cgmath::{Point3, Transform, Vector3};
 
 use crate::block::Resolution;
 use crate::math::{
-    Aab, Face, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
+    Aab, Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -575,7 +575,7 @@ impl Grid {
     #[track_caller] // TODO: better error reporting
     #[must_use]
     pub fn expand(self, deltas: FaceMap<GridCoordinate>) -> Self {
-        use Face::*;
+        use Face7::*;
         let l = self.lower_bounds();
         let u = self.upper_bounds();
         Self::from_lower_upper(
@@ -589,7 +589,6 @@ impl Grid {
     /// (inward if negative).
     ///
     /// Edge cases:
-    /// * If `face` is [`Face::Within`], returns `self`.
     /// * If `thickness` is negative and greater than the size of the input, it is clamped
     ///   (so that the returned `Grid` never extends beyond the opposite face of `self`).
     ///
@@ -597,11 +596,11 @@ impl Grid {
     ///
     /// ```
     /// use all_is_cubes::space::Grid;
-    /// use all_is_cubes::math::Face;
+    /// use all_is_cubes::math::Face6;
     ///
     /// let interior = Grid::from_lower_upper([10, 10, 10], [20, 20, 20]);
-    /// let left_wall = interior.abut(Face::NX, 2)?;
-    /// let right_wall = interior.abut(Face::PX, 2)?;
+    /// let left_wall = interior.abut(Face6::NX, 2)?;
+    /// let right_wall = interior.abut(Face6::PX, 2)?;
     ///
     /// assert_eq!(left_wall, Grid::from_lower_upper([8, 10, 10], [10, 20, 20]));
     /// assert_eq!(right_wall, Grid::from_lower_upper([20, 10, 10], [22, 20, 20]));
@@ -612,26 +611,23 @@ impl Grid {
     ///
     /// ```
     /// # use all_is_cubes::space::Grid;
-    /// # use all_is_cubes::math::Face;
+    /// # use all_is_cubes::math::Face6;
     ///
     /// let grid = Grid::from_lower_upper([10, 10, 10], [20, 20, 20]);
     /// assert_eq!(
-    ///     grid.abut(Face::PX, -3)?,
+    ///     grid.abut(Face6::PX, -3)?,
     ///     Grid::from_lower_upper([17, 10, 10], [20, 20, 20]),
     /// );
     /// assert_eq!(
     ///     // Thicker than the input, therefore clamped.
-    ///     grid.abut(Face::PX, -30)?,
+    ///     grid.abut(Face6::PX, -30)?,
     ///     Grid::from_lower_upper([10, 10, 10], [20, 20, 20]),
     /// );
     /// # Ok::<(), all_is_cubes::space::GridOverflowError>(())
     /// ```
     #[inline]
-    pub fn abut(self, face: Face, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
-        let axis = match face.axis_number() {
-            Some(axis) => axis,
-            None => return Ok(self),
-        };
+    pub fn abut(self, face: Face6, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
+        let axis = face.axis_number();
 
         let mut size = self.size();
         size[axis] = thickness.max(-size[axis]).abs();

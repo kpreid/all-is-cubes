@@ -10,14 +10,16 @@ use super::*;
 use crate::block::{Block, BlockAttributes, Primitive, AIR};
 use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
-use crate::math::{Face, GridRotation};
-use crate::math::{Face::*, FaceMap, FreeCoordinate, GridPoint, Rgba};
+use crate::math::{
+    Face6::{self, *},
+    Face7, FaceMap, FreeCoordinate, GridPoint, GridRotation, Rgba,
+};
 use crate::mesh::BlockMesh;
 use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::Universe;
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
-fn v_c(position: [FreeCoordinate; 3], face: Face, color: [f32; 4]) -> BlockVertex {
+fn v_c(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockVertex {
     BlockVertex {
         position: position.into(),
         face,
@@ -26,7 +28,7 @@ fn v_c(position: [FreeCoordinate; 3], face: Face, color: [f32; 4]) -> BlockVerte
 }
 
 /// Shorthand for writing out an entire [`BlockVertex`] with texturing.
-fn v_t(position: [FreeCoordinate; 3], face: Face, texture: [TextureCoordinate; 3]) -> BlockVertex {
+fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [TextureCoordinate; 3]) -> BlockVertex {
     let texture = texture.into();
     BlockVertex {
         position: position.into(),
@@ -340,10 +342,10 @@ fn shrunken_box_uniform_color() {
     );
 }
 
-/// Make a [`FaceMap`] with uniform values except for [`Face::Within`].
+/// Make a [`FaceMap`] with uniform values except for [`Face7::Within`].
 fn except_within<T: Clone>(without: T, within: T) -> FaceMap<T> {
     FaceMap::from_fn(|face| {
-        if face == Face::Within {
+        if face == Face7::Within {
             within.clone()
         } else {
             without.clone()

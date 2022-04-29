@@ -13,7 +13,7 @@ use cgmath::{
 pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::math::{
-    Face, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Point3,
+    Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Point3,
 };
 
 /// A 4×3 affine transformation matrix in [`GridCoordinate`]s, rather than floats as
@@ -86,13 +86,13 @@ impl GridMatrix {
     }
 
     /// Construct a transformation to a translated and rotated coordinate system from
-    /// an origin in the target coordinate system and basis vectors expressed as [`Face`]s.
+    /// an origin in the target coordinate system and basis vectors expressed as [`Face7`]s.
     ///
     /// Skews or scaling cannot be performed using this constructor.
     ///
     /// ```
     /// use cgmath::Transform as _;  // trait method Transform::transform_point
-    /// use all_is_cubes::math::{Face::*, GridMatrix, GridPoint};
+    /// use all_is_cubes::math::{Face7::*, GridMatrix, GridPoint};
     ///
     /// let transform = GridMatrix::from_origin([10, 10, 10], PX, PZ, NY);
     /// assert_eq!(
@@ -101,7 +101,7 @@ impl GridMatrix {
     /// );
     /// ```
     #[inline]
-    pub fn from_origin(origin: impl Into<GridPoint>, x: Face, y: Face, z: Face) -> Self {
+    pub fn from_origin(origin: impl Into<GridPoint>, x: Face7, y: Face7, z: Face7) -> Self {
         Self {
             x: x.normal_vector(),
             y: y.normal_vector(),
@@ -137,7 +137,7 @@ impl GridMatrix {
     /// that cube.
     ///
     /// ```
-    /// use all_is_cubes::math::{Face::*, GridMatrix, GridPoint};
+    /// use all_is_cubes::math::{Face7::*, GridMatrix, GridPoint};
     /// use cgmath::Transform; // for transform_point
     ///
     /// // Translation without rotation has the usual definition.
@@ -162,7 +162,7 @@ impl GridMatrix {
     /// Returns `None` if the matrix has any scaling or skew.
     ///
     /// ```
-    /// use all_is_cubes::math::{Face::*, GridMatrix, GridRotation, GridVector};
+    /// use all_is_cubes::math::{Face6::*, GridMatrix, GridRotation, GridVector};
     ///
     /// assert_eq!(
     ///     GridMatrix::new(
@@ -180,9 +180,9 @@ impl GridMatrix {
     pub fn decompose(self) -> Option<(GridRotation, GridVector)> {
         Some((
             GridRotation::from_basis([
-                Face::try_from(self.x).ok()?,
-                Face::try_from(self.y).ok()?,
-                Face::try_from(self.z).ok()?,
+                Face6::try_from(self.x).ok()?,
+                Face6::try_from(self.y).ok()?,
+                Face6::try_from(self.z).ok()?,
             ]),
             self.w,
         ))

@@ -25,10 +25,11 @@ use all_is_cubes::cgmath::{EuclideanSpace as _, Matrix4, Point3, Transform as _,
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::Listener;
-use all_is_cubes::math::{Aab, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba};
+use all_is_cubes::math::{
+    Aab, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb, Rgba,
+};
 use all_is_cubes::mesh::chunked_mesh::{ChunkMesh, ChunkedSpaceMesh};
 use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
-use all_is_cubes::raycast::Face;
 use all_is_cubes::space::{Grid, Space, SpaceChange};
 use all_is_cubes::universe::URef;
 
@@ -179,7 +180,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 }
 
                 // Frame the nearest chunk in detail
-                for face in Face::ALL_SIX {
+                for face in Face6::ALL {
                     let m = face.matrix(CHUNK_SIZE);
                     for i in 1..CHUNK_SIZE {
                         let mut push = |p| {

@@ -21,7 +21,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    cube_to_midpoint, Face, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    cube_to_midpoint, Face6, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
     GridVector, NoiseFnExt as _, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Grid, Space};
@@ -165,7 +165,7 @@ pub async fn install_demo_blocks(
                 .display_name("Lamppost")
                 .light_emission(Rgb::new(3.0, 3.0, 3.0))
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     if int_magnitude_squared(
                         (cube * 2 + one_diagonal - center_point_doubled)
@@ -182,7 +182,7 @@ pub async fn install_demo_blocks(
             LamppostBase => Block::builder()
                 .display_name("Lamppost Base")
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
                         [8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 6, 6, 5, 4, 4, 3];
@@ -202,7 +202,7 @@ pub async fn install_demo_blocks(
             LamppostTop => Block::builder()
                 .display_name("Lamppost Top")
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
                         [4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 7, 8];
@@ -222,7 +222,7 @@ pub async fn install_demo_blocks(
                 .display_name("Sconce")
                 .light_emission(Rgb::new(8.0, 7.0, 6.0))
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                 .voxels_fn(universe, resolution, |p| {
                     // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
                     let r2 = int_magnitude_squared(
@@ -284,7 +284,7 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Arrow")
                     .collision(BlockCollision::Recur)
-                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
@@ -293,14 +293,14 @@ pub async fn install_demo_blocks(
                 .display_name("Curb")
                 .collision(BlockCollision::Recur)
                 // TODO: rotation should specify curb line direction
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, curb_fn)?
                 .build(),
 
             CurbCorner => Block::builder()
                 .display_name("Curb Corner")
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     // TODO: rework so this isn't redoing the rotation calculations for every single voxel
                     // We should have tools for composing blocks instead...
@@ -381,7 +381,7 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Signboard")
                     .collision(BlockCollision::Recur)
-                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
@@ -393,7 +393,7 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Clock")
                     .collision(BlockCollision::None)
-                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                     .animation_hint(AnimationHint::CONTINUOUS)
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()

@@ -6,8 +6,7 @@ use std::sync::Arc;
 
 use cgmath::Zero as _;
 
-use crate::math::GridVector;
-use crate::raycast::Face;
+use crate::math::{Face6, GridVector};
 use crate::space::{Grid, SpaceTransaction};
 use crate::transaction::Merge;
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
@@ -76,8 +75,7 @@ pub enum LayoutTree<W> {
     Spacer(LayoutRequest),
     /// Fill the available space with the children, in order in the given direction.
     Stack {
-        // TODO: We should have a 6-valued Face type so that this cannot fail
-        direction: Face,
+        direction: Face6,
         children: Vec<Arc<LayoutTree<W>>>,
     },
 }
@@ -149,7 +147,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 let mut positioned_children = Vec::with_capacity(children.len());
                 for child in children {
                     let requirements = child.requirements();
-                    let axis = direction.axis_number().unwrap();
+                    let axis = direction.axis_number();
                     let size_on_axis = requirements.minimum[axis];
                     let available_size = bounds.size()[axis];
                     if size_on_axis > available_size {
@@ -227,7 +225,7 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
                 ref children,
             } => {
                 let mut accumulator = GridVector::zero();
-                let stack_axis = direction.axis_number().unwrap();
+                let stack_axis = direction.axis_number();
                 for child in children {
                     let child_req = child.requirements();
                     for axis in 0..3 {
@@ -248,6 +246,8 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
 
 #[cfg(test)]
 mod tests {
+    use crate::math::Face6;
+
     use super::*;
     use pretty_assertions::assert_eq;
 
@@ -278,7 +278,7 @@ mod tests {
     #[test]
     fn simple_stack_with_extra_room() {
         let tree = LayoutTree::Stack {
-            direction: Face::PX,
+            direction: Face6::PX,
             children: vec![
                 LayoutTree::leaf(LT::new("a", [1, 1, 1])),
                 LayoutTree::leaf(LT::new("b", [1, 1, 1])),
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn spacer() {
         let tree = LayoutTree::Stack {
-            direction: Face::PX,
+            direction: Face6::PX,
             children: vec![
                 LayoutTree::leaf(LT::new("a", [1, 1, 1])),
                 LayoutTree::spacer(LayoutRequest {

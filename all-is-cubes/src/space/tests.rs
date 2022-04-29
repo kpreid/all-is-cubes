@@ -8,12 +8,16 @@
 use cgmath::EuclideanSpace as _;
 use indoc::indoc;
 
-use super::*;
-use crate::block::AIR;
+use crate::block::{Block, BlockDef, BlockDefTransaction, EvalBlockError, Primitive, AIR};
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::Sink;
-use crate::math::GridPoint;
+use crate::math::{GridPoint, Rgba};
+use crate::space::{
+    Grid, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
+};
+use crate::time::Tick;
+use crate::transaction::UniverseTransaction;
 use crate::universe::{RefError, Universe, UniverseIndex as _};
 
 // TODO: test consistency between the index and get_* methods

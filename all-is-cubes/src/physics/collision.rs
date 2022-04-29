@@ -10,7 +10,9 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use super::POSITION_EPSILON;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution};
-use crate::math::{Aab, CubeFace, Face, FreeCoordinate, Geometry, GridCoordinate, GridPoint, Rgba};
+use crate::math::{
+    Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, Rgba,
+};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{GridArray, Space};
 use crate::util::{ConciseDebug, CustomFormat, MapExtend};
@@ -49,9 +51,9 @@ impl Contact {
     /// Returns the contact normal: the direction in which the colliding box should be
     /// pushed back.
     ///
-    /// Note that this may be equal to [`Face::Within`] in case the box was already
+    /// Note that this may be equal to [`Face7::Within`] in case the box was already
     /// intersecting before any movement.
-    pub fn normal(&self) -> Face {
+    pub fn normal(&self) -> Face7 {
         match *self {
             Contact::Block(CubeFace { face, .. }) => face,
             Contact::Voxel {
@@ -68,15 +70,15 @@ impl Contact {
         }
     }
 
-    /// Return a copy where the contact normal is replaced with [`Face::Within`].
+    /// Return a copy where the contact normal is replaced with [`Face7::Within`].
     fn without_normal(&self) -> Self {
         let mut result = *self;
         match result {
-            Contact::Block(CubeFace { ref mut face, .. }) => *face = Face::Within,
+            Contact::Block(CubeFace { ref mut face, .. }) => *face = Face7::Within,
             Contact::Voxel {
                 voxel: CubeFace { ref mut face, .. },
                 ..
-            } => *face = Face::Within,
+            } => *face = Face7::Within,
         }
         result
     }
@@ -246,10 +248,10 @@ where
                         ray,
                         cell,
                         match (stop_at, ray_step.face()) {
-                            // If we are checking the initial position (face == Face::Within),
+                            // If we are checking the initial position (face == Face7::Within),
                             // then don't recursively ignore initial collisions, but report them
                             // so that we can add to already_collising.
-                            (StopAt::NotAlreadyColliding, Face::Within) => StopAt::Anything,
+                            (StopAt::NotAlreadyColliding, Face7::Within) => StopAt::Anything,
                             (stop_at, _) => stop_at,
                         },
                     ) {
@@ -265,7 +267,7 @@ where
             nothing_hit = false;
 
             if stop_at == StopAt::NotAlreadyColliding {
-                if found_end.contact.normal() == Face::Within {
+                if found_end.contact.normal() == Face7::Within {
                     // If we start intersecting a block, we are allowed to leave it; pretend
                     // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
                     // maybe there's no clear direction.)
@@ -493,13 +495,17 @@ pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaste
 pub(crate) fn nudge_on_ray(
     aab: Aab,
     segment: Ray,
-    face: Face,
+    face: Face7,
     subdivision: Resolution,
     backward: bool,
 ) -> Ray {
-    if segment.direction.is_zero() || face == Face::Within {
+    if segment.direction.is_zero() {
         return segment;
     }
+    let face: Face6 = match face.try_into() {
+        Ok(f) => f,
+        Err(_) => return segment,
+    };
 
     // This is the depth by which the un-nudged face penetrates the plane, which we are going to subtract.
     let penetration_depth = {
@@ -557,7 +563,7 @@ mod tests {
             },
             Some(CollisionRayEnd {
                 t_distance: 0.25, // half of a unit cube, quarter of a ray with magnitude 2
-                contact: Contact::Block(CubeFace::new([1, 0, 0], Face::PY)),
+                contact: Contact::Block(CubeFace::new([1, 0, 0], Face7::PY)),
             }),
         );
     }
@@ -573,7 +579,7 @@ mod tests {
                     cube: GridPoint::new(1, 0, 0),
                     resolution: 2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
-                    voxel: CubeFace::new([0, 0, 0], Face::PY),
+                    voxel: CubeFace::new([0, 0, 0], Face7::PY),
                 },
             }),
         );
@@ -590,7 +596,7 @@ mod tests {
                     cube: GridPoint::new(1, 0, 0),
                     resolution: 2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
-                    voxel: CubeFace::new([0, 0, 0], Face::PY),
+                    voxel: CubeFace::new([0, 0, 0], Face7::PY),
                 },
             }),
         );
@@ -608,7 +614,7 @@ mod tests {
                 contact: Contact::Voxel {
                     cube: GridPoint::new(1, 0, 0), // second of 2 blocks is taller
                     resolution: 2,
-                    voxel: CubeFace::new([0, 0, 0], Face::PY),
+                    voxel: CubeFace::new([0, 0, 0], Face7::PY),
                 },
             }),
         );
@@ -621,7 +627,7 @@ mod tests {
                 contact: Contact::Voxel {
                     cube: GridPoint::new(0, 0, 0), // first of 2 blocks is taller
                     resolution: 2,
-                    voxel: CubeFace::new([1, 0, 0], Face::PY),
+                    voxel: CubeFace::new([1, 0, 0], Face7::PY),
                 },
             }),
         );
@@ -679,12 +685,12 @@ mod tests {
             (
                 None,
                 vec![
-                    Contact::Block(CubeFace::new([0, 0, 0], Face::Within)),
+                    Contact::Block(CubeFace::new([0, 0, 0], Face7::Within)),
                     Contact::Voxel {
                         cube: GridPoint::new(1, 0, 0),
                         resolution: 2,
                         // TODO: the voxel reported here is arbitrary, so this test is fragile
-                        voxel: CubeFace::new([0, 0, 0], Face::Within),
+                        voxel: CubeFace::new([0, 0, 0], Face7::Within),
                     }
                 ]
             )
@@ -709,7 +715,7 @@ mod tests {
             let axis = step.face().axis_number().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?
             let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vec());
-            let face_to_nudge = step.face().opposite();
+            let face_to_nudge: Face6 = Face6::try_from(step.face().opposite()).unwrap();
 
             eprintln!("\n#{case_number} with inputs:");
             eprintln!("  ray: {ray:?}");
@@ -721,7 +727,7 @@ mod tests {
                 // Perform nudge
                 // TODO: test non-1 resolution
                 let adjusted_segment =
-                    nudge_on_ray(moving_aab, segment, face_to_nudge, 1, backward);
+                    nudge_on_ray(moving_aab, segment, face_to_nudge.into(), 1, backward);
                 let nudged_aab = moving_aab.translate(adjusted_segment.unit_endpoint().to_vec());
 
                 // Check that the nudge was not too big

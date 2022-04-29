@@ -3,7 +3,7 @@
 
 use maze_generator::prelude::{Direction, Field, Maze};
 
-use all_is_cubes::math::{Face, GridPoint};
+use all_is_cubes::math::{Face7, GridPoint};
 use all_is_cubes::space::{Grid, GridArray};
 
 pub fn maze_to_array(maze: &Maze) -> GridArray<Field> {
@@ -20,11 +20,11 @@ pub fn gp2m(p: GridPoint) -> maze_generator::prelude::Coordinates {
     maze_generator::prelude::Coordinates { x: p.x, y: p.z }
 }
 
-pub fn d2f(direction: Direction) -> Face {
+pub fn d2f(direction: Direction) -> Face7 {
     match direction {
-        Direction::North => Face::NZ,
-        Direction::East => Face::PX,
-        Direction::South => Face::PZ,
-        Direction::West => Face::NX,
+        Direction::North => Face7::NZ,
+        Direction::East => Face7::PX,
+        Direction::South => Face7::PZ,
+        Direction::West => Face7::NX,
     }
 }

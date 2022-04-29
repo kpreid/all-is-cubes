@@ -7,7 +7,7 @@ use std::iter::FusedIterator;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
 
-use crate::math::{Face, FreeCoordinate, Geometry, GridCoordinate, GridPoint, Rgba};
+use crate::math::{Face6, FreeCoordinate, Geometry, GridCoordinate, GridPoint, Rgba};
 use crate::space::Grid;
 
 /// Axis-Aligned Box data type.
@@ -115,17 +115,14 @@ impl Aab {
     ///
     /// Note that negative faces' coordinates _are_ inverted; that is, all results
     /// will be positive if the box contains its origin.
-    ///
-    /// Returns 0 if given [`Face::Within`].
-    pub fn face_coordinate(&self, face: Face) -> FreeCoordinate {
+    pub fn face_coordinate(&self, face: Face6) -> FreeCoordinate {
         match face {
-            Face::Within => 0.0,
-            Face::NX => -self.lower_bounds.x,
-            Face::NY => -self.lower_bounds.y,
-            Face::NZ => -self.lower_bounds.z,
-            Face::PX => self.upper_bounds.x,
-            Face::PY => self.upper_bounds.y,
-            Face::PZ => self.upper_bounds.z,
+            Face6::NX => -self.lower_bounds.x,
+            Face6::NY => -self.lower_bounds.y,
+            Face6::NZ => -self.lower_bounds.z,
+            Face6::PX => self.upper_bounds.x,
+            Face6::PY => self.upper_bounds.y,
+            Face6::PZ => self.upper_bounds.z,
         }
     }
 

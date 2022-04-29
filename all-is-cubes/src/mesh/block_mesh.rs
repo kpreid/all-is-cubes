@@ -10,7 +10,7 @@ use std::fmt::Debug;
 
 use crate::block::{EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{Face, FaceMap, FreeCoordinate, GridCoordinate, OpacityCategory, Rgba};
+use crate::math::{Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, OpacityCategory, Rgba};
 use crate::mesh::{
     copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
     GreedyMesher, MeshOptions, QuadColoring, TextureAllocator, TextureTile,
@@ -18,14 +18,14 @@ use crate::mesh::{
 use crate::space::{Grid, GridArray, Space};
 
 /// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
-/// by [`Face`].
+/// by [`Face7`].
 ///
 /// All triangles which are on the surface of the unit cube (such that they may be omitted
 /// when a [`opaque`](EvaluatedBlock::opaque) block is adjacent) are grouped
 /// under the corresponding face, and all other triangles are grouped under
-/// [`Face::Within`]. In future versions, the triangulator might be improved so that blocks
+/// [`Face7::Within`]. In future versions, the triangulator might be improved so that blocks
 /// with concavities on their faces have the surface of each concavity included in that
-/// face mesh rather than in [`Face::Within`].
+/// face mesh rather than in [`Face7::Within`].
 ///
 /// The texture associated with the contained vertices' texture coordinates is recorded
 /// in the [`BlockMesh`] only.
@@ -171,10 +171,13 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     match &block.voxels {
         None => {
             let faces = FaceMap::from_fn(|face| {
-                if face == Face::Within {
-                    // No interior detail for atom blocks.
-                    return BlockFaceMesh::default();
-                }
+                let face = match Face6::try_from(face) {
+                    Ok(f) => f,
+                    Err(_) => {
+                        // No interior detail for atom blocks.
+                        return BlockFaceMesh::default();
+                    }
+                };
                 let color = options.transparency.limit_alpha(block.color);
 
                 let mut vertices: Vec<V> = Vec::new();
@@ -240,14 +243,14 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 // that consumes this structure will say "draw this face if its adjacent
                 // cube's opposing face is not opaque", and `Within` means the adjacent
                 // cube is ourself.
-                fully_opaque: face != Face::Within,
+                fully_opaque: face != Face7::Within,
             });
 
             let mut texture_if_needed: Option<A::Tile> = None;
 
             // Walk through the planes (layers) of the block, figuring out what geometry to
             // generate for each layer and whether it needs a texture.
-            for face in Face::ALL_SIX {
+            for face in Face6::ALL {
                 let transform = face.matrix(block_resolution - 1);
 
                 // Rotate the voxel array's extent into our local coordinate system, so we can find
@@ -264,7 +267,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     || rotated_voxel_range.x_range() != (0..block_resolution)
                     || rotated_voxel_range.y_range() != (0..block_resolution)
                 {
-                    output_by_face[face].fully_opaque = false;
+                    output_by_face[Face7::from(face)].fully_opaque = false;
                 }
 
                 // Layer 0 is the outside surface of the cube and successive layers are
@@ -298,7 +301,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             if layer == 0 && !color.fully_opaque() {
                                 // If the first layer is transparent in any cube at all, then the face is
                                 // not fully opaque
-                                output_by_face[face].fully_opaque = false;
+                                output_by_face[Face7::from(face)].fully_opaque = false;
                             }
 
                             let voxel_is_visible = {
@@ -364,7 +367,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                         indices_opaque,
                         indices_transparent,
                         ..
-                    } = &mut output_by_face[if layer == 0 { face } else { Face::Within }];
+                    } = &mut output_by_face[if layer == 0 {
+                        Face7::from(face)
+                    } else {
+                        Face7::Within
+                    }];
                     let depth = FreeCoordinate::from(layer);
 
                     // Traverse `visible_image` using the "greedy meshing" algorithm for

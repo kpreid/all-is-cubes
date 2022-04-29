@@ -7,9 +7,8 @@ use std::borrow::Cow;
 use std::fmt;
 
 use crate::drawing::VoxelBrush;
-use crate::math::Rgb;
+use crate::math::{Face6, Rgb};
 
-use crate::raycast::Face;
 #[cfg(doc)]
 use crate::{block::Block, space::Space};
 
@@ -190,7 +189,7 @@ pub enum RotationPlacementRule {
         ///
         /// If the block was somehow placed without such an adjacent block, it will not be
         /// rotated.
-        by: Face,
+        by: Face6,
         // TODO: control rotation about additional axis
     },
 }

@@ -12,8 +12,8 @@ use all_is_cubes::content::palette;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    point_to_enclosing_cube, Face, FaceMap, GridCoordinate, GridPoint, GridRotation, GridVector,
-    Rgb,
+    point_to_enclosing_cube, Face6, Face7, FaceMap, GridCoordinate, GridPoint, GridRotation,
+    GridVector, Rgb,
 };
 use all_is_cubes::rgb_const;
 use all_is_cubes::space::{Grid, GridArray, Space};
@@ -56,8 +56,11 @@ impl DemoTheme {
     ) -> Result<(), InGenError> {
         let wall_block = wall_block.unwrap_or(&self.wall_block);
 
-        space.fill_uniform(interior.abut(Face::NY, 1).unwrap(), &self.blocks[FloorTile])?;
-        space.fill_uniform(interior.abut(Face::PY, 1).unwrap(), wall_block)?;
+        space.fill_uniform(
+            interior.abut(Face6::NY, 1).unwrap(),
+            &self.blocks[FloorTile],
+        )?;
+        space.fill_uniform(interior.abut(Face6::PY, 1).unwrap(), wall_block)?;
 
         four_walls(
             interior.expand(FaceMap::repeat(1)),
@@ -76,9 +79,9 @@ impl DemoTheme {
         space: &mut Space,
         map: &GridArray<DemoRoom>,
         room_position: GridPoint,
-        face: Face,
+        face: Face6,
     ) -> Result<(), InGenError> {
-        let passage_axis = face.axis_number().unwrap();
+        let passage_axis = face.axis_number();
 
         let mut room_1_box = self.actual_room_box(room_position, &map[room_position]);
         let mut room_2_box = self.actual_room_box(
@@ -90,7 +93,7 @@ impl DemoTheme {
         }
 
         let wall_parallel = GridRotation::CLOCKWISE.transform(face);
-        let parallel_axis = wall_parallel.axis_number().unwrap();
+        let parallel_axis = wall_parallel.axis_number();
         assert!(parallel_axis != 1);
 
         let doorway_box = {
@@ -110,7 +113,7 @@ impl DemoTheme {
 
         // Add floor and walls
         space.fill_uniform(
-            doorway_box.abut(Face::NY, 1).unwrap(),
+            doorway_box.abut(Face6::NY, 1).unwrap(),
             &self.blocks[FloorTile],
         )?;
         space.fill_uniform(
@@ -121,7 +124,7 @@ impl DemoTheme {
             doorway_box.abut(wall_parallel.opposite(), 1).unwrap(),
             &self.wall_block,
         )?;
-        space.fill_uniform(doorway_box.abut(Face::PY, 1).unwrap(), &self.wall_block)?; // TODO: ceiling block
+        space.fill_uniform(doorway_box.abut(Face6::PY, 1).unwrap(), &self.wall_block)?; // TODO: ceiling block
 
         Ok(())
     }
@@ -172,7 +175,7 @@ impl Theme<DemoRoom> for DemoTheme {
 
                 if room_data.lit {
                     let top_middle =
-                        point_to_enclosing_cube(interior.abut(Face::PY, -1).unwrap().center());
+                        point_to_enclosing_cube(interior.abut(Face6::PY, -1).unwrap().center());
                     space.set(
                         top_middle,
                         if room_data.corridor_only {
@@ -187,7 +190,7 @@ impl Theme<DemoRoom> for DemoTheme {
                     interior.expand(FaceMap::repeat(1)),
                     |origin, along_wall, length, wall_excluding_corners_box| {
                         let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
-                        if room_data.windowed_faces[wall] {
+                        if room_data.windowed_faces[wall.into()] {
                             let midpoint = length / 2;
                             for step in WINDOW_PATTERN {
                                 let window_pos = origin
@@ -205,9 +208,9 @@ impl Theme<DemoRoom> for DemoTheme {
                 )?;
 
                 // Ceiling light port (not handled by four_walls above)
-                if room_data.windowed_faces[Face::PY] {
+                if room_data.windowed_faces[Face7::PY] {
                     let midpoint =
-                        point_to_enclosing_cube(interior.abut(Face::PY, 1).unwrap().center());
+                        point_to_enclosing_cube(interior.abut(Face6::PY, 1).unwrap().center());
                     for x in WINDOW_PATTERN {
                         for z in WINDOW_PATTERN {
                             space.set(
@@ -219,8 +222,8 @@ impl Theme<DemoRoom> for DemoTheme {
                 }
             }
             1 => {
-                for face in [Face::PX, Face::PZ] {
-                    if room_data.door_faces[face] {
+                for face in [Face6::PX, Face6::PZ] {
+                    if room_data.door_faces[face.into()] {
                         self.inside_doorway(space, map, room_position, face)?;
                     }
                 }
@@ -236,8 +239,8 @@ impl Theme<DemoRoom> for DemoTheme {
                     ]);
 
                     // Orient towards the first room's exit.
-                    for face in Face::ALL_SIX {
-                        if room_data.door_faces[face] {
+                    for face in Face6::ALL {
+                        if room_data.door_faces[face.into()] {
                             spawn.set_look_direction(face.normal_vector());
                             break;
                         }
@@ -298,7 +301,7 @@ pub(crate) async fn demo_dungeon(
             FaceMap::from_fn(|face| {
                 // Create windows only if they look into space outside the maze
                 let adjacent = m2gp(maze_field.coordinates) + face.normal_vector();
-                if bounds.contains_cube(adjacent) || corridor_only || face == Face::NY {
+                if bounds.contains_cube(adjacent) || corridor_only || face == Face7::NY {
                     false
                 } else {
                     rng.gen_bool(0.75)
@@ -320,7 +323,7 @@ pub(crate) async fn demo_dungeon(
             door_faces,
             windowed_faces,
             corridor_only,
-            lit: !windowed_faces[Face::PY] && rng.gen_bool(0.75),
+            lit: !windowed_faces[Face7::PY] && rng.gen_bool(0.75),
         }
     });
 
@@ -331,7 +334,7 @@ pub(crate) async fn demo_dungeon(
         .sky_color(palette::DAY_SKY_COLOR * 2.0)
         .build_empty();
     space.fill_uniform(
-        space_bounds.abut(Face::NY, -1).unwrap(),
+        space_bounds.abut(Face6::NY, -1).unwrap(),
         &landscape_blocks[LandscapeBlocks::Grass],
     )?;
     build_dungeon(&mut space, &theme, &dungeon_map, progress).await?;
@@ -376,7 +379,7 @@ pub async fn install_dungeon_blocks(
                 .display_name("Corridor Light")
                 .light_emission(Rgb::new(8.0, 7.0, 0.7))
                 .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::PY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::PY })
                 .voxels_fn(universe, resolution, |cube| {
                     let centered = cube * 2 - center_point_doubled;
                     if centered.y > centered.x.abs() && centered.y > centered.z.abs() {
