@@ -14,6 +14,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     text::{Baseline, Text},
     Drawable,
 };
+use futures_core::future::BoxFuture;
 use instant::Instant;
 use once_cell::sync::Lazy;
 
@@ -169,6 +170,9 @@ pub struct EverythingRenderer {
     device: Arc<wgpu::Device>,
 
     staging_belt: wgpu::util::StagingBelt,
+    /// Future indicating the `staging_belt.recall()` has completed and it can be reused.
+    /// TODO: When Rust has type_alias_impl_trait we can use that here instead of boxing.
+    staging_belt_recalled: Option<BoxFuture<'static, ()>>,
 
     cameras: StandardCameras,
 
@@ -250,6 +254,8 @@ impl EverythingRenderer {
                 // TODO: wild guess at good size
                 std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
             ),
+            staging_belt_recalled: None,
+
             space_renderers: Default::default(),
 
             lines_buffer: ResizingBuffer::default(),
@@ -443,6 +449,14 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::render_frame()"),
             });
 
+        // Await completion of previous frame's work.
+        // This must be done, at the latest, just before we start using the `StagingBelt`
+        // again, so we do it just before constructing `BeltWritingParts`.
+        // TODO: Measure and report this time separately.
+        if let Some(future) = self.staging_belt_recalled.take() {
+            let () = future.await;
+        }
+
         let mut bwp = BeltWritingParts {
             device: &*self.device,
             belt: &mut self.staging_belt,
@@ -563,7 +577,7 @@ impl EverythingRenderer {
         let ui_to_submit_time = Instant::now();
 
         queue.submit(std::iter::once(encoder.finish()));
-        self.staging_belt.recall().await;
+        self.staging_belt_recalled = Some(Box::pin(self.staging_belt.recall()));
 
         let end_time = Instant::now();
         Ok(RenderInfo {
