@@ -529,7 +529,8 @@ pub(crate) fn nudge_on_ray(
             face,
             aab.face_coordinate(face),
             penetration_depth,
-            translation
+            translation,
+            direction_projection,
         );
     }
     segment.scale_direction(1.0 + translation / direction_projection)
@@ -710,6 +711,12 @@ mod tests {
             let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vec());
             let face_to_nudge = step.face().opposite();
 
+            eprintln!("\n#{case_number} with inputs:");
+            eprintln!("  ray: {ray:?}");
+            eprintln!("  step: {step:?}");
+            eprintln!("  segment: {segment:?}");
+            eprintln!("  face_to_nudge: {face_to_nudge:?}");
+
             for backward in [true, false] {
                 // Perform nudge
                 // TODO: test non-1 resolution
@@ -721,7 +728,7 @@ mod tests {
                 let nudge_length = (adjusted_segment.direction - segment.direction).magnitude();
                 assert!(
                     nudge_length <= 0.001,
-                    "nudge moved from {:?} to {:?}, distance of {}",
+                    "nudge moved too far\nfrom {:?}\n  to {:?}\ndistance of {}",
                     segment,
                     adjusted_segment,
                     nudge_length
