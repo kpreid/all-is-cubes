@@ -421,19 +421,18 @@ pub struct StandardCameras {
 }
 
 impl StandardCameras {
-    pub fn from_session(
-        session: &Session,
+    /// Most general constructor; private because the details needed might vary.
+    fn new(
+        graphics_options: ListenableSource<GraphicsOptions>,
         viewport: Viewport,
+        character_source: ListenableSource<Option<URef<Character>>>,
+        ui_space_source: ListenableSource<Option<URef<Space>>>,
     ) -> Result<Self, std::convert::Infallible> {
         // TODO: Add a unit test that each of these listeners works as intended.
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
         // to not have it (some kind of "following cell")?
-        let graphics_options = session.graphics_options();
         let graphics_options_dirty = DirtyFlag::listening(false, |l| graphics_options.listen(l));
         let initial_options = &*graphics_options.get();
-
-        let character_source = session.character();
-        let ui_space_source = session.ui_space();
 
         let mut this = Self {
             graphics_options,
@@ -458,6 +457,19 @@ impl StandardCameras {
 
         this.update();
         Ok(this)
+    }
+
+    /// Constructs a [`StandardCameras`] that will display, and track, the current state of the [`Session`]
+    pub fn from_session(
+        session: &Session,
+        viewport: Viewport,
+    ) -> Result<Self, std::convert::Infallible> {
+        Self::new(
+            session.graphics_options(),
+            viewport,
+            session.character(),
+            session.ui_space(),
+        )
     }
 
     /// Updates camera state from data sources.
