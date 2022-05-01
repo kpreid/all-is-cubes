@@ -1,0 +1,49 @@
+[package]
+name = "test-renderers"
+version = "0.0.1"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+edition = "2021"
+rust-version = "1.60"
+description = "Rendering tests for all-is-cubes."
+publish = false
+
+# Tests use custom test harness because the `luminance` tests require custom main
+# thread actions, and we also want to skip the tests if there is no GPU on the system.
+
+[lib]
+doctest = false
+
+[[test]]
+name = "test-luminance"
+doctest = false
+harness = false
+
+[[test]]
+name = "test-raytracer"
+doctest = false
+harness = false
+
+[[test]]
+name = "test-wgpu"
+doctest = false
+harness = false
+
+[dependencies]
+all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["rayon"] }
+all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
+async_fn_traits = "0.1.1"
+futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+glfw = "0.44.0"
+image = { version = "0.24.2", default-features = false, features = ["png"] }
+luminance = "0.47.0"
+luminance-gl = "0.19.1"
+luminance-glfw = "0.18.2"
+send_wrapper = "0.5.0"
+serde = { version = "1.0.126", default-features = false, features = ["derive"] }
+serde_json = "1.0.64"
+# tinytemplate is already in the workspace's dependency tree via criterion,
+# so let's use it for our output report template.
+tinytemplate = "1.2.1"
+# Using tokio for async test-running.
+tokio = { version = "1.18.0", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
+wgpu = { version = "0.12.0", features = ["webgl"] }

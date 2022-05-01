@@ -1,0 +1,28 @@
+<!doctype html>
+<head>
+  <title>All is Cubes test-renderers report</title>
+</head>
+<body>
+  <table>
+    <thead><tr>
+      <th>Test Case</th>
+      <th><code>raytracer</code></th>
+      <th><code>luminance</code></th>
+      <th><code>wgpu</code></th>
+    </tr></thead>
+    {{ for test_case in statuses }}
+      <tr>
+        <th><code>{test_case.id}</code></th>
+        {{ for cell in test_case.renderers }}
+        <td>
+          {cell.test_outcome}<br>
+          {{ for comp_record in cell.comparisons }}
+          <img src="../../test-renderers/expected/{comp_record.expected_file_name}" title="Expected"><br>
+          <img src="./{comp_record.actual_file_name}" title="Actual"><br>
+          {{ endfor }}
+        </td>
+        {{ endfor }}
+      </tr>
+    {{ endfor }}
+  </table>
+</body>

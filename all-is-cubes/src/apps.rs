@@ -472,6 +472,21 @@ impl StandardCameras {
         )
     }
 
+    #[doc(hidden)]
+    pub fn from_constant_for_test(
+        graphics_options: GraphicsOptions,
+        viewport: Viewport,
+        universe: &Universe,
+    ) -> Self {
+        Self::new(
+            ListenableSource::constant(graphics_options),
+            viewport,
+            ListenableSource::constant(universe.get_default_character()),
+            ListenableSource::constant(None),
+        )
+        .unwrap()
+    }
+
     /// Updates camera state from data sources.
     ///
     /// This should be called at the beginning of each frame or as needed when the

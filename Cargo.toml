@@ -5,6 +5,7 @@ members = [
   "all-is-cubes-desktop",
   "all-is-cubes-server",
   "all-is-cubes-wasm",
+  "test-renderers",
   "xtask",
 
   # Including this makes the fuzz targets automatically built so we know they aren't broken.

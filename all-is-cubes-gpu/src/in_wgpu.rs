@@ -202,7 +202,7 @@ pub struct EverythingRenderer {
 
 impl EverythingRenderer {
     /// A device descriptor suitable for the expectations of [`EverythingRenderer`].
-    fn device_descriptor() -> wgpu::DeviceDescriptor<'static> {
+    pub fn device_descriptor() -> wgpu::DeviceDescriptor<'static> {
         wgpu::DeviceDescriptor {
             features: wgpu::Features::empty(),
             limits: wgpu::Limits::downlevel_webgl2_defaults()
@@ -680,7 +680,11 @@ impl EverythingRenderer {
     }
 }
 
-fn create_depth_texture(device: &wgpu::Device, everything: &EverythingRenderer) -> wgpu::Texture {
+#[doc(hidden)] // TODO: figure out what we want to do here for public API
+pub fn create_depth_texture(
+    device: &wgpu::Device,
+    everything: &EverythingRenderer,
+) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some("SurfaceRenderer::depth_texture"),
         size: wgpu::Extent3d {
@@ -698,78 +702,3 @@ fn create_depth_texture(device: &wgpu::Device, everything: &EverythingRenderer) 
 
 static INFO_TEXT_SHADER: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/info-text.wgsl"));
-
-#[cfg(test)]
-mod tests {
-    use crate::FrameBudget;
-
-    use super::*;
-    use all_is_cubes::apps::Session;
-    use futures_executor::block_on;
-
-    /// Run a renderer headless for one frame and see if it succeeds.
-    /// This will catch if we have any blatant errors such as shader compilation errors,
-    /// that otherwise wouldn't be caught if nobody runs `all-is-cubes -g window-wgpu`.
-    #[test]
-    fn renderer_smoke_test() {
-        block_on(renderer_smoke_test_async());
-    }
-    async fn renderer_smoke_test_async() {
-        let instance = wgpu::Instance::new(wgpu::Backends::all());
-        if let Some(adapter) = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: None,
-                force_fallback_adapter: false,
-            })
-            .await
-        {
-            let session = Session::new().await;
-            let viewport = Viewport::with_scale(1.0, Vector2::new(200, 100));
-
-            let (device, queue) = adapter
-                .request_device(&EverythingRenderer::device_descriptor(), None)
-                .await
-                .unwrap();
-            let device = Arc::new(device);
-
-            let mut everything = EverythingRenderer::new(
-                device.clone(),
-                StandardCameras::from_session(&session, viewport).unwrap(),
-                wgpu::TextureFormat::Rgba8UnormSrgb,
-            );
-
-            let mock_output_texture = device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("mock_output_texture"),
-                size: wgpu::Extent3d {
-                    width: viewport.framebuffer_size.x,
-                    height: viewport.framebuffer_size.y,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            });
-            let depth_texture = create_depth_texture(&device, &everything);
-            let depth_texture_view = depth_texture.create_view(&Default::default());
-
-            let _info = everything
-                .render_frame(
-                    &None,
-                    &FrameBudget::PRACTICALLY_INFINITE,
-                    &queue,
-                    &mock_output_texture,
-                    &depth_texture_view,
-                )
-                .await
-                .unwrap();
-
-            // TODO: Add image comparison?
-            println!("Success");
-        } else {
-            println!("skipping due to lack of GPU device");
-        }
-    }
-}
