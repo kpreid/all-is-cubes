@@ -171,11 +171,11 @@ impl Pipelines {
                                 src_factor: wgpu::BlendFactor::One,
                                 dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
                             },
-                            // TODO: this probably isn't correct but it doesn't matter until such
-                            // time as we get into transparent framebuffers
-                            alpha: wgpu::BlendComponent::REPLACE,
+                            alpha: wgpu::BlendComponent::REPLACE, // ignored due to write_mask
                         }),
-                        write_mask: wgpu::ColorWrites::ALL,
+                        // Write only to color channels -- we are not attempting to support transparent
+                        // framebuffers (yet).
+                        write_mask: wgpu::ColorWrites::COLOR,
                     }],
                 }),
                 primitive: block_primitive_state,
