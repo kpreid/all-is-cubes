@@ -645,6 +645,21 @@ impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
     }
 }
 
+impl Clone for StandardCameras {
+    /// Returns a [`StandardCameras`] which tracks the same data sources (graphics
+    /// options, scene sources) as `self`, but whose local state (such as viewport size
+    /// and last updated camera state) is independent.
+    fn clone(&self) -> Self {
+        Self::new(
+            self.graphics_options.clone(),
+            self.viewport(),
+            self.character_source.clone(),
+            self.ui_space_source.clone(),
+        )
+        .unwrap()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -725,5 +740,27 @@ mod tests {
         assert!(!flag.get_and_clear());
 
         // TODO: test further changes
+    }
+
+    #[test]
+    fn cameras_clone() {
+        let session = block_on(Session::new());
+        let mut cameras = StandardCameras::from_session(&session, Viewport::ARBITRARY).unwrap();
+        let mut cameras2 = cameras.clone();
+
+        let default_o = GraphicsOptions::default();
+        let mut different_o = default_o.clone();
+        different_o.debug_chunk_boxes = true;
+        session.graphics_options_mut().set(different_o.clone());
+
+        // Each `StandardCameras` has independent updating from the same data sources.
+        assert_eq!(cameras.cameras().world.options(), &default_o);
+        assert_eq!(cameras2.cameras().world.options(), &default_o);
+        cameras.update();
+        assert_eq!(cameras.cameras().world.options(), &different_o);
+        assert_eq!(cameras2.cameras().world.options(), &default_o);
+        cameras2.update();
+        assert_eq!(cameras.cameras().world.options(), &different_o);
+        assert_eq!(cameras2.cameras().world.options(), &different_o);
     }
 }
