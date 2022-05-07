@@ -27,7 +27,7 @@ use crate::in_wgpu::{
     glue::{to_wgpu_color, to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
-use crate::{time_budgets, GraphicsResourceError, SpaceRenderInfo};
+use crate::{GraphicsResourceError, SpaceRenderInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -135,6 +135,7 @@ impl SpaceRenderer {
     /// Prepare to draw a frame by updating as many chunks/buffers/textures as we're going to.
     pub(crate) fn prepare_frame<'a>(
         &'a mut self,
+        deadline: Instant,
         queue: &wgpu::Queue,
         camera: &Camera,
         pipelines: &'a Pipelines,
@@ -170,7 +171,7 @@ impl SpaceRenderer {
         let (csm_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
             camera,
             &mut self.block_texture,
-            end_light_update + time_budgets::UPDATE_MESHES,
+            deadline, // TODO: decrease deadline by some guess at texture writing time
             |mesh, render_data| {
                 update_chunk_buffers(rcbwp.borrow_mut().reborrow(), mesh, render_data);
             },
@@ -193,7 +194,8 @@ impl SpaceRenderer {
         );
 
         // Flush all texture updates to GPU.
-        // This must happen after `csm.update_blocks_and_some_chunks`.
+        // This must happen after `csm.update_blocks_and_some_chunks` so that the newly
+        // generated meshes have the texels they expect.
         let texture_info = self.block_texture.flush(queue);
 
         // if graphics_options.debug_chunk_boxes {

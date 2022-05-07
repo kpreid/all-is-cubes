@@ -38,7 +38,7 @@ use crate::in_luminance::{
     types::{AicLumBackend, LinesVertex},
 };
 use crate::reloadable::{reloadable_str, Reloadable};
-use crate::{gather_debug_lines, GraphicsResourceError, RenderInfo, SpaceRenderInfo};
+use crate::{gather_debug_lines, FrameBudget, GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
 /// Top-level renderer.
 /// Owns the [`GraphicsContext`] and an [`EverythingRenderer`] to draw with it.
@@ -98,8 +98,12 @@ where
         &mut self,
         cursor_result: &Option<Cursor>,
     ) -> Result<RenderInfo, GraphicsResourceError> {
-        self.objects
-            .render_frame(&mut self.surface, &self.back_buffer, cursor_result)
+        self.objects.render_frame(
+            &mut self.surface,
+            &self.back_buffer,
+            &FrameBudget::SIXTY_FPS, // TODO: figure out what we're vsyncing to, instead
+            cursor_result,
+        )
     }
 
     pub fn add_info_text(&mut self, text: &str) -> Result<(), GraphicsResourceError> {
@@ -208,6 +212,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         &mut self,
         context: &mut C,
         framebuffer: &Framebuffer<Backend, Dim2, CS, DS>,
+        frame_budget: &FrameBudget,
         cursor_result: &Option<Cursor>,
     ) -> Result<RenderInfo, GraphicsResourceError>
     where
@@ -265,14 +270,16 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         }
 
         // Get SpaceRendererOutput (per-frame ready to draw data)
+        let world_deadline = start_prepare_time + frame_budget.update_meshes.world;
+        let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
         let world_output: Option<SpaceRendererOutput<'_, C::Backend>> = self
             .space_renderers
             .world
             .as_mut()
-            .map(|r| r.prepare_frame(context, &self.cameras.cameras().world))
+            .map(|r| r.prepare_frame(world_deadline, context, &self.cameras.cameras().world))
             .transpose()?;
         let ui_output = if let Some(ui_renderer) = &mut self.space_renderers.ui {
-            Some(ui_renderer.prepare_frame(context, &self.cameras.cameras().ui)?)
+            Some(ui_renderer.prepare_frame(ui_deadline, context, &self.cameras.cameras().ui)?)
         } else {
             None
         };

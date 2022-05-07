@@ -39,7 +39,7 @@ use crate::in_luminance::{
     types::{AicLumBackend, LinesVertex, LumBlockVertex},
     wireframe_vertices,
 };
-use crate::{time_budgets, GraphicsResourceError, SpaceRenderInfo};
+use crate::{GraphicsResourceError, SpaceRenderInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -93,6 +93,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
     /// luminance pipeline.
     pub(super) fn prepare_frame<'a, C>(
         &'a mut self,
+        deadline: Instant,
         context: &mut C,
         camera: &Camera,
     ) -> Result<SpaceRendererOutput<'a, Backend>, GraphicsResourceError>
@@ -139,7 +140,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         let (csm_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
             camera,
             block_texture_allocator,
-            end_light_update + time_budgets::UPDATE_MESHES,
+            deadline, // TODO: decrease deadline by some guess at texture writing time
             |mesh, render_data| {
                 update_chunk_tess(context, mesh, render_data);
             },
@@ -161,7 +162,8 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         let view_direction_mask = camera.view_direction_mask();
 
         // Flush all texture updates to GPU.
-        // This must happen after `csm.update_blocks_and_some_chunks`.
+        // This must happen after `csm.update_blocks_and_some_chunks` so that the newly
+        // generated meshes have the texels they expect.
         let texture_info = block_texture_allocator.flush()?;
 
         if graphics_options.debug_chunk_boxes {

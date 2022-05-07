@@ -33,7 +33,7 @@ use crate::{
         vertex::{WgpuBlockVertex, WgpuLinesVertex},
     },
     reloadable::{reloadable_str, Reloadable},
-    wireframe_vertices,
+    wireframe_vertices, FrameBudget,
 };
 use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
@@ -149,6 +149,7 @@ impl SurfaceRenderer {
             .everything
             .render_frame(
                 cursor_result,
+                &FrameBudget::SIXTY_FPS, // TODO: figure out what we're vsyncing to, instead
                 &self.queue,
                 &output.texture,
                 &self.depth_texture_view,
@@ -382,6 +383,7 @@ impl EverythingRenderer {
     pub async fn render_frame(
         &mut self,
         cursor_result: &Option<Cursor>,
+        frame_budget: &FrameBudget,
         queue: &wgpu::Queue,
         output: &wgpu::Texture,
         depth_texture_view: &wgpu::TextureView,
@@ -463,6 +465,9 @@ impl EverythingRenderer {
             encoder: &mut encoder,
         };
 
+        let world_deadline = Instant::now() + frame_budget.update_meshes.world;
+        let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
+
         let outputs = Layers {
             world: self
                 .space_renderers
@@ -470,6 +475,7 @@ impl EverythingRenderer {
                 .as_mut()
                 .map(|sr| {
                     sr.prepare_frame(
+                        world_deadline,
                         queue,
                         &self.cameras.cameras().world,
                         &self.pipelines,
@@ -483,6 +489,7 @@ impl EverythingRenderer {
                 .as_mut()
                 .map(|sr| {
                     sr.prepare_frame(
+                        ui_deadline,
                         queue,
                         &self.cameras.cameras().ui,
                         &self.pipelines,
@@ -694,6 +701,8 @@ static INFO_TEXT_SHADER: Lazy<Reloadable> =
 
 #[cfg(test)]
 mod tests {
+    use crate::FrameBudget;
+
     use super::*;
     use all_is_cubes::apps::Session;
     use futures_executor::block_on;
@@ -747,7 +756,13 @@ mod tests {
             let depth_texture_view = depth_texture.create_view(&Default::default());
 
             let _info = everything
-                .render_frame(&None, &queue, &mock_output_texture, &depth_texture_view)
+                .render_frame(
+                    &None,
+                    &FrameBudget::PRACTICALLY_INFINITE,
+                    &queue,
+                    &mock_output_texture,
+                    &depth_texture_view,
+                )
                 .await
                 .unwrap();
 
