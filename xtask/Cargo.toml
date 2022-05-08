@@ -13,6 +13,7 @@ path = "src/xtask.rs"
 bench = false
 
 [dependencies]
+cargo_metadata = "0.8.2"
 clap = { version = "3.0.8", default-features = false, features = ["derive", "std", "suggestions"] }
 toml_edit = { version = "0.14.2" }
 xaction = "0.2.4"

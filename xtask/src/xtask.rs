@@ -17,6 +17,7 @@ use std::io::Write as _;
 use std::path::Path;
 use std::time::Duration;
 
+use cargo_metadata::PackageId;
 use xaction::{cmd, pushd, Cmd, Pushd};
 
 #[derive(Debug, clap::Parser)]
@@ -38,6 +39,11 @@ enum XtaskCommand {
 
     /// Format code (as `cargo fmt` but covering all packages)
     Fmt,
+
+    /// Fuzz: run all fuzz targets, with a chosen duration for each.
+    Fuzz {
+        duration: f64,
+    },
 
     /// Run webpack dev server (for testing `all-is-cubes-wasm`).
     RunDev,
@@ -80,6 +86,23 @@ fn main() -> Result<(), xaction::Error> {
                 cargo().arg("fmt").run()?;
                 Ok(())
             })?;
+        }
+        XtaskCommand::Fuzz { duration } => {
+            let metadata = cargo_metadata::MetadataCommand::new()
+                .manifest_path("fuzz/Cargo.toml")
+                .exec()
+                .unwrap();
+            let [fuzzpkg]: [PackageId; 1] = (metadata.workspace_members)
+                .clone()
+                .try_into()
+                .expect("Didn't find only one package");
+            for target in metadata[&fuzzpkg].targets.iter() {
+                cmd!("cargo +nightly fuzz run")
+                    .arg(&target.name)
+                    .arg("--")
+                    .arg(format!("-max_total_time={}", duration))
+                    .run()?;
+            }
         }
         XtaskCommand::RunDev => {
             let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
