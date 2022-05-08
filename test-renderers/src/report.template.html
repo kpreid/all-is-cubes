@@ -17,8 +17,10 @@
         <td>
           {cell.test_outcome}<br>
           {{ for comp_record in cell.comparisons }}
-          <img src="../../test-renderers/expected/{comp_record.expected_file_name}" title="Expected"><br>
-          <img src="./{comp_record.actual_file_name}" title="Actual"><br>
+            {{ if comp_record.show_expected_for_comparison }}
+              <img src="../../test-renderers/expected/{comp_record.expected_file_name}" title="Expected"><br>
+            {{ endif }}
+            <img src="./{comp_record.actual_file_name}" title="Actual"><br>
           {{ endfor }}
         </td>
         {{ endfor }}

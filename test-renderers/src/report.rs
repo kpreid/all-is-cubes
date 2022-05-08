@@ -24,21 +24,6 @@ pub struct TestCaseOutput {
 ///
 /// TODO: report staleness of the data, just in case.
 pub(crate) fn write_report_file() -> PathBuf {
-    #[derive(serde::Serialize)]
-    struct Context {
-        statuses: Vec<StatusRow>,
-    }
-    #[derive(serde::Serialize)]
-    struct StatusRow {
-        id: String,
-        renderers: Vec<StatusCell>,
-    }
-    #[derive(serde::Serialize)]
-    struct StatusCell {
-        test_outcome: &'static str,
-        comparisons: Vec<ComparisonRecord>,
-    }
-
     // Fetch previous comparison records from disk since we are currently only running one of the renderer cases
     let comparison_records: Vec<BTreeMap<TestId, TestCaseOutput>> = [
         // These must be in the same order that the template displays columns
@@ -63,10 +48,10 @@ pub(crate) fn write_report_file() -> PathBuf {
     tt.add_template("report", include_str!("report.template.html"))
         .unwrap();
 
-    let context = Context {
+    let context = tmpl::Context {
         statuses: all_ids
             .iter()
-            .map(|test_id| StatusRow {
+            .map(|test_id| tmpl::StatusRow {
                 id: test_id.clone(),
                 renderers: comparison_records
                     .iter()
@@ -75,11 +60,14 @@ pub(crate) fn write_report_file() -> PathBuf {
                             passed,
                             test_id: _,
                             ref comparisons,
-                        }) => StatusCell {
+                        }) => tmpl::StatusCell {
                             test_outcome: if passed { "✅" } else { "❌" },
-                            comparisons: comparisons.clone(),
+                            comparisons: comparisons
+                                .iter()
+                                .map(tmpl::TmplComparison::from)
+                                .collect(),
                         },
-                        None => StatusCell {
+                        None => tmpl::StatusCell {
                             test_outcome: "Not run",
                             comparisons: vec![],
                         },
@@ -100,4 +88,48 @@ pub(crate) fn write_report_file() -> PathBuf {
 
 pub fn results_json_path(renderer_id: RendererId) -> PathBuf {
     test_data_dir_path(Version::Actual).join(format!("results-{renderer_id}.json"))
+}
+
+/// Types for the HTML templating
+mod tmpl {
+    use crate::{ComparisonOutcome, ComparisonRecord};
+
+    #[derive(serde::Serialize)]
+    pub struct Context {
+        pub statuses: Vec<StatusRow>,
+    }
+
+    #[derive(serde::Serialize)]
+    pub struct StatusRow {
+        pub id: String,
+        pub renderers: Vec<StatusCell>,
+    }
+
+    #[derive(serde::Serialize)]
+    pub struct StatusCell {
+        pub test_outcome: &'static str,
+        pub comparisons: Vec<TmplComparison>,
+    }
+
+    /// As [`ComparisonRecord`] but adjusted for the needs of the templating
+    #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+    pub struct TmplComparison {
+        expected_file_name: String,
+        actual_file_name: String,
+        show_expected_for_comparison: bool,
+    }
+
+    impl From<&ComparisonRecord> for TmplComparison {
+        fn from(input: &ComparisonRecord) -> Self {
+            Self {
+                expected_file_name: input.expected_file_name.clone(),
+                actual_file_name: input.actual_file_name.clone(),
+                show_expected_for_comparison: match input.outcome {
+                    ComparisonOutcome::Different => true,
+                    ComparisonOutcome::Equal => false,
+                    ComparisonOutcome::NoExpected => true,
+                },
+            }
+        }
+    }
 }
