@@ -170,7 +170,7 @@ impl HeadlessRenderer for LumHeadlessRenderer {
                     context,
                     framebuffer,
                     &FrameBudget::PRACTICALLY_INFINITE,
-                    &None,
+                    None,
                 )
                 .unwrap();
             // TODO: provide for testing info text pass

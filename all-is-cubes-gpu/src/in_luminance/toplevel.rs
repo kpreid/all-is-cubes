@@ -96,7 +96,7 @@ where
     /// Draw a frame, excluding info text overlay.
     pub fn render_frame(
         &mut self,
-        cursor_result: &Option<Cursor>,
+        cursor_result: Option<&Cursor>,
     ) -> Result<RenderInfo, GraphicsResourceError> {
         self.objects.render_frame(
             &mut self.surface,
@@ -213,7 +213,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         context: &mut C,
         framebuffer: &Framebuffer<Backend, Dim2, CS, DS>,
         frame_budget: &FrameBudget,
-        cursor_result: &Option<Cursor>,
+        cursor_result: Option<&Cursor>,
     ) -> Result<RenderInfo, GraphicsResourceError>
     where
         C: GraphicsContext<Backend = Backend>,

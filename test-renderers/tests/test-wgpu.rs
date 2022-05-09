@@ -125,7 +125,7 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
             let _info = self
                 .everything
                 .render_frame(
-                    &None,
+                    None,
                     &FrameBudget::PRACTICALLY_INFINITE,
                     &self.factory.queue,
                     &self.color_texture,

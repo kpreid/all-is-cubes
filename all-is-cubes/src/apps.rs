@@ -296,8 +296,8 @@ impl Session {
             .and_then(|ndc_pos| cameras.project_cursor(ndc_pos));
     }
 
-    pub fn cursor_result(&self) -> &Option<Cursor> {
-        &self.cursor_result
+    pub fn cursor_result(&self) -> Option<&Cursor> {
+        self.cursor_result.as_ref()
     }
 
     /// Handle a mouse-click event, at the position specified by the last

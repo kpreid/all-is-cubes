@@ -31,7 +31,7 @@ use crate::{wireframe_vertices, GraphicsResourceError};
 /// Caller must set up the camera for the cursor's space.
 pub(crate) fn make_cursor_tess<C>(
     context: &mut C,
-    cursor_result: &Option<Cursor>,
+    cursor_result: Option<&Cursor>,
 ) -> Result<Option<Tess<C::Backend, LinesVertex>>, GraphicsResourceError>
 where
     C: GraphicsContext,

@@ -141,7 +141,7 @@ impl SurfaceRenderer {
 
     pub async fn render_frame(
         &mut self,
-        cursor_result: &Option<Cursor>,
+        cursor_result: Option<&Cursor>,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
     ) -> Result<RenderInfo, GraphicsResourceError> {
         let output = self.surface.get_current_texture()?;
@@ -382,7 +382,7 @@ impl EverythingRenderer {
 
     pub async fn render_frame(
         &mut self,
-        cursor_result: &Option<Cursor>,
+        cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
         queue: &wgpu::Queue,
         output: &wgpu::Texture,

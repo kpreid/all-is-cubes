@@ -17,7 +17,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
     character: Option<&Character>,
     graphics_options: &GraphicsOptions,
     v: &mut Vec<V>,
-    cursor_result: &Option<Cursor>,
+    cursor_result: Option<&Cursor>,
 ) {
     // All of these debug visualizations currently depend on the character
     if let Some(character) = character {
