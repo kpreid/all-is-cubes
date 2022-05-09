@@ -156,7 +156,7 @@ impl SurfaceRenderer {
             )
             .await?;
         self.everything
-            .add_info_text(&self.queue, &output, &info_text_fn(&info));
+            .add_info_text(&self.queue, &output.texture, &info_text_fn(&info));
         output.present();
         Ok(info)
     }
@@ -602,12 +602,7 @@ impl EverythingRenderer {
         })
     }
 
-    pub fn add_info_text(
-        &mut self,
-        queue: &wgpu::Queue,
-        output: &wgpu::SurfaceTexture,
-        text: &str,
-    ) {
+    pub fn add_info_text(&mut self, queue: &wgpu::Queue, output: &wgpu::Texture, text: &str) {
         if text.is_empty() || !self.cameras.cameras().world.options().debug_info_text {
             // TODO: Avoid computing the text, not just drawing it
             return;
@@ -626,9 +621,7 @@ impl EverythingRenderer {
         info_text_texture.upload(queue);
 
         // TODO: avoid recreating this
-        let output_view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let output_view = output.create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self
             .device

@@ -3,7 +3,7 @@
 
 use futures_core::future::BoxFuture;
 use image::RgbaImage;
-use test_renderers::{HeadlessRenderer, RendererFactory, RendererId};
+use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::listen::ListenableSource;
@@ -50,7 +50,8 @@ struct RtHeadless {
 }
 
 impl HeadlessRenderer for RtHeadless {
-    fn render(&mut self) -> BoxFuture<'_, RgbaImage> {
+    fn render<'a>(&'a mut self, _overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage> {
+        // TODO: implement drawing overlays
         Box::pin(async {
             let RtHeadless { cameras, rt } = self;
             let camera = cameras.cameras().world.clone();

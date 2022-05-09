@@ -12,7 +12,7 @@ use tokio::sync::OnceCell;
 
 use all_is_cubes::camera::Viewport;
 use all_is_cubes_gpu::in_wgpu::{create_depth_texture, EverythingRenderer};
-use test_renderers::{HeadlessRenderer, RendererFactory, RendererId};
+use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
 
 #[allow(clippy::result_unit_err)]
 #[cfg(test)]
@@ -119,13 +119,13 @@ struct WgpuHeadlessRenderer {
 }
 
 impl HeadlessRenderer for WgpuHeadlessRenderer {
-    fn render(&mut self) -> BoxFuture<'_, RgbaImage> {
-        Box::pin(async {
+    fn render<'a>(&'a mut self, overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage> {
+        Box::pin(async move {
             let viewport = self.everything.viewport();
             let _info = self
                 .everything
                 .render_frame(
-                    None,
+                    overlays.cursor,
                     &FrameBudget::PRACTICALLY_INFINITE,
                     &self.factory.queue,
                     &self.color_texture,
@@ -133,6 +133,11 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
                 )
                 .await
                 .unwrap();
+
+            if let Some(text) = overlays.info_text {
+                self.everything
+                    .add_info_text(&self.factory.queue, &self.color_texture, text);
+            }
 
             get_pixels_from_gpu(
                 &self.factory.device,

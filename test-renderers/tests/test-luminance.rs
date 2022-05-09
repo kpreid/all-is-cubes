@@ -28,7 +28,7 @@ use send_wrapper::SendWrapper;
 
 use all_is_cubes_gpu::in_luminance::EverythingRenderer;
 use all_is_cubes_gpu::FrameBudget;
-use test_renderers::{HeadlessRenderer, RendererFactory, RendererId};
+use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
 
 #[allow(clippy::result_unit_err)]
 #[cfg(test)]
@@ -157,7 +157,7 @@ struct UnsendRend {
 }
 
 impl HeadlessRenderer for LumHeadlessRenderer {
-    fn render(&mut self) -> BoxFuture<'_, RgbaImage> {
+    fn render<'a>(&'a mut self, overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage> {
         let UnsendRend {
             framebuffer,
             renderer,
@@ -170,13 +170,12 @@ impl HeadlessRenderer for LumHeadlessRenderer {
                     context,
                     framebuffer,
                     &FrameBudget::PRACTICALLY_INFINITE,
-                    None,
+                    overlays.cursor,
                 )
                 .unwrap();
-            // TODO: provide for testing info text pass
-            // renderer
-            //     .add_info_text(context, &offscreen_buffer, "foo")
-            //     .unwrap();
+            if let Some(text) = overlays.info_text {
+                renderer.add_info_text(context, framebuffer, text).unwrap();
+            }
         });
 
         let texels = framebuffer
