@@ -53,9 +53,11 @@ pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(cube: GridPoint) -> Chunk
 pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
     cube: Point3<FreeCoordinate>,
 ) -> ChunkPos<CHUNK_SIZE> {
-    ChunkPos(point_to_enclosing_cube(
+    ChunkPos(
+        point_to_enclosing_cube(
         cube.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE))),
-    ))
+    ).unwrap(/* TODO */),
+    )
 }
 
 /// Precomputed information about the spherical pattern of chunks within view distance.

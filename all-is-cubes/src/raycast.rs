@@ -11,7 +11,8 @@
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use crate::math::{
-    point_to_enclosing_cube, CubeFace, Face7, FreeCoordinate, Geometry, GridCoordinate, Rgba,
+    point_to_enclosing_cube, CubeFace, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint,
+    Rgba,
 };
 use crate::space::Grid;
 
@@ -140,7 +141,7 @@ pub struct Raycaster {
     /// Have we not yet produced the origin cube itself?
     emit_current: bool,
     /// Cube we're in; always the next cube to return from the iterator.
-    cube: Point3<GridCoordinate>,
+    cube: GridPoint,
     /// Which way to increment `cube` when stepping; signum of `direction`.
     step: Vector3<GridCoordinate>,
     /// t_max stores the t-value at which we would next cross a cube boundary,
@@ -189,10 +190,32 @@ impl Raycaster {
     ) -> Self {
         let origin = origin.into();
         let direction = direction.into();
+
+        // If there is no enclosing cube then the current cube is undefined so we cannot make
+        // meaningful progress. (In the event of within_grid(), we could in theory have a
+        // suitably bounded interpretation, but that is not of practical interest.)
+        let cube = match point_to_enclosing_cube(origin) {
+            Some(cube) => cube,
+            None => {
+                // Return a raycaster which emits no cubes.
+                return Self {
+                    ray: Ray::new(origin, direction),
+                    emit_current: false, // emit no cubes
+                    cube: GridPoint::origin(),
+                    step: Vector3::zero(),
+                    t_max: Vector3::zero(),
+                    t_delta: Vector3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY),
+                    last_face: Face7::Within,
+                    last_t_distance: 0.0,
+                    grid: None,
+                };
+            }
+        };
+
         Self {
             ray: Ray::new(origin, direction),
             emit_current: true,
-            cube: point_to_enclosing_cube(origin),
+            cube,
             step: direction.map(signum_101),
             t_max: origin.to_vec().zip(direction, scale_to_integer_step),
             t_delta: direction.map(|x| x.abs().recip()),
@@ -447,7 +470,7 @@ impl RaycastStep {
     /// Note that the cube containing the origin of the ray, if any, will be included. In
     /// that case and only that case, `self.cube_ahead() == self.cube_behind()`.
     #[inline]
-    pub fn cube_ahead(&self) -> Point3<GridCoordinate> {
+    pub fn cube_ahead(&self) -> GridPoint {
         self.cube_face.cube
     }
 
@@ -498,7 +521,7 @@ impl RaycastStep {
     /// assert_eq!(next().cube_behind(), GridPoint::new(2, 0, 0));
     /// ```
     #[inline]
-    pub fn cube_behind(&self) -> Point3<GridCoordinate> {
+    pub fn cube_behind(&self) -> GridPoint {
         self.cube_face.adjacent()
     }
 
@@ -609,7 +632,7 @@ fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeC
 
 fn ray_plane_intersection(
     ray: Ray,
-    plane_origin: Point3<GridCoordinate>,
+    plane_origin: GridPoint,
     plane_normal: Vector3<GridCoordinate>,
 ) -> FreeCoordinate {
     let plane_origin = plane_origin.map(FreeCoordinate::from);
@@ -633,7 +656,7 @@ mod tests {
     /// can be written, and contains 'final' values rather than ones used for calculation.
     #[derive(Clone, Copy, Debug, PartialEq)]
     struct TestStep {
-        cube: Point3<GridCoordinate>,
+        cube: GridPoint,
         face: Face7,
         t_distance: Option<FreeCoordinate>,
         intersection_point: Option<Point3<FreeCoordinate>>,
@@ -926,6 +949,17 @@ mod tests {
             [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MIN) - 1.5],
             [0.0, 0.0, -1.0],
         ));
+    }
+
+    /// Regression test (found by fuzzing) for being outside of integer
+    /// range while also using within_grid().
+    #[test]
+    fn start_outside_of_integer_range_with_grid() {
+        let grid = Grid::new([0, 0, 0], [10, 10, 10]);
+        assert_no_steps(Raycaster::new(
+            Point3::new(0., 1e303, 0.),
+            Vector3::new(0., -1e303, 0.),
+        ).within_grid(grid));
     }
 
     /// If we start inside the range of `GridCoordinate`s and exit, this should

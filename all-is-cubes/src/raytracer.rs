@@ -293,8 +293,11 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let mix_2 = smoothstep(mix_2);
 
         // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
-        let get_light = |p: Vector3<FreeCoordinate>| {
-            self.get_packed_light(point_to_enclosing_cube(Point3::from_vec(origin) + p))
+        let get_light = |p: Vector3<FreeCoordinate>| match point_to_enclosing_cube(
+            Point3::from_vec(origin) + p,
+        ) {
+            Some(cube) => self.get_packed_light(cube),
+            None => self.packed_sky_color,
         };
         let lin_lo = -0.5;
         let lin_hi = 0.5;

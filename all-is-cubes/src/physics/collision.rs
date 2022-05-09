@@ -766,8 +766,9 @@ mod tests {
 
                 let enclosing = nudged_aab.round_up_to_grid();
                 if backward {
-                    let expected_enclosing =
-                        Grid::single_cube(point_to_enclosing_cube(segment.unit_endpoint()));
+                    let expected_enclosing = Grid::single_cube(
+                        point_to_enclosing_cube(segment.unit_endpoint()).unwrap(),
+                    );
                     assert_eq!(
                         enclosing.axis_range(axis),
                         expected_enclosing.axis_range(axis),

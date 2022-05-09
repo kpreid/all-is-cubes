@@ -136,7 +136,10 @@ pub(crate) fn voronoi_pattern<'a>(
     let mut flood_fill_todo = HashSet::new();
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);
-        let starting_cube = point_to_enclosing_cube(region_point);
+        let starting_cube: GridPoint = match point_to_enclosing_cube(region_point) {
+            Some(p) => p,
+            None => continue, // TODO: panic? this can only happen when the inputs are not in 0 to 1
+        };
         flood_fill_todo.insert(starting_cube);
         while let Some(cube) = flood_fill_todo.iter().next().copied() {
             flood_fill_todo.remove(&cube);

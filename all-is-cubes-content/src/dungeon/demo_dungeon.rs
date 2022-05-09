@@ -175,7 +175,8 @@ impl Theme<DemoRoom> for DemoTheme {
 
                 if room_data.lit {
                     let top_middle =
-                        point_to_enclosing_cube(interior.abut(Face6::PY, -1).unwrap().center());
+                        point_to_enclosing_cube(interior.abut(Face6::PY, -1).unwrap().center())
+                            .unwrap();
                     space.set(
                         top_middle,
                         if room_data.corridor_only {
@@ -210,7 +211,8 @@ impl Theme<DemoRoom> for DemoTheme {
                 // Ceiling light port (not handled by four_walls above)
                 if room_data.windowed_faces[Face7::PY] {
                     let midpoint =
-                        point_to_enclosing_cube(interior.abut(Face6::PY, 1).unwrap().center());
+                        point_to_enclosing_cube(interior.abut(Face6::PY, 1).unwrap().center())
+                            .unwrap();
                     for x in WINDOW_PATTERN {
                         for z in WINDOW_PATTERN {
                             space.set(
