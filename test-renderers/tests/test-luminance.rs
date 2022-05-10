@@ -183,12 +183,13 @@ impl HeadlessRenderer for LumHeadlessRenderer {
             .get_raw_texels()
             .expect("Failed to read offscreen buffer");
 
-        let image = RgbaImage::from_raw(
+        let mut image = RgbaImage::from_raw(
             viewport.framebuffer_size.x,
             viewport.framebuffer_size.y,
             texels,
         )
         .expect("texels did not match expected image size");
+        image::imageops::flip_vertical_in_place(&mut image);
 
         // can't defer any of the work because the future wouldn't be Send
         Box::pin(std::future::ready(image))
