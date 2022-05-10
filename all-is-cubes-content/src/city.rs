@@ -25,7 +25,7 @@ use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Face6, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
-    GridVector, NoiseFnExt as _, Rgb,
+    GridVector, Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{Grid, LightPhysics, Space, SpacePhysics};
@@ -36,6 +36,7 @@ use crate::{
     clouds::clouds,
     draw_text_in_blocks,
     logo::{logo_text, logo_text_extent},
+    noise::NoiseFnExt,
     space_to_space_copy, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
 };
 

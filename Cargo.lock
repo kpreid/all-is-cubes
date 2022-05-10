@@ -75,7 +75,6 @@ dependencies = [
  "instant",
  "itertools",
  "log",
- "noise",
  "num-traits",
  "once_cell",
  "ordered-float",

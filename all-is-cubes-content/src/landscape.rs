@@ -11,15 +11,14 @@ use all_is_cubes::block::{Block, BlockCollision, Resolution, AIR};
 use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
-    cube_to_midpoint, Aab, FreeCoordinate, GridCoordinate, GridPoint, GridVector, NoiseFnExt as _,
-    Rgb,
+    cube_to_midpoint, Aab, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb,
 };
 use all_is_cubes::notnan;
 use all_is_cubes::space::{Grid, SetCubeError, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
-use crate::noise::array_of_noise;
+use crate::noise::{array_of_noise, NoiseFnExt};
 use crate::voronoi_pattern;
 use crate::{blocks::scale_color, palette};
 

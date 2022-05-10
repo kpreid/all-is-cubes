@@ -22,7 +22,7 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     cube_to_midpoint, Face6, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
-    GridVector, NoiseFnExt as _, NotNan, Rgb, Rgba,
+    GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::universe::Universe;
@@ -31,6 +31,7 @@ use all_is_cubes::{rgb_const, rgba_const};
 
 use crate::int_magnitude_squared;
 use crate::landscape::install_landscape_blocks;
+use crate::noise::NoiseFnExt;
 use crate::palette;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::IntoStaticStr /* kludge */, Exhaust)]

@@ -4,8 +4,10 @@
 //! Cloud generation.
 
 use all_is_cubes::block::{Block, BlockCollision, AIR};
-use all_is_cubes::math::{GridCoordinate, GridPoint, NoiseFnExt as _, NotNan, Rgb};
+use all_is_cubes::math::{GridCoordinate, GridPoint, NotNan, Rgb};
 use all_is_cubes::space::{Grid, SetCubeError, Space};
+
+use crate::noise::NoiseFnExt;
 
 /// Fill the [`AIR`] portions of `region` in `space` with clouds made up of various
 /// transparent blocks.

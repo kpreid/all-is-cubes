@@ -41,6 +41,9 @@
 
 ### Removed
 
+- `all-is-cubes` library:
+    - `math::NoiseFnExt` (no longer public).
+
 ## 0.4.0 (2022-01-29)
 
 ### Added
