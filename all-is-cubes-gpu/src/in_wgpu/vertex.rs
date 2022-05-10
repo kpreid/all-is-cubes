@@ -2,7 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
-use all_is_cubes::math::{Face7, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{Face7, GridPoint};
 use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
 use all_is_cubes::space::PackedLight;
 
@@ -22,9 +22,9 @@ pub(crate) struct WgpuBlockVertex {
     /// TODO: Once we implement storing chunks in relative coordinates for better
     /// precision, we can reduce this representation size down to i8 or u8.
     cube: [f32; 3],
-    /// Vertex normal (should be length 1).
-    /// TODO: Try storing this as an enum
-    normal: [f32; 3],
+    /// Vertex normal in [`Face7`] format.
+    /// TODO: Make use of all the spare bits here for something.
+    normal: u32,
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
     /// * If `[3]` is -1.0, then the first three components are 3D texture coordinates.
@@ -37,12 +37,12 @@ pub(crate) struct WgpuBlockVertex {
 
 impl WgpuBlockVertex {
     const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
-        0 => Float32x3,
-        1 => Float32x3,
-        2 => Float32x3,
-        3 => Float32x4,
-        4 => Float32x3,
-        5 => Float32x3,
+        0 => Float32x3, // position
+        1 => Float32x3, // cube
+        2 => Uint32, // normal
+        3 => Float32x4, // color_or_texture
+        4 => Float32x3, // clamp_min
+        5 => Float32x3, // clamp_max
     ];
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -59,7 +59,7 @@ impl From<BlockVertex> for WgpuBlockVertex {
     fn from(vertex: BlockVertex) -> Self {
         let position = vertex.position.cast::<f32>().unwrap().to_vec();
         let cube = [0., 0., 0.];
-        let normal = vertex.face.normal_vector::<f32>().into();
+        let normal = vertex.face as u32;
         match vertex.coloring {
             Coloring::Solid(color) => {
                 let mut color_attribute: [f32; 4] = color.into();
@@ -116,8 +116,7 @@ impl GfxVertex for WgpuBlockVertex {
 
     #[inline]
     fn face(&self) -> Face7 {
-        let normal: GridVector = Vector3::from(self.normal).map(|c| c as GridCoordinate);
-        Face7::try_from(normal).unwrap_or(Face7::Within)
+        Face7::from_discriminant(self.normal as u8).unwrap_or(Face7::Within)
     }
 }
 

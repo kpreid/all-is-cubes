@@ -73,6 +73,19 @@ impl Face6 {
         Face6::PZ,
     ];
 
+    /// Inverse function of `face as u8`, converting the number to [`Face6`].
+    pub const fn from_discriminant(d: u8) -> Option<Self> {
+        match d {
+            1 => Some(Self::NX),
+            2 => Some(Self::NY),
+            3 => Some(Self::NZ),
+            4 => Some(Self::PX),
+            5 => Some(Self::PY),
+            6 => Some(Self::PZ),
+            _ => None,
+        }
+    }
+
     /// Returns which axis this face's normal vector is parallel to, with the numbering
     /// X = 0, Y = 1, Z = 2, which matches the indexes used by most arrays.
     ///
@@ -221,6 +234,20 @@ impl Face7 {
         Face7::PY,
         Face7::PZ,
     ];
+
+    /// Inverse function of `face as u8`, converting the number to [`Face7`].
+    pub const fn from_discriminant(d: u8) -> Option<Self> {
+        match d {
+            0 => Some(Self::Within),
+            1 => Some(Self::NX),
+            2 => Some(Self::NY),
+            3 => Some(Self::NZ),
+            4 => Some(Self::PX),
+            5 => Some(Self::PY),
+            6 => Some(Self::PZ),
+            _ => None,
+        }
+    }
 
     /// Returns which axis this face's normal vector is parallel to, with the numbering
     /// X = 0, Y = 1, Z = 2, or [`None`] if the face is [`Face7::Within`].

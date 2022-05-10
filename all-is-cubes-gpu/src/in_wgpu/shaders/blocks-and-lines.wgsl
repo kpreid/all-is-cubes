@@ -19,7 +19,7 @@ struct WgpuCamera {
 struct WgpuBlockVertex {
     [[location(0)]] position: vec3<f32>;
     [[location(1)]] cube: vec3<f32>;
-    [[location(2)]] normal: vec3<f32>;
+    [[location(2)]] normal_face: u32;
     [[location(3)]] color_or_texture: vec4<f32>;
     [[location(4)]] clamp_min: vec3<f32>;
     [[location(5)]] clamp_max: vec3<f32>;
@@ -103,11 +103,22 @@ struct BlockFragmentInput {
 fn block_vertex_main(
     input: WgpuBlockVertex,
 ) -> BlockFragmentInput {
+    var normal = vec3<f32>(1.0);
+    switch (input.normal_face) {
+        case 1: { normal = vec3<f32>(-1.0, 0.0, 0.0); }
+        case 2: { normal = vec3<f32>(0.0, -1.0, 0.0); }
+        case 3: { normal = vec3<f32>(0.0, 0.0, -1.0); }
+        case 4: { normal = vec3<f32>(1.0, 0.0, 0.0); }
+        case 5: { normal = vec3<f32>(0.0, 1.0, 0.0); }
+        case 6: { normal = vec3<f32>(0.0, 0.0, 1.0); }
+        default: {}
+    }
+
     return BlockFragmentInput(
         camera.projection * camera.view_matrix * vec4<f32>(input.position, 1.0),
         input.position,
         input.cube,
-        input.normal,
+        normal,
         input.color_or_texture,
         input.clamp_min,
         input.clamp_max,
