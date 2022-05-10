@@ -2,7 +2,6 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::collections::{btree_map, BTreeMap};
-use std::fmt::Display;
 use std::fs;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -209,10 +208,11 @@ impl<'a> TestCaseCollector<'a> {
     }
 
     /// Generate an independent test case for each item of `values`.
-    pub fn insert_variants<F, I>(&mut self, name: &str, test_function: F, values: I)
+    /// The items must serialize to strings.
+    pub fn insert_variants<I, F>(&mut self, name: &str, test_function: F, values: I)
     where
         I: IntoIterator,
-        <I as IntoIterator>::Item: Display + Clone + Send + Sync + 'static,
+        <I as IntoIterator>::Item: serde::Serialize + Clone + Send + Sync + 'static,
         F: AsyncFn2<RenderTestContext, <I as IntoIterator>::Item, Output = ()>
             + Send
             + Sync
@@ -222,7 +222,11 @@ impl<'a> TestCaseCollector<'a> {
     {
         for variant_value in values {
             let test_function = test_function.clone();
-            self.insert(&format!("{name}-{variant_value}"), move |context| {
+            let variant_serialized = serde_json::to_value(&variant_value).unwrap();
+            let variant_string = variant_serialized
+                .as_str()
+                .expect("Variant didn't serialize to a string");
+            self.insert(&format!("{name}-{variant_string}"), move |context| {
                 let variant_value = variant_value.clone();
                 test_function(context, variant_value)
             });

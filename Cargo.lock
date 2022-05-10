@@ -4300,6 +4300,7 @@ name = "test-renderers"
 version = "0.0.1"
 dependencies = [
  "all-is-cubes",
+ "all-is-cubes-content",
  "all-is-cubes-gpu",
  "async_fn_traits",
  "futures-core",
