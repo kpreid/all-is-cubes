@@ -17,13 +17,14 @@ use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
-    GridVector, NoiseFnExt as _, Rgb,
+    GridVector, Rgb,
 };
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
+use crate::noise::array_of_noise;
 use crate::{four_walls, scale_color, Fire};
 
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
@@ -389,14 +390,17 @@ async fn install_atrium_blocks(
     let stone_range: Vec<Block> = (-2..=2_isize)
         .map(|x| scale_color(stone_base.clone(), 1.0 + x as f64 * 0.08, 0.02))
         .collect();
-    let stone_noise_v = noise::OpenSimplex::new().set_seed(0x2e240365);
-    let stone_noise_sc =
-        noise::ScalePoint::new(&stone_noise_v).set_scale(4.0 / f64::from(resolution_g));
-    let stone_noise = noise::ScaleBias::new(&stone_noise_sc)
-        .set_bias(2.5)
-        .set_scale(8.0);
-    let stone_base_pattern =
-        |p: GridPoint| &stone_range[stone_noise.at_grid(p).round().clamp(0.0, 4.0) as usize];
+
+    let stone_base_array = {
+        let stone_noise_v = noise::OpenSimplex::new().set_seed(0x2e240365);
+        let stone_noise_sc =
+            noise::ScalePoint::new(&stone_noise_v).set_scale(4.0 / f64::from(resolution_g));
+
+        // increased resolution to support brick offset patterning
+        array_of_noise(resolution, &stone_noise_sc, |value| {
+            &stone_range[(value * 8.0 + 2.5).round().clamp(0.0, 4.0) as usize]
+        })
+    };
 
     let brick_pattern = |mut p: GridPoint| {
         if (p.x.rem_euclid(resolution_g) > resolution_g / 2)
@@ -409,14 +413,14 @@ async fn install_atrium_blocks(
         if bricking == 0 {
             &grout_base
         } else {
-            stone_base_pattern(p)
+            stone_base_array[p.map(|c| c.rem_euclid(resolution_g))]
         }
     };
     let bottom_grout_pattern = |p: GridPoint| {
         if p.y == 0 {
             &grout_base
         } else {
-            stone_base_pattern(p)
+            stone_base_array[p]
         }
     };
     let molding_fn = |p: GridPoint| {

@@ -4,7 +4,7 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
-use futures_core::future::LocalBoxFuture;
+use futures_core::future::BoxFuture;
 use instant::Instant;
 use noise::Seedable as _;
 
@@ -116,26 +116,28 @@ pub(crate) async fn demo_city(
     p.progress(0.2).await;
 
     // Stray grass
-    let grass_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
-    let grass_noise = noise::ScaleBias::new(&grass_noise_v)
-        .set_bias(0.0)
-        .set_scale(4.0);
-    let grass_threshold = 1.2;
-    space.fill(
-        Grid::from_lower_upper((-radius_xz, 1, -radius_xz), (radius_xz, 2, radius_xz)),
-        |cube| {
-            if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
-                return None;
-            }
-            if grass_noise.at_cube(cube) > grass_threshold * 2. {
-                Some(&landscape_blocks[GrassBlades { variant: true }])
-            } else if grass_noise.at_cube(cube) > grass_threshold {
-                Some(&landscape_blocks[GrassBlades { variant: false }])
-            } else {
-                None
-            }
-        },
-    )?;
+    {
+        let grass_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
+        let grass_noise = noise::ScaleBias::new(&grass_noise_v)
+            .set_bias(0.0)
+            .set_scale(4.0);
+        let grass_threshold = 1.2;
+        space.fill(
+            Grid::from_lower_upper((-radius_xz, 1, -radius_xz), (radius_xz, 2, radius_xz)),
+            |cube| {
+                if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
+                    return None;
+                }
+                if grass_noise.at_cube(cube) > grass_threshold * 2. {
+                    Some(&landscape_blocks[GrassBlades { variant: true }])
+                } else if grass_noise.at_cube(cube) > grass_threshold {
+                    Some(&landscape_blocks[GrassBlades { variant: false }])
+                } else {
+                    None
+                }
+            },
+        )?;
+    }
     p.progress(0.3).await;
 
     // Roads and lamps
@@ -356,7 +358,7 @@ pub(crate) async fn demo_city(
 pub(crate) struct Exhibit {
     pub name: &'static str,
     pub factory:
-        for<'a> fn(&'a Exhibit, &'a mut Universe) -> LocalBoxFuture<'a, Result<Space, InGenError>>,
+        for<'a> fn(&'a Exhibit, &'a mut Universe) -> BoxFuture<'a, Result<Space, InGenError>>,
 }
 
 /// Tracks available land while the city is being generated.

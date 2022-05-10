@@ -19,6 +19,7 @@ use all_is_cubes::space::{Grid, SetCubeError, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
+use crate::noise::array_of_noise;
 use crate::voronoi_pattern;
 use crate::{blocks::scale_color, palette};
 
@@ -108,19 +109,23 @@ pub async fn install_landscape_blocks(
     let colors = BlockProvider::<LandscapeBlocks>::default();
     let rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(123890483921741);
 
-    let blade_color_noise_v = noise::Value::new().set_seed(0x2e240365);
-    let blade_color_noise = noise::ScaleBias::new(&blade_color_noise_v)
-        .set_bias(1.0)
-        .set_scale(0.12);
-    let overhang_noise_v = noise::Value::new();
-    let overhang_noise = noise::ScaleBias::new(&overhang_noise_v)
-        .set_bias(f64::from(resolution) * 0.75)
-        .set_scale(2.5);
-    let blade_noise_v = noise::OpenSimplex::new().set_seed(0x7af8c181);
-    let blade_noise_stretch = noise::ScalePoint::new(blade_noise_v).set_y_scale(0.1);
-    let blade_noise = noise::ScaleBias::new(&blade_noise_stretch)
-        .set_bias(f64::from(resolution) * -0.34)
-        .set_scale(f64::from(resolution) * 1.7);
+    let blade_color_noise = {
+        let blade_color_noise_v = noise::Value::new().set_seed(0x2e240365);
+        move |p| blade_color_noise_v.at_grid(p) * 0.12 + 1.0
+    };
+    let overhang_noise = {
+        let overhang_noise_v = noise::Value::new();
+        array_of_noise(resolution, &overhang_noise_v, |value| {
+            value * 2.5 + f64::from(resolution) * 0.75
+        })
+    };
+    let blade_noise = {
+        let blade_noise_v = noise::OpenSimplex::new().set_seed(0x7af8c181);
+        let blade_noise_stretch = noise::ScalePoint::new(blade_noise_v).set_y_scale(0.1);
+        array_of_noise(resolution * 2, &blade_noise_stretch, |value| {
+            value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.34)
+        })
+    };
 
     let stone_points = [(); 240].map(|_| {
         (
@@ -150,15 +155,14 @@ pub async fn install_landscape_blocks(
                 )
                 .voxels_fn(universe, resolution, |cube| {
                     if f64::from(cube.y)
-                        < blade_noise.at_grid(
-                            cube + GridVector::new(
+                        < blade_noise[cube
+                            + GridVector::new(
                                 GridCoordinate::from(resolution),
                                 GridCoordinate::from(resolution) * 3 / 4,
                                 0,
-                            ) * index,
-                        )
+                            ) * index]
                     {
-                        scale_color(colors[Grass].clone(), blade_color_noise.at_grid(cube), 0.02)
+                        scale_color(colors[Grass].clone(), blade_color_noise(cube), 0.02)
                     } else {
                         AIR
                     }
@@ -185,8 +189,8 @@ pub async fn install_landscape_blocks(
                         .attributes,
                 )
                 .voxels_fn(universe, resolution, |cube| {
-                    if f64::from(cube.y) >= overhang_noise.at_grid(cube) {
-                        scale_color(colors[Grass].clone(), blade_color_noise.at_grid(cube), 0.02)
+                    if f64::from(cube.y) >= overhang_noise[cube] {
+                        scale_color(colors[Grass].clone(), blade_color_noise(cube), 0.02)
                     } else {
                         dirt_pattern(cube).clone()
                     }

@@ -91,9 +91,7 @@ pub async fn install_demo_blocks(
     let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
     let road_noise_v = noise::Value::new().set_seed(0x52b19f6a);
-    let road_noise = noise::ScaleBias::new(&road_noise_v)
-        .set_bias(1.0)
-        .set_scale(0.12);
+    let road_noise = |cube| road_noise_v.at_grid(cube) * 0.12 + 1.0;
 
     let curb_fn = |cube: GridPoint| {
         let width = resolution_g / 3;
@@ -101,7 +99,7 @@ pub async fn install_demo_blocks(
             (cube - GridPoint::new(width / 2 + 2, 0, 0)).mul_element_wise(GridVector::new(1, 2, 0)),
         ) < width.pow(2)
         {
-            scale_color(curb_color.clone(), road_noise.at_grid(cube), 0.02)
+            scale_color(curb_color.clone(), road_noise(cube), 0.02)
         } else {
             AIR
         }
@@ -142,7 +140,7 @@ pub async fn install_demo_blocks(
             Road => Block::builder()
                 .display_name("Road")
                 .voxels_fn(universe, resolution, |cube| {
-                    scale_color(road_color.clone(), road_noise.at_grid(cube), 0.02)
+                    scale_color(road_color.clone(), road_noise(cube), 0.02)
                 })?
                 .build(),
 
