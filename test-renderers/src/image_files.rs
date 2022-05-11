@@ -69,5 +69,8 @@ pub(crate) fn test_data_dir_path(version: Version) -> PathBuf {
         Version::Actual => "../target/test-renderers-output/",
         Version::Expected => "expected/",
     });
+    if let Ok(p) = path.canonicalize() {
+        path = p;
+    }
     path
 }

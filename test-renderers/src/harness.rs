@@ -6,7 +6,9 @@ use std::fmt::Display;
 use std::fs;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
+use all_is_cubes::util::{CustomFormat as _, StatusText};
 use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
 use futures_core::future::BoxFuture;
 
@@ -15,7 +17,7 @@ use crate::{
     RendererFactory, RendererId, Scene, TestCaseOutput, TestCombo, TestId,
 };
 
-type BoxedTest = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()>>;
+type BoxedTest = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Send + Sync>;
 
 /// Information passed to each run of each test.
 ///
@@ -74,9 +76,12 @@ where
     let mut per_test_output = BTreeMap::new();
     let mut count_passed = 0;
     let mut count_failed = 0;
+    let mut cumulative_time = Duration::ZERO;
 
+    let suite_start_time = Instant::now();
+    writeln!(logging).unwrap();
     for (name, test_function) in test_table {
-        write!(logging, "test {name} ...").unwrap();
+        write!(logging, "test {name:20} ...").unwrap();
         logging.flush().unwrap();
 
         let comparison_log: Arc<Mutex<Vec<ComparisonRecord>>> = Default::default();
@@ -86,15 +91,17 @@ where
             comparison_log: comparison_log.clone(),
         };
 
-        // It's OK to call the test_function immediately, because `TestCaseCollector`
-        // will have wrapped the original function in an async block so it cannot do
-        // anything until polled.
-        let h = tokio::spawn(test_function(context));
+        let join_handle = tokio::spawn(async move {
+            let case_start_time = Instant::now();
+            test_function(context).await;
+            case_start_time.elapsed()
+        });
         // TODO: add concurrency of tests by not immediately awaiting
-        let passed = match h.await {
-            Ok(()) => {
-                writeln!(logging, " ok").unwrap();
+        let passed = match join_handle.await {
+            Ok(case_time) => {
+                writeln!(logging, " ok in {}", case_time.custom_format(StatusText)).unwrap();
                 count_passed += 1;
+                cumulative_time += case_time;
                 true
             }
             Err(e) => {
@@ -121,9 +128,13 @@ where
         );
     }
 
+    // format is imitating the standard test harness
     writeln!(
         logging,
-        "test result: {count_passed} passed, {count_failed} failed"
+        "\ntest result: {count_passed} passed; {count_failed} failed; \
+            finished in {wall_time:.2} s ({cumulative_time:.2} s summed)",
+        wall_time = suite_start_time.elapsed().as_secs_f64(),
+        cumulative_time = cumulative_time.as_secs_f64()
     )
     .unwrap();
 
