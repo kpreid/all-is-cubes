@@ -39,14 +39,19 @@ impl RenderTestContext {
             .renderer_from_cameras(scene.into_cameras())
     }
 
-    pub async fn render_comparison_test(&self, scene: impl Scene, overlays: Overlays<'_>) {
+    pub async fn render_comparison_test(
+        &self,
+        allowed_difference: u8,
+        scene: impl Scene,
+        overlays: Overlays<'_>,
+    ) {
         let combo = TestCombo {
             test_id: self.id(),
             renderer: self.renderer_factory.id(),
         };
 
         let image = self.renderer(scene).render(overlays).await;
-        let outcome = crate::compare_rendered_image(combo, image).await;
+        let outcome = crate::compare_rendered_image(combo, allowed_difference, image).await;
 
         self.comparison_log.lock().unwrap().push(outcome.clone());
 

@@ -67,7 +67,9 @@ async fn cursor_basic(context: RenderTestContext) {
         info_text: None,
     };
 
-    context.render_comparison_test(cameras, overlays).await;
+    // 1 unit difference threshold: we might have a color rounding error,
+    // but everything else should be exact.
+    context.render_comparison_test(1, cameras, overlays).await;
 }
 
 async fn fog(context: RenderTestContext, fog: FogOption) {
@@ -79,7 +81,9 @@ async fn fog(context: RenderTestContext, fog: FogOption) {
         COMMON_VIEWPORT,
         get_fog_test_universe().await,
     );
-    context.render_comparison_test(scene, Overlays::NONE).await;
+    context
+        .render_comparison_test(10, scene, Overlays::NONE)
+        .await;
 }
 
 /// Simplest possible test for testing the test case:
@@ -92,7 +96,7 @@ async fn sky_color(context: RenderTestContext) {
     finish_universe_from_space(&mut universe, space);
 
     context
-        .render_comparison_test(&universe, Overlays::NONE)
+        .render_comparison_test(0, &universe, Overlays::NONE)
         .await;
 }
 
@@ -114,7 +118,9 @@ async fn transparent_one(context: RenderTestContext, transparency_option: &str) 
     };
 
     let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
-    context.render_comparison_test(scene, Overlays::NONE).await;
+    context
+        .render_comparison_test(5, scene, Overlays::NONE)
+        .await;
 }
 
 // --- Test helpers -------------------------------------------------------------------------------

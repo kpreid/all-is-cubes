@@ -1,0 +1,14 @@
+figure {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+}
+
+figcaption {
+    font-size: 80%;
+}
+
+figure img {
+    display: block;
+    image-rendering: pixelated;
+}

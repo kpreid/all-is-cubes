@@ -38,6 +38,7 @@ impl fmt::Display for RendererId {
 pub(crate) enum Version {
     Expected,
     Actual,
+    Diff,
 }
 
 /// Returns the path at which to find a particular test data image.
@@ -67,6 +68,7 @@ pub(crate) fn test_data_dir_path(version: Version) -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push(match version {
         Version::Actual => "../target/test-renderers-output/",
+        Version::Diff => "../target/test-renderers-diffs/",
         Version::Expected => "expected/",
     });
     if let Ok(p) = path.canonicalize() {

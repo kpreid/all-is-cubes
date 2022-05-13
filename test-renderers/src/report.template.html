@@ -1,6 +1,7 @@
 <!doctype html>
 <head>
   <title>All is Cubes test-renderers report</title>
+  <link rel="stylesheet" type="text/css" href="../../test-renderers/src/report.css">
 </head>
 <body>
   <table>
@@ -18,9 +19,19 @@
           {cell.test_outcome}<br>
           {{ for comp_record in cell.comparisons }}
             {{ if comp_record.show_expected_for_comparison }}
-              <img src="../../test-renderers/expected/{comp_record.expected_file_name}" title="Expected"><br>
+              <figure>
+                <img src="../../test-renderers/expected/{comp_record.expected_file_name}" title="Expected">
+                <figcaption>Expected</figcaption>
+              </figure>
+              <figure>
+                <img src="../test-renderers-diffs/{comp_record.diff_file_name}" title="Diff">
+                <figcaption>Diff</figcaption>
+              </figure>
             {{ endif }}
-            <img src="./{comp_record.actual_file_name}" title="Actual"><br>
+            <figure>
+              <img src="./{comp_record.actual_file_name}" title="Actual">
+              <figcaption>Actual</figcaption>
+            </figure>
           {{ endfor }}
         </td>
         {{ endfor }}

@@ -24,6 +24,7 @@
 )]
 
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 
 use image::{ImageError, RgbaImage};
@@ -32,6 +33,8 @@ use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Universe, UniverseIndex};
 
+mod diff;
+pub use diff::*;
 mod harness;
 pub use harness::*;
 mod image_files;
@@ -58,6 +61,7 @@ pub fn finish_universe_from_space(universe: &mut Universe, space: Space) {
 pub struct ComparisonRecord {
     expected_file_name: String,
     actual_file_name: String,
+    diff_file_name: Option<String>,
     outcome: ComparisonOutcome,
 }
 
@@ -69,6 +73,31 @@ pub enum ComparisonOutcome {
 }
 
 impl ComparisonRecord {
+    fn from_paths(
+        expected_file_path: &Path,
+        actual_file_path: &Path,
+        diff_file_path: Option<&Path>,
+        outcome: ComparisonOutcome,
+    ) -> Self {
+        ComparisonRecord {
+            expected_file_name: expected_file_path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            actual_file_name: actual_file_path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            diff_file_name: diff_file_path
+                .map(|p| p.file_name().unwrap().to_str().unwrap().to_string()),
+            outcome,
+        }
+    }
+
     fn panic_if_unsuccessful(&self) {
         match self.outcome {
             ComparisonOutcome::Equal => {}
@@ -87,8 +116,13 @@ impl ComparisonRecord {
 }
 
 /// Finish a rendering test by storing/displaying/comparing the output image.
-pub async fn compare_rendered_image(test: TestCombo, actual_image: RgbaImage) -> ComparisonRecord {
+pub async fn compare_rendered_image(
+    test: TestCombo,
+    allowed_difference: u8,
+    actual_image: RgbaImage,
+) -> ComparisonRecord {
     let actual_file_path = image_path(&test, Version::Actual);
+    let diff_file_path = image_path(&test, Version::Diff);
 
     actual_image
         .save(&actual_file_path)
@@ -97,21 +131,6 @@ pub async fn compare_rendered_image(test: TestCombo, actual_image: RgbaImage) ->
     // TODO: all this needs a bunch of code deduplication for conveniently trying-to-open and carrying around the image and path
 
     let expected_file_path = image_path(&test, Version::Expected);
-    let record_without_outcome = ComparisonRecord {
-        expected_file_name: expected_file_path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string(),
-        actual_file_name: actual_file_path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string(),
-        outcome: ComparisonOutcome::NoExpected,
-    };
 
     // Load expected image, if any
     let (expected_image, expected_file_path): (RgbaImage, PathBuf) =
@@ -129,10 +148,12 @@ pub async fn compare_rendered_image(test: TestCombo, actual_image: RgbaImage) ->
                 match image::open(&expected_file_path) {
                     Ok(image) => (image.to_rgba8(), expected_file_path),
                     Err(ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
-                        return ComparisonRecord {
-                            outcome: ComparisonOutcome::NoExpected,
-                            ..record_without_outcome
-                        };
+                        return ComparisonRecord::from_paths(
+                            &actual_file_path,
+                            &expected_file_path,
+                            None,
+                            ComparisonOutcome::NoExpected,
+                        );
                     }
                     Err(e) => panic!(
                         "Failed to read expected image '{p}': {e}",
@@ -147,22 +168,20 @@ pub async fn compare_rendered_image(test: TestCombo, actual_image: RgbaImage) ->
         };
 
     // Compare expected and actual images
-    // TODO: provide for approximate equality and compute a diff
-    if actual_image == expected_image {
-        ComparisonRecord {
-            outcome: ComparisonOutcome::Equal,
-            expected_file_name: expected_file_path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string(),
-            ..record_without_outcome
-        }
-    } else {
-        ComparisonRecord {
-            outcome: ComparisonOutcome::Different,
-            ..record_without_outcome
-        }
-    }
+    let diff_result = diff::diff(&expected_image, &actual_image);
+    diff_result
+        .diff_image
+        .save(&diff_file_path)
+        .expect("failed to write renderer diff image");
+
+    ComparisonRecord::from_paths(
+        &expected_file_path,
+        &actual_file_path,
+        Some(&diff_file_path),
+        if diff_result.equal_or_different_below_threshold(allowed_difference) {
+            ComparisonOutcome::Equal
+        } else {
+            ComparisonOutcome::Different
+        },
+    )
 }
