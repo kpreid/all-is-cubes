@@ -1,14 +1,14 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use futures_core::future::BoxFuture;
+use futures::future::BoxFuture;
 use image::RgbaImage;
-use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
+use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
 
 #[allow(clippy::result_unit_err)]
 #[cfg(test)]

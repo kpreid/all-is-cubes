@@ -14,8 +14,7 @@ use std::cell::RefCell;
 use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use all_is_cubes::apps::StandardCameras;
-use futures_core::future::BoxFuture;
+use futures::future::BoxFuture;
 use glfw::{Context as _, WindowHint, WindowMode};
 use image::RgbaImage;
 use luminance::context::GraphicsContext;
@@ -26,6 +25,7 @@ use luminance_gl::GL33;
 use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 use send_wrapper::SendWrapper;
 
+use all_is_cubes::apps::StandardCameras;
 use all_is_cubes_gpu::in_luminance::EverythingRenderer;
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};

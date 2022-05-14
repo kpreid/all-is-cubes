@@ -4,14 +4,14 @@
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use all_is_cubes::apps::StandardCameras;
-use all_is_cubes_gpu::FrameBudget;
-use futures_core::future::BoxFuture;
+use futures::future::BoxFuture;
 use image::RgbaImage;
 use tokio::sync::OnceCell;
 
+use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes_gpu::in_wgpu::{create_depth_texture, EverythingRenderer};
+use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
 
 #[allow(clippy::result_unit_err)]

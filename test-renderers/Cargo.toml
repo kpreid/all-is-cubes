@@ -33,7 +33,7 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["rayon
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
 async_fn_traits = "0.1.1"
-futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+futures = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 glfw = "0.44.0"
 image = { version = "0.24.2", default-features = false, features = ["png"] }
 luminance = "0.47.0"

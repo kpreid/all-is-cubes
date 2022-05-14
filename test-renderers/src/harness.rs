@@ -7,9 +7,10 @@ use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{CustomFormat as _, StatusText};
 use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
-use futures_core::future::BoxFuture;
+use futures::future::{BoxFuture, Shared};
 use tokio::task::JoinHandle;
 
 use crate::{
@@ -17,7 +18,17 @@ use crate::{
     RendererFactory, RendererId, Scene, TestCaseOutput, TestCombo, TestId,
 };
 
-type BoxedTest = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Send + Sync>;
+/// The Universe parameter is an optional way to receive a pre-configured universe
+/// whose construction time is not counted against the test case's time.
+type BoxedTestFn = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Send + Sync>;
+
+pub type UniverseFuture = Shared<BoxFuture<'static, Arc<Universe>>>;
+
+/// Implementation of a particular test case (unique [`TestId`] stored externally).
+struct TestCase {
+    function: BoxedTestFn,
+    universe_source: Option<UniverseFuture>,
+}
 
 /// Information passed to each run of each test.
 ///
@@ -27,6 +38,7 @@ pub struct RenderTestContext {
     test_id: TestId,
     renderer_factory: Box<dyn RendererFactory>,
     comparison_log: Arc<Mutex<Vec<ComparisonRecord>>>,
+    universe: Option<Arc<Universe>>,
 }
 
 impl RenderTestContext {
@@ -37,6 +49,10 @@ impl RenderTestContext {
     pub fn renderer(&self, scene: impl Scene) -> Box<dyn HeadlessRenderer + Send> {
         self.renderer_factory
             .renderer_from_cameras(scene.into_cameras())
+    }
+
+    pub fn universe(&self) -> &Universe {
+        &*self.universe.as_ref().unwrap()
     }
 
     pub async fn render_comparison_test(
@@ -76,7 +92,7 @@ where
     Ff::OutputFuture: Send,
 {
     // Gather tests (don't run them yet).
-    let mut test_table: BTreeMap<String, BoxedTest> = BTreeMap::new();
+    let mut test_table: BTreeMap<String, TestCase> = BTreeMap::new();
     test_suite(&mut TestCaseCollector(&mut test_table));
 
     // Start the tests, in parallel.
@@ -84,22 +100,27 @@ where
     let suite_start_time = Instant::now();
     let test_handles: BTreeMap<String, RunningTest> = test_table
         .into_iter()
-        .map(|(name, test_function)| {
+        .map(|(name, test_case)| {
             let comparison_log: Arc<Mutex<Vec<ComparisonRecord>>> = Default::default();
 
             let handle = {
                 let test_id = name.clone();
                 let comparison_log = comparison_log.clone();
                 let factory_future = factory_factory();
+                let universe_future = test_case.universe_source.clone();
                 tokio::spawn(async move {
                     let context = RenderTestContext {
                         test_id,
                         renderer_factory: Box::new(factory_future.await),
                         comparison_log: comparison_log.clone(),
+                        universe: match universe_future {
+                            Some(f) => Some(f.await),
+                            None => None,
+                        },
                     };
 
                     let case_start_time = Instant::now();
-                    test_function(context).await;
+                    (test_case.function)(context).await;
                     case_start_time.elapsed()
                 })
             };
@@ -186,12 +207,16 @@ where
 }
 
 #[allow(missing_debug_implementations)]
-pub struct TestCaseCollector<'a>(&'a mut BTreeMap<String, BoxedTest>);
+pub struct TestCaseCollector<'a>(&'a mut BTreeMap<String, TestCase>);
 
 impl<'a> TestCaseCollector<'a> {
     #[track_caller]
-    pub fn insert<F>(&mut self, name: &str, test_function: F)
-    where
+    pub fn insert<F>(
+        &mut self,
+        name: &str,
+        universe_source: Option<UniverseFuture>,
+        test_function: F,
+    ) where
         F: AsyncFn1<RenderTestContext, Output = ()> + Send + Sync + Clone + 'static,
         F::OutputFuture: Send,
     {
@@ -204,7 +229,11 @@ impl<'a> TestCaseCollector<'a> {
                     });
                     boxed_future
                 });
-                e.insert(boxed_test_function);
+                let test_case = TestCase {
+                    function: boxed_test_function,
+                    universe_source,
+                };
+                e.insert(test_case);
             }
             btree_map::Entry::Occupied(_) => {
                 panic!("Duplicate test name {name:?}")
@@ -214,8 +243,13 @@ impl<'a> TestCaseCollector<'a> {
 
     /// Generate an independent test case for each item of `values`.
     /// The items must serialize to strings.
-    pub fn insert_variants<I, F>(&mut self, name: &str, test_function: F, values: I)
-    where
+    pub fn insert_variants<I, F>(
+        &mut self,
+        name: &str,
+        universe_source: Option<UniverseFuture>,
+        test_function: F,
+        values: I,
+    ) where
         I: IntoIterator,
         <I as IntoIterator>::Item: serde::Serialize + Clone + Send + Sync + 'static,
         F: AsyncFn2<RenderTestContext, <I as IntoIterator>::Item, Output = ()>
@@ -231,10 +265,14 @@ impl<'a> TestCaseCollector<'a> {
             let variant_string = variant_serialized
                 .as_str()
                 .expect("Variant didn't serialize to a string");
-            self.insert(&format!("{name}-{variant_string}"), move |context| {
-                let variant_value = variant_value.clone();
-                test_function(context, variant_value)
-            });
+            self.insert(
+                &format!("{name}-{variant_string}"),
+                universe_source.clone(),
+                move |context| {
+                    let variant_value = variant_value.clone();
+                    test_function(context, variant_value)
+                },
+            );
         }
     }
 }

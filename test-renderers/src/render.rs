@@ -5,13 +5,13 @@
 
 use std::fmt::Debug;
 
-use all_is_cubes::character::Cursor;
-use futures_core::future::BoxFuture;
+use futures::future::BoxFuture;
 use image::RgbaImage;
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::character::Cursor;
 use all_is_cubes::universe::Universe;
 
 use crate::RendererId;
