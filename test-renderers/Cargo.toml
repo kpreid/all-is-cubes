@@ -36,6 +36,7 @@ async_fn_traits = "0.1.1"
 futures = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 glfw = "0.44.0"
 image = { version = "0.24.2", default-features = false, features = ["png"] }
+itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
 luminance = "0.47.0"
 luminance-gl = "0.19.1"
 luminance-glfw = "0.18.2"

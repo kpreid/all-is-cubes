@@ -7,11 +7,13 @@ use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use all_is_cubes::universe::Universe;
-use all_is_cubes::util::{CustomFormat as _, StatusText};
 use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
 use futures::future::{BoxFuture, Shared};
+use itertools::Itertools;
 use tokio::task::JoinHandle;
+
+use all_is_cubes::universe::Universe;
+use all_is_cubes::util::{CustomFormat as _, StatusText};
 
 use crate::{
     results_json_path, write_report_file, ComparisonRecord, HeadlessRenderer, Overlays,
@@ -261,10 +263,9 @@ impl<'a> TestCaseCollector<'a> {
     {
         for variant_value in values {
             let test_function = test_function.clone();
-            let variant_serialized = serde_json::to_value(&variant_value).unwrap();
-            let variant_string = variant_serialized
-                .as_str()
-                .expect("Variant didn't serialize to a string");
+            let variant_serialized: serde_json::Value =
+                serde_json::to_value(&variant_value).unwrap();
+            let variant_string = stringify_variant(&variant_serialized);
             self.insert(
                 &format!("{name}-{variant_string}"),
                 universe_source.clone(),
@@ -274,6 +275,20 @@ impl<'a> TestCaseCollector<'a> {
                 },
             );
         }
+    }
+}
+
+/// Convert test variant data to a string.
+///
+/// It may not contain any JSON objects, and the result does not preserve
+/// nested array structure or strings containing "-" versus separate strings.
+fn stringify_variant(variant: &serde_json::Value) -> String {
+    use serde_json::Value;
+    match variant {
+        Value::Null | Value::Bool(_) | Value::Number(_) => variant.to_string(),
+        Value::String(s) => s.to_string(),
+        Value::Array(a) => a.iter().map(stringify_variant).join("-"),
+        Value::Object(_) => panic!("objects not allowed in stringify_variant()"),
     }
 }
 

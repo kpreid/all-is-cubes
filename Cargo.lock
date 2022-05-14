@@ -4306,6 +4306,7 @@ dependencies = [
  "futures 0.3.21",
  "glfw",
  "image",
+ "itertools",
  "luminance",
  "luminance-gl",
  "luminance-glfw",
