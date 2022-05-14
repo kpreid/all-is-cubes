@@ -36,9 +36,6 @@ pub struct Camera {
     /// Caller-provided options. Always validated by [`GraphicsOptions::repair`].
     options: GraphicsOptions,
 
-    /// Scale factor for scene brightness.
-    pub exposure: NotNan<f32>,
-
     /// Caller-provided viewport.
     viewport: Viewport,
 
@@ -65,14 +62,17 @@ pub struct Camera {
     /// Bounds of the visible area in world space.
     /// Calculated by [`Self::compute_matrices`].
     view_frustum: FrustumPoints,
+
+    /// Scale factor for scene brightness.
+    /// Calculated from `options.exposure` by [`Self::set_options`].
+    exposure_value: NotNan<f32>,
 }
 
 #[allow(clippy::cast_lossless)]
 impl Camera {
     pub fn new(options: GraphicsOptions, viewport: Viewport) -> Self {
+        let options = options.repair();
         let mut new_self = Self {
-            options: options.repair(),
-            exposure: NotNan::one(),
             viewport,
             eye_to_world_transform: ViewTransform::one(),
 
@@ -82,6 +82,10 @@ impl Camera {
             view_position: Point3::origin(),
             inverse_projection_view: M::identity(),
             view_frustum: Default::default(),
+
+            exposure_value: options.exposure.initial(),
+
+            options,
         };
         new_self.compute_matrices();
         new_self
@@ -98,7 +102,9 @@ impl Camera {
     }
 
     pub fn set_options(&mut self, options: GraphicsOptions) {
-        self.options = options.repair();
+        let options = options.repair();
+        self.exposure_value = options.exposure.initial();
+        self.options = options;
     }
 
     /// Sets the contained viewport value, and recalculates matrices to be suitable for
@@ -277,7 +283,12 @@ impl Camera {
     /// 1. Multiply the input by this camera's exposure value.
     /// 2. Apply the tone mapping operator specified in [`Camera::options()`].
     pub fn post_process_color(&self, color: Rgba) -> Rgba {
-        color.map_rgb(|rgb| self.options.tone_mapping.apply(rgb * self.exposure))
+        color.map_rgb(|rgb| self.options.tone_mapping.apply(rgb * self.exposure()))
+    }
+
+    /// Returns the current exposure value for scaling luminance.
+    pub fn exposure(&self) -> NotNan<f32> {
+        self.exposure_value
     }
 
     fn compute_matrices(&mut self) {
@@ -545,14 +556,16 @@ mod tests {
 
     #[test]
     fn post_process() {
-        let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
+        let mut options = GraphicsOptions::default();
+        let mut camera = Camera::new(options.clone(), Viewport::ARBITRARY);
 
         // A camera with all default options should pass colors unchanged.
         let color = rgba_const!(0.1, 0.2, 0.3, 0.4);
         assert_eq!(camera.post_process_color(color), color);
 
         // Try exposure
-        camera.exposure = notnan!(0.5);
+        options.exposure = ExposureOption::Fixed(notnan!(0.5));
+        camera.set_options(options);
         assert_eq!(
             camera.post_process_color(color),
             color.map_rgb(|rgb| rgb * 0.5)

@@ -347,7 +347,7 @@ impl BlockUniformInterface {
         program_iface.set(&self.fog_distance, fog_distance);
         program_iface.set(&self.fog_color, Vec3(space.data.sky_color.into()));
 
-        program_iface.set(&self.exposure, camera.exposure.into_inner());
+        program_iface.set(&self.exposure, camera.exposure().into_inner());
     }
 
     /// Type converting wrapper for [`Self::view_matrix`].

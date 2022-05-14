@@ -24,6 +24,11 @@ pub struct GraphicsOptions {
     /// Method to use to remap colors to fit within the displayable range.
     pub tone_mapping: ToneMappingOperator,
 
+    /// “Camera exposure” value: a scaling factor from scene luminance to displayed
+    /// luminance. Note that the exact interpretation of this depends on the chosen
+    /// [`tone_mapping`](ToneMappingOperator).
+    pub exposure: ExposureOption,
+
     /// Distance, in unit cubes, from the camera to the farthest visible point.
     ///
     /// TODO: Implement view distance limit (and fog) in raytracer.
@@ -75,6 +80,7 @@ impl Default for GraphicsOptions {
             fov_y: NotNan::from(90),
             // TODO: Change tone mapping default once we have a good implementation.
             tone_mapping: ToneMappingOperator::Clamp,
+            exposure: ExposureOption::default(),
             view_distance: NotNan::from(200),
             lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
@@ -126,6 +132,32 @@ impl ToneMappingOperator {
             // adaptation to average brightness.
             ToneMappingOperator::Reinhard => input * (1.0 + input.luminance()).recip(),
         }
+    }
+}
+
+/// “Camera exposure” control: selection of algorithm to control the scaling factor from
+/// scene luminance to displayed luminance.
+///
+/// Note that the exact interpretation of this value also depends on on the chosen
+/// [`ToneMappingOperator`].
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+pub enum ExposureOption {
+    Fixed(NotNan<f32>),
+    // Automatic,
+}
+
+impl ExposureOption {
+    pub(crate) fn initial(&self) -> NotNan<f32> {
+        match *self {
+            ExposureOption::Fixed(value) => value,
+        }
+    }
+}
+
+impl Default for ExposureOption {
+    fn default() -> Self {
+        ExposureOption::Fixed(notnan!(1.0))
     }
 }
 

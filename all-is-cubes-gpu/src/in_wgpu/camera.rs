@@ -74,7 +74,7 @@ impl WgpuCamera {
             fog_mode_blend,
             fog_distance,
 
-            exposure: camera.exposure.into_inner(),
+            exposure: camera.exposure().into_inner(),
 
             _padding: 0.,
         }
