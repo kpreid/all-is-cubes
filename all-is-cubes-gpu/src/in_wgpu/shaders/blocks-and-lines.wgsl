@@ -13,6 +13,7 @@ struct WgpuCamera {
     [[location(5)]] fog_mode_blend: f32;
     [[location(6)]] fog_distance: f32;
     [[location(7)]] exposure: f32;
+    [[location(8)]] tone_mapping_id: i32;
 };
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.

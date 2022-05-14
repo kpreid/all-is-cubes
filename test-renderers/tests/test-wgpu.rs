@@ -124,20 +124,20 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
             let viewport = self.everything.viewport();
             let _info = self
                 .everything
-                .render_frame(
+                .render_frame_linear(
                     overlays.cursor,
                     &FrameBudget::PRACTICALLY_INFINITE,
                     &self.factory.queue,
-                    &self.color_texture,
                     &self.depth_texture_view,
                 )
                 .await
                 .unwrap();
 
-            if let Some(text) = overlays.info_text {
-                self.everything
-                    .add_info_text(&self.factory.queue, &self.color_texture, text);
-            }
+            self.everything.add_info_text_and_postprocess(
+                &self.factory.queue,
+                &self.color_texture,
+                overlays.info_text.unwrap_or(""),
+            );
 
             get_pixels_from_gpu(
                 &self.factory.device,

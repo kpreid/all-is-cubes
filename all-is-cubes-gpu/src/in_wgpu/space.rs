@@ -48,7 +48,7 @@ pub(crate) struct SpaceRenderer {
     /// Buffer containing the [`WgpuCamera`] configured for this Space.
     camera_buffer: wgpu::Buffer,
     /// Bind group for camera_buffer.
-    camera_bind_group: wgpu::BindGroup,
+    pub(crate) camera_bind_group: wgpu::BindGroup,
 
     /// Bind group containing our block texture and light texture.
     space_bind_group: wgpu::BindGroup,

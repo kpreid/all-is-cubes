@@ -47,6 +47,7 @@ mod space;
 use space::SpaceRenderer;
 mod vertex;
 
+const LINEAR_COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 /// Entry point for [`wgpu`] rendering. Construct this and hand it the [`wgpu::Surface`]
@@ -147,16 +148,18 @@ impl SurfaceRenderer {
         let output = self.surface.get_current_texture()?;
         let info = self
             .everything
-            .render_frame(
+            .render_frame_linear(
                 cursor_result,
                 &FrameBudget::SIXTY_FPS, // TODO: figure out what we're vsyncing to, instead
                 &self.queue,
-                &output.texture,
                 &self.depth_texture_view,
             )
             .await?;
-        self.everything
-            .add_info_text(&self.queue, &output.texture, &info_text_fn(&info));
+        self.everything.add_info_text_and_postprocess(
+            &self.queue,
+            &output.texture,
+            &info_text_fn(&info),
+        );
         output.present();
         Ok(info)
     }
@@ -180,6 +183,10 @@ pub struct EverythingRenderer {
     /// Surface configuration maintained to match the viewport.
     config: wgpu::SurfaceConfiguration,
 
+    /// Texture into which geometry is drawn before postprocessing.
+    linear_scene_texture: wgpu::Texture,
+    linear_scene_texture_view: wgpu::TextureView,
+
     /// Pipelines and layouts for rendering Space content
     pipelines: Pipelines,
 
@@ -188,16 +195,15 @@ pub struct EverythingRenderer {
     /// Cursor and debug lines are written to this buffer.
     lines_buffer: ResizingBuffer,
 
+    /// Pipeline for the color postprocessing + info text layer drawing.
+    postprocess_render_pipeline: wgpu::RenderPipeline,
+    postprocess_bind_group: Option<wgpu::BindGroup>,
+    postprocess_bind_group_layout: wgpu::BindGroupLayout,
+    postprocess_shader_dirty: DirtyFlag,
+
     /// Debug overlay text is uploaded via this texture
     info_text_texture: DrawableTexture,
-
-    /// Pipeline for the info text layer.
-    /// This may eventually turn into a more general post-processing render pass.
-    info_text_render_pipeline: wgpu::RenderPipeline,
-    info_text_bind_group: Option<wgpu::BindGroup>,
-    info_text_bind_group_layout: wgpu::BindGroupLayout,
     info_text_sampler: wgpu::Sampler,
-    info_text_shader_dirty: DirtyFlag,
 }
 
 impl EverythingRenderer {
@@ -225,9 +231,12 @@ impl EverythingRenderer {
             present_mode: wgpu::PresentMode::Fifo,
         };
 
-        let info_text_bind_group_layout =
+        let linear_scene_texture = create_linear_scene_texture(&device, &config);
+
+        let postprocess_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
+                    // Binding for info_text_texture
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
@@ -238,17 +247,29 @@ impl EverythingRenderer {
                         },
                         count: None,
                     },
+                    // Binding for info_text_sampler
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
+                    // Binding for linear_scene_texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
                 ],
-                label: Some("EverythingRenderer::info_text_bind_group_layout"),
+                label: Some("EverythingRenderer::postprocess_bind_group_layout"),
             });
 
-        let pipelines = Pipelines::new(&device, config.format);
+        let pipelines = Pipelines::new(&device, LINEAR_COLOR_FORMAT);
 
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
@@ -257,21 +278,27 @@ impl EverythingRenderer {
             ),
             staging_belt_recalled: None,
 
+            linear_scene_texture_view: linear_scene_texture
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+            linear_scene_texture,
+
             space_renderers: Default::default(),
 
             lines_buffer: ResizingBuffer::default(),
 
-            info_text_shader_dirty: DirtyFlag::listening(false, |l| {
-                INFO_TEXT_SHADER.as_source().listen(l)
+            postprocess_shader_dirty: DirtyFlag::listening(false, |l| {
+                POSTPROCESS_SHADER.as_source().listen(l)
             }),
-            info_text_texture: DrawableTexture::new(),
-            info_text_bind_group: None,
-            info_text_render_pipeline: Self::create_info_text_pipeline(
+            postprocess_render_pipeline: Self::create_postprocess_pipeline(
                 &device,
-                &info_text_bind_group_layout,
+                &pipelines.camera_bind_group_layout,
+                &postprocess_bind_group_layout,
                 config.format,
             ),
-            info_text_bind_group_layout,
+            postprocess_bind_group_layout,
+            postprocess_bind_group: None,
+
+            info_text_texture: DrawableTexture::new(),
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("EverythingRenderer::info_text_sampler"),
                 address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -300,36 +327,36 @@ impl EverythingRenderer {
         new_self
     }
 
-    /// Read info text shader and create the info text render pipeline.
-    fn create_info_text_pipeline(
+    /// Read postprocessing shader and create the postprocessing render pipeline.
+    fn create_postprocess_pipeline(
         device: &wgpu::Device,
-        info_text_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_bind_group_layout: &wgpu::BindGroupLayout,
+        postprocess_bind_group_layout: &wgpu::BindGroupLayout,
         surface_format: wgpu::TextureFormat,
     ) -> wgpu::RenderPipeline {
-        let info_text_shader = create_wgsl_module_from_reloadable(
+        let postprocess_shader = create_wgsl_module_from_reloadable(
             device,
-            "EverythingRenderer::info_text_shader",
-            &*INFO_TEXT_SHADER,
+            "EverythingRenderer::postprocess_shader",
+            &*POSTPROCESS_SHADER,
         );
 
-        let info_text_render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("EverythingRenderer::info_text_render_pipeline_layout"),
-                bind_group_layouts: &[info_text_bind_group_layout],
-                push_constant_ranges: &[],
-            });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("EverythingRenderer::postprocess_pipeline_layout"),
+            bind_group_layouts: &[camera_bind_group_layout, postprocess_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("EverythingRenderer::info_text_render_pipeline"),
-            layout: Some(&info_text_render_pipeline_layout),
+            layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &info_text_shader,
-                entry_point: "info_text_vertex",
+                module: &postprocess_shader,
+                entry_point: "postprocess_vertex",
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &info_text_shader,
-                entry_point: "info_text_fragment",
+                module: &postprocess_shader,
+                entry_point: "postprocess_fragment",
                 targets: &[wgpu::ColorTargetState {
                     format: surface_format,
                     blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
@@ -367,6 +394,11 @@ impl EverythingRenderer {
             self.config.width = viewport.framebuffer_size.x;
             self.config.height = viewport.framebuffer_size.y;
 
+            self.linear_scene_texture = create_linear_scene_texture(&self.device, &self.config);
+            self.linear_scene_texture_view = self
+                .linear_scene_texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+
             self.info_text_texture.resize(
                 &self.device,
                 Some("info_text_texture"),
@@ -375,18 +407,20 @@ impl EverythingRenderer {
                     viewport.nominal_size.y as u32,
                 ),
             );
-            self.info_text_bind_group = None;
+            self.postprocess_bind_group = None;
         }
 
         Ok(())
     }
 
-    pub async fn render_frame(
+    /// Render the current scene content to the linear scene texture,
+    /// in linear color values without tone mapping.
+    // TODO: stop making this public
+    pub async fn render_frame_linear(
         &mut self,
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
         queue: &wgpu::Queue,
-        output: &wgpu::Texture,
         depth_texture_view: &wgpu::TextureView,
     ) -> Result<RenderInfo, GraphicsResourceError> {
         let start_frame_time = Instant::now();
@@ -395,17 +429,18 @@ impl EverythingRenderer {
         self.cameras.update();
 
         // Recompile shaders if needed.
-        if self.info_text_shader_dirty.get_and_clear() {
-            self.info_text_render_pipeline = Self::create_info_text_pipeline(
+        if self.postprocess_shader_dirty.get_and_clear() {
+            self.postprocess_render_pipeline = Self::create_postprocess_pipeline(
                 &self.device,
-                &self.info_text_bind_group_layout,
+                &self.pipelines.camera_bind_group_layout,
+                &self.postprocess_bind_group_layout,
                 self.config.format,
             );
         }
         self.pipelines
             .recompile_if_changed(&self.device, self.config.format);
 
-        let output_view = output.create_view(&wgpu::TextureViewDescriptor::default());
+        let output_view = &self.linear_scene_texture_view;
 
         let ws = self.cameras.world_space().snapshot(); // TODO: ugly
         let spaces_to_render = Layers {
@@ -537,7 +572,7 @@ impl EverythingRenderer {
         // move on to draw calls.
         let end_prepare_time = Instant::now();
         let world_render_info = if let Some(so) = &outputs.world {
-            so.draw(&output_view, depth_texture_view, queue, &mut encoder, true)?
+            so.draw(output_view, depth_texture_view, queue, &mut encoder, true)?
         } else {
             SpaceRenderInfo::default()
         };
@@ -548,7 +583,7 @@ impl EverythingRenderer {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("debug lines"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &output_view,
+                    view: output_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -578,7 +613,7 @@ impl EverythingRenderer {
 
         let lines_to_ui_time = Instant::now();
         let ui_render_info = if let Some(so) = outputs.ui {
-            so.draw(&output_view, depth_texture_view, queue, &mut encoder, false)?
+            so.draw(output_view, depth_texture_view, queue, &mut encoder, false)?
         } else {
             SpaceRenderInfo::default()
         };
@@ -603,23 +638,25 @@ impl EverythingRenderer {
         })
     }
 
-    pub fn add_info_text(&mut self, queue: &wgpu::Queue, output: &wgpu::Texture, text: &str) {
-        if text.is_empty() || !self.cameras.cameras().world.options().debug_info_text {
-            // TODO: Avoid computing the text, not just drawing it
-            return;
+    pub fn add_info_text_and_postprocess(
+        &mut self,
+        queue: &wgpu::Queue,
+        output: &wgpu::Texture,
+        text: &str,
+    ) {
+        if !text.is_empty() && self.cameras.cameras().world.options().debug_info_text {
+            let info_text_texture = &mut self.info_text_texture;
+            info_text_texture.draw_target().clear_transparent();
+            Text::with_baseline(
+                text,
+                Point::new(5, 5),
+                MonoTextStyle::new(&FONT_7X13_BOLD, Rgb888::new(0, 0, 0)),
+                Baseline::Top,
+            )
+            .draw(info_text_texture.draw_target())
+            .unwrap(); // TODO: use .into_ok() when stable
+            info_text_texture.upload(queue);
         }
-
-        let info_text_texture = &mut self.info_text_texture;
-        info_text_texture.draw_target().clear_transparent();
-        Text::with_baseline(
-            text,
-            Point::new(5, 5),
-            MonoTextStyle::new(&FONT_7X13_BOLD, Rgb888::new(0, 0, 0)),
-            Baseline::Top,
-        )
-        .draw(info_text_texture.draw_target())
-        .unwrap(); // TODO: use .into_ok() when stable
-        info_text_texture.upload(queue);
 
         // TODO: avoid recreating this
         let output_view = output.create_view(&wgpu::TextureViewDescriptor::default());
@@ -627,12 +664,12 @@ impl EverythingRenderer {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("add_info_text() encoder"),
+                label: Some("add_info_text_and_postprocess() encoder"),
             });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("add_info_text() pass"),
+                label: Some("add_info_text_and_postprocess() pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
                     view: &output_view,
                     resolve_target: None,
@@ -644,12 +681,22 @@ impl EverythingRenderer {
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&self.info_text_render_pipeline);
+            render_pass.set_pipeline(&self.postprocess_render_pipeline);
             render_pass.set_bind_group(
                 0,
-                self.info_text_bind_group.get_or_insert_with(|| {
+                &self
+                    .space_renderers
+                    .world
+                    .as_ref()
+                    .unwrap() // TODO: this is not currently impossible, but we should stop keeping add_info_text separate
+                    .camera_bind_group,
+                &[],
+            );
+            render_pass.set_bind_group(
+                1,
+                self.postprocess_bind_group.get_or_insert_with(|| {
                     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        layout: &self.info_text_bind_group_layout,
+                        layout: &self.postprocess_bind_group_layout,
                         entries: &[
                             wgpu::BindGroupEntry {
                                 binding: 0,
@@ -661,8 +708,14 @@ impl EverythingRenderer {
                                 binding: 1,
                                 resource: wgpu::BindingResource::Sampler(&self.info_text_sampler),
                             },
+                            wgpu::BindGroupEntry {
+                                binding: 2,
+                                resource: wgpu::BindingResource::TextureView(
+                                    &self.linear_scene_texture_view,
+                                ),
+                            },
                         ],
-                        label: Some("EverythingRenderer::info_text_bind_group"),
+                        label: Some("EverythingRenderer::postprocess_bind_group"),
                     })
                 }),
                 &[],
@@ -672,6 +725,25 @@ impl EverythingRenderer {
 
         queue.submit(std::iter::once(encoder.finish()));
     }
+}
+
+fn create_linear_scene_texture(
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("EverythingRenderer::linear_scene_texture"),
+        size: wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: LINEAR_COLOR_FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+    })
 }
 
 #[doc(hidden)] // TODO: figure out what we want to do here for public API
@@ -694,5 +766,5 @@ pub fn create_depth_texture(
     })
 }
 
-static INFO_TEXT_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/info-text.wgsl"));
+static POSTPROCESS_SHADER: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/postprocess.wgsl"));

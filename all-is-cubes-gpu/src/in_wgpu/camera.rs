@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::camera::{Camera, FogOption, LightingOption};
+use all_is_cubes::camera::{Camera, FogOption, LightingOption, ToneMappingOperator};
 use all_is_cubes::cgmath::{EuclideanSpace, Matrix4, Vector3};
 use all_is_cubes::math::Rgb;
 
@@ -40,7 +40,7 @@ pub(crate) struct WgpuCamera {
     exposure: f32,
 
     /// pad out to multiple of vec4<f32>
-    _padding: f32,
+    tone_mapping_id: i32,
 }
 
 impl WgpuCamera {
@@ -76,7 +76,11 @@ impl WgpuCamera {
 
             exposure: camera.exposure().into_inner(),
 
-            _padding: 0.,
+            tone_mapping_id: match options.tone_mapping {
+                ToneMappingOperator::Clamp => 0,
+                ToneMappingOperator::Reinhard => 1,
+                ref tmo => panic!("Missing implementation for tone mapping operator {:?}", tmo),
+            },
         }
     }
 }
