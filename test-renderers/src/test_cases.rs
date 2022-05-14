@@ -11,7 +11,7 @@ use futures::FutureExt;
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::block::Block;
-use all_is_cubes::camera::{FogOption, GraphicsOptions, TransparencyOption};
+use all_is_cubes::camera::{FogOption, GraphicsOptions, LightingOption, TransparencyOption};
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::math::Face6;
@@ -43,6 +43,16 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
             FogOption::Abrupt,
             FogOption::Compromise,
             FogOption::Physical,
+        ],
+    );
+    c.insert_variants(
+        "light",
+        u(light_test_universe()),
+        light,
+        [
+            LightingOption::None,
+            LightingOption::Flat,
+            LightingOption::Smooth,
         ],
     );
     c.insert("sky_color", None, sky_color);
@@ -91,6 +101,16 @@ async fn fog(context: RenderTestContext, fog: FogOption) {
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     context
         .render_comparison_test(10, scene, Overlays::NONE)
+        .await;
+}
+
+async fn light(context: RenderTestContext, option: LightingOption) {
+    let mut options = GraphicsOptions::default();
+    options.lighting_display = option;
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+    context
+        .render_comparison_test(6, scene, Overlays::NONE)
         .await;
 }
 
@@ -194,6 +214,39 @@ async fn fog_test_universe() -> Arc<Universe> {
         // lamp block placed in front of pillar so that its emission is reflected by the pillar
         space.set([x, 8, z + 1], &pillar_lamp_block).unwrap();
     }
+
+    space.fast_evaluate_light();
+    space.evaluate_light(1, |_| {});
+
+    let mut universe = Universe::new();
+    finish_universe_from_space(&mut universe, space);
+    Arc::new(universe)
+}
+
+async fn light_test_universe() -> Arc<Universe> {
+    let bounds = Grid::new([-10, -10, -1], [20, 20, 5]);
+    let mut space = Space::builder(bounds)
+        .spawn_position(Point3::new(0., 0., 4.))
+        .build_empty();
+
+    // Back wall
+    space
+        .fill_uniform(
+            bounds.abut(Face6::NZ, -1).unwrap(),
+            Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0)),
+        )
+        .unwrap();
+
+    let pillar_block = Block::from(palette::ALMOST_BLACK);
+    let light_source_block = Block::builder()
+        .color(rgba_const!(1.0, 0.05, 0.05, 1.0))
+        .light_emission(rgb_const!(10.0, 5.0, 0.0))
+        .build();
+
+    space.set([-2, -2, 0], &light_source_block).unwrap();
+    space.set([-2, -1, 0], &light_source_block).unwrap();
+    space.set([1, 0, 0], &pillar_block).unwrap();
+    space.set([0, 1, 0], &pillar_block).unwrap();
 
     space.fast_evaluate_light();
     space.evaluate_light(1, |_| {});
