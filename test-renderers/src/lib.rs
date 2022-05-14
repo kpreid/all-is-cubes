@@ -149,8 +149,8 @@ pub async fn compare_rendered_image(
                     Ok(image) => (image.to_rgba8(), expected_file_path),
                     Err(ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
                         return ComparisonRecord::from_paths(
-                            &actual_file_path,
                             &expected_file_path,
+                            &actual_file_path,
                             None,
                             ComparisonOutcome::NoExpected,
                         );
