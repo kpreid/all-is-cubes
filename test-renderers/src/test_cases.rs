@@ -11,10 +11,13 @@ use futures::FutureExt;
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::block::Block;
-use all_is_cubes::camera::{FogOption, GraphicsOptions, LightingOption, TransparencyOption};
+use all_is_cubes::camera::{
+    ExposureOption, FogOption, GraphicsOptions, LightingOption, ToneMappingOperator,
+    TransparencyOption,
+};
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector3};
 use all_is_cubes::character::Spawn;
-use all_is_cubes::math::Face6;
+use all_is_cubes::math::{Face6, NotNan};
 use all_is_cubes::space::{Grid, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{notnan, rgb_const, rgba_const};
@@ -56,6 +59,17 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         ],
     );
     c.insert("sky_and_info_text", None, sky_and_info_text);
+    c.insert_variants(
+        "tone_mapping",
+        u(light_test_universe()),
+        tone_mapping,
+        [
+            (ToneMappingOperator::Clamp, 0.5),
+            (ToneMappingOperator::Clamp, 2.0),
+            (ToneMappingOperator::Reinhard, 0.5),
+            (ToneMappingOperator::Reinhard, 2.0),
+        ],
+    );
     c.insert_variants("transparent_one", None, transparent_one, ["surf", "vol"]);
 }
 
@@ -134,6 +148,19 @@ async fn sky_and_info_text(context: RenderTestContext) {
     };
 
     context.render_comparison_test(1, &universe, overlays).await;
+}
+
+async fn tone_mapping(context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
+    let mut options = GraphicsOptions::default();
+    options.fov_y = notnan!(45.0);
+    options.tone_mapping = tmo;
+    options.exposure = ExposureOption::Fixed(NotNan::new(exposure).unwrap());
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+    // TODO: tighten this comparison threshold aftr reconciling smooth-lighting styles
+    context
+        .render_comparison_test(11, scene, Overlays::NONE)
+        .await;
 }
 
 /// Test rendering of transparent blocks. TODO: This needs to be split to different graphics options.
@@ -231,6 +258,7 @@ async fn fog_test_universe() -> Arc<Universe> {
     Arc::new(universe)
 }
 
+// Test scene for lighting and tone mapping.
 async fn light_test_universe() -> Arc<Universe> {
     let bounds = Grid::new([-10, -10, -1], [20, 20, 5]);
     let mut space = Space::builder(bounds)
