@@ -106,6 +106,7 @@ async fn fog(context: RenderTestContext, fog: FogOption) {
 
 async fn light(context: RenderTestContext, option: LightingOption) {
     let mut options = GraphicsOptions::default();
+    options.fov_y = notnan!(45.0);
     options.lighting_display = option;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
@@ -226,7 +227,7 @@ async fn fog_test_universe() -> Arc<Universe> {
 async fn light_test_universe() -> Arc<Universe> {
     let bounds = Grid::new([-10, -10, -1], [20, 20, 5]);
     let mut space = Space::builder(bounds)
-        .spawn_position(Point3::new(0., 0., 4.))
+        .spawn_position(Point3::new(0., 0., 8.))
         .build_empty();
 
     // Back wall
@@ -243,10 +244,13 @@ async fn light_test_universe() -> Arc<Universe> {
         .light_emission(rgb_const!(10.0, 5.0, 0.0))
         .build();
 
-    space.set([-2, -2, 0], &light_source_block).unwrap();
-    space.set([-2, -1, 0], &light_source_block).unwrap();
-    space.set([1, 0, 0], &pillar_block).unwrap();
-    space.set([0, 1, 0], &pillar_block).unwrap();
+    space.set([-2, 2, 0], &light_source_block).unwrap();
+    space.set([-3, -1, 1], &light_source_block).unwrap();
+
+    for i in -4..=4 {
+        space.set([i, i, 0], &pillar_block).unwrap();
+        space.set([i, i, 0], &pillar_block).unwrap();
+    }
 
     space.fast_evaluate_light();
     space.evaluate_light(1, |_| {});
