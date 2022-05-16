@@ -250,7 +250,7 @@ impl EverythingRenderer {
 
         let pipelines = Pipelines::new(&device, config.format);
 
-        EverythingRenderer {
+        let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
                 // TODO: wild guess at good size
                 std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
@@ -287,7 +287,17 @@ impl EverythingRenderer {
             config,
             cameras,
             pipelines,
-        }
+        };
+        // create initial texture
+        new_self.info_text_texture.resize(
+            &new_self.device,
+            Some("info_text_texture"),
+            Vector2::new(
+                viewport.nominal_size.x as u32,
+                viewport.nominal_size.y as u32,
+            ),
+        );
+        new_self
     }
 
     /// Read info text shader and create the info text render pipeline.
