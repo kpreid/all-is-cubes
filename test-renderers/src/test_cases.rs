@@ -55,7 +55,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
             LightingOption::Smooth,
         ],
     );
-    c.insert("sky_color", None, sky_color);
+    c.insert("sky_and_info_text", None, sky_and_info_text);
     c.insert_variants("transparent_one", None, transparent_one, ["surf", "vol"]);
 }
 
@@ -115,18 +115,25 @@ async fn light(context: RenderTestContext, option: LightingOption) {
         .await;
 }
 
-/// Simplest possible test for testing the test case:
-/// set a sky color.
-async fn sky_color(context: RenderTestContext) {
+/// Test (1) an explicitly set sky color, and (2) the info text rendering.
+async fn sky_and_info_text(context: RenderTestContext) {
     let mut universe = Universe::new();
     let space = Space::builder(Grid::new([0, 0, 0], [1, 1, 1]))
         .sky_color(rgb_const!(1.0, 0.5, 0.0))
         .build_empty();
     finish_universe_from_space(&mut universe, space);
+    let overlays = Overlays {
+        cursor: None,
+        info_text: Some(
+            "\
+            +-------------+\n\
+            | Hello world |\n\
+            +-------------+\n\
+            ",
+        ),
+    };
 
-    context
-        .render_comparison_test(0, &universe, Overlays::NONE)
-        .await;
+    context.render_comparison_test(1, &universe, overlays).await;
 }
 
 /// Test rendering of transparent blocks. TODO: This needs to be split to different graphics options.
