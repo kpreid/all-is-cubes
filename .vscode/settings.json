@@ -1,7 +1,7 @@
 {
     "rust-analyzer.cargo.allFeatures": true,
-    "rust-analyzer.assist.importPrefix": "crate",
     "rust-analyzer.checkOnSave.command": "clippy",
     "rust-analyzer.checkOnSave.allTargets": true,
-    "rust-analyzer.assist.importGranularity": "module"
+    "rust-analyzer.imports.granularity.group": "module",
+    "rust-analyzer.imports.prefix": "crate"
 }
