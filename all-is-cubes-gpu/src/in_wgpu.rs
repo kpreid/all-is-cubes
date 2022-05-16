@@ -332,16 +332,7 @@ impl EverythingRenderer {
                 entry_point: "info_text_fragment",
                 targets: &[wgpu::ColorTargetState {
                     format: surface_format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent {
-                            operation: wgpu::BlendOperation::Add,
-                            src_factor: wgpu::BlendFactor::One,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        },
-                        // TODO: this probably isn't correct but it doesn't matter until such
-                        // time as we get into transparent framebuffers
-                        alpha: wgpu::BlendComponent::REPLACE,
-                    }),
+                    blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 }],
             }),
