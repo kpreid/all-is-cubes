@@ -130,7 +130,7 @@ fn block_vertex_main(
 // --- Block fragment shader ---------------------------------------------------
 
 // Modulo, not remainder (matches GLSL builtin mod())
-fn mod(a: f32, b: f32) -> f32 {
+fn modulo(a: f32, b: f32) -> f32 {
     return ((a % b) + 1.0) % b;
 }
 
@@ -225,8 +225,8 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
 
     // Find linear interpolation coefficients based on where we are relative to
     // a half-cube-offset grid.
-    var mix_1: f32 = mod(dot(origin, v_perpendicular_1) - 0.5, 1.0);
-    var mix_2: f32 = mod(dot(origin, v_perpendicular_2) - 0.5, 1.0);
+    var mix_1: f32 = modulo(dot(origin, v_perpendicular_1) - 0.5, 1.0);
+    var mix_2: f32 = modulo(dot(origin, v_perpendicular_2) - 0.5, 1.0);
 
     // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on
     var dir_1: vec3<f32> = v_perpendicular_1;
