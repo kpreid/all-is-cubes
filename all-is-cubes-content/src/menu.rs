@@ -142,7 +142,6 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     };
 
     let size = tree.requirements().minimum;
-    dbg!(size);
     let bounds = Grid::new([0, 0, 0], size);
 
     let mut space = Space::builder(bounds)
@@ -160,7 +159,8 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         .build_empty();
 
     // TODO: These errors ought to autoconvert into InGenError
-    dbg!(tree.perform_layout(bounds).unwrap())
+    tree.perform_layout(bounds)
+        .unwrap()
         .installation()
         .map_err(|e| InGenError::Other(e.into()))?
         .execute(&mut space)
