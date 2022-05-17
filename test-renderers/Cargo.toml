@@ -12,6 +12,8 @@ publish = false
 
 [lib]
 doctest = false
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
 
 [[test]]
 name = "test-luminance"
