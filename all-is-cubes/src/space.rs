@@ -311,8 +311,17 @@ impl Space {
         position: impl Into<GridPoint>,
         block: impl Into<Cow<'a, Block>>,
     ) -> Result<bool, SetCubeError> {
-        let position: GridPoint = position.into();
-        let block: Cow<'a, Block> = block.into();
+        // Delegate to a monomorphic function.
+        // This may reduce compile time and code size.
+        self.set_impl(position.into(), block.into())
+    }
+
+    fn set_impl(
+        &mut self,
+        position: GridPoint,
+        // TODO: Is the `Cow` actually gaining us any performance, now that `Block` is an Arc-like type?
+        block: Cow<'_, Block>,
+    ) -> Result<bool, SetCubeError> {
         if let Some(contents_index) = self.grid.index(position) {
             let old_block_index = self.contents[contents_index];
             let old_block = &self.block_data[old_block_index as usize].block;
