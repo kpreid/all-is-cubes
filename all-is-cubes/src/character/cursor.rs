@@ -105,8 +105,7 @@ impl fmt::Display for Cursor {
 impl Geometry for Cursor {
     type Coord = GridCoordinate;
 
-    fn translate(mut self, offset: impl Into<GridVector>) -> Self {
-        let offset = offset.into();
+    fn translate(mut self, offset: GridVector) -> Self {
         self.place.cube += offset;
         self.point += offset.map(FreeCoordinate::from);
         self

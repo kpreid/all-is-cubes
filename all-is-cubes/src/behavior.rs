@@ -121,6 +121,9 @@ impl<H: Transactional + 'static> BehaviorSet<H> {
         &self,
         host: &H,
         host_transaction_binder: &dyn Fn(H::Transaction) -> UniverseTransaction,
+        // This is not `dyn` because it doesn't need to be stored, and there's no advantage
+        // to monomorphizing because this function is only going to be called once per `H`
+        // most of the time.
         set_transaction_binder: impl Fn(BehaviorSetTransaction<H>) -> H::Transaction,
         tick: Tick,
     ) -> UniverseTransaction {

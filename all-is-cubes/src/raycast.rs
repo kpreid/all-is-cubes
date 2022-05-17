@@ -98,9 +98,9 @@ impl Ray {
 impl Geometry for Ray {
     type Coord = FreeCoordinate;
 
-    fn translate(self, offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
+    fn translate(self, offset: Vector3<FreeCoordinate>) -> Self {
         Self {
-            origin: self.origin + offset.into(),
+            origin: self.origin + offset,
             ..self
         }
     }
@@ -188,9 +188,10 @@ impl Raycaster {
         origin: impl Into<Point3<FreeCoordinate>>,
         direction: impl Into<Vector3<FreeCoordinate>>,
     ) -> Self {
-        let origin = origin.into();
-        let direction = direction.into();
+        Self::new_impl(origin.into(), direction.into())
+    }
 
+    fn new_impl(origin: Point3<FreeCoordinate>, direction: Vector3<FreeCoordinate>) -> Self {
         // If there is no enclosing cube then the current cube is undefined so we cannot make
         // meaningful progress. (In the event of within_grid(), we could in theory have a
         // suitably bounded interpretation, but that is not of practical interest.)

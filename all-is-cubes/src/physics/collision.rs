@@ -109,8 +109,7 @@ impl fmt::Debug for Contact {
 impl Geometry for Contact {
     type Coord = GridCoordinate;
 
-    fn translate(mut self, offset: impl Into<Vector3<Self::Coord>>) -> Self {
-        let offset = offset.into();
+    fn translate(mut self, offset: Vector3<Self::Coord>) -> Self {
         match &mut self {
             Contact::Block(CubeFace { mut cube, .. }) => cube += offset,
             Contact::Voxel { mut cube, .. } => cube += offset,

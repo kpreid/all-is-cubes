@@ -109,7 +109,10 @@ impl GridRotation {
     /// Panics if the three provided axes are not mutually perpendicular.
     #[inline]
     pub fn from_basis(basis: impl Into<Vector3<Face6>>) -> Self {
-        let basis: Vector3<Face6> = basis.into();
+        Self::from_basis_impl(basis.into())
+    }
+
+    fn from_basis_impl(basis: Vector3<Face6>) -> Self {
         let basis: [Face6; 3] = basis.into(); // for concise matching
         use {Face6::*, GridRotation::*};
         match basis {

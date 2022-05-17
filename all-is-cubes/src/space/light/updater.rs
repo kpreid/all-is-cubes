@@ -470,7 +470,7 @@ pub struct LightUpdateCubeInfo {
 impl Geometry for LightUpdateCubeInfo {
     type Coord = FreeCoordinate;
 
-    fn translate(self, _offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
+    fn translate(self, _offset: Vector3<FreeCoordinate>) -> Self {
         unimplemented!();
     }
 
@@ -501,7 +501,7 @@ pub(crate) struct LightUpdateRayInfo {
 impl Geometry for LightUpdateRayInfo {
     type Coord = FreeCoordinate;
 
-    fn translate(self, _offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
+    fn translate(self, _offset: Vector3<FreeCoordinate>) -> Self {
         unimplemented!();
     }
 

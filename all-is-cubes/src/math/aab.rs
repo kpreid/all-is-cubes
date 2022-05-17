@@ -319,8 +319,7 @@ impl fmt::Debug for Aab {
 impl Geometry for Aab {
     type Coord = FreeCoordinate;
 
-    fn translate(self, offset: impl Into<Vector3<FreeCoordinate>>) -> Self {
-        let offset = offset.into();
+    fn translate(self, offset: Vector3<FreeCoordinate>) -> Self {
         Self::from_lower_upper(self.lower_bounds + offset, self.upper_bounds + offset)
     }
 

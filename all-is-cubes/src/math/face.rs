@@ -786,8 +786,8 @@ impl fmt::Debug for CubeFace {
 impl Geometry for CubeFace {
     type Coord = GridCoordinate;
 
-    fn translate(mut self, offset: impl Into<Vector3<Self::Coord>>) -> Self {
-        self.cube += offset.into();
+    fn translate(mut self, offset: Vector3<Self::Coord>) -> Self {
+        self.cube += offset;
         self
     }
 

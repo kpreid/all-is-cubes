@@ -347,8 +347,8 @@ impl Character {
     }
 
     /// Maximum range for normal keyboard input should be -1 to 1
-    pub fn set_velocity_input(&mut self, velocity: impl Into<Vector3<FreeCoordinate>>) {
-        self.velocity_input = velocity.into();
+    pub fn set_velocity_input(&mut self, velocity: Vector3<FreeCoordinate>) {
+        self.velocity_input = velocity;
     }
 
     /// Use this character's selected tool on the given cursor.
