@@ -17,8 +17,9 @@ use std::io::Write as _;
 use std::path::Path;
 use std::time::Duration;
 
+use anyhow::Error as ActionError;
 use cargo_metadata::PackageId;
-use xaction::{cmd, pushd, Cmd, Pushd};
+use xshell::{cmd, pushd, Cmd, Pushd};
 
 #[derive(Debug, clap::Parser)]
 struct XtaskArgs {
@@ -66,7 +67,7 @@ enum XtaskCommand {
     },
 }
 
-fn main() -> Result<(), xaction::Error> {
+fn main() -> Result<(), ActionError> {
     let XtaskArgs { command } = <XtaskArgs as clap::Parser>::parse();
 
     match command {
@@ -82,7 +83,7 @@ fn main() -> Result<(), xaction::Error> {
             cargo().arg("doc").run()?;
         }
         XtaskCommand::Fmt => {
-            do_for_all_workspaces::<xaction::Error, _>(|| {
+            do_for_all_workspaces(|| {
                 cargo().arg("fmt").run()?;
                 Ok(())
             })?;
@@ -164,7 +165,7 @@ fn main() -> Result<(), xaction::Error> {
                     continue;
                 }
 
-                let _pushd: Pushd = xaction::pushd(package)?;
+                let _pushd: Pushd = pushd(package)?;
                 let mut cmd = cargo().arg("publish").args(maybe_dry.iter().copied());
                 if package == "all-is-cubes-server" {
                     // static-all-is-cubes-wasm counts as dirty despite .gitignore so we must use --allow-dirty
@@ -198,14 +199,14 @@ const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 
 // Test all combinations of situations (that we've bothered to program test
 // setup for).
-fn exhaustive_test() -> Result<(), xaction::Error> {
+fn exhaustive_test() -> Result<(), ActionError> {
     do_for_all_packages(TestOrCheck::Test, Features::AllAndNothing)?;
     Ok(())
 }
 
 /// Build the WASM and other static files for the web/game server.
 /// Needed whenever `all-is-cubes-server` is being tested/run/published.
-fn update_server_static() -> Result<(), xaction::Error> {
+fn update_server_static() -> Result<(), ActionError> {
     ensure_wasm_tools_installed()?;
     {
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
@@ -222,7 +223,7 @@ fn update_server_static() -> Result<(), xaction::Error> {
 /// Run check or tests for all targets.
 ///
 /// TODO: run tests with and without relevant features, like rayon
-fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), xaction::Error> {
+fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), ActionError> {
     // Install npm-based tools for all-is-cubes-wasm build.
     ensure_wasm_tools_installed()?;
 
@@ -260,7 +261,7 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), xactio
     // (Supposedly, running `npm test` should run tests inside JS, but that seems
     // to do nothing for me, so we're limited to confirming it compiles.)
     {
-        let _pushd: Pushd = xaction::pushd("all-is-cubes-wasm")?;
+        let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
         cargo().arg(CHECK_SUBCMD).arg(TARGET_WASM).run()?;
     }
 
@@ -269,7 +270,7 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), xactio
 
     // Build fuzz targets that are not in the workspace
     {
-        let _pushd: Pushd = xaction::pushd("fuzz")?;
+        let _pushd: Pushd = pushd("fuzz")?;
         cargo().arg(CHECK_SUBCMD).run()?;
     }
 
@@ -279,22 +280,21 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), xactio
 /// cd into each workspace and do something.
 ///
 /// do_for_all_packages doesn't use this because it has more specialized handling
-fn do_for_all_workspaces<E, F>(mut f: F) -> Result<(), E>
+fn do_for_all_workspaces<F>(mut f: F) -> Result<(), ActionError>
 where
-    E: From<xshell::Error>,
-    F: FnMut() -> Result<(), E>,
+    F: FnMut() -> Result<(), ActionError>,
 {
     // main workspace
     f()?;
 
     {
-        let _pushd: Pushd = xaction::pushd("fuzz")?;
+        let _pushd: Pushd = pushd("fuzz")?;
         f()?;
     }
     Ok(())
 }
 
-fn ensure_wasm_tools_installed() -> Result<(), xaction::Error> {
+fn ensure_wasm_tools_installed() -> Result<(), ActionError> {
     if !Path::new("all-is-cubes-wasm/node_modules/.bin/webpack").exists() {
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
         cmd!("npm install").run()?;

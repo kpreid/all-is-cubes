@@ -5367,15 +5367,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "xaction"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5655cc22964d2ea3fe69a6e40e81ec1a979a7dd0d0d9c126eb211b2f59f9ab6a"
-dependencies = [
- "xshell",
-]
-
-[[package]]
 name = "xattr"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5409,10 +5400,10 @@ checksum = "4916a4a3cad759e499a3620523bf9545cc162d7a06163727dde97ce9aaa4cf39"
 name = "xtask"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "cargo_metadata",
  "clap 3.1.14",
  "toml_edit 0.14.3",
- "xaction",
  "xshell",
 ]
 
