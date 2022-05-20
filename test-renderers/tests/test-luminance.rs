@@ -26,9 +26,10 @@ use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 use send_wrapper::SendWrapper;
 
 use all_is_cubes::apps::StandardCameras;
+use all_is_cubes::camera::{HeadlessRenderer, Overlays};
 use all_is_cubes_gpu::in_luminance::EverythingRenderer;
 use all_is_cubes_gpu::FrameBudget;
-use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
+use test_renderers::{RendererFactory, RendererId};
 
 #[allow(clippy::result_unit_err)]
 #[cfg(test)]

@@ -9,6 +9,7 @@
 
 - `all-is-cubes` library:
     - `block::Modifier::Move`, for drawing blocks in motion or off the grid.
+    - `camera::HeadlessRenderer`, for easily creating images using the raytracer or other renderers.
     - `math::point_to_enclosing_cube()`
     - `math::Face6`, which is like `math::Face` (now) `Face7` but without the `Within` variant.
     - `DirtyFlag::listening()` which simplifies typical usage.

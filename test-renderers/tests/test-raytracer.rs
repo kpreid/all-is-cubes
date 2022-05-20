@@ -5,10 +5,11 @@ use futures::future::BoxFuture;
 use image::RgbaImage;
 
 use all_is_cubes::apps::StandardCameras;
+use all_is_cubes::camera::{HeadlessRenderer, Overlays};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
-use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
+use test_renderers::{RendererFactory, RendererId};
 
 #[allow(clippy::result_unit_err)]
 #[cfg(test)]

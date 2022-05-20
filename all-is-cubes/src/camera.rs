@@ -8,9 +8,12 @@ use cgmath::{
     Basis3, Decomposed, Deg, EuclideanSpace as _, InnerSpace as _, Matrix4, One as _, Point2,
     Point3, SquareMatrix, Transform, Vector2, Vector3,
 };
+use futures_core::future::BoxFuture;
+use image::RgbaImage;
 use itertools::Itertools as _;
 use ordered_float::NotNan;
 
+use crate::character::Cursor;
 use crate::chunking::OctantMask;
 use crate::math::{Aab, FreeCoordinate, Rgba};
 use crate::raycast::Ray;
@@ -33,6 +36,9 @@ pub type ViewTransform = Decomposed<Vector3<FreeCoordinate>, Basis3<FreeCoordina
 
 /// Defines a viewpoint in/of the world: a viewport (aspect ratio), projection matrix,
 /// and view matrix.
+///
+/// See also [`StandardCameras`](crate::apps::StandardCameras), which adds self-updating
+/// from a character’s viewport, among other features.
 #[derive(Clone, Debug)]
 pub struct Camera {
     /// Caller-provided options. Always validated by [`GraphicsOptions::repair`].
@@ -492,4 +498,32 @@ fn projected_range(
         .minmax()
         .into_option()
         .unwrap()
+}
+
+/// Rendering a previously-specified scene to an in-memory image.
+pub trait HeadlessRenderer {
+    /// Render an image of the current state of the scene this renderer was created to
+    /// track, with the given overlays.
+    ///
+    /// The returned image is always 8 bits per component and should be in the sRGB color
+    /// space. (This trait may be revised in the future to support HDR rendering.)
+    fn render<'a>(&'a mut self, overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage>;
+}
+
+/// Dynamic overlay content used by a [`HeadlessRenderer`] per-frame.
+#[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::exhaustive_structs)] // will very likely go through incompatible changes anyway
+pub struct Overlays<'a> {
+    /// The player's cursor, or [`None`] to draw nothing.
+    pub cursor: Option<&'a Cursor>,
+    /// Text to draw on top of the scene, in a style that is some compromise between
+    /// readability and not obscuring the content, or [`None`] to draw nothing.
+    pub info_text: Option<&'a str>,
+}
+
+impl Overlays<'static> {
+    pub const NONE: Self = Overlays {
+        cursor: None,
+        info_text: None,
+    };
 }

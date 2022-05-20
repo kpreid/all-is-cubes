@@ -9,10 +9,10 @@ use image::RgbaImage;
 use tokio::sync::OnceCell;
 
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::Viewport;
+use all_is_cubes::camera::{HeadlessRenderer, Overlays, Viewport};
 use all_is_cubes_gpu::in_wgpu::{create_depth_texture, EverythingRenderer};
 use all_is_cubes_gpu::FrameBudget;
-use test_renderers::{HeadlessRenderer, Overlays, RendererFactory, RendererId};
+use test_renderers::{RendererFactory, RendererId};
 
 #[allow(clippy::result_unit_err)]
 #[cfg(test)]

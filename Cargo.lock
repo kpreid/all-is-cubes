@@ -71,6 +71,7 @@ dependencies = [
  "futures-core",
  "futures-executor",
  "futures-task",
+ "image",
  "indoc",
  "instant",
  "itertools",

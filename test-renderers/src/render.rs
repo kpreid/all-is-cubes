@@ -5,13 +5,9 @@
 
 use std::fmt::Debug;
 
-use futures::future::BoxFuture;
-use image::RgbaImage;
-
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::{GraphicsOptions, Viewport};
+use all_is_cubes::camera::{GraphicsOptions, HeadlessRenderer, Viewport};
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::character::Cursor;
 use all_is_cubes::universe::Universe;
 
 use crate::RendererId;
@@ -35,20 +31,7 @@ impl Scene for &Universe {
     }
 }
 
-/// Dynamic overlay content passed to the renderer per-frame.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Overlays<'a> {
-    pub cursor: Option<&'a Cursor>,
-    pub info_text: Option<&'a str>,
-}
-
-impl Overlays<'static> {
-    pub const NONE: Self = Overlays {
-        cursor: None,
-        info_text: None,
-    };
-}
-
+/// Test-configuration-specific source of new [`HeadlessRenderer`]s.
 pub trait RendererFactory: Send + Sync + Debug {
     fn renderer_from_cameras(&self, cameras: StandardCameras) -> Box<dyn HeadlessRenderer + Send>;
 
@@ -60,14 +43,6 @@ pub trait RendererFactory: Send + Sync + Debug {
     }
 
     fn id(&self) -> RendererId;
-}
-
-/// Trait for renderers which remember a scene to draw (via `URef`s) and can draw
-/// fresh instances of it to an in-memory image.
-pub trait HeadlessRenderer {
-    /// Render an image of the current state of the scene this renderer was created to
-    /// track, with the given overlays.
-    fn render<'a>(&'a mut self, overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage>;
 }
 
 /// Viewport to use for tests not needing a specific other size.

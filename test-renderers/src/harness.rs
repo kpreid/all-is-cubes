@@ -12,12 +12,13 @@ use futures::future::{BoxFuture, Shared};
 use itertools::Itertools;
 use tokio::task::JoinHandle;
 
+use all_is_cubes::camera::{HeadlessRenderer, Overlays};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{CustomFormat as _, StatusText};
 
 use crate::{
-    results_json_path, write_report_file, ComparisonRecord, HeadlessRenderer, Overlays,
-    RendererFactory, RendererId, Scene, TestCaseOutput, TestCombo, TestId,
+    results_json_path, write_report_file, ComparisonRecord, RendererFactory, RendererId, Scene,
+    TestCaseOutput, TestCombo, TestId,
 };
 
 /// The Universe parameter is an optional way to receive a pre-configured universe
