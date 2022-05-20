@@ -42,16 +42,19 @@
 //!       be ways to teleport between spaces; for now, this mainly assists [`Block`]s.
 //! * A [`Block`] is a cubical object which can be placed in a [`Space`] or carried in
 //!   a [`Character`]'s inventory.
-//!     * Blocks' shape and appearance is either a cube of a single color or recursively
-//!        defined by a [`Space`] of smaller blocks (at a reduced size between 1/2 to
-//!        1/255 of a full cube). Each of these voxels can be transparent.
+//!     * Blocks' shape and appearance (their [`Primitive`]) is either a cube of a single
+//!        color, or recursively defined by a [`Space`] of smaller blocks (at a reduced
+//!        size between 1/2 to 1/255 of a full cube).
+//!        Each of these voxels can be transparent.
 //!         * The player will be able to enter these [`Space`]s and interactively edit
 //!           blocks. This is not currently implemented but that is a lack in the user
 //!           interface rather than core data structures.
 //!         * In the future, there may be ways for blocks to be fully procedurally defined
 //!           rather than working through [`Space`]s, such as for the purposes of
 //!           animation or deriving variations from a single template or formula.
-//!     * Blocks can be rotated into different orientations inside a [`Space`].
+//!     * Blocks can have [`Modifier`]s applied to them which change the basic shape and
+//!       behavior in a particular instance, such as being rotated into different
+//!       orientations.
 //!     * Blocks will have various forms of active behavior and responses to their
 //!       environment but that has not been designed yet.
 //! * A [`Character`] can move around a [`Space`], acting as the player's viewpoint, and
@@ -127,6 +130,8 @@
 //! [`Block`]: crate::block::Block
 //! [`Body`]: crate::physics::Body
 //! [`Character`]: crate::character::Character
+//! [`Modifier`]: crate::block::Modifier
+//! [`Primitive`]: crate::block::Primitive
 //! [`Session`]: crate::apps::Session
 //! [`Session::input_processor`]: crate::apps::Session::input_processor
 //! [`Space`]: crate::space::Space
