@@ -15,27 +15,50 @@ use all_is_cubes::util::{CustomFormat, StatusText};
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct RenderInfo {
-    pub(crate) frame_time: Duration,
-    pub(crate) prepare_time: Duration,
-    pub(crate) draw_time: Layers<Duration>,
-    pub(crate) draw_info: Layers<SpaceRenderInfo>,
+    pub(crate) update: UpdateInfo,
+    pub(crate) draw: DrawInfo,
+}
+
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct UpdateInfo {
+    pub(crate) total_time: Duration,
+    pub(crate) spaces: Layers<SpaceUpdateInfo>,
+}
+
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct DrawInfo {
+    pub(crate) times: Layers<Duration>,
+    pub(crate) space_info: Layers<SpaceDrawInfo>,
     pub(crate) submit_time: Option<Duration>,
 }
 
 impl CustomFormat<StatusText> for RenderInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
-        let Self {
-            frame_time,
-            prepare_time,
-            draw_time,
-            draw_info,
-            submit_time,
+        let &Self {
+            update:
+                UpdateInfo {
+                    total_time: update_time,
+                    spaces: ref update_spaces,
+                },
+            draw:
+                DrawInfo {
+                    times: draw_time,
+                    space_info: ref draw_spaces,
+                    submit_time,
+                },
         } = self;
+
+        let total_time = update_time
+            .saturating_add(draw_time.world)
+            .saturating_add(draw_time.ui);
+
         write!(
             fmt,
-            "Frame time: {} (prep {}, draw world {}, ui {}",
-            frame_time.custom_format(StatusText),
-            prepare_time.custom_format(StatusText),
+            "Frame time: {} (update {}, draw world {}, ui {}",
+            total_time.custom_format(StatusText),
+            update_time.custom_format(StatusText),
             draw_time.world.custom_format(StatusText),
             draw_time.ui.custom_format(StatusText),
         )?;
@@ -44,65 +67,16 @@ impl CustomFormat<StatusText> for RenderInfo {
         }
         write!(
             fmt,
-            ")\n\nWORLD:\n{}\n\n",
-            draw_info.world.custom_format(StatusText)
+            ")\n\nWORLD:\n{}\n{}\n\n",
+            update_spaces.world.custom_format(StatusText),
+            draw_spaces.world.custom_format(StatusText)
         )?;
-        write!(fmt, "UI:\n{}", draw_info.ui.custom_format(StatusText))?;
-        Ok(())
-    }
-}
-
-/// Performance info about drawing a [`Space`].
-///
-/// This is intended to be displayed to the user as real-time diagnostic information,
-/// part of [`RenderInfo`].
-///
-/// [`Space`]: all_is_cubes::space::Space
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
-pub struct SpaceRenderInfo {
-    /// Time spent updating CPU/GPU resources from the Space.
-    pub update: SpaceUpdateInfo,
-    /// Time spent calculating and sending draw commands.
-    pub draw: SpaceDrawInfo,
-}
-
-impl CustomFormat<StatusText> for SpaceRenderInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
-        let Self {
-            update:
-                SpaceUpdateInfo {
-                    chunk_info,
-                    texture_info,
-                    light_update_time,
-                    light_update_count,
-                },
-            draw:
-                SpaceDrawInfo {
-                    draw_init_time,
-                    draw_opaque_time,
-                    draw_transparent_time,
-                    chunks_drawn,
-                    squares_drawn,
-                },
-        } = self;
-
-        let light_update_time = light_update_time.custom_format(format_type);
-        let draw_init_time = draw_init_time.custom_format(format_type);
-        let draw_opaque_time = draw_opaque_time.custom_format(format_type);
-        let draw_transparent_time = draw_transparent_time.custom_format(format_type);
-
-        writeln!(fmt, "{}", chunk_info.custom_format(format_type))?;
-        writeln!(
+        write!(
             fmt,
-            "Draw init: {draw_init_time}  opaque: {draw_opaque_time}  transparent: {draw_transparent_time}",
+            "UI:\n{}\n{}",
+            update_spaces.ui.custom_format(StatusText),
+            draw_spaces.ui.custom_format(StatusText)
         )?;
-        writeln!(
-            fmt,
-            "Chunks drawn: {chunks_drawn:3} Quads drawn: {squares_drawn:7}  \
-            Light: {light_update_count:3} cubes in {light_update_time}",
-        )?;
-        write!(fmt, "{:#?}", texture_info.custom_format(StatusText))?;
         Ok(())
     }
 }
@@ -110,7 +84,7 @@ impl CustomFormat<StatusText> for SpaceRenderInfo {
 /// Performance info about copying [`Space`] data into the renderer per-frame.
 ///
 /// This is intended to be displayed to the user as real-time diagnostic information,
-/// part of [`SpaceRenderInfo`].
+/// part of [`RenderInfo`].
 ///
 /// [`Space`]: all_is_cubes::space::Space
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -127,6 +101,27 @@ pub struct SpaceUpdateInfo {
     pub(crate) light_update_count: usize,
 }
 
+impl CustomFormat<StatusText> for SpaceUpdateInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
+        let &SpaceUpdateInfo {
+            ref chunk_info,
+            ref texture_info,
+            light_update_time,
+            light_update_count,
+        } = self;
+
+        let light_update_time = light_update_time.custom_format(format_type);
+
+        writeln!(fmt, "{}", chunk_info.custom_format(format_type))?;
+        writeln!(
+            fmt,
+            "Light: {light_update_count:3} cubes in {light_update_time}"
+        )?;
+        write!(fmt, "{:#?}", texture_info.custom_format(StatusText))?;
+        Ok(())
+    }
+}
+
 /// Performance info about actually drawing a [`Space`] (excluding data updates).
 ///
 /// Depending on the asynchrony of the renderer implementation, this may not be a
@@ -134,7 +129,7 @@ pub struct SpaceUpdateInfo {
 /// time spent by the GPU or waiting for the GPU.
 ///
 /// This is intended to be displayed to the user as real-time diagnostic information,
-/// part of [`SpaceRenderInfo`].
+/// part of [`RenderInfo`].
 ///
 /// [`Space`]: all_is_cubes::space::Space
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -154,6 +149,32 @@ pub struct SpaceDrawInfo {
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
     /// to draw this frame.
     pub(crate) squares_drawn: usize,
+}
+
+impl CustomFormat<StatusText> for SpaceDrawInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
+        let &SpaceDrawInfo {
+            draw_init_time,
+            draw_opaque_time,
+            draw_transparent_time,
+            chunks_drawn,
+            squares_drawn,
+        } = self;
+
+        let draw_init_time = draw_init_time.custom_format(format_type);
+        let draw_opaque_time = draw_opaque_time.custom_format(format_type);
+        let draw_transparent_time = draw_transparent_time.custom_format(format_type);
+
+        writeln!(
+            fmt,
+            "Draw init: {draw_init_time}  opaque: {draw_opaque_time}  transparent: {draw_transparent_time}",
+        )?;
+        writeln!(
+            fmt,
+            "Chunks drawn: {chunks_drawn:3} Quads drawn: {squares_drawn:7}",
+        )?;
+        Ok(())
+    }
 }
 
 /// Performance info about [`Block`] texture management.

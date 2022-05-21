@@ -38,7 +38,10 @@ use crate::in_luminance::{
     types::{AicLumBackend, LinesVertex},
 };
 use crate::reloadable::{reloadable_str, Reloadable};
-use crate::{gather_debug_lines, FrameBudget, GraphicsResourceError, RenderInfo, SpaceRenderInfo};
+use crate::{
+    gather_debug_lines, DrawInfo, FrameBudget, GraphicsResourceError, RenderInfo, SpaceDrawInfo,
+    UpdateInfo,
+};
 
 /// Top-level renderer.
 /// Owns the [`GraphicsContext`] and an [`EverythingRenderer`] to draw with it.
@@ -220,8 +223,6 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         CS: ColorSlot<Backend, Dim2>,
         DS: DepthStencilSlot<Backend, Dim2>,
     {
-        let start_frame_time = Instant::now();
-
         // This updates camera matrices and graphics options
         self.cameras.update();
         let graphics_options = self.cameras.graphics_options();
@@ -283,6 +284,16 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         } else {
             None
         };
+        let space_update_info = Layers {
+            world: world_output
+                .as_ref()
+                .map(|o| o.data.update_info.clone())
+                .unwrap_or_default(),
+            ui: ui_output
+                .as_ref()
+                .map(|o| o.data.update_info.clone())
+                .unwrap_or_default(),
+        };
 
         let prepare_time = Instant::now().duration_since(start_prepare_time);
 
@@ -312,7 +323,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             None => Rgba::BLACK, // TODO: take from palette or config
         }
         .to_srgb_float();
-        let mut world_info = SpaceRenderInfo::default(); // can't return a value from pipeline()
+        let mut world_draw_info = SpaceDrawInfo::default(); // can't return a value from pipeline()
         context
             .new_pipeline_gate()
             .pipeline(
@@ -323,7 +334,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                     if let Some(world_output) = world_output {
                         let world_output_bound = world_output.bind(&pipeline)?;
                         // Space
-                        world_info = world_output_bound.render(
+                        world_draw_info = world_output_bound.render(
                             &mut shading_gate,
                             &mut block_programs.world,
                             &mut self.lines_program,
@@ -363,7 +374,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             .into_result()?;
 
         let start_draw_ui_time = Instant::now();
-        let mut ui_info = SpaceRenderInfo::default();
+        let mut ui_draw_info = SpaceDrawInfo::default();
         context
             .new_pipeline_gate()
             .pipeline(
@@ -372,7 +383,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                 &PipelineState::default().set_clear_color(None),
                 |ref pipeline, ref mut shading_gate| {
                     if let Some(ui_output) = ui_output {
-                        ui_info = ui_output.bind(pipeline)?.render(
+                        ui_draw_info = ui_output.bind(pipeline)?.render(
                             shading_gate,
                             &mut block_programs.ui,
                             &mut self.lines_program,
@@ -386,17 +397,21 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
 
         let end_time = Instant::now();
         Ok(RenderInfo {
-            frame_time: end_time.duration_since(start_frame_time),
-            prepare_time,
-            draw_time: Layers {
-                world: start_draw_ui_time.duration_since(start_draw_world_time),
-                ui: end_time.duration_since(start_draw_ui_time),
+            update: UpdateInfo {
+                total_time: prepare_time,
+                spaces: space_update_info,
             },
-            draw_info: Layers {
-                world: world_info,
-                ui: ui_info,
+            draw: DrawInfo {
+                times: Layers {
+                    world: start_draw_ui_time.duration_since(start_draw_world_time),
+                    ui: end_time.duration_since(start_draw_ui_time),
+                },
+                space_info: Layers {
+                    world: world_draw_info,
+                    ui: ui_draw_info,
+                },
+                submit_time: None,
             },
-            submit_time: None,
         })
     }
 

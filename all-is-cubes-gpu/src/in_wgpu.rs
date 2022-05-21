@@ -33,9 +33,9 @@ use crate::{
         vertex::{WgpuBlockVertex, WgpuLinesVertex},
     },
     reloadable::{reloadable_str, Reloadable},
-    wireframe_vertices, FrameBudget, SpaceDrawInfo, SpaceUpdateInfo,
+    wireframe_vertices, DrawInfo, FrameBudget, SpaceDrawInfo, SpaceUpdateInfo, UpdateInfo,
 };
-use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
+use crate::{GraphicsResourceError, RenderInfo};
 
 mod block_texture;
 mod camera;
@@ -640,23 +640,21 @@ impl EverythingRenderer {
 
         let end_time = Instant::now();
         Ok(RenderInfo {
-            frame_time: end_time.duration_since(start_frame_time),
-            prepare_time: end_prepare_time.duration_since(start_frame_time),
-            draw_time: Layers {
-                world: world_to_lines_time.duration_since(end_prepare_time),
-                ui: ui_to_submit_time.duration_since(lines_to_ui_time),
+            update: UpdateInfo {
+                total_time: end_prepare_time.duration_since(start_frame_time),
+                spaces: update_infos,
             },
-            draw_info: Layers {
-                world: SpaceRenderInfo {
-                    update: update_infos.world,
-                    draw: world_draw_info,
+            draw: DrawInfo {
+                times: Layers {
+                    world: world_to_lines_time.duration_since(end_prepare_time),
+                    ui: ui_to_submit_time.duration_since(lines_to_ui_time),
                 },
-                ui: SpaceRenderInfo {
-                    update: update_infos.ui,
-                    draw: ui_draw_info,
+                space_info: Layers {
+                    world: world_draw_info,
+                    ui: ui_draw_info,
                 },
+                submit_time: Some(end_time.duration_since(ui_to_submit_time)), // also counting recall()
             },
-            submit_time: Some(end_time.duration_since(ui_to_submit_time)), // also counting recall()
         })
     }
 

@@ -39,7 +39,7 @@ use crate::in_luminance::{
     types::{AicLumBackend, LinesVertex, LumBlockVertex},
     wireframe_vertices,
 };
-use crate::{GraphicsResourceError, SpaceDrawInfo, SpaceRenderInfo, SpaceUpdateInfo};
+use crate::{GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -255,7 +255,7 @@ pub(super) struct SpaceRendererOutputData<'a, Backend: AicLumBackend> {
     >,
     debug_chunk_boxes_tess: &'a Option<Tess<Backend, LinesVertex>>,
     view_chunk: ChunkPos<CHUNK_SIZE>,
-    update_info: SpaceUpdateInfo,
+    pub(super) update_info: SpaceUpdateInfo,
 
     /// Space's sky color, to be used as background color (clear color / fog).
     ///
@@ -309,7 +309,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
         shading_gate: &mut ShadingGate<'_, Backend>,
         block_programs: &mut BlockPrograms<Backend>,
         lines_program: &mut LinesProgram<Backend>,
-    ) -> Result<SpaceRenderInfo, E> {
+    ) -> Result<SpaceDrawInfo, E> {
         let view_direction_mask = self.data.camera.view_direction_mask();
 
         let mut chunks_drawn = 0;
@@ -406,16 +406,13 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
 
         let end_time = Instant::now();
 
-        Ok(SpaceRenderInfo {
-            update: self.data.update_info.clone(),
-            draw: SpaceDrawInfo {
-                chunks_drawn,
-                squares_drawn,
-                draw_init_time: Duration::ZERO, // nothing to do in this graphics API
-                // TODO: report debug lines time
-                draw_opaque_time: start_debug_draw_time.duration_since(start_opaque_draw_time),
-                draw_transparent_time: end_time.duration_since(start_transparent_draw_time),
-            },
+        Ok(SpaceDrawInfo {
+            chunks_drawn,
+            squares_drawn,
+            draw_init_time: Duration::ZERO, // nothing to do in this graphics API
+            // TODO: report debug lines time
+            draw_opaque_time: start_debug_draw_time.duration_since(start_opaque_draw_time),
+            draw_transparent_time: end_time.duration_since(start_transparent_draw_time),
         })
     }
 }
