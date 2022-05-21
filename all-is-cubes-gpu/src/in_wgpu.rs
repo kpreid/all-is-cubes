@@ -504,17 +504,16 @@ impl EverythingRenderer {
         let world_deadline = Instant::now() + frame_budget.update_meshes.world;
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
-        let outputs = Layers {
+        let update_infos = Layers {
             world: self
                 .space_renderers
                 .world
                 .as_mut()
                 .map(|sr| {
-                    sr.prepare_frame(
+                    sr.update(
                         world_deadline,
                         queue,
                         &self.cameras.cameras().world,
-                        &self.pipelines,
                         bwp.reborrow(),
                     )
                 })
@@ -524,11 +523,10 @@ impl EverythingRenderer {
                 .ui
                 .as_mut()
                 .map(|sr| {
-                    sr.prepare_frame(
+                    sr.update(
                         ui_deadline,
                         queue,
                         &self.cameras.cameras().ui,
-                        &self.pipelines,
                         bwp.reborrow(),
                     )
                 })
@@ -571,15 +569,24 @@ impl EverythingRenderer {
         // Done with general preparation (and everything that will write onto the staging belt);
         // move on to draw calls.
         let end_prepare_time = Instant::now();
-        let world_render_info = if let Some(so) = &outputs.world {
-            so.draw(output_view, depth_texture_view, queue, &mut encoder, true)?
+        let world_render_info = if let Some(sr) = &self.space_renderers.world {
+            sr.draw(
+                output_view,
+                depth_texture_view,
+                queue,
+                &mut encoder,
+                &self.pipelines,
+                &self.cameras.cameras().world,
+                true,
+                update_infos.world.unwrap(),
+            )?
         } else {
             SpaceRenderInfo::default()
         };
         let world_to_lines_time = Instant::now();
 
         // Lines pass (if there are any lines)
-        if let (Some(so), 1..) = (&outputs.world, lines_vertex_count) {
+        if let (Some(sr), 1..) = (&self.space_renderers.world, lines_vertex_count) {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("debug lines"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
@@ -600,7 +607,7 @@ impl EverythingRenderer {
                 }),
             });
             render_pass.set_pipeline(&self.pipelines.lines_render_pipeline);
-            render_pass.set_bind_group(0, so.camera_bind_group(), &[]);
+            render_pass.set_bind_group(0, sr.camera_bind_group(), &[]);
             render_pass.set_vertex_buffer(
                 0,
                 self.lines_buffer
@@ -612,8 +619,17 @@ impl EverythingRenderer {
         }
 
         let lines_to_ui_time = Instant::now();
-        let ui_render_info = if let Some(so) = outputs.ui {
-            so.draw(output_view, depth_texture_view, queue, &mut encoder, false)?
+        let ui_render_info = if let Some(sr) = &self.space_renderers.ui {
+            sr.draw(
+                output_view,
+                depth_texture_view,
+                queue,
+                &mut encoder,
+                &self.pipelines,
+                &self.cameras.cameras().ui,
+                false,
+                update_infos.ui.unwrap(),
+            )?
         } else {
             SpaceRenderInfo::default()
         };

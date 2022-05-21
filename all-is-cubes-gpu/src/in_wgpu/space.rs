@@ -137,24 +137,12 @@ impl SpaceRenderer {
         self.csm.space()
     }
 
-    /// Prepare to draw a frame by updating as many chunks/buffers/textures as we're going to.
-    pub(crate) fn prepare_frame<'a>(
-        &'a mut self,
-        deadline: Instant,
-        queue: &wgpu::Queue,
-        camera: &Camera,
-        pipelines: &'a Pipelines,
-        mut bwp: BeltWritingParts<'_, '_>,
-    ) -> Result<SpaceRendererOutput<'a>, GraphicsResourceError> {
-        let info = self.update(deadline, queue, camera, bwp.reborrow())?;
-        self.prepare_frame_2(camera, pipelines, info)
-    }
-
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
-    /// so that the next rendered meshes will be up to date.
+    /// so that the next rendered meshes will be up to date (or as far up to date as the
+    /// given [`deadline`] permits).
     ///
     /// The returned [`SpaceRenderInfo`] is incompletely filled out.
-    fn update(
+    pub(crate) fn update(
         &mut self,
         deadline: Instant,
         queue: &wgpu::Queue,
@@ -235,38 +223,6 @@ impl SpaceRenderer {
         })
     }
 
-    fn prepare_frame_2<'a>(
-        &'a mut self,
-        camera: &Camera,
-        pipelines: &'a Pipelines,
-        info: SpaceRenderInfo,
-    ) -> Result<SpaceRendererOutput<'a>, GraphicsResourceError> {
-        Ok(SpaceRendererOutput {
-            r: self,
-            pipelines,
-            camera: camera.clone(),
-            // TODO: debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
-            info,
-        })
-    }
-}
-
-/// Ingredients to actually draw the [`Space`], produced by
-/// [`SpaceRenderer::prepare_frame`].
-pub(crate) struct SpaceRendererOutput<'a> {
-    r: &'a SpaceRenderer,
-    pipelines: &'a Pipelines,
-
-    pub(super) camera: Camera,
-    // debug_chunk_boxes: &'a wgpu::Buffer,
-    info: SpaceRenderInfo,
-}
-
-impl<'a> SpaceRendererOutput<'a> {
-    fn cull(&self, chunk: ChunkPos<CHUNK_SIZE>) -> bool {
-        self.camera.options().use_frustum_culling && !self.camera.aab_in_view(chunk.grid().into())
-    }
-
     // TODO: needs error return or not?
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
@@ -275,35 +231,38 @@ impl<'a> SpaceRendererOutput<'a> {
         depth_texture_view: &wgpu::TextureView,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
+        pipelines: &Pipelines,
+        camera: &Camera,
         should_clear: bool,
+        partial_info: SpaceRenderInfo,
     ) -> Result<SpaceRenderInfo, GraphicsResourceError> {
         let start_time = Instant::now();
 
-        let mut final_info = self.info.clone();
-        let csm = &self.r.csm;
-        let view_direction_mask = self.camera.view_direction_mask();
+        let mut final_info = partial_info;
+        let csm = &self.csm;
+        let view_direction_mask = camera.view_direction_mask();
         let view_chunk = csm.view_chunk();
 
         queue.write_buffer(
-            &self.r.camera_buffer,
+            &self.camera_buffer,
             0,
             // The [] around the camera is needed for bytemuck, so that both input and output
             // are slices.
             bytemuck::cast_slice::<WgpuCamera, u8>(&[WgpuCamera::new(
-                &self.camera,
-                self.r.sky_color,
-                self.r.light_texture.light_lookup_offset(),
+                camera,
+                self.sky_color,
+                self.light_texture.light_lookup_offset(),
             )]),
         );
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some(&self.r.render_pass_label),
+            label: Some(&self.render_pass_label),
             color_attachments: &[wgpu::RenderPassColorAttachment {
                 view: output_view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: if should_clear {
-                        wgpu::LoadOp::Clear(to_wgpu_color(self.r.sky_color.with_alpha_one()))
+                        wgpu::LoadOp::Clear(to_wgpu_color(self.sky_color.with_alpha_one()))
                     } else {
                         wgpu::LoadOp::Load
                     },
@@ -319,18 +278,18 @@ impl<'a> SpaceRendererOutput<'a> {
                 stencil_ops: None,
             }),
         });
-        render_pass.set_bind_group(0, &self.r.camera_bind_group, &[]);
-        render_pass.set_bind_group(1, &self.r.space_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+        render_pass.set_bind_group(1, &self.space_bind_group, &[]);
 
         // Opaque geometry first, in front-to-back order
         let start_opaque_draw_time = Instant::now();
-        render_pass.set_pipeline(&self.pipelines.opaque_render_pipeline);
+        render_pass.set_pipeline(&pipelines.opaque_render_pipeline);
         // TODO: ChunkedSpaceMesh should probably provide this chunk iterator itself
         // since every caller needs it.
         for p in csm.chunk_chart().chunks(view_chunk, view_direction_mask) {
             // Chunk existence lookup is faster than the frustum culling test, so we do that first.
             if let Some(chunk) = csm.chunk(p) {
-                if self.cull(p) {
+                if cull(camera, p) {
                     continue;
                 }
                 final_info.chunks_drawn += 1;
@@ -349,8 +308,8 @@ impl<'a> SpaceRendererOutput<'a> {
 
         // Transparent geometry after opaque geometry, in back-to-front order
         let start_draw_transparent_time = Instant::now();
-        if self.camera.options().transparency.will_output_alpha() {
-            render_pass.set_pipeline(&self.pipelines.transparent_render_pipeline);
+        if camera.options().transparency.will_output_alpha() {
+            render_pass.set_pipeline(&pipelines.transparent_render_pipeline);
             for p in csm
                 .chunk_chart()
                 .chunks(view_chunk, view_direction_mask)
@@ -358,7 +317,7 @@ impl<'a> SpaceRendererOutput<'a> {
             {
                 // Chunk existence lookup is faster than the frustum culling test, so we do that first.
                 if let Some(chunk) = csm.chunk(p) {
-                    if self.cull(p) {
+                    if cull(camera, p) {
                         continue;
                     }
                     if let Some(buffers) = &chunk.render_data {
@@ -387,8 +346,13 @@ impl<'a> SpaceRendererOutput<'a> {
 
     /// Returns the camera, to allow additional drawing in the same coordinate system.
     pub(crate) fn camera_bind_group(&self) -> &wgpu::BindGroup {
-        &self.r.camera_bind_group
+        &self.camera_bind_group
     }
+}
+
+/// TODO: this probably should be a method on the camera
+fn cull(camera: &Camera, chunk: ChunkPos<CHUNK_SIZE>) -> bool {
+    camera.options().use_frustum_culling && !camera.aab_in_view(chunk.grid().into())
 }
 
 fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuffers) {
