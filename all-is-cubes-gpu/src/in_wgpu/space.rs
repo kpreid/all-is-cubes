@@ -36,11 +36,15 @@ const CHUNK_SIZE: GridCoordinate = 16;
 #[derive(Debug)]
 pub(crate) struct SpaceRenderer {
     /// A debugging label for the space's render pass.
-    /// (Derived from space_label)
+    /// (Derived from constructor's space_label)
     render_pass_label: String,
 
-    /// Note that `self.csm` has its own todo listener.
+    /// Tracks information we need to update from the `Space`.
+    /// Note that `self.csm` has its own todo listener too.
     todo: Arc<Mutex<SpaceRendererTodo>>,
+
+    /// Copy of `space.physics.sky_color`.
+    sky_color: Rgb,
 
     block_texture: AtlasAllocator,
     light_texture: SpaceLightTexture,
@@ -119,6 +123,7 @@ impl SpaceRenderer {
         Ok(SpaceRenderer {
             todo: todo_rc,
             render_pass_label: format!("{space_label} render_pass"),
+            sky_color: space_borrowed.physics().sky_color,
             block_texture,
             light_texture,
             space_bind_group,
@@ -139,8 +144,23 @@ impl SpaceRenderer {
         queue: &wgpu::Queue,
         camera: &Camera,
         pipelines: &'a Pipelines,
-        bwp: BeltWritingParts<'_, '_>,
+        mut bwp: BeltWritingParts<'_, '_>,
     ) -> Result<SpaceRendererOutput<'a>, GraphicsResourceError> {
+        let info = self.update(deadline, queue, camera, bwp.reborrow())?;
+        self.prepare_frame_2(camera, pipelines, info)
+    }
+
+    /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
+    /// so that the next rendered meshes will be up to date.
+    ///
+    /// The returned [`SpaceRenderInfo`] is incompletely filled out.
+    fn update(
+        &mut self,
+        deadline: Instant,
+        queue: &wgpu::Queue,
+        camera: &Camera,
+        bwp: BeltWritingParts<'_, '_>,
+    ) -> Result<SpaceRenderInfo, GraphicsResourceError> {
         let mut todo = self.todo.lock().unwrap();
 
         let space = &*self
@@ -148,6 +168,9 @@ impl SpaceRenderer {
             .space()
             .try_borrow()
             .expect("TODO: return a trivial result instead of panic.");
+
+        // Update sky color (cheap so we don't bother todo-tracking it)
+        self.sky_color = space.physics().sky_color;
 
         // Update light texture
         let start_light_update = Instant::now();
@@ -168,7 +191,7 @@ impl SpaceRenderer {
         let rcbwp = RefCell::new(bwp);
 
         // Update chunks
-        let (csm_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
+        let csm_info = self.csm.update_blocks_and_some_chunks(
             camera,
             &mut self.block_texture,
             deadline, // TODO: decrease deadline by some guess at texture writing time
@@ -203,23 +226,27 @@ impl SpaceRenderer {
         // } else {
         //     //self.debug_chunk_boxes_tess = None;
         // }
+        Ok(SpaceRenderInfo {
+            light_update_time: end_light_update.duration_since(start_light_update),
+            light_update_count,
+            chunk_info: csm_info,
+            texture_info,
+            ..SpaceRenderInfo::default() // other fields filled later
+        })
+    }
 
+    fn prepare_frame_2<'a>(
+        &'a mut self,
+        camera: &Camera,
+        pipelines: &'a Pipelines,
+        info: SpaceRenderInfo,
+    ) -> Result<SpaceRendererOutput<'a>, GraphicsResourceError> {
         Ok(SpaceRendererOutput {
             r: self,
             pipelines,
             camera: camera.clone(),
-            //debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
-            view_chunk,
-            info: SpaceRenderInfo {
-                light_update_time: end_light_update.duration_since(start_light_update),
-                light_update_count,
-                chunk_info: csm_info,
-                texture_info,
-                ..SpaceRenderInfo::default() // other fields filled later
-            },
-            sky_color: space.physics().sky_color,
-            // block_texture: &mut block_texture_allocator.texture,
-            // light_texture,
+            // TODO: debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
+            info,
         })
     }
 }
@@ -232,13 +259,7 @@ pub(crate) struct SpaceRendererOutput<'a> {
 
     pub(super) camera: Camera,
     // debug_chunk_boxes: &'a wgpu::Buffer,
-    view_chunk: ChunkPos<CHUNK_SIZE>,
     info: SpaceRenderInfo,
-
-    /// Space's sky color, to be used as background color (clear color / fog).
-    ///
-    /// Does not have camera exposure or tone mapping applied.
-    pub(super) sky_color: Rgb,
 }
 
 impl<'a> SpaceRendererOutput<'a> {
@@ -261,6 +282,7 @@ impl<'a> SpaceRendererOutput<'a> {
         let mut final_info = self.info.clone();
         let csm = &self.r.csm;
         let view_direction_mask = self.camera.view_direction_mask();
+        let view_chunk = csm.view_chunk();
 
         queue.write_buffer(
             &self.r.camera_buffer,
@@ -269,7 +291,7 @@ impl<'a> SpaceRendererOutput<'a> {
             // are slices.
             bytemuck::cast_slice::<WgpuCamera, u8>(&[WgpuCamera::new(
                 &self.camera,
-                self.sky_color,
+                self.r.sky_color,
                 self.r.light_texture.light_lookup_offset(),
             )]),
         );
@@ -281,7 +303,7 @@ impl<'a> SpaceRendererOutput<'a> {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: if should_clear {
-                        wgpu::LoadOp::Clear(to_wgpu_color(self.sky_color.with_alpha_one()))
+                        wgpu::LoadOp::Clear(to_wgpu_color(self.r.sky_color.with_alpha_one()))
                     } else {
                         wgpu::LoadOp::Load
                     },
@@ -303,10 +325,9 @@ impl<'a> SpaceRendererOutput<'a> {
         // Opaque geometry first, in front-to-back order
         let start_opaque_draw_time = Instant::now();
         render_pass.set_pipeline(&self.pipelines.opaque_render_pipeline);
-        for p in csm
-            .chunk_chart()
-            .chunks(self.view_chunk, view_direction_mask)
-        {
+        // TODO: ChunkedSpaceMesh should probably provide this chunk iterator itself
+        // since every caller needs it.
+        for p in csm.chunk_chart().chunks(view_chunk, view_direction_mask) {
             // Chunk existence lookup is faster than the frustum culling test, so we do that first.
             if let Some(chunk) = csm.chunk(p) {
                 if self.cull(p) {
@@ -332,7 +353,7 @@ impl<'a> SpaceRendererOutput<'a> {
             render_pass.set_pipeline(&self.pipelines.transparent_render_pipeline);
             for p in csm
                 .chunk_chart()
-                .chunks(self.view_chunk, view_direction_mask)
+                .chunks(view_chunk, view_direction_mask)
                 .rev()
             {
                 // Chunk existence lookup is faster than the frustum culling test, so we do that first.
@@ -343,7 +364,7 @@ impl<'a> SpaceRendererOutput<'a> {
                     if let Some(buffers) = &chunk.render_data {
                         let range = chunk.mesh().transparent_range(
                             // TODO: avoid adding and then subtracting view_chunk
-                            DepthOrdering::from_view_direction(p.0 - self.view_chunk.0),
+                            DepthOrdering::from_view_direction(p.0 - view_chunk.0),
                         );
                         if !range.is_empty() {
                             set_buffers(&mut render_pass, buffers);

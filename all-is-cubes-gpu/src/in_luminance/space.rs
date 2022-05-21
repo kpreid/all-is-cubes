@@ -137,7 +137,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         let end_light_update = Instant::now();
 
         // Update chunks
-        let (csm_info, view_chunk) = self.csm.update_blocks_and_some_chunks(
+        let csm_info = self.csm.update_blocks_and_some_chunks(
             camera,
             block_texture_allocator,
             deadline, // TODO: decrease deadline by some guess at texture writing time
@@ -159,6 +159,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 }
             },
         );
+        let view_chunk = self.csm.view_chunk();
         let view_direction_mask = camera.view_direction_mask();
 
         // Flush all texture updates to GPU.

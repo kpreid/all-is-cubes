@@ -50,10 +50,14 @@ where
     /// Resized as needed upon each [`Self::update_blocks_and_some_chunks()`].
     chunk_chart: ChunkChart<CHUNK_SIZE>,
 
+    /// The chunk in which the last [`Camera`] provided is located.
+    view_chunk: ChunkPos<CHUNK_SIZE>,
+
     /// Whether, on the previous frame, some chunks were unavailable.
     /// If so, then we prioritize adding new chunks over updating existing ones.
     chunks_were_missing: bool,
 
+    /// The [`MeshOptions`] specified by the last [`Camera`] provided.
     last_mesh_options: Option<MeshOptions>,
 }
 
@@ -76,6 +80,7 @@ where
             block_meshes: VersionedBlockMeshes::new(),
             chunks: HashMap::new(),
             chunk_chart: ChunkChart::new(0.0),
+            view_chunk: ChunkPos(Point3::new(0, 0, 0)),
             chunks_were_missing: true,
             last_mesh_options: None,
         }
@@ -86,7 +91,7 @@ where
         &self.space
     }
 
-    /// Returns a [`ChunkChart`] for the view distance used by the most tecent
+    /// Returns a [`ChunkChart`] for the view distance used by the most recent
     /// [`Self::update_blocks_and_some_chunks`].
     pub fn chunk_chart(&self) -> &ChunkChart<CHUNK_SIZE> {
         &self.chunk_chart
@@ -105,7 +110,8 @@ where
 
     /// Re-triangulate all blocks that need it, and the nearest chunks that need it.
     ///
-    /// * `camera`'s view position is used to choose what to update and for depth ordering; its graphics options are used for triangulation and view distance.
+    /// * `camera`'s view position is used to choose what to update and for depth
+    ///    ordering; its graphics options are used for triangulation and view distance.
     /// * `deadline` is the approximate time at which this should stop.
     /// * `chunk_render_updater` is called for every retriangulated chunk.
     /// * `indices_only_updater` is called when a chunk's indices, only, have been
@@ -119,7 +125,7 @@ where
         deadline: Instant,
         mut chunk_render_updater: CF,
         mut indices_only_updater: IF,
-    ) -> (CsmUpdateInfo, ChunkPos<CHUNK_SIZE>)
+    ) -> CsmUpdateInfo
     where
         CF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
         IF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
@@ -128,6 +134,7 @@ where
         let mesh_options = MeshOptions::new(graphics_options, Vert::WANTS_LIGHT);
         let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
+        self.view_chunk = view_chunk;
 
         let mut todo = self.todo.lock().unwrap();
 
@@ -135,7 +142,7 @@ where
             space
         } else {
             // TODO: report error
-            return (CsmUpdateInfo::default(), view_chunk);
+            return CsmUpdateInfo::default();
         };
 
         if Some(&mesh_options) != self.last_mesh_options.as_ref() {
@@ -238,20 +245,22 @@ where
 
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
-        (
-            CsmUpdateInfo {
-                chunk_scan_time: chunk_scan_end_time
-                    .saturating_duration_since(chunk_scan_start_time)
-                    .saturating_sub(
-                        chunk_mesh_generation_times.sum + chunk_mesh_callback_times.sum,
-                    ),
-                chunk_mesh_generation_times,
-                chunk_mesh_callback_times,
-                depth_sort_time: depth_sort_end_time.map(|t| t.duration_since(chunk_scan_end_time)),
-                block_updates,
-            },
-            view_chunk,
-        )
+        CsmUpdateInfo {
+            chunk_scan_time: chunk_scan_end_time
+                .saturating_duration_since(chunk_scan_start_time)
+                .saturating_sub(chunk_mesh_generation_times.sum + chunk_mesh_callback_times.sum),
+            chunk_mesh_generation_times,
+            chunk_mesh_callback_times,
+            depth_sort_time: depth_sort_end_time.map(|t| t.duration_since(chunk_scan_end_time)),
+            block_updates,
+        }
+    }
+
+    /// Returns the chunk in which the camera from the most recent
+    /// [`Self::update_blocks_and_some_chunks`] was located.
+    /// This may be used as the origin point to iterate over chunks in view.
+    pub fn view_chunk(&self) -> ChunkPos<CHUNK_SIZE> {
+        self.view_chunk
     }
 }
 
@@ -771,7 +780,7 @@ mod tests {
             &mut self,
             chunk_render_updater: CF,
             indices_only_updater: IF,
-        ) -> (CsmUpdateInfo, ChunkPos<16>)
+        ) -> CsmUpdateInfo
         where
             CF: FnMut(&SpaceMesh<BlockVertex, NoTextures>, &mut ()),
             IF: FnMut(&SpaceMesh<BlockVertex, NoTextures>, &mut ()),
