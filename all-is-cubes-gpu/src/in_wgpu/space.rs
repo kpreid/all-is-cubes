@@ -160,15 +160,16 @@ impl SpaceRenderer {
 
         // Update light texture
         let start_light_update = Instant::now();
-        let light_update_count = 0;
+        let mut light_update_count = 0;
         if let Some(set) = &mut todo.light {
             // TODO: work in larger, ahem, chunks
             for cube in set.drain() {
-                self.light_texture
-                    .update(queue, space, Grid::new(cube, [1, 1, 1]));
+                light_update_count +=
+                    self.light_texture
+                        .update(queue, space, Grid::new(cube, [1, 1, 1]));
             }
         } else {
-            self.light_texture.update_all(queue, space);
+            light_update_count += self.light_texture.update_all(queue, space);
             todo.light = Some(HashSet::new());
         }
         let end_light_update = Instant::now();
@@ -490,7 +491,7 @@ impl SpaceLightTexture {
     }
 
     /// Copy the specified region of light data.
-    pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: Grid) {
+    pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: Grid) -> usize {
         let mut data: Vec<[u8; 4]> = Vec::with_capacity(region.volume());
         // TODO: Enable circular operation and eliminate the need for the offset of the
         // coordinates (texture_grid.lower_bounds() and light_offset in the shader)
@@ -511,10 +512,13 @@ impl SpaceLightTexture {
             region.translate(self.light_lookup_offset()),
             &data,
         );
+
+        region.volume()
     }
 
-    pub fn update_all(&mut self, queue: &wgpu::Queue, space: &Space) {
-        self.update(queue, space, self.texture_grid)
+    pub fn update_all(&mut self, queue: &wgpu::Queue, space: &Space) -> usize {
+        self.update(queue, space, self.texture_grid);
+        self.texture_grid.volume()
     }
 
     fn light_lookup_offset(&self) -> Vector3<i32> {
