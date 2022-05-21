@@ -28,11 +28,11 @@ use crate::space::{BlockIndex, GridArray, PackedLight, Space, SpaceBlockData};
 
 mod pixel_buf;
 pub use pixel_buf::*;
-
+mod renderer;
+pub use renderer::*;
 mod surface;
 use surface::{DepthIter, DepthStep, Span, Surface, SurfaceIter, TraceStep};
 // TODO: pub use surface::*;
-
 mod text;
 pub use text::*;
 
