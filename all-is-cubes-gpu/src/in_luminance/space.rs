@@ -39,7 +39,7 @@ use crate::in_luminance::{
     types::{AicLumBackend, LinesVertex, LumBlockVertex},
     wireframe_vertices,
 };
-use crate::{GraphicsResourceError, SpaceRenderInfo};
+use crate::{GraphicsResourceError, SpaceDrawInfo, SpaceRenderInfo, SpaceUpdateInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -222,12 +222,11 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 csm: &self.csm,
                 debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
                 view_chunk,
-                info: SpaceRenderInfo {
+                update_info: SpaceUpdateInfo {
                     light_update_time: end_light_update.duration_since(start_light_update),
                     light_update_count,
                     chunk_info: csm_info,
                     texture_info,
-                    ..SpaceRenderInfo::default() // other fields filled later
                 },
                 sky_color: space.physics().sky_color,
             },
@@ -256,7 +255,7 @@ pub(super) struct SpaceRendererOutputData<'a, Backend: AicLumBackend> {
     >,
     debug_chunk_boxes_tess: &'a Option<Tess<Backend, LinesVertex>>,
     view_chunk: ChunkPos<CHUNK_SIZE>,
-    info: SpaceRenderInfo,
+    update_info: SpaceUpdateInfo,
 
     /// Space's sky color, to be used as background color (clear color / fog).
     ///
@@ -408,13 +407,15 @@ impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
         let end_time = Instant::now();
 
         Ok(SpaceRenderInfo {
-            chunks_drawn,
-            squares_drawn,
-            draw_init_time: Duration::ZERO, // nothing to do in this graphics API
-            // TODO: report debug lines time
-            draw_opaque_time: start_debug_draw_time.duration_since(start_opaque_draw_time),
-            draw_transparent_time: end_time.duration_since(start_transparent_draw_time),
-            ..self.data.info.clone()
+            update: self.data.update_info.clone(),
+            draw: SpaceDrawInfo {
+                chunks_drawn,
+                squares_drawn,
+                draw_init_time: Duration::ZERO, // nothing to do in this graphics API
+                // TODO: report debug lines time
+                draw_opaque_time: start_debug_draw_time.duration_since(start_opaque_draw_time),
+                draw_transparent_time: end_time.duration_since(start_transparent_draw_time),
+            },
         })
     }
 }

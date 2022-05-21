@@ -33,7 +33,7 @@ use crate::{
         vertex::{WgpuBlockVertex, WgpuLinesVertex},
     },
     reloadable::{reloadable_str, Reloadable},
-    wireframe_vertices, FrameBudget,
+    wireframe_vertices, FrameBudget, SpaceDrawInfo, SpaceUpdateInfo,
 };
 use crate::{GraphicsResourceError, RenderInfo, SpaceRenderInfo};
 
@@ -504,7 +504,7 @@ impl EverythingRenderer {
         let world_deadline = Instant::now() + frame_budget.update_meshes.world;
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
-        let update_infos = Layers {
+        let update_infos: Layers<SpaceUpdateInfo> = Layers {
             world: self
                 .space_renderers
                 .world
@@ -517,7 +517,8 @@ impl EverythingRenderer {
                         bwp.reborrow(),
                     )
                 })
-                .transpose()?,
+                .transpose()?
+                .unwrap_or_default(),
             ui: self
                 .space_renderers
                 .ui
@@ -530,7 +531,8 @@ impl EverythingRenderer {
                         bwp.reborrow(),
                     )
                 })
-                .transpose()?,
+                .transpose()?
+                .unwrap_or_default(),
         };
 
         // Prepare cursor and debug lines.
@@ -569,7 +571,7 @@ impl EverythingRenderer {
         // Done with general preparation (and everything that will write onto the staging belt);
         // move on to draw calls.
         let end_prepare_time = Instant::now();
-        let world_render_info = if let Some(sr) = &self.space_renderers.world {
+        let world_draw_info = if let Some(sr) = &self.space_renderers.world {
             sr.draw(
                 output_view,
                 depth_texture_view,
@@ -578,10 +580,9 @@ impl EverythingRenderer {
                 &self.pipelines,
                 &self.cameras.cameras().world,
                 true,
-                update_infos.world.unwrap(),
             )?
         } else {
-            SpaceRenderInfo::default()
+            SpaceDrawInfo::default()
         };
         let world_to_lines_time = Instant::now();
 
@@ -619,7 +620,7 @@ impl EverythingRenderer {
         }
 
         let lines_to_ui_time = Instant::now();
-        let ui_render_info = if let Some(sr) = &self.space_renderers.ui {
+        let ui_draw_info = if let Some(sr) = &self.space_renderers.ui {
             sr.draw(
                 output_view,
                 depth_texture_view,
@@ -628,10 +629,9 @@ impl EverythingRenderer {
                 &self.pipelines,
                 &self.cameras.cameras().ui,
                 false,
-                update_infos.ui.unwrap(),
             )?
         } else {
-            SpaceRenderInfo::default()
+            SpaceDrawInfo::default()
         };
         let ui_to_submit_time = Instant::now();
 
@@ -647,8 +647,14 @@ impl EverythingRenderer {
                 ui: ui_to_submit_time.duration_since(lines_to_ui_time),
             },
             draw_info: Layers {
-                world: world_render_info,
-                ui: ui_render_info,
+                world: SpaceRenderInfo {
+                    update: update_infos.world,
+                    draw: world_draw_info,
+                },
+                ui: SpaceRenderInfo {
+                    update: update_infos.ui,
+                    draw: ui_draw_info,
+                },
             },
             submit_time: Some(end_time.duration_since(ui_to_submit_time)), // also counting recall()
         })

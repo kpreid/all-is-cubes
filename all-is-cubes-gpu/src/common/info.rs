@@ -58,63 +58,33 @@ impl CustomFormat<StatusText> for RenderInfo {
 /// part of [`RenderInfo`].
 ///
 /// [`Space`]: all_is_cubes::space::Space
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
 pub struct SpaceRenderInfo {
-    /// Status of the block and chunk meshes.
-    pub(crate) chunk_info: CsmUpdateInfo,
-    /// Status of the texture atlas.
-    pub(crate) texture_info: BlockTextureInfo,
-
-    /// Time taken to upload light data.
-    pub(crate) light_update_time: Duration,
-    /// Number of light cubes updated
-    pub(crate) light_update_count: usize,
-
-    /// Time taken to set up for drawing the space.
-    pub(crate) draw_init_time: Duration,
-    /// Time taken to draw chunks' opaque geometry
-    /// (and determine if they are visible to be drawn).
-    pub(crate) draw_opaque_time: Duration,
-    /// Time taken to draw chunks' transparent geometry
-    /// (and determine if they are visible to be drawn).
-    pub(crate) draw_transparent_time: Duration,
-
-    /// Number of chunk meshes drawn.
-    pub(crate) chunks_drawn: usize,
-    /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
-    /// to draw this frame.
-    pub(crate) squares_drawn: usize,
-}
-
-impl Default for SpaceRenderInfo {
-    fn default() -> Self {
-        Self {
-            chunk_info: Default::default(),
-            chunks_drawn: 0,
-            squares_drawn: 0,
-            texture_info: Default::default(),
-            light_update_time: Duration::ZERO,
-            light_update_count: 0,
-            draw_init_time: Duration::ZERO,
-            draw_opaque_time: Duration::ZERO,
-            draw_transparent_time: Duration::ZERO,
-        }
-    }
+    /// Time spent updating CPU/GPU resources from the Space.
+    pub update: SpaceUpdateInfo,
+    /// Time spent calculating and sending draw commands.
+    pub draw: SpaceDrawInfo,
 }
 
 impl CustomFormat<StatusText> for SpaceRenderInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
         let Self {
-            chunk_info,
-            chunks_drawn,
-            squares_drawn,
-            texture_info,
-            light_update_time,
-            light_update_count,
-            draw_init_time,
-            draw_opaque_time,
-            draw_transparent_time,
+            update:
+                SpaceUpdateInfo {
+                    chunk_info,
+                    texture_info,
+                    light_update_time,
+                    light_update_count,
+                },
+            draw:
+                SpaceDrawInfo {
+                    draw_init_time,
+                    draw_opaque_time,
+                    draw_transparent_time,
+                    chunks_drawn,
+                    squares_drawn,
+                },
         } = self;
 
         let light_update_time = light_update_time.custom_format(format_type);
@@ -135,6 +105,55 @@ impl CustomFormat<StatusText> for SpaceRenderInfo {
         write!(fmt, "{:#?}", texture_info.custom_format(StatusText))?;
         Ok(())
     }
+}
+
+/// Performance info about copying [`Space`] data into the renderer per-frame.
+///
+/// This is intended to be displayed to the user as real-time diagnostic information,
+/// part of [`SpaceRenderInfo`].
+///
+/// [`Space`]: all_is_cubes::space::Space
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct SpaceUpdateInfo {
+    /// Status of the block and chunk meshes.
+    pub(crate) chunk_info: CsmUpdateInfo,
+    /// Status of the texture atlas.
+    pub(crate) texture_info: BlockTextureInfo,
+
+    /// Time taken to upload light data.
+    pub(crate) light_update_time: Duration,
+    /// Number of light cubes updated
+    pub(crate) light_update_count: usize,
+}
+
+/// Performance info about actually drawing a [`Space`] (excluding data updates).
+///
+/// Depending on the asynchrony of the renderer implementation, this may not be a
+/// complete accounting of time spent; in particular it is not guaranteed to include
+/// time spent by the GPU or waiting for the GPU.
+///
+/// This is intended to be displayed to the user as real-time diagnostic information,
+/// part of [`SpaceRenderInfo`].
+///
+/// [`Space`]: all_is_cubes::space::Space
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct SpaceDrawInfo {
+    /// Time taken to set up for drawing the space.
+    pub(crate) draw_init_time: Duration,
+    /// Time taken to draw chunks' opaque geometry
+    /// (and determine if they are visible to be drawn).
+    pub(crate) draw_opaque_time: Duration,
+    /// Time taken to draw chunks' transparent geometry
+    /// (and determine if they are visible to be drawn).
+    pub(crate) draw_transparent_time: Duration,
+
+    /// Number of chunk meshes drawn.
+    pub(crate) chunks_drawn: usize,
+    /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
+    /// to draw this frame.
+    pub(crate) squares_drawn: usize,
 }
 
 /// Performance info about [`Block`] texture management.

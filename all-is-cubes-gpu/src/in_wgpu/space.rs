@@ -27,7 +27,7 @@ use crate::in_wgpu::{
     glue::{to_wgpu_color, to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
-use crate::{GraphicsResourceError, SpaceRenderInfo};
+use crate::{GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -140,15 +140,13 @@ impl SpaceRenderer {
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
     /// so that the next rendered meshes will be up to date (or as far up to date as the
     /// given [`deadline`] permits).
-    ///
-    /// The returned [`SpaceRenderInfo`] is incompletely filled out.
     pub(crate) fn update(
         &mut self,
         deadline: Instant,
         queue: &wgpu::Queue,
         camera: &Camera,
         bwp: BeltWritingParts<'_, '_>,
-    ) -> Result<SpaceRenderInfo, GraphicsResourceError> {
+    ) -> Result<SpaceUpdateInfo, GraphicsResourceError> {
         let mut todo = self.todo.lock().unwrap();
 
         let space = &*self
@@ -214,12 +212,11 @@ impl SpaceRenderer {
         // } else {
         //     //self.debug_chunk_boxes_tess = None;
         // }
-        Ok(SpaceRenderInfo {
+        Ok(SpaceUpdateInfo {
             light_update_time: end_light_update.duration_since(start_light_update),
             light_update_count,
             chunk_info: csm_info,
             texture_info,
-            ..SpaceRenderInfo::default() // other fields filled later
         })
     }
 
@@ -234,11 +231,9 @@ impl SpaceRenderer {
         pipelines: &Pipelines,
         camera: &Camera,
         should_clear: bool,
-        partial_info: SpaceRenderInfo,
-    ) -> Result<SpaceRenderInfo, GraphicsResourceError> {
+    ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
         let start_time = Instant::now();
 
-        let mut final_info = partial_info;
         let csm = &self.csm;
         let view_direction_mask = camera.view_direction_mask();
         let view_chunk = csm.view_chunk();
@@ -283,6 +278,8 @@ impl SpaceRenderer {
 
         // Opaque geometry first, in front-to-back order
         let start_opaque_draw_time = Instant::now();
+        let mut chunks_drawn = 0;
+        let mut squares_drawn = 0;
         render_pass.set_pipeline(&pipelines.opaque_render_pipeline);
         // TODO: ChunkedSpaceMesh should probably provide this chunk iterator itself
         // since every caller needs it.
@@ -292,14 +289,14 @@ impl SpaceRenderer {
                 if cull(camera, p) {
                     continue;
                 }
-                final_info.chunks_drawn += 1;
+                chunks_drawn += 1;
 
                 if let Some(buffers) = &chunk.render_data {
                     let range = chunk.mesh().opaque_range();
                     if !range.is_empty() {
                         set_buffers(&mut render_pass, buffers);
                         render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, 0..1);
-                        final_info.squares_drawn += range.len() / 6;
+                        squares_drawn += range.len() / 6;
                     }
                 }
             }
@@ -328,7 +325,7 @@ impl SpaceRenderer {
                         if !range.is_empty() {
                             set_buffers(&mut render_pass, buffers);
                             render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, 0..1);
-                            final_info.squares_drawn += range.len() / 6;
+                            squares_drawn += range.len() / 6;
                         }
                     }
                 }
@@ -336,11 +333,12 @@ impl SpaceRenderer {
         }
         let end_time = Instant::now();
 
-        Ok(SpaceRenderInfo {
+        Ok(SpaceDrawInfo {
             draw_init_time: start_opaque_draw_time.duration_since(start_time),
             draw_opaque_time: start_draw_transparent_time.duration_since(start_opaque_draw_time),
             draw_transparent_time: end_time.duration_since(start_draw_transparent_time),
-            ..final_info
+            squares_drawn,
+            chunks_drawn,
         })
     }
 
