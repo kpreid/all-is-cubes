@@ -122,14 +122,18 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
     fn render<'a>(&'a mut self, overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage> {
         Box::pin(async move {
             let viewport = self.everything.viewport();
-            let _info = self
+            let _uinfo = self
                 .everything
-                .render_frame_linear(
+                .update(
+                    &self.factory.queue,
                     overlays.cursor,
                     &FrameBudget::PRACTICALLY_INFINITE,
-                    &self.factory.queue,
-                    &self.depth_texture_view,
                 )
+                .await
+                .unwrap();
+            let _dinfo = self
+                .everything
+                .draw_frame_linear(&self.factory.queue, &self.depth_texture_view)
                 .await
                 .unwrap();
 

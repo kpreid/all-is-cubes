@@ -146,15 +146,22 @@ impl SurfaceRenderer {
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
     ) -> Result<RenderInfo, GraphicsResourceError> {
         let output = self.surface.get_current_texture()?;
-        let info = self
+        let update_info = self
             .everything
-            .render_frame_linear(
+            .update(
+                &self.queue,
                 cursor_result,
                 &FrameBudget::SIXTY_FPS, // TODO: figure out what we're vsyncing to, instead
-                &self.queue,
-                &self.depth_texture_view,
             )
             .await?;
+        let draw_info = self
+            .everything
+            .draw_frame_linear(&self.queue, &self.depth_texture_view)
+            .await?;
+        let info = RenderInfo {
+            update: update_info,
+            draw: draw_info,
+        };
         self.everything.add_info_text_and_postprocess(
             &self.queue,
             &output.texture,
@@ -194,6 +201,8 @@ pub struct EverythingRenderer {
 
     /// Cursor and debug lines are written to this buffer.
     lines_buffer: ResizingBuffer,
+    /// Number of vertices currently in `lines_buffer`
+    lines_vertex_count: u32,
 
     /// Pipeline for the color postprocessing + info text layer drawing.
     postprocess_render_pipeline: wgpu::RenderPipeline,
@@ -285,6 +294,7 @@ impl EverythingRenderer {
             space_renderers: Default::default(),
 
             lines_buffer: ResizingBuffer::default(),
+            lines_vertex_count: 0,
 
             postprocess_shader_dirty: DirtyFlag::listening(false, |l| {
                 POSTPROCESS_SHADER.as_source().listen(l)
@@ -413,16 +423,14 @@ impl EverythingRenderer {
         Ok(())
     }
 
-    /// Render the current scene content to the linear scene texture,
-    /// in linear color values without tone mapping.
-    // TODO: stop making this public
-    pub async fn render_frame_linear(
+    /// Read current scene content, compute meshes, and send updated resources
+    /// to the GPU to prepare for actually drawing it.
+    pub async fn update(
         &mut self,
+        queue: &wgpu::Queue,
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
-        queue: &wgpu::Queue,
-        depth_texture_view: &wgpu::TextureView,
-    ) -> Result<RenderInfo, GraphicsResourceError> {
+    ) -> Result<UpdateInfo, GraphicsResourceError> {
         let start_frame_time = Instant::now();
 
         // This updates camera matrices and graphics options
@@ -440,15 +448,14 @@ impl EverythingRenderer {
         self.pipelines
             .recompile_if_changed(&self.device, self.config.format);
 
-        let output_view = &self.linear_scene_texture_view;
-
+        // Identify spaces to be rendered
         let ws = self.cameras.world_space().snapshot(); // TODO: ugly
         let spaces_to_render = Layers {
             world: ws.as_ref(),
             ui: self.cameras.ui_space(),
         };
 
-        // Make sure we're rendering the right spaces.
+        // Ensure SpaceRenderers are pointing at those spaces
         // TODO: we should be able to express this as something like "Layers::for_each_zip()"
         if self.space_renderers.world.as_ref().map(|sr| sr.space()) != spaces_to_render.world {
             self.space_renderers.world = spaces_to_render
@@ -484,7 +491,7 @@ impl EverythingRenderer {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("EverythingRenderer::render_frame()"),
+                label: Some("EverythingRenderer::update()"),
             });
 
         // Await completion of previous frame's work.
@@ -504,7 +511,7 @@ impl EverythingRenderer {
         let world_deadline = Instant::now() + frame_budget.update_meshes.world;
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
-        let update_infos: Layers<SpaceUpdateInfo> = Layers {
+        let space_infos: Layers<SpaceUpdateInfo> = Layers {
             world: self
                 .space_renderers
                 .world
@@ -536,7 +543,7 @@ impl EverythingRenderer {
         };
 
         // Prepare cursor and debug lines.
-        let lines_vertex_count = {
+        {
             let mut v: Vec<WgpuLinesVertex> = Vec::new();
 
             if let Some(cursor) = cursor_result {
@@ -561,16 +568,35 @@ impl EverythingRenderer {
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 },
             );
-            v.len() as u32
+            self.lines_vertex_count = v.len() as u32;
         };
 
-        //let start_staging_time = Instant::now();
+        // TODO: measure time of these
         self.staging_belt.finish();
-        //let end_staging_time = Instant::now();
+        queue.submit(std::iter::once(encoder.finish()));
 
-        // Done with general preparation (and everything that will write onto the staging belt);
-        // move on to draw calls.
-        let end_prepare_time = Instant::now();
+        Ok(UpdateInfo {
+            total_time: Instant::now().duration_since(start_frame_time),
+            spaces: space_infos,
+        })
+    }
+
+    /// Render the current scene content to the linear scene texture,
+    /// in linear color values without tone mapping.
+    // TODO: stop making this public
+    pub async fn draw_frame_linear(
+        &mut self,
+        queue: &wgpu::Queue,
+        depth_texture_view: &wgpu::TextureView,
+    ) -> Result<DrawInfo, GraphicsResourceError> {
+        let output_view = &self.linear_scene_texture_view;
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("EverythingRenderer::draw_frame_linear()"),
+            });
+
+        let start_draw_time = Instant::now();
         let world_draw_info = if let Some(sr) = &self.space_renderers.world {
             sr.draw(
                 output_view,
@@ -587,7 +613,7 @@ impl EverythingRenderer {
         let world_to_lines_time = Instant::now();
 
         // Lines pass (if there are any lines)
-        if let (Some(sr), 1..) = (&self.space_renderers.world, lines_vertex_count) {
+        if let (Some(sr), 1..) = (&self.space_renderers.world, self.lines_vertex_count) {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("debug lines"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
@@ -616,7 +642,7 @@ impl EverythingRenderer {
                     .expect("missing lines buffer!")
                     .slice(..),
             );
-            render_pass.draw(0..lines_vertex_count, 0..1);
+            render_pass.draw(0..self.lines_vertex_count, 0..1);
         }
 
         let lines_to_ui_time = Instant::now();
@@ -639,22 +665,16 @@ impl EverythingRenderer {
         self.staging_belt_recalled = Some(Box::pin(self.staging_belt.recall()));
 
         let end_time = Instant::now();
-        Ok(RenderInfo {
-            update: UpdateInfo {
-                total_time: end_prepare_time.duration_since(start_frame_time),
-                spaces: update_infos,
+        Ok(DrawInfo {
+            times: Layers {
+                world: world_to_lines_time.duration_since(start_draw_time),
+                ui: ui_to_submit_time.duration_since(lines_to_ui_time),
             },
-            draw: DrawInfo {
-                times: Layers {
-                    world: world_to_lines_time.duration_since(end_prepare_time),
-                    ui: ui_to_submit_time.duration_since(lines_to_ui_time),
-                },
-                space_info: Layers {
-                    world: world_draw_info,
-                    ui: ui_draw_info,
-                },
-                submit_time: Some(end_time.duration_since(ui_to_submit_time)), // also counting recall()
+            space_info: Layers {
+                world: world_draw_info,
+                ui: ui_draw_info,
             },
+            submit_time: Some(end_time.duration_since(ui_to_submit_time)), // also counting recall()
         })
     }
 
