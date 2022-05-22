@@ -1,3 +1,8 @@
+// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
+// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
+
+use std::fmt;
+
 use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
@@ -6,14 +11,13 @@ use crate::camera::{HeadlessRenderer, RenderError};
 use crate::character::Cursor;
 use crate::listen::ListenableSource;
 use crate::math::Rgba;
-use crate::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
+use crate::raytracer::{ColorBuf, RtBlockData, UpdatingSpaceRaytracer};
 
 /// Builds upon [`UpdatingSpaceRaytracer`] to make a complete [`HeadlessRenderer`],
 /// following the scene and camera information in a [`StandardCameras`].
-#[derive(Debug)]
-pub struct RtRenderer {
+pub struct RtRenderer<D: RtBlockData = ()> {
     cameras: StandardCameras,
-    rt: UpdatingSpaceRaytracer<()>,
+    rt: UpdatingSpaceRaytracer<D>,
 }
 
 impl RtRenderer {
@@ -32,7 +36,20 @@ impl RtRenderer {
     }
 }
 
-impl HeadlessRenderer for RtRenderer {
+// manual impl avoids `D: Debug` bound
+impl<D: RtBlockData> fmt::Debug for RtRenderer<D>
+where
+    D::Options: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RtRenderer")
+            .field("cameras", &self.cameras)
+            .field("rt", &self.rt)
+            .finish()
+    }
+}
+
+impl HeadlessRenderer for RtRenderer<()> {
     fn update<'a>(
         &'a mut self,
         _cursor: Option<&'a Cursor>,

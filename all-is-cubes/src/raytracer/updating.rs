@@ -1,23 +1,47 @@
-use super::*;
+// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
+// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::collections::HashSet;
+use std::fmt;
 use std::mem;
 use std::sync::{Arc, Mutex, Weak};
 
 use crate::block::AIR;
+use crate::camera::GraphicsOptions;
 use crate::listen::{ListenableSource, Listener};
-use crate::space::SpaceChange;
+use crate::math::GridPoint;
+use crate::raytracer::RtOptionsRef;
+use crate::raytracer::TracingBlock;
+use crate::raytracer::TracingCubeData;
+use crate::raytracer::{RtBlockData, SpaceRaytracer};
+use crate::space::BlockIndex;
+use crate::space::{Space, SpaceChange};
 use crate::universe::{RefError, URef};
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
 /// changed.
-#[derive(Debug)]
 pub struct UpdatingSpaceRaytracer<D: RtBlockData> {
     space: URef<Space>,
     graphics_options: ListenableSource<GraphicsOptions>,
     custom_options: ListenableSource<D::Options>,
     state: SpaceRaytracer<D>,
     todo: Arc<Mutex<SrtTodo>>,
+}
+
+// manual impl avoids `D: Debug` bound
+impl<D: RtBlockData> fmt::Debug for UpdatingSpaceRaytracer<D>
+where
+    D::Options: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UpdatingSpaceRaytracer")
+            .field("space", &self.space)
+            .field("graphics_options", &self.graphics_options)
+            .field("custom_options", &self.custom_options)
+            .field("state", &self.state)
+            .field("todo", &self.todo)
+            .finish()
+    }
 }
 
 impl<D: RtBlockData> UpdatingSpaceRaytracer<D>
@@ -168,11 +192,12 @@ impl Listener<SpaceChange> for TodoListener {
 mod tests {
     use super::*;
     use crate::block::AIR;
-    use crate::camera::{eye_for_look_at, Viewport};
+    use crate::camera::{eye_for_look_at, Camera, Viewport};
     use crate::content::make_some_voxel_blocks;
+    use crate::raytracer::{CharacterBuf, CharacterRtData};
     use crate::universe::Universe;
     use crate::util::{CustomFormat, Unquote};
-    use cgmath::{Decomposed, Transform as _};
+    use cgmath::{Decomposed, Transform as _, Vector2, Vector3};
     use pretty_assertions::assert_eq;
 
     struct EquivalenceTester {
