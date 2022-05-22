@@ -14,6 +14,7 @@ use std::cell::RefCell;
 use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use all_is_cubes::character::Cursor;
 use futures::future::BoxFuture;
 use glfw::{Context as _, WindowHint, WindowMode};
 use image::RgbaImage;
@@ -26,7 +27,7 @@ use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 use send_wrapper::SendWrapper;
 
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::{HeadlessRenderer, Overlays};
+use all_is_cubes::camera::{HeadlessRenderer, RenderError};
 use all_is_cubes_gpu::in_luminance::EverythingRenderer;
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{RendererFactory, RendererId};
@@ -135,6 +136,7 @@ impl RendererFactory for LumFactory {
                         .unwrap(),
                 ),
                 renderer: EverythingRenderer::new(context, cameras).unwrap(),
+                cursor: None,
             })))
         })
     }
@@ -155,13 +157,27 @@ struct UnsendRend {
     /// in tests. TODO: Consider reusing some framebuffers.
     framebuffer: ManuallyDrop<Framebuffer<GL33, Dim2, NormRGBA8UI, Depth32F>>,
     renderer: EverythingRenderer<GL33>,
+    cursor: Option<Cursor>,
 }
 
 impl HeadlessRenderer for LumHeadlessRenderer {
-    fn render<'a>(&'a mut self, overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage> {
+    fn update<'a>(
+        &'a mut self,
+        cursor: Option<&'a Cursor>,
+    ) -> BoxFuture<'a, Result<(), RenderError>> {
+        self.0.cursor = cursor.cloned();
+        Box::pin(std::future::ready(Ok(())))
+    }
+
+    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
+        // TODO: We're supposed to do the preparation work in update() instead of render(),
+        // but the luminance renderer doesn't currently support that split.
+        // This doesn't matter for our test-case usage.
+
         let UnsendRend {
             framebuffer,
             renderer,
+            cursor,
         } = &mut *self.0;
         let viewport = renderer.cameras().viewport();
 
@@ -171,11 +187,13 @@ impl HeadlessRenderer for LumHeadlessRenderer {
                     context,
                     framebuffer,
                     &FrameBudget::PRACTICALLY_INFINITE,
-                    overlays.cursor,
+                    cursor.as_ref(),
                 )
                 .unwrap();
-            if let Some(text) = overlays.info_text {
-                renderer.add_info_text(context, framebuffer, text).unwrap();
+            if !info_text.is_empty() {
+                renderer
+                    .add_info_text(context, framebuffer, info_text)
+                    .unwrap();
             }
         });
 
@@ -193,6 +211,6 @@ impl HeadlessRenderer for LumHeadlessRenderer {
         image::imageops::flip_vertical_in_place(&mut image);
 
         // can't defer any of the work because the future wouldn't be Send
-        Box::pin(std::future::ready(image))
+        Box::pin(std::future::ready(Ok(image)))
     }
 }

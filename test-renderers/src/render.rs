@@ -8,6 +8,7 @@ use std::fmt::Debug;
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::{GraphicsOptions, HeadlessRenderer, Viewport};
 use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::character::Cursor;
 use all_is_cubes::universe::Universe;
 
 use crate::RendererId;
@@ -29,6 +30,25 @@ impl Scene for &Universe {
     fn into_cameras(self) -> StandardCameras {
         StandardCameras::from_constant_for_test(GraphicsOptions::default(), COMMON_VIEWPORT, self)
     }
+}
+
+/// Dynamic overlay content passed to the [`HeadlessRenderer`] per-frame.
+/// This is a combination of the parameters of `update()` and `draw()`.
+#[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::exhaustive_structs)] // will very likely go through incompatible changes anyway
+pub struct Overlays<'a> {
+    /// The player's cursor, or [`None`] to draw nothing.
+    pub cursor: Option<&'a Cursor>,
+    /// Text to draw on top of the scene, in a style that is some compromise between
+    /// readability and not obscuring the content, or [`None`] to draw nothing.
+    pub info_text: Option<&'a str>,
+}
+
+impl Overlays<'static> {
+    pub const NONE: Self = Overlays {
+        cursor: None,
+        info_text: None,
+    };
 }
 
 /// Test-configuration-specific source of new [`HeadlessRenderer`]s.

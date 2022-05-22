@@ -4,12 +4,13 @@
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
+use all_is_cubes::character::Cursor;
 use futures::future::BoxFuture;
 use image::RgbaImage;
 use tokio::sync::OnceCell;
 
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::{HeadlessRenderer, Overlays, Viewport};
+use all_is_cubes::camera::{HeadlessRenderer, RenderError, Viewport};
 use all_is_cubes_gpu::in_wgpu::{create_depth_texture, EverythingRenderer};
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{RendererFactory, RendererId};
@@ -119,37 +120,46 @@ struct WgpuHeadlessRenderer {
 }
 
 impl HeadlessRenderer for WgpuHeadlessRenderer {
-    fn render<'a>(&'a mut self, overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage> {
+    fn update<'a>(
+        &'a mut self,
+        cursor: Option<&'a Cursor>,
+    ) -> BoxFuture<'a, Result<(), RenderError>> {
         Box::pin(async move {
-            let viewport = self.everything.viewport();
             let _uinfo = self
                 .everything
                 .update(
                     &self.factory.queue,
-                    overlays.cursor,
+                    cursor,
                     &FrameBudget::PRACTICALLY_INFINITE,
                 )
                 .await
                 .unwrap();
+            // TODO: report RenderError::Read rather than panicking, when applicable
+            Ok(())
+        })
+    }
+
+    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
+        let viewport = self.everything.viewport();
+        Box::pin(async move {
             let _dinfo = self
                 .everything
                 .draw_frame_linear(&self.factory.queue, &self.depth_texture_view)
                 .await
                 .unwrap();
-
             self.everything.add_info_text_and_postprocess(
                 &self.factory.queue,
                 &self.color_texture,
-                overlays.info_text.unwrap_or(""),
+                info_text,
             );
-
-            get_pixels_from_gpu(
+            let image = get_pixels_from_gpu(
                 &self.factory.device,
                 &self.factory.queue,
                 &self.color_texture,
                 viewport,
             )
-            .await
+            .await;
+            Ok(image)
         })
     }
 }

@@ -12,13 +12,13 @@ use futures::future::{BoxFuture, Shared};
 use itertools::Itertools;
 use tokio::task::JoinHandle;
 
-use all_is_cubes::camera::{HeadlessRenderer, Overlays};
+use all_is_cubes::camera::HeadlessRenderer;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{CustomFormat as _, StatusText};
 
 use crate::{
-    results_json_path, write_report_file, ComparisonRecord, RendererFactory, RendererId, Scene,
-    TestCaseOutput, TestCombo, TestId,
+    results_json_path, write_report_file, ComparisonRecord, Overlays, RendererFactory, RendererId,
+    Scene, TestCaseOutput, TestCombo, TestId,
 };
 
 /// The Universe parameter is an optional way to receive a pre-configured universe
@@ -58,6 +58,7 @@ impl RenderTestContext {
         &*self.universe.as_ref().unwrap()
     }
 
+    #[track_caller]
     pub async fn render_comparison_test(
         &self,
         allowed_difference: u8,
@@ -69,7 +70,15 @@ impl RenderTestContext {
             renderer: self.renderer_factory.id(),
         };
 
-        let image = self.renderer(scene).render(overlays).await;
+        let mut renderer = self.renderer(scene);
+        renderer
+            .update(overlays.cursor)
+            .await
+            .expect("renderer update() failed");
+        let image = renderer
+            .draw(overlays.info_text.unwrap_or(""))
+            .await
+            .expect("renderer draw() failed");
         let outcome = crate::compare_rendered_image(combo, allowed_difference, image).await;
 
         self.comparison_log.lock().unwrap().push(outcome.clone());

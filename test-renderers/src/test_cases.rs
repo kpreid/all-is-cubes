@@ -12,7 +12,7 @@ use futures::FutureExt;
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::block::Block;
 use all_is_cubes::camera::{
-    ExposureOption, FogOption, GraphicsOptions, LightingOption, Overlays, ToneMappingOperator,
+    ExposureOption, FogOption, GraphicsOptions, LightingOption, ToneMappingOperator,
     TransparencyOption,
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector3};
@@ -24,7 +24,7 @@ use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;
 
 use crate::{
-    finish_universe_from_space, RenderTestContext, TestCaseCollector, UniverseFuture,
+    finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, UniverseFuture,
     COMMON_VIEWPORT,
 };
 

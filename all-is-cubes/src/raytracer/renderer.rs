@@ -2,7 +2,8 @@ use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
 use crate::apps::StandardCameras;
-use crate::camera::{HeadlessRenderer, Overlays};
+use crate::camera::{HeadlessRenderer, RenderError};
+use crate::character::Cursor;
 use crate::listen::ListenableSource;
 use crate::math::Rgba;
 use crate::raytracer::{ColorBuf, UpdatingSpaceRaytracer};
@@ -32,8 +33,22 @@ impl RtRenderer {
 }
 
 impl HeadlessRenderer for RtRenderer {
-    fn render<'a>(&'a mut self, _overlays: Overlays<'a>) -> BoxFuture<'a, RgbaImage> {
-        // TODO: implement drawing overlays
+    fn update<'a>(
+        &'a mut self,
+        _cursor: Option<&'a Cursor>,
+    ) -> BoxFuture<'a, Result<(), RenderError>> {
+        Box::pin(async {
+            // TODO: raytracer needs to implement drawing the cursor
+            self.rt.update().map_err(RenderError::Read)?;
+            Ok(())
+        })
+    }
+
+    fn draw<'a>(
+        &'a mut self,
+        _info_text: &'a str,
+    ) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
+        // TODO: implement drawing info text (can use embedded_graphics for that)
         Box::pin(async {
             let RtRenderer { cameras, rt } = self;
             let camera = cameras.cameras().world.clone();
@@ -43,7 +58,7 @@ impl HeadlessRenderer for RtRenderer {
                     camera.post_process_color(Rgba::from(pixel_buf))
                 });
 
-            RgbaImage::from_raw(
+            let image = RgbaImage::from_raw(
                 camera.viewport().framebuffer_size.x,
                 camera.viewport().framebuffer_size.y,
                 Vec::from(image)
@@ -51,7 +66,9 @@ impl HeadlessRenderer for RtRenderer {
                     .flat_map(|color| color.to_srgb8())
                     .collect::<Vec<u8>>(),
             )
-            .unwrap()
+            .unwrap(/* can't happen: wrong dimensions */);
+
+            Ok(image)
         })
     }
 }
