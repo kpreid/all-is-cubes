@@ -47,6 +47,7 @@ impl HeadlessRenderer for RtRenderer<()> {
     ) -> BoxFuture<'a, Result<(), RenderError>> {
         // TODO: raytracer needs to implement drawing the cursor
         Box::pin(async {
+            self.cameras.update();
             // TODO: this Option-synchronization pattern is recurring but also ugly ... look for ways to make it nicer
             let space = self.cameras.world_space().snapshot();
             if let Some(rt) = self
