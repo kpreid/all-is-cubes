@@ -12,6 +12,7 @@
 
 use std::cell::RefCell;
 use std::mem::ManuallyDrop;
+use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use clap::Parser as _;
@@ -33,16 +34,14 @@ use all_is_cubes_gpu::in_luminance::EverythingRenderer;
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{RendererFactory, RendererId};
 
-#[allow(clippy::result_unit_err)]
-#[cfg(test)]
 #[tokio::main(flavor = "current_thread")]
-pub async fn main() -> Result<(), ()> {
+pub async fn main() -> test_renderers::HarnessResult {
     // luminance-glfw unconditionally calls glfw::init and supplies a fixed error callback
     // which would panic, but we can do it ourselves to find out whether the next one would
     // succeed.
     if let Err(()) = try_to_initialize_glfw() {
         eprintln!("Skipping rendering tests since GLFW failed to initialize.");
-        return Ok(());
+        return ExitCode::SUCCESS;
     }
 
     let GlfwSurface { context, .. } = GlfwSurface::new(|glfw| {

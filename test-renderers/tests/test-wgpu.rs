@@ -2,6 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::num::NonZeroU32;
+use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser as _;
@@ -16,10 +17,8 @@ use all_is_cubes_gpu::in_wgpu::{create_depth_texture, EverythingRenderer};
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{RendererFactory, RendererId};
 
-#[allow(clippy::result_unit_err)]
-#[cfg(test)]
 #[tokio::main]
-pub async fn main() -> Result<(), ()> {
+pub async fn main() -> test_renderers::HarnessResult {
     let instance = wgpu::Instance::new(wgpu::Backends::all()); // TODO: test more backends?
 
     let maybe_adapter: Option<wgpu::Adapter> = instance
@@ -35,7 +34,7 @@ pub async fn main() -> Result<(), ()> {
         WGPU_ADAPTER.set(a).unwrap();
     } else {
         eprintln!("Skipping rendering tests due to lack of wgpu Adapter.");
-        return Ok(());
+        return ExitCode::SUCCESS;
     };
 
     test_renderers::harness_main(

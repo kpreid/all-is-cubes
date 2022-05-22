@@ -3,7 +3,7 @@ name = "test-renderers"
 version = "0.0.1"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.61" # uses ExitCode
 description = "Rendering tests for all-is-cubes."
 publish = false
 

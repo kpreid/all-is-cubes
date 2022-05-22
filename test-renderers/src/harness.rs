@@ -4,6 +4,7 @@
 use std::collections::{btree_map, BTreeMap};
 use std::fs;
 use std::io::{self, Write};
+use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -98,6 +99,9 @@ pub struct HarnessArgs {
     filters: Vec<String>,
 }
 
+/// Return type of [`harness_main()`], to be returned from `main()`.
+pub type HarnessResult = std::process::ExitCode;
+
 /// Given a function which generates the tests, run all tests or the subset requested.
 /// Returns success if all of the tests that were run passed.
 ///
@@ -109,7 +113,7 @@ pub async fn harness_main<Factory, Ff>(
     renderer_id: RendererId,
     test_suite: fn(&mut TestCaseCollector<'_>),
     factory_factory: Ff, // TODO: better name
-) -> Result<(), ()>
+) -> HarnessResult
 where
     Factory: RendererFactory + 'static,
     Ff: AsyncFn0<Output = Factory> + Send + Sync + 'static,
@@ -237,9 +241,9 @@ where
     writeln!(logging, "report written to {p}", p = report_path.display()).unwrap();
 
     if count_failed == 0 {
-        Ok(())
+        ExitCode::SUCCESS
     } else {
-        Err(())
+        ExitCode::FAILURE
     }
 }
 

@@ -8,10 +8,8 @@ use all_is_cubes::camera::HeadlessRenderer;
 use all_is_cubes::raytracer::RtRenderer;
 use test_renderers::{RendererFactory, RendererId};
 
-#[allow(clippy::result_unit_err)]
-#[cfg(test)]
 #[tokio::main]
-pub async fn main() -> Result<(), ()> {
+pub async fn main() -> test_renderers::HarnessResult {
     test_renderers::harness_main(
         test_renderers::HarnessArgs::parse(),
         RendererId::Raytracer,
