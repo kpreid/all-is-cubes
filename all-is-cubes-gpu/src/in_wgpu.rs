@@ -24,10 +24,12 @@ use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::DirtyFlag;
+use wgpu::BufferDescriptor;
 
 use crate::{
     gather_debug_lines,
     in_wgpu::{
+        camera::ShaderPostprocessCamera,
         glue::{create_wgsl_module_from_reloadable, BeltWritingParts, ResizingBuffer},
         pipelines::Pipelines,
         vertex::{WgpuBlockVertex, WgpuLinesVertex},
@@ -209,6 +211,7 @@ pub struct EverythingRenderer {
     postprocess_bind_group: Option<wgpu::BindGroup>,
     postprocess_bind_group_layout: wgpu::BindGroupLayout,
     postprocess_shader_dirty: DirtyFlag,
+    postprocess_camera_buffer: wgpu::Buffer,
 
     /// Debug overlay text is uploaded via this texture
     info_text_texture: DrawableTexture,
@@ -274,6 +277,17 @@ impl EverythingRenderer {
                         },
                         count: None,
                     },
+                    // Binding for camera
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ],
                 label: Some("EverythingRenderer::postprocess_bind_group_layout"),
             });
@@ -301,12 +315,19 @@ impl EverythingRenderer {
             }),
             postprocess_render_pipeline: Self::create_postprocess_pipeline(
                 &device,
-                &pipelines.camera_bind_group_layout,
                 &postprocess_bind_group_layout,
                 config.format,
             ),
             postprocess_bind_group_layout,
             postprocess_bind_group: None,
+            postprocess_camera_buffer: device.create_buffer(&BufferDescriptor {
+                label: Some("EverythingRenderer::postprocess_camera_buffer"),
+                size: std::mem::size_of::<ShaderPostprocessCamera>()
+                    .try_into()
+                    .unwrap(),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }),
 
             info_text_texture: DrawableTexture::new(),
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
@@ -340,7 +361,6 @@ impl EverythingRenderer {
     /// Read postprocessing shader and create the postprocessing render pipeline.
     fn create_postprocess_pipeline(
         device: &wgpu::Device,
-        camera_bind_group_layout: &wgpu::BindGroupLayout,
         postprocess_bind_group_layout: &wgpu::BindGroupLayout,
         surface_format: wgpu::TextureFormat,
     ) -> wgpu::RenderPipeline {
@@ -352,12 +372,12 @@ impl EverythingRenderer {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("EverythingRenderer::postprocess_pipeline_layout"),
-            bind_group_layouts: &[camera_bind_group_layout, postprocess_bind_group_layout],
+            bind_group_layouts: &[postprocess_bind_group_layout],
             push_constant_ranges: &[],
         });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("EverythingRenderer::info_text_render_pipeline"),
+            label: Some("EverythingRenderer::postprocess_render_pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &postprocess_shader,
@@ -440,7 +460,6 @@ impl EverythingRenderer {
         if self.postprocess_shader_dirty.get_and_clear() {
             self.postprocess_render_pipeline = Self::create_postprocess_pipeline(
                 &self.device,
-                &self.pipelines.camera_bind_group_layout,
                 &self.postprocess_bind_group_layout,
                 self.config.format,
             );
@@ -596,6 +615,15 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::draw_frame_linear()"),
             });
 
+        queue.write_buffer(
+            &self.postprocess_camera_buffer,
+            0, // The [] around the camera is needed for bytemuck, so that both input and output
+            // are slices.
+            bytemuck::cast_slice::<ShaderPostprocessCamera, u8>(&[ShaderPostprocessCamera::new(
+                self.cameras.graphics_options(),
+            )]),
+        );
+
         let start_draw_time = Instant::now();
         let world_draw_info = if let Some(sr) = &self.space_renderers.world {
             sr.draw(
@@ -724,16 +752,6 @@ impl EverythingRenderer {
             render_pass.set_pipeline(&self.postprocess_render_pipeline);
             render_pass.set_bind_group(
                 0,
-                &self
-                    .space_renderers
-                    .world
-                    .as_ref()
-                    .unwrap() // TODO: this is not currently impossible, but we should stop keeping add_info_text separate
-                    .camera_bind_group,
-                &[],
-            );
-            render_pass.set_bind_group(
-                1,
                 self.postprocess_bind_group.get_or_insert_with(|| {
                     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                         layout: &self.postprocess_bind_group_layout,
@@ -753,6 +771,10 @@ impl EverythingRenderer {
                                 resource: wgpu::BindingResource::TextureView(
                                     &self.linear_scene_texture_view,
                                 ),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 3,
+                                resource: self.postprocess_camera_buffer.as_entire_binding(),
                             },
                         ],
                         label: Some("EverythingRenderer::postprocess_bind_group"),

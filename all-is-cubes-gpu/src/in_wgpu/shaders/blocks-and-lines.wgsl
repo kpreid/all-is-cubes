@@ -3,8 +3,8 @@
 
 // --- Interface declarations --------------------------------------------------
 
-// Mirrors `struct WgpuCamera` on the Rust side.
-struct WgpuCamera {
+// Mirrors `struct ShaderSpaceCamera` on the Rust side.
+struct ShaderSpaceCamera {
     [[location(0)]] projection: mat4x4<f32>;
     [[location(1)]] view_matrix: mat4x4<f32>;
     [[location(2)]] view_position: vec3<f32>;
@@ -13,7 +13,6 @@ struct WgpuCamera {
     [[location(5)]] fog_mode_blend: f32;
     [[location(6)]] fog_distance: f32;
     [[location(7)]] exposure: f32;
-    [[location(8)]] tone_mapping_id: i32;
 };
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
@@ -34,7 +33,7 @@ struct WgpuLinesVertex {
 
 // This group is named camera_bind_group_layout in the code.
 [[group(0), binding(0)]]
-var<uniform> camera: WgpuCamera;
+var<uniform> camera: ShaderSpaceCamera;
 
 // This group is named space_texture_bind_group_layout in the code.
 [[group(1), binding(0)]]

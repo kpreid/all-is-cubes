@@ -3,32 +3,21 @@
 
 // --- Interface declarations --------------------------------------------------
 
-// Mirrors `struct WgpuCamera` on the Rust side.
-// TODO: We don't need most of these during postprocessing, but
-// trimming them down would mean using a different buffer...
-struct WgpuCamera {
-    [[location(0)]] projection: mat4x4<f32>;
-    [[location(1)]] view_matrix: mat4x4<f32>;
-    [[location(2)]] view_position: vec3<f32>;
-    [[location(3)]] light_lookup_offset_and_option: vec4<i32>;
-    [[location(4)]] fog_color: vec3<f32>;
-    [[location(5)]] fog_mode_blend: f32;
-    [[location(6)]] fog_distance: f32;
-    [[location(7)]] exposure: f32;
+// Mirrors `struct ShaderPostprocessCamera` on the Rust side.
+struct ShaderPostprocessCamera {
     [[location(8)]] tone_mapping_id: i32;
 };
 
-// This group is named camera_bind_group_layout in the code.
-[[group(0), binding(0)]]
-var<uniform> camera: WgpuCamera;
 
 // This group is named postprocess_bind_group_layout in the code.
-[[group(1), binding(0)]]
+[[group(0), binding(0)]]
 var text_texture: texture_2d<f32>;
-[[group(1), binding(1)]]
+[[group(0), binding(1)]]
 var text_sampler: sampler;
-[[group(1), binding(2)]]
+[[group(0), binding(2)]]
 var linear_scene_texture: texture_2d<f32>;
+[[group(0), binding(3)]]
+var<uniform> camera: ShaderPostprocessCamera;
 
 // --- Vertex shader -----------------------------------------------------------
 

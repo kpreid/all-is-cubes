@@ -1,19 +1,21 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::camera::{Camera, FogOption, LightingOption, ToneMappingOperator};
+use all_is_cubes::camera::{
+    Camera, FogOption, GraphicsOptions, LightingOption, ToneMappingOperator,
+};
 use all_is_cubes::cgmath::{EuclideanSpace, Matrix4, Vector3};
 use all_is_cubes::math::Rgb;
 
 use crate::in_wgpu::glue::PaddedVec3;
 
-/// Information corresponding to [`Camera`] but in a form
-/// suitable for passing in a uniform buffer. Also includes some miscellaneous
+/// Information corresponding to [`Camera`] but in a form suitable for passing in a
+/// uniform buffer to the `blocks-and-lines.wgsl` shader. Also includes some miscellaneous
 /// data for rendering [`Space`], which hasn't yet demonstrated enough distinction
-/// to be worth putting in a separate buffer yet.
+/// to be worth putting in a separate buffer.
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct WgpuCamera {
+pub(crate) struct ShaderSpaceCamera {
     projection_matrix: [[f32; 4]; 4],
     view_matrix: [[f32; 4]; 4],
     /// Eye position in world coordinates. Used for computing distance
@@ -39,11 +41,11 @@ pub(crate) struct WgpuCamera {
     /// Scale factor for scene brightness.
     exposure: f32,
 
-    /// pad out to multiple of vec4<f32>
-    tone_mapping_id: i32,
+    /// pad out to multiple of vec4<something32>
+    _padding: i32,
 }
 
-impl WgpuCamera {
+impl ShaderSpaceCamera {
     pub fn new(camera: &Camera, sky_color: Rgb, light_lookup_offset: Vector3<i32>) -> Self {
         let options = camera.options();
         let view_distance = camera.view_distance() as f32;
@@ -76,11 +78,7 @@ impl WgpuCamera {
 
             exposure: camera.exposure().into_inner(),
 
-            tone_mapping_id: match options.tone_mapping {
-                ToneMappingOperator::Clamp => 0,
-                ToneMappingOperator::Reinhard => 1,
-                ref tmo => panic!("Missing implementation for tone mapping operator {:?}", tmo),
-            },
+            _padding: Default::default(),
         }
     }
 }
@@ -95,3 +93,29 @@ const OPENGL_TO_WGPU_PROJECTION: Matrix4<f64> = Matrix4::new(
     0.0, 0.0, 0.5, 0.0, //
     0.0, 0.0, 0.5, 1.0, //
 );
+
+/// Information corresponding to [`Camera`] (or, for the moment, just [`GraphicsOptions`])
+/// but in a form suitable for passing in a uniform buffer to the `postprocess.wgsl`
+/// shader.
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct ShaderPostprocessCamera {
+    tone_mapping_id: i32,
+
+    /// pad out to multiple of vec4<something32>
+    _padding: [i32; 3],
+}
+
+impl ShaderPostprocessCamera {
+    pub fn new(options: &GraphicsOptions) -> Self {
+        Self {
+            tone_mapping_id: match options.tone_mapping {
+                ToneMappingOperator::Clamp => 0,
+                ToneMappingOperator::Reinhard => 1,
+                ref tmo => panic!("Missing implementation for tone mapping operator {:?}", tmo),
+            },
+
+            _padding: Default::default(),
+        }
+    }
+}

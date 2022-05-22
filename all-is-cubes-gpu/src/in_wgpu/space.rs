@@ -23,7 +23,7 @@ use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
-    camera::WgpuCamera,
+    camera::ShaderSpaceCamera,
     glue::{to_wgpu_color, to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
@@ -49,7 +49,7 @@ pub(crate) struct SpaceRenderer {
     block_texture: AtlasAllocator,
     light_texture: SpaceLightTexture,
 
-    /// Buffer containing the [`WgpuCamera`] configured for this Space.
+    /// Buffer containing the [`ShaderSpaceCamera`] configured for this Space.
     camera_buffer: wgpu::Buffer,
     /// Bind group for camera_buffer.
     pub(crate) camera_bind_group: wgpu::BindGroup,
@@ -102,7 +102,7 @@ impl SpaceRenderer {
 
         let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(&format!("{space_label} camera_buffer")),
-            size: std::mem::size_of::<WgpuCamera>().try_into().unwrap(),
+            size: std::mem::size_of::<ShaderSpaceCamera>().try_into().unwrap(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -244,7 +244,7 @@ impl SpaceRenderer {
             0,
             // The [] around the camera is needed for bytemuck, so that both input and output
             // are slices.
-            bytemuck::cast_slice::<WgpuCamera, u8>(&[WgpuCamera::new(
+            bytemuck::cast_slice::<ShaderSpaceCamera, u8>(&[ShaderSpaceCamera::new(
                 camera,
                 self.sky_color,
                 self.light_texture.light_lookup_offset(),
