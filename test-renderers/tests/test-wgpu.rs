@@ -4,13 +4,14 @@
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use all_is_cubes::character::Cursor;
+use clap::Parser as _;
 use futures::future::BoxFuture;
 use image::RgbaImage;
 use tokio::sync::OnceCell;
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::{HeadlessRenderer, RenderError, Viewport};
+use all_is_cubes::character::Cursor;
 use all_is_cubes_gpu::in_wgpu::{create_depth_texture, EverythingRenderer};
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{RendererFactory, RendererId};
@@ -38,6 +39,7 @@ pub async fn main() -> Result<(), ()> {
     };
 
     test_renderers::harness_main(
+        test_renderers::HarnessArgs::parse(),
         RendererId::Wgpu,
         test_renderers::test_cases::all_tests,
         get_factory,

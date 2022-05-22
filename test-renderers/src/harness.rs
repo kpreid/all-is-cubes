@@ -87,6 +87,17 @@ impl RenderTestContext {
     }
 }
 
+/// Command-line arguments for binaries using the renderer test harness.
+///
+/// This should eventually match the [standard Rust test harness args]
+/// (https://doc.rust-lang.org/rustc/tests/index.html#cli-arguments)
+/// but it does fully do that yet.
+#[derive(Debug, clap::Parser)]
+#[clap(author, about, version)]
+pub struct HarnessArgs {
+    filters: Vec<String>,
+}
+
 /// Given a function which generates the tests, run all tests or the subset requested.
 /// Returns success if all of the tests that were run passed.
 ///
@@ -94,6 +105,7 @@ impl RenderTestContext {
 /// [`RendererFactory`] for the type of renderer under test, which should be as isolated
 /// as is reasonable for testing.
 pub async fn harness_main<Factory, Ff>(
+    args: HarnessArgs,
     renderer_id: RendererId,
     test_suite: fn(&mut TestCaseCollector<'_>),
     factory_factory: Ff, // TODO: better name
@@ -103,6 +115,8 @@ where
     Ff: AsyncFn0<Output = Factory> + Send + Sync + 'static,
     Ff::OutputFuture: Send,
 {
+    let HarnessArgs { filters } = args;
+
     // Gather tests (don't run them yet).
     let mut test_table: BTreeMap<String, TestCase> = BTreeMap::new();
     test_suite(&mut TestCaseCollector(&mut test_table));
@@ -110,8 +124,18 @@ where
     // Start the tests, in parallel.
     // TODO: When we have more tests we might benefit from concurrency limits.
     let suite_start_time = Instant::now();
+    let mut count_filtered = 0;
     let test_handles: BTreeMap<String, RunningTest> = test_table
         .into_iter()
+        .filter(|(name, _)| {
+            // Same behavior as the standard rust test harness: if there are any arguments, each
+            // is a substring filter on the test name, ANDed together, but no arguments is pass all.
+            let included = filters.is_empty() || filters.iter().any(|filter| name.contains(filter));
+            if !included {
+                count_filtered += 1;
+            }
+            included
+        })
         .map(|(name, test_case)| {
             let comparison_log: Arc<Mutex<Vec<ComparisonRecord>>> = Default::default();
 
@@ -194,6 +218,7 @@ where
     writeln!(
         logging,
         "\ntest result: {count_passed} passed; {count_failed} failed; \
+            {count_filtered} filtered out; \
             finished in {wall_time:.2} s ({cumulative_time:.2} s summed)",
         wall_time = suite_start_time.elapsed().as_secs_f64(),
         cumulative_time = cumulative_time.as_secs_f64()

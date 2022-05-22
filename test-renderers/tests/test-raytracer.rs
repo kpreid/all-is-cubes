@@ -1,6 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use clap::Parser as _;
+
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::HeadlessRenderer;
 use all_is_cubes::raytracer::RtRenderer;
@@ -11,6 +13,7 @@ use test_renderers::{RendererFactory, RendererId};
 #[tokio::main]
 pub async fn main() -> Result<(), ()> {
     test_renderers::harness_main(
+        test_renderers::HarnessArgs::parse(),
         RendererId::Raytracer,
         test_renderers::test_cases::all_tests,
         || std::future::ready(RtFactory),

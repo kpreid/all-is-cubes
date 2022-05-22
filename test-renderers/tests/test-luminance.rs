@@ -14,7 +14,7 @@ use std::cell::RefCell;
 use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use all_is_cubes::character::Cursor;
+use clap::Parser as _;
 use futures::future::BoxFuture;
 use glfw::{Context as _, WindowHint, WindowMode};
 use image::RgbaImage;
@@ -28,6 +28,7 @@ use send_wrapper::SendWrapper;
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::{HeadlessRenderer, RenderError};
+use all_is_cubes::character::Cursor;
 use all_is_cubes_gpu::in_luminance::EverythingRenderer;
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{RendererFactory, RendererId};
@@ -59,6 +60,7 @@ pub async fn main() -> Result<(), ()> {
     LUM_CONTEXT.with(|cref| *cref.borrow_mut() = Some(context));
 
     test_renderers::harness_main(
+        test_renderers::HarnessArgs::parse(),
         RendererId::Luminance,
         test_renderers::test_cases::all_tests,
         || std::future::ready(LumFactory {}),
