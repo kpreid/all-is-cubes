@@ -90,7 +90,10 @@ fn half_diff(have: &RgbaImage, want: &RgbaImage) -> GrayImage {
                 // means we're under-counting the brightness difference, but `image`
                 // is also doing it with linear arithmetic anyway:
                 // <https://docs.rs/image/0.24.2/src/image/color.rs.html#473>
-                hpixel.map2(&wpixel, |hch, wch| hch.abs_diff(wch)).to_luma()[0]
+                let channel_diffs = hpixel.map2(&wpixel, |hch, wch| hch.abs_diff(wch));
+                let color_diff = channel_diffs.to_luma()[0];
+                let alpha_diff = channel_diffs[3];
+                color_diff.max(alpha_diff)
             })
             .min()
             .expect("neighborhood is never empty");
@@ -201,6 +204,27 @@ mod tests {
                 diff_result.equal_or_different_below_threshold(dred)
             ),
             (false, true)
+        );
+    }
+
+    #[test]
+    fn alpha_only_difference() {
+        let delta = 55u8;
+        assert_eq!(
+            diff_vecs(
+                (1, 1),
+                vec![100, 200, 30, 100],
+                vec![100, 200, 30, 100 + delta],
+                Rgba([0, 0, 0, 255]),
+            ),
+            DiffResult {
+                histogram: {
+                    let mut h = [0; 256];
+                    h[usize::from(delta)] = 1;
+                    h
+                },
+                diff_image: RgbaImage::from_raw(1, 1, vec![delta, delta, delta, 255]).unwrap()
+            }
         );
     }
 }
