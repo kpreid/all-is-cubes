@@ -6,6 +6,7 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use futures::future::BoxFuture;
 use futures::FutureExt;
 
@@ -16,12 +17,13 @@ use all_is_cubes::camera::{
     TransparencyOption,
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector3};
-use all_is_cubes::character::Spawn;
-use all_is_cubes::math::{Face6, NotNan};
+use all_is_cubes::character::{Character, Spawn};
+use all_is_cubes::math::{Face6, NotNan, Rgb};
 use all_is_cubes::space::{Grid, Space};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;
+use image::RgbaImage;
 
 use crate::{
     finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, UniverseFuture,
@@ -48,6 +50,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
             FogOption::Physical,
         ],
     );
+    c.insert("follow_character_change", None, follow_character_change);
     c.insert_variants(
         "light",
         u(light_test_universe()),
@@ -116,6 +119,44 @@ async fn fog(context: RenderTestContext, fog: FogOption) {
     context
         .render_comparison_test(10, scene, Overlays::NONE)
         .await;
+}
+
+/// Does the renderer properly follow a change of character?
+async fn follow_character_change(context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let mut character_of_a_color = |color: Rgb| -> URef<Character> {
+        let space = Space::builder(Grid::for_block(1))
+            .sky_color(color)
+            .build_empty();
+        let character = Character::spawn_default(universe.insert_anonymous(space));
+        universe.insert_anonymous(character)
+    };
+    let c1 = character_of_a_color(rgb_const!(1.0, 0.0, 0.0));
+    let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
+    let character_cell = ListenableCell::new(Some(c1));
+    let cameras: StandardCameras = StandardCameras::new(
+        ListenableSource::constant(GraphicsOptions::default()),
+        COMMON_VIEWPORT,
+        character_cell.as_source(),
+        ListenableSource::constant(None),
+    )
+    .unwrap();
+    let mut renderer = context.renderer(cameras);
+
+    // Draw the first character
+    renderer.update(None).await.unwrap();
+    let _ = renderer.draw("").await.unwrap();
+
+    // Switch characters and draw the second -- the resulting sky color should be from it
+    character_cell.set(Some(c2));
+    renderer.update(None).await.unwrap();
+    let image: RgbaImage = renderer.draw("").await.unwrap();
+
+    assert_eq!(
+        image.get_pixel(0, 0),
+        &image::Rgba([0, 255, 0, 255]),
+        "Should be looking at c2 (green)"
+    );
 }
 
 async fn light(context: RenderTestContext, option: LightingOption) {

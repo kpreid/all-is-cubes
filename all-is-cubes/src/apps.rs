@@ -421,8 +421,10 @@ pub struct StandardCameras {
 }
 
 impl StandardCameras {
-    /// Most general constructor; private because the details needed might vary.
-    fn new(
+    /// Most general constructor; hidden because the details needed might vary and so we
+    /// want to discourage use of this directly.
+    #[doc(hidden)]
+    pub fn new(
         graphics_options: ListenableSource<GraphicsOptions>,
         viewport: Viewport,
         character_source: ListenableSource<Option<URef<Character>>>,
