@@ -3,6 +3,7 @@
 
 use std::fmt;
 
+use cgmath::Vector2;
 use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
@@ -17,22 +18,12 @@ use crate::raytracer::{ColorBuf, RtBlockData, UpdatingSpaceRaytracer};
 /// following the scene and camera information in a [`StandardCameras`].
 pub struct RtRenderer<D: RtBlockData = ()> {
     cameras: StandardCameras,
-    rt: UpdatingSpaceRaytracer<D>,
+    rt: Option<UpdatingSpaceRaytracer<D>>,
 }
 
 impl RtRenderer {
     pub fn new(cameras: StandardCameras) -> Self {
-        let rt = UpdatingSpaceRaytracer::<()>::new(
-            // TODO: We need to follow the cameras' character instead of snapshotting here
-            cameras
-                .world_space()
-                .snapshot()
-                .expect("No world space given!"),
-            // TODO: StandardCameras should expose the options source
-            ListenableSource::constant(cameras.graphics_options().clone()),
-            ListenableSource::constant(()),
-        );
-        RtRenderer { cameras, rt }
+        RtRenderer { cameras, rt: None }
     }
 }
 
@@ -54,9 +45,29 @@ impl HeadlessRenderer for RtRenderer<()> {
         &'a mut self,
         _cursor: Option<&'a Cursor>,
     ) -> BoxFuture<'a, Result<(), RenderError>> {
+        // TODO: raytracer needs to implement drawing the cursor
         Box::pin(async {
-            // TODO: raytracer needs to implement drawing the cursor
-            self.rt.update().map_err(RenderError::Read)?;
+            // TODO: this Option-synchronization pattern is recurring but also ugly ... look for ways to make it nicer
+            let space = self.cameras.world_space().snapshot();
+            if let Some(rt) = self
+                .rt
+                .as_mut()
+                .filter(|rt| Some(rt.space()) == space.as_ref())
+            {
+                rt.update().map_err(RenderError::Read)?;
+            } else {
+                self.rt = if let Some(space) = space {
+                    Some(UpdatingSpaceRaytracer::<()>::new(
+                        space,
+                        // TODO: StandardCameras should expose the options source
+                        ListenableSource::constant(self.cameras.graphics_options().clone()),
+                        ListenableSource::constant(()),
+                    ))
+                } else {
+                    None
+                }
+            }
+
             Ok(())
         })
     }
@@ -67,23 +78,32 @@ impl HeadlessRenderer for RtRenderer<()> {
     ) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
         // TODO: implement drawing info text (can use embedded_graphics for that)
         Box::pin(async {
-            let RtRenderer { cameras, rt } = self;
-            let camera = cameras.cameras().world.clone();
-            let (image, _info) = rt
-                .get()
-                .trace_scene_to_image::<ColorBuf, _, Rgba>(&camera, |pixel_buf| {
-                    camera.post_process_color(Rgba::from(pixel_buf))
-                });
+            let camera = self.cameras.cameras().world.clone();
+            let Vector2 {
+                x: width,
+                y: height,
+            } = camera.viewport().framebuffer_size;
 
-            let image = RgbaImage::from_raw(
-                camera.viewport().framebuffer_size.x,
-                camera.viewport().framebuffer_size.y,
-                Vec::from(image)
-                    .into_iter()
-                    .flat_map(|color| color.to_srgb8())
-                    .collect::<Vec<u8>>(),
-            )
-            .unwrap(/* can't happen: wrong dimensions */);
+            let image: RgbaImage = match &mut self.rt {
+                Some(rt) => {
+                    let (image_vec, _info) = rt
+                        .get()
+                        .trace_scene_to_image::<ColorBuf, _, Rgba>(&camera, |pixel_buf| {
+                            camera.post_process_color(Rgba::from(pixel_buf))
+                        });
+
+                    RgbaImage::from_raw(
+                            width,
+                            height,
+                            Vec::from(image_vec)
+                                .into_iter()
+                                .flat_map(|color| color.to_srgb8())
+                                .collect::<Vec<u8>>(),
+                        )
+                        .unwrap(/* can't happen: wrong dimensions */)
+                }
+                None => RgbaImage::from_pixel(width, height, image::Rgba([0, 0, 0, 255])),
+            };
 
             Ok(image)
         })
