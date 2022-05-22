@@ -24,7 +24,7 @@ use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
     camera::ShaderSpaceCamera,
-    glue::{to_wgpu_color, to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
+    glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
 use crate::{GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo};
@@ -43,8 +43,8 @@ pub(crate) struct SpaceRenderer {
     /// Note that `self.csm` has its own todo listener too.
     todo: Arc<Mutex<SpaceRendererTodo>>,
 
-    /// Copy of `space.physics.sky_color`.
-    sky_color: Rgb,
+    /// Cached copy of `space.physics.sky_color`.
+    pub(crate) sky_color: Rgb,
 
     block_texture: AtlasAllocator,
     light_texture: SpaceLightTexture,
@@ -231,7 +231,7 @@ impl SpaceRenderer {
         encoder: &mut wgpu::CommandEncoder,
         pipelines: &Pipelines,
         camera: &Camera,
-        should_clear: bool,
+        color_load_op: wgpu::LoadOp<wgpu::Color>,
     ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
         let start_time = Instant::now();
 
@@ -257,11 +257,7 @@ impl SpaceRenderer {
                 view: output_view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: if should_clear {
-                        wgpu::LoadOp::Clear(to_wgpu_color(self.sky_color.with_alpha_one()))
-                    } else {
-                        wgpu::LoadOp::Load
-                    },
+                    load: color_load_op,
                     store: true,
                 },
             }],

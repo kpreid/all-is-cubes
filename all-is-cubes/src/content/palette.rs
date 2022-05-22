@@ -73,6 +73,10 @@ palette! {
     ///
     /// TODO: Not currently used.
     UNPAINTED_TEXTURE_FALLBACK = srgb[0x00 0xC5 0xC5 0xFF];
+
+    /// Fill color to draw when a renderer does not have any [`Space`](crate::space::Space)
+    /// to define a sky color.
+    NO_WORLD_TO_SHOW = srgb[0xBC 0xBC 0xBC 0xFF];
 }
 
 palette! {

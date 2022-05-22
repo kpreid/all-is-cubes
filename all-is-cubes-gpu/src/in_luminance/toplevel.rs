@@ -3,6 +3,7 @@
 
 //! Top level of the `luminance`-based renderer.
 
+use all_is_cubes::content::palette;
 use instant::Instant;
 use luminance::backend::{color_slot::ColorSlot, depth_stencil_slot::DepthStencilSlot};
 use luminance::blending::{Blending, Equation, Factor};
@@ -26,7 +27,6 @@ use all_is_cubes::drawing::embedded_graphics::{
     text::{Baseline, Text},
 };
 use all_is_cubes::listen::DirtyFlag;
-use all_is_cubes::math::Rgba;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
 
@@ -320,7 +320,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         let start_draw_world_time = Instant::now();
         let clear_color = match world_output.as_ref() {
             Some(o) => o.data.clear_color(),
-            None => Rgba::BLACK, // TODO: take from palette or config
+            None => palette::NO_WORLD_TO_SHOW,
         }
         .to_srgb_float();
         let mut world_draw_info = SpaceDrawInfo::default(); // can't return a value from pipeline()

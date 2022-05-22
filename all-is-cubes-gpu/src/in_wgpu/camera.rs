@@ -102,18 +102,25 @@ const OPENGL_TO_WGPU_PROJECTION: Matrix4<f64> = Matrix4::new(
 pub(crate) struct ShaderPostprocessCamera {
     tone_mapping_id: i32,
 
+    /// 0 or 1 boolean indicating whether or not the `linear_scene_texture` was actually
+    /// written this frame. If zero, the postprocessing shader should display a “no data”
+    /// indication instead of reading the scene texture.
+    texture_is_valid: i32,
+
     /// pad out to multiple of vec4<something32>
-    _padding: [i32; 3],
+    _padding: [i32; 2],
 }
 
 impl ShaderPostprocessCamera {
-    pub fn new(options: &GraphicsOptions) -> Self {
+    pub(crate) fn new(options: &GraphicsOptions, texture_is_valid: bool) -> Self {
         Self {
             tone_mapping_id: match options.tone_mapping {
                 ToneMappingOperator::Clamp => 0,
                 ToneMappingOperator::Reinhard => 1,
                 ref tmo => panic!("Missing implementation for tone mapping operator {:?}", tmo),
             },
+
+            texture_is_valid: i32::from(texture_is_valid),
 
             _padding: Default::default(),
         }

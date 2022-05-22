@@ -10,6 +10,7 @@ use image::RgbaImage;
 use crate::apps::StandardCameras;
 use crate::camera::{HeadlessRenderer, RenderError};
 use crate::character::Cursor;
+use crate::content::palette;
 use crate::listen::ListenableSource;
 use crate::math::Rgba;
 use crate::raytracer::{ColorBuf, RtBlockData, UpdatingSpaceRaytracer};
@@ -103,7 +104,11 @@ impl HeadlessRenderer for RtRenderer<()> {
                         )
                         .unwrap(/* can't happen: wrong dimensions */)
                 }
-                None => RgbaImage::from_pixel(width, height, image::Rgba([0, 0, 0, 255])),
+                None => RgbaImage::from_pixel(
+                    width,
+                    height,
+                    image::Rgba(palette::NO_WORLD_TO_SHOW.to_srgb8()),
+                ),
             };
 
             Ok(image)

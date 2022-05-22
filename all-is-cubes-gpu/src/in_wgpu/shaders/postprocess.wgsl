@@ -5,7 +5,8 @@
 
 // Mirrors `struct ShaderPostprocessCamera` on the Rust side.
 struct ShaderPostprocessCamera {
-    [[location(8)]] tone_mapping_id: i32;
+    [[location(0)]] tone_mapping_id: i32;
+    [[location(1)]] scene_texture_valid: i32;
 };
 
 
@@ -65,12 +66,22 @@ fn postprocess_fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     // scale clip coordinates to 0.1 coordinates and flip Y
     let texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
 
-    let scene_color: vec4<f32> = textureSampleLevel(
-        linear_scene_texture,
-        text_sampler,
-        texcoord,
-        0.0
-    );
+    // Fetch scene pixel, if present
+    var scene_color: vec4<f32>;
+    if (camera.scene_texture_valid != 0) {
+        scene_color = textureSampleLevel(
+            linear_scene_texture,
+            text_sampler,
+            texcoord,
+            0.0
+        );
+    } else {
+        // TODO: make this a checkerboard or something to distinguish from “oops, all black”.
+        // (And when we do that, also use it for UI-on-top-of-nothing, by reading the alpha.)
+        // Note: this color is equal to all_is_cubes::palette::NO_WORLD_TO_SHOW.
+        scene_color = vec4<f32>(0.5, 0.5, 0.5, 1.0);
+    }
+
     // apply tone mapping, respecting premultiplied alpha
     let tone_mapped_scene = vec4<f32>(tone_map(scene_color.rgb * scene_color.a) / scene_color.a, scene_color.a);
 

@@ -5,7 +5,7 @@
 //!
 //! TODO: This code is experimental and not feature-complete.
 
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{iso_8859_1::FONT_7X13_BOLD, MonoTextStyle},
@@ -30,7 +30,9 @@ use crate::{
     gather_debug_lines,
     in_wgpu::{
         camera::ShaderPostprocessCamera,
-        glue::{create_wgsl_module_from_reloadable, BeltWritingParts, ResizingBuffer},
+        glue::{
+            create_wgsl_module_from_reloadable, to_wgpu_color, BeltWritingParts, ResizingBuffer,
+        },
         pipelines::Pipelines,
         vertex::{WgpuBlockVertex, WgpuLinesVertex},
     },
@@ -615,14 +617,10 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::draw_frame_linear()"),
             });
 
-        queue.write_buffer(
-            &self.postprocess_camera_buffer,
-            0, // The [] around the camera is needed for bytemuck, so that both input and output
-            // are slices.
-            bytemuck::cast_slice::<ShaderPostprocessCamera, u8>(&[ShaderPostprocessCamera::new(
-                self.cameras.graphics_options(),
-            )]),
-        );
+        // True until one of the passes has cleared linear_scene_texture.
+        // If it remains true at the end, we'll tell the postprocessing pass to
+        // not read the texture.
+        let mut output_needs_clearing = true;
 
         let start_draw_time = Instant::now();
         let world_draw_info = if let Some(sr) = &self.space_renderers.world {
@@ -633,7 +631,11 @@ impl EverythingRenderer {
                 &mut encoder,
                 &self.pipelines,
                 &self.cameras.cameras().world,
-                true,
+                if mem::take(&mut output_needs_clearing) {
+                    wgpu::LoadOp::Clear(to_wgpu_color(sr.sky_color.with_alpha_one()))
+                } else {
+                    wgpu::LoadOp::Load
+                },
             )?
         } else {
             SpaceDrawInfo::default()
@@ -682,12 +684,26 @@ impl EverythingRenderer {
                 &mut encoder,
                 &self.pipelines,
                 &self.cameras.cameras().ui,
-                false,
+                if mem::take(&mut output_needs_clearing) {
+                    wgpu::LoadOp::Clear(to_wgpu_color(palette::NO_WORLD_TO_SHOW))
+                } else {
+                    wgpu::LoadOp::Load
+                },
             )?
         } else {
             SpaceDrawInfo::default()
         };
         let ui_to_submit_time = Instant::now();
+
+        queue.write_buffer(
+            &self.postprocess_camera_buffer,
+            0, // The [] around the camera is needed for bytemuck, so that both input and output
+            // are slices.
+            bytemuck::cast_slice::<ShaderPostprocessCamera, u8>(&[ShaderPostprocessCamera::new(
+                self.cameras.graphics_options(),
+                !output_needs_clearing,
+            )]),
+        );
 
         queue.submit(std::iter::once(encoder.finish()));
         self.staging_belt_recalled = Some(Box::pin(self.staging_belt.recall()));

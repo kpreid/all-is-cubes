@@ -61,6 +61,8 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
             LightingOption::Smooth,
         ],
     );
+    c.insert("no_character_no_ui", None, no_character_no_ui);
+    c.insert("no_character_but_ui", None, no_character_but_ui);
     c.insert("sky_and_info_text", None, sky_and_info_text);
     c.insert_variants(
         "tone_mapping",
@@ -167,6 +169,49 @@ async fn light(context: RenderTestContext, option: LightingOption) {
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     context
         .render_comparison_test(6, scene, Overlays::NONE)
+        .await;
+}
+
+async fn no_character_no_ui(context: RenderTestContext) {
+    let universe = Universe::new();
+    context
+        .render_comparison_test(
+            0,
+            &universe,
+            Overlays {
+                cursor: None,
+                info_text: Some("no_character test"),
+            },
+        )
+        .await;
+}
+
+async fn no_character_but_ui(context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let mut ui_space = Space::builder(Grid::new([0, 0, 0], [4, 4, 4]))
+        .light_physics(all_is_cubes::space::LightPhysics::None)
+        .build_empty();
+    ui_space
+        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
+        .unwrap();
+    let ui_space = universe.insert_anonymous(ui_space);
+    let cameras: StandardCameras = StandardCameras::new(
+        ListenableSource::constant(GraphicsOptions::default()),
+        COMMON_VIEWPORT,
+        ListenableSource::constant(None),
+        ListenableSource::constant(Some(ui_space)),
+    )
+    .unwrap();
+
+    context
+        .render_comparison_test(
+            0,
+            cameras,
+            Overlays {
+                cursor: None,
+                info_text: Some("no_character_but_ui"),
+            },
+        )
         .await;
 }
 
