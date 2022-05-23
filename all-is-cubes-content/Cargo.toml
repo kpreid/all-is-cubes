@@ -30,7 +30,7 @@ exhaust = "0.1.0"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }
-macro_rules_attribute = "0.0.2"
+macro_rules_attribute = "0.1.0"
 maze_generator = "2.0.0"
 noise = { version = "0.7.0", default-features = false }
 paste = "1.0.5"
