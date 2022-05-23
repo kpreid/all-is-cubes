@@ -38,7 +38,7 @@ png = "0.17.0"
 rand = { version = "0.8.2", default-features = false, features = ["std", "std_rng"] }
 serde = { version = "1.0.126", default-features = false }
 serde_json = "1.0.64"
-simplelog = "0.11.1"
+simplelog = "0.12.0"
 strum = { version = "0.24.0", default-features = false, features = ["derive", "std"] }
 termion = "1.5.5" # TODO: Only used for ANSI color table. Remove?
 thiserror = "1.0.22"
