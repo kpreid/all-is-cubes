@@ -397,6 +397,26 @@ impl<T> Layers<T> {
     }
 }
 
+/// Bundle of inputs specifying the “standard” configuration of [`Camera`]s and other
+/// things to render an All is Cubes scene and user interface.
+///
+/// It holds the following data sources:
+///
+/// * A [`ListenableSource`] for user-provided [`GraphicsOptions`].
+/// * A [`ListenableSource`] for the [`Character`] whose eyes we look through to
+///   render the “world” [`Space`].
+/// * A [`ListenableSource`] for the [VUI](crate::vui) [`Space`] overlaid on the
+///   world.
+/// * A [`Viewport`] specifying the dimensions of image to render, which can be
+///   updated with [`StandardCameras::set_viewport()`].
+///
+/// When [`StandardCameras::update()`] is called, all of these data sources are read
+/// and used to update the [`Camera`] data. Those cameras, and copies of the input
+/// data, are then available for use while rendering.
+///
+/// Design note: The sense in which this is “standard” is that if an application wished
+/// to, for example, have multiple views into the same [`Space`], it would need to create
+/// additional [`Camera`]s (or multiple [`StandardCameras`]) and update them itself.
 #[derive(Debug)]
 pub struct StandardCameras {
     /// Cameras are synced with this
