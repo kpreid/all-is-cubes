@@ -10,9 +10,6 @@ use std::io::{self, Write as _};
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
-use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::space::Space;
-use all_is_cubes::universe::URef;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
@@ -28,9 +25,10 @@ use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::cgmath::{ElementWise as _, Point2};
 use all_is_cubes::inv::Slot;
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::raytracer::{
-    CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RaytraceInfo, UpdatingSpaceRaytracer,
+    CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RaytraceInfo, RtRenderer,
 };
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
@@ -120,7 +118,7 @@ struct TerminalMain {
     /// position.
     widths: HashMap<String, u16>,
 
-    buffer_reuse_out: mpsc::Receiver<Option<UpdatingSpaceRaytracer<CharacterRtData>>>,
+    buffer_reuse_out: mpsc::Receiver<RtRenderer<CharacterRtData>>,
     render_pipe_in: mpsc::SyncSender<FrameInput>,
     render_pipe_out: mpsc::Receiver<FrameOutput>,
 }
@@ -128,12 +126,13 @@ struct TerminalMain {
 struct FrameInput {
     camera: Camera,
     options: TerminalOptions,
-    scene: Option<UpdatingSpaceRaytracer<CharacterRtData>>,
+    scene: RtRenderer<CharacterRtData>,
 }
 
 /// A frame's pixels and all the context needed to interpret it (which duplicates fields
 /// in TerminalMain, but must be carried due to the pipelined rendering).
 struct FrameOutput {
+    /// The `framebuffer_size` of this viewport is equal to the size of the `image` data.
     viewport: Viewport,
     options: TerminalOptions,
     image: Box<[TextAndColor]>,
@@ -152,11 +151,15 @@ impl TerminalMain {
         // Generate reusable buffers for scene.
         // They are recirculated through the channels so that one can be updated while another is being raytraced.
         let number_of_scene_buffers = 3;
-        let (buffer_reuse_in, buffer_reuse_out) = mpsc::sync_channel::<
-            Option<UpdatingSpaceRaytracer<CharacterRtData>>,
-        >(number_of_scene_buffers);
+        let (buffer_reuse_in, buffer_reuse_out) =
+            mpsc::sync_channel::<RtRenderer<CharacterRtData>>(number_of_scene_buffers);
         for _ in 0..number_of_scene_buffers {
-            buffer_reuse_in.send(None).unwrap();
+            buffer_reuse_in
+                .send(RtRenderer::new(
+                    cameras.clone(),
+                    ListenableSource::constant(()),
+                ))
+                .unwrap();
         }
 
         // Create thread for making the raytracing operation concurrent with main loop
@@ -174,28 +177,15 @@ impl TerminalMain {
                         scene,
                     }) = render_thread_in.recv()
                     {
-                        if let Some(scene) = &scene {
-                            let (image, info) = scene
-                                .get()
-                                .trace_scene_to_image::<ColorCharacterBuf, _, _>(&camera, |b| {
-                                    b.output(&camera)
-                                });
-                            // Ignore send errors as they just mean we're shutting down or died elsewhere
-                            let _ = render_thread_out.send(FrameOutput {
-                                viewport: camera.viewport(),
-                                options,
-                                image,
-                                info,
-                            });
-                        } else {
-                            // No world to render; return dummy output
-                            let _ = render_thread_out.send(FrameOutput {
-                                viewport: Viewport::with_scale(1.0, [0, 0].into()),
-                                options,
-                                image: Default::default(),
-                                info: RaytraceInfo::default(),
-                            });
-                        }
+                        let (image, info) =
+                            scene.draw::<ColorCharacterBuf, _, _>("", |b| b.output(&camera));
+                        // Ignore send errors as they just mean we're shutting down or died elsewhere
+                        let _ = render_thread_out.send(FrameOutput {
+                            viewport: camera.viewport(),
+                            options,
+                            image,
+                            info,
+                        });
                         let _ = buffer_reuse_in.send(scene);
                     }
                 }
@@ -348,30 +338,15 @@ impl TerminalMain {
 
     fn send_frame_to_render(&mut self) {
         self.cameras.update();
-        let world_space = self.cameras.world_space().get();
-        let world_space: Option<&URef<Space>> = Option::as_ref(&world_space);
 
-        // Fetch previously used UpdatingSpaceRaytracer, if it exists and has the right space.
-        // `trace.is_some()` iff `world_space.is_some()`.
-        let mut tracer = match (self.buffer_reuse_out.recv().unwrap(), world_space) {
-            (Some(t), Some(s)) if t.space() == s => Some(t),
-            (_, Some(s)) => Some(UpdatingSpaceRaytracer::new(
-                s.clone(),
-                self.session.graphics_options(),
-                ListenableSource::constant(()),
-            )),
-            (_, None) => None,
-        };
-
-        // Refresh space data for render
-        if let Some(tracer) = tracer.as_mut() {
-            tracer.update().unwrap();
-        }
+        // Fetch and update one of our recirculating renderers.
+        let mut renderer = self.buffer_reuse_out.recv().unwrap();
+        renderer.update(self.session.cursor_result()).unwrap();
 
         match self.render_pipe_in.try_send(FrameInput {
             camera: self.cameras.cameras().world.clone(),
             options: self.options.clone(),
-            scene: tracer,
+            scene: renderer,
         }) {
             Ok(()) => {
                 self.session.frame_clock.did_draw();
