@@ -15,8 +15,8 @@ OPTIONS:
         --duration <SECONDS>     Length of time to simulate.
     -g, --graphics <mode>        Graphics/UI mode [default: window]
     -h, --help                   Print help information
-        --no-config-files        Ignore all configuration files, using only defaults and command-
-                                 line options
+        --no-config-files        Ignore all configuration files, using only defaults and
+                                 command-line options
     -o, --output <FILE>          Output PNG file name for 'record' mode
         --precompute-light       Fully calculate light before starting the game
     -t, --template <TEMPLATE>    Which world template to use [default: demo-city] [possible values:
