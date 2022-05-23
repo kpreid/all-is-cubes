@@ -5,6 +5,7 @@ use clap::Parser as _;
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::HeadlessRenderer;
+use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::raytracer::RtRenderer;
 use test_renderers::{RendererFactory, RendererId};
 
@@ -24,7 +25,7 @@ struct RtFactory;
 
 impl RendererFactory for RtFactory {
     fn renderer_from_cameras(&self, cameras: StandardCameras) -> Box<dyn HeadlessRenderer + Send> {
-        Box::new(RtRenderer::new(cameras))
+        Box::new(RtRenderer::new(cameras, ListenableSource::constant(())))
     }
 
     fn id(&self) -> RendererId {
