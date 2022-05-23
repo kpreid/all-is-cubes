@@ -10,7 +10,7 @@ use std::io::{self, Write as _};
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
 use crossterm::cursor::{self, MoveTo};
@@ -111,6 +111,9 @@ struct TerminalMain {
     // Tracking terminal state.
     /// Regionof the terminal the scene is drawn into.
     viewport_position: Rect,
+    /// The `viewport_position` written into a `ListenableCell` for the benefit of
+    /// [`StandardCameras`].
+    viewport_cell: ListenableCell<Viewport>,
 
     /// The widths of "single characters" according to the terminal's interpretation
     /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
@@ -142,8 +145,9 @@ impl TerminalMain {
         crossterm::terminal::enable_raw_mode()?;
 
         let viewport_position = Rect::default();
-        let viewport = options.viewport_from_terminal_size(rect_size(viewport_position));
-        let cameras = StandardCameras::from_session(&session, viewport).unwrap();
+        let viewport_cell =
+            ListenableCell::new(options.viewport_from_terminal_size(rect_size(viewport_position)));
+        let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
 
         // Generate reusable buffers for scene.
         // They are recirculated through the channels so that one can be updated while another is being raytraced.
@@ -203,6 +207,7 @@ impl TerminalMain {
             options,
             tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
             viewport_position,
+            viewport_cell,
             terminal_state_dirty: true,
             widths: HashMap::new(),
             buffer_reuse_out,
@@ -335,7 +340,7 @@ impl TerminalMain {
     }
 
     fn sync_viewport(&mut self) {
-        self.cameras.set_viewport(
+        self.viewport_cell.set(
             self.options
                 .viewport_from_terminal_size(rect_size(self.viewport_position)),
         );

@@ -5,6 +5,7 @@ use std::num::NonZeroU32;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use all_is_cubes::listen::ListenableSource;
 use clap::Parser as _;
 use futures::future::BoxFuture;
 use image::RgbaImage;
@@ -74,13 +75,16 @@ struct WgpuFactory {
 
 impl RendererFactory for WgpuFactory {
     fn renderer_from_cameras(&self, cameras: StandardCameras) -> Box<dyn HeadlessRenderer + Send> {
+        let viewport_source = cameras.viewport_source();
         let everything = EverythingRenderer::new(
             self.device.clone(),
             cameras,
             wgpu::TextureFormat::Rgba8UnormSrgb,
         );
-        let viewport = everything.viewport();
 
+        // TODO: support viewport changes by resizing this texture when needed
+        // (or maybe just recreate it every time).
+        let viewport = viewport_source.snapshot();
         let color_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("WgpuHeadlessRenderer::color_texture"),
             size: wgpu::Extent3d {
@@ -100,9 +104,9 @@ impl RendererFactory for WgpuFactory {
         Box::new(WgpuHeadlessRenderer {
             factory: self.clone(),
             color_texture,
-            // depth_texture,
             depth_texture_view,
             everything,
+            viewport_source,
         })
     }
 
@@ -118,6 +122,7 @@ struct WgpuHeadlessRenderer {
     // depth_texture: wgpu::Texture,
     depth_texture_view: wgpu::TextureView,
     everything: EverythingRenderer,
+    viewport_source: ListenableSource<Viewport>,
 }
 
 impl HeadlessRenderer for WgpuHeadlessRenderer {
@@ -141,7 +146,7 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
     }
 
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
-        let viewport = self.everything.viewport();
+        let viewport = self.viewport_source.snapshot();
         Box::pin(async move {
             let _dinfo = self
                 .everything

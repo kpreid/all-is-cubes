@@ -12,7 +12,9 @@ use glfw::{Action, Context as _, CursorMode, SwapInterval, WindowEvent, WindowMo
 use luminance_glfw::{GlfwSurface, GlfwSurfaceError};
 
 use all_is_cubes::apps::{Session, StandardCameras};
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
+use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_luminance::SurfaceRenderer;
 
@@ -53,9 +55,11 @@ pub fn glfw_main_loop(
         glfw.set_swap_interval(SwapInterval::Sync(1));
         Ok((window, events_rx))
     })?;
-    let viewport = window_size_as_viewport(&context.window);
-    let mut renderer =
-        SurfaceRenderer::new(context, StandardCameras::from_session(&session, viewport)?)?;
+    let mut viewport_cell = ListenableCell::new(window_size_as_viewport(&context.window));
+    let mut renderer = SurfaceRenderer::new(
+        context,
+        StandardCameras::from_session(&session, viewport_cell.as_source())?,
+    )?;
 
     let ready_time = Instant::now();
     log::debug!(
@@ -105,7 +109,9 @@ pub fn glfw_main_loop(
         // before the window is visible (at least on macOS).
         renderer.surface.window.glfw.poll_events();
         for (_, event) in events_rx.try_iter() {
-            if let ControlFlow::Break(_) = handle_glfw_event(event, &mut session, &mut renderer) {
+            if let ControlFlow::Break(_) =
+                handle_glfw_event(event, &mut session, &mut renderer, &mut viewport_cell)
+            {
                 break 'event_loop;
             }
         }
@@ -125,6 +131,7 @@ fn handle_glfw_event(
     event: WindowEvent,
     session: &mut Session,
     renderer: &mut SurfaceRenderer<luminance_glfw::GL33Context>,
+    viewport_cell: &mut ListenableCell<Viewport>,
 ) -> ControlFlow<()> {
     match event {
         WindowEvent::Close => return ControlFlow::Break(()),
@@ -179,9 +186,7 @@ fn handle_glfw_event(
 
         // Window state
         WindowEvent::FramebufferSize(..) | WindowEvent::ContentScale(..) => {
-            renderer
-                .set_viewport(window_size_as_viewport(&renderer.surface.window))
-                .unwrap();
+            viewport_cell.set(window_size_as_viewport(&renderer.surface.window));
         }
         WindowEvent::Focus(has_focus) => {
             session.input_processor.key_focus(has_focus);

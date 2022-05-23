@@ -19,7 +19,6 @@ use instant::Instant;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::apps::{Layers, StandardCameras};
-use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
@@ -67,6 +66,9 @@ pub struct SurfaceRenderer {
 
     depth_texture: wgpu::Texture,
     depth_texture_view: wgpu::TextureView,
+
+    /// True if we need to reconfigure the surface.
+    viewport_dirty: DirtyFlag,
 }
 
 impl SurfaceRenderer {
@@ -81,6 +83,7 @@ impl SurfaceRenderer {
             .unwrap();
         let device = Arc::new(device);
 
+        let viewport_source = cameras.viewport_source();
         let everything = EverythingRenderer::new(
             device.clone(),
             cameras,
@@ -89,45 +92,19 @@ impl SurfaceRenderer {
 
         let depth_texture = create_depth_texture(&device, &everything);
 
-        let mut new_self = Self {
+        Ok(Self {
+            viewport_dirty: DirtyFlag::listening(true, |l| viewport_source.listen(l)),
             depth_texture_view: depth_texture.create_view(&Default::default()),
             depth_texture,
             everything,
             surface,
             device,
             queue,
-        };
-        new_self.set_viewport(new_self.viewport())?;
-        Ok(new_self)
+        })
     }
 
     pub fn device(&self) -> &Arc<wgpu::Device> {
         &self.device
-    }
-
-    /// Returns the last [`Viewport`] provided.
-    pub fn viewport(&self) -> Viewport {
-        self.everything.viewport()
-    }
-
-    /// Sets the expected viewport dimensions to use for the next frame.
-    pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), GraphicsResourceError> {
-        log::trace!(
-            "SurfaceRenderer::set_viewport {:?}",
-            viewport.framebuffer_size
-        );
-        self.everything.set_viewport(viewport)?;
-
-        // Test because wgpu insists on nonzero values -- we'd rather be inconsistent
-        // than crash.
-        let config = &self.everything.config;
-        if config.width > 0 && config.height > 0 {
-            self.surface.configure(&self.device, config);
-            self.depth_texture = create_depth_texture(&self.device, &self.everything);
-            self.depth_texture_view = self.depth_texture.create_view(&Default::default());
-        }
-
-        Ok(())
     }
 
     /// Sync camera to character state. This is used so that cursor raycasts can be up-to-date
@@ -149,7 +126,6 @@ impl SurfaceRenderer {
         cursor_result: Option<&Cursor>,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
     ) -> Result<RenderInfo, GraphicsResourceError> {
-        let output = self.surface.get_current_texture()?;
         let update_info = self
             .everything
             .update(
@@ -158,6 +134,19 @@ impl SurfaceRenderer {
                 &FrameBudget::SIXTY_FPS, // TODO: figure out what we're vsyncing to, instead
             )
             .await?;
+
+        if self.viewport_dirty.get_and_clear() {
+            // Test because wgpu insists on nonzero values -- we'd rather be inconsistent
+            // than crash.
+            let config = &self.everything.config;
+            if config.width > 0 && config.height > 0 {
+                self.surface.configure(&self.device, config);
+                self.depth_texture = create_depth_texture(&self.device, &self.everything);
+                self.depth_texture_view = self.depth_texture.create_view(&Default::default());
+            }
+        }
+
+        let output = self.surface.get_current_texture()?;
         let draw_info = self
             .everything
             .draw_frame_linear(&self.queue, &self.depth_texture_view)
@@ -410,41 +399,6 @@ impl EverythingRenderer {
         })
     }
 
-    /// Returns the last [`Viewport`] provided.
-    pub fn viewport(&self) -> Viewport {
-        self.cameras.viewport()
-    }
-
-    /// Sets the expected viewport dimensions to use for the next frame.
-    ///
-    /// Returns an error if relevant resources could not be allocated.
-    pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), GraphicsResourceError> {
-        self.cameras.set_viewport(viewport);
-
-        // wgpu insists on nonzero values
-        if viewport.framebuffer_size.x > 0 && viewport.framebuffer_size.y > 0 {
-            self.config.width = viewport.framebuffer_size.x;
-            self.config.height = viewport.framebuffer_size.y;
-
-            self.linear_scene_texture = create_linear_scene_texture(&self.device, &self.config);
-            self.linear_scene_texture_view = self
-                .linear_scene_texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-
-            self.info_text_texture.resize(
-                &self.device,
-                Some("info_text_texture"),
-                Vector2::new(
-                    viewport.nominal_size.x as u32,
-                    viewport.nominal_size.y as u32,
-                ),
-            );
-            self.postprocess_bind_group = None;
-        }
-
-        Ok(())
-    }
-
     /// Read current scene content, compute meshes, and send updated resources
     /// to the GPU to prepare for actually drawing it.
     pub async fn update(
@@ -457,6 +411,33 @@ impl EverythingRenderer {
 
         // This updates camera matrices and graphics options
         self.cameras.update();
+
+        // Update viewport-sized resources from viewport.
+        {
+            let viewport = self.cameras.viewport();
+            let size = viewport.framebuffer_size;
+            let previous_size = Vector2::new(self.config.width, self.config.height);
+            // wgpu insists on nonzero values, so if we get a zero, ignore it
+            if size != previous_size && size.x != 0 && size.y != 0 {
+                self.config.width = size.x;
+                self.config.height = size.y;
+
+                self.linear_scene_texture = create_linear_scene_texture(&self.device, &self.config);
+                self.linear_scene_texture_view = self
+                    .linear_scene_texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+
+                self.info_text_texture.resize(
+                    &self.device,
+                    Some("info_text_texture"),
+                    Vector2::new(
+                        viewport.nominal_size.x as u32,
+                        viewport.nominal_size.y as u32,
+                    ),
+                );
+                self.postprocess_bind_group = None;
+            }
+        }
 
         // Recompile shaders if needed.
         if self.postprocess_shader_dirty.get_and_clear() {

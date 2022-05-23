@@ -5,7 +5,6 @@
 
 use std::fmt::{self, Display};
 use std::future::Future;
-use std::mem;
 use std::sync::mpsc::{self, TryRecvError};
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -400,19 +399,21 @@ impl<T> Layers<T> {
 /// Bundle of inputs specifying the “standard” configuration of [`Camera`]s and other
 /// things to render an All is Cubes scene and user interface.
 ///
-/// It holds the following data sources:
+/// All of its data is provided through [`ListenableSource`]s, and consists of:
 ///
-/// * A [`ListenableSource`] for user-provided [`GraphicsOptions`].
-/// * A [`ListenableSource`] for the [`Character`] whose eyes we look through to
-///   render the “world” [`Space`].
-/// * A [`ListenableSource`] for the [VUI](crate::vui) [`Space`] overlaid on the
-///   world.
-/// * A [`Viewport`] specifying the dimensions of image to render, which can be
-///   updated with [`StandardCameras::set_viewport()`].
+/// * [`GraphicsOptions`].
+/// * A [`Viewport`] specifying the dimensions of image to render.
+/// * A [`URef`] to the [`Character`] whose eyes we look through to render the “world”
+///   [`Space`].
+/// * A [`URef`] to the [VUI](crate::vui) [`Space`] overlaid on the world.
 ///
 /// When [`StandardCameras::update()`] is called, all of these data sources are read
 /// and used to update the [`Camera`] data. Those cameras, and copies of the input
 /// data, are then available for use while rendering.
+///
+/// Because every input is a [`ListenableSource`], it is never necessary to call a setter.
+/// Every [`StandardCameras`] which was created with the same sources will have the same
+/// results (after `update()`).
 ///
 /// Design note: The sense in which this is “standard” is that if an application wished
 /// to, for example, have multiple views into the same [`Space`], it would need to create
@@ -435,7 +436,8 @@ pub struct StandardCameras {
     ui_space_dirty: DirtyFlag,
     ui_space: Option<URef<Space>>,
 
-    viewport_dirty: bool,
+    viewport_source: ListenableSource<Viewport>,
+    viewport_dirty: DirtyFlag,
 
     cameras: Layers<Camera>,
 }
@@ -446,7 +448,7 @@ impl StandardCameras {
     #[doc(hidden)]
     pub fn new(
         graphics_options: ListenableSource<GraphicsOptions>,
-        viewport: Viewport,
+        viewport_source: ListenableSource<Viewport>,
         character_source: ListenableSource<Option<URef<Character>>>,
         ui_space_source: ListenableSource<Option<URef<Space>>>,
     ) -> Result<Self, std::convert::Infallible> {
@@ -454,7 +456,10 @@ impl StandardCameras {
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
         // to not have it (some kind of "following cell")?
         let graphics_options_dirty = DirtyFlag::listening(false, |l| graphics_options.listen(l));
-        let initial_options = &*graphics_options.get();
+        let viewport_dirty = DirtyFlag::listening(false, |l| viewport_source.listen(l));
+
+        let initial_options: &GraphicsOptions = &*graphics_options.get();
+        let initial_viewport: Viewport = *viewport_source.get();
 
         let mut this = Self {
             graphics_options,
@@ -469,11 +474,15 @@ impl StandardCameras {
             ui_space_dirty: DirtyFlag::listening(true, |l| ui_space_source.listen(l)),
             ui_space_source,
 
-            viewport_dirty: true,
+            viewport_dirty,
+            viewport_source,
 
             cameras: Layers {
-                ui: Camera::new(Vui::graphics_options(initial_options.clone()), viewport),
-                world: Camera::new(initial_options.clone(), viewport),
+                ui: Camera::new(
+                    Vui::graphics_options(initial_options.clone()),
+                    initial_viewport,
+                ),
+                world: Camera::new(initial_options.clone(), initial_viewport),
             },
         };
 
@@ -481,14 +490,14 @@ impl StandardCameras {
         Ok(this)
     }
 
-    /// Constructs a [`StandardCameras`] that will display, and track, the current state of the [`Session`]
+    /// Constructs a [`StandardCameras`] that will display, and track, the current state of the [`Session`].
     pub fn from_session(
         session: &Session,
-        viewport: Viewport,
+        viewport_source: ListenableSource<Viewport>,
     ) -> Result<Self, std::convert::Infallible> {
         Self::new(
             session.graphics_options(),
-            viewport,
+            viewport_source,
             session.character(),
             session.ui_space(),
         )
@@ -502,7 +511,7 @@ impl StandardCameras {
     ) -> Self {
         Self::new(
             ListenableSource::constant(graphics_options),
-            viewport,
+            ListenableSource::constant(viewport),
             ListenableSource::constant(universe.get_default_character()),
             ListenableSource::constant(None),
         )
@@ -533,9 +542,14 @@ impl StandardCameras {
             }
         }
 
-        // Update UI view if the FOV changed or the viewport did
-        let viewport_dirty = mem::take(&mut self.viewport_dirty);
+        // Update viewports, and UI view if the FOV changed or the viewport did
+        let viewport_dirty = self.viewport_dirty.get_and_clear();
         if options_dirty || viewport_dirty || ui_space_dirty {
+            let viewport: Viewport = self.viewport_source.snapshot();
+            // TODO: this should be a Layers::iter_mut() or something
+            self.cameras.world.set_viewport(viewport);
+            self.cameras.ui.set_viewport(viewport);
+
             if let Some(space_ref) = &self.ui_space {
                 // TODO: try_borrow()
                 // TODO: ...or just skip the whole idea
@@ -609,14 +623,17 @@ impl StandardCameras {
         self.ui_space.as_ref()
     }
 
+    /// Returns the current viewport.
+    ///
+    /// This is always equal to the viewports of all managed [`Camera`]s,
+    /// and only updates when [`StandardCameras::update()`] is called.
     pub fn viewport(&self) -> Viewport {
         self.cameras.world.viewport()
     }
 
-    pub fn set_viewport(&mut self, viewport: Viewport) {
-        // TODO: this should be an iter_mut() or something
-        self.cameras.world.set_viewport(viewport);
-        self.cameras.ui.set_viewport(viewport);
+    /// Returns a clone of the viewport source this is following.
+    pub fn viewport_source(&self) -> ListenableSource<Viewport> {
+        self.viewport_source.clone()
     }
 
     /// Perform a raycast through these cameras to find what the cursor hits.
@@ -640,6 +657,21 @@ impl StandardCameras {
         }
 
         None
+    }
+}
+
+impl Clone for StandardCameras {
+    /// Returns a [`StandardCameras`] which tracks the same data sources (graphics
+    /// options, scene sources, viewport) as `self`, but whose local state (such as
+    /// the last updated camera state) is independent.
+    fn clone(&self) -> Self {
+        Self::new(
+            self.graphics_options.clone(),
+            self.viewport_source.clone(),
+            self.character_source.clone(),
+            self.ui_space_source.clone(),
+        )
+        .unwrap()
     }
 }
 
@@ -679,21 +711,6 @@ impl<T: CustomFormat<StatusText>> Display for InfoText<'_, T> {
             None => write!(f, "No block"),
         }?;
         Ok(())
-    }
-}
-
-impl Clone for StandardCameras {
-    /// Returns a [`StandardCameras`] which tracks the same data sources (graphics
-    /// options, scene sources) as `self`, but whose local state (such as viewport size
-    /// and last updated camera state) is independent.
-    fn clone(&self) -> Self {
-        Self::new(
-            self.graphics_options.clone(),
-            self.viewport(),
-            self.character_source.clone(),
-            self.ui_space_source.clone(),
-        )
-        .unwrap()
     }
 }
 
@@ -742,7 +759,11 @@ mod tests {
     #[test]
     fn cameras_follow_character_and_world() {
         let mut session = block_on(Session::new());
-        let mut cameras = StandardCameras::from_session(&session, Viewport::ARBITRARY).unwrap();
+        let mut cameras = StandardCameras::from_session(
+            &session,
+            ListenableSource::constant(Viewport::ARBITRARY),
+        )
+        .unwrap();
 
         let world_source = cameras.world_space();
         let flag = DirtyFlag::listening(false, |l| world_source.listen(l));
@@ -782,7 +803,11 @@ mod tests {
     #[test]
     fn cameras_clone() {
         let session = block_on(Session::new());
-        let mut cameras = StandardCameras::from_session(&session, Viewport::ARBITRARY).unwrap();
+        let mut cameras = StandardCameras::from_session(
+            &session,
+            ListenableSource::constant(Viewport::ARBITRARY),
+        )
+        .unwrap();
         let mut cameras2 = cameras.clone();
 
         let default_o = GraphicsOptions::default();

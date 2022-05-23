@@ -56,6 +56,8 @@ where
     pub surface: C,
     pub objects: EverythingRenderer<C::Backend>,
     back_buffer: Framebuffer<C::Backend, Dim2, (), ()>,
+
+    viewport_dirty: DirtyFlag,
 }
 
 impl<C> SurfaceRenderer<C>
@@ -68,7 +70,7 @@ where
     /// May return errors due to failure to allocate GPU resources or to compile shaders.
     pub fn new(mut surface: C, cameras: StandardCameras) -> Result<Self, GraphicsResourceError> {
         Ok(Self {
-            // TODO: duplicated code with set_viewport()
+            viewport_dirty: DirtyFlag::listening(false, |l| cameras.viewport_source().listen(l)),
             back_buffer: luminance::framebuffer::Framebuffer::back_buffer(
                 &mut surface,
                 cameras.viewport().framebuffer_size.into(),
@@ -83,24 +85,21 @@ where
         self.objects.cameras.viewport()
     }
 
-    /// Sets the expected viewport dimensions. Use in case of window resizing.
-    pub fn set_viewport(&mut self, viewport: Viewport) -> Result<(), GraphicsResourceError> {
-        self.objects.set_viewport(&mut self.surface, viewport)?;
-
-        // TODO: If this somehow fails, it should be "warning, not error"
-        self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
-            &mut self.surface,
-            viewport.framebuffer_size.into(),
-        )?;
-
-        Ok(())
-    }
-
     /// Draw a frame, excluding info text overlay.
     pub fn render_frame(
         &mut self,
         cursor_result: Option<&Cursor>,
     ) -> Result<RenderInfo, GraphicsResourceError> {
+        if self.viewport_dirty.get_and_clear() {
+            self.objects.cameras.update(); // TODO: this is a redundant update with the one self.objects.render_frame() does
+
+            // TODO: If this somehow fails, it should be "warning, not error"
+            self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
+                &mut self.surface,
+                self.objects.cameras.viewport().framebuffer_size.into(),
+            )?;
+        }
+
         self.objects.render_frame(
             &mut self.surface,
             &self.back_buffer,
@@ -177,25 +176,6 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         })
     }
 
-    /// Sets the expected viewport dimensions to use for the next frame.
-    pub fn set_viewport<C: GraphicsContext<Backend = Backend>>(
-        &mut self,
-        context: &mut C,
-        viewport: Viewport,
-    ) -> Result<(), GraphicsResourceError> {
-        self.cameras.set_viewport(viewport);
-
-        // TODO: If this fails, it should be "warning, not error"
-        self.info_text_texture.resize(
-            context,
-            viewport,
-            info_text_size_policy,
-            (MagFilter::Nearest, MinFilter::Linear),
-        )?;
-
-        Ok(())
-    }
-
     /// Sync camera to character state. This is used so that cursor raycasts can be up-to-date
     /// to the same frame of input.
     ///
@@ -226,6 +206,15 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         // This updates camera matrices and graphics options
         self.cameras.update();
         let graphics_options = self.cameras.graphics_options();
+
+        // Update full frame texture. (resize() implements do-nothing-if-equal so it's
+        // OK to do this unconditionally.)
+        self.info_text_texture.resize(
+            context,
+            self.cameras.viewport(),
+            info_text_size_policy,
+            (MagFilter::Nearest, MinFilter::Linear),
+        )?;
 
         // Recompile shaders if needed
         let sources_changed = self.shader_programs_dirty.get_and_clear();

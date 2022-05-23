@@ -138,7 +138,7 @@ async fn follow_character_change(context: RenderTestContext) {
     let character_cell = ListenableCell::new(Some(c1));
     let cameras: StandardCameras = StandardCameras::new(
         ListenableSource::constant(GraphicsOptions::default()),
-        COMMON_VIEWPORT,
+        ListenableSource::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
         ListenableSource::constant(None),
     )
@@ -197,7 +197,7 @@ async fn no_character_but_ui(context: RenderTestContext) {
     let ui_space = universe.insert_anonymous(ui_space);
     let cameras: StandardCameras = StandardCameras::new(
         ListenableSource::constant(GraphicsOptions::default()),
-        COMMON_VIEWPORT,
+        ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(None),
         ListenableSource::constant(Some(ui_space)),
     )

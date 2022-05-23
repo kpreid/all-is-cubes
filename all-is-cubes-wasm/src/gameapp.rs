@@ -17,7 +17,9 @@ use web_sys::{
 };
 
 use all_is_cubes::apps::{Key, Session, StandardCameras};
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
+use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_luminance::SurfaceRenderer;
@@ -97,9 +99,11 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     static_dom.loading_log.append_data("\nLoading shaders...")?;
     app_progress.progress(0.6).await;
+
+    let viewport_cell = ListenableCell::new(gui_helpers.canvas_helper().viewport());
     let renderer = SurfaceRenderer::new(
         surface,
-        StandardCameras::from_session(&session, gui_helpers.canvas_helper().viewport()).unwrap(),
+        StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap(),
     )
     .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
 
@@ -107,7 +111,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .loading_log
         .append_data("\nStarting game loop...")?;
     app_progress.progress(0.8).await;
-    let root = WebGameRoot::new(gui_helpers, static_dom.clone(), session, renderer);
+    let root = WebGameRoot::new(gui_helpers, static_dom.clone(), session, renderer, viewport_cell);
     root.borrow().start_loop();
 
     static_dom
@@ -149,6 +153,7 @@ struct WebGameRoot {
     static_dom: StaticDom,
     session: Session,
     renderer: SurfaceRenderer<WebSysWebGL2Surface>,
+    viewport_cell: ListenableCell<Viewport>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
     step_callback_scheduled: bool,
@@ -162,6 +167,7 @@ impl WebGameRoot {
         static_dom: StaticDom,
         session: Session,
         renderer: SurfaceRenderer<WebSysWebGL2Surface>,
+        viewport_cell: ListenableCell<Viewport>,
     ) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {
@@ -171,6 +177,7 @@ impl WebGameRoot {
             static_dom,
             session,
             renderer,
+            viewport_cell,
             raf_callback: Closure::wrap(Box::new(|_| { /* dummy no-op for initialization */ })),
             step_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
             step_callback_scheduled: false,
@@ -342,10 +349,10 @@ impl WebGameRoot {
         let should_draw = self.session.frame_clock.request_frame(delta);
 
         if should_draw {
-            // TODO do projection updates only when needed
-            self.renderer
-                .set_viewport(self.gui_helpers.canvas_helper().viewport())
-                .unwrap();
+            let viewport = self.gui_helpers.canvas_helper().viewport();
+            if viewport != *self.viewport_cell.get() {
+                self.viewport_cell.set(viewport);
+            }
             self.renderer.objects.update_world_camera();
             self.session.update_cursor(self.renderer.objects.cameras());
 

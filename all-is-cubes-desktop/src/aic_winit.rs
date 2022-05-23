@@ -7,6 +7,7 @@ use std::future::Future;
 use std::task::Context;
 use std::time::Instant;
 
+use all_is_cubes::listen::ListenableCell;
 use futures::executor::block_on;
 use futures::task::noop_waker_ref;
 use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
@@ -55,7 +56,10 @@ pub fn winit_main_loop(
         .with_title(window_title)
         //.with_visible(false)
         .build(&event_loop)?;
-    let viewport = physical_size_to_viewport(window.scale_factor(), window.inner_size());
+    let viewport_cell = ListenableCell::new(physical_size_to_viewport(
+        window.scale_factor(),
+        window.inner_size(),
+    ));
 
     let instance = wgpu::Instance::new(wgpu::Backends::all());
     // Safety: create_surface specifies that the window must be kept alive
@@ -69,7 +73,7 @@ pub fn winit_main_loop(
     }))
     .ok_or_else(|| anyhow::format_err!("Could not request suitable graphics adapter"))?;
     let mut renderer = block_on(SurfaceRenderer::new(
-        StandardCameras::from_session(&session, viewport)?,
+        StandardCameras::from_session(&session, viewport_cell.as_source())?,
         surface,
         &adapter,
     ))?;
@@ -128,7 +132,7 @@ pub fn winit_main_loop(
                     WindowEvent::CursorMoved { position, .. } => {
                         let position: [f64; 2] = position.into();
                         session.input_processor.mouse_pixel_position(
-                            renderer.viewport(),
+                            *viewport_cell.get(),
                             Some(Point2::from(position) / window.scale_factor()),
                             false,
                         );
@@ -138,7 +142,7 @@ pub fn winit_main_loop(
                     }
                     WindowEvent::CursorLeft { .. } => {
                         session.input_processor.mouse_pixel_position(
-                            renderer.viewport(),
+                            *viewport_cell.get(),
                             None,
                             false,
                         );
@@ -156,19 +160,17 @@ pub fn winit_main_loop(
 
                     // Window state
                     WindowEvent::Resized(physical_size) => {
-                        renderer
-                            .set_viewport(physical_size_to_viewport(
-                                window.scale_factor(),
-                                physical_size,
-                            ))
-                            .unwrap();
+                        viewport_cell.set(physical_size_to_viewport(
+                            window.scale_factor(),
+                            physical_size,
+                        ));
                     }
                     WindowEvent::ScaleFactorChanged {
                         scale_factor,
                         new_inner_size,
-                    } => renderer
-                        .set_viewport(physical_size_to_viewport(scale_factor, *new_inner_size))
-                        .unwrap(),
+                    } => {
+                        viewport_cell.set(physical_size_to_viewport(scale_factor, *new_inner_size))
+                    }
                     WindowEvent::Focused(has_focus) => {
                         session.input_processor.key_focus(has_focus);
                     }
