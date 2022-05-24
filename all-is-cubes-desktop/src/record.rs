@@ -11,13 +11,14 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use futures::executor::block_on;
 use image::RgbaImage;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::{chunk::ChunkType, Encoder};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::behavior::AutoRotate;
-use all_is_cubes::camera::Viewport;
+use all_is_cubes::camera::{HeadlessRenderer, Viewport};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::NotNan;
@@ -93,7 +94,7 @@ pub(crate) fn record_main(
         drawing_progress_bar.enable_steady_tick(1000);
 
         for frame_number in options.frame_range() {
-            // TODO: Start reusing renderers instead of recreating them
+            // TODO: Start reusing renderers instead of recreating them.
             let mut renderer = RtRenderer::new(cameras.clone(), ListenableSource::constant(()));
             renderer.update(None).unwrap();
 
@@ -135,29 +136,34 @@ pub(crate) fn record_main(
 ///
 /// TODO: Add use of recirculating renderers, which means there will be a third
 /// "return for next update" output.
-struct Recorder<K> {
-    pub scene_sender: mpsc::SyncSender<(K, RtRenderer)>,
+struct Recorder<K, R> {
+    pub scene_sender: mpsc::SyncSender<(K, R)>,
     /// Contains the successive identifiers of each frame successfully written.
     pub status_receiver: mpsc::Receiver<K>,
 }
 
-impl<K: Send + 'static> Recorder<K> {
+impl<K, R> Recorder<K, R>
+where
+    K: Send + 'static,
+    R: HeadlessRenderer + Send + 'static,
+{
     /// TODO: This is only implementing part of the RecordOptions (not the frame timing); refactor.
     fn new(options: RecordOptions) -> Result<Self, anyhow::Error> {
         // Set up threads. Raytracing is internally parallel using Rayon, but we want to
         // thread everything else too so we're not alternating single-threaded and parallel
         // operations.
-        let (scene_sender, scene_receiver) = mpsc::sync_channel::<(K, RtRenderer)>(1);
+        let (scene_sender, scene_receiver) = mpsc::sync_channel::<(K, R)>(1);
         let (image_data_sender, image_data_receiver) = mpsc::sync_channel(1);
         let (mut write_status_sender, status_receiver) = mpsc::channel();
 
         // Raytracing thread.
         std::thread::Builder::new()
-            .name("raytracer".to_string())
+            .name("renderer".to_string())
             .spawn({
                 move || {
-                    while let Ok((frame_id, renderer)) = scene_receiver.recv() {
-                        let (image, _info) = renderer.draw_rgba("");
+                    while let Ok((frame_id, mut renderer)) = scene_receiver.recv() {
+                        // TODO: error handling
+                        let image = block_on(renderer.draw("")).unwrap();
                         image_data_sender.send((frame_id, image)).unwrap();
                     }
                 }
