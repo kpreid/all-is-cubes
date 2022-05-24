@@ -506,6 +506,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "camino"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "869119e97797867fd90f5e22af7d0bd274bd4635ebb9eb68c04f3f513ae6c412"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "cargo-platform"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbdb825da8a5df079a43676dbe042702f1707b1109f713a01420fbb4cc71fa27"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cargo_metadata"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -514,6 +532,19 @@ dependencies = [
  "semver 0.9.0",
  "serde",
  "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4acbb09d9ee8e23699b9634375c72795d095bf268439da88562cf9b501f181fa"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver 1.0.9",
+ "serde",
  "serde_json",
 ]
 
@@ -3843,6 +3874,9 @@ name = "semver"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8cb243bdfdb5936c8dc3c45762a19d12ab4550cdc753bc247637d4ec35a040fd"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "semver-parser"
@@ -5072,7 +5106,7 @@ checksum = "e05e9918c3da86a50822e92ad0ed72445504bddd3d9bb7a5fa72eb49ec807447"
 dependencies = [
  "atty",
  "binary-install",
- "cargo_metadata",
+ "cargo_metadata 0.8.2",
  "chrono",
  "console 0.6.2",
  "curl",
@@ -5399,7 +5433,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cargo_metadata",
+ "cargo_metadata 0.14.2",
  "clap 3.1.18",
  "toml_edit",
  "xshell",
