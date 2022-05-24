@@ -90,9 +90,10 @@ impl RenderTestContext {
 
 /// Command-line arguments for binaries using the renderer test harness.
 ///
-/// This should eventually match the [standard Rust test harness args]
-/// (https://doc.rust-lang.org/rustc/tests/index.html#cli-arguments)
-/// but it does fully do that yet.
+/// TODO: This should eventually match the [standard Rust test harness args](
+/// https://doc.rust-lang.org/rustc/tests/index.html#cli-arguments),
+/// so that `cargo test -- --whatever` in the workspace succeeds, but it
+/// does not have all of the options yet.
 #[derive(Debug, clap::Parser)]
 #[clap(author, about, version)]
 pub struct HarnessArgs {

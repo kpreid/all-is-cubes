@@ -121,6 +121,8 @@ where
 impl RtRenderer<()> {
     /// As [`Self::draw()`], but the output is an [`RgbaImage`], and
     /// [`Camera::post_process_color()`] is applied to the pixels.
+    ///
+    ///  [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color
     pub fn draw_rgba(&self, info_text: &str) -> (RgbaImage, RaytraceInfo) {
         let camera = self.cameras.cameras().world.clone();
         let Vector2 {
