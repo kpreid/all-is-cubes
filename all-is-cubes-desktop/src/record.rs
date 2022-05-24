@@ -11,18 +11,17 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use anyhow::anyhow;
+use image::RgbaImage;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::{chunk::ChunkType, Encoder};
 
-use all_is_cubes::apps::Session;
+use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::behavior::AutoRotate;
-use all_is_cubes::camera::{Camera, Viewport};
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::character::Character;
-use all_is_cubes::math::{NotNan, Rgba};
-use all_is_cubes::raytracer::{ColorBuf, SpaceRaytracer};
-use all_is_cubes::universe::URef;
+use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::math::NotNan;
+use all_is_cubes::raytracer::RtRenderer;
 
 /// Options for recording and output in [`record_main`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -68,24 +67,18 @@ pub(crate) fn record_main(
     let mut stderr = std::io::stderr();
 
     let viewport = options.viewport();
-    let mut camera = Camera::new(session.graphics_options().snapshot(), viewport);
-
-    // Get character or fail.
-    // (We could instead try to render a blank scene, but that is probably not wanted.)
-    let character_ref: URef<Character> = session
-        .character()
-        .snapshot()
-        .ok_or_else(|| anyhow!("Character not found"))?;
-
-    let space_ref = character_ref.borrow().space.clone();
+    let cameras =
+        StandardCameras::from_session(&session, ListenableSource::constant(viewport)).unwrap();
 
     if let Some(anim) = &options.animation {
-        // TODO: replace this with a general camera scripting mechanism
-        character_ref.try_modify(|c| {
-            c.add_behavior(AutoRotate {
-                rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
-            })
-        })?;
+        if let Some(character_ref) = session.character().snapshot() {
+            // TODO: replace this with a general camera scripting mechanism
+            character_ref.try_modify(|c| {
+                c.add_behavior(AutoRotate {
+                    rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
+                })
+            })?;
+        }
     }
 
     let recorder = Recorder::new(options.clone())?;
@@ -100,15 +93,13 @@ pub(crate) fn record_main(
         drawing_progress_bar.enable_steady_tick(1000);
 
         for frame_number in options.frame_range() {
-            camera.set_view_transform(character_ref.borrow().view());
-            let scene = SpaceRaytracer::<()>::new(
-                &*space_ref.borrow(),
-                session.graphics_options().snapshot(),
-                (),
-            );
+            // TODO: Start reusing renderers instead of recreating them
+            let mut renderer = RtRenderer::new(cameras.clone(), ListenableSource::constant(()));
+            renderer.update(None).unwrap();
+
             recorder
                 .scene_sender
-                .send((frame_number, camera.clone(), scene))
+                .send((frame_number, renderer))
                 .unwrap();
 
             // Advance time for next frame.
@@ -137,15 +128,15 @@ pub(crate) fn record_main(
     Ok(())
 }
 
-/// A threaded pipeline for writing one or more [`SpaceRaytracer`] renderings.
+/// A threaded pipeline for writing one or more raytracer renderings.
 ///
 /// TODO: This may end up wanting to be split into two pipeline-end custom structs
 /// instead of just presenting the raw sender and receiver.
 ///
-/// TODO: Add use of UpdatingSpaceRaytracer, which means there will be a third
+/// TODO: Add use of recirculating renderers, which means there will be a third
 /// "return for next update" output.
 struct Recorder<K> {
-    pub scene_sender: mpsc::SyncSender<(K, Camera, SpaceRaytracer<()>)>,
+    pub scene_sender: mpsc::SyncSender<(K, RtRenderer)>,
     /// Contains the successive identifiers of each frame successfully written.
     pub status_receiver: mpsc::Receiver<K>,
 }
@@ -156,8 +147,7 @@ impl<K: Send + 'static> Recorder<K> {
         // Set up threads. Raytracing is internally parallel using Rayon, but we want to
         // thread everything else too so we're not alternating single-threaded and parallel
         // operations.
-        let (scene_sender, scene_receiver) =
-            mpsc::sync_channel::<(K, Camera, SpaceRaytracer<()>)>(1);
+        let (scene_sender, scene_receiver) = mpsc::sync_channel::<(K, RtRenderer)>(1);
         let (image_data_sender, image_data_receiver) = mpsc::sync_channel(1);
         let (mut write_status_sender, status_receiver) = mpsc::channel();
 
@@ -166,13 +156,9 @@ impl<K: Send + 'static> Recorder<K> {
             .name("raytracer".to_string())
             .spawn({
                 move || {
-                    while let Ok((frame_id, camera, raytracer)) = scene_receiver.recv() {
-                        let (image_data, _info) = raytracer
-                            .trace_scene_to_image::<ColorBuf, _, Rgba>(&camera, |pixel_buf| {
-                                camera.post_process_color(Rgba::from(pixel_buf))
-                            });
-                        // TODO: Offer supersampling (multiple rays per output pixel).
-                        image_data_sender.send((frame_id, image_data)).unwrap();
+                    while let Ok((frame_id, renderer)) = scene_receiver.recv() {
+                        let (image, _info) = renderer.draw_rgba("");
+                        image_data_sender.send((frame_id, image)).unwrap();
                     }
                 }
             })?;
@@ -203,7 +189,7 @@ impl<K: Send + 'static> Recorder<K> {
 fn threaded_write_frames<K: Send + 'static>(
     file: File,
     options: RecordOptions,
-    image_data_receiver: mpsc::Receiver<(K, Box<[Rgba]>)>,
+    image_data_receiver: mpsc::Receiver<(K, RgbaImage)>,
     write_status_sender: &mut mpsc::Sender<K>,
 ) -> Result<(), std::io::Error> {
     let mut buf_writer = BufWriter::new(file);
@@ -212,7 +198,7 @@ fn threaded_write_frames<K: Send + 'static>(
         'frame_loop: loop {
             match image_data_receiver.recv() {
                 Ok((frame_number, image_data)) => {
-                    write_frame(&mut png_writer, &*image_data)?;
+                    png_writer.write_image_data(image_data.as_ref())?;
                     let _ = write_status_sender.send(frame_number);
                 }
                 Err(mpsc::RecvError) => {
@@ -223,18 +209,6 @@ fn threaded_write_frames<K: Send + 'static>(
     }
     let file = buf_writer.into_inner()?;
     file.sync_all()?;
-    Ok(())
-}
-
-fn write_frame(
-    png_writer: &mut png::Writer<&mut BufWriter<File>>,
-    image_data: &[Rgba],
-) -> Result<(), std::io::Error> {
-    let byte_raster = image_data
-        .iter()
-        .flat_map(|c| c.to_srgb8())
-        .collect::<Vec<u8>>();
-    png_writer.write_image_data(&byte_raster)?;
     Ok(())
 }
 

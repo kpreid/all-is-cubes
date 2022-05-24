@@ -123,6 +123,7 @@ dependencies = [
  "dot_vox",
  "futures 0.3.21",
  "glfw",
+ "image",
  "indicatif",
  "log",
  "luminance-glfw",
