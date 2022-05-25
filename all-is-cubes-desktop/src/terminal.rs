@@ -124,7 +124,6 @@ struct TerminalMain {
 }
 
 struct FrameInput {
-    camera: Camera,
     options: TerminalOptions,
     scene: RtRenderer<CharacterRtData>,
 }
@@ -171,14 +170,13 @@ impl TerminalMain {
             .name("raytracer".to_string())
             .spawn({
                 move || {
-                    while let Ok(FrameInput {
-                        camera,
-                        options,
-                        scene,
-                    }) = render_thread_in.recv()
-                    {
+                    while let Ok(FrameInput { options, scene }) = render_thread_in.recv() {
+                        // TODO: it isn't actually correct to use the world camera always,
+                        // once UI exists because it will use the world exposure for UI,
+                        // but this will require a rethink of the raytracer interface.
+                        let camera = &scene.cameras().cameras().world;
                         let (image, info) =
-                            scene.draw::<ColorCharacterBuf, _, _>("", |b| b.output(&camera));
+                            scene.draw::<ColorCharacterBuf, _, _>("", |b| b.output(camera));
                         // Ignore send errors as they just mean we're shutting down or died elsewhere
                         let _ = render_thread_out.send(FrameOutput {
                             viewport: camera.viewport(),
@@ -272,7 +270,7 @@ impl TerminalMain {
                         let position =
                             Point2::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
                         self.session.input_processor.mouse_pixel_position(
-                            self.cameras.viewport(),
+                            *self.viewport_cell.get(),
                             Some(position),
                             true,
                         );
@@ -305,7 +303,10 @@ impl TerminalMain {
             }
 
             if self.session.frame_clock.should_draw() {
-                self.session.update_cursor(&self.cameras); // TODO: wrong UI camera ...
+                // TODO: this is the only reason self.cameras exists
+                self.cameras.update();
+                self.session.update_cursor(&self.cameras);
+
                 self.send_frame_to_render();
             } else {
                 std::thread::yield_now();
@@ -337,14 +338,11 @@ impl TerminalMain {
     }
 
     fn send_frame_to_render(&mut self) {
-        self.cameras.update();
-
         // Fetch and update one of our recirculating renderers.
         let mut renderer = self.buffer_reuse_out.recv().unwrap();
         renderer.update(self.session.cursor_result()).unwrap();
 
         match self.render_pipe_in.try_send(FrameInput {
-            camera: self.cameras.cameras().world.clone(),
             options: self.options.clone(),
             scene: renderer,
         }) {
