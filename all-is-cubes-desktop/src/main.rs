@@ -42,6 +42,7 @@ mod data_files;
 mod glue;
 mod record;
 use record::record_main;
+mod session;
 mod terminal;
 use terminal::{terminal_main_loop, TerminalOptions};
 

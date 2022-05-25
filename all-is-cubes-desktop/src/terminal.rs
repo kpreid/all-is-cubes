@@ -32,6 +32,7 @@ use all_is_cubes::raytracer::{
 };
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
+use crate::session::DesktopSession;
 
 /// Options for the terminal UI.
 ///
@@ -98,8 +99,7 @@ pub fn terminal_print_once(
 }
 
 struct TerminalMain {
-    session: Session,
-    cameras: StandardCameras,
+    dsession: DesktopSession<TerminalRenderer>,
 
     options: TerminalOptions,
     tuiout: tui::Terminal<CrosstermBackend<io::Stdout>>,
@@ -109,9 +109,16 @@ struct TerminalMain {
     // Tracking terminal state.
     /// Regionof the terminal the scene is drawn into.
     viewport_position: Rect,
-    /// The `viewport_position` written into a `ListenableCell` for the benefit of
-    /// [`StandardCameras`].
-    viewport_cell: ListenableCell<Viewport>,
+}
+
+/// Fills the renderer slot of [`DesktopSession`].
+///
+/// TODO: Refactor this 'till we can merge it with the record mode
+/// raytracing.
+struct TerminalRenderer {
+    /// Redundant with the RtRenderer's cameras, but is a copy that
+    /// isn't hopping around threads.
+    cameras: StandardCameras,
 
     /// The widths of "single characters" according to the terminal's interpretation
     /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
@@ -190,17 +197,21 @@ impl TerminalMain {
             })?;
 
         Ok(Self {
-            cameras,
-            session,
+            dsession: DesktopSession {
+                session,
+                renderer: TerminalRenderer {
+                    cameras,
+                    widths: HashMap::new(),
+                    buffer_reuse_out,
+                    render_pipe_in,
+                    render_pipe_out,
+                },
+                viewport_cell,
+            },
             options,
             tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
             viewport_position,
-            viewport_cell,
             terminal_state_dirty: true,
-            widths: HashMap::new(),
-            buffer_reuse_out,
-            render_pipe_in,
-            render_pipe_out,
         })
     }
 
@@ -228,7 +239,12 @@ impl TerminalMain {
             'input: while crossterm::event::poll(Duration::ZERO)? {
                 let event = crossterm::event::read()?;
                 if let Some(aic_event) = event_to_key(&event) {
-                    if self.session.input_processor.key_momentary(aic_event) {
+                    if self
+                        .dsession
+                        .session
+                        .input_processor
+                        .key_momentary(aic_event)
+                    {
                         // Handled by input_processor
                         continue 'input;
                     }
@@ -269,14 +285,14 @@ impl TerminalMain {
                         // system. Define a version of mouse_pixel_position which takes sizes directly?
                         let position =
                             Point2::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
-                        self.session.input_processor.mouse_pixel_position(
-                            *self.viewport_cell.get(),
+                        self.dsession.session.input_processor.mouse_pixel_position(
+                            *self.dsession.viewport_cell.get(),
                             Some(position),
                             true,
                         );
                         match kind {
                             MouseEventKind::Down(button) => {
-                                self.session.click(map_mouse_button(button));
+                                self.dsession.session.click(map_mouse_button(button));
                             }
                             MouseEventKind::Up(_)
                             | MouseEventKind::Drag(_)
@@ -289,10 +305,10 @@ impl TerminalMain {
             }
 
             // TODO: sleep instead of spinning, and maybe put a general version of this in Session.
-            self.session.frame_clock.advance_to(Instant::now());
-            self.session.maybe_step_universe();
+            self.dsession.session.frame_clock.advance_to(Instant::now());
+            self.dsession.session.maybe_step_universe();
 
-            match self.render_pipe_out.try_recv() {
+            match self.dsession.renderer.render_pipe_out.try_recv() {
                 Ok(frame) => {
                     self.write_ui(&frame)?;
                     self.write_frame(frame, true)?;
@@ -302,10 +318,11 @@ impl TerminalMain {
                 Err(mpsc::TryRecvError::Disconnected) => panic!("render thread died"),
             }
 
-            if self.session.frame_clock.should_draw() {
-                // TODO: this is the only reason self.cameras exists
-                self.cameras.update();
-                self.session.update_cursor(&self.cameras);
+            if self.dsession.session.frame_clock.should_draw() {
+                // TODO: this is the only reason .cameras exists
+                let c = &mut self.dsession.renderer.cameras;
+                c.update();
+                self.dsession.session.update_cursor(&*c);
 
                 self.send_frame_to_render();
             } else {
@@ -322,6 +339,8 @@ impl TerminalMain {
 
         self.send_frame_to_render();
         let frame = self
+            .dsession
+            .renderer
             .render_pipe_out
             .recv()
             .expect("Internal error in rendering");
@@ -331,7 +350,7 @@ impl TerminalMain {
     }
 
     fn sync_viewport(&mut self) {
-        self.viewport_cell.set(
+        self.dsession.viewport_cell.set(
             self.options
                 .viewport_from_terminal_size(rect_size(self.viewport_position)),
         );
@@ -339,15 +358,17 @@ impl TerminalMain {
 
     fn send_frame_to_render(&mut self) {
         // Fetch and update one of our recirculating renderers.
-        let mut renderer = self.buffer_reuse_out.recv().unwrap();
-        renderer.update(self.session.cursor_result()).unwrap();
+        let mut renderer = self.dsession.renderer.buffer_reuse_out.recv().unwrap();
+        renderer
+            .update(self.dsession.session.cursor_result())
+            .unwrap();
 
-        match self.render_pipe_in.try_send(FrameInput {
+        match self.dsession.renderer.render_pipe_in.try_send(FrameInput {
             options: self.options.clone(),
             scene: renderer,
         }) {
             Ok(()) => {
-                self.session.frame_clock.did_draw();
+                self.dsession.session.frame_clock.did_draw();
             }
             Err(TrySendError::Disconnected(_)) => {
                 // Ignore send errors as they should be detected on the receive side
@@ -419,7 +440,7 @@ impl TerminalMain {
                     .constraints([Constraint::Ratio(1, SLOTS as u32); SLOTS])
                     .split(toolbar_rect);
 
-                if let Some(character_ref) = self.session.character().snapshot() {
+                if let Some(character_ref) = self.dsession.session.character().snapshot() {
                     let character = character_ref.borrow();
                     let selected_slots = character.selected_slots();
                     let slots = &character.inventory().slots;
@@ -483,7 +504,7 @@ impl TerminalMain {
                 f.render_widget(
                     Paragraph::new(format!(
                         "{:5.1} FPS",
-                        self.session.draw_fps_counter().frames_per_second()
+                        self.dsession.session.draw_fps_counter().frames_per_second()
                     )),
                     frame_info_rect,
                 );
@@ -501,7 +522,7 @@ impl TerminalMain {
 
             // Cursor info
             f.render_widget(
-                if let Some(cursor) = self.session.cursor_result() {
+                if let Some(cursor) = self.dsession.session.cursor_result() {
                     // TODO: design good formatting for cursor data
                     Paragraph::new(format!(
                         "{:?} : {}",
@@ -578,7 +599,7 @@ impl TerminalMain {
 
                 let width = write_colored_and_measure(
                     backend,
-                    &mut self.widths,
+                    &mut self.dsession.renderer.widths,
                     &mut current_color,
                     color,
                     text,

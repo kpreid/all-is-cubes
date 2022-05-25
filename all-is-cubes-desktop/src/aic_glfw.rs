@@ -9,19 +9,18 @@ use std::ops::ControlFlow;
 use std::time::Instant;
 
 use glfw::{Action, Context as _, CursorMode, SwapInterval, WindowEvent, WindowMode};
-use luminance_glfw::{GlfwSurface, GlfwSurfaceError};
+use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 
 use all_is_cubes::apps::{Session, StandardCameras};
-use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
-use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_luminance::SurfaceRenderer;
 
 use crate::choose_graphical_window_size;
 use crate::glue::glfw::{
     get_primary_workarea_size, map_key, map_mouse_button, window_size_as_viewport,
 };
+use crate::session::DesktopSession;
 
 #[derive(Clone, Copy, Debug)]
 struct CannotCreateWindow;
@@ -36,7 +35,7 @@ impl Error for CannotCreateWindow {}
 ///
 /// Returns when the user closes the window/app.
 pub fn glfw_main_loop(
-    mut session: Session,
+    session: Session,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
 ) -> Result<(), anyhow::Error> {
@@ -55,11 +54,16 @@ pub fn glfw_main_loop(
         glfw.set_swap_interval(SwapInterval::Sync(1));
         Ok((window, events_rx))
     })?;
-    let mut viewport_cell = ListenableCell::new(window_size_as_viewport(&context.window));
-    let mut renderer = SurfaceRenderer::new(
-        context,
-        StandardCameras::from_session(&session, viewport_cell.as_source())?,
-    )?;
+
+    let viewport_cell = ListenableCell::new(window_size_as_viewport(&context.window));
+    let mut dsession = DesktopSession {
+        renderer: SurfaceRenderer::new(
+            context,
+            StandardCameras::from_session(&session, viewport_cell.as_source())?,
+        )?,
+        session,
+        viewport_cell,
+    };
 
     let ready_time = Instant::now();
     log::debug!(
@@ -69,17 +73,23 @@ pub fn glfw_main_loop(
 
     let mut first_frame = true;
     'event_loop: loop {
-        session.frame_clock.advance_to(Instant::now());
-        session.maybe_step_universe();
-        if session.frame_clock.should_draw() {
-            renderer.objects.update_world_camera();
-            session.update_cursor(renderer.objects.cameras());
-            let render_info = renderer.render_frame(session.cursor_result()).unwrap();
-            renderer
-                .add_info_text(&format!("{}", session.info_text(render_info)))
+        dsession.session.frame_clock.advance_to(Instant::now());
+        dsession.session.maybe_step_universe();
+        if dsession.session.frame_clock.should_draw() {
+            dsession.renderer.objects.update_world_camera();
+            dsession
+                .session
+                .update_cursor(dsession.renderer.objects.cameras());
+            let render_info = dsession
+                .renderer
+                .render_frame(dsession.session.cursor_result())
                 .unwrap();
-            renderer.surface.window.swap_buffers();
-            session.frame_clock.did_draw();
+            dsession
+                .renderer
+                .add_info_text(&format!("{}", dsession.session.info_text(render_info)))
+                .unwrap();
+            dsession.renderer.surface.window.swap_buffers();
+            dsession.session.frame_clock.did_draw();
         } else {
             std::thread::yield_now();
         }
@@ -93,25 +103,22 @@ pub fn glfw_main_loop(
         }
 
         // Sync UI state back to glfw
-        renderer
-            .surface
-            .window
-            .set_cursor_mode(if session.input_processor.wants_pointer_lock() {
+        dsession.renderer.surface.window.set_cursor_mode(
+            if dsession.session.input_processor.wants_pointer_lock() {
                 CursorMode::Disabled
             } else {
                 CursorMode::Normal
-            });
-        session
-            .input_processor
-            .has_pointer_lock(renderer.surface.window.get_cursor_mode() == CursorMode::Disabled);
+            },
+        );
+        dsession.session.input_processor.has_pointer_lock(
+            dsession.renderer.surface.window.get_cursor_mode() == CursorMode::Disabled,
+        );
 
         // Poll for events after drawing, so that on the first loop iteration we draw
         // before the window is visible (at least on macOS).
-        renderer.surface.window.glfw.poll_events();
+        dsession.renderer.surface.window.glfw.poll_events();
         for (_, event) in events_rx.try_iter() {
-            if let ControlFlow::Break(_) =
-                handle_glfw_event(event, &mut session, &mut renderer, &mut viewport_cell)
-            {
+            if let ControlFlow::Break(_) = handle_glfw_event(event, &mut dsession) {
                 break 'event_loop;
             }
         }
@@ -129,22 +136,22 @@ pub fn glfw_main_loop(
 /// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
 fn handle_glfw_event(
     event: WindowEvent,
-    session: &mut Session,
-    renderer: &mut SurfaceRenderer<luminance_glfw::GL33Context>,
-    viewport_cell: &mut ListenableCell<Viewport>,
+    dsession: &mut DesktopSession<SurfaceRenderer<GL33Context>>,
 ) -> ControlFlow<()> {
+    let input_processor = &mut dsession.session.input_processor;
+
     match event {
         WindowEvent::Close => return ControlFlow::Break(()),
 
         // Keyboard input
         WindowEvent::Key(key, _, Action::Press, _) => {
             if let Some(key) = map_key(key) {
-                session.input_processor.key_down(key);
+                input_processor.key_down(key);
             }
         }
         WindowEvent::Key(key, _, Action::Release, _) => {
             if let Some(key) = map_key(key) {
-                session.input_processor.key_up(key);
+                input_processor.key_up(key);
             }
         }
         WindowEvent::Key(_, _, Action::Repeat, _) => {
@@ -156,26 +163,28 @@ fn handle_glfw_event(
 
         // Mouse input
         WindowEvent::CursorPos(..) => {
-            session.input_processor.mouse_pixel_position(
-                renderer.viewport(),
-                Some(Point2::from(renderer.surface.window.get_cursor_pos())),
+            input_processor.mouse_pixel_position(
+                *dsession.viewport_cell.get(),
+                Some(Point2::from(
+                    dsession.renderer.surface.window.get_cursor_pos(),
+                )),
                 true,
             );
         }
         WindowEvent::CursorEnter(true) => {
-            session.input_processor.mouse_pixel_position(
-                renderer.viewport(),
-                Some(Point2::from(renderer.surface.window.get_cursor_pos())),
+            input_processor.mouse_pixel_position(
+                *dsession.viewport_cell.get(),
+                Some(Point2::from(
+                    dsession.renderer.surface.window.get_cursor_pos(),
+                )),
                 false,
             );
         }
         WindowEvent::CursorEnter(false) => {
-            session
-                .input_processor
-                .mouse_pixel_position(renderer.viewport(), None, false);
+            input_processor.mouse_pixel_position(*dsession.viewport_cell.get(), None, false);
         }
         WindowEvent::MouseButton(button, Action::Press, _) => {
-            session.click(map_mouse_button(button));
+            dsession.session.click(map_mouse_button(button));
         }
         WindowEvent::MouseButton(_, Action::Release, _) => {}
         WindowEvent::MouseButton(_, Action::Repeat, _) => {}
@@ -186,23 +195,18 @@ fn handle_glfw_event(
 
         // Window state
         WindowEvent::FramebufferSize(..) | WindowEvent::ContentScale(..) => {
-            viewport_cell.set(window_size_as_viewport(&renderer.surface.window));
+            dsession
+                .viewport_cell
+                .set(window_size_as_viewport(&dsession.renderer.surface.window));
         }
         WindowEvent::Focus(has_focus) => {
-            session.input_processor.key_focus(has_focus);
+            input_processor.key_focus(has_focus);
         }
 
         WindowEvent::FileDrop(files) => {
             // TODO: Offer confirmation before replacing the current universe
             if let Some(path) = files.into_iter().next() {
-                session.set_universe_async(async move {
-                    crate::data_files::load_universe_from_file(YieldProgress::noop(), &path)
-                        .await
-                        .map_err(|e| {
-                            // TODO: show error in user interface
-                            log::error!("Failed to load file '{}':\n{}", path.display(), e);
-                        })
-                })
+                dsession.replace_universe_with_file(path);
             }
         }
 

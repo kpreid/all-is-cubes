@@ -12,7 +12,7 @@ use futures::executor::block_on;
 use futures::task::noop_waker_ref;
 use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
+use winit::window::{Window, WindowBuilder};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
@@ -24,12 +24,13 @@ use crate::glue::winit::{
     logical_size_from_vec, map_key, map_mouse_button, monitor_size_for_window,
     physical_size_to_viewport, sync_cursor_grab,
 };
+use crate::session::DesktopSession;
 
 /// Run Winit/wgpu-based rendering and event loop.
 ///
 /// Returns when the user closes the window/app.
 pub fn winit_main_loop(
-    mut session: Session,
+    session: Session,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
 ) -> Result<(), anyhow::Error> {
@@ -72,11 +73,17 @@ pub fn winit_main_loop(
         force_fallback_adapter: false,
     }))
     .ok_or_else(|| anyhow::format_err!("Could not request suitable graphics adapter"))?;
-    let mut renderer = block_on(SurfaceRenderer::new(
+    let renderer = block_on(SurfaceRenderer::new(
         StandardCameras::from_session(&session, viewport_cell.as_source())?,
         surface,
         &adapter,
     ))?;
+
+    let mut dsession = DesktopSession {
+        session,
+        renderer,
+        viewport_cell,
+    };
 
     let ready_time = Instant::now();
     log::debug!(
@@ -95,163 +102,180 @@ pub fn winit_main_loop(
         }
 
         // Sync UI state back to window
-        sync_cursor_grab(&window, &mut session.input_processor);
+        sync_cursor_grab(&window, &mut dsession.session.input_processor);
 
-        match event {
-            Event::NewEvents(_) => {}
-            Event::WindowEvent { window_id, event } if window_id == window.id() => {
-                match event {
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+        handle_winit_event(event, &window, &mut dsession, control_flow)
+    });
+}
 
-                    // Keyboard input
-                    WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                virtual_keycode,
-                                state,
-                                ..
-                            },
-                        ..
-                    } => {
-                        // TODO: use KeyboardInput::scancode once we have editable bindings
-                        if let Some(key) = virtual_keycode.and_then(map_key) {
-                            match state {
-                                ElementState::Pressed => {
-                                    session.input_processor.key_down(key);
-                                }
-                                ElementState::Released => {
-                                    session.input_processor.key_up(key);
-                                }
+/// Handle one winit event.
+///
+/// Modifies `control_flow` if an event indicates the application should exit.
+/// (TODO: Clarify this for possible multi-window)
+///
+/// This is separated from [`winit_main_loop`] for the sake of readability (more overall structure
+/// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
+fn handle_winit_event(
+    event: Event<'_, ()>,
+    window: &Window,
+    dsession: &mut DesktopSession<SurfaceRenderer>,
+    control_flow: &mut ControlFlow,
+) {
+    let input_processor = &mut dsession.session.input_processor;
+    match event {
+        Event::NewEvents(_) => {}
+        Event::WindowEvent { window_id, event } if window_id == window.id() => {
+            match event {
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+
+                // Keyboard input
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode,
+                            state,
+                            ..
+                        },
+                    ..
+                } => {
+                    // TODO: use KeyboardInput::scancode once we have editable bindings
+                    if let Some(key) = virtual_keycode.and_then(map_key) {
+                        match state {
+                            ElementState::Pressed => {
+                                input_processor.key_down(key);
+                            }
+                            ElementState::Released => {
+                                input_processor.key_up(key);
                             }
                         }
                     }
-                    WindowEvent::ReceivedCharacter(..) => {}
-                    WindowEvent::ModifiersChanged(..) => {}
-
-                    // Mouse input
-                    WindowEvent::CursorMoved { position, .. } => {
-                        let position: [f64; 2] = position.into();
-                        session.input_processor.mouse_pixel_position(
-                            *viewport_cell.get(),
-                            Some(Point2::from(position) / window.scale_factor()),
-                            false,
-                        );
-                    }
-                    WindowEvent::CursorEntered { .. } => {
-                        // CursorEntered doesn't tell us position, so ignore
-                    }
-                    WindowEvent::CursorLeft { .. } => {
-                        session.input_processor.mouse_pixel_position(
-                            *viewport_cell.get(),
-                            None,
-                            false,
-                        );
-                    }
-                    WindowEvent::MouseInput { button, state, .. } => match state {
-                        ElementState::Pressed => {
-                            session.click(map_mouse_button(button));
-                        }
-                        ElementState::Released => {}
-                    },
-                    WindowEvent::MouseWheel { .. } => {
-                        // TODO: Hook up to input processor once we have customizable bindings
-                        // or otherwise something to do with it
-                    }
-
-                    // Window state
-                    WindowEvent::Resized(physical_size) => {
-                        viewport_cell.set(physical_size_to_viewport(
-                            window.scale_factor(),
-                            physical_size,
-                        ));
-                    }
-                    WindowEvent::ScaleFactorChanged {
-                        scale_factor,
-                        new_inner_size,
-                    } => {
-                        viewport_cell.set(physical_size_to_viewport(scale_factor, *new_inner_size))
-                    }
-                    WindowEvent::Focused(has_focus) => {
-                        session.input_processor.key_focus(has_focus);
-                    }
-
-                    // Unused
-                    WindowEvent::HoveredFile(_) => {}
-                    WindowEvent::DroppedFile(_) => {} // TODO: implement like we had for glfw
-                    WindowEvent::HoveredFileCancelled => {}
-                    WindowEvent::Moved(_) => {}
-                    WindowEvent::Destroyed => {}
-                    WindowEvent::TouchpadPressure { .. } => {}
-                    WindowEvent::AxisMotion { .. } => {}
-                    WindowEvent::Touch(_) => {}
-                    WindowEvent::ThemeChanged(_) => {}
                 }
-            }
-            Event::DeviceEvent {
-                device_id: _,
-                event,
-            } => match event {
-                DeviceEvent::MouseMotion { delta } => {
-                    session.input_processor.mouselook_delta(delta.into())
+                WindowEvent::ReceivedCharacter(..) => {}
+                WindowEvent::ModifiersChanged(..) => {}
+
+                // Mouse input
+                WindowEvent::CursorMoved { position, .. } => {
+                    let position: [f64; 2] = position.into();
+                    input_processor.mouse_pixel_position(
+                        *dsession.viewport_cell.get(),
+                        Some(Point2::from(position) / window.scale_factor()),
+                        false,
+                    );
+                }
+                WindowEvent::CursorEntered { .. } => {
+                    // CursorEntered doesn't tell us position, so ignore
+                }
+                WindowEvent::CursorLeft { .. } => {
+                    input_processor.mouse_pixel_position(
+                        *dsession.viewport_cell.get(),
+                        None,
+                        false,
+                    );
+                }
+                WindowEvent::MouseInput { button, state, .. } => match state {
+                    ElementState::Pressed => {
+                        dsession.session.click(map_mouse_button(button));
+                    }
+                    ElementState::Released => {}
+                },
+                WindowEvent::MouseWheel { .. } => {
+                    // TODO: Hook up to input processor once we have customizable bindings
+                    // or otherwise something to do with it
+                }
+
+                // Window state
+                WindowEvent::Resized(physical_size) => {
+                    dsession.viewport_cell.set(physical_size_to_viewport(
+                        window.scale_factor(),
+                        physical_size,
+                    ));
+                }
+                WindowEvent::ScaleFactorChanged {
+                    scale_factor,
+                    new_inner_size,
+                } => dsession
+                    .viewport_cell
+                    .set(physical_size_to_viewport(scale_factor, *new_inner_size)),
+                WindowEvent::Focused(has_focus) => {
+                    input_processor.key_focus(has_focus);
                 }
 
                 // Unused
-                DeviceEvent::Added => {}
-                DeviceEvent::Removed => {}
-                DeviceEvent::MouseWheel { .. } => {}
-                DeviceEvent::Motion { .. } => {}
-                DeviceEvent::Button { .. } => {}
-                DeviceEvent::Key(_) => {}
-                DeviceEvent::Text { .. } => {}
-            },
-            e @ Event::WindowEvent { .. } => {
-                log::error!("event for a window we aren't managing: {:?}", e)
+                WindowEvent::HoveredFile(_) => {}
+                WindowEvent::DroppedFile(_) => {} // TODO: implement like we had for glfw
+                WindowEvent::HoveredFileCancelled => {}
+                WindowEvent::Moved(_) => {}
+                WindowEvent::Destroyed => {}
+                WindowEvent::TouchpadPressure { .. } => {}
+                WindowEvent::AxisMotion { .. } => {}
+                WindowEvent::Touch(_) => {}
+                WindowEvent::ThemeChanged(_) => {}
             }
-
-            Event::MainEventsCleared => {
-                // Run simulation if it's time
-                session.frame_clock.advance_to(Instant::now());
-                session.maybe_step_universe();
-                if session.frame_clock.should_draw() {
-                    window.request_redraw();
-                }
-            }
-
-            Event::RedrawRequested(id) if id == window.id() => {
-                renderer.update_world_camera();
-                session.update_cursor(renderer.cameras());
-
-                {
-                    let device = renderer.device().clone();
-                    let mut done_rendering_future = Box::pin(
-                        renderer.render_frame(session.cursor_result(), |render_info| {
-                            format!("{}", session.info_text(render_info))
-                        }),
-                    );
-                    // TODO: integrate into event loop
-                    let _info = loop {
-                        device.poll(wgpu::Maintain::Poll);
-                        match done_rendering_future
-                            .as_mut()
-                            .poll(&mut Context::from_waker(noop_waker_ref()))
-                        {
-                            std::task::Poll::Ready(outcome) => break outcome.unwrap(),
-                            std::task::Poll::Pending => {}
-                        }
-                    };
-                }
-
-                session.frame_clock.did_draw();
-            }
-            e @ Event::RedrawRequested(_) => {
-                log::error!("event for a window we aren't managing: {:?}", e)
-            }
-
-            Event::UserEvent(()) => unreachable!("not using UserEvent"),
-            Event::Suspended => {}
-            Event::Resumed => {}
-            Event::RedrawEventsCleared => {}
-            Event::LoopDestroyed => {}
         }
-    });
+        Event::DeviceEvent {
+            device_id: _,
+            event,
+        } => match event {
+            DeviceEvent::MouseMotion { delta } => input_processor.mouselook_delta(delta.into()),
+
+            // Unused
+            DeviceEvent::Added => {}
+            DeviceEvent::Removed => {}
+            DeviceEvent::MouseWheel { .. } => {}
+            DeviceEvent::Motion { .. } => {}
+            DeviceEvent::Button { .. } => {}
+            DeviceEvent::Key(_) => {}
+            DeviceEvent::Text { .. } => {}
+        },
+        e @ Event::WindowEvent { .. } => {
+            log::error!("event for a window we aren't managing: {:?}", e)
+        }
+
+        Event::MainEventsCleared => {
+            // Run simulation if it's time
+            dsession.session.frame_clock.advance_to(Instant::now());
+            dsession.session.maybe_step_universe();
+            if dsession.session.frame_clock.should_draw() {
+                window.request_redraw();
+            }
+        }
+
+        Event::RedrawRequested(id) if id == window.id() => {
+            dsession.renderer.update_world_camera();
+            dsession.session.update_cursor(dsession.renderer.cameras());
+
+            {
+                let device = dsession.renderer.device().clone();
+                let mut done_rendering_future = Box::pin(
+                    dsession
+                        .renderer
+                        .render_frame(dsession.session.cursor_result(), |render_info| {
+                            format!("{}", dsession.session.info_text(render_info))
+                        }),
+                );
+                // TODO: integrate into event loop
+                let _info = loop {
+                    device.poll(wgpu::Maintain::Poll);
+                    match done_rendering_future
+                        .as_mut()
+                        .poll(&mut Context::from_waker(noop_waker_ref()))
+                    {
+                        std::task::Poll::Ready(outcome) => break outcome.unwrap(),
+                        std::task::Poll::Pending => {}
+                    }
+                };
+            }
+
+            dsession.session.frame_clock.did_draw();
+        }
+        e @ Event::RedrawRequested(_) => {
+            log::error!("event for a window we aren't managing: {:?}", e)
+        }
+
+        Event::UserEvent(()) => unreachable!("not using UserEvent"),
+        Event::Suspended => {}
+        Event::Resumed => {}
+        Event::RedrawEventsCleared => {}
+        Event::LoopDestroyed => {}
+    }
 }
