@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::{self, Write as _};
 use std::sync::mpsc::{self, TrySendError};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
@@ -32,7 +32,7 @@ use all_is_cubes::raytracer::{
 };
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
-use crate::session::DesktopSession;
+use crate::session::{ClockSource, DesktopSession};
 
 /// Options for the terminal UI.
 ///
@@ -207,6 +207,7 @@ impl TerminalMain {
                     render_pipe_out,
                 },
                 viewport_cell,
+                clock_source: ClockSource::Instant,
             },
             options,
             tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
@@ -304,9 +305,7 @@ impl TerminalMain {
                 }
             }
 
-            // TODO: sleep instead of spinning, and maybe put a general version of this in Session.
-            self.dsession.session.frame_clock.advance_to(Instant::now());
-            self.dsession.session.maybe_step_universe();
+            self.dsession.advance_time_and_maybe_step();
 
             match self.dsession.renderer.render_pipe_out.try_recv() {
                 Ok(frame) => {
@@ -326,6 +325,7 @@ impl TerminalMain {
 
                 self.send_frame_to_render();
             } else {
+                // TODO: sleep instead of spinning.
                 std::thread::yield_now();
             }
         }

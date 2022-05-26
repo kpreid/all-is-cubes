@@ -26,8 +26,9 @@ use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rand::{thread_rng, Rng};
 
 use all_is_cubes::apps::Session;
-use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::camera::{GraphicsOptions, Viewport};
+use all_is_cubes::cgmath::{Vector2, Zero as _};
+use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::util::YieldProgress;
 
@@ -49,6 +50,7 @@ use terminal::{terminal_main_loop, TerminalOptions};
 use crate::command_options::{
     parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
 };
+use crate::session::{ClockSource, DesktopSession};
 use crate::terminal::terminal_print_once;
 
 // TODO: put version numbers in the title when used as a window title
@@ -177,6 +179,17 @@ fn main() -> Result<(), anyhow::Error> {
                 .map(|component| component.min(u16::MAX.into()) as u16),
         ),
         GraphicsType::Headless => {
+            let mut dsession = DesktopSession {
+                session,
+                renderer: (),
+                // dummy value
+                viewport_cell: ListenableCell::new(Viewport::with_scale(
+                    1.0,
+                    display_size.unwrap_or_else(Vector2::zero),
+                )),
+                clock_source: ClockSource::Instant,
+            };
+
             // TODO: Right now this is useless. Eventually, we may have other paths for side
             // effects from the universe, or interesting logging.
             log::info!("Simulating a universe nobody's looking at...");
@@ -185,14 +198,16 @@ fn main() -> Result<(), anyhow::Error> {
 
             let t0 = Instant::now();
             loop {
-                // TODO: sleep instead of spinning, and maybe put a general version of this in Session.
-                // TODO: Offer a faster-than-real-time option. (Right now, FrameClock bakes in a slowdown policy that would need adjustment.)
-                let t = Instant::now();
-                session.frame_clock.advance_to(t);
-                session.maybe_step_universe();
+                dsession.advance_time_and_maybe_step();
 
-                if duration.map(|d| t.duration_since(t0) > d).unwrap_or(false) {
+                if duration
+                    .map(|d| Instant::now().duration_since(t0) > d)
+                    .unwrap_or(false)
+                {
                     break;
+                } else {
+                    // TODO: sleep instead of spinning (provide a general implementation)
+                    std::thread::yield_now();
                 }
             }
 

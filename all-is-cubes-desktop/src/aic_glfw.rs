@@ -20,7 +20,7 @@ use crate::choose_graphical_window_size;
 use crate::glue::glfw::{
     get_primary_workarea_size, map_key, map_mouse_button, window_size_as_viewport,
 };
-use crate::session::DesktopSession;
+use crate::session::{ClockSource, DesktopSession};
 
 #[derive(Clone, Copy, Debug)]
 struct CannotCreateWindow;
@@ -63,6 +63,7 @@ pub fn glfw_main_loop(
         )?,
         session,
         viewport_cell,
+        clock_source: ClockSource::Instant,
     };
 
     let ready_time = Instant::now();
@@ -73,8 +74,7 @@ pub fn glfw_main_loop(
 
     let mut first_frame = true;
     'event_loop: loop {
-        dsession.session.frame_clock.advance_to(Instant::now());
-        dsession.session.maybe_step_universe();
+        dsession.advance_time_and_maybe_step();
         if dsession.session.frame_clock.should_draw() {
             dsession.renderer.objects.update_world_camera();
             dsession

@@ -24,7 +24,7 @@ use crate::glue::winit::{
     logical_size_from_vec, map_key, map_mouse_button, monitor_size_for_window,
     physical_size_to_viewport, sync_cursor_grab,
 };
-use crate::session::DesktopSession;
+use crate::session::{ClockSource, DesktopSession};
 
 /// Run Winit/wgpu-based rendering and event loop.
 ///
@@ -83,6 +83,7 @@ pub fn winit_main_loop(
         session,
         renderer,
         viewport_cell,
+        clock_source: ClockSource::Instant,
     };
 
     let ready_time = Instant::now();
@@ -233,8 +234,7 @@ fn handle_winit_event(
 
         Event::MainEventsCleared => {
             // Run simulation if it's time
-            dsession.session.frame_clock.advance_to(Instant::now());
-            dsession.session.maybe_step_universe();
+            dsession.advance_time_and_maybe_step();
             if dsession.session.frame_clock.should_draw() {
                 window.request_redraw();
             }

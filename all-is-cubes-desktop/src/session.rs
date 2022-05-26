@@ -2,10 +2,12 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::path::PathBuf;
+use std::time::Instant;
 
 use all_is_cubes::apps::Session;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 
 /// Wraps a basic [`Session`] to add functionality that is common within
@@ -22,9 +24,19 @@ pub(crate) struct DesktopSession<R> {
     /// The current viewport size linked to the renderer.
     pub(crate) viewport_cell: ListenableCell<Viewport>,
     // TODO: Add an optional `Recorder` that works with any session type.
+    pub(crate) clock_source: ClockSource,
 }
 
 impl<R> DesktopSession<R> {
+    pub fn advance_time_and_maybe_step(&mut self) -> Option<UniverseStepInfo> {
+        match self.clock_source {
+            ClockSource::Instant => {
+                self.session.frame_clock.advance_to(Instant::now());
+            }
+        }
+        self.session.maybe_step_universe()
+    }
+
     /// Replace the session's universe with one whose contents are the given file.
     ///
     /// See [`crate::data_files::load_universe_from_file`] for supported formats.
@@ -40,4 +52,11 @@ impl<R> DesktopSession<R> {
                 })
         })
     }
+}
+
+/// Defines the clock for time passing in the simulation.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ClockSource {
+    /// Use [`instant::Instant::now()`].
+    Instant,
 }
