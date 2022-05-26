@@ -31,6 +31,7 @@ OPTIONS:
             
             * window      — Open a window (uses OpenGL)
             * window-wgpu — EXPERIMENTAL: Open a window (uses `wgpu` for GPU)
+            * window-rt   — EXPERIMENTAL: Open a window (uses CPU raytracing)
             * terminal    — Colored text in this terminal (uses raytracing)
             * headless    — Non-interactive; don't draw anything but only simulates
             * record      — Non-interactive; save an image or video (uses raytracing)

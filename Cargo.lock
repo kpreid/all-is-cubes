@@ -117,6 +117,7 @@ dependencies = [
  "all-is-cubes-content",
  "all-is-cubes-gpu",
  "anyhow",
+ "bytemuck",
  "clap 3.1.18",
  "crossterm",
  "directories-next",
@@ -133,6 +134,7 @@ dependencies = [
  "serde",
  "serde_json",
  "simplelog",
+ "softbuffer",
  "strum",
  "termion",
  "thiserror",
@@ -1309,6 +1311,15 @@ name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
+
+[[package]]
+name = "dlib"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac1b7517328c04c2aa68422fc60a41b92208182142ed04a25879c26c8f878794"
+dependencies = [
+ "libloading",
+]
 
 [[package]]
 name = "dot_vox"
@@ -2702,6 +2713,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.22.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4916f159ed8e5de0082076562152a76b7a1f64a01fd9d1e0fea002c37624faf"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "memoffset 0.6.5",
+]
+
+[[package]]
 name = "noise"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4081,6 +4105,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "softbuffer"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d1cda310762a78016e0bcb9f21b9f6c288858941eab798443c19d8f77cde68a"
+dependencies = [
+ "cocoa",
+ "core-graphics 0.22.3",
+ "foreign-types",
+ "objc",
+ "raw-window-handle",
+ "tempfile 3.3.0",
+ "thiserror",
+ "wasm-bindgen",
+ "wayland-client",
+ "web-sys",
+ "winapi 0.3.9",
+ "x11-dl",
+]
+
+[[package]]
 name = "spirv"
 version = "0.2.0+1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5097,6 +5141,55 @@ dependencies = [
  "toml 0.4.10",
  "walkdir",
  "which",
+]
+
+[[package]]
+name = "wayland-client"
+version = "0.29.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91223460e73257f697d9e23d401279123d36039a3f7a449e983f123292d4458f"
+dependencies = [
+ "bitflags",
+ "downcast-rs",
+ "libc",
+ "nix",
+ "scoped-tls",
+ "wayland-commons",
+ "wayland-scanner",
+ "wayland-sys",
+]
+
+[[package]]
+name = "wayland-commons"
+version = "0.29.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94f6e5e340d7c13490eca867898c4cec5af56c27a5ffe5c80c6fc4708e22d33e"
+dependencies = [
+ "nix",
+ "once_cell",
+ "smallvec 1.8.0",
+ "wayland-sys",
+]
+
+[[package]]
+name = "wayland-scanner"
+version = "0.29.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39a1ed3143f7a143187156a2ab52742e89dac33245ba505c17224df48939f9e0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "xml-rs",
+]
+
+[[package]]
+name = "wayland-sys"
+version = "0.29.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9341df79a8975679188e37dab3889bfa57c44ac2cb6da166f519a81cbe452d4"
+dependencies = [
+ "dlib",
+ "pkg-config",
 ]
 
 [[package]]

@@ -155,6 +155,8 @@ pub enum GraphicsType {
     Window,
     #[clap(help = "EXPERIMENTAL: Open a window (uses `wgpu` for GPU)")]
     WindowWgpu,
+    #[clap(help = "EXPERIMENTAL: Open a window (uses CPU raytracing)")]
+    WindowRt,
     #[clap(help = "Colored text in this terminal (uses raytracing)")]
     Terminal,
     #[clap(help = "Non-interactive; don't draw anything but only simulates")]

@@ -7,15 +7,18 @@ use std::future::Future;
 use std::task::Context;
 use std::time::Instant;
 
+use anyhow::anyhow;
 use futures::executor::block_on;
 use futures::task::noop_waker_ref;
+use image::imageops::{self, FilterType};
 use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
-use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
 
@@ -29,9 +32,9 @@ use crate::session::{ClockSource, DesktopSession};
 /// Run Winit/wgpu-based rendering and event loop.
 ///
 /// Does not return; exits the process instead.
-pub(crate) fn winit_main_loop(
+pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
     event_loop: EventLoop<()>,
-    mut dsession: DesktopSession<SurfaceRenderer, Window>,
+    mut dsession: DesktopSession<Ren, Ren::Window>,
 ) -> Result<(), anyhow::Error> {
     let loop_start_time = Instant::now();
     let mut first_frame = true;
@@ -45,7 +48,10 @@ pub(crate) fn winit_main_loop(
         }
 
         // Sync UI state back to window
-        sync_cursor_grab(&dsession.window, &mut dsession.session.input_processor);
+        sync_cursor_grab(
+            dsession.window.window(),
+            &mut dsession.session.input_processor,
+        );
 
         handle_winit_event(event, &mut dsession, control_flow)
     })
@@ -123,6 +129,45 @@ pub(crate) fn create_winit_wgpu_desktop_session(
     Ok(dsession)
 }
 
+pub(crate) fn create_winit_rt_desktop_session(
+    session: Session,
+    window: Window,
+) -> Result<DesktopSession<RtRenderer, softbuffer::GraphicsContext<Window>>, anyhow::Error> {
+    let start_time = Instant::now();
+
+    let viewport_cell = ListenableCell::new(physical_size_to_viewport(
+        window.scale_factor(),
+        window.inner_size(),
+    ));
+
+    // Safety:
+    // GraphicsContext::new says "Ensure that the passed object is valid to draw a 2D buffer to".
+    // What does that mean? Well, we're not doing anything *else*...
+    let sb_context = unsafe { softbuffer::GraphicsContext::new(window) }
+        .map_err(|_| anyhow!("Failed to initialize softbuffer GraphicsContext"))?;
+
+    let renderer = RtRenderer::new(
+        StandardCameras::from_session(&session, viewport_cell.as_source())?,
+        ListenableSource::constant(()),
+    );
+
+    let dsession = DesktopSession {
+        session,
+        renderer,
+        window: sb_context, // softbuffer takes ownership of the window for safety
+        viewport_cell,
+        clock_source: ClockSource::Instant,
+    };
+
+    let ready_time = Instant::now();
+    log::debug!(
+        "Renderer and window initialized in {:.3} s",
+        ready_time.duration_since(start_time).as_secs_f32()
+    );
+
+    Ok(dsession)
+}
+
 /// Handle one winit event.
 ///
 /// Modifies `control_flow` if an event indicates the application should exit.
@@ -130,15 +175,15 @@ pub(crate) fn create_winit_wgpu_desktop_session(
 ///
 /// This is separated from [`winit_main_loop`] for the sake of readability (more overall structure
 /// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
-fn handle_winit_event(
+fn handle_winit_event<Ren: RendererToWinit>(
     event: Event<'_, ()>,
-    dsession: &mut DesktopSession<SurfaceRenderer, Window>,
+    dsession: &mut DesktopSession<Ren, Ren::Window>,
     control_flow: &mut ControlFlow,
 ) {
     let input_processor = &mut dsession.session.input_processor;
     match event {
         Event::NewEvents(_) => {}
-        Event::WindowEvent { window_id, event } if window_id == dsession.window.id() => {
+        Event::WindowEvent { window_id, event } if window_id == dsession.window.window().id() => {
             match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
 
@@ -172,7 +217,7 @@ fn handle_winit_event(
                     let position: [f64; 2] = position.into();
                     input_processor.mouse_pixel_position(
                         *dsession.viewport_cell.get(),
-                        Some(Point2::from(position) / dsession.window.scale_factor()),
+                        Some(Point2::from(position) / dsession.window.window().scale_factor()),
                         false,
                     );
                 }
@@ -200,7 +245,7 @@ fn handle_winit_event(
                 // Window state
                 WindowEvent::Resized(physical_size) => {
                     dsession.viewport_cell.set(physical_size_to_viewport(
-                        dsession.window.scale_factor(),
+                        dsession.window.window().scale_factor(),
                         physical_size,
                     ));
                 }
@@ -251,35 +296,17 @@ fn handle_winit_event(
             // Run simulation if it's time
             dsession.advance_time_and_maybe_step();
             if dsession.session.frame_clock.should_draw() {
-                dsession.window.request_redraw();
+                dsession.window.window().request_redraw();
             }
         }
 
-        Event::RedrawRequested(id) if id == dsession.window.id() => {
+        Event::RedrawRequested(id) if id == dsession.window.window().id() => {
             dsession.renderer.update_world_camera();
             dsession.session.update_cursor(dsession.renderer.cameras());
 
-            {
-                let device = dsession.renderer.device().clone();
-                let mut done_rendering_future = Box::pin(
-                    dsession
-                        .renderer
-                        .render_frame(dsession.session.cursor_result(), |render_info| {
-                            format!("{}", dsession.session.info_text(render_info))
-                        }),
-                );
-                // TODO: integrate into event loop
-                let _info = loop {
-                    device.poll(wgpu::Maintain::Poll);
-                    match done_rendering_future
-                        .as_mut()
-                        .poll(&mut Context::from_waker(noop_waker_ref()))
-                    {
-                        std::task::Poll::Ready(outcome) => break outcome.unwrap(),
-                        std::task::Poll::Pending => {}
-                    }
-                };
-            }
+            dsession
+                .renderer
+                .redraw(&dsession.session, &mut dsession.window);
 
             dsession.session.frame_clock.did_draw();
         }
@@ -292,5 +319,119 @@ fn handle_winit_event(
         Event::Resumed => {}
         Event::RedrawEventsCleared => {}
         Event::LoopDestroyed => {}
+    }
+}
+
+/// Trait to generically deal with softbuffer's entirely reasonable ownership requirement.
+/// May be made obsolete if <https://github.com/john01dav/softbuffer/pull/6> is accepted.
+pub(crate) trait HasWindow {
+    fn window(&self) -> &Window;
+}
+
+impl HasWindow for Window {
+    fn window(&self) -> &Window {
+        self
+    }
+}
+
+impl HasWindow for softbuffer::GraphicsContext<Window> {
+    fn window(&self) -> &Window {
+        softbuffer::GraphicsContext::window(self)
+    }
+}
+
+/// TODO: Give this a better name and definition
+pub(crate) trait RendererToWinit: 'static {
+    type Window: HasWindow + 'static;
+    fn update_world_camera(&mut self);
+    fn cameras(&self) -> &StandardCameras;
+    fn redraw(&mut self, session: &Session, window: &mut Self::Window);
+}
+
+impl RendererToWinit for SurfaceRenderer {
+    type Window = Window;
+
+    fn update_world_camera(&mut self) {
+        self.update_world_camera()
+    }
+
+    fn cameras(&self) -> &StandardCameras {
+        self.cameras()
+    }
+
+    fn redraw(&mut self, session: &Session, _window: &mut Self::Window) {
+        let device = self.device().clone();
+        let mut done_rendering_future =
+            Box::pin(self.render_frame(session.cursor_result(), |render_info| {
+                format!("{}", session.info_text(render_info))
+            }));
+        // TODO: integrate into event loop
+        let _info = loop {
+            device.poll(wgpu::Maintain::Poll);
+            match done_rendering_future
+                .as_mut()
+                .poll(&mut Context::from_waker(noop_waker_ref()))
+            {
+                std::task::Poll::Ready(outcome) => break outcome.unwrap(),
+                std::task::Poll::Pending => {}
+            }
+        };
+    }
+}
+
+impl RendererToWinit for RtRenderer {
+    type Window = softbuffer::GraphicsContext<Window>;
+
+    fn update_world_camera(&mut self) {
+        // TODO: implement this or eliminate its necessity...
+    }
+
+    fn cameras(&self) -> &StandardCameras {
+        self.cameras()
+    }
+
+    fn redraw(&mut self, session: &Session, window: &mut Self::Window) {
+        // TODO: Horrible kludge to produce a lower-than-optimal-resolution output...
+        // This should be built into RtRenderer ins
+        // let mut viewport: Viewport = session.viewport_cell.get();
+        // viewport.framebuffer_size = viewport.logical_size.map(|c| c / 2.0 as u32);
+        // session.viewport_cell.set(viewport);
+
+        self.update(session.cursor_result()).unwrap(/* TODO: fix */);
+
+        // TODO: call the raytracer directly to trace into a buffer of the format we
+        // can best use.
+        let (image, _info) = self.draw_rgba(""); // TODO: pass info text
+
+        // At least on macOS, softbuffer's idea of "size of the window" is logical size
+        let actual_size = window
+            .window()
+            .inner_size()
+            .to_logical(window.window().scale_factor());
+        let scaled_image = imageops::resize(
+            &image,
+            actual_size.width,
+            actual_size.height,
+            FilterType::Triangle,
+        );
+        let mut data: Vec<u8> = scaled_image.into_vec();
+
+        // Shuffle bytes to produce softbuffer's expected format of "0RGB" u32s
+        for pixel in bytemuck::cast_slice_mut::<u8, [u8; 4]>(data.as_mut_slice()) {
+            // Note: we work in terms of arrays and not u32s to avoid imposing an alignment
+            // requirement.
+            // Start with an array in guaranteed R, G, B, A order...
+            let &mut [r, g, b, _a] = pixel;
+            // ...then pack them into a u32 as specified by softbuffer, and convert to
+            // bytes in *native* order for u32. The optimizer will turn all of this into
+            // a reasonable set of machine instructions.
+            *pixel = u32::to_ne_bytes(u32::from_be_bytes([0, r, g, b]));
+        }
+
+        window.set_buffer(
+            bytemuck::cast_slice::<u8, u32>(&data),
+            actual_size.width as u16,
+            actual_size.height as u16,
+        );
     }
 }

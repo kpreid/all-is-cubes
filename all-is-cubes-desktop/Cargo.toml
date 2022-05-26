@@ -23,6 +23,7 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["rayon
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 anyhow = "1.0"
+bytemuck = { version = "1.7.2", default-features = false }
 clap = { version = "3.1.1", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }
 # Note: keep crossterm in sync with tui's crossterm dependency.
 crossterm = "0.23.2"
@@ -40,6 +41,7 @@ rand = { version = "0.8.2", default-features = false, features = ["std", "std_rn
 serde = { version = "1.0.126", default-features = false }
 serde_json = "1.0.64"
 simplelog = "0.12.0"
+softbuffer = "0.1.1"
 strum = { version = "0.24.0", default-features = false, features = ["derive", "std"] }
 termion = "1.5.5" # TODO: Only used for ANSI color table. Remove?
 thiserror = "1.0.22"
