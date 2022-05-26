@@ -7,7 +7,6 @@ use std::future::Future;
 use std::task::Context;
 use std::time::Instant;
 
-use all_is_cubes::listen::ListenableCell;
 use futures::executor::block_on;
 use futures::task::noop_waker_ref;
 use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
@@ -16,6 +15,7 @@ use winit::window::{Window, WindowBuilder};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::cgmath::{Point2, Vector2};
+use all_is_cubes::listen::ListenableCell;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
 
@@ -28,7 +28,7 @@ use crate::session::{ClockSource, DesktopSession};
 
 /// Run Winit/wgpu-based rendering and event loop.
 ///
-/// Returns when the user closes the window/app.
+/// Does not return; exits the process instead.
 pub(crate) fn winit_main_loop(
     event_loop: EventLoop<()>,
     mut dsession: DesktopSession<SurfaceRenderer, Window>,
@@ -48,17 +48,14 @@ pub(crate) fn winit_main_loop(
         sync_cursor_grab(&dsession.window, &mut dsession.session.input_processor);
 
         handle_winit_event(event, &mut dsession, control_flow)
-    });
+    })
 }
 
-pub(crate) fn create_winit_desktop_session(
-    session: Session,
+pub(crate) fn create_window(
     event_loop: &EventLoop<()>,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
-) -> Result<DesktopSession<SurfaceRenderer, Window>, anyhow::Error> {
-    let start_time = Instant::now();
-
+) -> Result<Window, winit::error::OsError> {
     // Pick a window size.
     let inner_size = if let Some(size) = requested_size {
         logical_size_from_vec(size)
@@ -73,11 +70,19 @@ pub(crate) fn create_winit_desktop_session(
         ))
     };
 
-    let window = WindowBuilder::new()
+    WindowBuilder::new()
         .with_inner_size(inner_size)
         .with_title(window_title)
         //.with_visible(false)
-        .build(event_loop)?;
+        .build(event_loop)
+}
+
+pub(crate) fn create_winit_wgpu_desktop_session(
+    session: Session,
+    window: Window,
+) -> Result<DesktopSession<SurfaceRenderer, Window>, anyhow::Error> {
+    let start_time = Instant::now();
+
     let viewport_cell = ListenableCell::new(physical_size_to_viewport(
         window.scale_factor(),
         window.inner_size(),
