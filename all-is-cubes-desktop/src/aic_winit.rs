@@ -86,7 +86,8 @@ pub(crate) fn create_winit_desktop_session(
     let instance = wgpu::Instance::new(wgpu::Backends::all());
     // Safety: create_surface specifies that the window must be kept alive
     // as long as the surface is. We will do that by keeping them both in
-    // this function which does not exit from the winit event loop.
+    // the `DesktopSession` struct. TODO: Make this more robust by having
+    // the renderer jointly own the window via `Arc`.
     let surface = unsafe { instance.create_surface(&window) };
     let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
