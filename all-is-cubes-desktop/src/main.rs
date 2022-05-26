@@ -47,6 +47,8 @@ mod session;
 mod terminal;
 use terminal::{terminal_main_loop, TerminalOptions};
 
+use crate::aic_glfw::create_glfw_desktop_session;
+use crate::aic_winit::create_winit_desktop_session;
 use crate::command_options::{
     parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
 };
@@ -165,8 +167,21 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     match graphics_type {
-        GraphicsType::Window => glfw_main_loop(session, &title_and_version(), display_size),
-        GraphicsType::WindowWgpu => winit_main_loop(session, &title_and_version(), display_size),
+        GraphicsType::Window => glfw_main_loop(create_glfw_desktop_session(
+            session,
+            &title_and_version(),
+            display_size,
+        )?),
+        GraphicsType::WindowWgpu => {
+            let event_loop = winit::event_loop::EventLoop::new();
+            let dsession = create_winit_desktop_session(
+                session,
+                &event_loop,
+                &title_and_version(),
+                display_size,
+            )?;
+            winit_main_loop(event_loop, dsession)
+        }
         GraphicsType::Terminal => terminal_main_loop(session, TerminalOptions::default()),
         GraphicsType::Record => record_main(session, options.record_options()),
         GraphicsType::Print => terminal_print_once(
@@ -182,6 +197,7 @@ fn main() -> Result<(), anyhow::Error> {
             let mut dsession = DesktopSession {
                 session,
                 renderer: (),
+                window: (),
                 // dummy value
                 viewport_cell: ListenableCell::new(Viewport::with_scale(
                     1.0,

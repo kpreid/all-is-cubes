@@ -6,6 +6,7 @@
 use std::error::Error;
 use std::fmt;
 use std::ops::ControlFlow;
+use std::sync::mpsc;
 use std::time::Instant;
 
 use glfw::{Action, Context as _, CursorMode, SwapInterval, WindowEvent, WindowMode};
@@ -22,6 +23,10 @@ use crate::glue::glfw::{
 };
 use crate::session::{ClockSource, DesktopSession};
 
+type Renderer = SurfaceRenderer<GL33Context>;
+type EventReceiver = mpsc::Receiver<(f64, WindowEvent)>;
+type GlfwSession = DesktopSession<Renderer, EventReceiver>;
+
 #[derive(Clone, Copy, Debug)]
 struct CannotCreateWindow;
 impl fmt::Display for CannotCreateWindow {
@@ -34,44 +39,8 @@ impl Error for CannotCreateWindow {}
 /// Run GLFW-based rendering and event loop.
 ///
 /// Returns when the user closes the window/app.
-pub fn glfw_main_loop(
-    session: Session,
-    window_title: &str,
-    requested_size: Option<Vector2<u32>>,
-) -> Result<(), anyhow::Error> {
-    let glfw_start_time = Instant::now();
-    let GlfwSurface {
-        context, events_rx, ..
-    } = GlfwSurface::new(|glfw| {
-        let size: Vector2<u32> = requested_size
-            .unwrap_or_else(|| choose_graphical_window_size(get_primary_workarea_size(glfw)));
-
-        let (mut window, events_rx) = glfw
-            .create_window(size.x, size.y, window_title, WindowMode::Windowed)
-            .ok_or(GlfwSurfaceError::UserError(CannotCreateWindow))?;
-        window.make_current();
-        window.set_all_polling(true);
-        glfw.set_swap_interval(SwapInterval::Sync(1));
-        Ok((window, events_rx))
-    })?;
-
-    let viewport_cell = ListenableCell::new(window_size_as_viewport(&context.window));
-    let mut dsession = DesktopSession {
-        renderer: SurfaceRenderer::new(
-            context,
-            StandardCameras::from_session(&session, viewport_cell.as_source())?,
-        )?,
-        session,
-        viewport_cell,
-        clock_source: ClockSource::Instant,
-    };
-
-    let ready_time = Instant::now();
-    log::debug!(
-        "Renderer and GLFW initialized in {:.3} s",
-        ready_time.duration_since(glfw_start_time).as_secs_f32()
-    );
-
+pub(crate) fn glfw_main_loop(mut dsession: GlfwSession) -> Result<(), anyhow::Error> {
+    let loop_start_time = Instant::now();
     let mut first_frame = true;
     'event_loop: loop {
         dsession.advance_time_and_maybe_step();
@@ -98,7 +67,7 @@ pub fn glfw_main_loop(
             first_frame = false;
             log::debug!(
                 "First frame completed in {:.3} s",
-                Instant::now().duration_since(ready_time).as_secs_f32()
+                Instant::now().duration_since(loop_start_time).as_secs_f32()
             );
         }
 
@@ -117,7 +86,9 @@ pub fn glfw_main_loop(
         // Poll for events after drawing, so that on the first loop iteration we draw
         // before the window is visible (at least on macOS).
         dsession.renderer.surface.window.glfw.poll_events();
-        for (_, event) in events_rx.try_iter() {
+        // The "window" value is actually the window event receiver, because that's
+        // all we currently need and the window is embedded in the renderer.
+        while let Ok((_, event)) = dsession.window.try_recv() {
             if let ControlFlow::Break(_) = handle_glfw_event(event, &mut dsession) {
                 break 'event_loop;
             }
@@ -127,6 +98,48 @@ pub fn glfw_main_loop(
     Ok(())
 }
 
+pub(crate) fn create_glfw_desktop_session(
+    session: Session,
+    window_title: &str,
+    requested_size: Option<Vector2<u32>>,
+) -> Result<GlfwSession, anyhow::Error> {
+    let start_time = Instant::now();
+    let GlfwSurface {
+        context, events_rx, ..
+    } = GlfwSurface::new(|glfw| {
+        let size: Vector2<u32> = requested_size
+            .unwrap_or_else(|| choose_graphical_window_size(get_primary_workarea_size(glfw)));
+
+        let (mut window, events_rx) = glfw
+            .create_window(size.x, size.y, window_title, WindowMode::Windowed)
+            .ok_or(GlfwSurfaceError::UserError(CannotCreateWindow))?;
+        window.make_current();
+        window.set_all_polling(true);
+        glfw.set_swap_interval(SwapInterval::Sync(1));
+        Ok((window, events_rx))
+    })?;
+
+    let viewport_cell = ListenableCell::new(window_size_as_viewport(&context.window));
+    let dsession = DesktopSession {
+        renderer: SurfaceRenderer::new(
+            context,
+            StandardCameras::from_session(&session, viewport_cell.as_source())?,
+        )?,
+        window: events_rx,
+        session,
+        viewport_cell,
+        clock_source: ClockSource::Instant,
+    };
+
+    let ready_time = Instant::now();
+    log::debug!(
+        "Renderer and GLFW initialized in {:.3} s",
+        ready_time.duration_since(start_time).as_secs_f32()
+    );
+
+    Ok(dsession)
+}
+
 /// Handle one GLFW event.
 ///
 /// Returns [`ControlFlow::Break`] if an event indicates the application should exit.
@@ -134,10 +147,7 @@ pub fn glfw_main_loop(
 ///
 /// This is separated from [`glfw_main_loop`] for the sake of readability (more overall structure
 /// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
-fn handle_glfw_event(
-    event: WindowEvent,
-    dsession: &mut DesktopSession<SurfaceRenderer<GL33Context>>,
-) -> ControlFlow<()> {
+fn handle_glfw_event(event: WindowEvent, dsession: &mut GlfwSession) -> ControlFlow<()> {
     let input_processor = &mut dsession.session.input_processor;
 
     match event {

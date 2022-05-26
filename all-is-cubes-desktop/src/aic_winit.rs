@@ -29,14 +29,35 @@ use crate::session::{ClockSource, DesktopSession};
 /// Run Winit/wgpu-based rendering and event loop.
 ///
 /// Returns when the user closes the window/app.
-pub fn winit_main_loop(
+pub(crate) fn winit_main_loop(
+    event_loop: EventLoop<()>,
+    mut dsession: DesktopSession<SurfaceRenderer, Window>,
+) -> Result<(), anyhow::Error> {
+    let loop_start_time = Instant::now();
+    let mut first_frame = true;
+    event_loop.run(move |event, _, control_flow| {
+        if first_frame {
+            first_frame = false;
+            log::debug!(
+                "First frame completed in {:.3} s",
+                Instant::now().duration_since(loop_start_time).as_secs_f32()
+            );
+        }
+
+        // Sync UI state back to window
+        sync_cursor_grab(&dsession.window, &mut dsession.session.input_processor);
+
+        handle_winit_event(event, &mut dsession, control_flow)
+    });
+}
+
+pub(crate) fn create_winit_desktop_session(
     session: Session,
+    event_loop: &EventLoop<()>,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
-) -> Result<(), anyhow::Error> {
-    let init_start_time = Instant::now();
-
-    let event_loop = EventLoop::new();
+) -> Result<DesktopSession<SurfaceRenderer, Window>, anyhow::Error> {
+    let start_time = Instant::now();
 
     // Pick a window size.
     let inner_size = if let Some(size) = requested_size {
@@ -56,7 +77,7 @@ pub fn winit_main_loop(
         .with_inner_size(inner_size)
         .with_title(window_title)
         //.with_visible(false)
-        .build(&event_loop)?;
+        .build(event_loop)?;
     let viewport_cell = ListenableCell::new(physical_size_to_viewport(
         window.scale_factor(),
         window.inner_size(),
@@ -79,9 +100,10 @@ pub fn winit_main_loop(
         &adapter,
     ))?;
 
-    let mut dsession = DesktopSession {
+    let dsession = DesktopSession {
         session,
         renderer,
+        window,
         viewport_cell,
         clock_source: ClockSource::Instant,
     };
@@ -89,24 +111,10 @@ pub fn winit_main_loop(
     let ready_time = Instant::now();
     log::debug!(
         "Renderer and window initialized in {:.3} s",
-        ready_time.duration_since(init_start_time).as_secs_f32()
+        ready_time.duration_since(start_time).as_secs_f32()
     );
 
-    let mut first_frame = true;
-    event_loop.run(move |event, _, control_flow| {
-        if first_frame {
-            first_frame = false;
-            log::debug!(
-                "First frame completed in {:.3} s",
-                Instant::now().duration_since(ready_time).as_secs_f32()
-            );
-        }
-
-        // Sync UI state back to window
-        sync_cursor_grab(&window, &mut dsession.session.input_processor);
-
-        handle_winit_event(event, &window, &mut dsession, control_flow)
-    });
+    Ok(dsession)
 }
 
 /// Handle one winit event.
@@ -118,14 +126,13 @@ pub fn winit_main_loop(
 /// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
 fn handle_winit_event(
     event: Event<'_, ()>,
-    window: &Window,
-    dsession: &mut DesktopSession<SurfaceRenderer>,
+    dsession: &mut DesktopSession<SurfaceRenderer, Window>,
     control_flow: &mut ControlFlow,
 ) {
     let input_processor = &mut dsession.session.input_processor;
     match event {
         Event::NewEvents(_) => {}
-        Event::WindowEvent { window_id, event } if window_id == window.id() => {
+        Event::WindowEvent { window_id, event } if window_id == dsession.window.id() => {
             match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
 
@@ -159,7 +166,7 @@ fn handle_winit_event(
                     let position: [f64; 2] = position.into();
                     input_processor.mouse_pixel_position(
                         *dsession.viewport_cell.get(),
-                        Some(Point2::from(position) / window.scale_factor()),
+                        Some(Point2::from(position) / dsession.window.scale_factor()),
                         false,
                     );
                 }
@@ -187,7 +194,7 @@ fn handle_winit_event(
                 // Window state
                 WindowEvent::Resized(physical_size) => {
                     dsession.viewport_cell.set(physical_size_to_viewport(
-                        window.scale_factor(),
+                        dsession.window.scale_factor(),
                         physical_size,
                     ));
                 }
@@ -236,11 +243,11 @@ fn handle_winit_event(
             // Run simulation if it's time
             dsession.advance_time_and_maybe_step();
             if dsession.session.frame_clock.should_draw() {
-                window.request_redraw();
+                dsession.window.request_redraw();
             }
         }
 
-        Event::RedrawRequested(id) if id == window.id() => {
+        Event::RedrawRequested(id) if id == dsession.window.id() => {
             dsession.renderer.update_world_camera();
             dsession.session.update_cursor(dsession.renderer.cameras());
 

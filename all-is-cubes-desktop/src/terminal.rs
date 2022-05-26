@@ -99,7 +99,7 @@ pub fn terminal_print_once(
 }
 
 struct TerminalMain {
-    dsession: DesktopSession<TerminalRenderer>,
+    dsession: DesktopSession<TerminalRenderer, ()>,
 
     options: TerminalOptions,
     tuiout: tui::Terminal<CrosstermBackend<io::Stdout>>,
@@ -206,6 +206,7 @@ impl TerminalMain {
                     render_pipe_in,
                     render_pipe_out,
                 },
+                window: (),
                 viewport_cell,
                 clock_source: ClockSource::Instant,
             },

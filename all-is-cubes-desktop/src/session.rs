@@ -14,20 +14,22 @@ use all_is_cubes::util::YieldProgress;
 /// all-is-cubes-desktop's scope of supported usage (such as loading a universe
 /// from disk).
 #[derive(Debug)]
-pub(crate) struct DesktopSession<R> {
+pub(crate) struct DesktopSession<Ren, Win> {
     pub(crate) session: Session,
     // TODO: Instead of being generic over the renderer, be generic over
     // the window-system-type such that we can accept any
-    // "dyn DesktopRenderer<Window = W>" which supports the current type
+    // "dyn DesktopRenderer<Window = Win>" which supports the current type
     // of main-loop.
-    pub(crate) renderer: R,
+    pub(crate) renderer: Ren,
+    /// Whatever handle or other state is needed to maintain the window or interact with the event loop.
+    pub(crate) window: Win,
     /// The current viewport size linked to the renderer.
     pub(crate) viewport_cell: ListenableCell<Viewport>,
     // TODO: Add an optional `Recorder` that works with any session type.
     pub(crate) clock_source: ClockSource,
 }
 
-impl<R> DesktopSession<R> {
+impl<Ren, Win> DesktopSession<Ren, Win> {
     pub fn advance_time_and_maybe_step(&mut self) -> Option<UniverseStepInfo> {
         match self.clock_source {
             ClockSource::Instant => {
