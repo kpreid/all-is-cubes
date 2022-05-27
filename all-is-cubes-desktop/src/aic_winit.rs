@@ -216,7 +216,9 @@ fn handle_winit_event(
 
                 // Unused
                 WindowEvent::HoveredFile(_) => {}
-                WindowEvent::DroppedFile(_) => {} // TODO: implement like we had for glfw
+                WindowEvent::DroppedFile(path) => {
+                    dsession.replace_universe_with_file(path);
+                }
                 WindowEvent::HoveredFileCancelled => {}
                 WindowEvent::Moved(_) => {}
                 WindowEvent::Destroyed => {}

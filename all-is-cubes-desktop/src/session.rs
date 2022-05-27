@@ -42,6 +42,11 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
     /// Replace the session's universe with one whose contents are the given file.
     ///
     /// See [`crate::data_files::load_universe_from_file`] for supported formats.
+    ///
+    /// TODO: Instead of specifying exactly “replace universe”, we should have a
+    /// general application concept of “open a provided file” which matches the
+    /// command-line behavior as much as is reasonable, and also maybe supports
+    /// e.g. importing resources *into* an existing universe.
     pub fn replace_universe_with_file(&mut self, path: PathBuf) {
         // TODO: Offer confirmation before replacing the current universe.
         // Also a progress bar and other UI.
