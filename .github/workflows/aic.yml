@@ -108,3 +108,42 @@ jobs:
         jekyll: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  fuzz:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    # Cache the target/ dir (for xtask).
+    - uses: Swatinem/rust-cache@v1
+      with:
+        key: main
+    # Cache the fuzz/target/ dir where the actual fuzz targets are built.
+    - uses: Swatinem/rust-cache@v1
+      with:
+        # additional key to distinguish ./fuzz/target from ./target
+        key: fuzz
+        target-dir: ./fuzz/target
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: nightly
+          override: true
+
+    - name: Install cargo-fuzz
+      run: cargo install cargo-fuzz
+
+    - name: Cache fuzzer corpus
+      uses: actions/cache@v3
+      with:
+        key: fuzz-corpus
+        path: |
+          fuzz/corpus
+
+    - name: Fuzz
+      # Note: The specified timeout value is per-fuzz-target; as of this writing
+      # there are 6 fuzz targets and so the total time will be 720 seconds = 12 minutes.
+      run: cargo xtask fuzz 120
