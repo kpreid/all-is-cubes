@@ -389,8 +389,9 @@ impl Raycaster {
 
         // TODO: Right test?
         if max_t > self.last_t_distance {
-            let t_start = max_t - 0.01;
-            // TODO: bad epsilon
+            // Go forward to half a cube behind where we think we found the intersection point.
+            let t_start = max_t - 0.5 / self.ray.direction.magnitude();
+            let t_start = if t_start.is_finite() { t_start } else { max_t };
             let mut new_state = self.ray.advance(t_start).cast();
 
             new_state.grid = Some(grid); // .within_grid() would recurse
@@ -1050,6 +1051,31 @@ mod tests {
             .within_grid(grid),
             vec![None],
         );
+    }
+
+    /// Regression test from a fuzz test case where fast_forward would perform poorly,
+    /// requiring a large number of steps. Note that this test is not intended to
+    /// detect the poor performance, but to confirm that the _fix_ doesn't change the
+    /// behavior.
+    #[test]
+    fn regression_long_distance_fast_forward() {
+        assert_steps(
+            &mut Raycaster::new(
+                Point3::new(
+                    6.749300603672869e-67,
+                    6.750109954921438e-67,
+                    -85891558.96000093,
+                ),
+                Vector3::new(
+                    1.1036366354256313e-305,
+                    0.0,
+                    8589152896.000092,
+                ),
+            )
+            .within_grid(Grid::from_lower_upper([-10, -20, -30], [10, 20, 30])),
+            vec![step(0, 0, -30, Face7::NZ, 0.010000000000000002)],
+        );
+
     }
 
     #[test]
