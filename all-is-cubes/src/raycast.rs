@@ -646,13 +646,12 @@ fn ray_plane_intersection(
 }
 
 #[cfg(test)]
-#[rustfmt::skip]
 mod tests {
     use crate::math::{Aab, FaceMap};
 
     use super::*;
     use cgmath::Vector3;
-    use rand::{SeedableRng as _};
+    use rand::SeedableRng as _;
 
     /// Alternative to [`RaycastStep`] which contains optional data so partial assertions
     /// can be written, and contains 'final' values rather than ones used for calculation.
@@ -675,18 +674,15 @@ mod tests {
         }
 
         fn matches(self, step: &RaycastStep) -> bool {
-            self.cube == step.cube_ahead() &&
-            self.face == step.face() &&
-            self.t_distance.map_or(true, |td| step.t_distance() == td) &&
-            self.t_distance.map_or(true, |td| step.t_distance() == td)
+            self.cube == step.cube_ahead()
+                && self.face == step.face()
+                && self.t_distance.map_or(true, |td| step.t_distance() == td)
+                && self.t_distance.map_or(true, |td| step.t_distance() == td)
         }
     }
 
     #[track_caller]
-    fn assert_steps_option<T: IntoIterator<Item = Option<TestStep>>>(
-        r: &mut Raycaster,
-        steps: T,
-    ) {
+    fn assert_steps_option<T: IntoIterator<Item = Option<TestStep>>>(r: &mut Raycaster, steps: T) {
         for (i, expected_step) in steps.into_iter().enumerate() {
             let r_backup = r.clone(); // save for diagnostics
             let actual_step = r.next();
@@ -697,13 +693,13 @@ mod tests {
             };
             if !matches {
                 panic!(
-                    "step {}\n\
-                    expected: {:?}\n\
-                    found:    {:?}\n\
-                    actual:   {:?}\n\
-                    before: {:?}\n\
-                    after:  {:?}\n",
-                    i, expected_step, actual_step.map(|s| TestStep::from(&s, r.ray)), actual_step, r_backup, r
+                    "step {i}\n\
+                    expected: {expected_step:?}\n\
+                    found:    {actual_ts:?}\n\
+                    actual:   {actual_step:?}\n\
+                    before: {r_backup:?}\n\
+                    after:  {r:?}\n",
+                    actual_ts = actual_step.map(|s| TestStep::from(&s, r.ray)),
                 );
             }
         }
@@ -723,7 +719,13 @@ mod tests {
     }
 
     /// Helper to construct steps
-    fn step(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate, face: Face7, t_distance: FreeCoordinate) -> TestStep {
+    fn step(
+        x: GridCoordinate,
+        y: GridCoordinate,
+        z: GridCoordinate,
+        face: Face7,
+        t_distance: FreeCoordinate,
+    ) -> TestStep {
         TestStep {
             cube: Point3::new(x, y, z),
             face,
@@ -738,98 +740,106 @@ mod tests {
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.01, 0.0001, 0.0001)),
+                Vector3::new(0.01, 0.0001, 0.0001),
+            ),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(11, 20, 30, Face7::NX, 50.0),
                 step(12, 20, 30, Face7::NX, 150.0),
-            ]);
+            ],
+        );
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(-0.01, 0.0001, 0.0001)),
+                Vector3::new(-0.01, 0.0001, 0.0001),
+            ),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(9, 20, 30, Face7::PX, 50.0),
                 step(8, 20, 30, Face7::PX, 150.0),
-            ]);
+            ],
+        );
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.0001, 0.01, 0.0001)),
+                Vector3::new(0.0001, 0.01, 0.0001),
+            ),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 21, 30, Face7::NY, 50.0),
                 step(10, 22, 30, Face7::NY, 150.0),
-            ]);
+            ],
+        );
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.0001, -0.01, 0.0001)),
+                Vector3::new(0.0001, -0.01, 0.0001),
+            ),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 19, 30, Face7::PY, 50.0),
                 step(10, 18, 30, Face7::PY, 150.0),
-            ]);
+            ],
+        );
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.0001, 0.0001, 0.01)),
+                Vector3::new(0.0001, 0.0001, 0.01),
+            ),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 20, 31, Face7::NZ, 50.0),
                 step(10, 20, 32, Face7::NZ, 150.0),
-            ]);
+            ],
+        );
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.0001, 0.0001, -0.01)),
+                Vector3::new(0.0001, 0.0001, -0.01),
+            ),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 20, 29, Face7::PZ, 50.0),
                 step(10, 20, 28, Face7::PZ, 150.0),
-            ]);
+            ],
+        );
     }
 
     #[test]
     fn simple_exactly_1d() {
         // Not testing all six directions because other tests cover that
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.01, 0.0, 0.0)),
+            &mut Raycaster::new(Point3::new(10.5, 20.5, 30.5), Vector3::new(0.01, 0.0, 0.0)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(11, 20, 30, Face7::NX, 50.0),
                 step(12, 20, 30, Face7::NX, 150.0),
-            ]);
+            ],
+        );
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(-0.01, 0.0, 0.0)),
+            &mut Raycaster::new(Point3::new(10.5, 20.5, 30.5), Vector3::new(-0.01, 0.0, 0.0)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(9, 20, 30, Face7::PX, 50.0),
                 step(8, 20, 30, Face7::PX, 150.0),
-            ]);
+            ],
+        );
     }
 
     #[test]
     fn direction_zero_produces_origin_cube_only() {
         assert_only_one_step(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::zero()),
-            step(10, 20, 30, Face7::Within, 0.0));
+            &mut Raycaster::new(Point3::new(10.5, 20.5, 30.5), Vector3::zero()),
+            step(10, 20, 30, Face7::Within, 0.0),
+        );
     }
 
     #[test]
     fn direction_negative_zero_produces_origin_cube_only() {
         assert_only_one_step(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::zero()),
-            step(10, 20, 30, Face7::Within, 0.0));
+            &mut Raycaster::new(Point3::new(10.5, 20.5, 30.5), Vector3::zero()),
+            step(10, 20, 30, Face7::Within, 0.0),
+        );
     }
 
     #[test]
@@ -837,8 +847,10 @@ mod tests {
         assert_only_one_step(
             &mut Raycaster::new(
                 Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(1.0, 2.0, FreeCoordinate::NAN)),
-            step(10, 20, 30, Face7::Within, 0.0));
+                Vector3::new(1.0, 2.0, FreeCoordinate::NAN),
+            ),
+            step(10, 20, 30, Face7::Within, 0.0),
+        );
     }
 
     /// Test the case where the starting point is exactly on a cube border
@@ -847,44 +859,40 @@ mod tests {
     fn start_on_cube_edge_parallel() {
         // Positive origin, positive direction
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.0, 20.5, 30.5),
-                Vector3::new(2.0, 0.1, 0.1)),
+            &mut Raycaster::new(Point3::new(10.0, 20.5, 30.5), Vector3::new(2.0, 0.1, 0.1)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(11, 20, 30, Face7::NX, 0.5),
                 step(12, 20, 30, Face7::NX, 1.0),
-            ]);
+            ],
+        );
         // Positive origin, negative direction
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.0, 20.5, 30.5),
-                Vector3::new(-2.0, 0.1, 0.1)),
+            &mut Raycaster::new(Point3::new(10.0, 20.5, 30.5), Vector3::new(-2.0, 0.1, 0.1)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(9, 20, 30, Face7::PX, 0.5),
                 step(8, 20, 30, Face7::PX, 1.0),
-            ]);
+            ],
+        );
         // Negative origin, positive direction
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(-10.0, 20.5, 30.5),
-                Vector3::new(2.0, 0.1, 0.1)),
+            &mut Raycaster::new(Point3::new(-10.0, 20.5, 30.5), Vector3::new(2.0, 0.1, 0.1)),
             vec![
                 step(-10, 20, 30, Face7::Within, 0.0),
                 step(-9, 20, 30, Face7::NX, 0.5),
                 step(-8, 20, 30, Face7::NX, 1.0),
-            ]);
+            ],
+        );
         // Negative origin, negative direction
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(-10.0, 20.5, 30.5),
-                Vector3::new(-2.0, 0.1, 0.1)),
+            &mut Raycaster::new(Point3::new(-10.0, 20.5, 30.5), Vector3::new(-2.0, 0.1, 0.1)),
             vec![
                 step(-10, 20, 30, Face7::Within, 0.0),
                 step(-11, 20, 30, Face7::PX, 0.5),
                 step(-12, 20, 30, Face7::PX, 1.0),
-            ]);
+            ],
+        );
     }
 
     /// Test the case where the starting point is exactly on a cube border
@@ -893,44 +901,49 @@ mod tests {
     fn start_on_cube_edge_perpendicular() {
         // Positive origin, positive direction
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.0, 20.5, 30.5),
-                Vector3::new(0.125, 1.0, 0.0)),
+            &mut Raycaster::new(Point3::new(10.0, 20.5, 30.5), Vector3::new(0.125, 1.0, 0.0)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 21, 30, Face7::NY, 0.5),
                 step(10, 22, 30, Face7::NY, 1.5),
-            ]);
+            ],
+        );
         // Positive origin, negative direction
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(10.0, 20.5, 30.5),
-                Vector3::new(-0.125, -1.0, 0.0)),
+                Vector3::new(-0.125, -1.0, 0.0),
+            ),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 19, 30, Face7::PY, 0.5),
                 step(10, 18, 30, Face7::PY, 1.5),
-            ]);
+            ],
+        );
         // Negative origin, positive direction
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(-10.0, -20.5, 30.5),
-                Vector3::new(0.125, 1.0, 0.0)),
+                Vector3::new(0.125, 1.0, 0.0),
+            ),
             vec![
                 step(-10, -21, 30, Face7::Within, 0.0),
                 step(-10, -20, 30, Face7::NY, 0.5),
                 step(-10, -19, 30, Face7::NY, 1.5),
-            ]);
+            ],
+        );
         // Negative origin, negative direction
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(-10.0, -20.5, 30.5),
-                Vector3::new(-0.125, -1.0, 0.0)),
+                Vector3::new(-0.125, -1.0, 0.0),
+            ),
             vec![
                 step(-10, -21, 30, Face7::Within, 0.0),
                 step(-10, -22, 30, Face7::PY, 0.5),
                 step(-10, -23, 30, Face7::PY, 1.5),
-            ]);
+            ],
+        );
     }
 
     #[test]
@@ -958,10 +971,10 @@ mod tests {
     #[test]
     fn start_outside_of_integer_range_with_grid() {
         let grid = Grid::new([0, 0, 0], [10, 10, 10]);
-        assert_no_steps(Raycaster::new(
-            Point3::new(0., 1e303, 0.),
-            Vector3::new(0., -1e303, 0.),
-        ).within_grid(grid));
+        assert_no_steps(
+            Raycaster::new(Point3::new(0., 1e303, 0.), Vector3::new(0., -1e303, 0.))
+                .within_grid(grid),
+        );
     }
 
     /// If we start inside the range of `GridCoordinate`s and exit, this should
@@ -1030,12 +1043,14 @@ mod tests {
         assert_steps(
             &mut Raycaster::new(
                 Point3::new(4.833333333333334, 4.666666666666666, -3.0),
-                Vector3::new(0.0, 0.0, 10.0)),
+                Vector3::new(0.0, 0.0, 10.0),
+            ),
             vec![
                 step(4, 4, -3, Face7::Within, 0.0),
                 step(4, 4, -2, Face7::NZ, 0.1),
                 step(4, 4, -1, Face7::NZ, 0.2),
-            ]);
+            ],
+        );
     }
 
     /// within_grid wasn't working for axis-aligned rays that don't intersect the world,
@@ -1066,16 +1081,11 @@ mod tests {
                     6.750109954921438e-67,
                     -85891558.96000093,
                 ),
-                Vector3::new(
-                    1.1036366354256313e-305,
-                    0.0,
-                    8589152896.000092,
-                ),
+                Vector3::new(1.1036366354256313e-305, 0.0, 8589152896.000092),
             )
             .within_grid(Grid::from_lower_upper([-10, -20, -30], [10, 20, 30])),
             vec![step(0, 0, -30, Face7::NZ, 0.010000000000000002)],
         );
-
     }
 
     #[test]
@@ -1083,7 +1093,7 @@ mod tests {
         let ray = Ray::new((0.5, 0.5, 0.5), (-1.0, 0.0, 0.0));
         let mut raycaster = ray.cast();
         let mut next = || raycaster.next().unwrap().intersection_point(ray);
-       
+
         assert_eq!(next(), Point3::new(0.5, 0.5, 0.5));
         assert_eq!(next(), Point3::new(0.0, 0.5, 0.5));
         assert_eq!(next(), Point3::new(-1.0, 0.5, 0.5));
@@ -1100,11 +1110,13 @@ mod tests {
         for _ in 0..1000 {
             let ray = Ray::new(
                 ray_origins.random_point(&mut rng),
-                Aab::new(-1., 1., -1., 1., -1., 1.).random_point(&mut rng).to_vec(),
+                Aab::new(-1., 1., -1., 1., -1., 1.)
+                    .random_point(&mut rng)
+                    .to_vec(),
             );
             let steps: Vec<RaycastStep> = ray.cast().within_grid(grid).collect();
             match &steps[..] {
-                [] => {},
+                [] => {}
                 [step] => {
                     let point = step.intersection_point(ray);
                     let mut surfaces = 0;
@@ -1116,11 +1128,13 @@ mod tests {
                             interiors += 1;
                         }
                     }
-                    assert!(surfaces + interiors == 3 && (surfaces > 0 || step.face() == Face7::Within),
-                        "ray {:?} produced invalid point {:?}", ray, point);
+                    assert!(
+                        surfaces + interiors == 3 && (surfaces > 0 || step.face() == Face7::Within),
+                        "ray {ray:?} produced invalid point {point:?}",
+                    );
                 }
                 steps => {
-                    panic!("Raycaster should not have produced multiple steps {:?}", steps);
+                    panic!("Raycaster should not have produced multiple steps {steps:?}",);
                 }
             }
         }
@@ -1150,7 +1164,7 @@ mod tests {
         assert_eq!(scale_to_integer_step(-3.0, 0.5), 2.0);
         assert_eq!(scale_to_integer_step(-3.0, -0.5), 2.0);
     }
-    
+
     #[test]
     fn scale_to_integer_step_nan_propagation() {
         assert!(scale_to_integer_step(1.5, FreeCoordinate::NAN).is_nan());
