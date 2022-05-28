@@ -98,10 +98,17 @@ fn main() -> Result<(), ActionError> {
                 .try_into()
                 .expect("Didn't find only one package");
             for target in metadata[&fuzzpkg].targets.iter() {
+                // Note that a timeout is specified because if any one fuzz task takes
+                // more than a fraction of a second, that's a sign that something has
+                // gone wrong, because all of the things we are fuzzing are supposed to
+                // be fast. (TODO: Tune this per-target.)
+                let timeout = 5; // seconds
+
                 cmd!("cargo +nightly fuzz run")
                     .arg(&target.name)
                     .arg("--")
-                    .arg(format!("-max_total_time={}", duration))
+                    .arg(format!("-timeout={timeout}"))
+                    .arg(format!("-max_total_time={duration}"))
                     .run()?;
             }
         }
