@@ -51,10 +51,10 @@ jobs:
       # so that the build of wasm-pack will be cached by rust-cache action.
       run: CARGO_TARGET_DIR=`pwd`/target cargo install wasm-pack
 
-    - name: Build and lint
-      run: cargo xtask lint
     - name: Run tests
       run: cargo xtask test-more
+    - name: Lint
+      run: cargo xtask lint
     
     # Save wasm build so that we can optionally deploy it without rebuilding
     # (but only for the stablest matrix version)
