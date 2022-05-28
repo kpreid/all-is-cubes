@@ -249,10 +249,13 @@ async fn tone_mapping(context: RenderTestContext, (tmo, exposure): (ToneMappingO
         .await;
 }
 
-/// Test rendering of transparent blocks. TODO: This needs to be split to different graphics options.
+/// Test rendering of transparent blocks.
 async fn transparent_one(context: RenderTestContext, transparency_option: &str) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
+    // For example, in the case of TransparencyOption::Surface,
+    // this should be a 50% mix of [1, 0, 0] and [0.5, 0.5, 0.5], i.e.
+    // [0.75, 0.25, 0.25], whose closest sRGB8 approximation is [225, 137, 137] = #E18989.
     space
         .set([0, 0, 0], Block::from(rgba_const!(1.0, 0.0, 0.0, 0.5)))
         .unwrap();
@@ -265,10 +268,12 @@ async fn transparent_one(context: RenderTestContext, transparency_option: &str) 
         "vol" => TransparencyOption::Volumetric,
         _ => unreachable!(),
     };
+    // Don't complicate things by adding lighting effects
+    options.lighting_display = LightingOption::None;
 
     let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
     context
-        .render_comparison_test(5, scene, Overlays::NONE)
+        .render_comparison_test(2, scene, Overlays::NONE)
         .await;
 }
 
