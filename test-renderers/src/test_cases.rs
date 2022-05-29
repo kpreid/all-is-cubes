@@ -14,12 +14,12 @@ use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::block::Block;
 use all_is_cubes::camera::{
     ExposureOption, FogOption, GraphicsOptions, LightingOption, ToneMappingOperator,
-    TransparencyOption,
+    TransparencyOption, Viewport,
 };
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::math::{Face6, NotNan, Rgb};
-use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::space::{Grid, LightPhysics, Space};
 use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;
@@ -38,6 +38,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         });
     }
 
+    c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
     c.insert_variants(
         "fog",
@@ -85,6 +86,61 @@ fn u(f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static) -> Option<U
 
 // --- Test cases ---------------------------------------------------------------------------------
 // Listed in alphabetical order.
+
+/// Generate colors which should be every sRGB component value.
+/// This should detect failures of output color mapping.
+async fn color_srgb_ramp(context: RenderTestContext) {
+    let bounds = Grid::new([0, 0, 0], [16 * 2, 16 * 2, 1]);
+    let mut universe = Universe::new();
+    let mut space = Space::builder(bounds)
+        .light_physics(LightPhysics::None)
+        .spawn({
+            let mut spawn = Spawn::default_for_new_space(bounds);
+            spawn.set_eye_position([16., 16., 17.]); // z distance is +1 to allow for block thickness
+            spawn.set_look_direction([0., 0., -1.]);
+            spawn
+        })
+        .build_empty();
+
+    let dr = Vector3::new(1, 0, 0);
+    let dg = Vector3::new(1, 1, 0);
+    let db = Vector3::new(0, 1, 0);
+    for i in 0..=255u8 {
+        let p = Point3::new(
+            i32::from(i.rem_euclid(16)) * 2,
+            i32::from(i.div_euclid(16)) * 2,
+            0,
+        );
+        space
+            .set(p, Block::from(Rgb::from_srgb8([i, i, i])))
+            .unwrap();
+        space
+            .set(p + dr, Block::from(Rgb::from_srgb8([i, 0, 0])))
+            .unwrap();
+        space
+            .set(p + dg, Block::from(Rgb::from_srgb8([0, i, 0])))
+            .unwrap();
+        space
+            .set(p + db, Block::from(Rgb::from_srgb8([0, 0, i])))
+            .unwrap();
+    }
+
+    finish_universe_from_space(&mut universe, space);
+
+    // TODO: if we ever get an orthographic camera this would be a great time to use it
+    let cameras = StandardCameras::from_constant_for_test(
+        unaltered_color_options(),
+        Viewport::with_scale(
+            1.0,
+            Vector2::new(1, 1) * (f64::from(bounds.size().x) * 4.) as u32,
+        ),
+        &universe,
+    );
+
+    context
+        .render_comparison_test(0, cameras, Overlays::NONE)
+        .await;
+}
 
 /// Test rendering of the cursor.
 async fn cursor_basic(context: RenderTestContext) {
@@ -262,14 +318,12 @@ async fn transparent_one(context: RenderTestContext, transparency_option: &str) 
 
     finish_universe_from_space(&mut universe, space);
 
-    let mut options = GraphicsOptions::default();
+    let mut options = unaltered_color_options();
     options.transparency = match transparency_option {
         "surf" => TransparencyOption::Surface,
         "vol" => TransparencyOption::Volumetric,
         _ => unreachable!(),
     };
-    // Don't complicate things by adding lighting effects
-    options.lighting_display = LightingOption::None;
 
     let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
     context
@@ -278,6 +332,16 @@ async fn transparent_one(context: RenderTestContext, transparency_option: &str) 
 }
 
 // --- Test helpers -------------------------------------------------------------------------------
+
+/// A set of graphics options that are the defaults but with everything that might tweak
+/// colors turned off: lighting, fog, and tone mapping.
+fn unaltered_color_options() -> GraphicsOptions {
+    let mut options = GraphicsOptions::default();
+    options.fog = FogOption::None;
+    options.lighting_display = LightingOption::None;
+    options.tone_mapping = ToneMappingOperator::Clamp;
+    options
+}
 
 fn one_cube_space() -> Space {
     let bounds = Grid::new([0, 0, 0], [1, 1, 1]);
