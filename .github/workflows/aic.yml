@@ -51,8 +51,22 @@ jobs:
       # so that the build of wasm-pack will be cached by rust-cache action.
       run: CARGO_TARGET_DIR=`pwd`/target cargo install wasm-pack
 
-    - name: Run tests
+    # Run tests in `test-more` mode in the "normal" matrix configuration, and
+    # run them in the faster mode (which does not try disabling/enabling
+    # features) for all other variations.
+    # This is because the exhaustive tests are intended to catch bugs in our own
+    # code (a miswritten `cfg` or similar), and the testing against nightly and
+    # latest versions is intended to catch bugs in *our dependencies*; and the
+    # two are sufficiently unlikely to interact that it doesn't seem worth
+    # spending the CI latency to do both.
+    - name: Run basic tests
+      if: ${{ !(matrix.toolchain == 'stable' && matrix.depversions == 'locked') }}
+      run: cargo xtask test
+    - name: Run exhaustive tests
+      if: ${{ matrix.toolchain == 'stable' && matrix.depversions == 'locked' }}
       run: cargo xtask test-more
+    # Unlike the above, we *do* run lint against all versions because future
+    # warnings might be interesting.
     - name: Lint
       run: cargo xtask lint
     
