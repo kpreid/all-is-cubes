@@ -1,3 +1,48 @@
+body {
+    /* #BCBCBC = sRGB encoding of 50% gray */
+    background: #BCBCBC;
+    color: black;
+}
+
+/* Test case matrix results table */
+
+table.results-table {
+    /* Overall centering */
+    margin: auto;
+
+    border-collapse: collapse;
+}
+
+.results-table tr {
+    border-bottom: 1px solid white;
+}
+
+td.test-case-name-cell {
+    text-align: left;
+}
+
+.results-table th,
+.results-table td {
+    /* Baseline align the test names and outcomes. */
+    vertical-align: baseline;
+}
+
+/* Image comparisons */
+
+.comparison-record {
+    /** allowed but not required to go on the same line */
+    display: inline-block;
+
+    border: 1px solid transparent;
+    padding: 1px;
+    white-space: nowrap;
+}
+
+.comparison-record-with-diff {
+    /* Both highlight errors, and group diff results together. */
+    border-color: red;
+}
+
 figure {
     display: inline-block;
     margin: 0;
@@ -9,6 +54,7 @@ figcaption {
 }
 
 figure img {
+    border: 1px dotted white;
     display: block;
     image-rendering: pixelated;
 }
