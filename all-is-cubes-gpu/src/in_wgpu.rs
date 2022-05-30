@@ -605,15 +605,18 @@ impl EverythingRenderer {
 
         let start_draw_time = Instant::now();
         let world_draw_info = if let Some(sr) = &self.space_renderers.world {
+            let camera = &self.cameras.cameras().world;
             sr.draw(
                 output_view,
                 depth_texture_view,
                 queue,
                 &mut encoder,
                 &self.pipelines,
-                &self.cameras.cameras().world,
+                camera,
                 if mem::take(&mut output_needs_clearing) {
-                    wgpu::LoadOp::Clear(to_wgpu_color(sr.sky_color.with_alpha_one()))
+                    wgpu::LoadOp::Clear(to_wgpu_color(
+                        (sr.sky_color * camera.exposure()).with_alpha_one(),
+                    ))
                 } else {
                     wgpu::LoadOp::Load
                 },
