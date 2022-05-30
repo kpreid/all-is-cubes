@@ -183,8 +183,14 @@ impl TerminalMain {
                         // once UI exists because it will use the world exposure for UI,
                         // but this will require a rethink of the raytracer interface.
                         let camera = &scene.cameras().cameras().world;
-                        let (viewport, image, info) =
-                            scene.draw::<ColorCharacterBuf, _, _>("", |b| b.output(camera));
+                        let viewport = scene.modified_viewport();
+                        let mut image =
+                            vec![(String::new(), None); viewport.pixel_count().unwrap()];
+                        let info = scene.draw::<ColorCharacterBuf, _, _>(
+                            "",
+                            |b| b.output(camera),
+                            &mut image,
+                        );
                         // Ignore send errors as they just mean we're shutting down or died elsewhere
                         let _ = render_thread_out.send(FrameOutput {
                             viewport,

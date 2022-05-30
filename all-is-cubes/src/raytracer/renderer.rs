@@ -90,7 +90,8 @@ where
     ///
     /// The image's dimensions are determined by the previously supplied
     /// [`StandardCameras`]’ viewport value as of the last call to [`Self::update()`],
-    /// as affected by the `size_policy`.
+    /// as affected by the `size_policy`. The provided `output` buffer must have exactly
+    /// that length.
     ///
     /// This operation does not attempt to access the scene objects and therefore may be
     /// called while the [`Universe`] is being stepped, etc.
@@ -101,8 +102,7 @@ where
     ///
     /// [`Universe`]: crate::universe::Universe
     // TODO: this should take an info text *function*
-    // TODO: This should take an image buffer to write into
-    pub fn draw<P, E, O>(&self, _info_text: &str, encoder: E) -> (Viewport, Vec<O>, RaytraceInfo)
+    pub fn draw<P, E, O>(&self, _info_text: &str, encoder: E, output: &mut [O]) -> RaytraceInfo
     where
         P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
@@ -112,27 +112,23 @@ where
 
         let mut camera = self.cameras.cameras().world.clone();
         camera.set_viewport((self.size_policy)(camera.viewport()));
-        let pixel_count = camera.viewport().pixel_count().unwrap(/* checked by caller */);
 
-        let encoded_placeholder = {
-            let options = RtOptionsRef {
-                graphics_options: self.cameras.graphics_options(),
-                custom_options: &*self.custom_options.get(),
-            };
-            let mut pixel_buf = P::default();
-            pixel_buf.add(palette::NO_WORLD_TO_SHOW, &D::sky(options));
-            encoder(pixel_buf)
-        };
-
-        let mut data = vec![encoded_placeholder; pixel_count];
         match &self.rt {
-            Some(rt) => {
-                let info = rt
-                    .get()
-                    .trace_scene_to_image::<P, E, O>(&camera, encoder, &mut data);
-                (camera.viewport(), data, info)
+            Some(rt) => rt
+                .get()
+                .trace_scene_to_image::<P, E, O>(&camera, encoder, output),
+            None => {
+                output.fill({
+                    let options = RtOptionsRef {
+                        graphics_options: self.cameras.graphics_options(),
+                        custom_options: &*self.custom_options.get(),
+                    };
+                    let mut pixel_buf = P::default();
+                    pixel_buf.add(palette::NO_WORLD_TO_SHOW, &D::sky(options));
+                    encoder(pixel_buf)
+                });
+                RaytraceInfo::default()
             }
-            None => (camera.viewport(), data, RaytraceInfo::default()),
         }
     }
 
@@ -142,6 +138,13 @@ where
     /// to be useful for dealing with cursors and such matters, I think.
     pub fn cameras(&self) -> &StandardCameras {
         &self.cameras
+    }
+
+    /// Returns the [`Viewport`] as of the last [`Self::update()`] as modified by the
+    /// `size_policy`. That is, this reports the size of images that will be actually
+    /// drawn.
+    pub fn modified_viewport(&self) -> Viewport {
+        (self.size_policy)(self.cameras.viewport())
     }
 }
 
@@ -153,17 +156,17 @@ impl RtRenderer<()> {
     pub fn draw_rgba(&self, info_text: &str) -> (RgbaImage, RaytraceInfo) {
         let camera = self.cameras.cameras().world.clone();
 
-        let (viewport, image_data, info) = self
-            .draw::<ColorBuf, _, [u8; 4]>(info_text, |pixel_buf| {
-                camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8()
-            });
-
         let Vector2 {
             x: width,
             y: height,
-        } = viewport.framebuffer_size;
-        let image = RgbaImage::from_raw(width, height, image_data.into_iter().flatten().collect())
-            .expect("RtRenderer's given size_policy was inconsistent");
+        } = self.modified_viewport().framebuffer_size;
+        let mut image = RgbaImage::new(width, height);
+
+        let info = self.draw::<ColorBuf, _, [u8; 4]>(
+            info_text,
+            |pixel_buf| camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8(),
+            bytemuck::cast_slice_mut::<u8, [u8; 4]>(image.as_mut()),
+        );
 
         (image, info)
     }
