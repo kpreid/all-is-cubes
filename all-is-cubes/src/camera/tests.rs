@@ -1,3 +1,6 @@
+// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
+// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
+
 use super::*;
 use pretty_assertions::assert_eq;
 
