@@ -13,6 +13,18 @@ fn camera_bad_viewport_doesnt_panic() {
 }
 
 #[test]
+fn set_options_updates_matrices() {
+    let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
+    let matrix = camera.projection();
+    camera.set_options({
+        let mut g = camera.options().clone();
+        g.fov_y = notnan!(30.0);
+        g
+    });
+    assert_ne!(matrix, camera.projection());
+}
+
+#[test]
 fn camera_view_position() {
     // This test used to be less trivial when the transform was taken as a matrix
     let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);

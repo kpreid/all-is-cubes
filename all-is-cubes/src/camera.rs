@@ -114,6 +114,8 @@ impl Camera {
         let options = options.repair();
         self.exposure_value = options.exposure.initial();
         self.options = options;
+        // TODO: we only *need* to recompute if fov_y changed (currently)
+        self.compute_matrices();
     }
 
     /// Sets the contained viewport value, and recalculates matrices to be suitable for
