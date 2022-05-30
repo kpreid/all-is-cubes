@@ -102,7 +102,7 @@ where
     ///
     /// [`Universe`]: crate::universe::Universe
     // TODO: this should take an info text *function*
-    pub fn draw<P, E, O>(&self, _info_text: &str, encoder: E, output: &mut [O]) -> RaytraceInfo
+    pub fn draw<P, E, O>(&self, info_text: &str, encoder: E, output: &mut [O]) -> RaytraceInfo
     where
         P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
@@ -111,25 +111,49 @@ where
         // TODO: implement drawing info text (can use embedded_graphics for that)
 
         let mut camera = self.cameras.cameras().world.clone();
-        camera.set_viewport((self.size_policy)(camera.viewport()));
+        let viewport = (self.size_policy)(camera.viewport());
+        camera.set_viewport(viewport);
 
-        match &self.rt {
+        let options = RtOptionsRef {
+            graphics_options: self.cameras.graphics_options(),
+            custom_options: &*self.custom_options.get(),
+        };
+
+        let info = match &self.rt {
             Some(rt) => rt
                 .get()
-                .trace_scene_to_image::<P, E, O>(&camera, encoder, output),
+                .trace_scene_to_image::<P, &E, O>(&camera, &encoder, output),
             None => {
                 output.fill({
-                    let options = RtOptionsRef {
-                        graphics_options: self.cameras.graphics_options(),
-                        custom_options: &*self.custom_options.get(),
-                    };
                     let mut pixel_buf = P::default();
                     pixel_buf.add(palette::NO_WORLD_TO_SHOW, &D::sky(options));
                     encoder(pixel_buf)
                 });
                 RaytraceInfo::default()
             }
+        };
+
+        if !info_text.is_empty() && self.cameras.cameras().world.options().debug_info_text {
+            eg::draw_info_text(
+                output,
+                viewport,
+                [
+                    {
+                        let mut pixel_buf = P::default();
+                        pixel_buf.add(Rgba::BLACK, &D::sky(options));
+                        encoder(pixel_buf)
+                    },
+                    {
+                        let mut pixel_buf = P::default();
+                        pixel_buf.add(Rgba::WHITE, &D::sky(options));
+                        encoder(pixel_buf)
+                    },
+                ],
+                info_text,
+            );
         }
+
+        info
     }
 
     /// Returns the [`StandardCameras`] this renderer contains.
@@ -199,6 +223,90 @@ impl HeadlessRenderer for RtRenderer<()> {
             let (image, _rt_info) = self.draw_rgba(info_text);
             Ok(image)
         })
+    }
+}
+
+mod eg {
+    use super::*;
+    use crate::camera::info_text_drawable;
+    use embedded_graphics::draw_target::DrawTarget;
+    use embedded_graphics::draw_target::DrawTargetExt;
+    use embedded_graphics::pixelcolor::BinaryColor;
+    use embedded_graphics::prelude::{OriginDimensions, Point, Size};
+    use embedded_graphics::primitives::Rectangle;
+    use embedded_graphics::Drawable;
+    use embedded_graphics::Pixel;
+
+    pub fn draw_info_text<T: Clone>(
+        output: &mut [T],
+        viewport: Viewport,
+        paint: [T; 2],
+        info_text: &str,
+    ) {
+        let target = &mut eg::EgImageTarget {
+            data: output,
+            paint,
+            size: Size {
+                width: viewport.framebuffer_size.x,
+                height: viewport.framebuffer_size.y,
+            },
+        };
+        let shadow = info_text_drawable(info_text, BinaryColor::Off);
+        // TODO: use .into_ok() when stable for infallible drawing
+        shadow
+            .draw(&mut target.translated(Point::new(0, -1)))
+            .unwrap();
+        shadow
+            .draw(&mut target.translated(Point::new(0, 1)))
+            .unwrap();
+        shadow
+            .draw(&mut target.translated(Point::new(-1, 0)))
+            .unwrap();
+        shadow
+            .draw(&mut target.translated(Point::new(1, 0)))
+            .unwrap();
+        info_text_drawable(info_text, BinaryColor::On)
+            .draw(target)
+            .unwrap();
+    }
+
+    /// Just enough [`DrawTarget`] to implement info text drawing.
+    pub(crate) struct EgImageTarget<'a, T> {
+        data: &'a mut [T],
+        paint: [T; 2],
+        size: Size,
+    }
+
+    impl<T: Clone> DrawTarget for EgImageTarget<'_, T> {
+        type Color = BinaryColor;
+        type Error = std::convert::Infallible;
+
+        fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+        where
+            I: IntoIterator<Item = Pixel<Self::Color>>,
+        {
+            let bounds = Rectangle {
+                top_left: Point::zero(),
+                size: self.size,
+            };
+            for Pixel(point, color) in pixels.into_iter() {
+                if bounds.contains(point) {
+                    self.data[point.y as usize * self.size.width as usize + point.x as usize] =
+                        match color {
+                            BinaryColor::Off => &self.paint[0],
+                            BinaryColor::On => &self.paint[1],
+                        }
+                        .clone();
+                }
+            }
+            Ok(())
+        }
+    }
+
+    impl<T> OriginDimensions for EgImageTarget<'_, T> {
+        fn size(&self) -> Size {
+            self.size
+        }
     }
 }
 
