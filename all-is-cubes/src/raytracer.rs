@@ -17,7 +17,10 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3};
 use cgmath::{Point3, Vector4};
 use ordered_float::NotNan;
 #[cfg(feature = "rayon")]
-use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
+use rayon::{
+    iter::{IndexedParallelIterator as _, IntoParallelIterator as _, ParallelIterator as _},
+    slice::ParallelSliceMut as _,
+};
 
 use crate::block::{Evoxel, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
@@ -150,28 +153,39 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         s.finish(self.sky_color, &self.sky_data)
     }
 
-    /// Compute a full image.
+    /// Compute a full image, writing it into `output`.
     ///
-    /// The returned data is in the usual left-right then top-bottom raster order;
+    /// The produced data is in the usual left-right then top-bottom raster order;
     /// its dimensions are `camera.framebuffer_size`.
     ///
-    /// `encoder` may be used to transform the output of the `PixelBuf`.
+    /// `encoder` may be used to transform the output of the `PixelBuf` into the stored
+    /// representation.
     ///
-    /// TODO: Add a mechanism for incrementally rendering into a mutable buffer instead of
-    /// all-at-once into a newly allocated one, for interactive use.
+    /// Panics if `output`'s length does not match the area of `camera.framebuffer_size`.
+    ///
+    /// TODO: Add a mechanism for incrementally rendering (not 100% of pixels) for
+    /// interactive use.
     pub fn trace_scene_to_image<P, E, O>(
         &self,
         camera: &Camera,
         encoder: E,
-    ) -> (Box<[O]>, RaytraceInfo)
+        output: &mut [O],
+    ) -> RaytraceInfo
     where
         P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
+        let viewport = camera.viewport();
+        assert_eq!(
+            viewport.pixel_count(),
+            Some(output.len()),
+            "Viewport size does not match output buffer length",
+        );
+
         // This wrapper function ensures that the two implementations have consistent
         // signatures.
-        self.trace_scene_to_image_impl(camera, encoder)
+        self.trace_scene_to_image_impl(camera, encoder, output)
     }
 
     #[cfg(feature = "rayon")]
@@ -179,7 +193,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         &self,
         camera: &Camera,
         encoder: E,
-    ) -> (Box<[O]>, RaytraceInfo)
+        output: &mut [O],
+    ) -> RaytraceInfo
     where
         P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
@@ -189,23 +204,26 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
         let encoder = &encoder; // make shareable
 
-        let output_iterator = (0..viewport_size.y)
-            .into_par_iter()
-            .map(move |ych| {
+        let total_info = output
+            .par_chunks_mut(viewport_size.x)
+            .enumerate()
+            .map(move |(ych, raster_row)| {
                 let y = viewport.normalize_fb_y(ych);
-                (0..viewport_size.x).into_par_iter().map(move |xch| {
-                    let x = viewport.normalize_fb_x(xch);
-                    let (pixel, info) =
-                        self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
-                    (encoder(pixel), info)
-                })
+                raster_row
+                    .into_par_iter()
+                    .enumerate()
+                    .map(move |(xch, pixel_out)| {
+                        let x = viewport.normalize_fb_x(xch);
+                        let (pixel, info) =
+                            self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
+                        *pixel_out = encoder(pixel);
+                        info
+                    })
             })
-            .flatten();
+            .flatten()
+            .sum();
 
-        let (image, info_sum): (Vec<O>, rayon_helper::ParExtSum<RaytraceInfo>) =
-            output_iterator.unzip();
-
-        (image.into_boxed_slice(), info_sum.result())
+        total_info
     }
 
     #[cfg(not(feature = "rayon"))]
@@ -213,7 +231,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         &self,
         camera: &Camera,
         encoder: E,
-    ) -> (Box<[O]>, RaytraceInfo)
+        output: &mut [O],
+    ) -> RaytraceInfo
     where
         P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
@@ -221,21 +240,22 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     {
         let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
-        let mut image = Vec::with_capacity(viewport.pixel_count().expect("image too large"));
 
         let mut total_info = RaytraceInfo::default();
+        let mut index = 0;
         for ych in 0..viewport_size.y {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
                 let (pixel, info) =
                     self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
+                output[index] = encoder(pixel);
                 total_info += info;
-                image.push(encoder(pixel));
+                index += 1;
             }
         }
 
-        (image.into_boxed_slice(), total_info)
+        total_info
     }
 
     #[inline]

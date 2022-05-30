@@ -141,7 +141,7 @@ struct FrameOutput {
     /// The `framebuffer_size` of this viewport is equal to the size of the `image` data.
     viewport: Viewport,
     options: TerminalOptions,
-    image: Box<[TextAndColor]>,
+    image: Vec<TextAndColor>,
     info: RaytraceInfo,
 }
 

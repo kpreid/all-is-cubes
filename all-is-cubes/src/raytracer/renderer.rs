@@ -102,7 +102,7 @@ where
     /// [`Universe`]: crate::universe::Universe
     // TODO: this should take an info text *function*
     // TODO: This should take an image buffer to write into
-    pub fn draw<P, E, O>(&self, _info_text: &str, encoder: E) -> (Viewport, Box<[O]>, RaytraceInfo)
+    pub fn draw<P, E, O>(&self, _info_text: &str, encoder: E) -> (Viewport, Vec<O>, RaytraceInfo)
     where
         P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
@@ -112,30 +112,27 @@ where
 
         let mut camera = self.cameras.cameras().world.clone();
         camera.set_viewport((self.size_policy)(camera.viewport()));
+        let pixel_count = camera.viewport().pixel_count().unwrap(/* checked by caller */);
 
+        let encoded_placeholder = {
+            let options = RtOptionsRef {
+                graphics_options: self.cameras.graphics_options(),
+                custom_options: &*self.custom_options.get(),
+            };
+            let mut pixel_buf = P::default();
+            pixel_buf.add(palette::NO_WORLD_TO_SHOW, &D::sky(options));
+            encoder(pixel_buf)
+        };
+
+        let mut data = vec![encoded_placeholder; pixel_count];
         match &self.rt {
             Some(rt) => {
-                let (data, info) = rt.get().trace_scene_to_image::<P, E, O>(&camera, encoder);
+                let info = rt
+                    .get()
+                    .trace_scene_to_image::<P, E, O>(&camera, encoder, &mut data);
                 (camera.viewport(), data, info)
             }
-            None => {
-                let options = RtOptionsRef {
-                    graphics_options: self.cameras.graphics_options(),
-                    custom_options: &*self.custom_options.get(),
-                };
-                let mut pixel_buf = P::default();
-                pixel_buf.add(palette::NO_WORLD_TO_SHOW, &D::sky(options));
-                let encoded = encoder(pixel_buf);
-                let Vector2 {
-                    x: width,
-                    y: height,
-                } = camera.viewport().framebuffer_size;
-                (
-                    camera.viewport(),
-                    vec![encoded; width as usize * height as usize].into(),
-                    RaytraceInfo::default(),
-                )
-            }
+            None => (camera.viewport(), data, RaytraceInfo::default()),
         }
     }
 
@@ -165,12 +162,8 @@ impl RtRenderer<()> {
             x: width,
             y: height,
         } = viewport.framebuffer_size;
-        let image = RgbaImage::from_raw(
-            width,
-            height,
-            Vec::from(image_data).into_iter().flatten().collect(),
-        )
-        .expect("RtRenderer's given size_policy was inconsistent");
+        let image = RgbaImage::from_raw(width, height, image_data.into_iter().flatten().collect())
+            .expect("RtRenderer's given size_policy was inconsistent");
 
         (image, info)
     }
