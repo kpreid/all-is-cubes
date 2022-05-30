@@ -52,6 +52,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         ],
     );
     c.insert("follow_character_change", None, follow_character_change);
+    c.insert("follow_options_change", None, follow_options_change);
     c.insert_variants(
         "light",
         u(light_test_universe()),
@@ -89,7 +90,7 @@ fn u(f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static) -> Option<U
 
 /// Generate colors which should be every sRGB component value.
 /// This should detect failures of output color mapping.
-async fn color_srgb_ramp(context: RenderTestContext) {
+async fn color_srgb_ramp(mut context: RenderTestContext) {
     let bounds = Grid::new([0, 0, 0], [16 * 2, 16 * 2, 1]);
     let mut universe = Universe::new();
     let mut space = Space::builder(bounds)
@@ -143,7 +144,7 @@ async fn color_srgb_ramp(context: RenderTestContext) {
 }
 
 /// Test rendering of the cursor.
-async fn cursor_basic(context: RenderTestContext) {
+async fn cursor_basic(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
     space
@@ -168,7 +169,7 @@ async fn cursor_basic(context: RenderTestContext) {
     context.render_comparison_test(1, cameras, overlays).await;
 }
 
-async fn fog(context: RenderTestContext, fog: FogOption) {
+async fn fog(mut context: RenderTestContext, fog: FogOption) {
     let mut options = GraphicsOptions::default();
     options.view_distance = notnan!(50.0);
     options.fog = fog;
@@ -216,8 +217,54 @@ async fn follow_character_change(context: RenderTestContext) {
         "Should be looking at c2 (green)"
     );
 }
+/// Does the renderer properly follow a change of graphics options?
+async fn follow_options_change(mut context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let bounds = Grid::from_lower_upper([-1, 0, 0], [2, 1, 1]);
+    let mut space = Space::builder(bounds)
+        .sky_color(rgb_const!(0.5, 0.5, 0.5))
+        .spawn(looking_at_one_cube_spawn(bounds))
+        .build_empty();
+    space
+        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
+        .unwrap();
+    space
+        .set([1, 0, 0], Block::from(rgba_const!(0.0, 0.0, 1.0, 0.5)))
+        .unwrap();
+    finish_universe_from_space(&mut universe, space);
 
-async fn light(context: RenderTestContext, option: LightingOption) {
+    // Two sets of graphics options with various differences
+    let mut options_1 = GraphicsOptions::default();
+    options_1.fov_y = notnan!(90.0);
+    let mut options_2 = GraphicsOptions::default();
+    options_2.fov_y = notnan!(70.0);
+    options_2.exposure = ExposureOption::Fixed(notnan!(1.5));
+    options_2.transparency = TransparencyOption::Threshold(notnan!(0.1));
+
+    let options_cell = ListenableCell::new(options_1);
+    let cameras: StandardCameras = StandardCameras::new(
+        options_cell.as_source(),
+        ListenableSource::constant(COMMON_VIEWPORT),
+        ListenableSource::constant(universe.get_default_character()),
+        ListenableSource::constant(None),
+    )
+    .unwrap();
+
+    // Render the image once. This isn't that interesting a comparison test,
+    // but we do want to display the image for manual verification of the change.
+    let mut renderer = context.renderer(cameras);
+    context
+        .render_comparison_test_with_renderer(1, &mut renderer, Overlays::NONE)
+        .await;
+
+    // Change the graphics options and rerender.
+    options_cell.set(options_2);
+    context
+        .render_comparison_test_with_renderer(1, &mut renderer, Overlays::NONE)
+        .await;
+}
+
+async fn light(mut context: RenderTestContext, option: LightingOption) {
     let mut options = GraphicsOptions::default();
     options.fov_y = notnan!(45.0);
     options.lighting_display = option;
@@ -228,7 +275,7 @@ async fn light(context: RenderTestContext, option: LightingOption) {
         .await;
 }
 
-async fn no_character_no_ui(context: RenderTestContext) {
+async fn no_character_no_ui(mut context: RenderTestContext) {
     let universe = Universe::new();
     context
         .render_comparison_test(
@@ -242,7 +289,7 @@ async fn no_character_no_ui(context: RenderTestContext) {
         .await;
 }
 
-async fn no_character_but_ui(context: RenderTestContext) {
+async fn no_character_but_ui(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut ui_space = Space::builder(Grid::new([0, 0, 0], [4, 4, 4]))
         .light_physics(all_is_cubes::space::LightPhysics::None)
@@ -272,7 +319,7 @@ async fn no_character_but_ui(context: RenderTestContext) {
 }
 
 /// Test (1) an explicitly set sky color, and (2) the info text rendering.
-async fn sky_and_info_text(context: RenderTestContext) {
+async fn sky_and_info_text(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let space = Space::builder(Grid::new([0, 0, 0], [1, 1, 1]))
         .sky_color(rgb_const!(1.0, 0.5, 0.0))
@@ -292,7 +339,7 @@ async fn sky_and_info_text(context: RenderTestContext) {
     context.render_comparison_test(1, &universe, overlays).await;
 }
 
-async fn tone_mapping(context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
+async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
     let mut options = GraphicsOptions::default();
     options.fov_y = notnan!(45.0);
     options.tone_mapping = tmo;
@@ -306,7 +353,7 @@ async fn tone_mapping(context: RenderTestContext, (tmo, exposure): (ToneMappingO
 }
 
 /// Test rendering of transparent blocks.
-async fn transparent_one(context: RenderTestContext, transparency_option: &str) {
+async fn transparent_one(mut context: RenderTestContext, transparency_option: &str) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
     // For example, in the case of TransparencyOption::Surface,
@@ -355,8 +402,8 @@ fn looking_at_one_cube_spawn(bounds: Grid) -> Spawn {
     // TODO: Maybe we should have a "back-convert a Spawn (and FOV) from a Camera" operation.
 
     let mut spawn = Spawn::default_for_new_space(bounds);
-    spawn.set_eye_position([0.5, 2.0, 0.5]);
-    spawn.set_look_direction([0., -1., 0.]);
+    spawn.set_eye_position([0.5, 0.5, 2.0]);
+    spawn.set_look_direction([0., 0., -1.]);
     spawn
 }
 

@@ -18,8 +18,8 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{CustomFormat as _, StatusText};
 
 use crate::{
-    results_json_path, write_report_file, ComparisonRecord, Overlays, RendererFactory, RendererId,
-    Scene, TestCaseOutput, TestCombo, TestId,
+    results_json_path, write_report_file, ComparisonRecord, ImageId, Overlays, RendererFactory,
+    RendererId, Scene, TestCaseOutput, TestId,
 };
 
 /// The Universe parameter is an optional way to receive a pre-configured universe
@@ -43,6 +43,7 @@ pub struct RenderTestContext {
     renderer_factory: Box<dyn RendererFactory>,
     comparison_log: Arc<Mutex<Vec<ComparisonRecord>>>,
     universe: Option<Arc<Universe>>,
+    image_serial: u64,
 }
 
 impl RenderTestContext {
@@ -61,17 +62,33 @@ impl RenderTestContext {
 
     #[track_caller]
     pub async fn render_comparison_test(
-        &self,
+        &mut self,
         allowed_difference: u8,
         scene: impl Scene,
         overlays: Overlays<'_>,
     ) {
-        let combo = TestCombo {
+        let mut renderer = self.renderer(scene);
+        self.render_comparison_test_with_renderer(allowed_difference, &mut renderer, overlays)
+            .await
+    }
+
+    // TODO: better name
+    #[track_caller]
+    pub async fn render_comparison_test_with_renderer(
+        &mut self,
+        allowed_difference: u8,
+        renderer: &mut Box<dyn HeadlessRenderer + Send>,
+        overlays: Overlays<'_>,
+    ) {
+        let combo = ImageId {
             test_id: self.id(),
             renderer: self.renderer_factory.id(),
+            serial_number: {
+                self.image_serial += 1;
+                self.image_serial
+            },
         };
 
-        let mut renderer = self.renderer(scene);
         renderer
             .update(overlays.cursor)
             .await
@@ -158,6 +175,7 @@ where
                             Some(f) => Some(f.await),
                             None => None,
                         },
+                        image_serial: 0,
                     };
 
                     let case_start_time = Instant::now();

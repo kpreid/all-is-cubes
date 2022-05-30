@@ -117,7 +117,7 @@ impl ComparisonRecord {
 
 /// Finish a rendering test by storing/displaying/comparing the output image.
 pub async fn compare_rendered_image(
-    test: TestCombo,
+    test: ImageId,
     allowed_difference: u8,
     actual_image: RgbaImage,
 ) -> ComparisonRecord {
@@ -139,9 +139,9 @@ pub async fn compare_rendered_image(
             Err(ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
                 // Look for a generic all-renderers output file
                 let expected_file_path = image_path(
-                    &TestCombo {
-                        test_id: test.test_id,
+                    &ImageId {
                         renderer: RendererId::All,
+                        ..test
                     },
                     Version::Expected,
                 );
