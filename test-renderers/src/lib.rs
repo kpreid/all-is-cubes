@@ -68,7 +68,7 @@ pub struct ComparisonRecord {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ComparisonOutcome {
     Equal,
-    Different,
+    Different { amount: u8 },
     NoExpected,
 }
 
@@ -101,9 +101,9 @@ impl ComparisonRecord {
     fn panic_if_unsuccessful(&self) {
         match self.outcome {
             ComparisonOutcome::Equal => {}
-            ComparisonOutcome::Different => {
+            ComparisonOutcome::Different { amount } => {
                 // TODO: show filenames
-                panic!("Image mismatch!");
+                panic!("Image mismatch! ({amount})");
             }
             ComparisonOutcome::NoExpected => {
                 panic!(
@@ -181,7 +181,17 @@ pub async fn compare_rendered_image(
         if diff_result.equal_or_different_below_threshold(allowed_difference) {
             ComparisonOutcome::Equal
         } else {
-            ComparisonOutcome::Different
+            ComparisonOutcome::Different {
+                amount: diff_result
+                    .histogram
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .rev() // find highest difference
+                    .find(|&(_, v)| v > 0)
+                    .map(|(i, _)| i as u8)
+                    .unwrap_or(0),
+            }
         },
     )
 }

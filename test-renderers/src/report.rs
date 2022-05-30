@@ -127,7 +127,7 @@ mod tmpl {
                 actual_file_name: input.actual_file_name.clone(),
                 diff_file_name: input.diff_file_name.clone().unwrap_or_default(),
                 show_expected_for_comparison: match input.outcome {
-                    ComparisonOutcome::Different => true,
+                    ComparisonOutcome::Different { .. } => true,
                     ComparisonOutcome::Equal => false,
                     ComparisonOutcome::NoExpected => true,
                 },
