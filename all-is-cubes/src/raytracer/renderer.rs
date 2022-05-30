@@ -8,7 +8,7 @@ use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
 use crate::apps::StandardCameras;
-use crate::camera::{HeadlessRenderer, RenderError};
+use crate::camera::{HeadlessRenderer, RenderError, Viewport};
 use crate::character::Cursor;
 use crate::content::palette;
 use crate::listen::ListenableSource;
@@ -22,6 +22,9 @@ use crate::raytracer::{
 pub struct RtRenderer<D: RtBlockData = ()> {
     rt: Option<UpdatingSpaceRaytracer<D>>,
     cameras: StandardCameras,
+    /// Adjusts the `cameras` viewport to control how many pixels are actually traced.
+    /// The output images will alway
+    size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
     custom_options: ListenableSource<D::Options>,
 }
 
@@ -29,10 +32,20 @@ impl<D: RtBlockData> RtRenderer<D>
 where
     D::Options: Clone + Sync + 'static,
 {
-    pub fn new(cameras: StandardCameras, custom_options: ListenableSource<D::Options>) -> Self {
+    /// * `cameras`: Scene to draw.
+    /// * `size_policy`: Modifier to the `cameras`' provided viewport to control how many
+    ///    pixels are actually traced.
+    /// * `custom_options`: The custom options for the `D` block data type; see
+    ///   [`RtBlockData`].
+    pub fn new(
+        cameras: StandardCameras,
+        size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
+        custom_options: ListenableSource<D::Options>,
+    ) -> Self {
         RtRenderer {
             rt: None,
             cameras,
+            size_policy,
             custom_options,
         }
     }
@@ -76,6 +89,10 @@ where
     /// Produce an image of the current state of the scene this renderer was created to
     /// track, as of the last call to [`Self::update()`], with the given overlaid text.
     ///
+    /// The image's dimensions are determined by the previously supplied
+    /// [`StandardCameras`]’ viewport value as of the last call to [`Self::update()`],
+    /// as affected by the `size_policy`.
+    ///
     /// This operation does not attempt to access the scene objects and therefore may be
     /// called while the [`Universe`] is being stepped, etc.
     ///
@@ -85,7 +102,8 @@ where
     ///
     /// [`Universe`]: crate::universe::Universe
     // TODO: this should take an info text *function*
-    pub fn draw<P, E, O>(&self, _info_text: &str, encoder: E) -> (Box<[O]>, RaytraceInfo)
+    // TODO: This should take an image buffer to write into
+    pub fn draw<P, E, O>(&self, _info_text: &str, encoder: E) -> (Viewport, Box<[O]>, RaytraceInfo)
     where
         P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
@@ -93,14 +111,14 @@ where
     {
         // TODO: implement drawing info text (can use embedded_graphics for that)
 
-        let camera = self.cameras.cameras().world.clone();
-        let Vector2 {
-            x: width,
-            y: height,
-        } = camera.viewport().framebuffer_size;
+        let mut camera = self.cameras.cameras().world.clone();
+        camera.set_viewport((self.size_policy)(camera.viewport()));
 
         match &self.rt {
-            Some(rt) => rt.get().trace_scene_to_image::<P, E, O>(&camera, encoder),
+            Some(rt) => {
+                let (data, info) = rt.get().trace_scene_to_image::<P, E, O>(&camera, encoder);
+                (camera.viewport(), data, info)
+            }
             None => {
                 let options = RtOptionsRef {
                     graphics_options: self.cameras.graphics_options(),
@@ -109,7 +127,12 @@ where
                 let mut pixel_buf = P::default();
                 pixel_buf.add(palette::NO_WORLD_TO_SHOW, &D::sky(options));
                 let encoded = encoder(pixel_buf);
+                let Vector2 {
+                    x: width,
+                    y: height,
+                } = camera.viewport().framebuffer_size;
                 (
+                    camera.viewport(),
                     vec![encoded; width as usize * height as usize].into(),
                     RaytraceInfo::default(),
                 )
@@ -133,21 +156,22 @@ impl RtRenderer<()> {
     ///  [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color
     pub fn draw_rgba(&self, info_text: &str) -> (RgbaImage, RaytraceInfo) {
         let camera = self.cameras.cameras().world.clone();
+
+        let (viewport, image_data, info) = self
+            .draw::<ColorBuf, _, [u8; 4]>(info_text, |pixel_buf| {
+                camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8()
+            });
+
         let Vector2 {
             x: width,
             y: height,
-        } = camera.viewport().framebuffer_size;
-
-        let (image_data, info) = self.draw::<ColorBuf, _, [u8; 4]>(info_text, |pixel_buf| {
-            camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8()
-        });
-
+        } = viewport.framebuffer_size;
         let image = RgbaImage::from_raw(
             width,
             height,
             Vec::from(image_data).into_iter().flatten().collect(),
         )
-        .unwrap(/* can't happen: wrong dimensions */);
+        .expect("RtRenderer's given size_policy was inconsistent");
 
         (image, info)
     }

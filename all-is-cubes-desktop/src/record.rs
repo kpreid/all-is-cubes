@@ -95,7 +95,11 @@ pub(crate) fn record_main(
 
         for frame_number in options.frame_range() {
             // TODO: Start reusing renderers instead of recreating them.
-            let mut renderer = RtRenderer::new(cameras.clone(), ListenableSource::constant(()));
+            let mut renderer = RtRenderer::new(
+                cameras.clone(),
+                Box::new(|v| v),
+                ListenableSource::constant(()),
+            );
             renderer.update(None).unwrap();
 
             recorder

@@ -25,7 +25,11 @@ struct RtFactory;
 
 impl RendererFactory for RtFactory {
     fn renderer_from_cameras(&self, cameras: StandardCameras) -> Box<dyn HeadlessRenderer + Send> {
-        Box::new(RtRenderer::new(cameras, ListenableSource::constant(())))
+        Box::new(RtRenderer::new(
+            cameras,
+            Box::new(|v| v),
+            ListenableSource::constant(()),
+        ))
     }
 
     fn id(&self) -> RendererId {

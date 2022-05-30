@@ -163,6 +163,7 @@ impl TerminalMain {
             buffer_reuse_in
                 .send(RtRenderer::new(
                     cameras.clone(),
+                    Box::new(|v| v),
                     ListenableSource::constant(()),
                 ))
                 .unwrap();
@@ -182,11 +183,11 @@ impl TerminalMain {
                         // once UI exists because it will use the world exposure for UI,
                         // but this will require a rethink of the raytracer interface.
                         let camera = &scene.cameras().cameras().world;
-                        let (image, info) =
+                        let (viewport, image, info) =
                             scene.draw::<ColorCharacterBuf, _, _>("", |b| b.output(camera));
                         // Ignore send errors as they just mean we're shutting down or died elsewhere
                         let _ = render_thread_out.send(FrameOutput {
-                            viewport: camera.viewport(),
+                            viewport,
                             options,
                             image,
                             info,

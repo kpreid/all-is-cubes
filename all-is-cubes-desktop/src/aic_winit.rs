@@ -7,6 +7,7 @@ use std::future::Future;
 use std::task::Context;
 use std::time::Instant;
 
+use all_is_cubes::camera::Viewport;
 use anyhow::anyhow;
 use futures::executor::block_on;
 use futures::task::noop_waker_ref;
@@ -146,8 +147,15 @@ pub(crate) fn create_winit_rt_desktop_session(
     let sb_context = unsafe { softbuffer::GraphicsContext::new(window) }
         .map_err(|_| anyhow!("Failed to initialize softbuffer GraphicsContext"))?;
 
+    fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
+        // use 2x2 nominal pixels
+        viewport.framebuffer_size = viewport.nominal_size.map(|c| (c / 2.0).round() as u32);
+        viewport
+    }
+
     let renderer = RtRenderer::new(
         StandardCameras::from_session(&session, viewport_cell.as_source())?,
+        Box::new(raytracer_size_policy),
         ListenableSource::constant(()),
     );
 
