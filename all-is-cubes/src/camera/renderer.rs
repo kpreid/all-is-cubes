@@ -1,6 +1,11 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;
+use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::prelude::{PixelColor, Point};
+use embedded_graphics::text::{Baseline, Text};
+use embedded_graphics::Drawable;
 use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
@@ -53,4 +58,23 @@ pub enum RenderError {
     #[error("scene to be rendered was not available for reading")]
     Read(RefError),
     // TODO: add errors for out of memory, lost GPU, etc.
+}
+
+/// Provides the standard text style and positioning to draw the “debug info text”
+/// (as in [`HeadlessRenderer::draw()`]'s parameter).
+///
+/// Note: The conventional color is white with a black drop-shadow, but the exact color
+/// format and means by which the shadow is accomplished depends on the specific renderer,
+/// so this function makes no assumption about color.
+#[doc(hidden)] // TODO: decide whether to make public
+pub fn info_text_drawable<'t, C: PixelColor + 'static>(
+    text: &'t str,
+    color_value: C,
+) -> impl Drawable<Color = C> + 't {
+    Text::with_baseline(
+        text,
+        Point::new(5, 5),
+        MonoTextStyle::new(&FONT_7X13_BOLD, color_value),
+        Baseline::Top,
+    )
 }

@@ -7,21 +7,16 @@
 
 use std::{mem, sync::Arc};
 
-use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::{iso_8859_1::FONT_7X13_BOLD, MonoTextStyle},
-    pixelcolor::Rgb888,
-    prelude::Point,
-    text::{Baseline, Text},
-    Drawable,
-};
 use futures_core::future::BoxFuture;
 use instant::Instant;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::apps::{Layers, StandardCameras};
+use all_is_cubes::camera::info_text_drawable;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
+use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, Drawable};
 use all_is_cubes::listen::DirtyFlag;
 use wgpu::BufferDescriptor;
 
@@ -715,14 +710,9 @@ impl EverythingRenderer {
         if !text.is_empty() && self.cameras.cameras().world.options().debug_info_text {
             let info_text_texture = &mut self.info_text_texture;
             info_text_texture.draw_target().clear_transparent();
-            Text::with_baseline(
-                text,
-                Point::new(5, 5),
-                MonoTextStyle::new(&FONT_7X13_BOLD, Rgb888::new(0, 0, 0)),
-                Baseline::Top,
-            )
-            .draw(info_text_texture.draw_target())
-            .unwrap(); // TODO: use .into_ok() when stable
+            info_text_drawable(text, Rgb888::new(0, 0, 0))
+                .draw(info_text_texture.draw_target())
+                .unwrap(); // TODO: use .into_ok() when stable
             info_text_texture.upload(queue);
         }
 

@@ -17,15 +17,10 @@ use luminance::texture::{Dim2, MagFilter, MinFilter};
 use once_cell::sync::Lazy;
 
 use all_is_cubes::apps::{Layers, StandardCameras};
-use all_is_cubes::camera::{Camera, Viewport};
+use all_is_cubes::camera::{info_text_drawable, Camera, Viewport};
 use all_is_cubes::cgmath::{Matrix4, SquareMatrix};
 use all_is_cubes::character::{Character, Cursor};
-use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::{iso_8859_1::FONT_7X13_BOLD, MonoTextStyle},
-    pixelcolor::Rgb888,
-    prelude::{Drawable, Point},
-    text::{Baseline, Text},
-};
+use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, prelude::Drawable};
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
@@ -424,14 +419,9 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
 
         let info_text_texture = &mut self.info_text_texture;
         info_text_texture.draw_target().clear_transparent();
-        Text::with_baseline(
-            text,
-            Point::new(5, 5),
-            MonoTextStyle::new(&FONT_7X13_BOLD, Rgb888::new(0, 0, 0)),
-            Baseline::Top,
-        )
-        .draw(info_text_texture.draw_target())
-        .unwrap(); // TODO: use .into_ok() when stable
+        info_text_drawable(text, Rgb888::new(0, 0, 0))
+            .draw(info_text_texture.draw_target())
+            .unwrap(); // TODO: use .into_ok() when stable
         info_text_texture.upload()?;
 
         context
