@@ -596,6 +596,10 @@ impl StandardCameras {
         self.cameras.world.options()
     }
 
+    pub fn graphics_options_source(&self) -> ListenableSource<GraphicsOptions> {
+        self.graphics_options.clone()
+    }
+
     /// Returns [`Camera`]s appropriate for drawing each graphical layer.
     pub fn cameras(&self) -> &Layers<Camera> {
         &self.cameras

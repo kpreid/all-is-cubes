@@ -74,8 +74,7 @@ where
             self.rt = if let Some(space) = space {
                 Some(UpdatingSpaceRaytracer::new(
                     space,
-                    // TODO: StandardCameras should expose the options source
-                    ListenableSource::constant(self.cameras.graphics_options().clone()),
+                    self.cameras.graphics_options_source(),
                     self.custom_options.clone(),
                 ))
             } else {
