@@ -64,6 +64,24 @@ pub trait PixelBuf: Default {
     /// anything to draw. May be used for special diagnostic drawing. If used, should
     /// disable the effects of future [`Self::add`] calls.
     fn hit_nothing(&mut self) {}
+
+    /// Creates a [`PixelBuf`] already containing the given color.
+    ///
+    /// This may be useful when content that is not strictly raytraced is passing through
+    /// an image buffer otherwise being used with the raytracer, such as a text overlay.
+    fn paint(
+        color: Rgba,
+        options: RtOptionsRef<'_, <Self::BlockData as RtBlockData>::Options>,
+    ) -> Self
+    where
+        Self: Sized,
+    {
+        let mut result = Self::default();
+        // TODO: Should give RtBlockData a dedicated method for this, but we haven't
+        // yet had a use case where it matters.
+        result.add(color, &Self::BlockData::sky(options));
+        result
+    }
 }
 
 /// Precomputed data about a [`Space`]'s blocks that may be used by a [`PixelBuf`].

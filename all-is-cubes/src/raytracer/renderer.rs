@@ -124,11 +124,7 @@ where
                 .get()
                 .trace_scene_to_image::<P, &E, O>(&camera, &encoder, output),
             None => {
-                output.fill({
-                    let mut pixel_buf = P::default();
-                    pixel_buf.add(palette::NO_WORLD_TO_SHOW, &D::sky(options));
-                    encoder(pixel_buf)
-                });
+                output.fill(encoder(P::paint(palette::NO_WORLD_TO_SHOW, options)));
                 RaytraceInfo::default()
             }
         };
@@ -138,16 +134,8 @@ where
                 output,
                 viewport,
                 [
-                    {
-                        let mut pixel_buf = P::default();
-                        pixel_buf.add(Rgba::BLACK, &D::sky(options));
-                        encoder(pixel_buf)
-                    },
-                    {
-                        let mut pixel_buf = P::default();
-                        pixel_buf.add(Rgba::WHITE, &D::sky(options));
-                        encoder(pixel_buf)
-                    },
+                    encoder(P::paint(Rgba::BLACK, options)),
+                    encoder(P::paint(Rgba::WHITE, options)),
                 ],
                 info_text,
             );
