@@ -399,12 +399,6 @@ impl RendererToWinit for RtRenderer {
     }
 
     fn redraw(&mut self, session: &Session, window: &mut Self::Window) {
-        // TODO: Horrible kludge to produce a lower-than-optimal-resolution output...
-        // This should be built into RtRenderer ins
-        // let mut viewport: Viewport = session.viewport_cell.get();
-        // viewport.framebuffer_size = viewport.logical_size.map(|c| c / 2.0 as u32);
-        // session.viewport_cell.set(viewport);
-
         self.update(session.cursor_result()).unwrap(/* TODO: fix */);
 
         // TODO: call the raytracer directly to trace into a buffer of the format we
