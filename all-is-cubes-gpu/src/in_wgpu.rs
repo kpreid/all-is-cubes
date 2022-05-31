@@ -5,9 +5,15 @@
 //!
 //! TODO: This code is experimental and not feature-complete.
 
-use std::{mem, sync::Arc};
+use std::mem;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Context;
 
 use futures_core::future::BoxFuture;
+use futures_core::stream::Stream as _;
+use futures_util::stream::FuturesUnordered;
+use futures_util::task::noop_waker_ref;
 use instant::Instant;
 use once_cell::sync::Lazy;
 
@@ -116,19 +122,16 @@ impl SurfaceRenderer {
         &self.everything.cameras
     }
 
-    pub async fn render_frame(
+    pub fn render_frame(
         &mut self,
         cursor_result: Option<&Cursor>,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
     ) -> Result<RenderInfo, GraphicsResourceError> {
-        let update_info = self
-            .everything
-            .update(
-                &self.queue,
-                cursor_result,
-                &FrameBudget::SIXTY_FPS, // TODO: figure out what we're vsyncing to, instead
-            )
-            .await?;
+        let update_info = self.everything.update(
+            &self.queue,
+            cursor_result,
+            &FrameBudget::SIXTY_FPS, // TODO: figure out what we're vsyncing to, instead
+        )?;
 
         if self.viewport_dirty.get_and_clear() {
             // Test because wgpu insists on nonzero values -- we'd rather be inconsistent
@@ -144,8 +147,7 @@ impl SurfaceRenderer {
         let output = self.surface.get_current_texture()?;
         let draw_info = self
             .everything
-            .draw_frame_linear(&self.queue, &self.depth_texture_view)
-            .await?;
+            .draw_frame_linear(&self.queue, &self.depth_texture_view)?;
         let info = RenderInfo {
             update: update_info,
             draw: draw_info,
@@ -169,9 +171,10 @@ pub struct EverythingRenderer {
     device: Arc<wgpu::Device>,
 
     staging_belt: wgpu::util::StagingBelt,
-    /// Future indicating the `staging_belt.recall()` has completed and it can be reused.
+    /// Future(s) that do the work of `staging_belt.recall()` has completed and it can be reused.
+    /// We don't need to await these but we do need to poll them.
     /// TODO: When Rust has type_alias_impl_trait we can use that here instead of boxing.
-    staging_belt_recalled: Option<BoxFuture<'static, ()>>,
+    staging_belt_recallers: Pin<Box<FuturesUnordered<BoxFuture<'static, ()>>>>,
 
     cameras: StandardCameras,
 
@@ -285,7 +288,7 @@ impl EverythingRenderer {
                 // TODO: wild guess at good size
                 std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
             ),
-            staging_belt_recalled: None,
+            staging_belt_recallers: Box::pin(FuturesUnordered::new()),
 
             linear_scene_texture_view: linear_scene_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
@@ -396,7 +399,7 @@ impl EverythingRenderer {
 
     /// Read current scene content, compute meshes, and send updated resources
     /// to the GPU to prepare for actually drawing it.
-    pub async fn update(
+    pub fn update(
         &mut self,
         queue: &wgpu::Queue,
         cursor_result: Option<&Cursor>,
@@ -491,13 +494,12 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::update()"),
             });
 
-        // Await completion of previous frame's work.
-        // This must be done, at the latest, just before we start using the `StagingBelt`
-        // again, so we do it just before constructing `BeltWritingParts`.
-        // TODO: Measure and report this time separately.
-        if let Some(future) = self.staging_belt_recalled.take() {
-            let () = future.await;
-        }
+        // Poll the staging belt recall future(s) to reclaim previously used buffers.
+        // We don't need to await them but we do need to poll them in order to not leak memory.
+        let _: std::task::Poll<Option<()>> = self
+            .staging_belt_recallers
+            .as_mut()
+            .poll_next(&mut Context::from_waker(noop_waker_ref()));
 
         let mut bwp = BeltWritingParts {
             device: &*self.device,
@@ -581,7 +583,7 @@ impl EverythingRenderer {
     /// Render the current scene content to the linear scene texture,
     /// in linear color values without tone mapping.
     // TODO: stop making this public
-    pub async fn draw_frame_linear(
+    pub fn draw_frame_linear(
         &mut self,
         queue: &wgpu::Queue,
         depth_texture_view: &wgpu::TextureView,
@@ -685,7 +687,14 @@ impl EverythingRenderer {
         );
 
         queue.submit(std::iter::once(encoder.finish()));
-        self.staging_belt_recalled = Some(Box::pin(self.staging_belt.recall()));
+
+        // Note: It doesn't actually matter when the recall completes.
+        // If we render another frame before it does, all that happens is that the belt
+        // allocates more buffers, which is OK and better than delaying the next frame.
+        // However, it is important that the future gets polled in order to get that to
+        // happen eventually.
+        self.staging_belt_recallers
+            .push(Box::pin(self.staging_belt.recall()));
 
         let end_time = Instant::now();
         Ok(DrawInfo {

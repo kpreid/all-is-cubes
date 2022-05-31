@@ -1,14 +1,11 @@
 // Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Glue between [`all_is_cubes`] and [`glfw`] & [`luminance_glfw`].
+//! Glue between [`all_is_cubes`], [`winit`], and `winit`-compatible renderers.
 
-use std::future::Future;
-use std::task::Context;
 use std::time::Instant;
 
 use anyhow::anyhow;
-use futures::task::noop_waker_ref;
 use image::imageops::{self, FilterType};
 use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -370,22 +367,11 @@ impl RendererToWinit for SurfaceRenderer {
     }
 
     fn redraw(&mut self, session: &Session, _window: &mut Self::Window) {
-        let device = self.device().clone();
-        let mut done_rendering_future =
-            Box::pin(self.render_frame(session.cursor_result(), |render_info| {
+        let _info = self
+            .render_frame(session.cursor_result(), |render_info| {
                 format!("{}", session.info_text(render_info))
-            }));
-        // TODO: integrate into event loop
-        let _info = loop {
-            device.poll(wgpu::Maintain::Poll);
-            match done_rendering_future
-                .as_mut()
-                .poll(&mut Context::from_waker(noop_waker_ref()))
-            {
-                std::task::Poll::Ready(outcome) => break outcome.unwrap(),
-                std::task::Poll::Pending => {}
-            }
-        };
+            })
+            .unwrap();
     }
 }
 

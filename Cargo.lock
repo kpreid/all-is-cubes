@@ -133,6 +133,8 @@ dependencies = [
  "all-is-cubes",
  "bytemuck",
  "futures-core",
+ "futures-task",
+ "futures-util",
  "instant",
  "log",
  "luminance",

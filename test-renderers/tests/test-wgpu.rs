@@ -138,7 +138,6 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
                     cursor,
                     &FrameBudget::PRACTICALLY_INFINITE,
                 )
-                .await
                 .unwrap();
             // TODO: report RenderError::Read rather than panicking, when applicable
             Ok(())
@@ -151,7 +150,6 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
             let _dinfo = self
                 .everything
                 .draw_frame_linear(&self.factory.queue, &self.depth_texture_view)
-                .await
                 .unwrap();
             self.everything.add_info_text_and_postprocess(
                 &self.factory.queue,
