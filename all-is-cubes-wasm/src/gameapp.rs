@@ -111,7 +111,13 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .loading_log
         .append_data("\nStarting game loop...")?;
     app_progress.progress(0.8).await;
-    let root = WebGameRoot::new(gui_helpers, static_dom.clone(), session, renderer, viewport_cell);
+    let root = WebGameRoot::new(
+        gui_helpers,
+        static_dom.clone(),
+        session,
+        renderer,
+        viewport_cell,
+    );
     root.borrow().start_loop();
 
     static_dom
