@@ -8,7 +8,6 @@ use std::task::Context;
 use std::time::Instant;
 
 use anyhow::anyhow;
-use futures::executor::block_on;
 use futures::task::noop_waker_ref;
 use image::imageops::{self, FilterType};
 use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
@@ -84,7 +83,7 @@ pub(crate) fn create_window(
         .build(event_loop)
 }
 
-pub(crate) fn create_winit_wgpu_desktop_session(
+pub(crate) async fn create_winit_wgpu_desktop_session(
     session: Session,
     window: Window,
 ) -> Result<DesktopSession<SurfaceRenderer, Window>, anyhow::Error> {
@@ -101,17 +100,20 @@ pub(crate) fn create_winit_wgpu_desktop_session(
     // the `DesktopSession` struct. TODO: Make this more robust by having
     // the renderer jointly own the window via `Arc`.
     let surface = unsafe { instance.create_surface(&window) };
-    let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
-        compatible_surface: Some(&surface),
-        force_fallback_adapter: false,
-    }))
-    .ok_or_else(|| anyhow::format_err!("Could not request suitable graphics adapter"))?;
-    let renderer = block_on(SurfaceRenderer::new(
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
+        })
+        .await
+        .ok_or_else(|| anyhow::format_err!("Could not request suitable graphics adapter"))?;
+    let renderer = SurfaceRenderer::new(
         StandardCameras::from_session(&session, viewport_cell.as_source())?,
         surface,
         &adapter,
-    ))?;
+    )
+    .await?;
 
     let dsession = DesktopSession {
         session,

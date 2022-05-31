@@ -174,10 +174,10 @@ fn main() -> Result<(), anyhow::Error> {
         )?),
         GraphicsType::WindowWgpu => {
             let event_loop = winit::event_loop::EventLoop::new();
-            let dsession = create_winit_wgpu_desktop_session(
+            let dsession = block_on(create_winit_wgpu_desktop_session(
                 session,
                 aic_winit::create_window(&event_loop, &title_and_version(), display_size)?,
-            )?;
+            ))?;
             winit_main_loop(event_loop, dsession)
         }
         GraphicsType::WindowRt => {
