@@ -10,6 +10,7 @@ use std::io::{self, Write as _};
 use std::sync::mpsc::{self, TrySendError};
 use std::time::Duration;
 
+use all_is_cubes::util::{CustomFormat, StatusText};
 use crossterm::cursor::{self, MoveTo};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
@@ -186,8 +187,8 @@ impl TerminalMain {
                         let viewport = scene.modified_viewport();
                         let mut image =
                             vec![(String::new(), None); viewport.pixel_count().unwrap()];
-                        let info = scene.draw::<ColorCharacterBuf, _, _>(
-                            "",
+                        let info = scene.draw::<ColorCharacterBuf, _, _, _>(
+                            |_| String::new(),
                             |b| b.output(camera),
                             &mut image,
                         );
@@ -525,7 +526,10 @@ impl TerminalMain {
                     colors_info_rect,
                 );
 
-                f.render_widget(Paragraph::new(format!("{:?}", info)), render_info_rect);
+                f.render_widget(
+                    Paragraph::new(format!("{}", info.custom_format(StatusText))),
+                    render_info_rect,
+                );
             }
 
             // Cursor info

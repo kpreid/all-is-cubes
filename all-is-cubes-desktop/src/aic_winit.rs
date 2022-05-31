@@ -7,7 +7,6 @@ use std::future::Future;
 use std::task::Context;
 use std::time::Instant;
 
-use all_is_cubes::camera::Viewport;
 use anyhow::anyhow;
 use futures::executor::block_on;
 use futures::task::noop_waker_ref;
@@ -17,6 +16,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
 use all_is_cubes::apps::{Session, StandardCameras};
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::raytracer::RtRenderer;
@@ -401,9 +401,8 @@ impl RendererToWinit for RtRenderer {
     fn redraw(&mut self, session: &Session, window: &mut Self::Window) {
         self.update(session.cursor_result()).unwrap(/* TODO: fix */);
 
-        // TODO: call the raytracer directly to trace into a buffer of the format we
-        // can best use.
-        let (image, _info) = self.draw_rgba(""); // TODO: pass info text
+        let (image, _render_info) =
+            self.draw_rgba(|render_info| session.info_text(render_info).to_string());
 
         // At least on macOS, softbuffer's idea of "size of the window" is logical size
         let actual_size = window

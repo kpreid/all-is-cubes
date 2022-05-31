@@ -28,6 +28,7 @@ use crate::math::{point_to_enclosing_cube, smoothstep};
 use crate::math::{Face7, FreeCoordinate, GridPoint, Rgb, Rgba};
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, GridArray, PackedLight, Space, SpaceBlockData};
+use crate::util::{CustomFormat, StatusText};
 
 mod pixel_buf;
 pub use pixel_buf::*;
@@ -499,6 +500,13 @@ impl std::iter::Sum for RaytraceInfo {
             sum += part;
         }
         sum
+    }
+}
+
+impl CustomFormat<StatusText> for RaytraceInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _format_type: StatusText) -> fmt::Result {
+        let &Self { cubes_traced } = self;
+        write!(fmt, "Cubes traced: {cubes_traced}")
     }
 }
 

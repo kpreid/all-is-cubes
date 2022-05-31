@@ -101,12 +101,12 @@ where
     /// is not async, and does not require `&mut self`.
     ///
     /// [`Universe`]: crate::universe::Universe
-    // TODO: this should take an info text *function*
-    pub fn draw<P, E, O>(&self, info_text: &str, encoder: E, output: &mut [O]) -> RaytraceInfo
+    pub fn draw<P, E, O, IF>(&self, info_text_fn: IF, encoder: E, output: &mut [O]) -> RaytraceInfo
     where
         P: PixelBuf<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
         O: Clone + Send + Sync, // Clone is used in the no-data case
+        IF: FnOnce(&RaytraceInfo) -> String,
     {
         // TODO: implement drawing info text (can use embedded_graphics for that)
 
@@ -129,6 +129,7 @@ where
             }
         };
 
+        let info_text: String = info_text_fn(&info);
         if !info_text.is_empty() && self.cameras.cameras().world.options().debug_info_text {
             eg::draw_info_text(
                 output,
@@ -137,7 +138,7 @@ where
                     encoder(P::paint(Rgba::BLACK, options)),
                     encoder(P::paint(Rgba::WHITE, options)),
                 ],
-                info_text,
+                &info_text,
             );
         }
 
@@ -165,7 +166,10 @@ impl RtRenderer<()> {
     /// [`Camera::post_process_color()`] is applied to the pixels.
     ///
     ///  [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color
-    pub fn draw_rgba(&self, info_text: &str) -> (RgbaImage, RaytraceInfo) {
+    pub fn draw_rgba(
+        &self,
+        info_text_fn: impl FnOnce(&RaytraceInfo) -> String,
+    ) -> (RgbaImage, RaytraceInfo) {
         let camera = self.cameras.cameras().world.clone();
 
         let Vector2 {
@@ -174,8 +178,8 @@ impl RtRenderer<()> {
         } = self.modified_viewport().framebuffer_size;
         let mut image = RgbaImage::new(width, height);
 
-        let info = self.draw::<ColorBuf, _, [u8; 4]>(
-            info_text,
+        let info = self.draw::<ColorBuf, _, [u8; 4], _>(
+            info_text_fn,
             |pixel_buf| camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8(),
             bytemuck::cast_slice_mut::<u8, [u8; 4]>(image.as_mut()),
         );
@@ -208,7 +212,7 @@ impl HeadlessRenderer for RtRenderer<()> {
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
         // TODO: implement drawing info text (can use embedded_graphics for that)
         Box::pin(async {
-            let (image, _rt_info) = self.draw_rgba(info_text);
+            let (image, _rt_info) = self.draw_rgba(|_| info_text.to_string());
             Ok(image)
         })
     }
