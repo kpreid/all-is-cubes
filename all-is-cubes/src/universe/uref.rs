@@ -2,6 +2,7 @@ use std::borrow::Borrow;
 use std::fmt;
 use std::hash;
 use std::ops::Deref;
+use std::sync::Mutex;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use ouroboros::self_referencing;
@@ -27,13 +28,16 @@ type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
 ///
 /// [avoiding deadlock]: crate::universe#thread-safety
 pub struct URef<T> {
-    // TODO: We're going to want to either track reference counts or implement a garbage
-    // collector for the graph of URefs. Reference counts would be an easy way to ensure
-    // nothing is deleted while it is in use from a UI perspective.
     /// Reference to the object. Weak because we don't want to create reference cycles;
     /// the assumption is that the overall game system will keep the [`Universe`] alive
     /// and that [`Universe`] will ensure no entry goes away while referenced.
     weak_ref: Weak<RwLock<UEntry<T>>>,
+
+    /// Contains an optional strong reference to the same target as `weak_ref`.
+    /// This is used to allow constructing `URef`s with targets *before* they are
+    /// inserted into a [`Universe`], and thus inserting entire trees into the
+    /// Universe. Upon that insertion, these strong references are dropped.
+    strong_init: Arc<Mutex<Option<StrongEntryRef<T>>>>,
 
     /// Name by which the universe knows this ref.
     name: Name,
@@ -45,6 +49,26 @@ pub struct URef<T> {
 }
 
 impl<T: 'static> URef<T> {
+    /// Constructs a new [`URef`] that is not yet associated with any [`Universe`],
+    /// and strongly references its value (until inserted into a universe).
+    ///
+    /// This may be used to construct subtrees that are later inserted into a
+    /// [`Universe`]. Caution: creating cyclic structure and never inserting it
+    /// will result in a memory leak.
+    ///
+    /// TODO: Actually inserting these into a [`Universe`] is not yet implemented.
+    pub fn new_pending(name: Name, initial_value: T) -> Self {
+        let strong_ref = Arc::new(RwLock::new(UEntry {
+            data: initial_value,
+        }));
+        URef {
+            weak_ref: Arc::downgrade(&strong_ref),
+            strong_init: Arc::new(Mutex::new(Some(strong_ref))),
+            name,
+            universe_id: None,
+        }
+    }
+
     /// Constructs a [`URef`] that does not refer to a value, as if it used to but
     /// is now defunct.
     ///
@@ -56,6 +80,7 @@ impl<T: 'static> URef<T> {
     pub fn new_gone(name: Name) -> URef<T> {
         URef {
             weak_ref: Weak::new(),
+            strong_init: Arc::new(Mutex::new(None)),
             name,
             universe_id: None,
         }
@@ -165,7 +190,22 @@ impl<T: 'static> URef<T> {
 impl<T> fmt::Debug for URef<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Maybe print dead refs differently?
-        write!(f, "URef({})", self.name)
+
+        // Note: strong_init is never held for long operations, so it is safe
+        // to block on locking it.
+        match self.strong_init.lock() {
+            Ok(opt_strong) => {
+                if opt_strong.is_some() {
+                    write!(f, "URef(no universe, {})", self.name)?;
+                } else {
+                    write!(f, "URef({})", self.name)?;
+                }
+            }
+            Err(_) => {
+                write!(f, "URef(<lock error>, {})", self.name)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -189,6 +229,7 @@ impl<T> Clone for URef<T> {
     fn clone(&self) -> Self {
         URef {
             weak_ref: self.weak_ref.clone(),
+            strong_init: self.strong_init.clone(),
             name: self.name.clone(),
             universe_id: self.universe_id,
         }
@@ -299,6 +340,8 @@ impl<T> URootRef<T> {
     pub(crate) fn downgrade(&self) -> URef<T> {
         URef {
             weak_ref: Arc::downgrade(&self.strong_ref),
+            // TODO: we only need one of these per type; save allocation?
+            strong_init: Arc::new(Mutex::new(None)),
             name: self.name.clone(),
             universe_id: Some(self.universe_id),
         }
@@ -331,13 +374,20 @@ mod tests {
     use crate::universe::{Universe, UniverseIndex};
 
     #[test]
-    fn uref_debug() {
+    fn uref_debug_in_universe() {
         let mut u = Universe::new();
         let r = u
             .insert("foo".into(), Space::empty_positive(1, 2, 3))
             .unwrap();
         assert_eq!(format!("{:?}", r), "URef('foo')");
         assert_eq!(format!("{:#?}", r), "URef('foo')");
+    }
+
+    #[test]
+    fn uref_debug_pending() {
+        let r = URef::new_pending("foo".into(), Space::empty_positive(1, 2, 3));
+        assert_eq!(format!("{:?}", r), "URef(no universe, 'foo')");
+        assert_eq!(format!("{:#?}", r), "URef(no universe, 'foo')");
     }
 
     #[test]
@@ -426,6 +476,15 @@ mod tests {
         assert_eq!(ref_a_1, ref_a_1, "reflexive eq");
         assert_eq!(ref_a_1, ref_a_2, "separately constructed are equal");
         assert!(ref_a_1 != ref_b_1, "not equal");
+    }
+
+    #[test]
+    #[allow(clippy::eq_op)]
+    fn pending_uref_equality_is_pointer_equality() {
+        let ref_a = URef::new_pending("space".into(), Space::empty_positive(1, 1, 1));
+        let ref_b = URef::new_pending("space".into(), Space::empty_positive(1, 1, 1));
+        assert_eq!(ref_a, ref_a, "reflexive eq");
+        assert!(ref_a != ref_b, "not equal");
     }
 
     // TODO: more tests of the hairy reference logic
