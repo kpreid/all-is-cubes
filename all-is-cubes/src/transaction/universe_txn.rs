@@ -125,6 +125,10 @@ enum AnyTransaction {
     Space(TransactionInUniverse<Space>),
 }
 
+/// Not-an-associated-type alias for check values produced by AnyTransaction.
+/// TODO: Make this a newtype struct since we're bothering to name it.
+type AnyTransactionCheck = Box<dyn Any>;
+
 impl AnyTransaction {
     fn target_name(&self) -> Option<&Name> {
         use AnyTransaction::*;
@@ -149,7 +153,7 @@ impl AnyTransaction {
 }
 
 impl Transaction<()> for AnyTransaction {
-    type CommitCheck = Box<dyn Any>;
+    type CommitCheck = AnyTransactionCheck;
     type Output = ();
 
     fn check(&self, _target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -165,7 +169,7 @@ impl Transaction<()> for AnyTransaction {
     fn commit(&self, _target: &mut (), check: Self::CommitCheck) -> Result<(), CommitError> {
         fn commit_helper<O>(
             transaction: &TransactionInUniverse<O>,
-            check: Box<dyn Any>,
+            check: AnyTransactionCheck,
         ) -> Result<(), CommitError>
         where
             O: Transactional,
@@ -188,7 +192,7 @@ impl Transaction<()> for AnyTransaction {
 }
 
 impl Merge for AnyTransaction {
-    type MergeCheck = Box<dyn Any>;
+    type MergeCheck = AnyTransactionCheck;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         use AnyTransaction::*;
@@ -207,7 +211,7 @@ impl Merge for AnyTransaction {
             t1: TransactionInUniverse<O>,
             t2: TransactionInUniverse<O>,
             rewrapper: fn(TransactionInUniverse<O>) -> AnyTransaction,
-            check: Box<dyn Any>, // contains <TransactionInUniverse<O> as Transaction<()>>::MergeCheck,
+            check: AnyTransactionCheck, // contains <TransactionInUniverse<O> as Transaction<()>>::MergeCheck,
         ) -> AnyTransaction
         where
             O: Transactional,
@@ -278,8 +282,14 @@ mod any_transaction {
 #[derive(Clone, Default, PartialEq)]
 #[must_use]
 pub struct UniverseTransaction {
-    members: HashMap<Name, AnyTransaction>,
+    members: HashMap<Name, MemberTxn>,
 }
+
+// TODO: Benchmark cheaper HashMaps / using BTreeMap here
+#[derive(Debug)]
+pub struct UniverseMergeCheck(HashMap<Name, MemberMergeCheck>);
+#[derive(Debug)]
+pub struct UniverseCommitCheck(HashMap<Name, MemberCommitCheck>);
 
 impl Transactional for Universe {
     type Transaction = UniverseTransaction;
@@ -288,8 +298,8 @@ impl Transactional for Universe {
 impl From<AnyTransaction> for UniverseTransaction {
     fn from(transaction: AnyTransaction) -> Self {
         if let Some(name) = transaction.target_name() {
-            let mut members: HashMap<Name, AnyTransaction> = HashMap::new();
-            members.insert(name.clone(), transaction);
+            let mut members: HashMap<Name, MemberTxn> = HashMap::new();
+            members.insert(name.clone(), MemberTxn::Modify(transaction));
             UniverseTransaction { members }
         } else {
             UniverseTransaction::default()
@@ -298,37 +308,42 @@ impl From<AnyTransaction> for UniverseTransaction {
 }
 
 impl Transaction<Universe> for UniverseTransaction {
-    // TODO: Benchmark cheaper HashMaps / using BTreeMap here
-    type CommitCheck = HashMap<Name, Box<dyn Any>>;
+    type CommitCheck = UniverseCommitCheck;
     type Output = ();
 
-    fn check(&self, _target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(&self, target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
         // TODO: Enforce that `target` is the universe all the URefs belong to.
 
         let mut checks = HashMap::new();
         for (name, member) in self.members.iter() {
-            checks.insert(name.clone(), member.check(&())?);
+            checks.insert(name.clone(), member.check(target, name)?);
         }
-        Ok(checks)
+        Ok(UniverseCommitCheck(checks))
     }
 
-    fn commit(&self, _target: &mut Universe, checks: Self::CommitCheck) -> Result<(), CommitError> {
+    fn commit(
+        &self,
+        target: &mut Universe,
+        UniverseCommitCheck(checks): Self::CommitCheck,
+    ) -> Result<(), CommitError> {
         for (name, check) in checks {
-            self.members[&name].commit(&mut (), check)?;
+            self.members[&name].commit(target, name, check)?;
         }
         Ok(())
     }
 }
 
 impl Merge for UniverseTransaction {
-    type MergeCheck = HashMap<Name, Box<dyn Any>>;
+    type MergeCheck = UniverseMergeCheck;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         // TODO: Enforce that other has the same universe.
-        self.members.check_merge(&other.members)
+        Ok(UniverseMergeCheck(
+            self.members.check_merge(&other.members)?,
+        ))
     }
 
-    fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self
+    fn commit_merge(self, other: Self, UniverseMergeCheck(check): Self::MergeCheck) -> Self
     where
         Self: Sized,
     {
@@ -348,6 +363,102 @@ impl Debug for UniverseTransaction {
             ds.field(&name.to_string(), txn.transaction_as_debug());
         }
         ds.finish()
+    }
+}
+
+/// Transaction for anything that can be done to a single member of a [`Universe`].
+///
+/// Note: This does not implement [`Transaction`] because it needs to refer to an
+/// _entry_ in a Universe. We could kludge around that by having it take the Universe
+/// and embed the Name, but that's unnecessary.
+#[derive(Clone, Debug, PartialEq)]
+enum MemberTxn {
+    /// Mergeable types are required to have a no-operation [`Default`] value,
+    /// though this shouldn't come up much.
+    Noop,
+    /// Apply given transaction to the existing value.
+    Modify(AnyTransaction),
+    // TODO: Insert(...),
+    // TODO: Delete,
+}
+
+#[derive(Debug)]
+struct MemberMergeCheck(Option<AnyTransactionCheck>);
+#[derive(Debug)]
+struct MemberCommitCheck(Option<AnyTransactionCheck>);
+
+impl MemberTxn {
+    fn check(
+        &self,
+        _universe: &Universe,
+        _name: &Name,
+    ) -> Result<MemberCommitCheck, PreconditionFailed> {
+        match self {
+            MemberTxn::Noop => Ok(MemberCommitCheck(None)),
+            // Kludge: The individual `AnyTransaction`s embed the `URef<T>` they operate on --
+            // so we don't actually pass anything here.
+            MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(txn.check(&())?))),
+        }
+    }
+
+    fn commit(
+        &self,
+        _universe: &mut Universe,
+        _name: Name,
+        MemberCommitCheck(check): MemberCommitCheck,
+    ) -> Result<(), CommitError> {
+        match self {
+            MemberTxn::Noop => {
+                assert!(check.is_none());
+                Ok(())
+            }
+            MemberTxn::Modify(txn) => txn.commit(&mut (), check.expect("missing check value")),
+        }
+    }
+
+    /// Returns the transaction out of the wrappers.
+    fn transaction_as_debug(&self) -> &dyn Debug {
+        use MemberTxn::*;
+        match self {
+            Noop => self,
+            Modify(t) => t.transaction_as_debug(),
+        }
+    }
+}
+
+/// This probably won't be used but is mandated by the implementation of
+/// Merge for HashMap.
+impl Default for MemberTxn {
+    fn default() -> Self {
+        Self::Noop
+    }
+}
+
+impl Merge for MemberTxn {
+    type MergeCheck = MemberMergeCheck;
+
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+        use MemberTxn::*;
+        match (self, other) {
+            (Noop, _) | (_, Noop) => Ok(MemberMergeCheck(None)),
+            (Modify(t1), Modify(t2)) => Ok(MemberMergeCheck(Some(t1.check_merge(t2)?))),
+        }
+    }
+
+    fn commit_merge(self, other: Self, MemberMergeCheck(check): Self::MergeCheck) -> Self
+    where
+        Self: Sized,
+    {
+        use MemberTxn::*;
+        match (self, other) {
+            (Noop, t) | (t, Noop) => {
+                assert!(check.is_none());
+                t
+            }
+            (Modify(t1), Modify(t2)) => {
+                Modify(t1.commit_merge(t2, check.expect("missing check value")))
+            }
+        }
     }
 }
 
