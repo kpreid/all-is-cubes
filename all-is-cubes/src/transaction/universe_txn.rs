@@ -4,6 +4,7 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
+use std::sync::{Arc, Mutex};
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -11,7 +12,9 @@ use crate::space::Space;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
-use crate::universe::{Name, UBorrowMutImpl, URef, Universe};
+use crate::universe::{
+    MemberValue, Name, UBorrowMutImpl, URef, Universe, UniverseIndex, UniverseMember,
+};
 
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
 ///
@@ -296,12 +299,29 @@ impl Transactional for Universe {
     type Transaction = UniverseTransaction;
 }
 
+impl UniverseTransaction {
+    fn from_member_txn(name: Name, transaction: MemberTxn) -> Self {
+        UniverseTransaction {
+            members: HashMap::from([(name, transaction)]),
+        }
+    }
+
+    /// Transaction which inserts the given object into the universe under
+    /// the given name.
+    pub fn insert<T: UniverseMember>(name: Name, value: T) -> Self {
+        Self::from_member_txn(
+            name,
+            MemberTxn::Insert(InsertGimmick {
+                value: Arc::new(Mutex::new(Some(value.into_member_value()))),
+            }),
+        )
+    }
+}
+
 impl From<AnyTransaction> for UniverseTransaction {
     fn from(transaction: AnyTransaction) -> Self {
         if let Some(name) = transaction.target_name() {
-            let mut members: HashMap<Name, MemberTxn> = HashMap::new();
-            members.insert(name.clone(), MemberTxn::Modify(transaction));
-            UniverseTransaction { members }
+            Self::from_member_txn(name.clone(), MemberTxn::Modify(transaction))
         } else {
             UniverseTransaction::default()
         }
@@ -381,7 +401,11 @@ enum MemberTxn {
     Noop,
     /// Apply given transaction to the existing value.
     Modify(AnyTransaction),
-    // TODO: Insert(...),
+    /// Insert the provided value in the universe.
+    ///
+    /// Note: Currently, they are not all [`Clone`].
+    /// As a consequence, this transaction can only be used once.
+    Insert(InsertGimmick),
     // TODO: Delete,
 }
 
@@ -393,21 +417,43 @@ struct MemberCommitCheck(Option<AnyTransactionCheck>);
 impl MemberTxn {
     fn check(
         &self,
-        _universe: &Universe,
-        _name: &Name,
+        universe: &Universe,
+        name: &Name,
     ) -> Result<MemberCommitCheck, PreconditionFailed> {
         match self {
             MemberTxn::Noop => Ok(MemberCommitCheck(None)),
             // Kludge: The individual `AnyTransaction`s embed the `URef<T>` they operate on --
             // so we don't actually pass anything here.
             MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(txn.check(&())?))),
+            MemberTxn::Insert(InsertGimmick { value }) => {
+                if universe.get_any(name).is_some() {
+                    return Err(PreconditionFailed {
+                        location: "UniverseTransaction",
+                        problem: "insert(): name already in use",
+                    });
+                }
+                if value
+                    .lock()
+                    .map_err(|_| PreconditionFailed {
+                        location: "UniverseTransaction",
+                        problem: "insert() poisoned mutex",
+                    })?
+                    .is_none()
+                {
+                    return Err(PreconditionFailed {
+                        location: "UniverseTransaction",
+                        problem: "insert() transactions can only be used once",
+                    });
+                }
+                Ok(MemberCommitCheck(None))
+            }
         }
     }
 
     fn commit(
         &self,
-        _universe: &mut Universe,
-        _name: &Name,
+        universe: &mut Universe,
+        name: &Name,
         MemberCommitCheck(check): MemberCommitCheck,
     ) -> Result<(), CommitError> {
         match self {
@@ -416,6 +462,25 @@ impl MemberTxn {
                 Ok(())
             }
             MemberTxn::Modify(txn) => txn.commit(&mut (), check.expect("missing check value")),
+            MemberTxn::Insert(InsertGimmick { value: value_mutex }) => {
+                let value: MemberValue = value_mutex
+                    .lock()
+                    .map_err(|_| CommitError::message::<Self>("insert() poisoned mutex".into()))?
+                    .take()
+                    .ok_or_else(|| {
+                        CommitError::message::<Self>(
+                            "insert() transactions can only be used once".into(),
+                        )
+                    })?;
+                let name = name.clone();
+                match value {
+                    MemberValue::BlockDef(v) => universe.insert(name, *v).map(|_| ()),
+                    MemberValue::Character(v) => universe.insert(name, *v).map(|_| ()),
+                    MemberValue::Space(v) => universe.insert(name, *v).map(|_| ()),
+                }
+                .map_err(CommitError::catch::<Self, _>)?;
+                Ok(())
+            }
         }
     }
 
@@ -423,8 +488,8 @@ impl MemberTxn {
     fn transaction_as_debug(&self) -> &dyn Debug {
         use MemberTxn::*;
         match self {
-            Noop => self,
             Modify(t) => t.transaction_as_debug(),
+            Noop | Insert(_) => self,
         }
     }
 }
@@ -443,8 +508,12 @@ impl Merge for MemberTxn {
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         use MemberTxn::*;
         match (self, other) {
+            // Noop merges with anything
             (Noop, _) | (_, Noop) => Ok(MemberMergeCheck(None)),
+            // Modify merges by merging the transaction
             (Modify(t1), Modify(t2)) => Ok(MemberMergeCheck(Some(t1.check_merge(t2)?))),
+            // Insert conflicts with everything
+            (Insert(_), _) | (_, Insert(_)) => Err(TransactionConflict {}),
         }
     }
 
@@ -461,15 +530,32 @@ impl Merge for MemberTxn {
             (Modify(t1), Modify(t2)) => {
                 Modify(t1.commit_merge(t2, check.expect("missing check value")))
             }
+            (Insert(_), _) | (_, Insert(_)) => {
+                panic!("Invalid merge check: tried to merge a MemberTxn::Insert");
+            }
         }
     }
 }
+
+/// Pointer-compared, emptyable ... TODO explain further
+#[derive(Clone, Debug)]
+struct InsertGimmick {
+    value: Arc<Mutex<Option<MemberValue>>>,
+}
+
+impl PartialEq for InsertGimmick {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.value, &other.value)
+    }
+}
+impl Eq for InsertGimmick {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::content::make_some_blocks;
     use crate::space::SpaceTransaction;
+    use crate::transaction::TransactionTester;
     use indoc::indoc;
     use std::collections::HashMap;
 
@@ -555,5 +641,21 @@ mod tests {
             t3,
             SpaceTransaction::set_cube([0, 0, 0], Some(old_block), Some(new_block)).bind(s)
         );
+    }
+
+    #[test]
+    #[ignore] // TODO: figure out how to get this to work w/ insert transactions
+    fn systematic() {
+        TransactionTester::new()
+            // TODO: more transactions of all kinds
+            .transaction(UniverseTransaction::default(), |_, _| Ok(()))
+            // TODO: this is going to fail because insert transactions aren't reusable
+            .transaction(
+                UniverseTransaction::insert("foo".into(), Space::empty_positive(1, 1, 1)),
+                |_, _| Ok(()),
+            )
+            .target(Universe::new)
+            // TODO: target with existing members
+            .test();
     }
 }

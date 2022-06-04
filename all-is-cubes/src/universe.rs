@@ -31,7 +31,8 @@ use crate::transaction::Transaction as _;
 use crate::util::{CustomFormat, StatusText, TypeName};
 
 mod members;
-use members::*;
+// pub(crate) because all items are currently internal
+pub(crate) use members::*;
 
 mod uref;
 pub use uref::*;
@@ -170,6 +171,7 @@ impl Universe {
     pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T>
     where
         Self: UniverseIndex<T>,
+        T: UniverseMember,
     {
         let name = Name::Anonym(self.next_anonym);
         self.next_anonym += 1;
@@ -200,11 +202,12 @@ where
     }
 }
 
-impl sealed_gimmick::Sealed for Universe {}
-
 /// Trait implemented once for each type of object that can be stored in a [`Universe`]
 /// that permits lookups of that type.
-pub trait UniverseIndex<T>: sealed_gimmick::Sealed {
+pub trait UniverseIndex<T>
+where
+    T: UniverseMember,
+{
     // Internal: Implementations of this are in the [`members`] module.
 
     /// Translates a name for an object of type `T` into a [`URef`] for it, which
@@ -295,9 +298,4 @@ impl CustomFormat<StatusText> for UniverseStepInfo {
         write!(fmt, "{}", self.space_step.custom_format(StatusText))?;
         Ok(())
     }
-}
-
-mod sealed_gimmick {
-    /// As a supertrait, this prevents a trait from being implemented outside the crate.
-    pub trait Sealed {}
 }

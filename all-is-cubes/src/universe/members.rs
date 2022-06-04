@@ -12,6 +12,14 @@ use crate::universe::{InsertError, Name, URef, URootRef, Universe, UniverseIndex
 /// runs/versions.
 pub(super) type Storage<T> = BTreeMap<Name, URootRef<T>>;
 
+/// Trait for every type which can be a named member of a universe.
+/// This trait is also public-in-private and serves to “seal” the [`UniverseIndex`]
+/// trait.
+pub trait UniverseMember {
+    /// Generic constructor for [`MemberValue`].
+    fn into_member_value(self) -> MemberValue;
+}
+
 /// Trait implemented once for each type of object that can be stored in a [`Universe`]
 /// that internally provides the table for that type. This trait differs from
 /// [`UniverseIndex`] in that it is not public.
@@ -51,8 +59,15 @@ where
     }
 }
 
+/// Generates impls for a specific Universe member type.
 macro_rules! impl_universe_for_member {
-    ($member_type:ty, $table:ident) => {
+    ($member_type:ident, $table:ident) => {
+        impl UniverseMember for $member_type {
+            fn into_member_value(self) -> MemberValue {
+                MemberValue::$member_type(Box::new(self))
+            }
+        }
+
         impl UniverseTable<$member_type> for Universe {
             fn table(&self) -> &Storage<$member_type> {
                 &self.$table
@@ -80,6 +95,18 @@ macro_rules! impl_universe_for_member {
     };
 }
 
+/// Generates enums which cover all universe types.
+macro_rules! member_enums {
+    ( $( ($member_type:ident), )* ) => {
+        /// Holds any one of the value types that can be in a [`Universe`].
+        #[derive(Debug)]
+        #[doc(hidden)] // actually public-in-private but if we make a mistake, hide it
+        pub enum MemberValue {
+            $( $member_type(Box<$member_type>), )*
+        }
+    }
+}
+
 // This macro only handles trait implementations.
 // To add another type, it is also necessary to update:
 //    struct Universe
@@ -90,3 +117,5 @@ macro_rules! impl_universe_for_member {
 impl_universe_for_member!(BlockDef, blocks);
 impl_universe_for_member!(Character, characters);
 impl_universe_for_member!(Space, spaces);
+
+member_enums!((BlockDef), (Character), (Space),);

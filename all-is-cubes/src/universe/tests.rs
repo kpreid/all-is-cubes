@@ -8,7 +8,7 @@ use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::space::Space;
-use crate::transaction::Transaction;
+use crate::transaction::{Transaction, UniverseTransaction};
 use crate::universe::{InsertError, ListRefs, URef, Universe, UniverseIndex};
 
 fn _test_thread_safety()
@@ -58,9 +58,18 @@ fn get_any() {
 
     assert!(u.get_any(&"nonexistent".into()).is_none());
 
-    assert_eq!(u.get_any(&"test_block".into()).unwrap().type_id(), TypeId::of::<URef<BlockDef>>());
-    assert_eq!(u.get_any(&"test_space".into()).unwrap().type_id(), TypeId::of::<URef<Space>>());
-    assert_eq!(u.get_any(&"test_char".into()).unwrap().type_id(), TypeId::of::<URef<Character>>());
+    assert_eq!(
+        u.get_any(&"test_block".into()).unwrap().type_id(),
+        TypeId::of::<URef<BlockDef>>()
+    );
+    assert_eq!(
+        u.get_any(&"test_space".into()).unwrap().type_id(),
+        TypeId::of::<URef<Space>>()
+    );
+    assert_eq!(
+        u.get_any(&"test_char".into()).unwrap().type_id(),
+        TypeId::of::<URef<Character>>()
+    );
 }
 
 #[test]
@@ -100,6 +109,20 @@ fn insert_duplicate_name_different_type() {
     assert_eq!(
         u.insert("test_thing".into(), Space::empty_positive(1, 1, 1)),
         Err(InsertError::AlreadyExists("test_thing".into()))
+    );
+}
+
+#[test]
+fn insert_duplicate_name_via_txn() {
+    let mut u = Universe::new();
+    u.insert("test_thing".into(), BlockDef::new(AIR)).unwrap();
+    let error = UniverseTransaction::insert("test_thing".into(), Space::empty_positive(1, 1, 1))
+        .execute(&mut u)
+        .unwrap_err();
+    // not a great assertion but it'll do
+    assert_eq!(
+        error.to_string(),
+        "Transaction precondition not met: UniverseTransaction: insert(): name already in use"
     );
 }
 
