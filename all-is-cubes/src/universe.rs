@@ -1,26 +1,20 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Top-level game state container.
+//! [`Universe`], the top-level game-world container.
 //!
 //! ## Thread-safety
 //!
-//! A caution: While [`Universe`], [`URef`], and their contents implement [`Send`] and
-//! [`Sync`] in a safe manner, they do not yet provide the tools that would be necessary
-//! for multiple threads to operate on a Universe. In particular, (TODO:) there are no
-//! methods to wait for a [`URef`]'s lock to be available.
+//! [`Universe`], [`URef`], and their contents implement [`Send`] and [`Sync`],
+//! such that it is possible to access a universe from multiple threads.
+//! However, they do not (currently) provide any ability to wait to obtain a lock,
+//! because there is not yet a policy about how one would avoid the possibility of
+//! deadlock. Instead, you may only _attempt_ to acquire a lock, receiving an error if it
+//! is already held. (TODO: Improve this.)
 //!
-//! <!-- TODO: And once we have waiting, we have a deadlock problem:
-//!
-//! ... without causing **deadlocks.** For the
-//! time being, stick to the following usage patterns to avoid deadlock:
-//!
-//! * Mutable access should be confined to a single thread — do not have multiple threads
-//!   using [`URef::try_modify`] or [`URef::execute`]. That thread need not stay
-//!   the same (as if the whole package were [`Send`] but not [`Sync`]).
-//! * Other threads should never hold more than one [`URef`] lock at once.
-//!
-//! -->
+//! For the time being, if you wish to use a [`Universe`] from multiple threads, you must
+//! bring your own synchronization mechanisms to ensure that readers and writers do not
+//! run at the same time.
 
 use std::fmt;
 use std::marker::PhantomData;
