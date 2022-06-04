@@ -83,7 +83,7 @@ pub struct Universe {
 }
 
 impl Universe {
-    /// Construct an empty [`Universe`].
+    /// Constructs an empty [`Universe`].
     pub fn new() -> Self {
         Universe {
             blocks: Storage::new(),
@@ -92,6 +92,35 @@ impl Universe {
             characters: Storage::new(),
             next_anonym: 0,
         }
+    }
+
+    /// Returns a [`URef`] for the object in this universe with the given name,
+    /// regardless of its type, or [`None`] if there is none.
+    ///
+    /// This is a dynamically-typed version of [`UniverseIndex::get`].
+    //
+    // TODO: Find a useful way to implement this which does not require
+    // boxing. Perhaps `URootRef` should implement `URefErased`? That would
+    // change what `URef: Any` means, though. Perhaps `URootRef` should own
+    // a prepared `URef` that it can return a reference to.
+    pub fn get_any(&self, name: &Name) -> Option<Box<dyn URefErased>> {
+        let Self {
+            blocks,
+            characters,
+            spaces,
+            next_anonym: _,
+        } = self;
+
+        if let Some(r) = blocks.get(name) {
+            return Some(Box::new(r.downgrade()));
+        }
+        if let Some(r) = characters.get(name) {
+            return Some(Box::new(r.downgrade()));
+        }
+        if let Some(r) = spaces.get(name) {
+            return Some(Box::new(r.downgrade()));
+        }
+        None
     }
 
     // TODO: temporary shortcuts to be replaced with more nuance

@@ -15,6 +15,7 @@
     - `DirtyFlag::listening()` which simplifies typical usage.
     - `GridRotation::ALL_BUT_REFLECTIONS`, as `GridRotation::ALL` but excluding reflections.
     - `StandardCameras::world_space()`, so that clients don't need to consult the `Character` each frame.
+    - `Universe::get_any()` allows looking up universe members without knowing their type.
     - Most `Listener` implementations now also implement `Clone` and `Debug`. This allows taking a listener and registering it with more than one `Notifier`. Relatedly, some uses of `-> impl Listener` have been replaced with concrete types.
 
 ### Changed

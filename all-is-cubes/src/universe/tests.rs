@@ -1,6 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::any::TypeId;
+
 use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, AIR};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
@@ -45,6 +47,23 @@ Universe {
 }
 
 #[test]
+fn get_any() {
+    let mut u = Universe::new();
+    u.insert("test_block".into(), BlockDef::new(AIR)).unwrap();
+    let sp = u
+        .insert("test_space".into(), Space::empty_positive(1, 1, 1))
+        .unwrap();
+    u.insert("test_char".into(), Character::spawn_default(sp))
+        .unwrap();
+
+    assert!(u.get_any(&"nonexistent".into()).is_none());
+
+    assert_eq!(u.get_any(&"test_block".into()).unwrap().type_id(), TypeId::of::<URef<BlockDef>>());
+    assert_eq!(u.get_any(&"test_space".into()).unwrap().type_id(), TypeId::of::<URef<Space>>());
+    assert_eq!(u.get_any(&"test_char".into()).unwrap().type_id(), TypeId::of::<URef<Character>>());
+}
+
+#[test]
 fn insert_anonymous_makes_distinct_names() {
     let [block_0, block_1] = make_some_blocks();
     let mut u = Universe::new();
@@ -65,12 +84,22 @@ fn insert_anonymous_makes_distinct_names() {
 }
 
 #[test]
-fn insert_duplicate_name() {
+fn insert_duplicate_name_same_type() {
     let mut u = Universe::new();
     u.insert("test_block".into(), BlockDef::new(AIR)).unwrap();
     assert_eq!(
         u.insert("test_block".into(), BlockDef::new(AIR)),
         Err(InsertError::AlreadyExists("test_block".into()))
+    );
+}
+
+#[test]
+fn insert_duplicate_name_different_type() {
+    let mut u = Universe::new();
+    u.insert("test_thing".into(), BlockDef::new(AIR)).unwrap();
+    assert_eq!(
+        u.insert("test_thing".into(), Space::empty_positive(1, 1, 1)),
+        Err(InsertError::AlreadyExists("test_thing".into()))
     );
 }
 

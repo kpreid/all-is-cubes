@@ -34,10 +34,14 @@ where
     Universe: UniverseTable<T>,
 {
     use std::collections::btree_map::Entry::*;
-    // TODO: prohibit existing names under any type, not just the same type
+
+    if this.get_any(&name).is_some() {
+        return Err(InsertError::AlreadyExists(name));
+    }
+
     let table = this.table_mut();
     match table.entry(name.clone()) {
-        Occupied(_) => Err(InsertError::AlreadyExists(name)),
+        Occupied(_) => unreachable!(/* should have already checked for existence */),
         Vacant(vacant) => {
             let root_ref = URootRef::new(name, value);
             let returned_ref = root_ref.downgrade();
@@ -80,7 +84,9 @@ macro_rules! impl_universe_for_member {
 // To add another type, it is also necessary to update:
 //    struct Universe
 //    impl Debug for Universe
+//    Universe::get_any
 //    Universe::step
+//    transaction::universe_txn::*
 impl_universe_for_member!(BlockDef, blocks);
 impl_universe_for_member!(Character, characters);
 impl_universe_for_member!(Space, spaces);
