@@ -108,8 +108,6 @@ where
         O: Clone + Send + Sync, // Clone is used in the no-data case
         IF: FnOnce(&RaytraceInfo) -> String,
     {
-        // TODO: implement drawing info text (can use embedded_graphics for that)
-
         let mut camera = self.cameras.cameras().world.clone();
         let viewport = (self.size_policy)(camera.viewport());
         camera.set_viewport(viewport);
@@ -210,7 +208,6 @@ impl HeadlessRenderer for RtRenderer<()> {
     }
 
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
-        // TODO: implement drawing info text (can use embedded_graphics for that)
         Box::pin(async {
             let (image, _rt_info) = self.draw_rgba(|_| info_text.to_string());
             Ok(image)
