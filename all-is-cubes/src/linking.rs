@@ -21,7 +21,7 @@ use exhaust::Exhaust;
 
 use crate::block::{Block, BlockDef, Primitive};
 use crate::space::SetCubeError;
-use crate::transaction::CommitError;
+use crate::transaction::ExecuteError;
 use crate::universe::{InsertError, Name, URef, Universe, UniverseIndex};
 use crate::util::YieldProgress;
 
@@ -243,7 +243,7 @@ pub enum InGenError {
     /// Failed during a transaction.
     // TODO: This isn't very coherent; we're just aggregating various errors
     #[error(transparent)]
-    Commit(#[from] CommitError),
+    Transaction(#[from] ExecuteError),
 }
 
 impl InGenError {

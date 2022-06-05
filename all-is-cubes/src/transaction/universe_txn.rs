@@ -175,9 +175,10 @@ impl Transaction<()> for AnyTransaction {
             O: Transactional,
             TransactionInUniverse<O>: Transaction<()>,
         {
-            let check: <TransactionInUniverse<O> as Transaction<()>>::CommitCheck = *(check
-                .downcast()
-                .map_err(|_| "AnyTransaction: type mismatch in check data")?);
+            let check: <TransactionInUniverse<O> as Transaction<()>>::CommitCheck =
+                *(check.downcast().map_err(|_| {
+                    CommitError::message::<AnyTransaction>("type mismatch in check data".into())
+                })?);
             transaction.commit(&mut (), check).map(|_| ())
         }
 
@@ -327,7 +328,9 @@ impl Transaction<Universe> for UniverseTransaction {
         UniverseCommitCheck(checks): Self::CommitCheck,
     ) -> Result<(), CommitError> {
         for (name, check) in checks {
-            self.members[&name].commit(target, name, check)?;
+            self.members[&name]
+                .commit(target, &name, check)
+                .map_err(|e| e.context(format!("universe member {name}")))?;
         }
         Ok(())
     }
@@ -404,7 +407,7 @@ impl MemberTxn {
     fn commit(
         &self,
         _universe: &mut Universe,
-        _name: Name,
+        _name: &Name,
         MemberCommitCheck(check): MemberCommitCheck,
     ) -> Result<(), CommitError> {
         match self {

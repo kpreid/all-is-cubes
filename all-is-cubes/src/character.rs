@@ -470,20 +470,24 @@ impl Transaction<Character> for CharacterTransaction {
         target: &mut Character,
         (body_check, inventory_check, behaviors_check): Self::CommitCheck,
     ) -> Result<(), CommitError> {
-        self.body.commit(&mut target.body, body_check)?;
+        self.body
+            .commit(&mut target.body, body_check)
+            .map_err(|e| e.context("body".into()))?;
 
         // TODO: Perhaps Transaction should have an explicit cheap ".is_empty()"?
         if self.inventory != Default::default() {
             let change = self
                 .inventory
-                .commit(&mut target.inventory, inventory_check)?;
+                .commit(&mut target.inventory, inventory_check)
+                .map_err(|e| e.context("inventory".into()))?;
             if let Some(change) = change {
                 target.notifier.notify(CharacterChange::Inventory(change));
             }
         }
 
         self.behaviors
-            .commit(&mut target.behaviors, behaviors_check)?;
+            .commit(&mut target.behaviors, behaviors_check)
+            .map_err(|e| e.context("behaviors".into()))?;
 
         Ok(())
     }

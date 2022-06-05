@@ -9,7 +9,8 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use ouroboros::self_referencing;
 
-use crate::transaction::CommitError;
+use crate::transaction::ExecuteError;
+use crate::transaction::PreconditionFailed;
 use crate::transaction::Transaction;
 use crate::transaction::Transactional;
 use crate::universe::Name;
@@ -107,16 +108,25 @@ impl<T: 'static> URef<T> {
     /// Execute the given transaction on the referent.
     ///
     /// Returns an error if the transaction's preconditions were not met, if the
-    /// referent was already borrowed, or if the transaction encountered an unexpected
-    /// error. TODO: Distinguish these cases.
+    /// referent was already borrowed (which is denoted as an [`ExecuteError::Check`]),
+    /// or if the transaction encountered an unexpected error.
     pub fn execute(
         &self,
         transaction: &<T as Transactional>::Transaction,
-    ) -> Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, CommitError>
+    ) -> Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, ExecuteError>
     where
         T: Transactional,
     {
-        self.try_modify(|data| transaction.execute(data))?
+        let outcome: Result<
+            Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, ExecuteError>,
+            RefError,
+        > = self.try_modify(|data| transaction.execute(data));
+        outcome.map_err(|_| {
+            ExecuteError::Check(PreconditionFailed {
+                location: "URef::execute()",
+                problem: "target is currently in use",
+            })
+        })?
     }
 
     fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {

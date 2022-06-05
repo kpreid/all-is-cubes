@@ -224,11 +224,12 @@ impl Transaction<Space> for SpaceTransaction {
         {
             if let Some(new) = new {
                 match space.set(cube, new) {
+                    Ok(_) => Ok(()),
                     Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
                         // ignore
-                        Ok(false)
+                        Ok(())
                     }
-                    other => other,
+                    Err(other) => Err(CommitError::catch::<Self, _>(other)),
                 }?;
             }
             if *activate {
@@ -236,7 +237,9 @@ impl Transaction<Space> for SpaceTransaction {
                 to_activate.push(cube);
             }
         }
-        self.behaviors.commit(&mut space.behaviors, check)?;
+        self.behaviors
+            .commit(&mut space.behaviors, check)
+            .map_err(|e| e.context("behaviors".into()))?;
         if !to_activate.is_empty() {
             'b: for behavior in space.behaviors.query::<ActivatableRegion>() {
                 // TODO: error return from the function? error report for nonexistence?

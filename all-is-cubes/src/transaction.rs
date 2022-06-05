@@ -1,8 +1,10 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::any::type_name;
 use std::error::Error;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::universe::URef;
 
@@ -87,9 +89,9 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// ```
     ///
     /// TODO: this should have an error type which distinguishes precondition from unexpected errors
-    fn execute(&self, target: &mut T) -> Result<Self::Output, CommitError> {
-        let check = self.check(target)?;
-        self.commit(target, check)
+    fn execute(&self, target: &mut T) -> Result<Self::Output, ExecuteError> {
+        let check = self.check(target).map_err(ExecuteError::Check)?;
+        self.commit(target, check).map_err(ExecuteError::Commit)
     }
 
     /// Specify the target of this transaction as a [`URef`], and erase its type,
@@ -155,8 +157,19 @@ pub trait Merge {
     }
 }
 
-/// Type of “unexpected errors” from [`Transaction::commit`].
-pub type CommitError = Box<dyn Error + Send + Sync>;
+/// Error type from [`Transaction::execute()`].
+#[derive(Clone, Debug, thiserror::Error)]
+#[error(transparent)]
+#[allow(clippy::exhaustive_enums)]
+pub enum ExecuteError {
+    /// The transaction's preconditions were not met; it does not apply to the current
+    /// state of the target. No change has been made.
+    Check(PreconditionFailed),
+    /// An unexpected error occurred while applying the transaction's effects.
+    /// See the documentation of [`Transaction::commit()`] for the unfortunate
+    /// implications of this.
+    Commit(CommitError),
+}
 
 /// Error type returned by [`Transaction::check`].
 ///
@@ -169,6 +182,71 @@ pub struct PreconditionFailed {
     // TODO: Figure out how to have at least a little dynamic information. `Option<[i32; 3]>` ???
     pub(crate) location: &'static str,
     pub(crate) problem: &'static str,
+}
+
+/// Type of “unexpected errors” from [`Transaction::commit()`].
+//
+/// Design note: CommitError doesn't need to be cheap because it should never happen
+/// during normal game operation; it exists because we want to do better than panicking
+/// if it does, and give a report that's detailed enough that someone might be able to
+/// fix the underlying bug.
+#[derive(Clone, Debug, thiserror::Error)]
+#[error("Unexpected error while committing a transaction")]
+pub struct CommitError(CommitErrorKind);
+
+#[derive(Clone, Debug, thiserror::Error)]
+enum CommitErrorKind {
+    #[error("{transaction_type}::commit() failed")]
+    Leaf {
+        transaction_type: &'static str,
+        #[source]
+        error: Arc<dyn Error + Send + Sync>,
+    },
+    #[error("{transaction_type}::commit() failed: {message}")]
+    LeafMessage {
+        transaction_type: &'static str,
+        message: String,
+    },
+    /// A transaction forwarded an error to one of its parts and that failed.
+    #[error("in transaction part '{component}'")]
+    Context {
+        component: String,
+        #[source]
+        error: Arc<CommitError>, // must box recursion, might as well Arc
+    },
+}
+
+impl CommitError {
+    /// Wrap an arbitrary unexpected error as a [`CommitError`].
+    /// `T` should be the type of the transaction that caught it.
+    #[must_use]
+    pub fn catch<T, E: Error + Send + Sync + 'static>(error: E) -> Self {
+        CommitError(CommitErrorKind::Leaf {
+            transaction_type: type_name::<T>(),
+            error: Arc::new(error),
+        })
+    }
+
+    /// Construct a [`CommitError`] with a string description.
+    /// `T` should be the type of the transaction that detected the problem.
+    #[must_use]
+    pub fn message<T>(message: String) -> Self {
+        CommitError(CommitErrorKind::LeafMessage {
+            transaction_type: type_name::<T>(),
+            message,
+        })
+    }
+
+    /// Report an error propagating up from an inner transaction.
+    /// `component` should describe which part of the current transaction
+    /// returned the error from its `commit()`.
+    #[must_use]
+    pub fn context(self, component: String) -> Self {
+        CommitError(CommitErrorKind::Context {
+            component,
+            error: Arc::new(self),
+        })
+    }
 }
 
 /// Error type returned by [`Merge::check_merge`].

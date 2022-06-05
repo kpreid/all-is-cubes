@@ -164,7 +164,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         .installation()
         .map_err(|e| InGenError::Other(e.into()))?
         .execute(&mut space)
-        .map_err(|e| InGenError::Other(e))?; // TODO: shouldn't need to convert
+        .map_err(InGenError::Transaction)?; // TODO: shouldn't need to convert
 
     Ok(space)
 }
