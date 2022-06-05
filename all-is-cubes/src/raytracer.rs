@@ -17,10 +17,7 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3};
 use cgmath::{Point3, Vector4};
 use ordered_float::NotNan;
 #[cfg(feature = "rayon")]
-use rayon::{
-    iter::{IndexedParallelIterator as _, IntoParallelIterator as _, ParallelIterator as _},
-    slice::ParallelSliceMut as _,
-};
+use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{Evoxel, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
@@ -82,7 +79,11 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     }
 
     /// Computes a single image pixel from the given ray.
-    pub fn trace_ray<P: PixelBuf<BlockData = D>>(&self, ray: Ray) -> (P, RaytraceInfo) {
+    pub fn trace_ray<P: PixelBuf<BlockData = D>>(
+        &self,
+        ray: Ray,
+        include_sky: bool,
+    ) -> (P, RaytraceInfo) {
         let options = RtOptionsRef {
             graphics_options: &self.graphics_options,
             custom_options: &self.custom_options,
@@ -151,112 +152,14 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                 }
             }
         }
-        s.finish(self.sky_color, &self.sky_data)
-    }
-
-    /// Compute a full image, writing it into `output`.
-    ///
-    /// The produced data is in the usual left-right then top-bottom raster order;
-    /// its dimensions are `camera.framebuffer_size`.
-    ///
-    /// `encoder` may be used to transform the output of the `PixelBuf` into the stored
-    /// representation.
-    ///
-    /// Panics if `output`'s length does not match the area of `camera.framebuffer_size`.
-    ///
-    /// TODO: Add a mechanism for incrementally rendering (not 100% of pixels) for
-    /// interactive use.
-    pub fn trace_scene_to_image<P, E, O>(
-        &self,
-        camera: &Camera,
-        encoder: E,
-        output: &mut [O],
-    ) -> RaytraceInfo
-    where
-        P: PixelBuf<BlockData = D>,
-        E: Fn(P) -> O + Send + Sync,
-        O: Send + Sync,
-    {
-        let viewport = camera.viewport();
-        assert_eq!(
-            viewport.pixel_count(),
-            Some(output.len()),
-            "Viewport size does not match output buffer length",
-        );
-
-        // This wrapper function ensures that the two implementations have consistent
-        // signatures.
-        self.trace_scene_to_image_impl(camera, encoder, output)
-    }
-
-    #[cfg(feature = "rayon")]
-    fn trace_scene_to_image_impl<P, E, O>(
-        &self,
-        camera: &Camera,
-        encoder: E,
-        output: &mut [O],
-    ) -> RaytraceInfo
-    where
-        P: PixelBuf<BlockData = D>,
-        E: Fn(P) -> O + Send + Sync,
-        O: Send + Sync,
-    {
-        let viewport = camera.viewport();
-        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
-        let encoder = &encoder; // make shareable
-
-        let total_info = output
-            .par_chunks_mut(viewport_size.x)
-            .enumerate()
-            .map(move |(ych, raster_row)| {
-                let y = viewport.normalize_fb_y(ych);
-                raster_row
-                    .into_par_iter()
-                    .enumerate()
-                    .map(move |(xch, pixel_out)| {
-                        let x = viewport.normalize_fb_x(xch);
-                        let (pixel, info) =
-                            self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
-                        *pixel_out = encoder(pixel);
-                        info
-                    })
-            })
-            .flatten()
-            .sum();
-
-        total_info
-    }
-
-    #[cfg(not(feature = "rayon"))]
-    fn trace_scene_to_image_impl<P, E, O>(
-        &self,
-        camera: &Camera,
-        encoder: E,
-        output: &mut [O],
-    ) -> RaytraceInfo
-    where
-        P: PixelBuf<BlockData = D>,
-        E: Fn(P) -> O + Send + Sync,
-        O: Send + Sync,
-    {
-        let viewport = camera.viewport();
-        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
-
-        let mut total_info = RaytraceInfo::default();
-        let mut index = 0;
-        for ych in 0..viewport_size.y {
-            let y = viewport.normalize_fb_y(ych);
-            for xch in 0..viewport_size.x {
-                let x = viewport.normalize_fb_x(xch);
-                let (pixel, info) =
-                    self.trace_ray(camera.project_ndc_into_world(Point2::new(x, y)));
-                output[index] = encoder(pixel);
-                total_info += info;
-                index += 1;
-            }
-        }
-
-        total_info
+        s.finish(
+            if include_sky {
+                self.sky_color.with_alpha_one()
+            } else {
+                Rgba::TRANSPARENT
+            },
+            &self.sky_data,
+        )
     }
 
     #[inline]
@@ -399,8 +302,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                     .into_par_iter()
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);
-                        let (buf, info) =
-                            self.trace_ray::<P>(camera.project_ndc_into_world(Point2::new(x, y)));
+                        let (buf, info) = self
+                            .trace_ray::<P>(camera.project_ndc_into_world(Point2::new(x, y)), true);
                         (buf.into(), info)
                     })
                     .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
@@ -434,7 +337,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
                 let (buf, info) =
-                    self.trace_ray::<P>(camera.project_ndc_into_world(Point2::new(x, y)));
+                    self.trace_ray::<P>(camera.project_ndc_into_world(Point2::new(x, y)), true);
                 total_info += info;
                 write(buf.into().as_str())?;
             }
@@ -580,14 +483,14 @@ impl<P: PixelBuf> TracingState<P> {
         }
     }
 
-    fn finish(mut self, sky_color: Rgb, sky_data: &P::BlockData) -> (P, RaytraceInfo) {
+    fn finish(mut self, sky_color: Rgba, sky_data: &P::BlockData) -> (P, RaytraceInfo) {
         if self.cubes_traced == 0 {
-            // Didn't intersect the world at all. Draw these as plain background.
-            // TODO: Switch to using the sky color, unless debugging options are set.
+            // Didn't intersect the world at all.
+            // Inform the PixelBuf of this in case it wants to do something different.
             self.pixel_buf.hit_nothing();
         }
 
-        self.pixel_buf.add(sky_color.with_alpha_one(), sky_data);
+        self.pixel_buf.add(sky_color, sky_data);
 
         // Debug visualization of number of raytracing steps.
         // TODO: Make this togglable and less of a kludge — we'd like to be able to mix with

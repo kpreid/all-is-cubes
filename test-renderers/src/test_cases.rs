@@ -287,7 +287,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
 
     context
         .render_comparison_test(
-            0,
+            10, // slop for any GPU shadow rendering variations
             cameras,
             Overlays {
                 cursor: None,

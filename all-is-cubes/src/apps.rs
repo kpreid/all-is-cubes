@@ -387,6 +387,22 @@ pub struct Layers<T> {
 }
 
 impl<T> Layers<T> {
+    // experimental API
+    pub(crate) fn as_refs(&self) -> Layers<&T> {
+        Layers {
+            world: &self.world,
+            ui: &self.ui,
+        }
+    }
+
+    // experimental API
+    pub(crate) fn map<U, F: FnMut(T) -> U>(self, mut f: F) -> Layers<U> {
+        Layers {
+            world: f(self.world),
+            ui: f(self.ui),
+        }
+    }
+
     #[doc(hidden)] // used in related crates, but it's ugly and experimental
     pub fn try_map_ref<U, E>(&self, mut f: impl FnMut(&T) -> Result<U, E>) -> Result<Layers<U>, E> {
         Ok(Layers {
