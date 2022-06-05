@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
 use futures::future::{BoxFuture, Shared};
+use image::RgbaImage;
 use itertools::Itertools;
 use tokio::task::JoinHandle;
 
@@ -80,6 +81,22 @@ impl RenderTestContext {
         renderer: &mut Box<dyn HeadlessRenderer + Send>,
         overlays: Overlays<'_>,
     ) {
+        renderer
+            .update(overlays.cursor)
+            .await
+            .expect("renderer update() failed");
+        let image = renderer
+            .draw(overlays.info_text.unwrap_or(""))
+            .await
+            .expect("renderer draw() failed");
+
+        self.compare_image(allowed_difference, image)
+    }
+
+    /// Perform an image comparison and log the result, without also calling the renderer
+    /// ourselves.
+    #[track_caller]
+    pub fn compare_image(&mut self, allowed_difference: u8, image: RgbaImage) {
         let combo = ImageId {
             test_id: self.id(),
             renderer: self.renderer_factory.id(),
@@ -89,15 +106,7 @@ impl RenderTestContext {
             },
         };
 
-        renderer
-            .update(overlays.cursor)
-            .await
-            .expect("renderer update() failed");
-        let image = renderer
-            .draw(overlays.info_text.unwrap_or(""))
-            .await
-            .expect("renderer draw() failed");
-        let outcome = crate::compare_rendered_image(combo, allowed_difference, image).await;
+        let outcome = crate::compare_rendered_image(combo, allowed_difference, image);
 
         self.comparison_log.lock().unwrap().push(outcome.clone());
 

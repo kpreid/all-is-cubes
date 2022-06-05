@@ -65,6 +65,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert("no_character_no_ui", None, no_character_no_ui);
     c.insert("no_character_but_ui", None, no_character_but_ui);
+    c.insert("no_update", None, no_update);
     c.insert("sky_and_info_text", None, sky_and_info_text);
     c.insert_variants(
         "tone_mapping",
@@ -146,10 +147,7 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
 /// Test rendering of the cursor.
 async fn cursor_basic(mut context: RenderTestContext) {
     let mut universe = Universe::new();
-    let mut space = one_cube_space();
-    space
-        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
-        .unwrap();
+    let space = one_cube_space();
 
     finish_universe_from_space(&mut universe, space);
 
@@ -318,6 +316,25 @@ async fn no_character_but_ui(mut context: RenderTestContext) {
         .await;
 }
 
+/// Test calling renderer's draw() without update().
+/// This is not directly useful/plausible by itself, but is intended to
+/// exercise robustness in the presence of errors that stop update() from
+/// completing.
+async fn no_update(mut context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let space = one_cube_space();
+    finish_universe_from_space(&mut universe, space);
+
+    let mut renderer = context.renderer(&universe);
+    let image = renderer.draw("").await.unwrap();
+    context.compare_image(5, image);
+
+    // Now run a normal update and see what happens.
+    context
+        .render_comparison_test_with_renderer(5, &mut renderer, Overlays::NONE)
+        .await;
+}
+
 /// Test (1) an explicitly set sky color, and (2) the info text rendering.
 async fn sky_and_info_text(mut context: RenderTestContext) {
     let mut universe = Universe::new();
@@ -392,10 +409,17 @@ fn unaltered_color_options() -> GraphicsOptions {
 
 fn one_cube_space() -> Space {
     let bounds = Grid::new([0, 0, 0], [1, 1, 1]);
-    Space::builder(bounds)
+    let mut space = Space::builder(bounds)
         .sky_color(rgb_const!(0.5, 0.5, 0.5))
         .spawn(looking_at_one_cube_spawn(bounds))
-        .build_empty()
+        .build_empty();
+
+    // Fill the cube with a default block -- tests can replace this.
+    space
+        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
+        .unwrap();
+
+    space
 }
 
 fn looking_at_one_cube_spawn(bounds: Grid) -> Spawn {

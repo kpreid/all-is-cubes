@@ -116,7 +116,7 @@ impl ComparisonRecord {
 }
 
 /// Finish a rendering test by storing/displaying/comparing the output image.
-pub async fn compare_rendered_image(
+pub fn compare_rendered_image(
     test: ImageId,
     allowed_difference: u8,
     actual_image: RgbaImage,
