@@ -48,6 +48,11 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
     c.insert("error_character_gone", None, error_character_gone);
+    c.insert(
+        "error_character_unavailable",
+        None,
+        error_character_unavailable,
+    );
     c.insert_variants(
         "fog",
         u(fog_test_universe()),
@@ -197,10 +202,7 @@ async fn cursor_basic(mut context: RenderTestContext) {
 
 /// Test what happens when the renderer's character goes away *after* the first frame.
 ///
-/// TODO: Split this into more cases:
-/// - resources gone on creation
-/// - space gone but character not gone
-/// - character gone but space not gone
+/// TODO: also test case of space gone but character not gone
 async fn error_character_gone(context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
@@ -228,6 +230,34 @@ async fn error_character_gone(context: RenderTestContext) {
         Err(e) => panic!("unexpected other error from update(): {e:?}"),
     }
     // Drawing should succeed with no data.
+    // TODO: We temporarily also allow failure. Stop that.
+    match renderer.draw("").await {
+        Ok(_image) => {}
+        Err(RenderError::Read(RefError::Gone(name)))
+            if name == "character".into() || name == "space".into() => {}
+        res => panic!("unexpected result from draw(): {res:?}"),
+    }
+}
+
+/// Test what happens when the renderer's character goes away *before* the first frame.
+async fn error_character_unavailable(context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let mut space = one_cube_space();
+    space
+        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
+        .unwrap();
+    finish_universe_from_space(&mut universe, space);
+    let mut renderer = context.renderer(&universe);
+
+    // The simplest way for the character to be unavailable is to drop the entire universe.
+    drop(universe);
+
+    match renderer.update(None).await {
+        Err(RenderError::Read(RefError::Gone(name)))
+            if name == "character".into() || name == "space".into() => {}
+        res => panic!("unexpected result from update(): {res:?}"),
+    }
+    // Drawing should always succeed anyway.
     // TODO: We temporarily also allow failure. Stop that.
     match renderer.draw("").await {
         Ok(_image) => {}
