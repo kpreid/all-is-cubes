@@ -5,8 +5,10 @@ use ordered_float::NotNan;
 
 use crate::math::{FreeCoordinate, Rgb, Rgba};
 
-/// User/debug options for rendering (i.e. not affecting gameplay except informationally).
-/// Not all of these options are applicable to all renderers.
+/// Options for controlling rendering (not affecting gameplay except informationally).
+///
+/// Some options may be ignored by some renderers, such as when they request a particular
+/// implementation approach or debug visualization.
 ///
 /// TODO: This may not be the best module location. Possibly it should get its own module.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -40,6 +42,19 @@ pub struct GraphicsOptions {
 
     /// Method/fidelity to use for transparency.
     pub transparency: TransparencyOption,
+
+    /// Whether to show the HUD or other UI elements.
+    ///
+    /// This does not affect UI state or clickability; it purely controls display.
+    /// It is intended for the purpose of asking a [renderer] to produce an image
+    /// of the scene without any UI.
+    ///
+    /// The cursor is not currently considered part of the UI. This may be revisited
+    /// later. The “info text” is controlled separately by
+    /// [`debug_info_text`](Self::debug_info_text).
+    ///
+    /// [renderer]: crate::camera::HeadlessRenderer
+    pub show_ui: bool,
 
     /// Whether to use frustum culling for drawing only in-view chunks and objects.
     ///
@@ -84,6 +99,7 @@ impl Default for GraphicsOptions {
             view_distance: NotNan::from(200),
             lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
+            show_ui: true,
             use_frustum_culling: true,
             debug_info_text: true,
             debug_chunk_boxes: false,

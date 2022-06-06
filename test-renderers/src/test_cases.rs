@@ -20,7 +20,7 @@ use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::math::{Face6, NotNan, Rgb};
 use all_is_cubes::space::{Grid, LightPhysics, Space};
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{URef, Universe, UniverseIndex};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;
 use image::RgbaImage;
@@ -53,6 +53,10 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert("follow_character_change", None, follow_character_change);
     c.insert("follow_options_change", None, follow_options_change);
+    c.insert("layers_all", None, layers_all);
+    c.insert("layers_hidden_ui", None, layers_hidden_ui);
+    c.insert("layers_none_but_text", None, layers_none_but_text);
+    c.insert("layers_ui_only", None, layers_ui_only);
     c.insert_variants(
         "light",
         u(light_test_universe()),
@@ -63,8 +67,6 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
             LightingOption::Smooth,
         ],
     );
-    c.insert("no_character_no_ui", None, no_character_no_ui);
-    c.insert("no_character_but_ui", None, no_character_but_ui);
     c.insert("no_update", None, no_update);
     c.insert("sky_and_info_text", None, sky_and_info_text);
     c.insert_variants(
@@ -262,45 +264,24 @@ async fn follow_options_change(mut context: RenderTestContext) {
         .await;
 }
 
-async fn light(mut context: RenderTestContext, option: LightingOption) {
-    let mut options = GraphicsOptions::default();
-    options.fov_y = notnan!(45.0);
-    options.lighting_display = option;
-    let scene =
-        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
-    context
-        .render_comparison_test(6, scene, Overlays::NONE)
-        .await;
+/// Render with content in all layers (world, UI, and info text).
+async fn layers_all(context: RenderTestContext) {
+    layers_all_show_ui(context, true).await;
 }
 
-async fn no_character_no_ui(mut context: RenderTestContext) {
-    let universe = Universe::new();
-    context
-        .render_comparison_test(
-            0,
-            &universe,
-            Overlays {
-                cursor: None,
-                info_text: Some("no_character test"),
-            },
-        )
-        .await;
-}
-
-async fn no_character_but_ui(mut context: RenderTestContext) {
+/// Combined impl for layers_all() and layers_hidden_ui()
+async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     let mut universe = Universe::new();
-    let mut ui_space = Space::builder(Grid::new([0, 0, 0], [4, 4, 4]))
-        .light_physics(all_is_cubes::space::LightPhysics::None)
-        .build_empty();
-    ui_space
-        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
-        .unwrap();
-    let ui_space = universe.insert_anonymous(ui_space);
+    let cube_space = one_cube_space();
+    finish_universe_from_space(&mut universe, cube_space);
+
+    let mut options = GraphicsOptions::default();
+    options.show_ui = show_ui;
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(GraphicsOptions::default()),
+        ListenableSource::constant(options),
         ListenableSource::constant(COMMON_VIEWPORT),
-        ListenableSource::constant(None),
-        ListenableSource::constant(Some(ui_space)),
+        ListenableSource::constant(universe.get_default_character()),
+        ListenableSource::constant(Some(ui_space(&mut universe))),
     )
     .unwrap();
 
@@ -310,9 +291,64 @@ async fn no_character_but_ui(mut context: RenderTestContext) {
             cameras,
             Overlays {
                 cursor: None,
-                info_text: Some("no_character_but_ui"),
+                info_text: Some("hello world"),
             },
         )
+        .await;
+}
+
+/// Render with content in all layers (world, UI, and info text) but the show_ui option off.
+async fn layers_hidden_ui(context: RenderTestContext) {
+    layers_all_show_ui(context, false).await;
+}
+
+/// Test rendering with missing pieces.
+/// No world, no UI, but info text.
+async fn layers_none_but_text(mut context: RenderTestContext) {
+    let universe = Universe::new();
+    context
+        .render_comparison_test(
+            0,
+            &universe,
+            Overlays {
+                cursor: None,
+                info_text: Some("hello world"),
+            },
+        )
+        .await;
+}
+
+/// No world, but UI and info text.
+async fn layers_ui_only(mut context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let cameras: StandardCameras = StandardCameras::new(
+        ListenableSource::constant(GraphicsOptions::default()),
+        ListenableSource::constant(COMMON_VIEWPORT),
+        ListenableSource::constant(None),
+        ListenableSource::constant(Some(ui_space(&mut universe))),
+    )
+    .unwrap();
+
+    context
+        .render_comparison_test(
+            0,
+            cameras,
+            Overlays {
+                cursor: None,
+                info_text: Some("hello world"),
+            },
+        )
+        .await;
+}
+
+async fn light(mut context: RenderTestContext, option: LightingOption) {
+    let mut options = GraphicsOptions::default();
+    options.fov_y = notnan!(45.0);
+    options.lighting_display = option;
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+    context
+        .render_comparison_test(6, scene, Overlays::NONE)
         .await;
 }
 
@@ -429,6 +465,18 @@ fn looking_at_one_cube_spawn(bounds: Grid) -> Spawn {
     spawn.set_eye_position([0.5, 0.5, 2.0]);
     spawn.set_look_direction([0., 0., -1.]);
     spawn
+}
+
+/// A simple space to draw something in the UI layer.
+fn ui_space(universe: &mut Universe) -> URef<Space> {
+    let mut ui_space = Space::builder(Grid::new([0, 0, 0], [4, 4, 4]))
+        .light_physics(all_is_cubes::space::LightPhysics::None)
+        .sky_color(rgb_const!(1.0, 1.0, 0.5)) // blatantly wrong color that should not be seen
+        .build_empty();
+    ui_space
+        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
+        .unwrap();
+    universe.insert("ui_space".into(), ui_space).unwrap()
 }
 
 /// Construct a space suitable for testing long-distance rendering (fog).

@@ -67,6 +67,16 @@ pub(crate) fn record_main(
 
     let mut stderr = std::io::stderr();
 
+    // Modify graphics options to suit recording
+    // TODO: Find a better place to put this policy, and in particular allow the user to
+    // override it if they do want to record the UI.
+    session
+        .graphics_options_mut()
+        .update_mut(|mut graphics_options| {
+            graphics_options.show_ui = false;
+            graphics_options.debug_info_text = false;
+        });
+
     let viewport = options.viewport();
     let cameras =
         StandardCameras::from_session(&session, ListenableSource::constant(viewport)).unwrap();

@@ -533,8 +533,12 @@ impl StandardCameras {
         }
 
         let ui_space_dirty = self.ui_space_dirty.get_and_clear();
-        if ui_space_dirty {
-            self.ui_space = self.ui_space_source.snapshot();
+        if ui_space_dirty || options_dirty {
+            self.ui_space = if self.cameras.ui.options().show_ui {
+                self.ui_space_source.snapshot()
+            } else {
+                None
+            };
             if self.ui_space.is_none() {
                 // Reset transform so it isn't a *stale* transform.
                 // TODO: set an error flag saying that nothing should be drawn
@@ -621,6 +625,9 @@ impl StandardCameras {
     }
 
     /// Returns the UI space, that should be drawn on top of the world using `self.cameras().ui`.
+    ///
+    /// This implements [`GraphicsOptions::show_ui`] by returning [`None`] when the option is
+    /// false.
     ///
     /// TODO: Make this also a ListenableSource
     pub fn ui_space(&self) -> Option<&URef<Space>> {
