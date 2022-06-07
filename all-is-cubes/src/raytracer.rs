@@ -89,15 +89,18 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             custom_options: &self.custom_options,
         };
 
-        let t_to_absolute_distance = ray.direction.magnitude();
-        let mut s: TracingState<P> = TracingState::default();
+        let mut state: TracingState<P> = TracingState {
+            t_to_absolute_distance: ray.direction.magnitude(),
+            cubes_traced: 0,
+            pixel_buf: P::default(),
+        };
         let surface_iter = SurfaceIter::new(self, ray);
 
         // Use the more expensive volumetric tracing strategy only if we need it.
         match self.graphics_options.transparency {
             TransparencyOption::Volumetric => {
                 for step in DepthIter::new(surface_iter) {
-                    if s.count_step_should_stop(options) {
+                    if state.count_step_should_stop(options) {
                         break;
                     }
 
@@ -105,37 +108,16 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                         DepthStep::Invisible => {
                             // Side effect: called count_step_should_stop.
                         }
-                        DepthStep::Span(Span {
-                            mut surface,
-                            exit_t_distance,
-                        }) => {
-                            debug_assert!(!surface.diffuse_color.fully_transparent());
-
-                            let thickness = ((exit_t_distance - surface.t_distance)
-                                * t_to_absolute_distance)
-                                as f32;
-
-                            // Convert alpha to transmittance (light transmitted / light received).
-                            let unit_transmittance =
-                                1.0 - surface.diffuse_color.alpha().into_inner();
-                            // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
-                            let depth_transmittance = unit_transmittance.powf(thickness);
-                            // Convert back to alpha.
-                            // TODO: skip NaN check ... this may require refactoring Surface usage.
-                            // We might also benefit from an "UncheckedRgba" concept.
-                            surface.diffuse_color = surface
-                                .diffuse_color
-                                .to_rgb()
-                                .with_alpha(NotNan::new(1.0 - depth_transmittance).unwrap());
-
-                            s.trace_through_surface(surface, self);
+                        DepthStep::Span(span) => {
+                            debug_assert!(!span.surface.diffuse_color.fully_transparent());
+                            state.trace_through_span(span, self);
                         }
                     }
                 }
             }
             _ => {
                 for step in surface_iter {
-                    if s.count_step_should_stop(options) {
+                    if state.count_step_should_stop(options) {
                         break;
                     }
 
@@ -146,13 +128,13 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                         }
                         EnterSurface(surface) => {
                             debug_assert!(!surface.diffuse_color.fully_transparent());
-                            s.trace_through_surface(surface, self);
+                            state.trace_through_surface(surface, self);
                         }
                     }
                 }
             }
         }
-        s.finish(
+        state.finish(
             if include_sky {
                 self.sky_color.with_alpha_one()
             } else {
@@ -457,12 +439,18 @@ impl<D: RtBlockData> TracingBlock<D> {
     }
 }
 
-/// Holds a [`PixelBuf`] and other per-ray state.
+/// Holds a [`PixelBuf`] and other per-ray state, and updates it
+/// according to the things it encounters.
 #[derive(Clone, Debug, Default)]
 struct TracingState<P: PixelBuf> {
+    /// Conversion factor from raycaster `t` values to “true” [`Space`] distance values
+    /// where 1 unit = 1 block thickness.
+    t_to_absolute_distance: f64,
+
     /// Number of cubes traced through -- controlled by the caller, so not necessarily
     /// equal to the number of calls to [`Self::trace_through_surface()`].
     cubes_traced: usize,
+
     pixel_buf: P,
 }
 impl<P: PixelBuf> TracingState<P> {
@@ -521,6 +509,35 @@ impl<P: PixelBuf> TracingState<P> {
         if let Some(color) = surface.to_lit_color(rt) {
             self.pixel_buf.add(color, surface.block_data);
         }
+    }
+
+    #[inline]
+    fn trace_through_span(
+        &mut self,
+        span: Span<'_, P::BlockData>,
+        rt: &SpaceRaytracer<P::BlockData>,
+    ) {
+        let Span {
+            mut surface,
+            exit_t_distance,
+        } = span;
+
+        let thickness =
+            ((exit_t_distance - surface.t_distance) * self.t_to_absolute_distance) as f32;
+
+        // Convert alpha to transmittance (light transmitted / light received).
+        let unit_transmittance = 1.0 - surface.diffuse_color.alpha().into_inner();
+        // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
+        let depth_transmittance = unit_transmittance.powf(thickness);
+        // Convert back to alpha.
+        // TODO: skip NaN check ... this may require refactoring Surface usage.
+        // We might also benefit from an "UncheckedRgba" concept.
+        surface.diffuse_color = surface
+            .diffuse_color
+            .to_rgb()
+            .with_alpha(NotNan::new(1.0 - depth_transmittance).unwrap());
+
+        self.trace_through_surface(surface, rt);
     }
 }
 
