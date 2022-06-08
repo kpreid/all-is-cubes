@@ -89,21 +89,28 @@ fn postprocess_fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 
     var shadowing: f32 = 0.0;
     let radius: i32 = 2;
-    for (var dx: i32 = -radius; dx <= radius; dx = dx + 1) {
-        for (var dy: i32 = -radius; dy <= radius; dy = dy + 1) {
-            let offset: vec2<f32> = vec2<f32>(vec2<i32>(dx, dy));
-            let offset_alpha: f32 = textureSampleLevel(
-                text_texture,
-                text_sampler,
-                texcoord + offset * derivatives,
-                0.0
-            ).a;
-            let weight: f32 = 0.2 / max(1.0, length(offset));
-            shadowing = shadowing + offset_alpha * weight;
-        }
+    let diameter = radius * 2 + 1;
+    // Note: This roundabout method of computing the neighborhood coordinates using
+    // a linear index is because the obvious nested for loop would stop early somehow.
+    // (Mac, Metal, AMD Radeon Pro 5500M.) Obviously that is some kind of bug in some
+    // part of the system, but I want to stop dealing with the unreadability and
+    // inconsistency while I write rendering tests, so it's this workaround for now.
+    for (var index = 0; index < diameter * diameter; index = index + 1) {
+        let dx: i32 = index % diameter - radius;
+        let dy: i32 = index / diameter - radius;
+
+        let offset: vec2<f32> = vec2<f32>(vec2<i32>(dx, dy));
+        let offset_alpha: f32 = textureSampleLevel(
+            text_texture,
+            text_sampler,
+            texcoord + offset * derivatives,
+            0.0
+        ).a;
+        let weight: f32 = 0.2 / max(1.0, length(offset));
+        shadowing = shadowing + offset_alpha * weight;
     }
     shadowing = clamp(shadowing, 0.0, 0.5);
-    shadowing = pow(shadowing, 0.45);  // TODO: kludge for gamma, or sensible visual tweak?
+    shadowing = pow(shadowing, 0.48);  // TODO: kludge for gamma, or sensible visual tweak?
 
     let foreground_texel = textureSampleLevel(text_texture, text_sampler, texcoord, 0.0);
 

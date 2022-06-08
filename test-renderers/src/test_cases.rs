@@ -287,7 +287,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
 
     context
         .render_comparison_test(
-            10, // slop for any GPU shadow rendering variations
+            TEXT_MAX_DIFF,
             cameras,
             Overlays {
                 cursor: None,
@@ -308,7 +308,7 @@ async fn layers_none_but_text(mut context: RenderTestContext) {
     let universe = Universe::new();
     context
         .render_comparison_test(
-            0,
+            TEXT_MAX_DIFF,
             &universe,
             Overlays {
                 cursor: None,
@@ -331,7 +331,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
 
     context
         .render_comparison_test(
-            0,
+            TEXT_MAX_DIFF,
             cameras,
             Overlays {
                 cursor: None,
@@ -389,7 +389,9 @@ async fn sky_and_info_text(mut context: RenderTestContext) {
         ),
     };
 
-    context.render_comparison_test(1, &universe, overlays).await;
+    context
+        .render_comparison_test(TEXT_MAX_DIFF, &universe, overlays)
+        .await;
 }
 
 async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
@@ -432,6 +434,9 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
 }
 
 // --- Test helpers -------------------------------------------------------------------------------
+
+/// Maximum expected color difference for tests that have text shadows.
+const TEXT_MAX_DIFF: u8 = 20;
 
 /// A set of graphics options that are the defaults but with everything that might tweak
 /// colors turned off: lighting, fog, and tone mapping.
