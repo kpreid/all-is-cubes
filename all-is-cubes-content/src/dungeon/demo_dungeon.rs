@@ -3,6 +3,7 @@
 
 use exhaust::Exhaust;
 use maze_generator::prelude::{Direction, FieldType, Generator};
+use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{Block, BlockCollision, RotationPlacementRule, AIR};
@@ -25,13 +26,38 @@ use crate::{four_walls, DemoBlocks, LandscapeBlocks};
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 
+#[derive(Clone, Debug)]
 struct DemoRoom {
     // TODO: remove dependency on maze gen entirely
     maze_field_type: FieldType,
+
+    /// In a *relative* room coordinate system (1 unit = 1 room box),
+    /// how big is this room? Occupying multiple rooms' space if this
+    /// is not equal to `Grid::for_block(1)`.
+    extended_bounds: Grid,
+
+    /// Which faces have doors-to-corridors in them.
     door_faces: FaceMap<bool>,
+    /// Which faces have windows to the outside in them.
     windowed_faces: FaceMap<bool>,
+
+    floor: FloorKind,
     corridor_only: bool,
     lit: bool,
+}
+
+impl DemoRoom {
+    /// Area of dungeon-room-cubes this room data actually occupies
+    fn extended_map_bounds(&self) -> Grid {
+        self.extended_bounds
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FloorKind {
+    Solid,
+    Chasm,
+    Bridge,
 }
 
 /// Data to use to construct specific dungeon rooms.
@@ -71,22 +97,31 @@ impl DemoTheme {
             },
         )?;
 
+        space.fill_uniform(interior, &AIR)?;
+
         Ok(())
     }
 
     fn inside_doorway(
         &self,
         space: &mut Space,
-        map: &GridArray<DemoRoom>,
+        map: &GridArray<Option<DemoRoom>>,
         room_position: GridPoint,
         face: Face6,
     ) -> Result<(), InGenError> {
         let passage_axis = face.axis_number();
 
-        let mut room_1_box = self.actual_room_box(room_position, &map[room_position]);
+        let mut room_1_box = self.actual_room_box(
+            room_position,
+            map[room_position]
+                .as_ref()
+                .expect("passage led to nonexistent room"),
+        );
         let mut room_2_box = self.actual_room_box(
             room_position + face.normal_vector(),
-            &map[room_position + face.normal_vector()],
+            map[room_position + face.normal_vector()]
+                .as_ref()
+                .expect("passage led to nonexistent room"),
         );
         if room_1_box.lower_bounds()[passage_axis] > room_2_box.lower_bounds()[passage_axis] {
             std::mem::swap(&mut room_1_box, &mut room_2_box);
@@ -129,19 +164,26 @@ impl DemoTheme {
         Ok(())
     }
 
-    /// Box that might be smaller than the DungeonGrid's box.
+    /// Box of the room, in space coordinates, that might be smaller or bigger than the
+    /// DungeonGrid's box.
     /// TODO: Should we teach DungeonGrid to help with this?
     fn actual_room_box(&self, room_position: GridPoint, room_data: &DemoRoom) -> Grid {
         if room_data.corridor_only {
             self.corridor_box
                 .translate(self.dungeon_grid.room_translation(room_position))
         } else {
-            self.dungeon_grid.room_box_at(room_position)
+            let eb = room_data.extended_map_bounds();
+            self.dungeon_grid
+                .room_box_at(room_position + eb.lower_bounds().to_vec())
+                .union(self.dungeon_grid.room_box_at(
+                    room_position + eb.upper_bounds().to_vec() - GridVector::new(1, 1, 1),
+                ))
+                .unwrap()
         }
     }
 }
 
-impl Theme<DemoRoom> for DemoTheme {
+impl Theme<Option<DemoRoom>> for DemoTheme {
     fn grid(&self) -> &DungeonGrid {
         &self.dungeon_grid
     }
@@ -154,10 +196,15 @@ impl Theme<DemoRoom> for DemoTheme {
         &self,
         space: &mut Space,
         pass_index: usize,
-        map: &GridArray<DemoRoom>,
+        map: &GridArray<Option<DemoRoom>>,
         room_position: GridPoint,
-        room_data: &DemoRoom,
+        room_data: &Option<DemoRoom>,
     ) -> Result<(), InGenError> {
+        let room_data = match room_data.as_ref() {
+            Some(room_data) => room_data,
+            None => return Ok(()),
+        };
+
         // TODO: put in struct, or eliminate
         let start_wall = Block::from(rgb_const!(1.0, 0.0, 0.0));
         let goal_wall = Block::from(rgb_const!(0.0, 0.8, 0.0));
@@ -168,10 +215,40 @@ impl Theme<DemoRoom> for DemoTheme {
             FieldType::Goal => Some(&goal_wall),
             FieldType::Normal => None,
         };
+        let floor_layer = self
+            .dungeon_grid
+            .room_box_at(room_position)
+            .abut(Face6::NY, 1)
+            .unwrap();
 
         match pass_index {
             0 => {
                 self.plain_room(wall_type, space, interior)?;
+
+                match room_data.floor {
+                    FloorKind::Solid => {
+                        space.fill_uniform(floor_layer, &self.blocks[DungeonBlocks::FloorTile])?;
+                    }
+                    FloorKind::Chasm => { /* TODO: little platforms */ }
+                    FloorKind::Bridge => {
+                        let midpoint = point_to_enclosing_cube(floor_layer.center()).unwrap();
+                        for direction in [Face6::NX, Face6::NZ, Face6::PX, Face6::PZ] {
+                            if room_data.door_faces[direction.into()] {
+                                let wall_cube = point_to_enclosing_cube(
+                                    floor_layer.abut(direction, -1).unwrap().center(),
+                                )
+                                .unwrap();
+                                let bridge_box = Grid::single_cube(midpoint)
+                                    .union(Grid::single_cube(wall_cube))
+                                    .unwrap();
+                                space.fill_uniform(
+                                    bridge_box,
+                                    &self.blocks[DungeonBlocks::FloorTile],
+                                )?;
+                            }
+                        }
+                    }
+                }
 
                 if room_data.lit {
                     let top_middle =
@@ -187,6 +264,13 @@ impl Theme<DemoRoom> for DemoTheme {
                     )?;
                 }
 
+                // Windowed walls
+                let window_y = self
+                    .dungeon_grid
+                    .room_box_at(room_position)
+                    .lower_bounds()
+                    .y
+                    + 1;
                 four_walls(
                     interior.expand(FaceMap::repeat(1)),
                     |origin, along_wall, length, wall_excluding_corners_box| {
@@ -194,9 +278,9 @@ impl Theme<DemoRoom> for DemoTheme {
                         if room_data.windowed_faces[wall.into()] {
                             let midpoint = length / 2;
                             for step in WINDOW_PATTERN {
-                                let window_pos = origin
-                                    + along_wall.normal_vector() * (midpoint + step)
-                                    + GridVector::unit_y() * 2;
+                                let mut window_pos =
+                                    origin + along_wall.normal_vector() * (midpoint + step);
+                                window_pos.y = window_y;
                                 if let Some(window_box) = Grid::new(window_pos, [1, 3, 1])
                                     .intersection(wall_excluding_corners_box)
                                 {
@@ -293,18 +377,43 @@ pub(crate) async fn demo_dungeon(
         .map_err(|e| InGenError::Other(e.into()))?;
 
     let maze = maze_to_array(&maze);
-    let bounds = maze.grid();
-    let dungeon_map = maze.map(|maze_field| {
-        let room_position = m2gp(maze_field.coordinates);
+
+    // Expand bounds to allow for extra-tall rooms.
+    let expanded_bounds = maze.grid().expand(FaceMap::symmetric([0, 1, 0]));
+
+    let dungeon_map = GridArray::from_fn(expanded_bounds, |room_position| {
+        let maze_field = maze.get(room_position)?;
 
         let corridor_only = rng.gen_bool(0.5);
+
+        let mut extended_bounds = Grid::for_block(1);
+        // Optional high ceiling
+        if !corridor_only && rng.gen_bool(0.25) {
+            extended_bounds = extended_bounds.expand(FaceMap::from_fn(|face| {
+                GridCoordinate::from(face == Face7::PY)
+            }));
+        };
+        // Floor pit
+        let floor = if matches!(maze_field.field_type, FieldType::Normal) && rng.gen_bool(0.5) {
+            extended_bounds = extended_bounds.expand(FaceMap::from_fn(|face| {
+                GridCoordinate::from(face == Face7::NY)
+            }));
+            *[FloorKind::Chasm, FloorKind::Bridge]
+                .choose(&mut rng)
+                .unwrap()
+        } else {
+            FloorKind::Solid
+        };
 
         let windowed_faces = {
             FaceMap::from_fn(|face| {
                 // Create windows only if they look into space outside the maze
                 let adjacent = m2gp(maze_field.coordinates) + face.normal_vector();
-                if bounds.contains_cube(adjacent) || corridor_only || face == Face7::NY {
+                if maze.grid().contains_cube(adjacent) || corridor_only || face == Face7::NY {
                     false
+                } else if face == Face7::PY {
+                    // ceilings are more common overall and we want more internally-lit ones
+                    rng.gen_bool(0.25)
                 } else {
                     rng.gen_bool(0.75)
                 }
@@ -317,16 +426,19 @@ pub(crate) async fn demo_dungeon(
             let neighbor = room_position + face.normal_vector();
             // contains_cube() check is to work around the maze generator sometimes producing
             // out-of-bounds passages.
-            door_faces[face] = maze_field.has_passage(&direction) && bounds.contains_cube(neighbor);
+            door_faces[face] =
+                maze_field.has_passage(&direction) && maze.grid().contains_cube(neighbor);
         }
 
-        DemoRoom {
+        Some(DemoRoom {
             maze_field_type: maze_field.field_type,
+            extended_bounds,
             door_faces,
             windowed_faces,
+            floor,
             corridor_only,
             lit: !windowed_faces[Face7::PY] && rng.gen_bool(0.75),
-        }
+        })
     });
 
     let space_bounds = dungeon_grid
@@ -335,10 +447,27 @@ pub(crate) async fn demo_dungeon(
     let mut space = Space::builder(space_bounds)
         .sky_color(palette::DAY_SKY_COLOR * 2.0)
         .build_empty();
+
+    // Fill in (under)ground areas
     space.fill_uniform(
-        space_bounds.abut(Face6::NY, -1).unwrap(),
+        {
+            let mut l = space_bounds.lower_bounds();
+            let mut u = space_bounds.upper_bounds();
+            l.y = -1;
+            u.y = 0;
+            Grid::from_lower_upper(l, u)
+        },
         &landscape_blocks[LandscapeBlocks::Grass],
     )?;
+    space.fill_uniform(
+        {
+            let mut u = space_bounds.upper_bounds();
+            u.y = -1;
+            Grid::from_lower_upper(space_bounds.lower_bounds(), u)
+        },
+        &landscape_blocks[LandscapeBlocks::Dirt],
+    )?;
+
     build_dungeon(&mut space, &theme, &dungeon_map, progress).await?;
 
     Ok(space)
