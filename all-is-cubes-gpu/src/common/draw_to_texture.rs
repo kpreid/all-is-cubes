@@ -56,6 +56,10 @@ impl EgFramebuffer {
         }
         self.nonzero = Rectangle::zero();
     }
+
+    pub fn is_nonzero(&self) -> bool {
+        !self.nonzero.is_zero_sized()
+    }
 }
 
 impl DrawTarget for EgFramebuffer {

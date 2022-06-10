@@ -705,10 +705,16 @@ impl EverythingRenderer {
         &mut self,
         queue: &wgpu::Queue,
         output: &wgpu::Texture,
-        text: &str,
+        mut text: &str,
     ) {
-        if !text.is_empty() && self.cameras.cameras().world.options().debug_info_text {
-            let info_text_texture = &mut self.info_text_texture;
+        // Apply info text option
+        if !self.cameras.cameras().world.options().debug_info_text {
+            text = "";
+        }
+
+        let info_text_texture = &mut self.info_text_texture;
+        // Update info text texture if there is text to draw or if there *was* text that we need to clear.
+        if !text.is_empty() || info_text_texture.is_nonzero() {
             info_text_texture.draw_target().clear_transparent();
             info_text_drawable(text, Rgb888::new(0, 0, 0))
                 .draw(info_text_texture.draw_target())

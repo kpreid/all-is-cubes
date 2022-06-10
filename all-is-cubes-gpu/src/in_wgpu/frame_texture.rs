@@ -73,6 +73,10 @@ impl DrawableTexture {
         self.texture_view.as_ref()
     }
 
+    pub fn is_nonzero(&self) -> bool {
+        self.local_buffer.is_nonzero()
+    }
+
     pub fn upload(&mut self, queue: &wgpu::Queue) {
         let dirty_rect = self.local_buffer.dirty_rect();
         if !dirty_rect.is_zero_sized() {
