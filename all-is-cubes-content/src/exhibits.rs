@@ -625,7 +625,7 @@ exhibit! {
         let brightness = 1.0;
 
         let interior = Grid::new([0, 0, 0], [room_width, room_height, room_length]);
-        let mut space = Space::empty(interior.expand(FaceMap::from_fn(|_| 1)));
+        let mut space = Space::empty(interior.expand(FaceMap::repeat(1)));
 
 
         fn normalize(color: Rgb) -> Rgb {

@@ -697,6 +697,28 @@ impl<V> FaceMap<V> {
         }
     }
 
+    /// Returns this map with one entry's value replaced.
+    ///
+    /// This may be used for constructing a map with only one interesting entry:
+    ///
+    /// ```
+    /// use all_is_cubes::math::{Face7, FaceMap};
+    ///
+    /// assert_eq!(
+    ///     FaceMap::default().with(Face7::PY, 10),
+    ///     {
+    ///         let mut m = FaceMap::default();
+    ///         m[Face7::PY] = 10;
+    ///         m
+    ///     },
+    /// );
+    /// ```
+    #[must_use]
+    pub fn with(mut self, face: Face7, value: V) -> Self {
+        self[face] = value;
+        self
+    }
+
     // TODO: provide more convenience methods for iteration & transformation
 }
 

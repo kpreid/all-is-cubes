@@ -8,7 +8,7 @@ use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::content::free_editing_starter_inventory;
 use crate::linking::InGenError;
-use crate::math::{FaceMap, Rgb};
+use crate::math::{Face7, FaceMap, Rgb};
 use crate::space::{Grid, LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 
@@ -41,10 +41,7 @@ pub fn lighting_bench_space(_universe: &mut Universe) -> Result<Space, InGenErro
     // Ground level
     space
         .fill_uniform(
-            space_bounds.expand(FaceMap {
-                py: -yup,
-                ..FaceMap::default()
-            }),
+            space_bounds.expand(FaceMap::default().with(Face7::PY, -yup)),
             Block::from(rgb_const!(0.5, 0.5, 0.5)),
         )
         .unwrap();
@@ -75,15 +72,7 @@ pub fn lighting_bench_space(_universe: &mut Universe) -> Result<Space, InGenErro
                 1 => {
                     space
                         .fill_uniform(
-                            section_bounds.expand(FaceMap {
-                                within: 0,
-                                nx: 0,
-                                ny: 0,
-                                nz: 0,
-                                px: 0,
-                                py: -yup,
-                                pz: 0,
-                            }),
+                            section_bounds.expand(FaceMap::default().with(Face7::PY, -yup)),
                             color,
                         )
                         .unwrap();

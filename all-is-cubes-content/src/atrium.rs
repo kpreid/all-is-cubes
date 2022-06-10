@@ -58,9 +58,8 @@ pub(crate) async fn atrium(
     let balcony_floor_pos = GridVector::new(0, ceiling_height + WALL, 0);
     let top_floor_pos = GridVector::new(0, (ceiling_height + WALL) * 2, 0);
 
-    let space_grid = outer_walls_footprint.expand(FaceMap::from_fn(|f| {
-        GridCoordinate::from(f == Face7::PY) * ceiling_height * floor_count
-    }));
+    let space_grid = outer_walls_footprint
+        .expand(FaceMap::default().with(Face7::PY, ceiling_height * floor_count));
 
     let floor_with_cutout = |mut p: GridPoint| {
         p.y = 0;

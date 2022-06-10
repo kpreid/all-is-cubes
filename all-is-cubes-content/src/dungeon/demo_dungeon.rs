@@ -389,15 +389,11 @@ pub(crate) async fn demo_dungeon(
         let mut extended_bounds = Grid::for_block(1);
         // Optional high ceiling
         if !corridor_only && rng.gen_bool(0.25) {
-            extended_bounds = extended_bounds.expand(FaceMap::from_fn(|face| {
-                GridCoordinate::from(face == Face7::PY)
-            }));
+            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::PY, 1));
         };
         // Floor pit
         let floor = if matches!(maze_field.field_type, FieldType::Normal) && rng.gen_bool(0.5) {
-            extended_bounds = extended_bounds.expand(FaceMap::from_fn(|face| {
-                GridCoordinate::from(face == Face7::NY)
-            }));
+            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::NY, 1));
             *[FloorKind::Chasm, FloorKind::Bridge]
                 .choose(&mut rng)
                 .unwrap()
