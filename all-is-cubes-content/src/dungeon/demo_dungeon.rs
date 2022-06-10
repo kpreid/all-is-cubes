@@ -1,6 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::f64::consts::TAU;
+
 use exhaust::Exhaust;
 use maze_generator::prelude::{Direction, FieldType, Generator};
 use rand::prelude::SliceRandom;
@@ -224,6 +226,15 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         match pass_index {
             0 => {
                 self.plain_room(wall_type, space, interior)?;
+
+                // Spikes on the bottom of the pit
+                // (TODO: revise this condition when staircase-ish rooms exist)
+                if room_data.extended_map_bounds().lower_bounds().y < 0 {
+                    space.fill_uniform(
+                        interior.abut(Face6::NY, -1).unwrap(),
+                        &self.blocks[DungeonBlocks::Spikes],
+                    )?;
+                }
 
                 match room_data.floor {
                     FloorKind::Solid => {
@@ -473,8 +484,12 @@ pub(crate) async fn demo_dungeon(
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub(crate) enum DungeonBlocks {
+    /// A dim light to attach to ceilings.
     CorridorLight,
+    /// Normal flooring for the dungeon.
     FloorTile,
+    /// Spikes for pit traps, facing upward.
+    Spikes,
 }
 impl BlockModule for DungeonBlocks {
     fn namespace() -> &'static str {
@@ -498,6 +513,7 @@ pub async fn install_dungeon_blocks(
     let stone_floor_voxel = Block::from(stone_color);
     let stone_grout_1 = Block::from(stone_color * 0.8);
     let stone_grout_2 = Block::from(stone_color * 0.9);
+    let spike_metal = Block::from(palette::STEEL);
 
     use DungeonBlocks::*;
     BlockProvider::<DungeonBlocks>::new(progress, |key| {
@@ -533,6 +549,19 @@ pub async fn install_dungeon_blocks(
                         &stone_grout_2
                     } else {
                         &stone_floor_voxel
+                    }
+                })?
+                .build(),
+            Spikes => Block::builder()
+                .display_name("Spikes")
+                .collision(BlockCollision::None)
+                .voxels_fn(universe, resolution, |GridPoint { x, y, z }| {
+                    let resolution = f64::from(resolution);
+                    let bsin = |x| (f64::from(x) * TAU / resolution * 2.0).sin();
+                    if f64::from(y) / resolution < bsin(x) * bsin(z) {
+                        &spike_metal
+                    } else {
+                        &AIR
                     }
                 })?
                 .build(),
