@@ -51,5 +51,5 @@ serde_json = "1.0.64"
 # so let's use it for our output report template.
 tinytemplate = "1.2.1"
 # Using tokio for async test-running.
-tokio = { version = "1.18.0", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
+tokio = { version = "1.19.2", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
 wgpu = { version = "0.12.0", features = ["webgl"] }
