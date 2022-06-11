@@ -48,8 +48,10 @@ pub enum Modifier {
         direction: Face6,
         /// The distance, in 1/256ths, by which it is displaced.
         distance: u16,
-        /// The velocity **per tick** with which this block is moving in the given direction.
-        velocity: i8,
+        /// The velocity **per tick** with which the displacement is changing.
+        ///
+        /// TODO: "Per tick" is a bad unit.
+        velocity: i16,
     },
 }
 
@@ -250,7 +252,7 @@ impl Modifier {
     ///
     /// TODO: This is going to need to change again in order to support
     /// moving one block in and another out at the same time.
-    pub fn paired_move(direction: Face6, distance: u16, velocity: i8) -> [Modifier; 2] {
+    pub fn paired_move(direction: Face6, distance: u16, velocity: i16) -> [Modifier; 2] {
         [
             Modifier::Move {
                 direction,
@@ -284,11 +286,13 @@ impl VisitRefs for Modifier {
 mod tests {
     use super::*;
     use crate::block::{BlockAttributes, BlockCollision, Evoxel, Primitive, AIR};
-    use crate::content::make_some_voxel_blocks;
+    use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::drawing::VoxelBrush;
     use crate::math::{GridPoint, OpacityCategory, Rgba};
-    use crate::space::Grid;
+    use crate::space::{Grid, Space};
+    use crate::time::Tick;
     use crate::universe::Universe;
+    use cgmath::EuclideanSpace;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -486,5 +490,54 @@ mod tests {
         .attach(original);
 
         assert_eq!(moved.evaluate().unwrap().attributes.tick_action, None);
+    }
+
+    /// Set up a `Modifier::Move`, let it run, and then allow assertions to be made about the result.
+    fn move_block_test(direction: Face6, velocity: i16, checker: impl FnOnce(&Space, &Block)) {
+        let [block] = make_some_blocks();
+        let mut space =
+            Space::builder(Grid::from_lower_upper([-1, -1, -1], [2, 2, 2])).build_empty();
+        let [move_out, move_in] = Modifier::paired_move(direction, 0, velocity);
+        space
+            .set([0, 0, 0], move_out.attach(block.clone()))
+            .unwrap();
+        space
+            .set(
+                GridPoint::origin() + direction.normal_vector(),
+                move_in.attach(block.clone()),
+            )
+            .unwrap();
+        let mut universe = Universe::new();
+        let space = universe.insert_anonymous(space);
+        // TODO: We need a "step until idle" function, or for the UniverseStepInfo to convey how many blocks were updated / are waiting
+        // TODO: Some tests will want to look at the partial results
+        for _ in 0..257 {
+            universe.step(Tick::arbitrary());
+        }
+        checker(&space.borrow(), &block);
+    }
+
+    #[test]
+    fn move_zero_velocity() {
+        move_block_test(Face6::PX, 0, |space, block| {
+            assert_eq!(&space[[0, 0, 0]], block);
+            assert_eq!(&space[[1, 0, 0]], &AIR);
+        });
+    }
+
+    #[test]
+    fn move_slowly() {
+        move_block_test(Face6::PX, 1, |space, block| {
+            assert_eq!(&space[[0, 0, 0]], &AIR);
+            assert_eq!(&space[[1, 0, 0]], block);
+        });
+    }
+
+    #[test]
+    fn move_instant_velocity() {
+        move_block_test(Face6::PX, 256, |space, block| {
+            assert_eq!(&space[[0, 0, 0]], &AIR);
+            assert_eq!(&space[[1, 0, 0]], block);
+        });
     }
 }
