@@ -48,6 +48,9 @@ pub enum Tool {
     /// TODO: This is not yet actually implemented.
     EditBlock,
 
+    /// Push targeted block into adjacent cube.
+    PushPull,
+
     /// Allows flight.
     ///
     /// TODO: This should probably be a feature a tool can have rather than a
@@ -152,6 +155,40 @@ impl Tool {
                     Err(ref_err) => Err(ToolError::SpaceRef(ref_err)),
                 }
             }
+            Self::PushPull => {
+                let cursor = input.cursor()?;
+                let mut direction: Face6 = cursor
+                    .place
+                    .face
+                    .opposite()
+                    .try_into()
+                    .map_err(|_| ToolError::NotUsable)?;
+
+                // If we can't push, then try pulling.
+                // TODO: Tool should have user-controllable modes
+                if cursor.space.borrow()[cursor.place.cube + direction.normal_vector()] != AIR {
+                    direction = direction.opposite();
+                }
+
+                let velocity = 8;
+                let [move_out, move_in] = Modifier::paired_move(direction, 0, velocity);
+                let leaving = input.set_cube(
+                    cursor.place.cube,
+                    cursor.block.clone(),
+                    move_out.attach(cursor.block.clone()),
+                )?;
+                let entering = input.set_cube(
+                    cursor.place.cube + direction.normal_vector(),
+                    AIR,
+                    move_in.attach(cursor.block.clone()),
+                )?;
+                Ok((
+                    Some(self),
+                    entering
+                        .merge(leaving)
+                        .expect("Push transactions conflicted???"),
+                ))
+            }
             Self::Jetpack { active } => Ok((
                 Some(Self::Jetpack { active: !active }),
                 UniverseTransaction::default(),
@@ -201,6 +238,7 @@ impl Tool {
             }
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
             Self::EditBlock => Cow::Borrowed(&predefined[Icons::EditBlock]),
+            Self::PushPull => Cow::Borrowed(&predefined[Icons::Push]),
             Self::Jetpack { active } => {
                 Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
             }
@@ -219,6 +257,7 @@ impl Tool {
             Tool::InfiniteBlocks(_) => One,
             Tool::CopyFromSpace => One,
             Tool::EditBlock => One,
+            Tool::PushPull => One,
             Tool::Jetpack { .. } => One,
             Tool::ExternalAction { .. } => One,
         }
@@ -234,6 +273,7 @@ impl VisitRefs for Tool {
             Tool::InfiniteBlocks(block) => block.visit_refs(visitor),
             Tool::CopyFromSpace => {}
             Tool::EditBlock => {}
+            Tool::PushPull => {}
             Tool::Jetpack { active: _ } => {}
             Tool::ExternalAction { function: _, icon } => {
                 icon.visit_refs(visitor);
