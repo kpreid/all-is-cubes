@@ -325,8 +325,10 @@ mod trace_image {
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
         let encoder = &encoder; // make shareable
 
+        // x.max(1) is zero-sized-viewport protection; the chunk size will be wrong, but there
+        // will be zero chunks anyway.
         let total_info = output
-            .par_chunks_mut(viewport_size.x)
+            .par_chunks_mut(viewport_size.x.max(1))
             .enumerate()
             .map(move |(ych, raster_row)| {
                 let y = viewport.normalize_fb_y(ych);
