@@ -135,6 +135,7 @@ where
     ff: Rc<FullFramePainter<Backend>>,
     texture: Option<Texture<Backend, Dim2, NormRGBA8UI>>,
     /// Viewport whose `framebuffer_size` is the size of our texture.
+    /// None if the texture was never set or if the last size was zero.
     scaled_viewport: Option<Viewport>,
     local_buffer: EgFramebuffer,
     texture_is_valid: bool,
@@ -164,17 +165,14 @@ where
             return Ok(());
         }
         let size = scaled_viewport.framebuffer_size;
+        let nonzero = size.x > 0 && size.y > 0;
 
-        // Invalidate previous size
-        self.scaled_viewport = None;
-
-        // TODO: systematic overflow checks
         self.local_buffer = EgFramebuffer::new(Size {
             width: size.x,
             height: size.y,
         });
         self.texture_is_valid = false;
-        self.texture = if size.x > 0 && size.y > 0 {
+        self.texture = if nonzero {
             Some(context.new_texture(
                 [size.x, size.y],
                 Sampler {
@@ -190,7 +188,8 @@ where
             None
         };
 
-        self.scaled_viewport = Some(scaled_viewport);
+        self.scaled_viewport = if nonzero { Some(scaled_viewport) } else { None };
+
         Ok(())
     }
 
@@ -205,20 +204,21 @@ where
     }
 
     pub fn upload(&mut self) -> Result<(), GraphicsResourceError> {
+        let texture = match &mut self.texture {
+            Some(t) => t,
+            None => {
+                // Size was zero or not set
+                return Ok(());
+            }
+        };
         if !self.texture_is_valid {
-            self.texture
-                .as_mut()
-                .expect("upload() without resize()")
-                .upload(TexelUpload::base_level(self.local_buffer.data(), 0))?;
+            texture.upload(TexelUpload::base_level(self.local_buffer.data(), 0))?;
             self.texture_is_valid = true;
-        }
-        let dirty_rect = self.local_buffer.dirty_rect();
-        if !dirty_rect.is_zero_sized() {
-            let width = self.local_buffer.size().width;
-            self.texture
-                .as_mut()
-                .expect("upload() without resize()")
-                .upload_part(
+        } else {
+            let dirty_rect = self.local_buffer.dirty_rect();
+            if !dirty_rect.is_zero_sized() {
+                let width = self.local_buffer.size().width;
+                texture.upload_part(
                     // We can't specify stride, but we can specify a contiguous Y span
                     [0, dirty_rect.top_left.y as u32],
                     [width, dirty_rect.bottom_right().unwrap().y as u32 + 1],
@@ -228,7 +228,8 @@ where
                         0,
                     ),
                 )?;
-            self.local_buffer.mark_not_dirty();
+                self.local_buffer.mark_not_dirty();
+            }
         }
         Ok(())
     }

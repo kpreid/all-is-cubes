@@ -430,7 +430,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                 framebuffer,
                 &PipelineState::default().set_clear_color(None),
                 |ref pipeline, ref mut shading_gate| -> Result<(), GraphicsResourceError> {
-                    let success = info_text_texture.render(
+                    info_text_texture.render(
                         &RenderState::default()
                             .set_depth_write(Write::Off)
                             .set_blending(Some(Blending {
@@ -441,7 +441,6 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                         pipeline,
                         shading_gate,
                     )?;
-                    assert!(success);
 
                     Ok(())
                 },

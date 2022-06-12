@@ -15,6 +15,7 @@ use std::mem::ManuallyDrop;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use all_is_cubes::listen::DirtyFlag;
 use clap::Parser as _;
 use futures::future::BoxFuture;
 use glfw::{Context as _, WindowHint, WindowMode};
@@ -123,22 +124,14 @@ struct LumFactory {}
 
 impl RendererFactory for LumFactory {
     fn renderer_from_cameras(&self, cameras: StandardCameras) -> Box<dyn HeadlessRenderer + Send> {
+        let viewport_source = cameras.viewport_source();
+        let viewport_dirty = DirtyFlag::listening(false, |l| viewport_source.listen(l));
         let viewport = cameras.viewport();
 
         with_context(|context| {
             Box::new(LumHeadlessRenderer(SendWrapper::new(UnsendRend {
-                framebuffer: ManuallyDrop::new(
-                    context
-                        .new_framebuffer::<Dim2, NormRGBA8UI, Depth32F>(
-                            viewport
-                                .framebuffer_size
-                                .map(|component| component.max(1))
-                                .into(),
-                            0,
-                            Sampler::default(),
-                        )
-                        .unwrap(),
-                ),
+                viewport_dirty,
+                framebuffer: create_framebuffer(context, viewport),
                 renderer: EverythingRenderer::new(context, cameras).unwrap(),
                 cursor: None,
             })))
@@ -162,6 +155,7 @@ struct UnsendRend {
     framebuffer: ManuallyDrop<Framebuffer<GL33, Dim2, NormRGBA8UI, Depth32F>>,
     renderer: EverythingRenderer<GL33>,
     cursor: Option<Cursor>,
+    viewport_dirty: DirtyFlag,
 }
 
 impl HeadlessRenderer for LumHeadlessRenderer {
@@ -182,10 +176,19 @@ impl HeadlessRenderer for LumHeadlessRenderer {
             framebuffer,
             renderer,
             cursor,
+            viewport_dirty,
         } = &mut *self.0;
+
+        // must call this to get a fresh viewport so we can update the framebuffer if needed
+        // TODO: kludgey
+        renderer.update_world_camera();
         let viewport = renderer.cameras().viewport();
 
         with_context(|context| {
+            if viewport_dirty.get_and_clear() {
+                *framebuffer = create_framebuffer(context, viewport);
+            }
+
             renderer
                 .render_frame(
                     context,
@@ -217,4 +220,22 @@ impl HeadlessRenderer for LumHeadlessRenderer {
         // can't defer any of the work because the future wouldn't be Send
         Box::pin(std::future::ready(Ok(image)))
     }
+}
+
+fn create_framebuffer(
+    context: &mut GL33Context,
+    viewport: all_is_cubes::camera::Viewport,
+) -> ManuallyDrop<Framebuffer<GL33, Dim2, NormRGBA8UI, Depth32F>> {
+    ManuallyDrop::new(
+        context
+            .new_framebuffer::<Dim2, NormRGBA8UI, Depth32F>(
+                viewport
+                    .framebuffer_size
+                    .map(|component| component.max(1))
+                    .into(),
+                0,
+                Sampler::default(),
+            )
+            .unwrap(),
+    )
 }
