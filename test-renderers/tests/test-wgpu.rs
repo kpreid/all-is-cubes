@@ -5,7 +5,7 @@ use std::num::NonZeroU32;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use clap::Parser as _;
 use futures::future::BoxFuture;
 use image::RgbaImage;
@@ -82,28 +82,16 @@ impl RendererFactory for WgpuFactory {
             wgpu::TextureFormat::Rgba8UnormSrgb,
         );
 
-        // TODO: support viewport changes by resizing this texture when needed
-        // (or maybe just recreate it every time).
+        let viewport_dirty = DirtyFlag::listening(false, |l| viewport_source.listen(l));
         let viewport = viewport_source.snapshot();
-        let color_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("WgpuHeadlessRenderer::color_texture"),
-            size: wgpu::Extent3d {
-                width: viewport.framebuffer_size.x.max(1),
-                height: viewport.framebuffer_size.y.max(1),
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        });
+        let color_texture = create_color_texture(&self.device, viewport);
 
         Box::new(WgpuHeadlessRenderer {
             factory: self.clone(),
             color_texture,
             everything,
             viewport_source,
+            viewport_dirty,
         })
     }
 
@@ -118,6 +106,7 @@ struct WgpuHeadlessRenderer {
     color_texture: wgpu::Texture,
     everything: EverythingRenderer,
     viewport_source: ListenableSource<Viewport>,
+    viewport_dirty: DirtyFlag,
 }
 
 impl HeadlessRenderer for WgpuHeadlessRenderer {
@@ -141,6 +130,10 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
 
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
         let viewport = self.viewport_source.snapshot();
+        if self.viewport_dirty.get_and_clear() {
+            self.color_texture = create_color_texture(&self.factory.device, viewport);
+        }
+
         Box::pin(async move {
             let _dinfo = self
                 .everything
@@ -161,6 +154,22 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
             Ok(image)
         })
     }
+}
+
+fn create_color_texture(device: &wgpu::Device, viewport: Viewport) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("WgpuHeadlessRenderer::color_texture"),
+        size: wgpu::Extent3d {
+            width: viewport.framebuffer_size.x.max(1),
+            height: viewport.framebuffer_size.y.max(1),
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+    })
 }
 
 async fn get_pixels_from_gpu(
