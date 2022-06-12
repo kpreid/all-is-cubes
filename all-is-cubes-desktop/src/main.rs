@@ -210,6 +210,7 @@ fn main() -> Result<(), anyhow::Error> {
                     display_size.unwrap_or_else(Vector2::zero),
                 )),
                 clock_source: ClockSource::Instant,
+                recorder: None,
             };
 
             // TODO: Right now this is useless. Eventually, we may have other paths for side

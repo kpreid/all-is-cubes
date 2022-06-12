@@ -118,6 +118,7 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
         window,
         viewport_cell,
         clock_source: ClockSource::Instant,
+        recorder: None,
     };
 
     let ready_time = Instant::now();
@@ -164,6 +165,7 @@ pub(crate) fn create_winit_rt_desktop_session(
         window: sb_context, // softbuffer takes ownership of the window for safety
         viewport_cell,
         clock_source: ClockSource::Instant,
+        recorder: None,
     };
 
     let ready_time = Instant::now();

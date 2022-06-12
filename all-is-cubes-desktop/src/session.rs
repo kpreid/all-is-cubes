@@ -2,11 +2,12 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use std::path::PathBuf;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-use all_is_cubes::apps::Session;
+use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::camera::Viewport;
-use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 
@@ -25,8 +26,10 @@ pub(crate) struct DesktopSession<Ren, Win> {
     pub(crate) window: Win,
     /// The current viewport size linked to the renderer.
     pub(crate) viewport_cell: ListenableCell<Viewport>,
-    // TODO: Add an optional `Recorder` that works with any session type.
     pub(crate) clock_source: ClockSource,
+
+    // If present, writes frames to disk.
+    pub(crate) recorder: Option<crate::record::RtRecorder>,
 }
 
 impl<Ren, Win> DesktopSession<Ren, Win> {
@@ -35,8 +38,31 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
             ClockSource::Instant => {
                 self.session.frame_clock.advance_to(Instant::now());
             }
+            ClockSource::Fixed(dt) => {
+                // TODO: maybe_step_universe has a catch-up time cap, which we should disable for this.
+                self.session.frame_clock.advance_by(dt);
+            }
         }
-        self.session.maybe_step_universe()
+        let step_info = self.session.maybe_step_universe();
+
+        // If we are recording, then do it now.
+        // (TODO: We want to record 1 frame *before the first step* too)
+        // (TODO: This code is awkward because of partial refactoring to wards recording being a
+        // option to combine with anything rather than a special main loop mode)
+        if let Some(recorder) = self.recorder.as_mut() {
+            // TODO: Start reusing renderers instead of recreating them.
+            let mut renderer = RtRenderer::new(
+                StandardCameras::from_session(&self.session, self.viewport_cell.as_source())
+                    .unwrap(),
+                Box::new(|v| v),
+                ListenableSource::constant(()),
+            );
+            renderer.update(None).unwrap();
+
+            recorder.send_frame(recorder.sending_frame_number(), renderer);
+        }
+
+        step_info
     }
 
     /// Replace the session's universe with one whose contents are the given file.
@@ -66,4 +92,7 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
 pub(crate) enum ClockSource {
     /// Use [`instant::Instant::now()`].
     Instant,
+    /// Every time [`DesktopSession::advance_time_and_maybe_step`] is called, advance time
+    /// by the specified amount.
+    Fixed(Duration),
 }

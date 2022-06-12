@@ -16,13 +16,15 @@ use image::RgbaImage;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::{chunk::ChunkType, Encoder};
 
-use all_is_cubes::apps::{Session, StandardCameras};
+use all_is_cubes::apps::Session;
 use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{HeadlessRenderer, Viewport};
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::math::NotNan;
 use all_is_cubes::raytracer::RtRenderer;
+
+use crate::session::{ClockSource, DesktopSession};
 
 /// Options for recording and output in [`record_main`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,10 +59,7 @@ impl RecordAnimationOptions {
     }
 }
 
-pub(crate) fn record_main(
-    mut session: Session,
-    options: RecordOptions,
-) -> Result<(), anyhow::Error> {
+pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
         .on_finish(ProgressFinish::AtCurrentPos);
@@ -78,8 +77,6 @@ pub(crate) fn record_main(
         });
 
     let viewport = options.viewport();
-    let cameras =
-        StandardCameras::from_session(&session, ListenableSource::constant(viewport)).unwrap();
 
     if let Some(anim) = &options.animation {
         if let Some(character_ref) = session.character().snapshot() {
@@ -94,6 +91,18 @@ pub(crate) fn record_main(
 
     let recorder = Recorder::new(options.clone())?;
 
+    let mut dsession = DesktopSession {
+        session,
+        renderer: (),
+        window: (),
+        viewport_cell: ListenableCell::new(viewport),
+        clock_source: ClockSource::Fixed(match &options.animation {
+            Some(anim) => anim.frame_period,
+            None => Duration::ZERO,
+        }),
+        recorder: Some(recorder),
+    };
+
     // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
     // (We could move the universe stepping to another thread to get more precise progress updates,
     // but that doesn't seem necessary.)
@@ -103,38 +112,32 @@ pub(crate) fn record_main(
             .with_prefix("Drawing");
         drawing_progress_bar.enable_steady_tick(1000);
 
-        for frame_number in options.frame_range() {
-            // TODO: Start reusing renderers instead of recreating them.
-            let mut renderer = RtRenderer::new(
-                cameras.clone(),
-                Box::new(|v| v),
-                ListenableSource::constant(()),
-            );
-            renderer.update(None).unwrap();
-
-            recorder
-                .scene_sender
-                .send((frame_number, renderer))
-                .unwrap();
-
+        for _ in options.frame_range() {
             // Advance time for next frame.
-            if let Some(anim) = &options.animation {
-                let _ = session.frame_clock.request_frame(anim.frame_period);
-                // TODO: maybe_step_universe has a catch-up time cap, which we should disable for this.
-                while session.maybe_step_universe().is_some() {}
-            }
+            dsession.advance_time_and_maybe_step();
 
             // Update progress bar.
-            if let Ok(frame_number) = recorder.status_receiver.try_recv() {
+            if let Ok(frame_number) = dsession
+                .recorder
+                .as_mut()
+                .unwrap()
+                .status_receiver
+                .try_recv()
+            {
                 drawing_progress_bar.set_position((frame_number + 1) as u64);
             }
         }
-        drop(recorder.scene_sender);
+        dsession.recorder.as_mut().unwrap().no_more_frames();
 
         // We've completed sending frames; now block on their completion.
-        while let Ok(frame_number) = recorder.status_receiver.recv() {
+        while let Ok(frame_number) = dsession.recorder.as_mut().unwrap().status_receiver.recv() {
             drawing_progress_bar.set_position((frame_number + 1) as u64);
         }
+        assert_eq!(
+            drawing_progress_bar.position() as usize,
+            options.frame_range().end() - options.frame_range().start() + 1,
+            "Didn't draw the correct number of frames"
+        );
     }
 
     // Report completion
@@ -150,11 +153,23 @@ pub(crate) fn record_main(
 ///
 /// TODO: Add use of recirculating renderers, which means there will be a third
 /// "return for next update" output.
-struct Recorder<K, R> {
-    pub scene_sender: mpsc::SyncSender<(K, R)>,
+///
+/// * `K` is the type of a “key” for identifying the frame.
+/// * `R` is the type of a renderer that should be [`HeadlessRenderer::update`]d with
+///   the latest scene for each frame.
+#[derive(Debug)]
+pub(crate) struct Recorder<K, R> {
+    /// The number of times [`Self::send_frame`] has been called.
+    sending_frame_number: usize,
+    /// None if dropped to signal no more frames
+    scene_sender: Option<mpsc::SyncSender<(K, R)>>,
     /// Contains the successive identifiers of each frame successfully written.
     pub status_receiver: mpsc::Receiver<K>,
 }
+
+// TODO: Recorder's genericness is not yet taken advantage of;
+// this is the type that we in fact actually use everywhere.
+pub(crate) type RtRecorder = Recorder<usize, RtRenderer>;
 
 impl<K, R> Recorder<K, R>
 where
@@ -199,9 +214,28 @@ where
             })?;
 
         Ok(Self {
-            scene_sender,
+            sending_frame_number: 0,
+            scene_sender: Some(scene_sender),
             status_receiver,
         })
+    }
+
+    pub fn send_frame(&mut self, key: K, renderer: R) {
+        // TODO: instead of panic on send failure, log the problem
+        self.scene_sender
+            .as_ref()
+            .expect("cannot send_frame() after no_more_frames()")
+            .send((key, renderer))
+            .expect("channel closed; recorder render thread died?");
+        self.sending_frame_number += 1;
+    }
+
+    pub fn sending_frame_number(&self) -> usize {
+        self.sending_frame_number
+    }
+
+    pub fn no_more_frames(&mut self) {
+        self.scene_sender = None;
     }
 }
 

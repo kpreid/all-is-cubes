@@ -45,7 +45,7 @@ impl FrameClock {
     /// Advance the clock using a source of absolute time.
     ///
     /// This cannot be meaningfully used in combination with
-    /// [`FrameClock::request_frame()`].
+    /// [`FrameClock::request_frame()`] or [`FrameClock::advance_by()`].
     pub fn advance_to(&mut self, instant: Instant) {
         if let Some(last_absolute_time) = self.last_absolute_time {
             let delta = instant - last_absolute_time;
@@ -53,6 +53,12 @@ impl FrameClock {
             self.cap_step_time();
         }
         self.last_absolute_time = Some(instant);
+    }
+
+    /// Advance the clock using a source of relative time.
+    pub fn advance_by(&mut self, duration: Duration) {
+        self.accumulated_step_time += duration;
+        self.cap_step_time();
     }
 
     /// Reacts to a callback from the environment requesting drawing a frame ASAP if
@@ -68,8 +74,7 @@ impl FrameClock {
         let result = self.should_draw();
         self.did_draw();
 
-        self.accumulated_step_time += time_since_last_frame;
-        self.cap_step_time();
+        self.advance_by(time_since_last_frame);
 
         result
     }

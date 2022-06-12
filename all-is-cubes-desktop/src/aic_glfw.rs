@@ -129,6 +129,7 @@ pub(crate) fn create_glfw_desktop_session(
         session,
         viewport_cell,
         clock_source: ClockSource::Instant,
+        recorder: None,
     };
 
     let ready_time = Instant::now();

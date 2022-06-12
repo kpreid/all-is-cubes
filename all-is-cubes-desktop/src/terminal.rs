@@ -217,6 +217,7 @@ impl TerminalMain {
                 window: (),
                 viewport_cell,
                 clock_source: ClockSource::Instant,
+                recorder: None,
             },
             options,
             tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
