@@ -451,7 +451,7 @@ impl WebGameRoot {
         ));
         i.has_pointer_lock(lock);
         i.mouse_pixel_position(
-            self.renderer.viewport(),
+            self.gui_helpers.canvas_helper().viewport(),
             Some(Point2::new(
                 event.client_x().into(),
                 event.client_y().into(),

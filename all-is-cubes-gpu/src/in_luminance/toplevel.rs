@@ -75,11 +75,6 @@ where
         })
     }
 
-    /// Returns the last [`Viewport`] provided.
-    pub fn viewport(&self) -> Viewport {
-        self.objects.cameras.viewport()
-    }
-
     /// Draw a frame, excluding info text overlay.
     pub fn render_frame(
         &mut self,
