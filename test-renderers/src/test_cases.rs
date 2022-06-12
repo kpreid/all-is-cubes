@@ -81,6 +81,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         ],
     );
     c.insert_variants("transparent_one", None, transparent_one, ["surf", "vol"]);
+    c.insert("zero_viewport", None, zero_viewport);
 }
 
 fn u(f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static) -> Option<UniverseFuture> {
@@ -430,6 +431,55 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
     let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
     context
         .render_comparison_test(2, scene, Overlays::NONE)
+        .await;
+}
+
+/// Renderer should not crash if given a zero-size viewport,
+/// either at initialization time or afterward.
+async fn zero_viewport(mut context: RenderTestContext) {
+    let mut universe = Universe::new();
+    finish_universe_from_space(&mut universe, one_cube_space());
+    let zero = Viewport::with_scale(1.00, Vector2::new(0, 0));
+    let viewport_cell = ListenableCell::new(zero);
+    let cameras: StandardCameras = StandardCameras::new(
+        ListenableSource::constant(GraphicsOptions::default()),
+        viewport_cell.as_source(),
+        ListenableSource::constant(universe.get_default_character()),
+        ListenableSource::constant(None),
+    )
+    .unwrap();
+    let overlays = Overlays {
+        cursor: None,
+        info_text: Some("hello world"),
+    };
+
+    let mut renderer = context.renderer(cameras);
+
+    // Initially zero viewport
+    renderer.update(None).await.unwrap();
+    let image: RgbaImage = renderer
+        .draw(overlays.info_text.as_ref().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(image.dimensions(), (0, 0));
+
+    // Now confirm the renderer can produce an okay image afterward
+    viewport_cell.set(COMMON_VIEWPORT);
+    context
+        .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays.clone())
+        .await;
+
+    // Now try *resizing to* zero and back
+    viewport_cell.set(zero);
+    renderer.update(None).await.unwrap();
+    let image: RgbaImage = renderer
+        .draw(overlays.info_text.as_ref().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(image.dimensions(), (0, 0));
+    viewport_cell.set(COMMON_VIEWPORT);
+    context
+        .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays)
         .await;
 }
 
