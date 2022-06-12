@@ -15,8 +15,9 @@ Requirements
 
 Your system must have these installed:
 
-* OpenGL. (Note: This excludes macOS on ARM computers.)
+* OpenGL. (Note: This excludes macOS on ARM computers. TODO: Add a feature to disable these)
 * The `cmake` build tool. (This is used to build GLFW.)
+* If on Linux, then `wayland-client` headers.
 
 Usage
 -----
