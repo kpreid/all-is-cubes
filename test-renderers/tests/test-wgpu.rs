@@ -14,7 +14,7 @@ use tokio::sync::OnceCell;
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::{HeadlessRenderer, RenderError, Viewport};
 use all_is_cubes::character::Cursor;
-use all_is_cubes_gpu::in_wgpu::{create_depth_texture, EverythingRenderer};
+use all_is_cubes_gpu::in_wgpu::EverythingRenderer;
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{RendererFactory, RendererId};
 
@@ -98,13 +98,10 @@ impl RendererFactory for WgpuFactory {
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
         });
-        let depth_texture = create_depth_texture(&self.device, &everything);
-        let depth_texture_view = depth_texture.create_view(&Default::default());
 
         Box::new(WgpuHeadlessRenderer {
             factory: self.clone(),
             color_texture,
-            depth_texture_view,
             everything,
             viewport_source,
         })
@@ -119,8 +116,6 @@ struct WgpuHeadlessRenderer {
     // factory provides Device and Queue
     factory: WgpuFactory,
     color_texture: wgpu::Texture,
-    // depth_texture: wgpu::Texture,
-    depth_texture_view: wgpu::TextureView,
     everything: EverythingRenderer,
     viewport_source: ListenableSource<Viewport>,
 }
@@ -149,7 +144,7 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
         Box::pin(async move {
             let _dinfo = self
                 .everything
-                .draw_frame_linear(&self.factory.queue, &self.depth_texture_view)
+                .draw_frame_linear(&self.factory.queue)
                 .unwrap();
             self.everything.add_info_text_and_postprocess(
                 &self.factory.queue,

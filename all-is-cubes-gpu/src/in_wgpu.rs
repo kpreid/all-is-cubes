@@ -65,9 +65,6 @@ pub struct SurfaceRenderer {
 
     everything: EverythingRenderer,
 
-    depth_texture: wgpu::Texture,
-    depth_texture_view: wgpu::TextureView,
-
     /// True if we need to reconfigure the surface.
     viewport_dirty: DirtyFlag,
 }
@@ -91,12 +88,8 @@ impl SurfaceRenderer {
             surface.get_preferred_format(adapter).unwrap(),
         );
 
-        let depth_texture = create_depth_texture(&device, &everything);
-
         Ok(Self {
             viewport_dirty: DirtyFlag::listening(true, |l| viewport_source.listen(l)),
-            depth_texture_view: depth_texture.create_view(&Default::default()),
-            depth_texture,
             everything,
             surface,
             device,
@@ -139,15 +132,11 @@ impl SurfaceRenderer {
             let config = &self.everything.config;
             if config.width > 0 && config.height > 0 {
                 self.surface.configure(&self.device, config);
-                self.depth_texture = create_depth_texture(&self.device, &self.everything);
-                self.depth_texture_view = self.depth_texture.create_view(&Default::default());
             }
         }
 
         let output = self.surface.get_current_texture()?;
-        let draw_info = self
-            .everything
-            .draw_frame_linear(&self.queue, &self.depth_texture_view)?;
+        let draw_info = self.everything.draw_frame_linear(&self.queue)?;
         let info = RenderInfo {
             update: update_info,
             draw: draw_info,
@@ -184,6 +173,9 @@ pub struct EverythingRenderer {
     /// Texture into which geometry is drawn before postprocessing.
     linear_scene_texture: wgpu::Texture,
     linear_scene_texture_view: wgpu::TextureView,
+    /// Depth texture to pair with `linear_scene_texture`.
+    depth_texture: wgpu::Texture,
+    depth_texture_view: wgpu::TextureView,
 
     /// Pipelines and layouts for rendering Space content
     pipelines: Pipelines,
@@ -232,7 +224,7 @@ impl EverythingRenderer {
             present_mode: wgpu::PresentMode::Fifo,
         };
 
-        let linear_scene_texture = create_linear_scene_texture(&device, &config);
+        let (linear_scene_texture, depth_texture) = create_fb_textures(&device, &config);
 
         let postprocess_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -293,6 +285,8 @@ impl EverythingRenderer {
             linear_scene_texture_view: linear_scene_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             linear_scene_texture,
+            depth_texture_view: depth_texture.create_view(&Default::default()),
+            depth_texture,
 
             space_renderers: Default::default(),
 
@@ -420,10 +414,11 @@ impl EverythingRenderer {
                 self.config.width = size.x;
                 self.config.height = size.y;
 
-                self.linear_scene_texture = create_linear_scene_texture(&self.device, &self.config);
-                self.linear_scene_texture_view = self
-                    .linear_scene_texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
+                (self.linear_scene_texture, self.depth_texture) =
+                    create_fb_textures(&self.device, &self.config);
+                self.linear_scene_texture_view =
+                    self.linear_scene_texture.create_view(&Default::default());
+                self.depth_texture_view = self.depth_texture.create_view(&Default::default());
 
                 self.info_text_texture.resize(
                     &self.device,
@@ -586,9 +581,9 @@ impl EverythingRenderer {
     pub fn draw_frame_linear(
         &mut self,
         queue: &wgpu::Queue,
-        depth_texture_view: &wgpu::TextureView,
     ) -> Result<DrawInfo, GraphicsResourceError> {
         let output_view = &self.linear_scene_texture_view;
+        let depth_texture_view = &self.depth_texture_view;
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -794,43 +789,41 @@ impl EverythingRenderer {
     }
 }
 
-fn create_linear_scene_texture(
+/// Create linear color texture and depth texture.
+///
+/// `config` must be valid (in particular, not zero sized).
+fn create_fb_textures(
     device: &wgpu::Device,
     config: &wgpu::SurfaceConfiguration,
-) -> wgpu::Texture {
-    device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("EverythingRenderer::linear_scene_texture"),
-        size: wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: LINEAR_COLOR_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-    })
-}
-
-#[doc(hidden)] // TODO: figure out what we want to do here for public API
-pub fn create_depth_texture(
-    device: &wgpu::Device,
-    everything: &EverythingRenderer,
-) -> wgpu::Texture {
-    device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("SurfaceRenderer::depth_texture"),
-        size: wgpu::Extent3d {
-            width: everything.config.width,
-            height: everything.config.height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: DEPTH_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-    })
+) -> (wgpu::Texture, wgpu::Texture) {
+    (
+        device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("EverythingRenderer::linear_scene_texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: LINEAR_COLOR_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        }),
+        device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("EverythingRenderer::depth_texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: DEPTH_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        }),
+    )
 }
 
 static POSTPROCESS_SHADER: Lazy<Reloadable> =
