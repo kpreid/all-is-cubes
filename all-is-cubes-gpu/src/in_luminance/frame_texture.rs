@@ -174,17 +174,21 @@ where
             height: size.y,
         });
         self.texture_is_valid = false;
-        self.texture = Some(context.new_texture(
-            [size.x, size.y],
-            Sampler {
-                wrap_s: Wrap::ClampToEdge,
-                wrap_t: Wrap::ClampToEdge,
-                mag_filter: filters.0,
-                min_filter: filters.1,
-                ..Sampler::default()
-            },
-            TexelUpload::reserve(0),
-        )?);
+        self.texture = if size.x > 0 && size.y > 0 {
+            Some(context.new_texture(
+                [size.x, size.y],
+                Sampler {
+                    wrap_s: Wrap::ClampToEdge,
+                    wrap_t: Wrap::ClampToEdge,
+                    mag_filter: filters.0,
+                    min_filter: filters.1,
+                    ..Sampler::default()
+                },
+                TexelUpload::reserve(0),
+            )?)
+        } else {
+            None
+        };
 
         self.scaled_viewport = Some(scaled_viewport);
         Ok(())

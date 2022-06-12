@@ -130,7 +130,10 @@ impl RendererFactory for LumFactory {
                 framebuffer: ManuallyDrop::new(
                     context
                         .new_framebuffer::<Dim2, NormRGBA8UI, Depth32F>(
-                            viewport.framebuffer_size.into(),
+                            viewport
+                                .framebuffer_size
+                                .map(|component| component.max(1))
+                                .into(),
                             0,
                             Sampler::default(),
                         )

@@ -86,7 +86,12 @@ where
             // TODO: If this somehow fails, it should be "warning, not error"
             self.back_buffer = luminance::framebuffer::Framebuffer::back_buffer(
                 &mut self.surface,
-                self.objects.cameras.viewport().framebuffer_size.into(),
+                self.objects
+                    .cameras
+                    .viewport()
+                    .framebuffer_size
+                    .map(|component| component.max(1))
+                    .into(),
             )?;
         }
 
