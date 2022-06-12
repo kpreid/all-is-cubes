@@ -219,8 +219,10 @@ impl EverythingRenderer {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
-            width: viewport.framebuffer_size.x,
-            height: viewport.framebuffer_size.y,
+            // wgpu operations will fail if the size is zero; set a minimum of 1 so we can
+            // successfully initialize and get a working renderer later.
+            width: viewport.framebuffer_size.x.max(1),
+            height: viewport.framebuffer_size.y.max(1),
             present_mode: wgpu::PresentMode::Fifo,
         };
 
@@ -333,10 +335,9 @@ impl EverythingRenderer {
         new_self.info_text_texture.resize(
             &new_self.device,
             Some("info_text_texture"),
-            Vector2::new(
-                viewport.nominal_size.x as u32,
-                viewport.nominal_size.y as u32,
-            ),
+            viewport
+                .nominal_size
+                .map(|component| (component as u32).max(1)),
         );
         new_self
     }
@@ -423,10 +424,9 @@ impl EverythingRenderer {
                 self.info_text_texture.resize(
                     &self.device,
                     Some("info_text_texture"),
-                    Vector2::new(
-                        viewport.nominal_size.x as u32,
-                        viewport.nominal_size.y as u32,
-                    ),
+                    viewport
+                        .nominal_size
+                        .map(|component| (component as u32).max(1)),
                 );
                 self.postprocess_bind_group = None;
             }

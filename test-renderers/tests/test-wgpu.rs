@@ -88,8 +88,8 @@ impl RendererFactory for WgpuFactory {
         let color_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("WgpuHeadlessRenderer::color_texture"),
             size: wgpu::Extent3d {
-                width: viewport.framebuffer_size.x,
-                height: viewport.framebuffer_size.y,
+                width: viewport.framebuffer_size.x.max(1),
+                height: viewport.framebuffer_size.y.max(1),
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -169,9 +169,14 @@ async fn get_pixels_from_gpu(
     fb_texture: &wgpu::Texture,
     viewport: Viewport,
 ) -> RgbaImage {
+    let size = viewport.framebuffer_size;
+    if size.x == 0 || size.y == 0 {
+        return RgbaImage::new(size.x, size.y);
+    }
+
     let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("test output image copy buffer"),
-        size: viewport.framebuffer_size.x as u64 * viewport.framebuffer_size.y as u64 * 4,
+        size: size.x as u64 * size.y as u64 * 4,
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     });
@@ -189,13 +194,13 @@ async fn get_pixels_from_gpu(
                 buffer: &temp_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: NonZeroU32::new(viewport.framebuffer_size.x * 4),
+                    bytes_per_row: NonZeroU32::new(size.x * 4),
                     rows_per_image: None,
                 },
             },
             wgpu::Extent3d {
-                width: viewport.framebuffer_size.x,
-                height: viewport.framebuffer_size.y,
+                width: size.x,
+                height: size.y,
                 depth_or_array_layers: 1,
             },
         );
@@ -210,10 +215,5 @@ async fn get_pixels_from_gpu(
         dst_buffer_slice.get_mapped_range().to_vec()
     };
 
-    RgbaImage::from_raw(
-        viewport.framebuffer_size.x,
-        viewport.framebuffer_size.y,
-        bytes,
-    )
-    .expect("image copy buffer was incorrectly sized")
+    RgbaImage::from_raw(size.x, size.y, bytes).expect("image copy buffer was incorrectly sized")
 }
