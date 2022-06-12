@@ -40,7 +40,28 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
 
     // Initialize logging via the `log` crate's interface.
-    console_log::init_with_level(log::Level::Trace).unwrap();
+    // We use `console_log` to perform the actual logging, but it doesn't offer a message source
+    // filter, so we have to do that ourselves.
+    log::set_logger({
+        struct FilteredWebLogger;
+        impl log::Log for FilteredWebLogger {
+            fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+                let t = metadata.target();
+                // Trace is the finest level, so no need to check it
+                /* metadata.level() <= log::LevelFilter::Trace && */
+                !t.starts_with("wgpu") && !t.starts_with("winit") && !t.starts_with("naga")
+            }
+            fn log(&self, record: &log::Record<'_>) {
+                if self.enabled(record.metadata()) {
+                    console_log::log(record);
+                }
+            }
+            fn flush(&self) {}
+        }
+        &FilteredWebLogger
+    })
+    .unwrap();
+    log::set_max_level(log::LevelFilter::Trace);
 
     let document = web_sys::window()
         .expect("missing `window`")
