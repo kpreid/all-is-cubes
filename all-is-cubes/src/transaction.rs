@@ -1,6 +1,8 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+//! The [`Transaction`] trait, for modifying game objects.
+
 use std::any::type_name;
 use std::error::Error;
 use std::fmt::Debug;
