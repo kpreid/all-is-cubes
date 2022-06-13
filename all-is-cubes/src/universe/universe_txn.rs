@@ -290,8 +290,10 @@ pub struct UniverseTransaction {
 }
 
 // TODO: Benchmark cheaper HashMaps / using BTreeMap here
+#[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
 pub struct UniverseMergeCheck(HashMap<Name, MemberMergeCheck>);
+#[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
 pub struct UniverseCommitCheck(HashMap<Name, MemberCommitCheck>);
 
