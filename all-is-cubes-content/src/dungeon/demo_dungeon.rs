@@ -230,6 +230,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Spikes on the bottom of the pit
                 // (TODO: revise this condition when staircase-ish rooms exist)
                 if room_data.extended_map_bounds().lower_bounds().y < 0 {
+                    assert!(!room_data.corridor_only, "{:?}", room_data);
                     space.fill_uniform(
                         interior.abut(Face6::NY, -1).unwrap(),
                         &self.blocks[DungeonBlocks::Spikes],
@@ -403,7 +404,10 @@ pub(crate) async fn demo_dungeon(
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::PY, 1));
         };
         // Floor pit
-        let floor = if matches!(maze_field.field_type, FieldType::Normal) && rng.gen_bool(0.5) {
+        let floor = if !corridor_only
+            && matches!(maze_field.field_type, FieldType::Normal)
+            && rng.gen_bool(0.5)
+        {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::NY, 1));
             *[FloorKind::Chasm, FloorKind::Bridge]
                 .choose(&mut rng)
