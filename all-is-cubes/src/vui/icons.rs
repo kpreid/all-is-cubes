@@ -51,9 +51,9 @@ pub enum Icons {
     CopyFromSpace,
     /// Icon for [`Tool::EditBlock`].
     EditBlock,
+    /// Icon for [`Tool::PushPull`].
+    PushPull,
     /// Icon for [`Tool::Jetpack`].
-    Push,
-    /// Icon for [`Tool::Push`].
     Jetpack {
         active: bool,
     },
@@ -82,7 +82,7 @@ impl fmt::Display for Icons {
             Icons::Delete => write!(f, "delete"),
             Icons::CopyFromSpace => write!(f, "copy-from-space"),
             Icons::EditBlock => write!(f, "edit-block"),
-            Icons::Push => write!(f, "push"),
+            Icons::PushPull => write!(f, "push"),
             Icons::Jetpack { active } => write!(f, "jetpack/{}", active),
             Icons::PauseButton(state) => write!(f, "pause-button/{}", state),
             Icons::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
@@ -239,7 +239,7 @@ impl Icons {
                     .color(Rgba::new(0., 1., 0., 1.))
                     .build(),
 
-                Icons::Push => Block::builder()
+                Icons::PushPull => Block::builder()
                     .display_name("Push")
                     // TODO: design actual icon
                     .color(Rgba::new(0., 1., 0., 1.))

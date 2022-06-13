@@ -238,7 +238,7 @@ impl Tool {
             }
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
             Self::EditBlock => Cow::Borrowed(&predefined[Icons::EditBlock]),
-            Self::PushPull => Cow::Borrowed(&predefined[Icons::Push]),
+            Self::PushPull => Cow::Borrowed(&predefined[Icons::PushPull]),
             Self::Jetpack { active } => {
                 Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
             }
