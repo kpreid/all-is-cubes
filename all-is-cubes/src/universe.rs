@@ -34,6 +34,9 @@ mod members;
 // pub(crate) because all items are currently internal
 pub(crate) use members::*;
 
+mod universe_txn;
+pub use universe_txn::*;
+
 mod uref;
 pub use uref::*;
 

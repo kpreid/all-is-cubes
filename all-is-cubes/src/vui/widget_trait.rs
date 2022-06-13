@@ -109,7 +109,7 @@ impl Behavior<Space> for WidgetBehavior {
         &self,
         context: &BehaviorContext<'_, Space>,
         tick: Tick,
-    ) -> crate::transaction::UniverseTransaction {
+    ) -> crate::universe::UniverseTransaction {
         context.bind_host(
             self.controller
                 .lock()

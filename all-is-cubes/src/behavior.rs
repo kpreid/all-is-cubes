@@ -16,9 +16,8 @@ use crate::physics::BodyTransaction;
 use crate::time::Tick;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
-    UniverseTransaction,
 };
-use crate::universe::{RefVisitor, VisitRefs};
+use crate::universe::{RefVisitor, UniverseTransaction, VisitRefs};
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior

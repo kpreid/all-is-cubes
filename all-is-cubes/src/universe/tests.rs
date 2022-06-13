@@ -8,8 +8,8 @@ use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::space::Space;
-use crate::transaction::{Transaction, UniverseTransaction};
-use crate::universe::{InsertError, ListRefs, URef, Universe, UniverseIndex};
+use crate::transaction::Transaction;
+use crate::universe::{InsertError, ListRefs, URef, Universe, UniverseIndex, UniverseTransaction};
 
 fn _test_thread_safety()
 where

@@ -20,8 +20,8 @@ use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::{Face6, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, NotNan, Rgb};
 use crate::time::Tick;
-use crate::transaction::{Merge, Transaction as _, UniverseTransaction};
-use crate::universe::{RefVisitor, URef, VisitRefs};
+use crate::transaction::{Merge, Transaction as _};
+use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
 use crate::util::ConciseDebug;
 use crate::util::{CustomFormat, StatusText};
 

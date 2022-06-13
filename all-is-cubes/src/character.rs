@@ -23,9 +23,8 @@ use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
-    UniverseTransaction,
 };
-use crate::universe::{RefVisitor, URef, VisitRefs};
+use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 mod cursor;

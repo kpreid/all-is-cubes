@@ -38,6 +38,7 @@
 
     - Renamed: `math::Face` is now `math::Face7`.
     - Renamed: `apps::AllIsCubesAppState` to `apps::Session`.
+    - Renamed: `transaction::UniverseTransaction` is now `universe::UniverseTransaction`.
 
 - `all-is-cubes-gpu` library:
     - To allow for working with alternative GPU APIs, everything specific to `luminance` has been moved into a submodule `in_luminance`.

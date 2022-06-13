@@ -6,7 +6,7 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::universe::URef;
+use crate::universe::{URef, UTransactional, UniverseTransaction};
 
 mod generic;
 
@@ -14,9 +14,6 @@ mod generic;
 mod tester;
 #[cfg(test)]
 pub use tester::*;
-
-mod universe_txn;
-pub use universe_txn::*;
 
 /// A `Transaction` is a description of a mutation to an object or collection thereof that
 /// should occur in a logically atomic fashion (all or nothing), with a set of
@@ -77,8 +74,8 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// need to override this. Equivalent to:
     ///
     /// ```rust
-    /// # use all_is_cubes::universe::Universe;
-    /// # use all_is_cubes::transaction::{Transaction, UniverseTransaction};
+    /// # use all_is_cubes::transaction::Transaction;
+    /// # use all_is_cubes::universe::{Universe, UniverseTransaction};
     /// # let transaction = UniverseTransaction::default();
     /// # let target = &mut Universe::new();
     /// let check = transaction.check(target)?;

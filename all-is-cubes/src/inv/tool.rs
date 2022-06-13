@@ -13,8 +13,8 @@ use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
 use crate::math::{Face6, GridPoint, GridRotation};
 use crate::space::{Space, SpaceTransaction};
-use crate::transaction::{Merge, Transaction, UniverseTransaction};
-use crate::universe::{RefError, RefVisitor, URef, VisitRefs};
+use crate::transaction::{Merge, Transaction};
+use crate::universe::{RefError, RefVisitor, URef, UniverseTransaction, VisitRefs};
 use crate::vui::Icons;
 
 /// A `Tool` is an object which a character can use to have some effect in the game,

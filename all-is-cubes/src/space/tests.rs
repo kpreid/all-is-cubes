@@ -17,8 +17,7 @@ use crate::space::{
     Grid, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
 };
 use crate::time::Tick;
-use crate::transaction::UniverseTransaction;
-use crate::universe::{RefError, Universe, UniverseIndex as _};
+use crate::universe::{RefError, Universe, UniverseIndex as _, UniverseTransaction};
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling

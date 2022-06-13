@@ -18,8 +18,8 @@ use all_is_cubes::math::{cube_to_midpoint, GridPoint, GridVector};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Grid, GridArray, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
-use all_is_cubes::transaction::{Merge, UniverseTransaction};
-use all_is_cubes::universe::{RefVisitor, VisitRefs};
+use all_is_cubes::transaction::Merge;
+use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.
