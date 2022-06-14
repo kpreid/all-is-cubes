@@ -12,9 +12,9 @@ pub(super) type Storage<T> = BTreeMap<Name, URootRef<T>>;
 /// Trait for every type which can be a named member of a universe.
 /// This trait is also public-in-private and serves to “seal” the [`UniverseIndex`]
 /// trait.
-pub trait UniverseMember {
-    /// Generic constructor for [`MemberValue`].
-    fn into_member_value(self) -> MemberValue;
+pub trait UniverseMember: Sized + 'static {
+    /// Generic constructor for [`AnyURef`].
+    fn into_any_ref(r: URef<Self>) -> AnyURef;
 }
 
 /// Trait implemented once for each type of object that can be stored in a [`Universe`]
@@ -34,22 +34,20 @@ where
 {
     this.table().get(name).map(URootRef::downgrade)
 }
-fn index_insert<T>(this: &mut Universe, name: Name, value: T) -> Result<URef<T>, InsertError>
+/// Implementation of inserting an item in a universe.
+/// Note that the same logic also exists in `UniverseTransaction`.
+fn index_insert<T>(this: &mut Universe, mut name: Name, value: T) -> Result<URef<T>, InsertError>
 where
     Universe: UniverseTable<T>,
 {
     use std::collections::btree_map::Entry::*;
 
-    // Check that the name is not already used by a different type.
-    if this.get_any(&name).is_some() {
-        return Err(InsertError::AlreadyExists(name));
-    }
+    name = this.allocate_name(&name)?;
 
     this.wants_gc = true;
 
     let id = this.id;
-    let table = this.table_mut();
-    match table.entry(name.clone()) {
+    match this.table_mut().entry(name.clone()) {
         Occupied(_) => unreachable!(/* should have already checked for existence */),
         Vacant(vacant) => {
             let root_ref = URootRef::new(id, name, value);
@@ -64,8 +62,8 @@ where
 macro_rules! impl_universe_for_member {
     ($member_type:ident, $table:ident) => {
         impl UniverseMember for $member_type {
-            fn into_member_value(self) -> MemberValue {
-                MemberValue::$member_type(Box::new(self))
+            fn into_any_ref(r: URef<$member_type>) -> AnyURef {
+                AnyURef::$member_type(r)
             }
         }
 
@@ -99,11 +97,24 @@ macro_rules! impl_universe_for_member {
 /// Generates enums which cover all universe types.
 macro_rules! member_enums {
     ( $( ($member_type:ident), )* ) => {
-        /// Holds any one of the value types that can be in a [`Universe`].
-        #[derive(Debug)]
+        /// Holds any one of the [`URef`] types that can be in a [`Universe`].
+        ///
+        /// See also [`URefErased`], which is implemented by `URef`s rather than owning one.
+        #[derive(Clone, Debug, Eq, Hash, PartialEq)]
         #[doc(hidden)] // actually public-in-private but if we make a mistake, hide it
-        pub enum MemberValue {
-            $( $member_type(Box<$member_type>), )*
+        pub enum AnyURef {
+            $( $member_type(URef<$member_type>), )*
+        }
+
+        impl AnyURef {
+            pub(crate) fn check_upgrade_pending(
+                &self,
+                universe_id: $crate::universe::UniverseId,
+            ) -> Result<(), $crate::transaction::PreconditionFailed> {
+                match self {
+                    $( Self::$member_type(r) => r.check_upgrade_pending(universe_id), )*
+                }
+            }
         }
     }
 }

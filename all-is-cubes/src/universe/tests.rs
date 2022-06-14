@@ -9,7 +9,8 @@ use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::Transaction;
 use crate::universe::{
-    list_refs, InsertError, Name, RefError, URef, Universe, UniverseIndex, UniverseTransaction,
+    list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseIndex,
+    UniverseTransaction,
 };
 use crate::util::assert_send_sync;
 
@@ -99,7 +100,10 @@ fn insert_duplicate_name_same_type() {
     u.insert("test_block".into(), BlockDef::new(AIR)).unwrap();
     assert_eq!(
         u.insert("test_block".into(), BlockDef::new(AIR)),
-        Err(InsertError::AlreadyExists("test_block".into()))
+        Err(InsertError {
+            name: "test_block".into(),
+            kind: InsertErrorKind::AlreadyExists,
+        })
     );
 }
 
@@ -109,7 +113,10 @@ fn insert_duplicate_name_different_type() {
     u.insert("test_thing".into(), BlockDef::new(AIR)).unwrap();
     assert_eq!(
         u.insert("test_thing".into(), Space::empty_positive(1, 1, 1)),
-        Err(InsertError::AlreadyExists("test_thing".into()))
+        Err(InsertError {
+            name: "test_thing".into(),
+            kind: InsertErrorKind::AlreadyExists,
+        })
     );
 }
 
@@ -117,14 +124,63 @@ fn insert_duplicate_name_different_type() {
 fn insert_duplicate_name_via_txn() {
     let mut u = Universe::new();
     u.insert("test_thing".into(), BlockDef::new(AIR)).unwrap();
-    let error = UniverseTransaction::insert("test_thing".into(), Space::empty_positive(1, 1, 1))
-        .execute(&mut u)
-        .unwrap_err();
+    let error = UniverseTransaction::insert(URef::new_pending(
+        "test_thing".into(),
+        Space::empty_positive(1, 1, 1),
+    ))
+    .execute(&mut u)
+    .unwrap_err();
     // not a great assertion but it'll do
     assert_eq!(
         error.to_string(),
         "Transaction precondition not met: UniverseTransaction: insert(): name already in use"
     );
+}
+
+#[test]
+fn insert_anonym_prohibited_direct() {
+    assert_eq!(
+        Universe::new().insert(Name::Anonym(0), BlockDef::new(AIR)),
+        Err(InsertError {
+            name: Name::Anonym(0),
+            kind: InsertErrorKind::InvalidName
+        })
+    );
+}
+
+#[test]
+fn insert_anonym_prohibited_via_txn() {
+    let e = UniverseTransaction::insert(URef::new_pending(
+        Name::Anonym(0),
+        Space::empty_positive(1, 1, 1),
+    ))
+    .execute(&mut Universe::new())
+    .unwrap_err();
+    // TODO: structured transaction errors
+    assert_eq!(
+        e.to_string(),
+        "Transaction precondition not met: UniverseTransaction: insert(): cannot insert Name::Anonym"
+    );
+}
+
+#[test]
+fn insert_pending_becomes_anonym_direct() {
+    let mut u = Universe::new();
+    u.insert(Name::Pending, BlockDef::new(AIR)).unwrap();
+    assert_eq!(u.blocks.keys().collect::<Vec<_>>(), vec![&Name::Anonym(0)]);
+}
+
+#[test]
+#[ignore = "UniverseTransaction does not yet support pending"]
+fn insert_pending_becomes_anonym_via_txn() {
+    let mut u = Universe::new();
+    UniverseTransaction::insert(URef::new_pending(
+        Name::Pending,
+        Space::empty_positive(1, 1, 1),
+    ))
+    .execute(&mut u)
+    .unwrap();
+    assert_eq!(u.blocks.keys().collect::<Vec<_>>(), vec![&Name::Anonym(0)]);
 }
 
 #[test]

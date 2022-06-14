@@ -203,9 +203,7 @@ impl From<InsertError> for GenError {
     // TODO: Maybe InsertError should just be a variant of GenError?
     fn from(error: InsertError) -> Self {
         GenError {
-            for_object: match &error {
-                InsertError::AlreadyExists(name) => Some(name.clone()),
-            },
+            for_object: Some(error.name.clone()),
             detail: error.into(),
         }
     }

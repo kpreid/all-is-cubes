@@ -220,10 +220,49 @@ impl Universe {
         Self: UniverseIndex<T>,
         T: UniverseMember,
     {
-        let name = Name::Anonym(self.next_anonym);
-        self.next_anonym += 1;
-        self.insert(name, value)
-            .expect("shouldn't happen: newly created anonym already in use")
+        self.insert(Name::Pending, value)
+            .expect("shouldn't happen: insert_anonymous failed")
+    }
+
+    /// Convert a possibly-[pending](Name::Pending) [`Name`] into a name that may be an
+    /// actual name in this universe (which is always either [`Name::Specific`] or
+    /// [`Name::Anonym`] if it succeeds).
+    ///
+    /// Fails if:
+    ///
+    /// * The name is already present.
+    /// * The name is an [`Name::Anonym`] (which may not be pre-selected, only allocated).
+    fn allocate_name(&mut self, proposed_name: &Name) -> Result<Name, InsertError> {
+        // TODO: This logic is semi-duplicated in MemberTxn::check.
+        // Resolve that by making all inserts happen via transactions, or by sharing
+        // the code (this will need a "don't actually allocate anonym" mode).
+
+        match proposed_name {
+            Name::Specific(_) => {
+                // Check that the name is not already used, under *any* type.
+                if self.get_any(proposed_name).is_some() {
+                    return Err(InsertError {
+                        name: proposed_name.clone(),
+                        kind: InsertErrorKind::AlreadyExists,
+                    });
+                }
+                Ok(proposed_name.clone())
+            }
+            Name::Anonym(_) => Err(InsertError {
+                name: proposed_name.clone(),
+                kind: InsertErrorKind::InvalidName,
+            }),
+            Name::Pending => {
+                let new_name = Name::Anonym(self.next_anonym);
+                self.next_anonym += 1;
+
+                assert!(
+                    self.get_any(&new_name).is_none(),
+                    "shouldn't happen: newly created anonym already in use"
+                );
+                Ok(new_name)
+            }
+        }
     }
 
     /// Delete a member.
@@ -361,11 +400,37 @@ impl Default for Universe {
 }
 
 /// Errors resulting from attempting to insert an object in a `Universe`.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InsertError {
-    #[error("an object already exists with name {0}")]
-    AlreadyExists(Name),
+pub struct InsertError {
+    /// The name given for the insertion.
+    pub name: Name,
+    pub kind: InsertErrorKind,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum InsertErrorKind {
+    AlreadyExists,
+    InvalidName,
+    Gone,
+    AlreadyInserted,
+}
+
+impl std::error::Error for InsertError {}
+impl fmt::Display for InsertError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { name, kind } = self;
+        match kind {
+            InsertErrorKind::AlreadyExists => {
+                write!(f, "an object already exists with name {name}")
+            }
+            InsertErrorKind::InvalidName => {
+                write!(f, "the name {name} may not be used in an insert operation")
+            }
+            InsertErrorKind::Gone => write!(f, "the URef {name} was already dead"),
+            InsertErrorKind::AlreadyInserted => write!(f, "the object {name} is already inserted"),
+        }
+    }
 }
 
 /// Performance data returned by [`Universe::step`]. The exact contents of this structure

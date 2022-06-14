@@ -12,6 +12,10 @@
 
 ### Changed
 
+- `all-is-cubes` library:
+    - `universe::UniverseTransaction::insert()` now takes a `URef` created by `URef::new_pending()`, instead of a bare value.
+      This allows associations between the new member and other objects to be created within the same transaction.
+
 - `all-is-cubes-ui` library:
     - `vui::LayoutGrant` now takes an additional parameter, `enlarge_for_symmetry`. Existing calls should be changed to pass `false` to get the prior behavior.
 

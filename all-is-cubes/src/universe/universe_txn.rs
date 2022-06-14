@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
-use std::sync::{Arc, Mutex};
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -10,7 +9,7 @@ use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{
-    MemberValue, Name, UBorrowMutImpl, URef, Universe, UniverseId, UniverseIndex, UniverseMember,
+    AnyURef, Name, UBorrowMutImpl, URef, Universe, UniverseId, UniverseMember, UniverseTable,
 };
 
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
@@ -317,13 +316,14 @@ impl UniverseTransaction {
     }
 
     /// Transaction which inserts the given object into the universe under
-    /// the given name.
-    pub fn insert<T: UniverseMember>(name: Name, value: T) -> Self {
+    /// the reference's name.
+    ///
+    /// Note that this transaction can only ever succeed once.
+    pub fn insert<T: UniverseMember>(reference: URef<T>) -> Self {
+        // TODO: fail right away if the ref is already in a universe?
         Self::from_member_txn(
-            name,
-            MemberTxn::Insert(InsertGimmick {
-                value: Arc::new(Mutex::new(Some(value.into_member_value()))),
-            }),
+            reference.name(),
+            MemberTxn::Insert(UniverseMember::into_any_ref(reference)),
         )
     }
 
@@ -458,11 +458,11 @@ enum MemberTxn {
     Noop,
     /// Apply given transaction to the existing value.
     Modify(AnyTransaction),
-    /// Insert the provided value in the universe.
+    /// Insert the provided [pending](URef::new_pending) [`URef`] in the universe.
     ///
-    /// Note: Currently, they are not all [`Clone`].
-    /// As a consequence, this transaction can only be used once.
-    Insert(InsertGimmick),
+    /// Note: This transaction can only succeed once, since after the first time it will
+    /// no longer be pending.
+    Insert(AnyURef),
     /// Delete this member from the universe.
     ///
     /// See [`UniverseTransaction::delete()`] for full documentation.
@@ -485,26 +485,34 @@ impl MemberTxn {
             // Kludge: The individual `AnyTransaction`s embed the `URef<T>` they operate on --
             // so we don't actually pass anything here.
             MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(txn.check(&())?))),
-            MemberTxn::Insert(InsertGimmick { value }) => {
+            MemberTxn::Insert(pending_ref) => {
+                // TODO: Deduplicate this check logic vs. Universe::allocate_name
+                match name {
+                    Name::Specific(_) => {}
+                    Name::Anonym(_) => {
+                        return Err(PreconditionFailed {
+                            location: "UniverseTransaction",
+                            problem: "insert(): cannot insert Name::Anonym",
+                        })
+                    }
+                    Name::Pending => {
+                        return Err(PreconditionFailed {
+                            location: "UniverseTransaction",
+                            problem:
+                                "insert(): anonymous inserts via transaction not yet supported",
+                        })
+                    }
+                }
+
                 if universe.get_any(name).is_some() {
                     return Err(PreconditionFailed {
                         location: "UniverseTransaction",
                         problem: "insert(): name already in use",
                     });
                 }
-                if value
-                    .lock()
-                    .map_err(|_| PreconditionFailed {
-                        location: "UniverseTransaction",
-                        problem: "insert() poisoned mutex",
-                    })?
-                    .is_none()
-                {
-                    return Err(PreconditionFailed {
-                        location: "UniverseTransaction",
-                        problem: "insert() transactions can only be used once",
-                    });
-                }
+                // TODO: This has a TOCTTOU problem because it doesn't ensure another thread
+                // couldn't insert the ref in the mean time.
+                pending_ref.check_upgrade_pending(universe.id)?;
                 Ok(MemberCommitCheck(None))
             }
             MemberTxn::Delete => {
@@ -539,21 +547,35 @@ impl MemberTxn {
                 Ok(())
             }
             MemberTxn::Modify(txn) => txn.commit(&mut (), check.expect("missing check value")),
-            MemberTxn::Insert(InsertGimmick { value: value_mutex }) => {
-                let value: MemberValue = value_mutex
-                    .lock()
-                    .map_err(|_| CommitError::message::<Self>("insert() poisoned mutex".into()))?
-                    .take()
-                    .ok_or_else(|| {
-                        CommitError::message::<Self>(
-                            "insert() transactions can only be used once".into(),
-                        )
+            MemberTxn::Insert(pending_ref) => {
+                /// Generic helper function to handle each type of ref.
+                fn do_insert<T>(
+                    universe: &mut Universe,
+                    pending_ref: &URef<T>,
+                ) -> Result<(), CommitError>
+                where
+                    T: 'static,
+                    Universe: UniverseTable<T>,
+                {
+                    let new_root_ref = pending_ref.upgrade_pending(universe).map_err(|e| {
+                        CommitError::message::<UniverseTransaction>(format!(
+                            "insert() unable to upgrade: {e}"
+                        ))
                     })?;
-                let name = name.clone();
-                match value {
-                    MemberValue::BlockDef(v) => universe.insert(name, *v).map(|_| ()),
-                    MemberValue::Character(v) => universe.insert(name, *v).map(|_| ()),
-                    MemberValue::Space(v) => universe.insert(name, *v).map(|_| ()),
+
+                    UniverseTable::<T>::table_mut(universe)
+                        .insert(pending_ref.name(), new_root_ref);
+                    universe.wants_gc = true;
+
+                    Ok(())
+                }
+
+                // TODO: The check version of this is in the universe member macro code instead.
+                // Decide which style we should use.
+                match pending_ref {
+                    AnyURef::BlockDef(pending_ref) => do_insert(universe, pending_ref),
+                    AnyURef::Character(pending_ref) => do_insert(universe, pending_ref),
+                    AnyURef::Space(pending_ref) => do_insert(universe, pending_ref),
                 }
                 .map_err(CommitError::catch::<Self, _>)?;
                 Ok(())
@@ -627,25 +649,16 @@ impl Merge for MemberTxn {
     }
 }
 
-/// Pointer-compared, emptyable ... TODO explain further
-#[derive(Clone, Debug)]
-struct InsertGimmick {
-    value: Arc<Mutex<Option<MemberValue>>>,
-}
-
-impl PartialEq for InsertGimmick {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.value, &other.value)
-    }
-}
-impl Eq for InsertGimmick {}
-
 #[cfg(test)]
 mod tests {
+    //! Additional tests of universe transactions also exist in [`super::tests`]
+    //! (where they are parallel with non-transaction behavior tests).
+
     use super::*;
     use crate::content::make_some_blocks;
     use crate::space::SpaceTransaction;
     use crate::transaction::{ExecuteError, TransactionTester};
+    use crate::universe::UniverseIndex;
     use indoc::indoc;
     use std::collections::HashMap;
 
@@ -735,6 +748,20 @@ mod tests {
     }
 
     #[test]
+    fn insert_affects_clones() {
+        let mut u = Universe::new();
+        let pending_1 = URef::new_pending("foo".into(), Space::empty_positive(1, 1, 1));
+        let pending_2 = pending_1.clone();
+
+        UniverseTransaction::insert(pending_2)
+            .execute(&mut u)
+            .unwrap();
+
+        assert_eq!(pending_1.universe_id(), Some(u.universe_id()));
+        // TODO: Also verify that pending_1 is not still in the pending state
+    }
+
+    #[test]
     #[ignore] // TODO: figure out how to get this to work w/ insert transactions
     fn systematic() {
         TransactionTester::new()
@@ -742,7 +769,10 @@ mod tests {
             .transaction(UniverseTransaction::default(), |_, _| Ok(()))
             // TODO: this is going to fail because insert transactions aren't reusable
             .transaction(
-                UniverseTransaction::insert("foo".into(), Space::empty_positive(1, 1, 1)),
+                UniverseTransaction::insert(URef::new_pending(
+                    "foo".into(),
+                    Space::empty_positive(1, 1, 1),
+                )),
                 |_, _| Ok(()),
             )
             .target(Universe::new)
@@ -774,5 +804,24 @@ mod tests {
         let t2 = bare_txn.bind(s2);
 
         t1.merge(t2).unwrap_err();
+    }
+
+    #[test]
+    fn insert_ref_already_in_different_universe() {
+        let mut u1 = Universe::new();
+        let mut u2 = Universe::new();
+        let r = u1
+            .insert("foo".into(), Space::empty_positive(1, 1, 1))
+            .unwrap();
+        let txn = UniverseTransaction::insert(r);
+
+        let e = txn.execute(&mut u2).unwrap_err();
+        assert!(matches!(
+            dbg!(e),
+            ExecuteError::Check(PreconditionFailed {
+                problem: "insert(): the URef is already in a universe",
+                ..
+            })
+        ));
     }
 }

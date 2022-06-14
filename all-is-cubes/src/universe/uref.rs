@@ -8,8 +8,10 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 use ouroboros::self_referencing;
 
 use crate::transaction::{ExecuteError, PreconditionFailed, Transaction, Transactional};
-#[cfg(doc)]
+use crate::universe::InsertError;
+use crate::universe::InsertErrorKind;
 use crate::universe::Universe;
+use crate::universe::VisitRefs;
 use crate::universe::{Name, UniverseId};
 
 /// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
@@ -213,6 +215,116 @@ impl<T: 'static> URef<T> {
             .upgrade()
             .ok_or_else(|| RefError::Gone(self.name()))
     }
+
+    /// Returns whether this [`URef`] does not yet belong to a universe and can start.
+    /// doing so. Used by [`UniverseTransaction`].
+    ///
+    /// TODO: There's a TOCTTOU problem here. We should modify the state and return a
+    /// ticket (that resets the state if dropped without use), so that other simultaneous
+    /// attempted `upgrade_pending()`s cannot succeed.
+    pub(in crate::universe) fn check_upgrade_pending(
+        &self,
+        future_universe_id: UniverseId,
+    ) -> Result<(), PreconditionFailed>
+    where
+        T: VisitRefs,
+    {
+        match self.state.lock() {
+            Ok(state_guard) => match &*state_guard {
+                State::Pending { .. } => {}
+                State::Member { .. } => {
+                    return Err(PreconditionFailed {
+                        location: "UniverseTransaction",
+                        problem: "insert(): the URef is already in a universe",
+                    });
+                }
+                State::Gone { .. } => {
+                    return Err(PreconditionFailed {
+                        location: "UniverseTransaction",
+                        problem: "insert(): the URef never had a value",
+                    });
+                }
+            },
+            Err(_) => {
+                return Err(PreconditionFailed {
+                    location: "UniverseTransaction",
+                    problem: "insert(): the URef experienced an error previously",
+                })
+            }
+        }
+
+        match self.read() {
+            Ok(data_guard) => {
+                // TODO: We need to enforce rules about not referring to items from another
+                // universe, but also to be able to opt out for the UI containing world elements.
+                // This should become a universe-wide setting.
+                if false {
+                    let mut ok = true;
+                    (*data_guard).visit_refs(&mut |r: &dyn URefErased| match r.universe_id() {
+                        Some(id) if id == future_universe_id => {}
+                        None => {}
+                        Some(_) => ok = false,
+                    });
+                    if !ok {
+                        return Err(PreconditionFailed {
+                            location: "UniverseTransaction",
+                            problem: "insert(): the URef contains another ref \
+                            which belongs to a different universe",
+                        });
+                    }
+                }
+            }
+            Err(RefError::InUse(_)) => {
+                return Err(PreconditionFailed {
+                    location: "UniverseTransaction",
+                    problem: "insert(): the URef is currently being mutated",
+                })
+            }
+            Err(RefError::Gone(_)) => {
+                return Err(PreconditionFailed {
+                    location: "UniverseTransaction",
+                    problem: "insert(): the URef is already gone",
+                })
+            }
+        }
+
+        Ok(())
+    }
+
+    /// If this [`URef`] does not yet belong to a universe, create its association with one.
+    pub(in crate::universe) fn upgrade_pending(
+        &self,
+        universe: &mut Universe,
+    ) -> Result<URootRef<T>, InsertError> {
+        let mut state_guard: std::sync::MutexGuard<'_, State<T>> =
+            self.state.lock().expect("URef::state lock error");
+
+        let (strong_ref, name) = match &*state_guard {
+            State::Gone { name } => {
+                return Err(InsertError {
+                    name: name.clone(),
+                    kind: InsertErrorKind::Gone,
+                })
+            }
+            State::Member { name, .. } => {
+                return Err(InsertError {
+                    name: name.clone(),
+                    kind: InsertErrorKind::AlreadyInserted,
+                })
+            }
+            State::Pending { name, strong } => (strong.clone(), universe.allocate_name(name)?),
+        };
+
+        *state_guard = State::Member {
+            name,
+            universe_id: universe.universe_id(),
+        };
+
+        Ok(URootRef {
+            strong_ref,
+            state: self.state.clone(),
+        })
+    }
 }
 
 impl<T: fmt::Debug + 'static> fmt::Debug for URef<T> {
@@ -406,7 +518,6 @@ impl<T> URootRef<T> {
     pub(crate) fn downgrade(&self) -> URef<T> {
         URef {
             weak_ref: Arc::downgrade(&self.strong_ref),
-            // TODO: we only need one of these per type; save allocation?
             state: Arc::clone(&self.state),
         }
     }
@@ -423,11 +534,15 @@ impl<T> URootRef<T> {
 /// TODO: seal this trait?
 pub trait URefErased: core::any::Any {
     fn name(&self) -> Name;
+    fn universe_id(&self) -> Option<UniverseId>;
 }
 
 impl<T: 'static> URefErased for URef<T> {
     fn name(&self) -> Name {
         URef::name(self)
+    }
+    fn universe_id(&self) -> Option<UniverseId> {
+        URef::universe_id(self)
     }
 }
 
