@@ -43,15 +43,17 @@ where
 {
     use std::collections::btree_map::Entry::*;
 
+    // Check that the name is not already used by a different type.
     if this.get_any(&name).is_some() {
         return Err(InsertError::AlreadyExists(name));
     }
 
+    let id = this.id;
     let table = this.table_mut();
     match table.entry(name.clone()) {
         Occupied(_) => unreachable!(/* should have already checked for existence */),
         Vacant(vacant) => {
-            let root_ref = URootRef::new(name, value);
+            let root_ref = URootRef::new(id, name, value);
             let returned_ref = root_ref.downgrade();
             vacant.insert(root_ref);
             Ok(returned_ref)

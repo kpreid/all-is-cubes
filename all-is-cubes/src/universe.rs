@@ -18,6 +18,7 @@
 
 use std::fmt;
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -71,6 +72,20 @@ impl fmt::Display for Name {
     }
 }
 
+/// Copiable unique (within this process) identifier for a [`Universe`].
+///
+/// Used to check whether [`URef`]s belong to particular [`Universe`]s.
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+pub struct UniverseId(u64);
+
+static UNIVERSE_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+impl UniverseId {
+    fn new() -> Self {
+        Self(UNIVERSE_ID_COUNTER.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
 /// A collection of named objects which can refer to each other via [`URef`]. In the
 /// future, it will enable garbage collection and inter-object invariants.
 ///
@@ -83,6 +98,8 @@ pub struct Universe {
     blocks: Storage<BlockDef>,
     characters: Storage<Character>,
     spaces: Storage<Space>,
+
+    id: UniverseId,
     next_anonym: usize,
 }
 
@@ -94,6 +111,8 @@ impl Universe {
             spaces: Storage::new(),
             // TODO: bodies so body-in-world stepping
             characters: Storage::new(),
+
+            id: UniverseId::new(),
             next_anonym: 0,
         }
     }
@@ -112,6 +131,7 @@ impl Universe {
             blocks,
             characters,
             spaces,
+            id: _,
             next_anonym: _,
         } = self;
 

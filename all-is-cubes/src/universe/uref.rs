@@ -9,13 +9,10 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use ouroboros::self_referencing;
 
-use crate::transaction::ExecuteError;
-use crate::transaction::PreconditionFailed;
-use crate::transaction::Transaction;
-use crate::transaction::Transactional;
-use crate::universe::Name;
+use crate::transaction::{ExecuteError, PreconditionFailed, Transaction, Transactional};
 #[cfg(doc)]
 use crate::universe::Universe;
+use crate::universe::{Name, UniverseId};
 
 /// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
 /// parameterized with this somewhat less hairy.
@@ -40,12 +37,27 @@ pub struct URef<T> {
     /// the assumption is that the overall game system will keep the [`Universe`] alive
     /// and that [`Universe`] will ensure no entry goes away while referenced.
     weak_ref: Weak<RwLock<UEntry<T>>>,
+
+    /// Name by which the universe knows this ref.
     name: Name,
+
+    /// ID of the universe this ref belongs to.
+    universe_id: UniverseId,
 }
 
 impl<T: 'static> URef<T> {
     pub fn name(&self) -> &Name {
         &self.name
+    }
+
+    /// Returns the unique ID of the universe this reference belongs to.
+    ///
+    /// This may be used to confirm that two [`URef`]s belong to the same universe.
+    ///
+    /// Returns [`None`] if this [`URef`] is not yet associated with a universe.
+    pub fn universe_id(&self) -> Option<UniverseId> {
+        // the None case is not yet implemented
+        Some(self.universe_id)
     }
 
     /// Borrow the value, in the sense of `RefCell::borrow`, and panic on failure.
@@ -164,6 +176,7 @@ impl<T> Clone for URef<T> {
         URef {
             weak_ref: self.weak_ref.clone(),
             name: self.name.clone(),
+            universe_id: self.universe_id,
         }
     }
 }
@@ -251,15 +264,17 @@ struct UEntry<T> {
 pub(super) struct URootRef<T> {
     strong_ref: StrongEntryRef<T>,
     name: Name,
+    universe_id: UniverseId,
 }
 
 impl<T> URootRef<T> {
-    pub(super) fn new(name: Name, initial_value: T) -> Self {
+    pub(super) fn new(universe_id: UniverseId, name: Name, initial_value: T) -> Self {
         URootRef {
             strong_ref: Arc::new(RwLock::new(UEntry {
                 data: initial_value,
             })),
             name,
+            universe_id,
         }
     }
 
@@ -271,6 +286,7 @@ impl<T> URootRef<T> {
         URef {
             weak_ref: Arc::downgrade(&self.strong_ref),
             name: self.name.clone(),
+            universe_id: self.universe_id,
         }
     }
 }
@@ -358,8 +374,9 @@ mod tests {
     #[test]
     #[allow(clippy::eq_op)]
     fn uref_equality_is_pointer_equality() {
-        let root_a = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
-        let root_b = URootRef::new("space".into(), Space::empty_positive(1, 1, 1));
+        let uid = UniverseId::new();
+        let root_a = URootRef::new(uid, "space".into(), Space::empty_positive(1, 1, 1));
+        let root_b = URootRef::new(uid, "space".into(), Space::empty_positive(1, 1, 1));
         let ref_a_1 = root_a.downgrade();
         let ref_a_2 = root_a.downgrade();
         let ref_b_1 = root_b.downgrade();

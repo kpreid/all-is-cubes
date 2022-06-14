@@ -13,7 +13,7 @@ use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{
-    MemberValue, Name, UBorrowMutImpl, URef, Universe, UniverseIndex, UniverseMember,
+    MemberValue, Name, UBorrowMutImpl, URef, Universe, UniverseId, UniverseIndex, UniverseMember,
 };
 
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
@@ -153,6 +153,16 @@ impl AnyTransaction {
             Space(t) => &t.transaction,
         }
     }
+
+    fn universe_id(&self) -> Option<UniverseId> {
+        use AnyTransaction::*;
+        match self {
+            Noop => None,
+            BlockDef(t) => t.target.universe_id(),
+            Character(t) => t.target.universe_id(),
+            Space(t) => t.target.universe_id(),
+        }
+    }
 }
 
 impl Transaction<()> for AnyTransaction {
@@ -287,6 +297,8 @@ mod any_transaction {
 #[must_use]
 pub struct UniverseTransaction {
     members: HashMap<Name, MemberTxn>,
+    /// Invariant: Has a universe ID if any of the `members` do.
+    universe_id: Option<UniverseId>,
 }
 
 // TODO: Benchmark cheaper HashMaps / using BTreeMap here
@@ -304,6 +316,7 @@ impl Transactional for Universe {
 impl UniverseTransaction {
     fn from_member_txn(name: Name, transaction: MemberTxn) -> Self {
         UniverseTransaction {
+            universe_id: transaction.universe_id(),
             members: HashMap::from([(name, transaction)]),
         }
     }
@@ -317,6 +330,13 @@ impl UniverseTransaction {
                 value: Arc::new(Mutex::new(Some(value.into_member_value()))),
             }),
         )
+    }
+
+    /// If this transaction contains any operations that are on a specific member of a
+    /// universe, then returns the ID of that universe.
+    // TODO: make public?
+    pub fn universe_id(&self) -> Option<UniverseId> {
+        self.universe_id
     }
 }
 
@@ -335,8 +355,15 @@ impl Transaction<Universe> for UniverseTransaction {
     type Output = ();
 
     fn check(&self, target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
-        // TODO: Enforce that `target` is the universe all the URefs belong to.
-
+        if let Some(universe_id) = self.universe_id() {
+            if universe_id != target.id {
+                return Err(PreconditionFailed {
+                    location: "UniverseTransaction",
+                    problem: "cannot commit a transaction to a different universe \
+                        than it was constructed for",
+                });
+            }
+        }
         let mut checks = HashMap::new();
         for (name, member) in self.members.iter() {
             checks.insert(name.clone(), member.check(target, name)?);
@@ -362,7 +389,11 @@ impl Merge for UniverseTransaction {
     type MergeCheck = UniverseMergeCheck;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
-        // TODO: Enforce that other has the same universe.
+        if let (Some(id1), Some(id2)) = (self.universe_id(), other.universe_id()) {
+            if id1 != id2 {
+                return Err(TransactionConflict {});
+            }
+        }
         Ok(UniverseMergeCheck(
             self.members.check_merge(&other.members)?,
         ))
@@ -374,6 +405,7 @@ impl Merge for UniverseTransaction {
     {
         UniverseTransaction {
             members: self.members.commit_merge(other.members, check),
+            universe_id: self.universe_id.or(other.universe_id),
         }
     }
 }
@@ -494,6 +526,14 @@ impl MemberTxn {
             Noop | Insert(_) => self,
         }
     }
+
+    fn universe_id(&self) -> Option<UniverseId> {
+        use MemberTxn::*;
+        match self {
+            Modify(t) => t.universe_id(),
+            Noop | Insert(_) => None,
+        }
+    }
 }
 
 /// This probably won't be used but is mandated by the implementation of
@@ -557,7 +597,7 @@ mod tests {
     use super::*;
     use crate::content::make_some_blocks;
     use crate::space::SpaceTransaction;
-    use crate::transaction::TransactionTester;
+    use crate::transaction::{ExecuteError, TransactionTester};
     use indoc::indoc;
     use std::collections::HashMap;
 
@@ -568,6 +608,7 @@ mod tests {
             UniverseTransaction {
                 // TODO: Replace this literal with some other means of specifying an empty transaction
                 members: HashMap::new(),
+                universe_id: None,
             }
         )
     }
@@ -659,5 +700,31 @@ mod tests {
             .target(Universe::new)
             // TODO: target with existing members
             .test();
+    }
+
+    #[test]
+    fn wrong_universe_execute() {
+        let [block] = make_some_blocks();
+        let mut u1 = Universe::new();
+        let mut u2 = Universe::new();
+        let s1 = u1.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(s1);
+
+        let e = t1.execute(&mut u2).unwrap_err();
+        assert!(matches!(e, ExecuteError::Check(_)));
+    }
+
+    #[test]
+    fn wrong_universe_merge() {
+        let [block] = make_some_blocks();
+        let mut u1 = Universe::new();
+        let mut u2 = Universe::new();
+        let s1 = u1.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let s2 = u2.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let bare_txn = SpaceTransaction::set_cube([0, 0, 0], None, Some(block));
+        let t1 = bare_txn.clone().bind(s1);
+        let t2 = bare_txn.bind(s2);
+
+        t1.merge(t2).unwrap_err();
     }
 }
