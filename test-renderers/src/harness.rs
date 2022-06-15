@@ -10,9 +10,10 @@ use std::time::{Duration, Instant};
 
 use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
 use futures::future::{BoxFuture, Shared};
+use futures::stream::FuturesUnordered;
+use futures::{FutureExt, StreamExt as _};
 use image::RgbaImage;
 use itertools::Itertools;
-use tokio::task::JoinHandle;
 
 use all_is_cubes::camera::HeadlessRenderer;
 use all_is_cubes::universe::Universe;
@@ -156,7 +157,7 @@ where
     // TODO: When we have more tests we might benefit from concurrency limits.
     let suite_start_time = Instant::now();
     let mut count_filtered = 0;
-    let test_handles: BTreeMap<String, RunningTest> = test_table
+    let mut handles: FuturesUnordered<BoxFuture<'static, TestRunResult>> = test_table
         .into_iter()
         .filter(|(name, _)| {
             // Same behavior as the standard rust test harness: if there are any arguments, each
@@ -168,18 +169,18 @@ where
             included
         })
         .map(|(name, test_case)| {
+            let test_id = name.clone();
             let comparison_log: Arc<Mutex<Vec<ComparisonRecord>>> = Default::default();
-
-            let handle = {
-                let test_id = name.clone();
-                let comparison_log = comparison_log.clone();
-                let factory_future = factory_factory();
-                let universe_future = test_case.universe_source.clone();
-                tokio::spawn(async move {
+            let factory_future = factory_factory();
+            let universe_future = test_case.universe_source.clone();
+            async {
+                // This handle serves to act as a catch_unwind for the test case itself.
+                let comparison_log_tc = comparison_log.clone();
+                let test_case_handle = tokio::spawn(async move {
                     let context = RenderTestContext {
                         test_id,
                         renderer_factory: Box::new(factory_future.await),
-                        comparison_log: comparison_log.clone(),
+                        comparison_log: comparison_log_tc,
                         universe: match universe_future {
                             Some(f) => Some(f.await),
                             None => None,
@@ -190,16 +191,16 @@ where
                     let case_start_time = Instant::now();
                     (test_case.function)(context).await;
                     case_start_time.elapsed()
-                })
-            };
+                });
+                let outcome: Result<Duration, tokio::task::JoinError> = test_case_handle.await;
 
-            (
-                name,
-                RunningTest {
+                TestRunResult {
+                    name,
+                    outcome,
                     comparison_log,
-                    handle,
-                },
-            )
+                }
+            }
+            .boxed()
         })
         .collect();
 
@@ -211,11 +212,14 @@ where
 
     // Collect results.
     writeln!(logging).unwrap();
-    for (name, running_test) in test_handles {
+    while let Some(result) = handles.next().await {
+        let TestRunResult {
+            name,
+            outcome,
+            comparison_log,
+        } = result;
         write!(logging, "test {name:20} ...").unwrap();
-        logging.flush().unwrap();
-
-        let passed = match running_test.handle.await {
+        let passed = match outcome {
             Ok(case_time) => {
                 writeln!(logging, " ok in {}", case_time.custom_format(StatusText)).unwrap();
                 count_passed += 1;
@@ -238,7 +242,7 @@ where
             TestCaseOutput {
                 passed,
                 test_id: name,
-                comparisons: Arc::try_unwrap(running_test.comparison_log)
+                comparisons: Arc::try_unwrap(comparison_log)
                     .expect("somebody hung onto the log")
                     .into_inner()
                     .unwrap(),
@@ -359,8 +363,9 @@ fn stringify_variant(variant: &serde_json::Value) -> String {
     }
 }
 
-/// Handle to a test that might be still running.
-struct RunningTest {
-    handle: JoinHandle<Duration>,
+/// Data conveyed from a test case.
+struct TestRunResult {
+    name: String,
+    outcome: Result<Duration, tokio::task::JoinError>,
     comparison_log: Arc<Mutex<Vec<ComparisonRecord>>>,
 }
