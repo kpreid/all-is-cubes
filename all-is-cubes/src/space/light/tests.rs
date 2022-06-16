@@ -3,15 +3,14 @@
 
 //! Tests for the behavior of light in a [`Space`].
 
+use pretty_assertions::assert_eq;
+
+use super::{data::LightStatus, LightUpdatesInfo, PackedLight};
 use crate::block::{AnimationHint, Block, AIR};
 use crate::listen::{Listener, Sink};
 use crate::math::{FaceMap, GridPoint, Rgb, Rgba};
-use crate::space::{
-    Grid, LightPhysics, LightStatus, LightUpdatesInfo, PackedLight, Space, SpaceChange,
-    SpacePhysics,
-};
+use crate::space::{Grid, LightPhysics, Space, SpaceChange, SpacePhysics};
 use crate::time::Tick;
-use pretty_assertions::assert_eq;
 
 #[test]
 fn initial_lighting_value() {

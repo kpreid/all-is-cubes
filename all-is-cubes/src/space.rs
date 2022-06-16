@@ -32,7 +32,10 @@ mod grid;
 pub use grid::*;
 
 mod light;
-pub use light::*;
+#[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
+pub use light::LightUpdateCubeInfo;
+use light::{opaque_for_light_computation, LightUpdateQueue, PackedLightScalar};
+pub use light::{LightUpdatesInfo, PackedLight};
 
 mod space_txn;
 pub use space_txn::*;
