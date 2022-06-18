@@ -33,6 +33,7 @@ use crate::web_glue::{
     yield_to_event_loop,
 };
 
+#[allow(clippy::large_enum_variant)]
 enum WebRenderer {
     Luminance(in_luminance::SurfaceRenderer<WebSysWebGL2Surface>),
     Wgpu(in_wgpu::SurfaceRenderer),
@@ -162,7 +163,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
                 })
                 .await
                 .ok_or_else(|| {
-                    Error::new(&format!("Could not request suitable graphics adapter"))
+                    Error::new("Could not request suitable graphics adapter")
                 })?;
             let renderer = in_wgpu::SurfaceRenderer::new(cameras, surface, &adapter)
                 .await
