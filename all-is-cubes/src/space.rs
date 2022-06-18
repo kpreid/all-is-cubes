@@ -183,6 +183,9 @@ impl Space {
         .expect("evaluation of block for newly created space failed");
         block_data.count = volume;
 
+        // TODO: light update queue should not necessarily be empty.
+        // TODO: handle the block possibly having a tick_action.
+
         Space {
             bounds,
             block_data: if volume > 0 { vec![block_data] } else { vec![] },
@@ -428,6 +431,13 @@ impl Space {
                 // more determinism, and the old value could be temporarily revealed when
                 // the block is removed.)
                 self.lighting[contents_index] = PackedLight::OPAQUE;
+
+                // Cancel any previously scheduled light update.
+                // (Note: This does not empirically have any significant effect on overall
+                // lighting performance — these trivial updates are not most of the cost.
+                // But it'll at least save a little bit of memory.)
+                self.light_update_queue.remove(position);
+
                 self.notifier.notify(SpaceChange::Lighting(position));
             } else {
                 self.light_needs_update(position, PackedLightScalar::MAX);
@@ -545,6 +555,8 @@ impl Space {
             for i in self.contents.iter_mut() {
                 *i = new_block_index;
             }
+            // TODO: also need to reset lighting and activate tick_action.
+            // And see if we can share more of the logic of this with new_from_builder().
             self.notifier.notify(SpaceChange::EveryBlock);
             Ok(())
         } else {

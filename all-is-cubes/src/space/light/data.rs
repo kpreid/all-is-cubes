@@ -251,7 +251,7 @@ impl LightUpdateQueue {
         }
     }
 
-    /// Insert a queue entry or increase the priority of an existing one.
+    /// Inserts a queue entry or increases the priority of an existing one.
     #[inline]
     pub fn insert(&mut self, request: LightUpdateRequest) {
         match self.table.entry(request.cube) {
@@ -271,6 +271,17 @@ impl LightUpdateQueue {
                 e.insert(request.priority);
                 self.queue.insert(request);
             }
+        }
+    }
+
+    /// Removes the specified queue entry and returns whether it was present.
+    pub fn remove(&mut self, cube: GridPoint) -> bool {
+        if let Some(priority) = self.table.remove(&cube) {
+            let q_removed = self.queue.remove(&LightUpdateRequest { cube, priority });
+            debug_assert!(q_removed);
+            true
+        } else {
+            false
         }
     }
 
