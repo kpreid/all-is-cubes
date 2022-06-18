@@ -13,7 +13,7 @@ use futures_task::noop_waker_ref;
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, StandardCameras};
 use crate::camera::GraphicsOptions;
 use crate::character::{Character, Cursor};
-use crate::inv::{Tool, ToolError, ToolInput};
+use crate::inv::ToolError;
 use crate::listen::{ListenableCell, ListenableCellWithLocal, ListenableSource};
 use crate::space::Space;
 use crate::transaction::Transaction;
@@ -314,17 +314,7 @@ impl Session {
     fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
         let cursor_space = self.cursor_result.as_ref().map(|c| &c.space);
         if cursor_space == Option::as_ref(&self.ui_space().get()) {
-            // Clicks on UI use `Tool::Activate`.
-            // TODO: We'll probably want to distinguish buttons eventually.
-            // TODO: It should be easier to use a tool
-            let transaction = Tool::Activate.use_immutable_tool(&ToolInput {
-                cursor: self.cursor_result.clone(),
-                character: None,
-            })?;
-            transaction
-                .execute(self.universe_mut()) // TODO: wrong universe
-                .map_err(|e| ToolError::Internal(e.to_string()))?;
-            Ok(())
+            self.ui.click(button, self.cursor_result.clone())
         } else {
             // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
             // TODO: if the cursor space is not the game space this should be an error

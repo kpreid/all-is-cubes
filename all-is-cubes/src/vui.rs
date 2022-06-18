@@ -17,14 +17,15 @@ use ordered_float::NotNan;
 use crate::apps::{ControlMessage, InputProcessor};
 use crate::block::Block;
 use crate::camera::{FogOption, GraphicsOptions, ViewTransform};
-use crate::character::Character;
+use crate::character::{Character, Cursor};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
-use crate::inv::ToolError;
+use crate::inv::{Tool, ToolError, ToolInput};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
 use crate::math::{FreeCoordinate, GridMatrix};
 use crate::space::Space;
 use crate::time::Tick;
+use crate::transaction::Transaction;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::YieldProgress;
 use crate::vui::widgets::TooltipState;
@@ -173,6 +174,24 @@ impl Vui {
         if let Ok(mut state) = self.tooltip_state.lock() {
             state.set_message(error.to_string().into());
         }
+    }
+
+    pub fn click(&mut self, _button: usize, cursor: Option<Cursor>) -> Result<(), ToolError> {
+        if cursor.as_ref().map(|c| &c.space) != Option::as_ref(&self.current_space.get()) {
+            return Err(ToolError::Internal(String::from(
+                "Vui::click: space didn't match",
+            )));
+        }
+        // TODO: We'll probably want to distinguish buttons eventually.
+        // TODO: It should be easier to use a tool
+        let transaction = Tool::Activate.use_immutable_tool(&ToolInput {
+            cursor,
+            character: None,
+        })?;
+        transaction
+            .execute(&mut self.universe)
+            .map_err(|e| ToolError::Internal(e.to_string()))?;
+        Ok(())
     }
 }
 
