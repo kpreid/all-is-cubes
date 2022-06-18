@@ -306,7 +306,15 @@ impl Session {
     pub fn click(&mut self, button: usize) {
         match self.click_impl(button) {
             Ok(()) => {}
-            Err(e) => self.ui.show_tool_error(e),
+            Err(e) => {
+                if let ToolError::Internal(_) = e {
+                    // Log the message because the UI text field currently doesn't
+                    // fit long errors at all.
+                    // TODO: include source() chain
+                    log::error!("Error applying tool: {e}")
+                }
+                self.ui.show_tool_error(e);
+            }
         }
     }
 
