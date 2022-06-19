@@ -8,7 +8,7 @@ use std::fmt;
 use std::iter::FusedIterator;
 use std::ops::Range;
 
-use cgmath::{Point3, Transform, Vector3};
+use cgmath::{EuclideanSpace, Point3, Transform, Vector3};
 
 use crate::block::Resolution;
 use crate::math::{
@@ -418,6 +418,14 @@ impl Grid {
             .upper_bounds()
             .zip(other.upper_bounds(), GridCoordinate::max);
         Self::checked_new(lower, upper - lower)
+    }
+
+    pub(crate) fn minkowski_sum(self, other: Grid) -> Result<Grid, GridOverflowError> {
+        // TODO: needs checked sums
+        Self::checked_new(
+            self.lower_bounds() + other.lower_bounds().to_vec(),
+            self.size() + other.size(),
+        )
     }
 
     /// Returns a random cube contained by the grid, if there are any.

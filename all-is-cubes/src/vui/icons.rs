@@ -17,14 +17,15 @@ use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use exhaust::Exhaust;
 
 use crate::block::{Block, BlockCollision, Resolution, AIR, AIR_EVALUATED};
+use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::content::palette;
 use crate::drawing::{DrawingPlane, VoxelBrush};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{
-    cube_to_midpoint, Face7, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
-    Rgb, Rgba,
+    cube_to_midpoint, Face7, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    GridVector, Rgb, Rgba,
 };
-use crate::space::{GridArray, Space, SpacePhysics};
+use crate::space::{Space, SpacePhysics};
 use crate::universe::Universe;
 
 #[cfg(doc)]
@@ -136,43 +137,17 @@ impl Icons {
                     .color(Rgba::TRANSPARENT)
                     .build(),
 
-                Icons::Activate => {
-                    // TODO: Replace this 2D scribble with a 3D hand shape
-                    #[rustfmt::skip]
-                    let image = GridArray::from_y_flipped_array([[
-                        *b"                ",
-                        *b"      #         ",
-                        *b"     #.#        ",
-                        *b"     #.#        ",
-                        *b"     #.## # #   ",
-                        *b"   # #.#.#.#.#  ",
-                        *b"  #.##.#.#.#.#  ",
-                        *b"  #.##.......#  ",
-                        *b"  #..#......#   ",
-                        *b"   #........#   ",
-                        *b"    #......#    ",
-                        *b"    #......#    ",
-                        *b"    #......#    ",
-                        *b"                ",
-                    ]]);
-                    Block::builder()
-                        .display_name("Activate")
-                        .voxels_fn(universe, 16, |p| {
-                            Block::from(
-                                match image
-                                    .get(p - GridVector::new(0, 0, 8))
-                                    .copied()
-                                    .unwrap_or(b' ')
-                                {
-                                    b' ' => Rgba::TRANSPARENT,
-                                    b'.' => Rgba::WHITE,
-                                    b'#' => Rgba::BLACK,
-                                    byte => panic!("unrecognized {:?}", byte as char),
-                                },
-                            )
-                        })?
-                        .build()
-                }
+                Icons::Activate => Block::builder()
+                    .display_name("Activate")
+                    .voxels_ref(
+                        16, // TODO: get resolution from image file
+                        universe.insert_anonymous(space_from_image(
+                            include_image!("icons/hand.png"),
+                            GridRotation::RXyZ,
+                            default_srgb,
+                        )?),
+                    )
+                    .build(),
 
                 Icons::Delete => {
                     let x_radius = i32::from(resolution) * 3 / 16;
@@ -239,11 +214,52 @@ impl Icons {
                     .color(Rgba::new(0., 1., 0., 1.))
                     .build(),
 
-                Icons::PushPull => Block::builder()
-                    .display_name("Push")
-                    // TODO: design actual icon
-                    .color(Rgba::new(0., 1., 0., 1.))
-                    .build(),
+                Icons::PushPull => {
+                    let dots = [Block::from(Rgba::BLACK), AIR];
+                    let dots = move |y: GridCoordinate| dots[(y % 2) as usize].clone();
+                    Block::builder()
+                        .display_name("Push/Pull")
+                        .voxels_ref(
+                            32, // TODO: get resolution from image file,
+                            universe.insert_anonymous(space_from_image(
+                                include_image!("icons/push.png"),
+                                GridRotation::RXZY,
+                                |color| {
+                                    // TODO: Figure out abstractions to not need so much fiddly custom code
+                                    let bcolor = Block::from(Rgba::from_srgb8(color.0));
+                                    match color.0 {
+                                        [0, 0, 0, 255] => {
+                                            VoxelBrush::new(vec![([0, 15, 0], dots(0))])
+                                        }
+                                        [0x85, 0x85, 0x85, 255] => {
+                                            VoxelBrush::new(vec![([0, 0, 0], dots(0))])
+                                        }
+                                        [0, 127, 0, 255] => VoxelBrush::new(
+                                            (0..16)
+                                                .into_iter()
+                                                .map(|y| ([0, y, 0], dots(y)))
+                                                .collect(),
+                                        ),
+                                        [0, 255, 0, 255] => VoxelBrush::new(
+                                            (0..16)
+                                                .into_iter()
+                                                .map(|y| ([0, y, 0], dots(y + 1)))
+                                                .collect(),
+                                        ),
+                                        [255, 0, 0, 255] => VoxelBrush::new(
+                                            (0..16)
+                                                .into_iter()
+                                                .map(|y| ([0, y, 0], bcolor.clone()))
+                                                .collect(),
+                                        ),
+                                        _ => VoxelBrush::new(vec![([0, 0, 0], bcolor)]),
+                                    }
+                                    .translate([8, 8, 0])
+                                },
+                            )?),
+                        )
+                        .build()
+                }
 
                 Icons::Jetpack { active } => {
                     let shell_block = Block::from(rgb_const!(0.5, 0.5, 0.5));

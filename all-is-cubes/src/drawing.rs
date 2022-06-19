@@ -268,6 +268,25 @@ impl<'a> VoxelBrush<'a> {
         }
         self
     }
+
+    /// Computes the region affected by this brush.
+    ///
+    /// TODO: This does not currently report behaviors but it should, once they have
+    /// formalized regions of attachment.
+    ///
+    /// TODO: Handle the case where the total volume is too large. (Maybe Grid should lose
+    /// that restriction.)
+    pub(crate) fn bounds(&self) -> Option<Grid> {
+        let mut bounds: Option<Grid> = None;
+        for &(cube, _) in self.0.iter() {
+            if let Some(bounds) = &mut bounds {
+                *bounds = (*bounds).union(Grid::single_cube(cube)).unwrap();
+            } else {
+                bounds = Some(Grid::single_cube(cube));
+            }
+        }
+        bounds
+    }
 }
 
 impl<'a> PixelColor for &'a VoxelBrush<'a> {
@@ -371,7 +390,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block;
+    use crate::block::{self, AIR};
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
     use crate::raytracer::print_space;
@@ -541,5 +560,22 @@ mod tests {
             VoxelBrush::new(vec![((1, 2, 3), &block)]).translate((10, 20, 30)),
             VoxelBrush::new(vec![((11, 22, 33), &block)]),
         );
+    }
+
+    /// Test that VoxelBrush::bounds() gives the same result as SpaceTransaction::bounds().
+    #[test]
+    fn voxel_brush_bounds() {
+        for brush_vec in [
+            vec![],
+            vec![([0, 0, 0], AIR)],
+            vec![([100, 0, 0], AIR)],
+            vec![([0, 0, 5], AIR), ([0, 5, 0], AIR)],
+        ] {
+            let brush: VoxelBrush<'static> = VoxelBrush::new(brush_vec);
+            assert_eq!(
+                brush.bounds(),
+                brush.paint_transaction(GridPoint::origin()).bounds()
+            );
+        }
     }
 }
