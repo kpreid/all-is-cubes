@@ -92,6 +92,7 @@ pub(crate) async fn demo_city(
             let mut inventory = vec![
                 Tool::RemoveBlock { keep: true }.into(),
                 Tool::Jetpack { active: false }.into(),
+                Tool::PushPull.into(),
             ];
             for block in [
                 &landscape_blocks[Stone],
