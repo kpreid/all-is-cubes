@@ -80,8 +80,6 @@ pub enum UniverseTemplate {
     /// Use entirely random choices.
     ///
     /// TODO: This doesn't yet produce anything even visible — we need more sanity constraints.
-    /// Also, it should take an RNG seed once we have support for templates having parameters
-    /// at all.
     #[cfg(feature = "arbitrary")]
     Random,
     // TODO: add an "nothing, you get a blank editor" option once we have enough editing support.
@@ -138,7 +136,7 @@ impl UniverseTemplate {
                 &mut universe,
             )),
             #[cfg(feature = "arbitrary")]
-            Random => Some(arbitrary_space(&mut universe)),
+            Random => Some(arbitrary_space(&mut universe, p.take().unwrap(), seed).await),
         };
 
         if let Some(p) = p {
@@ -316,28 +314,36 @@ async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InG
 }
 
 #[cfg(feature = "arbitrary")]
-fn arbitrary_space(_: &mut Universe) -> Result<Space, InGenError> {
+async fn arbitrary_space(
+    _: &mut Universe,
+    mut progress: YieldProgress,
+    seed: u64,
+) -> Result<Space, InGenError> {
     use all_is_cubes::cgmath::{Vector3, Zero};
+    use all_is_cubes::math::FaceMap;
     use arbitrary::{Arbitrary, Error, Unstructured};
-    use rand::RngCore;
+    use rand::{RngCore, SeedableRng};
+
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
     let mut bytes = [0u8; 16384];
     let mut attempt = 0;
     loop {
         attempt += 1;
-        rand::thread_rng().fill_bytes(&mut bytes);
+        rng.fill_bytes(&mut bytes);
         let r: Result<Space, _> = Arbitrary::arbitrary(&mut Unstructured::new(&bytes));
         match r {
             Ok(mut space) => {
                 // Patch spawn position to be reasonable
                 let grid = space.grid();
                 let mut spawn = space.spawn().clone();
+                spawn.set_bounds(grid.expand(FaceMap::repeat(20)));
                 spawn.set_eye_position(grid.center());
                 space.set_spawn(spawn);
 
                 // Patch physics to be reasonable
                 let mut p = space.physics().clone();
-                p.gravity = Vector3::zero();
-                p.sky_color = Rgb::ONE * 0.5;
+                p.gravity = Vector3::zero(); // won't be a floor
+                p.sky_color = p.sky_color * (0.5 / p.sky_color.luminance());
                 space.set_physics(p);
 
                 // TODO: These patches are still not enough to get a good result.
@@ -351,6 +357,7 @@ fn arbitrary_space(_: &mut Universe) -> Result<Space, InGenError> {
             }
             Err(e) => panic!("{}", e),
         }
+        progress = progress.finish_and_cut(0.1).await; // mostly nonsense but we do want to yield
     }
 }
 
