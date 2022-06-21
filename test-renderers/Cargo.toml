@@ -36,7 +36,7 @@ all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
 async_fn_traits = "0.1.1"
 # Using clap for parsing test command-line arguments
-clap = { version = "3.1.1", default-features = false, features = ["derive", "std", "suggestions"] }
+clap = { version = "3.2.5", default-features = false, features = ["derive", "std", "suggestions"] }
 exhaust = "0.1.0"
 futures = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 glfw = "0.44.0"
