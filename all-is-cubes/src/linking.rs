@@ -142,6 +142,17 @@ where
                 .collect(),
         })
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (E, &Block)> + Send
+    where
+        E: Sync,
+        <E as Exhaust>::Iter: Send,
+    {
+        E::exhaust().map(|key| {
+            let block: &Block = &self.map[&key];
+            (key, block)
+        })
+    }
 }
 
 impl<E: Eq + Hash> Index<E> for BlockProvider<E> {

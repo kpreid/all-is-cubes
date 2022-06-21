@@ -7,6 +7,8 @@ use std::future::Future;
 use std::sync::Arc;
 
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::util::YieldProgress;
+use all_is_cubes::vui::Icons;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 
@@ -18,7 +20,7 @@ use all_is_cubes::camera::{
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::math::{Face6, NotNan, Rgb};
+use all_is_cubes::math::{Face6, FreeCoordinate, GridCoordinate, NotNan, Rgb};
 use all_is_cubes::space::{Grid, LightPhysics, Space};
 use all_is_cubes::universe::{URef, Universe, UniverseIndex};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
@@ -53,6 +55,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert("follow_character_change", None, follow_character_change);
     c.insert("follow_options_change", None, follow_options_change);
+    c.insert("icons", None, icons);
     c.insert("layers_all", None, layers_all);
     c.insert("layers_hidden_ui", None, layers_hidden_ui);
     c.insert("layers_none_but_text", None, layers_none_but_text);
@@ -262,6 +265,60 @@ async fn follow_options_change(mut context: RenderTestContext) {
     options_cell.set(options_2);
     context
         .render_comparison_test_with_renderer(1, &mut renderer, Overlays::NONE)
+        .await;
+}
+
+/// Display all the [`Icons`].
+///
+/// This is more of a content test than a renderer test, except that it also
+/// exercises the renderers with various block shapes.
+async fn icons(mut context: RenderTestContext) {
+    let universe = &mut Universe::new();
+    let icons = Icons::new(universe, YieldProgress::noop())
+        .await
+        .install(universe)
+        .unwrap();
+
+    // Compute layout
+    let count = icons.iter().count() as GridCoordinate;
+    let row_length = 4;
+    let bounds = Grid::from_lower_upper(
+        [0, 0, 0],
+        [row_length, ((count + row_length - 1) / row_length), 2],
+    );
+    let aspect_ratio = f64::from(bounds.size().y) / f64::from(bounds.size().x);
+
+    // Fill space with icons
+    let mut space = Space::builder(bounds)
+        .spawn_position(Point3::new(
+            FreeCoordinate::from(bounds.size().x) / 2.,
+            FreeCoordinate::from(bounds.size().y) / 2.,
+            FreeCoordinate::from(bounds.size().y) * 1.5,
+        ))
+        .build_empty();
+    for (index, (_key, icon)) in icons.iter().enumerate() {
+        let index = index as GridCoordinate;
+        space
+            .set([index % row_length, index / row_length, 0], icon)
+            .unwrap();
+    }
+
+    space.evaluate_light(1, |_| {});
+    finish_universe_from_space(universe, space);
+
+    let mut options = GraphicsOptions::default();
+    options.lighting_display = LightingOption::Flat;
+    options.fov_y = notnan!(45.0);
+    context
+        .render_comparison_test(
+            20, // Fairly sloppy because this test is looking for "Does this icon look right"
+            StandardCameras::from_constant_for_test(
+                options,
+                Viewport::with_scale(1.0, [256, (256.0 * aspect_ratio) as u32].into()),
+                universe,
+            ),
+            Overlays::NONE,
+        )
         .await;
 }
 

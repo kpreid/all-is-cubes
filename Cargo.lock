@@ -3108,6 +3108,7 @@ dependencies = [
  "all-is-cubes-gpu",
  "async_fn_traits",
  "clap 3.1.18",
+ "exhaust",
  "futures",
  "glfw",
  "image",
