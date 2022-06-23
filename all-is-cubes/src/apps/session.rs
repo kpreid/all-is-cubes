@@ -203,6 +203,7 @@ impl Session {
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
                     // Lack of whatever control sources is non-fatal.
+                    break;
                 }
             }
         }
