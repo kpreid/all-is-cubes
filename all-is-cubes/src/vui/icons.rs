@@ -487,7 +487,7 @@ impl ButtonBuilder {
     /// Y-down coordinate system whose origin is centered on the button (or more precisely,
     /// (0, 0) is the lower-right pixel closest to the center, since e-g uses a convention
     /// where coordinates identify pixels, not their edges).
-    pub fn label_draw_target<C: PixelColor>(&mut self) -> DrawingPlane<'_, C> {
+    pub fn label_draw_target<C: PixelColor>(&mut self) -> DrawingPlane<'_, Space, C> {
         self.space.draw_target(
             GridMatrix::from_translation([
                 Self::RESOLUTION_G / 2,

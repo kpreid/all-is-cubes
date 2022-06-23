@@ -35,21 +35,21 @@ use crate::math::{Face7, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb,
 use crate::space::{Grid, SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
-/// Adapter to use a [`Space`] as a [`DrawTarget`].
+/// Adapter to use a [`Space`] or [`SpaceTransaction`] as a [`DrawTarget`].
 /// Use [`Space::draw_target`] to construct this.
 ///
 /// `'s` is the lifetime of the [`Space`].
 /// `C` is the “color” type to use, which should implement [`VoxelColor`].
 #[derive(Debug)]
-pub struct DrawingPlane<'s, C> {
-    space: &'s mut Space,
+pub struct DrawingPlane<'s, T, C> {
+    space: &'s mut T,
     /// Defines the coordinate transformation from 2D graphics to the [`Space`].
     transform: GridMatrix,
     _color: PhantomData<fn(C)>,
 }
 
-impl<'s, C> DrawingPlane<'s, C> {
-    pub(crate) fn new(space: &'s mut Space, transform: GridMatrix) -> Self {
+impl<'s, T, C> DrawingPlane<'s, T, C> {
+    pub(crate) fn new(space: &'s mut T, transform: GridMatrix) -> Self {
         Self {
             space,
             transform,
@@ -67,7 +67,7 @@ impl<'s, C> DrawingPlane<'s, C> {
 }
 
 /// A [`DrawingPlane`] accepts any color type that implements [`VoxelColor`].
-impl<'c, C> DrawTarget for DrawingPlane<'_, C>
+impl<'c, C> DrawTarget for DrawingPlane<'_, Space, C>
 where
     C: VoxelColor<'c>,
 {
@@ -90,7 +90,31 @@ where
     }
 }
 
-impl<C> Dimensions for DrawingPlane<'_, C> {
+/// A [`DrawingPlane`] accepts any color type that implements [`VoxelColor`].
+impl<'c, C> DrawTarget for DrawingPlane<'_, SpaceTransaction, C>
+where
+    C: VoxelColor<'c>,
+{
+    type Color = C;
+    type Error = SetCubeError;
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        for Pixel(point, color) in pixels.into_iter() {
+            // TODO: Add a cache so we're not reconstructing the block for every single pixel.
+            // (This is possible because `PixelColor: PartialEq`.)
+            // TODO: Need to rotate the brush to match our transform
+            color
+                .into_blocks()
+                .paint_transaction_mut(self.space, self.convert_point(point));
+        }
+        Ok(())
+    }
+}
+
+impl<C> Dimensions for DrawingPlane<'_, Space, C> {
     fn bounding_box(&self) -> Rectangle {
         // Invert our coordinate transform to bring the space's bounds into the drawing
         // coordinate system. If the transform fails, return a 1×1×1 placeholder rather
@@ -114,7 +138,20 @@ impl<C> Dimensions for DrawingPlane<'_, C> {
         }
     }
 }
-
+impl<C> Dimensions for DrawingPlane<'_, SpaceTransaction, C> {
+    fn bounding_box(&self) -> Rectangle {
+        Rectangle {
+            top_left: Point {
+                x: i32::MIN,
+                y: i32::MIN,
+            },
+            size: Size {
+                width: u32::MAX,
+                height: u32::MAX,
+            },
+        }
+    }
+}
 /// Adapt embedded_graphics's most general color type to ours.
 // TODO: Also adapt the other types, so that if someone wants to use them they can.
 impl From<Rgb888> for Rgb {
@@ -228,14 +265,19 @@ impl<'a> VoxelBrush<'a> {
     /// out-of-bounds drawing, but transactions do not support this and will fail instead.
     pub fn paint_transaction(&self, origin: GridPoint) -> SpaceTransaction {
         let mut txn = SpaceTransaction::default();
-        for (offset, block) in &self.0 {
-            txn.set(
-                origin + offset.to_vec(),
-                None,
-                Some(block.to_owned().into_owned()),
-            ).unwrap(/* TODO: make conflict not possible */);
-        }
+        self.paint_transaction_mut(&mut txn, origin);
         txn
+    }
+
+    /// Like [`Self::paint_transaction()`] but modifies an existing transaction (as per
+    /// [`SpaceTransaction::set_overwrite()`]).
+    ///
+    /// Note that [`VoxelBrush::paint`] or using it in a [`DrawTarget`] ignores
+    /// out-of-bounds drawing, but transactions do not support this and will fail instead.
+    pub fn paint_transaction_mut(&self, transaction: &mut SpaceTransaction, origin: GridPoint) {
+        for (offset, block) in &self.0 {
+            transaction.set_overwrite(origin + offset.to_vec(), block.to_owned().into_owned());
+        }
     }
 
     /// Converts a `&VoxelBrush` into a `VoxelBrush` that borrows it.

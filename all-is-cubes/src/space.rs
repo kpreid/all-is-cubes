@@ -550,7 +550,7 @@ impl Space {
     ///
     /// For more information on how to use this, see
     /// [`all_is_cubes::drawing`](crate::drawing).
-    pub fn draw_target<C>(&mut self, transform: GridMatrix) -> DrawingPlane<'_, C> {
+    pub fn draw_target<C>(&mut self, transform: GridMatrix) -> DrawingPlane<'_, Space, C> {
         DrawingPlane::new(self, transform)
     }
 

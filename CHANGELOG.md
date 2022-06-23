@@ -14,6 +14,7 @@
     - `math::Face6`, which is like `math::Face` (now) `Face7` but without the `Within` variant.
     - `DirtyFlag::listening()` which simplifies typical usage.
     - `GridRotation::ALL_BUT_REFLECTIONS`, as `GridRotation::ALL` but excluding reflections.
+    - `SpaceTransaction::draw_target()` allows 2.5D drawing into a transaction in the same way `Space::draw_target()` works on `&mut Space`.
     - `StandardCameras::world_space()`, so that clients don't need to consult the `Character` each frame.
     - `Universe::get_any()` allows looking up universe members without knowing their type.
     - `UniverseTransaction::insert()` allows inserting objects into a `Universe` via transaction rather than directly.

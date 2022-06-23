@@ -7,13 +7,14 @@ use std::collections::btree_map::Entry::*;
 use std::collections::BTreeMap;
 use std::{fmt, mem};
 
-use super::Space;
 use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
-use crate::math::{GridCoordinate, GridPoint};
-use crate::space::{Grid, SetCubeError};
-use crate::transaction::{CommitError, Merge, PreconditionFailed};
-use crate::transaction::{Transaction, TransactionConflict, Transactional};
+use crate::drawing::DrawingPlane;
+use crate::math::{GridCoordinate, GridMatrix, GridPoint};
+use crate::space::{Grid, SetCubeError, Space};
+use crate::transaction::{
+    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+};
 use crate::util::{ConciseDebug, CustomFormat as _};
 use crate::vui::ActivatableRegion;
 
@@ -98,6 +99,15 @@ impl SpaceTransaction {
                 entry.get_mut().new = Some(block);
             }
         }
+    }
+
+    /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
+    /// adapter for 2.5D drawing.
+    ///
+    /// For more information on how to use this, see
+    /// [`all_is_cubes::drawing`](crate::drawing).
+    pub fn draw_target<C>(&mut self, transform: GridMatrix) -> DrawingPlane<'_, Self, C> {
+        DrawingPlane::new(self, transform)
     }
 
     /// Marks all cube modifications in this transaction as [non-conservative].
