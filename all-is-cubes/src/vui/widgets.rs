@@ -158,7 +158,10 @@ impl<D> Layoutable for ToggleButtonWidget<D> {
 impl<D: Clone + Debug + Send + Sync + 'static> Widget for ToggleButtonWidget<D> {
     fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
         Box::new(ToggleButtonController::new(
-            position.bounds.lower_bounds(),
+            position
+                .shrink_to(self.requirements().minimum)
+                .bounds
+                .lower_bounds(),
             self,
         ))
     }

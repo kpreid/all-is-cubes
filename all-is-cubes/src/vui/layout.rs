@@ -4,9 +4,9 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::Zero as _;
+use cgmath::{Vector3, Zero as _};
 
-use crate::math::{Face6, GridVector};
+use crate::math::{Face6, GridPoint, GridVector};
 use crate::space::{Grid, SpaceTransaction};
 use crate::transaction::Merge;
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
@@ -30,7 +30,58 @@ pub struct LayoutRequest {
 pub struct LayoutGrant {
     /// The widget may have exclusive access to this volume.
     pub bounds: Grid,
+
+    /// Preferred alignment for non-stretchy widgets.
+    pub gravity: Gravity,
 }
+
+impl LayoutGrant {
+    /// Construct a `LayoutGrant` from scratch, such as to begin layout.
+    pub fn new(bounds: Grid) -> Self {
+        LayoutGrant {
+            bounds,
+            gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+        }
+    }
+
+    /// Shrink the bounds to the requested size, obeying the gravity
+    /// parameter to choose where to position the result.
+    #[must_use]
+    pub fn shrink_to(self, sizes: GridVector) -> Self {
+        let mut origin = GridPoint::new(0, 0, 0);
+        for axis in 0..3 {
+            let l = self.bounds.lower_bounds()[axis];
+            let h = self.bounds.upper_bounds()[axis] - sizes[axis];
+            origin[axis] = match self.gravity[axis] {
+                Align::Low => l,
+                Align::Center => l + (h - l) / 2,
+                Align::High => h,
+            };
+        }
+        LayoutGrant {
+            bounds: Grid::new(origin, sizes),
+            gravity: self.gravity,
+        }
+    }
+}
+
+/// Where to position things, on a given axis, when available space exceeds required space.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum Align {
+    /// All the way in the direction of the lower corner (left, down, back).
+    Low,
+    /// Centered, or as close as possible.
+    Center,
+    /// All the way in the direction of the upper corner (right, up, front).
+    High,
+}
+
+/// Specifies which corner of available space a widget should prefer to position
+/// itself towards if it is not intending to fill that space.
+///
+/// TODO: Use a better enum
+pub type Gravity = Vector3<Align>;
 
 /// Something which can occupy space in a [`LayoutTree`], or is one.
 ///
@@ -73,8 +124,9 @@ pub enum LayoutTree<W> {
     Leaf(W),
     /// An space laid out like a widget but left empty.
     Spacer(LayoutRequest),
-    /// Fill the available space with the children, in order in the given direction.
+    /// Fill the available space with the children arranged along an axis.
     Stack {
+        /// Which axis of space to arrange on.
         direction: Face6,
         children: Vec<Arc<LayoutTree<W>>>,
     },
@@ -130,14 +182,14 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
     /// TODO: haven't decided whether layout can fail yet, hence the placeholder non-error
     pub fn perform_layout(
         &self,
-        mut bounds: Grid,
+        grant: LayoutGrant,
     ) -> Result<Arc<LayoutTree<Positioned<W>>>, std::convert::Infallible> {
         Ok(Arc::new(match *self {
             LayoutTree::Leaf(ref w) => LayoutTree::Leaf(Positioned {
                 // TODO: Implicitly Arc the leaf values? Or just drop this idea of the tree being
                 // shared at all?
                 value: W::clone(w),
-                position: LayoutGrant { bounds },
+                position: grant,
             }),
             LayoutTree::Spacer(ref r) => LayoutTree::Spacer(r.clone()),
             LayoutTree::Stack {
@@ -145,6 +197,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 ref children,
             } => {
                 let mut positioned_children = Vec::with_capacity(children.len());
+                let mut bounds = grant.bounds;
                 for child in children {
                     let requirements = child.requirements();
                     let axis = direction.axis_number();
@@ -161,7 +214,10 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                     let remainder_bounds = bounds.abut(direction, -(available_size - size_on_axis))
                         .unwrap(/* always smaller, can't overflow */);
 
-                    positioned_children.push(child.perform_layout(child_bounds)?);
+                    positioned_children.push(child.perform_layout(LayoutGrant {
+                        bounds: child_bounds,
+                        gravity: grant.gravity,
+                    })?);
                     bounds = remainder_bounds;
                 }
                 LayoutTree::Stack {
@@ -285,8 +341,9 @@ mod tests {
                 LayoutTree::leaf(LT::new("c", [1, 1, 1])),
             ],
         };
+        let grant = LayoutGrant::new(Grid::new([10, 10, 10], [10, 10, 10]));
         assert_eq!(
-            tree.perform_layout(Grid::new([10, 10, 10], [10, 10, 10]))
+            tree.perform_layout(grant)
                 .unwrap()
                 .leaves()
                 .collect::<Vec<_>>(),
@@ -294,19 +351,22 @@ mod tests {
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([10, 10, 10], [1, 10, 10])
+                        bounds: Grid::new([10, 10, 10], [1, 10, 10]),
+                        gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([11, 10, 10], [1, 10, 10])
+                        bounds: Grid::new([11, 10, 10], [1, 10, 10]),
+                        gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("c", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([12, 10, 10], [1, 10, 10])
+                        bounds: Grid::new([12, 10, 10], [1, 10, 10]),
+                        gravity: grant.gravity,
                     },
                 }
             ]
@@ -325,8 +385,9 @@ mod tests {
                 LayoutTree::leaf(LT::new("b", [1, 1, 1])),
             ],
         };
+        let grant = LayoutGrant::new(Grid::new([10, 10, 10], [10, 10, 10]));
         assert_eq!(
-            tree.perform_layout(Grid::new([10, 10, 10], [10, 10, 10]))
+            tree.perform_layout(grant)
                 .unwrap()
                 .leaves()
                 .collect::<Vec<_>>(),
@@ -334,13 +395,15 @@ mod tests {
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([10, 10, 10], [1, 10, 10])
+                        bounds: Grid::new([10, 10, 10], [1, 10, 10]),
+                        gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([14, 10, 10], [1, 10, 10])
+                        bounds: Grid::new([14, 10, 10], [1, 10, 10]),
+                        gravity: grant.gravity,
                     },
                 }
             ]

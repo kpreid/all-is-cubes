@@ -159,7 +159,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         .build_empty();
 
     // TODO: These errors ought to autoconvert into InGenError
-    tree.perform_layout(bounds)
+    tree.perform_layout(LayoutGrant::new(bounds))
         .unwrap()
         .installation()
         .map_err(|e| InGenError::Other(e.into()))?

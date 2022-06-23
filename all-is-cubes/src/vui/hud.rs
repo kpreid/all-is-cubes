@@ -4,7 +4,7 @@
 use std::convert::TryInto;
 use std::sync::{mpsc, Arc, Mutex};
 
-use cgmath::Vector2;
+use cgmath::{Vector2, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Primitive as _, Transform as _};
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Triangle};
@@ -22,7 +22,7 @@ use crate::math::{Face6, GridCoordinate, GridMatrix, GridPoint, GridRotation, Rg
 use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
-use crate::vui::widgets::ToggleButtonVisualState;
+use crate::vui::widgets::{FrameWidget, ToggleButtonVisualState};
 use crate::vui::{
     layout::LayoutTree,
     widgets::{
@@ -30,6 +30,7 @@ use crate::vui::{
     },
     Icons, Widget, WidgetBehavior, WidgetController,
 };
+use crate::vui::{Align, LayoutGrant};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -102,8 +103,13 @@ impl HudLayout {
         GridPoint::new(self.size.x / 2, self.size.y / 2, 0)
     }
 
-    pub(crate) fn control_bar_bounds(&self) -> Grid {
-        Grid::new([0, self.size.y - 1, -1], [self.size.x, 1, 1])
+    pub(crate) fn control_bar_bounds(&self) -> LayoutGrant {
+        let upper = self.grid().upper_bounds();
+        let cp = self.crosshair_position();
+        // TODO: how do we want to habitually construct this?
+        let mut grant = LayoutGrant::new(Grid::from_lower_upper([0, cp.y + 1, -1], upper));
+        grant.gravity = Vector3::new(Align::High, Align::High, Align::Low);
+        grant
     }
 
     pub(crate) fn first_tool_icon_position(&self) -> GridPoint {
@@ -178,8 +184,8 @@ pub(super) fn new_hud_space(
             .expect("installing widget");
     }
 
-    // Widgets laid out in top-right corner
-    let top_right_buttons: LayoutTree<Arc<dyn Widget>> = LayoutTree::Stack {
+    // Miscellaneous control widgets drawn in the corner
+    let control_bar_widgets: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Stack {
         direction: Face6::NX,
         children: vec![
             Arc::new(LayoutTree::Stack {
@@ -209,12 +215,21 @@ pub(super) fn new_hud_space(
                 },
             )),
         ],
+    });
+    let control_bar_positioning: Arc<LayoutTree<Arc<dyn Widget>>> = if false {
+        // reveal the bounds by adding a FrameWidget
+        Arc::new(LayoutTree::Stack {
+            direction: Face6::PZ,
+            children: vec![LayoutTree::leaf(FrameWidget::new()), control_bar_widgets],
+        })
+    } else {
+        control_bar_widgets
     };
 
     // TODO: error handling
     hud_space
         .execute(
-            &top_right_buttons
+            &control_bar_positioning
                 .perform_layout(hud_layout.control_bar_bounds())
                 .expect("layout/widget error")
                 .installation()
