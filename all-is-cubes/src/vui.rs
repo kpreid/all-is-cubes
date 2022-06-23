@@ -9,20 +9,14 @@
 use std::sync::{mpsc, Arc, Mutex};
 
 use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
-use embedded_graphics::geometry::Point;
-use embedded_graphics::prelude::{Drawable, Primitive};
-use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
 use ordered_float::NotNan;
 
 use crate::apps::{ControlMessage, InputProcessor};
-use crate::block::Block;
 use crate::camera::{FogOption, GraphicsOptions, ViewTransform};
 use crate::character::{Character, Cursor};
-use crate::content::palette;
-use crate::drawing::VoxelBrush;
 use crate::inv::{Tool, ToolError, ToolInput};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
-use crate::math::{FreeCoordinate, GridMatrix};
+use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::Transaction;
@@ -195,32 +189,6 @@ impl Vui {
     }
 }
 
-#[allow(unused)] // TODO: not yet used for real
-pub(crate) fn draw_background(space: &mut Space) {
-    let grid = space.grid();
-    let background_rect = Rectangle::with_corners(
-        Point::new(grid.lower_bounds().x, grid.lower_bounds().y),
-        Point::new(grid.upper_bounds().x - 1, grid.upper_bounds().y - 1),
-    );
-
-    let display =
-        &mut space.draw_target(GridMatrix::from_translation([0, 0, grid.lower_bounds().z]));
-
-    let background = VoxelBrush::single(Block::from(palette::MENU_BACK));
-    let frame = VoxelBrush::single(Block::from(palette::MENU_FRAME)).translate((0, 0, 1));
-
-    background_rect
-        .into_styled(
-            PrimitiveStyleBuilder::new()
-                .stroke_width(1)
-                .stroke_color(&frame)
-                .fill_color(&background)
-                .build(),
-        )
-        .draw(display)
-        .unwrap();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,11 +207,5 @@ mod tests {
     #[test]
     fn vui_smoke_test() {
         let _ = new_vui_for_test();
-    }
-
-    #[test]
-    fn background_smoke_test() {
-        let mut space = Space::empty_positive(100, 100, 10);
-        draw_background(&mut space);
     }
 }

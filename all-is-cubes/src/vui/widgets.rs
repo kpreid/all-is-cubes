@@ -7,13 +7,18 @@ use std::error::Error;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 
+use embedded_graphics::prelude::{Point, Primitive};
+use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
+use embedded_graphics::Drawable;
 use exhaust::Exhaust;
 
 use crate::behavior::BehaviorSetTransaction;
 use crate::block::{Block, AIR};
+use crate::content::palette;
+use crate::drawing::VoxelBrush;
 use crate::inv::EphemeralOpaque;
 use crate::listen::{DirtyFlag, ListenableSource};
-use crate::math::{GridPoint, GridVector};
+use crate::math::{GridMatrix, GridPoint, GridVector};
 use crate::space::{Grid, SpaceTransaction};
 use crate::time::Tick;
 use crate::vui::{
@@ -38,6 +43,63 @@ impl WidgetController for OneshotController {
     }
 
     // TODO: Arrange somehow for this controller to be deleted since it doesn't need to be step()ped
+}
+
+/// Widget that fills a flat XY surface with a "dialog box" sort of background.
+/// Also useful for identifying the bounds of a layout region.
+///
+/// TODO: Define what it does in 3D.
+#[derive(Debug)]
+pub(crate) struct FrameWidget {}
+
+impl FrameWidget {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {})
+    }
+}
+
+impl Layoutable for FrameWidget {
+    fn requirements(&self) -> LayoutRequest {
+        LayoutRequest {
+            minimum: GridVector::new(0, 0, 1),
+        }
+    }
+}
+
+impl Widget for FrameWidget {
+    fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
+        let bounds = position.bounds;
+        let mut txn = SpaceTransaction::default();
+
+        if !bounds.is_empty() {
+            let background_rect = Rectangle::with_corners(
+                Point::new(bounds.lower_bounds().x, bounds.lower_bounds().y),
+                Point::new(bounds.upper_bounds().x - 1, bounds.upper_bounds().y - 1),
+            );
+
+            let dt = &mut txn.draw_target(GridMatrix::from_translation([
+                0,
+                0,
+                bounds.lower_bounds().z,
+            ]));
+
+            let background = VoxelBrush::single(Block::from(palette::MENU_BACK));
+            let frame = VoxelBrush::single(Block::from(palette::MENU_FRAME));
+
+            background_rect
+                .into_styled(
+                    PrimitiveStyleBuilder::new()
+                        .stroke_width(1)
+                        .stroke_color(&frame)
+                        .fill_color(&background)
+                        .build(),
+                )
+                .draw(dt)
+                .unwrap();
+        }
+
+        Box::new(OneshotController(Some(txn)))
+    }
 }
 
 /// A single-block button that displays a boolean state derived from a
