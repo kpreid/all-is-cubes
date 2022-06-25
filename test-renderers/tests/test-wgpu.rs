@@ -5,7 +5,6 @@ use std::num::NonZeroU32;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use clap::Parser as _;
 use futures::future::BoxFuture;
 use image::RgbaImage;
@@ -14,6 +13,7 @@ use tokio::sync::OnceCell;
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::{HeadlessRenderer, RenderError, Viewport};
 use all_is_cubes::character::Cursor;
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes_gpu::in_wgpu::EverythingRenderer;
 use all_is_cubes_gpu::FrameBudget;
 use test_renderers::{RendererFactory, RendererId};
@@ -22,19 +22,34 @@ use test_renderers::{RendererFactory, RendererId};
 pub async fn main() -> test_renderers::HarnessResult {
     let instance = wgpu::Instance::new(wgpu::Backends::all()); // TODO: test more backends?
 
-    let maybe_adapter: Option<wgpu::Adapter> = instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: None,
-            force_fallback_adapter: false,
-        })
-        .await;
+    eprintln!("Available adapters:");
+    for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
+        eprintln!("  {:?}", adapter.get_info());
+    }
 
-    if let Some(a) = maybe_adapter {
-        eprintln!("Adapter: {a:?}");
-        WGPU_ADAPTER.set(a).unwrap();
+    // TODO: Replace this with
+    //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
+    // once we have fixed https://github.com/kpreid/all-is-cubes/issues/173 which seemingly
+    // manifests on low-power GPUs in general (?!)
+    // Or, how about we test on *all* available adapters?
+    let mut adapter: Option<wgpu::Adapter> =
+        wgpu::util::initialize_adapter_from_env(&instance, wgpu::Backends::all());
+    if adapter.is_none() {
+        eprintln!("No adapter specified via WGPU_ADAPTER_NAME; picking automatically.");
+        adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: None,
+                force_fallback_adapter: false,
+            })
+            .await;
+    }
+
+    if let Some(adapter) = adapter {
+        eprintln!("Using: {:?}", adapter.get_info());
+        WGPU_ADAPTER.set(adapter).unwrap();
     } else {
-        eprintln!("Skipping rendering tests due to lack of wgpu Adapter.");
+        eprintln!("Skipping rendering tests due to lack of wgpu::Adapter.");
         return ExitCode::SUCCESS;
     };
 
