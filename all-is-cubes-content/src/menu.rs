@@ -24,7 +24,10 @@ use all_is_cubes::{
     space::{Grid, Space, SpacePhysics, SpaceTransaction},
     transaction::{Merge, Transaction as _},
     universe::Universe,
-    vui::{self, LayoutGrant, LayoutRequest, LayoutTree, Layoutable, Widget, WidgetController},
+    vui::{
+        self, widgets::FrameWidget, LayoutGrant, LayoutRequest, LayoutTree, Layoutable, Widget,
+        WidgetController,
+    },
 };
 
 use crate::{logo::LogoTextLarge, UniverseTemplate};
@@ -137,8 +140,14 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         )?)));
     }
     let tree: LayoutTree<Arc<dyn Widget>> = LayoutTree::Stack {
-        direction: Face6::NY,
-        children: vertical_widgets,
+        direction: Face6::PZ,
+        children: vec![
+            LayoutTree::leaf(FrameWidget::new()),
+            Arc::new(LayoutTree::Stack {
+                direction: Face6::NY,
+                children: vertical_widgets,
+            }),
+        ],
     };
 
     let size = tree.requirements().minimum;

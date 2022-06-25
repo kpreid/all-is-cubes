@@ -50,11 +50,16 @@ impl WidgetController for OneshotController {
 ///
 /// TODO: Define what it does in 3D.
 #[derive(Debug)]
-pub(crate) struct FrameWidget {}
+#[doc(hidden)] // TODO: widget API still in development
+pub struct FrameWidget {
+    _private_placeholder: (),
+}
 
 impl FrameWidget {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self {})
+        Arc::new(Self {
+            _private_placeholder: (),
+        })
     }
 }
 
