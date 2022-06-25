@@ -80,8 +80,6 @@ fn main() -> Result<(), anyhow::Error> {
     } = options.clone();
     let input_source = parse_universe_source(input_file, template);
 
-    // Convert options we will consult multiple times.
-
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal || verbose {
         use simplelog::LevelFilter::{Debug, Off, Trace};
