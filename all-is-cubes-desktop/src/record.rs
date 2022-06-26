@@ -11,14 +11,13 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use futures::executor::block_on;
 use image::RgbaImage;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::{chunk::ChunkType, Encoder};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::behavior::AutoRotate;
-use all_is_cubes::camera::{HeadlessRenderer, Viewport};
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::NotNan;
@@ -156,43 +155,28 @@ pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<()
     Ok(())
 }
 
-/// A threaded pipeline for writing one or more raytracer renderings.
+/// Takes world states from a `DesktopSession` and writes renderings to disk.
 ///
-/// TODO: This may end up wanting to be split into two pipeline-end custom structs
-/// instead of just presenting the raw sender and receiver.
-///
-/// TODO: Add use of recirculating renderers, which means there will be a third
-/// "return for next update" output.
-///
-/// * `K` is the type of a “key” for identifying the frame.
-/// * `R` is the type of a renderer that should be [`HeadlessRenderer::update`]d with
-///   the latest scene for each frame.
+/// Internally manages worker threads to offload the rendering work.
 #[derive(Debug)]
-pub(crate) struct Recorder<K, R> {
+pub(crate) struct Recorder {
     cameras: StandardCameras,
     /// The number of times [`Self::send_frame`] has been called.
-    sending_frame_number: usize,
+    sending_frame_number: FrameNumber,
     /// None if dropped to signal no more frames
-    scene_sender: Option<mpsc::SyncSender<(K, R)>>,
-    /// Contains the successive identifiers of each frame successfully written.
-    pub status_receiver: mpsc::Receiver<K>,
+    scene_sender: Option<mpsc::SyncSender<(FrameNumber, RtRenderer)>>,
+    /// Contains the successive numbers of each frame successfully written.
+    pub status_receiver: mpsc::Receiver<FrameNumber>,
 }
+type FrameNumber = usize;
 
-// TODO: Recorder's genericness is not yet taken advantage of;
-// this is the type that we in fact actually use everywhere.
-pub(crate) type RtRecorder = Recorder<usize, RtRenderer>;
-
-impl<K, R> Recorder<K, R>
-where
-    K: Send + 'static,
-    R: HeadlessRenderer + Send + 'static,
-{
+impl Recorder {
     /// TODO: This is only implementing part of the RecordOptions (not the frame timing); refactor.
     fn new(options: RecordOptions, cameras: StandardCameras) -> Result<Self, anyhow::Error> {
         // Set up threads. Raytracing is internally parallel using Rayon, but we want to
         // thread everything else too so we're not alternating single-threaded and parallel
         // operations.
-        let (scene_sender, scene_receiver) = mpsc::sync_channel::<(K, R)>(1);
+        let (scene_sender, scene_receiver) = mpsc::sync_channel::<(FrameNumber, RtRenderer)>(1);
         let (image_data_sender, image_data_receiver) = mpsc::sync_channel(1);
         let (mut write_status_sender, status_receiver) = mpsc::channel();
 
@@ -201,9 +185,9 @@ where
             .name("renderer".to_string())
             .spawn({
                 move || {
-                    while let Ok((frame_id, mut renderer)) = scene_receiver.recv() {
+                    while let Ok((frame_id, renderer)) = scene_receiver.recv() {
                         // TODO: error handling
-                        let image = block_on(renderer.draw("")).unwrap();
+                        let (image, _info) = renderer.draw_rgba(|_| String::new());
                         image_data_sender.send((frame_id, image)).unwrap();
                     }
                 }
@@ -232,27 +216,21 @@ where
         })
     }
 
-    fn send_frame(&mut self, key: K, renderer: R) {
+    fn send_frame(&mut self, renderer: RtRenderer) {
         // TODO: instead of panic on send failure, log the problem
         self.scene_sender
             .as_ref()
             .expect("cannot send_frame() after no_more_frames()")
-            .send((key, renderer))
+            .send((self.sending_frame_number, renderer))
             .expect("channel closed; recorder render thread died?");
         self.sending_frame_number += 1;
-    }
-
-    pub fn sending_frame_number(&self) -> usize {
-        self.sending_frame_number
     }
 
     pub fn no_more_frames(&mut self) {
         self.scene_sender = None;
     }
-}
 
-impl<K: Send + 'static> Recorder<K, RtRenderer> {
-    pub fn capture_frame(&mut self, key: K) {
+    pub fn capture_frame(&mut self) {
         // TODO: Start reusing renderers instead of recreating them.
         let mut renderer = RtRenderer::new(
             self.cameras.clone(),
@@ -261,7 +239,7 @@ impl<K: Send + 'static> Recorder<K, RtRenderer> {
         );
         renderer.update(None).unwrap();
 
-        self.send_frame(key, renderer);
+        self.send_frame(renderer);
     }
 }
 

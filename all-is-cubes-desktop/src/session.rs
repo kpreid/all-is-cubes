@@ -28,7 +28,7 @@ pub(crate) struct DesktopSession<Ren, Win> {
     pub(crate) clock_source: ClockSource,
 
     // If present, writes frames to disk.
-    pub(crate) recorder: Option<crate::record::RtRecorder>,
+    pub(crate) recorder: Option<crate::record::Recorder>,
 }
 
 impl<Ren, Win> DesktopSession<Ren, Win> {
@@ -49,7 +49,7 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
         // (TODO: This code is awkward because of partial refactoring towards recording being a
         // option to combine with anything rather than a special main loop mode)
         if let Some(recorder) = self.recorder.as_mut() {
-            recorder.capture_frame(recorder.sending_frame_number());
+            recorder.capture_frame();
         }
 
         step_info
