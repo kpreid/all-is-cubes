@@ -3,8 +3,10 @@
 
 //! Command line option parsing.
 
+use std::ffi::OsStr;
 use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::os::unix::prelude::OsStrExt;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -15,7 +17,7 @@ use strum::IntoEnumIterator;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes_content::UniverseTemplate;
 
-use crate::record::{RecordAnimationOptions, RecordOptions};
+use crate::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
 use crate::TITLE;
 
 #[derive(Clone, Debug, Parser)]
@@ -51,15 +53,17 @@ pub(crate) struct AicDesktopArgs {
     #[clap(long = "precompute-light")]
     pub(crate) precompute_light: bool,
 
-    /// Output PNG file name for 'record' mode.
+    /// Output file name for 'record' mode.
     ///
-    /// If animating, a frame number will be inserted.
+    /// The file name must have an extension specifying the type; currently only PNG is supported
+    /// ('.png' or '.apng').
     #[clap(
         long = "output",
         short = 'o',
         required_if_eq("graphics", "record"),
         value_name = "FILE",
-        parse(from_os_str)
+        parse(from_os_str),
+        validator_os = validate_output_file,
     )]
     pub(crate) output_file: Option<PathBuf>,
 
@@ -86,17 +90,26 @@ pub(crate) struct AicDesktopArgs {
     /// Currently supported formats:
     ///
     /// * MagicaVoxel .vox (partial support)
-    #[clap(conflicts_with = "template", value_name = "FILE", parse(from_os_str))]
+    #[clap(conflicts_with = "template", value_name = "FILE")]
     pub(crate) input_file: Option<PathBuf>,
 }
 
 impl AicDesktopArgs {
-    /// Construct RecordOptions.
+    /// Construct [`RecordOptions`].
     ///
-    /// Panics if `output_path` is not set, which should have been validated already.
-    pub fn record_options(&self) -> RecordOptions {
-        RecordOptions {
+    /// Returns an error if options were inconsistent with each other.
+    ///
+    /// Panics if `output_path` is not set or validated (this should have been checked at parse time).
+    pub fn record_options(&self) -> clap::Result<RecordOptions> {
+        let output_path = self
+            .output_file
+            .clone()
+            .expect("output_file should be present");
+        let output_format = determine_record_format(&output_path)
+            .expect("output_file should have been validated to specify a format");
+        Ok(RecordOptions {
             output_path: self.output_file.clone().unwrap(),
+            output_format,
             image_size: self
                 .display_size
                 .0
@@ -111,7 +124,7 @@ impl AicDesktopArgs {
                 }
                 None => None,
             },
-        }
+        })
     }
 }
 
@@ -195,6 +208,23 @@ pub fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
     }
 }
 
+pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'static str> {
+    if let Some(extension) = output_path.extension() {
+        match extension.as_bytes() {
+            // When updating this match, also update the docs for output_file!
+            b"png" | b"PNG" => return Ok(RecordFormat::PngOrApng),
+            b"apng" | b"APNG" => return Ok(RecordFormat::PngOrApng),
+            _ => {}
+        }
+    }
+    // TODO: Have a separate option for choosing file type as a fallback
+    Err("file name must have an extension specifying the type; one of 'png' or 'apng'")
+}
+
+fn validate_output_file(path_str: &OsStr) -> Result<(), &'static str> {
+    determine_record_format(Path::new(path_str)).map(|_| ())
+}
+
 /// Source of the universe to create/load
 ///
 /// TODO: we will eventually want to support new/open while running and this will
@@ -232,9 +262,11 @@ mod tests {
         assert_eq!(
             parse(&["-g", "record", "-o", "output.png"])
                 .unwrap()
-                .record_options(),
+                .record_options()
+                .unwrap(),
             RecordOptions {
                 output_path: PathBuf::from("output.png"),
+                output_format: RecordFormat::PngOrApng,
                 image_size: Vector2::new(640, 480),
                 animation: None,
             },
@@ -245,9 +277,11 @@ mod tests {
         assert_eq!(
             parse(&["-g", "record", "-o", "fancy.png", "--duration", "3"])
                 .unwrap()
-                .record_options(),
+                .record_options()
+                .unwrap(),
             RecordOptions {
                 output_path: PathBuf::from("fancy.png"),
+                output_format: RecordFormat::PngOrApng,
                 image_size: Vector2::new(640, 480),
                 animation: Some(RecordAnimationOptions {
                     frame_count: 180,

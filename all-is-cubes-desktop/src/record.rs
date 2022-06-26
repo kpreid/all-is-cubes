@@ -30,6 +30,7 @@ use crate::session::{ClockSource, DesktopSession};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RecordOptions {
     pub output_path: PathBuf,
+    pub output_format: RecordFormat,
     pub image_size: Vector2<u32>,
     pub animation: Option<RecordAnimationOptions>,
 }
@@ -38,6 +39,12 @@ pub struct RecordOptions {
 pub struct RecordAnimationOptions {
     pub frame_count: usize,
     pub frame_period: Duration,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RecordFormat {
+    // PNG and Animated-PNG are (currently) the same implementation, just with multiple frames or not
+    PngOrApng,
 }
 
 impl RecordOptions {

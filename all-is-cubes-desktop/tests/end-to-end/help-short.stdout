@@ -17,7 +17,7 @@ OPTIONS:
     -h, --help                   Print help information
         --no-config-files        Ignore all configuration files, using only defaults and
                                  command-line options
-    -o, --output <FILE>          Output PNG file name for 'record' mode
+    -o, --output <FILE>          Output file name for 'record' mode
         --precompute-light       Fully calculate light before starting the game
     -t, --template <TEMPLATE>    Which world template to use [default: demo-city] [possible values:
                                  menu, blank, fail, demo-city, dungeon, atrium, cornell-box,

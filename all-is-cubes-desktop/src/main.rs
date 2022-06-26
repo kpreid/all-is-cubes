@@ -20,7 +20,7 @@
 
 use std::time::{Duration, Instant};
 
-use clap::Parser as _;
+use clap::{CommandFactory as _, Parser as _};
 use futures::executor::block_on;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rand::{thread_rng, Rng};
@@ -187,7 +187,12 @@ fn main() -> Result<(), anyhow::Error> {
             winit_main_loop(event_loop, dsession)
         }
         GraphicsType::Terminal => terminal_main_loop(session, TerminalOptions::default()),
-        GraphicsType::Record => record_main(session, options.record_options()),
+        GraphicsType::Record => record_main(
+            session,
+            options
+                .record_options()
+                .map_err(|e| e.format(&mut AicDesktopArgs::command()))?,
+        ),
         GraphicsType::Print => terminal_print_once(
             session,
             TerminalOptions::default(),

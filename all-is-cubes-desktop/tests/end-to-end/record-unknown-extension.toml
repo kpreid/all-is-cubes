@@ -1,0 +1,4 @@
+# Tests the error reported if the output file doesn't have a known extension
+bin.name = "all-is-cubes"
+args = "--no-config-files --graphics record -o should-not-be-written.nonsense"
+status.code = 2

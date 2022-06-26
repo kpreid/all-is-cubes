@@ -46,9 +46,10 @@ OPTIONS:
             Ignore all configuration files, using only defaults and command-line options
 
     -o, --output <FILE>
-            Output PNG file name for 'record' mode.
+            Output file name for 'record' mode.
             
-            If animating, a frame number will be inserted.
+            The file name must have an extension specifying the type; currently only PNG is
+            supported ('.png' or '.apng').
 
         --precompute-light
             Fully calculate light before starting the game
