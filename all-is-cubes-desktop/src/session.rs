@@ -4,10 +4,9 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use all_is_cubes::apps::{Session, StandardCameras};
+use all_is_cubes::apps::Session;
 use all_is_cubes::camera::Viewport;
-use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::raytracer::RtRenderer;
+use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 
@@ -47,19 +46,10 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
 
         // If we are recording, then do it now.
         // (TODO: We want to record 1 frame *before the first step* too)
-        // (TODO: This code is awkward because of partial refactoring to wards recording being a
+        // (TODO: This code is awkward because of partial refactoring towards recording being a
         // option to combine with anything rather than a special main loop mode)
         if let Some(recorder) = self.recorder.as_mut() {
-            // TODO: Start reusing renderers instead of recreating them.
-            let mut renderer = RtRenderer::new(
-                StandardCameras::from_session(&self.session, self.viewport_cell.as_source())
-                    .unwrap(),
-                Box::new(|v| v),
-                ListenableSource::constant(()),
-            );
-            renderer.update(None).unwrap();
-
-            recorder.send_frame(recorder.sending_frame_number(), renderer);
+            recorder.capture_frame(recorder.sending_frame_number());
         }
 
         step_info

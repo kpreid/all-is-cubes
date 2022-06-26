@@ -16,11 +16,11 @@ use image::RgbaImage;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use png::{chunk::ChunkType, Encoder};
 
-use all_is_cubes::apps::Session;
+use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::behavior::AutoRotate;
 use all_is_cubes::camera::{HeadlessRenderer, Viewport};
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::NotNan;
 use all_is_cubes::raytracer::RtRenderer;
 
@@ -96,13 +96,16 @@ pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<()
         }
     }
 
-    let recorder = Recorder::new(options.clone())?;
-
+    let viewport_cell = ListenableCell::new(viewport);
+    let recorder = Recorder::new(
+        options.clone(),
+        StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap(),
+    )?;
     let mut dsession = DesktopSession {
         session,
         renderer: (),
         window: (),
-        viewport_cell: ListenableCell::new(viewport),
+        viewport_cell,
         clock_source: ClockSource::Fixed(match &options.animation {
             Some(anim) => anim.frame_period,
             None => Duration::ZERO,
@@ -166,6 +169,7 @@ pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<()
 ///   the latest scene for each frame.
 #[derive(Debug)]
 pub(crate) struct Recorder<K, R> {
+    cameras: StandardCameras,
     /// The number of times [`Self::send_frame`] has been called.
     sending_frame_number: usize,
     /// None if dropped to signal no more frames
@@ -184,7 +188,7 @@ where
     R: HeadlessRenderer + Send + 'static,
 {
     /// TODO: This is only implementing part of the RecordOptions (not the frame timing); refactor.
-    fn new(options: RecordOptions) -> Result<Self, anyhow::Error> {
+    fn new(options: RecordOptions, cameras: StandardCameras) -> Result<Self, anyhow::Error> {
         // Set up threads. Raytracing is internally parallel using Rayon, but we want to
         // thread everything else too so we're not alternating single-threaded and parallel
         // operations.
@@ -221,13 +225,14 @@ where
             })?;
 
         Ok(Self {
+            cameras,
             sending_frame_number: 0,
             scene_sender: Some(scene_sender),
             status_receiver,
         })
     }
 
-    pub fn send_frame(&mut self, key: K, renderer: R) {
+    fn send_frame(&mut self, key: K, renderer: R) {
         // TODO: instead of panic on send failure, log the problem
         self.scene_sender
             .as_ref()
@@ -243,6 +248,20 @@ where
 
     pub fn no_more_frames(&mut self) {
         self.scene_sender = None;
+    }
+}
+
+impl<K: Send + 'static> Recorder<K, RtRenderer> {
+    pub fn capture_frame(&mut self, key: K) {
+        // TODO: Start reusing renderers instead of recreating them.
+        let mut renderer = RtRenderer::new(
+            self.cameras.clone(),
+            Box::new(|v| v),
+            ListenableSource::constant(()),
+        );
+        renderer.update(None).unwrap();
+
+        self.send_frame(key, renderer);
     }
 }
 
