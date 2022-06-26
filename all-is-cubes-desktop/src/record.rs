@@ -96,7 +96,7 @@ pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<()
     }
 
     let viewport_cell = ListenableCell::new(viewport);
-    let recorder = Recorder::new(
+    let (recorder, status_receiver) = Recorder::new(
         options.clone(),
         StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap(),
     )?;
@@ -126,20 +126,14 @@ pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<()
             dsession.advance_time_and_maybe_step();
 
             // Update progress bar.
-            if let Ok(frame_number) = dsession
-                .recorder
-                .as_mut()
-                .unwrap()
-                .status_receiver
-                .try_recv()
-            {
+            if let Ok(frame_number) = status_receiver.try_recv() {
                 drawing_progress_bar.set_position((frame_number + 1) as u64);
             }
         }
         dsession.recorder.as_mut().unwrap().no_more_frames();
 
         // We've completed sending frames; now block on their completion.
-        while let Ok(frame_number) = dsession.recorder.as_mut().unwrap().status_receiver.recv() {
+        while let Ok(frame_number) = status_receiver.recv() {
             drawing_progress_bar.set_position((frame_number + 1) as u64);
         }
         assert_eq!(
@@ -156,23 +150,28 @@ pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<()
 }
 
 /// Takes world states from a `DesktopSession` and writes renderings to disk.
-///
-/// Internally manages worker threads to offload the rendering work.
 #[derive(Debug)]
-pub(crate) struct Recorder {
+pub(crate) enum Recorder {
+    Raytrace(RtRecorder),
+}
+
+/// Part of [`Recorder`]. Manages worker threads to offload the raytracing work.
+#[derive(Debug)]
+pub(crate) struct RtRecorder {
     cameras: StandardCameras,
     /// The number of times [`Self::send_frame`] has been called.
     sending_frame_number: FrameNumber,
     /// None if dropped to signal no more frames
     scene_sender: Option<mpsc::SyncSender<(FrameNumber, RtRenderer)>>,
-    /// Contains the successive numbers of each frame successfully written.
-    pub status_receiver: mpsc::Receiver<FrameNumber>,
 }
 type FrameNumber = usize;
 
 impl Recorder {
     /// TODO: This is only implementing part of the RecordOptions (not the frame timing); refactor.
-    fn new(options: RecordOptions, cameras: StandardCameras) -> Result<Self, anyhow::Error> {
+    fn new(
+        options: RecordOptions,
+        cameras: StandardCameras,
+    ) -> Result<(Self, mpsc::Receiver<FrameNumber>), anyhow::Error> {
         // Set up threads. Raytracing is internally parallel using Rayon, but we want to
         // thread everything else too so we're not alternating single-threaded and parallel
         // operations.
@@ -208,38 +207,52 @@ impl Recorder {
                 }
             })?;
 
-        Ok(Self {
-            cameras,
-            sending_frame_number: 0,
-            scene_sender: Some(scene_sender),
+        Ok((
+            Recorder::Raytrace(RtRecorder {
+                cameras,
+                sending_frame_number: 0,
+                scene_sender: Some(scene_sender),
+            }),
             status_receiver,
-        })
+        ))
     }
 
     fn send_frame(&mut self, renderer: RtRenderer) {
-        // TODO: instead of panic on send failure, log the problem
-        self.scene_sender
-            .as_ref()
-            .expect("cannot send_frame() after no_more_frames()")
-            .send((self.sending_frame_number, renderer))
-            .expect("channel closed; recorder render thread died?");
-        self.sending_frame_number += 1;
+        match self {
+            Recorder::Raytrace(rec) => {
+                // TODO: instead of panic on send failure, log the problem
+                rec.scene_sender
+                    .as_ref()
+                    .expect("cannot send_frame() after no_more_frames()")
+                    .send((rec.sending_frame_number, renderer))
+                    .expect("channel closed; recorder render thread died?");
+                rec.sending_frame_number += 1;
+            }
+        }
     }
 
     pub fn no_more_frames(&mut self) {
-        self.scene_sender = None;
+        match self {
+            Recorder::Raytrace(rec) => {
+                rec.scene_sender = None;
+            }
+        }
     }
 
     pub fn capture_frame(&mut self) {
-        // TODO: Start reusing renderers instead of recreating them.
-        let mut renderer = RtRenderer::new(
-            self.cameras.clone(),
-            Box::new(|v| v),
-            ListenableSource::constant(()),
-        );
-        renderer.update(None).unwrap();
+        match self {
+            Recorder::Raytrace(rec) => {
+                // TODO: Start reusing renderers instead of recreating them.
+                let mut renderer = RtRenderer::new(
+                    rec.cameras.clone(),
+                    Box::new(|v| v),
+                    ListenableSource::constant(()),
+                );
+                renderer.update(None).unwrap();
 
-        self.send_frame(renderer);
+                self.send_frame(renderer);
+            }
+        }
     }
 }
 
