@@ -215,7 +215,7 @@ where
                 });
                 chunk.recompute_mesh(
                     todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
-                    &*space,
+                    space,
                     mesh_options,
                     &self.block_meshes,
                 );

@@ -346,7 +346,7 @@ impl InputProcessor {
                         });
                     }
                 }
-                Key::Character(numeral) if numeral.is_digit(10) => {
+                Key::Character(numeral) if numeral.is_ascii_digit() => {
                     let digit = numeral.to_digit(10).unwrap() as usize;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
                     if let Some(character_ref) = character_opt {

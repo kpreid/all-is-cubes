@@ -129,7 +129,7 @@ impl<H: Transactional + 'static> BehaviorSet<H> {
         let mut transactions = Vec::new();
         for (index, behavior) in self.items.iter().enumerate() {
             let context = &BehaviorContext {
-                host: &*host,
+                host,
                 host_transaction_binder,
                 self_transaction_binder: &|new_behavior| {
                     host_transaction_binder(set_transaction_binder(

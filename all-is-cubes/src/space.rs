@@ -899,7 +899,7 @@ impl SpaceBlockData {
         // TODO: double ref error check suggests that maybe evaluate() and listen() should be one combined operation.
         let evaluated = block.evaluate().map_err(SetCubeError::EvalBlock)?;
         let (gate, block_listener) = listener.gate();
-        let _ = block
+        block
             .listen(block_listener)
             .map_err(SetCubeError::EvalBlock)?;
         Ok(Self {
