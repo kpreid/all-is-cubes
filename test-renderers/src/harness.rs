@@ -59,7 +59,9 @@ impl RenderTestContext {
     }
 
     pub fn universe(&self) -> &Universe {
-        &*self.universe.as_ref().unwrap()
+        self.universe
+            .as_ref()
+            .expect("RenderTestContext not configured with universe input")
     }
 
     #[track_caller]

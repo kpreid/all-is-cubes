@@ -55,7 +55,7 @@ pub(crate) fn write_report_file() -> PathBuf {
                 id: test_id.clone(),
                 renderers: comparison_records
                     .iter()
-                    .map(|records| match records.get(&*test_id) {
+                    .map(|records| match records.get(test_id) {
                         Some(&TestCaseOutput {
                             passed,
                             test_id: _,
