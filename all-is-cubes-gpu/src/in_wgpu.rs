@@ -402,7 +402,8 @@ impl EverythingRenderer {
     ) -> Result<UpdateInfo, GraphicsResourceError> {
         let start_frame_time = Instant::now();
 
-        // This updates camera matrices and graphics options
+        // This updates camera matrices and graphics options which we are going to consult
+        // or copy to the GPU.
         self.cameras.update();
 
         // Update viewport-sized resources from viewport.
@@ -502,7 +503,9 @@ impl EverythingRenderer {
             encoder: &mut encoder,
         };
 
-        let world_deadline = Instant::now() + frame_budget.update_meshes.world;
+        let update_prep_to_space_update_time = Instant::now();
+
+        let world_deadline = update_prep_to_space_update_time + frame_budget.update_meshes.world;
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
         let space_infos: Layers<SpaceUpdateInfo> = Layers {
@@ -536,6 +539,8 @@ impl EverythingRenderer {
                 .unwrap_or_default(),
         };
 
+        let space_update_to_lines_time = Instant::now();
+
         // Prepare cursor and debug lines.
         {
             let mut v: Vec<WgpuLinesVertex> = Vec::new();
@@ -565,12 +570,18 @@ impl EverythingRenderer {
             self.lines_vertex_count = v.len() as u32;
         };
 
+        let lines_to_submit_time = Instant::now();
+
         // TODO: measure time of these
         self.staging_belt.finish();
         queue.submit(std::iter::once(encoder.finish()));
 
+        let finish_update_time = Instant::now();
         Ok(UpdateInfo {
-            total_time: Instant::now().duration_since(start_frame_time),
+            total_time: finish_update_time.duration_since(start_frame_time),
+            prep_time: update_prep_to_space_update_time.duration_since(start_frame_time),
+            lines_time: lines_to_submit_time.duration_since(space_update_to_lines_time),
+            submit_time: Some(finish_update_time.duration_since(lines_to_submit_time)),
             spaces: space_infos,
         })
     }

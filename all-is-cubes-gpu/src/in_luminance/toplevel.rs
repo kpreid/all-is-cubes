@@ -198,6 +198,8 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         CS: ColorSlot<Backend, Dim2>,
         DS: DepthStencilSlot<Backend, Dim2>,
     {
+        let start_frame_time = Instant::now();
+
         // This updates camera matrices and graphics options
         self.cameras.update();
         let graphics_options = self.cameras.graphics_options();
@@ -243,7 +245,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         let world_space: Option<&URef<Space>> = character.map(|c| &c.space);
 
         // Now we get into the meat of the space-renderer computation.
-        let start_prepare_time = Instant::now();
+        let update_prep_to_space_update_time = Instant::now();
 
         // Make sure we're rendering the right spaces.
         // TODO: we should be able to express this as something like "Layers::for_each_zip()"
@@ -255,7 +257,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         }
 
         // Get SpaceRendererOutput (per-frame ready to draw data)
-        let world_deadline = start_prepare_time + frame_budget.update_meshes.world;
+        let world_deadline = update_prep_to_space_update_time + frame_budget.update_meshes.world;
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
         let world_output: Option<SpaceRendererOutput<'_, C::Backend>> = self
             .space_renderers
@@ -279,8 +281,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                 .unwrap_or_default(),
         };
 
-        let prepare_time = Instant::now().duration_since(start_prepare_time);
-
+        let space_update_to_lines_time = Instant::now();
         let debug_lines_tess = {
             let mut v: Vec<LinesVertex> = Vec::new();
             gather_debug_lines(character, graphics_options, &mut v, cursor_result);
@@ -301,7 +302,8 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         // TODO: cache
         let cursor_tess = make_cursor_tess(context, cursor_result)?;
 
-        let start_draw_world_time = Instant::now();
+        let update_to_draw_time = Instant::now();
+
         let clear_color = match world_output.as_ref() {
             Some(o) => o.data.clear_color(),
             None => palette::NO_WORLD_TO_SHOW,
@@ -357,7 +359,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             .assume()
             .into_result()?;
 
-        let start_draw_ui_time = Instant::now();
+        let draw_world_to_draw_ui_time = Instant::now();
         let mut ui_draw_info = SpaceDrawInfo::default();
         context
             .new_pipeline_gate()
@@ -382,13 +384,16 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         let end_time = Instant::now();
         Ok(RenderInfo {
             update: UpdateInfo {
-                total_time: prepare_time,
+                total_time: start_frame_time.duration_since(update_to_draw_time),
+                prep_time: update_prep_to_space_update_time.duration_since(start_frame_time),
+                lines_time: update_to_draw_time.duration_since(space_update_to_lines_time),
+                submit_time: None,
                 spaces: space_update_info,
             },
             draw: DrawInfo {
                 times: Layers {
-                    world: start_draw_ui_time.duration_since(start_draw_world_time),
-                    ui: end_time.duration_since(start_draw_ui_time),
+                    world: draw_world_to_draw_ui_time.duration_since(update_to_draw_time),
+                    ui: end_time.duration_since(draw_world_to_draw_ui_time),
                 },
                 space_info: Layers {
                     world: world_draw_info,

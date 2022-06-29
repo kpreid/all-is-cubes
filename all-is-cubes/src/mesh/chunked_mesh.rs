@@ -130,6 +130,8 @@ where
         CF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
         IF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
     {
+        let update_start_time = Instant::now();
+
         let graphics_options = camera.options();
         let mesh_options = MeshOptions::new(graphics_options, Vert::WANTS_LIGHT);
         let view_point = camera.view_position();
@@ -142,7 +144,10 @@ where
             space
         } else {
             // TODO: report error
-            return CsmUpdateInfo::default();
+            return CsmUpdateInfo {
+                prep_time: Instant::now().duration_since(update_start_time),
+                ..CsmUpdateInfo::default()
+            };
         };
 
         if Some(&mesh_options) != self.last_mesh_options.as_ref() {
@@ -160,6 +165,10 @@ where
             // stale by the new block versioning value.
         }
 
+        self.chunk_chart.resize_if_needed(camera.view_distance());
+
+        let prep_to_update_meshes_time = Instant::now();
+
         let block_updates = self.block_meshes.update(
             &mut todo.blocks,
             space,
@@ -172,14 +181,13 @@ where
         // We are now done with todo preparation, and block mesh updates,
         // and can start updating chunk meshes.
 
-        self.chunk_chart.resize_if_needed(camera.view_distance());
+        let block_update_to_chunk_scan_time = Instant::now();
 
         // Update some chunk geometry.
         let chunk_grid = space.grid().divide(CHUNK_SIZE);
         let mut chunk_mesh_generation_times = TimeStats::default();
         let mut chunk_mesh_callback_times = TimeStats::default();
         let mut chunks_are_missing = false;
-        let chunk_scan_start_time = Instant::now();
         for p in self.chunk_chart.chunks(view_chunk, OctantMask::ALL) {
             if !chunk_grid.contains_cube(p.0) {
                 // Chunk not in the Space
@@ -246,8 +254,12 @@ where
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
         CsmUpdateInfo {
+            total_time: depth_sort_end_time
+                .unwrap_or(chunk_scan_end_time)
+                .duration_since(update_start_time),
+            prep_time: prep_to_update_meshes_time.duration_since(update_start_time),
             chunk_scan_time: chunk_scan_end_time
-                .saturating_duration_since(chunk_scan_start_time)
+                .saturating_duration_since(block_update_to_chunk_scan_time)
                 .saturating_sub(chunk_mesh_generation_times.sum + chunk_mesh_callback_times.sum),
             chunk_mesh_generation_times,
             chunk_mesh_callback_times,
@@ -266,9 +278,13 @@ where
 
 /// Performance info from a [`ChunkedSpaceMesh`]'s per-frame update.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct CsmUpdateInfo {
+    pub total_time: Duration,
+    /// Time spent on gathering information before starting the chunk scan.
+    pub prep_time: Duration,
     /// Time spent on traversing chunks in view this frame,
-    /// excluding the other steps.
+    /// excluding the actual chunk mesh generation operations.
     pub chunk_scan_time: Duration,
     /// Time spent on building chunk meshes this frame.
     pub chunk_mesh_generation_times: TimeStats,
@@ -284,12 +300,14 @@ impl CustomFormat<StatusText> for CsmUpdateInfo {
         write!(
             fmt,
             indoc! {"
+                Space prep     {}
                 Block mesh gen {}
                 Chunk scan     {}
                       mesh gen {}
                       upload   {}
                       depthsort {}\
             "},
+            self.prep_time.custom_format(StatusText),
             self.block_updates,
             self.chunk_scan_time.custom_format(StatusText),
             self.chunk_mesh_generation_times,

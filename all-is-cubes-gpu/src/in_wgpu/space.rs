@@ -147,6 +147,8 @@ impl SpaceRenderer {
         camera: &Camera,
         bwp: BeltWritingParts<'_, '_>,
     ) -> Result<SpaceUpdateInfo, GraphicsResourceError> {
+        let start_time = Instant::now();
+
         let mut todo = self.todo.lock().unwrap();
 
         let space = &*self
@@ -213,7 +215,11 @@ impl SpaceRenderer {
         // } else {
         //     //self.debug_chunk_boxes_tess = None;
         // }
+
+        let end_time = Instant::now();
+
         Ok(SpaceUpdateInfo {
+            total_time: end_time.duration_since(start_time),
             light_update_time: end_light_update.duration_since(start_light_update),
             light_update_count,
             chunk_info: csm_info,

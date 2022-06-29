@@ -100,6 +100,8 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
     where
         C: GraphicsContext<Backend = Backend>,
     {
+        let start_time = Instant::now();
+
         let graphics_options = camera.options();
         let mut todo = self.todo.lock().unwrap();
 
@@ -216,6 +218,8 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
             self.debug_chunk_boxes_tess = None;
         }
 
+        let end_time = Instant::now();
+
         Ok(SpaceRendererOutput {
             data: SpaceRendererOutputData {
                 camera: camera.clone(),
@@ -223,6 +227,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 debug_chunk_boxes_tess: &self.debug_chunk_boxes_tess,
                 view_chunk,
                 update_info: SpaceUpdateInfo {
+                    total_time: end_time.duration_since(start_time),
                     light_update_time: end_light_update.duration_since(start_light_update),
                     light_update_count,
                     chunk_info: csm_info,

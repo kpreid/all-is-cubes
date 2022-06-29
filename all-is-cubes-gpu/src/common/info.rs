@@ -19,18 +19,36 @@ pub struct RenderInfo {
     pub(crate) draw: DrawInfo,
 }
 
+/// Info about the “update” operation, where fresh scene information is gathered,
+/// processed (e.g. mesh generation), and copied to GPU memory.
+///
+/// All of the timings here are CPU time, so they do not account for GPU activity
+/// unless blocking occurs.
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct UpdateInfo {
+    /// Start-to-finish time for the update operation.
     pub(crate) total_time: Duration,
+    /// Time taken on miscellaneous preparatory actions such as calculating the current
+    /// camera state.
+    pub(crate) prep_time: Duration,
+    /// Time taken on gathering cursor and debug line vertices.
+    pub(crate) lines_time: Duration,
+    /// Time taken on submitting accumulated information to the GPU.
+    /// `None` if the graphics API does not expose this as a step.
+    pub(crate) submit_time: Option<Duration>,
+    /// Per-space details, including time taken.
     pub(crate) spaces: Layers<SpaceUpdateInfo>,
 }
 
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct DrawInfo {
+    /// Total time taken by drawing each layer.
     pub(crate) times: Layers<Duration>,
     pub(crate) space_info: Layers<SpaceDrawInfo>,
+    /// Time taken on submitting accumulated information to the GPU.
+    /// `None` if the graphics API does not expose this as a step.
     pub(crate) submit_time: Option<Duration>,
 }
 
@@ -40,6 +58,9 @@ impl CustomFormat<StatusText> for RenderInfo {
             update:
                 UpdateInfo {
                     total_time: update_time,
+                    prep_time: update_prep_time,
+                    lines_time,
+                    submit_time: update_submit_time,
                     spaces: ref update_spaces,
                 },
             draw:
@@ -54,8 +75,10 @@ impl CustomFormat<StatusText> for RenderInfo {
             .saturating_add(draw_time.world)
             .saturating_add(draw_time.ui);
 
+        // Overall summary line
         write!(
             fmt,
+            // TODO: adjust this format to account for more pieces
             "Frame time: {} (update {}, draw world {}, ui {}",
             total_time.custom_format(StatusText),
             update_time.custom_format(StatusText),
@@ -65,9 +88,25 @@ impl CustomFormat<StatusText> for RenderInfo {
         if let Some(t) = submit_time {
             write!(fmt, ", submit {}", t.custom_format(StatusText))?;
         }
+        writeln!(fmt, ")")?;
+
+        // UpdateInfo details
         write!(
             fmt,
-            ")\n\nWORLD:\n{}\n{}\n\n",
+            "Update breakdown: prep {}, world mesh {}, ui mesh {}, lines {}",
+            update_prep_time.custom_format(StatusText),
+            update_spaces.world.total_time.custom_format(StatusText),
+            update_spaces.ui.total_time.custom_format(StatusText),
+            lines_time.custom_format(StatusText),
+        )?;
+        if let Some(t) = update_submit_time {
+            write!(fmt, ", submit {}", t.custom_format(StatusText))?;
+        }
+
+        // Spaces
+        write!(
+            fmt,
+            "\n\nWORLD:\n{}\n{}\n\n",
             update_spaces.world.custom_format(StatusText),
             draw_spaces.world.custom_format(StatusText)
         )?;
@@ -90,6 +129,8 @@ impl CustomFormat<StatusText> for RenderInfo {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct SpaceUpdateInfo {
+    pub(crate) total_time: Duration,
+
     /// Status of the block and chunk meshes.
     pub(crate) chunk_info: CsmUpdateInfo,
     /// Status of the texture atlas.
@@ -104,6 +145,7 @@ pub struct SpaceUpdateInfo {
 impl CustomFormat<StatusText> for SpaceUpdateInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
         let &SpaceUpdateInfo {
+            total_time: _, // we print this as summary info from the parent only
             ref chunk_info,
             ref texture_info,
             light_update_time,
