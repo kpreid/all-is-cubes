@@ -105,12 +105,12 @@ fn block_vertex_main(
 ) -> BlockFragmentInput {
     var normal = vec3<f32>(1.0);
     switch (input.normal_face) {
-        case 1: { normal = vec3<f32>(-1.0, 0.0, 0.0); }
-        case 2: { normal = vec3<f32>(0.0, -1.0, 0.0); }
-        case 3: { normal = vec3<f32>(0.0, 0.0, -1.0); }
-        case 4: { normal = vec3<f32>(1.0, 0.0, 0.0); }
-        case 5: { normal = vec3<f32>(0.0, 1.0, 0.0); }
-        case 6: { normal = vec3<f32>(0.0, 0.0, 1.0); }
+        case 1u: { normal = vec3<f32>(-1.0, 0.0, 0.0); }
+        case 2u: { normal = vec3<f32>(0.0, -1.0, 0.0); }
+        case 3u: { normal = vec3<f32>(0.0, 0.0, -1.0); }
+        case 4u: { normal = vec3<f32>(1.0, 0.0, 0.0); }
+        case 5u: { normal = vec3<f32>(0.0, 1.0, 0.0); }
+        case 6u: { normal = vec3<f32>(0.0, 0.0, 1.0); }
         default: {}
     }
 
@@ -155,7 +155,7 @@ fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
     lookup_position = (lookup_position % size + size) % size;
 
     let texel: vec4<u32> = textureLoad(light_texture, lookup_position, 0);
-    let packed_light = vec4<i32>(texel.rgb);
+    let packed_light = vec3<i32>(texel.rgb);
 
     // Decode logarithmic representation.
     // Exception: A texel value of exactly 0 is taken as 0, not the lowest power of 2.
