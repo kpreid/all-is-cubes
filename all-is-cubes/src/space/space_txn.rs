@@ -282,7 +282,7 @@ impl Merge for SpaceTransaction {
         }
         for (cube, t1) in cubes1.iter() {
             if let Some(t2) = cubes2.get(cube) {
-                let () = t1.check_merge(t2)?;
+                let CubeMergeCheck {} = t1.check_merge(t2)?;
             }
         }
         self.behaviors.check_merge(&other.behaviors)
@@ -296,7 +296,7 @@ impl Merge for SpaceTransaction {
             match self.cubes.entry(cube) {
                 Occupied(mut entry) => {
                     let t1_ref = entry.get_mut();
-                    *t1_ref = mem::take(t1_ref).commit_merge(t2, ());
+                    *t1_ref = mem::take(t1_ref).commit_merge(t2, CubeMergeCheck {});
                 }
                 Vacant(entry) => {
                     entry.insert(t2);
@@ -356,7 +356,7 @@ impl CubeTransaction {
 }
 
 impl Merge for CubeTransaction {
-    type MergeCheck = ();
+    type MergeCheck = CubeMergeCheck;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
         if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
@@ -368,10 +368,10 @@ impl Merge for CubeTransaction {
             // equal, doing so could violate an intended conservation law.
             return Err(TransactionConflict {});
         }
-        Ok(())
+        Ok(CubeMergeCheck {})
     }
 
-    fn commit_merge(self, other: Self, (): Self::MergeCheck) -> Self
+    fn commit_merge(self, other: Self, CubeMergeCheck {}: Self::MergeCheck) -> Self
 where {
         CubeTransaction {
             // This would be more elegant if `conserved` was within the `self.new` Option.
@@ -383,6 +383,12 @@ where {
             activate: self.activate || other.activate,
         }
     }
+}
+
+struct CubeMergeCheck {
+    // This might end up having some data later.
+    // For now, it's a placeholder to avoid passing () around
+    // and getting clippy::let_unit_value warnings
 }
 
 #[cfg(test)]
