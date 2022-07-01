@@ -118,10 +118,11 @@ where
 }
 
 /// Polymorphic container for transactions in a [`UniverseTransaction`].
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 enum AnyTransaction {
+    #[default]
     Noop,
     BlockDef(TransactionInUniverse<BlockDef>),
     Character(TransactionInUniverse<Character>),
@@ -243,12 +244,6 @@ impl Merge for AnyTransaction {
             (Space(t1), Space(t2)) => merge_helper(t1, t2, Space, check),
             (_, _) => panic!("Mismatched transaction target types"),
         }
-    }
-}
-
-impl Default for AnyTransaction {
-    fn default() -> Self {
-        Self::Noop
     }
 }
 
@@ -428,10 +423,11 @@ impl Debug for UniverseTransaction {
 /// Note: This does not implement [`Transaction`] because it needs to refer to an
 /// _entry_ in a Universe. We could kludge around that by having it take the Universe
 /// and embed the Name, but that's unnecessary.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 enum MemberTxn {
     /// Mergeable types are required to have a no-operation [`Default`] value,
     /// though this shouldn't come up much.
+    #[default]
     Noop,
     /// Apply given transaction to the existing value.
     Modify(AnyTransaction),
@@ -533,14 +529,6 @@ impl MemberTxn {
             Modify(t) => t.universe_id(),
             Noop | Insert(_) => None,
         }
-    }
-}
-
-/// This probably won't be used but is mandated by the implementation of
-/// Merge for HashMap.
-impl Default for MemberTxn {
-    fn default() -> Self {
-        Self::Noop
     }
 }
 

@@ -20,17 +20,11 @@ pub struct OptionsInUrl {
     pub renderer: RendererOption,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum RendererOption {
+    #[default] // TODO: change to Wgpu when that works better
     Luminance,
     Wgpu,
-}
-
-impl Default for RendererOption {
-    fn default() -> Self {
-        // TODO: change to Wgpu when that works better
-        Self::Luminance
-    }
 }
 
 /// Parse the given URL query string (without leading "?") to obtain configuration parameters.
