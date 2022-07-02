@@ -65,7 +65,19 @@ jobs:
     - name: Run exhaustive tests
       if: ${{ matrix.toolchain == 'stable' && matrix.depversions == 'locked' }}
       run: cargo xtask test-more
-    # Unlike the above, we *do* run lint against all versions because future
+    
+    # Save the test-renderers results so we can download and view them
+    - name: Save test-renderers output
+      if: ${{ always() && matrix.toolchain == 'stable' && matrix.depversions == 'locked' }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-renderers-output
+        path: |
+          target/test-renderers-*/
+          test-renderers/expected/
+          test-renderers/src/report.css
+
+    # Unlike the tests, we *do* run lint against all versions because future
     # warnings might be interesting.
     - name: Lint
       run: cargo xtask lint
@@ -74,7 +86,7 @@ jobs:
     # (but only for the stablest matrix version)
     - name: Save wasm dist artifact
       if: ${{ matrix.toolchain == 'stable' && matrix.depversions == 'locked' }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: wasm-dist
         path: all-is-cubes-wasm/dist
