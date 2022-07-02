@@ -6,6 +6,7 @@
 //! TODO: This code is experimental and not feature-complete.
 
 use std::mem;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use instant::Instant;
@@ -45,7 +46,6 @@ mod space;
 use space::SpaceRenderer;
 mod vertex;
 
-const LINEAR_COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 /// Entry point for [`wgpu`] rendering. Construct this and hand it the [`wgpu::Surface`]
@@ -80,6 +80,7 @@ impl SurfaceRenderer {
             device.clone(),
             cameras,
             surface.get_supported_formats(adapter)[0],
+            adapter,
         );
 
         Ok(Self {
@@ -161,8 +162,13 @@ pub struct EverythingRenderer {
     config: wgpu::SurfaceConfiguration,
 
     /// Texture into which geometry is drawn before postprocessing.
+    ///
+    /// Is a floating-point texture allowing HDR rendering, if the backend supports that.
+    /// "Linear" in that the values stored in it are not sRGB-encoded as read and written,
+    /// though they are if that's all we can support.
     linear_scene_texture: wgpu::Texture,
     linear_scene_texture_view: wgpu::TextureView,
+    linear_scene_texture_format: wgpu::TextureFormat,
     /// Depth texture to pair with `linear_scene_texture`.
     depth_texture: wgpu::Texture,
     depth_texture_view: wgpu::TextureView,
@@ -203,12 +209,13 @@ impl EverythingRenderer {
     pub fn new(
         device: Arc<wgpu::Device>,
         cameras: StandardCameras,
-        format: wgpu::TextureFormat,
+        surface_format: wgpu::TextureFormat,
+        adapter: &wgpu::Adapter,
     ) -> Self {
         let viewport = cameras.viewport();
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format,
+            format: surface_format,
             // wgpu operations will fail if the size is zero; set a minimum of 1 so we can
             // successfully initialize and get a working renderer later.
             width: viewport.framebuffer_size.x.max(1),
@@ -216,7 +223,31 @@ impl EverythingRenderer {
             present_mode: wgpu::PresentMode::Fifo,
         };
 
-        let (linear_scene_texture, depth_texture) = create_fb_textures(&device, &config);
+        // Downlevel GL backend may not support rendering to float textures, so we need
+        // to check explicitly.
+        let preferred_color_format = wgpu::TextureFormat::Rgba16Float;
+        let linear_scene_texture_format = if adapter
+            .get_texture_format_features(preferred_color_format)
+            .allowed_usages
+            .contains(LINEAR_SCENE_TEXTURE_USAGES)
+        {
+            preferred_color_format
+        } else {
+            // Fall back to sRGB, which loses HDR support.
+            // TODO: Also disable tone mapping since it'll make things worse.
+            // TODO: expose this "not working as intended" via RenderInfo and eventually the UI
+            // (except when user settings are such that it doesn't matter).
+            static HDR_WARNING_SENT: AtomicBool = AtomicBool::new(false);
+            if !HDR_WARNING_SENT.swap(true, Ordering::Relaxed) {
+                log::warn!(
+                    "{preferred_color_format:?} texture support unavailable; HDR rendering disabled."
+                );
+            }
+            wgpu::TextureFormat::Rgba8UnormSrgb
+        };
+
+        let (linear_scene_texture, depth_texture) =
+            create_fb_textures(&device, &config, linear_scene_texture_format);
 
         let postprocess_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -265,7 +296,7 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::postprocess_bind_group_layout"),
             });
 
-        let pipelines = Pipelines::new(&device, LINEAR_COLOR_FORMAT);
+        let pipelines = Pipelines::new(&device, linear_scene_texture_format);
 
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
@@ -273,6 +304,7 @@ impl EverythingRenderer {
                 std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
             ),
 
+            linear_scene_texture_format,
             linear_scene_texture_view: linear_scene_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             linear_scene_texture,
@@ -405,8 +437,11 @@ impl EverythingRenderer {
                 self.config.width = size.x;
                 self.config.height = size.y;
 
-                (self.linear_scene_texture, self.depth_texture) =
-                    create_fb_textures(&self.device, &self.config);
+                (self.linear_scene_texture, self.depth_texture) = create_fb_textures(
+                    &self.device,
+                    &self.config,
+                    self.linear_scene_texture_format,
+                );
                 self.linear_scene_texture_view =
                     self.linear_scene_texture.create_view(&Default::default());
                 self.depth_texture_view = self.depth_texture.create_view(&Default::default());
@@ -775,12 +810,16 @@ impl EverythingRenderer {
     }
 }
 
+const LINEAR_SCENE_TEXTURE_USAGES: wgpu::TextureUsages =
+    wgpu::TextureUsages::RENDER_ATTACHMENT.union(wgpu::TextureUsages::TEXTURE_BINDING);
+
 /// Create linear color texture and depth texture.
 ///
 /// `config` must be valid (in particular, not zero sized).
 fn create_fb_textures(
     device: &wgpu::Device,
     config: &wgpu::SurfaceConfiguration,
+    scene_texture_format: wgpu::TextureFormat,
 ) -> (wgpu::Texture, wgpu::Texture) {
     (
         device.create_texture(&wgpu::TextureDescriptor {
@@ -793,8 +832,8 @@ fn create_fb_textures(
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: LINEAR_COLOR_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            format: scene_texture_format,
+            usage: LINEAR_SCENE_TEXTURE_USAGES,
         }),
         device.create_texture(&wgpu::TextureDescriptor {
             label: Some("EverythingRenderer::depth_texture"),

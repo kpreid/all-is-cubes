@@ -49,7 +49,7 @@ pub async fn main() -> test_renderers::HarnessResult {
 
     if let Some(adapter) = adapter {
         eprintln!("Using: {:?}", adapter.get_info());
-        WGPU_ADAPTER.set(adapter).unwrap();
+        WGPU_ADAPTER.set(Arc::new(adapter)).unwrap();
     } else {
         eprintln!("Skipping rendering tests due to lack of wgpu::Adapter.");
         return ExitCode::SUCCESS;
@@ -68,26 +68,28 @@ pub async fn main() -> test_renderers::HarnessResult {
 /// but we can use just one [`wgpu::Adapter`] to create all of them.
 /// TODO: Should we bother not making this global, but threading it through
 /// the test harness? Probably, in the form of some `impl TestRenderer`.
-static WGPU_ADAPTER: OnceCell<wgpu::Adapter> = OnceCell::const_new();
+static WGPU_ADAPTER: OnceCell<Arc<wgpu::Adapter>> = OnceCell::const_new();
 
 async fn get_factory() -> WgpuFactory {
-    let (device, queue) = WGPU_ADAPTER
+    let adapter: &Arc<wgpu::Adapter> = WGPU_ADAPTER
         .get()
-        .expect("Called get_device() without initializing WGPU_ADAPTER")
+        .expect("Called get_device() without initializing WGPU_ADAPTER");
+    let (device, queue) = adapter
         .request_device(&EverythingRenderer::device_descriptor(), None)
         .await
         .expect("Adapter::request_device() failed");
-
-    let device = Arc::new(device);
-    let queue = Arc::new(queue);
-
-    WgpuFactory { device, queue }
+    WgpuFactory {
+        device: Arc::new(device),
+        queue: Arc::new(queue),
+        adapter: Arc::clone(adapter),
+    }
 }
 
 #[derive(Clone, Debug)]
 struct WgpuFactory {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
+    adapter: Arc<wgpu::Adapter>,
 }
 
 impl RendererFactory for WgpuFactory {
@@ -97,6 +99,7 @@ impl RendererFactory for WgpuFactory {
             self.device.clone(),
             cameras,
             wgpu::TextureFormat::Rgba8UnormSrgb,
+            &self.adapter,
         );
 
         let viewport_dirty = DirtyFlag::listening(false, |l| viewport_source.listen(l));
