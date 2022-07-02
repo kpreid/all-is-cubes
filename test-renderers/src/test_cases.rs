@@ -170,7 +170,9 @@ async fn cursor_basic(mut context: RenderTestContext) {
 
     // 1 unit difference threshold: we might have a color rounding error,
     // but everything else should be exact.
-    context.render_comparison_test(1, cameras, overlays).await;
+    context
+        .render_comparison_test(COLOR_ROUNDING_MAX_DIFF, cameras, overlays)
+        .await;
 }
 
 async fn fog(mut context: RenderTestContext, fog: FogOption) {
@@ -487,7 +489,7 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
 
     let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
     context
-        .render_comparison_test(2, scene, Overlays::NONE)
+        .render_comparison_test(COLOR_ROUNDING_MAX_DIFF, scene, Overlays::NONE)
         .await;
 }
 
@@ -544,6 +546,12 @@ async fn zero_viewport(mut context: RenderTestContext) {
 
 /// Maximum expected color difference for tests that have text shadows.
 const TEXT_MAX_DIFF: u8 = 20;
+
+/// Maximum expected color difference for tests that should at most have rounding errors
+///
+/// Note: This should really be 1, but 2 was observed when using the non-HDR fallback
+/// rendering.
+const COLOR_ROUNDING_MAX_DIFF: u8 = 2;
 
 /// A set of graphics options that are the defaults but with everything that might tweak
 /// colors turned off: lighting, fog, and tone mapping.
