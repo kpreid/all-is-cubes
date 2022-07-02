@@ -20,6 +20,14 @@ use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main]
 pub async fn main() -> test_renderers::HarnessResult {
+    simplelog::TermLogger::init(
+        simplelog::LevelFilter::Debug,
+        simplelog::ConfigBuilder::new().build(),
+        simplelog::TerminalMode::Stderr,
+        simplelog::ColorChoice::Auto,
+    )
+    .unwrap();
+
     let instance = wgpu::Instance::new(wgpu::Backends::all()); // TODO: test more backends?
 
     eprintln!("Available adapters:");

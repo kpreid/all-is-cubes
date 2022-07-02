@@ -51,6 +51,9 @@ jobs:
       # so that the build of wasm-pack will be cached by rust-cache action.
       run: CARGO_TARGET_DIR=`pwd`/target cargo install wasm-pack
 
+    - name: GL Info
+      run: glxinfo || true
+
     # Run tests in `test-more` mode in the "normal" matrix configuration, and
     # run them in the faster mode (which does not try disabling/enabling
     # features) for all other variations.
