@@ -23,8 +23,8 @@ use tui::{backend::CrosstermBackend, Terminal};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::camera::{Camera, Viewport};
-use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::cgmath::{ElementWise as _, Point2};
+use all_is_cubes::cgmath::{ElementWise as _, InnerSpace, Point2};
+use all_is_cubes::cgmath::{Vector2, Vector3};
 use all_is_cubes::inv::Slot;
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{FreeCoordinate, Rgba};
@@ -870,16 +870,52 @@ impl ColorMode {
             (None, _) => Some(Color::Reset),
             // ColorMode::Sixteen => {}
             (Some(rgba), ColorMode::TwoFiftySix) => {
-                let [r, g, b, _] = rgba.to_srgb8();
-
-                // Crossterm doesn't have a convenient 216-color table. Use Termion's.
-                use termion::color::AnsiValue;
-                fn scale(x: u8) -> u8 {
-                    ((u16::from(x) * 5) / 255) as u8
+                // The 256-color palette consists of
+                // * the original 16 "ANSI" colors,
+                // * a 216-color 6×6×6 RGB color cube (unevenly divided) starting at index 16,
+                // * and a grayscale ramp from index 232 to 255 (without black or white entries).
+                fn srgb_to_216(x: u8) -> u8 {
+                    match x {
+                        0..=47 => 0,    // 0
+                        48..=114 => 1,  // 95
+                        115..=154 => 2, // 135
+                        155..=194 => 3, // 175
+                        195..=234 => 4, // 215
+                        235..=255 => 5, // 255
+                    }
                 }
-                let AnsiValue(byte) = AnsiValue::rgb(scale(r), scale(g), scale(b));
+                fn srgb_to_gray(x: u8) -> u8 {
+                    // TODO: the ramp is not quite linear-in-sRGB-value at the ends, so this is not
+                    // quite an accurate conversion. We could also get more shades by using the
+                    // grays that appear in the color cube.
+                    let gray_ramp_color = (f32::from(x) / 255. * 25.).round() as u8; // zero to 25
+                    if gray_ramp_color == 0 {
+                        16 // Black from the color cube
+                    } else if gray_ramp_color == 25 {
+                        231 // Bhite from the color cube
+                    } else {
+                        // The contiguous ramp range excludes black and white.
+                        gray_ramp_color + 231
+                    }
+                }
 
-                Some(Color::AnsiValue(byte))
+                let luminance = rgba.luminance();
+                // TODO: this is probably not how you calculate saturation
+                let saturation = Vector3::from(rgba.to_rgb())
+                    .map(|component| (component - luminance).abs())
+                    .dot(Vector3::new(1., 1., 1.));
+
+                // Pick the gray ramp (more shades) or the RGB cube based on whether
+                // there is significant saturation (threshold picked arbitrarily).
+                let ansi_color = if saturation < 0.1 {
+                    let srgblum = Rgba::new(luminance, 0., 0., 0.).to_srgb8()[0];
+                    srgb_to_gray(srgblum)
+                } else {
+                    let [r, g, b, _] = rgba.to_srgb8();
+                    16 + (srgb_to_216(r) * 6 + srgb_to_216(g)) * 6 + srgb_to_216(b)
+                };
+
+                Some(Color::AnsiValue(ansi_color))
             }
             (Some(rgba), ColorMode::Rgb) => {
                 let [r, g, b, _] = rgba.to_srgb8();
@@ -932,7 +968,7 @@ impl CharacterMode {
 /// Output of ColorCharacterBuf
 type TextAndColor = (String, Option<Rgba>);
 
-/// Implements `PixelBuf` for colored text output using `termion`.
+/// Implements `PixelBuf` for colored text output.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct ColorCharacterBuf {
     color: ColorBuf,
