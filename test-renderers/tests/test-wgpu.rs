@@ -22,13 +22,18 @@ use test_renderers::{RendererFactory, RendererId};
 pub async fn main() -> test_renderers::HarnessResult {
     test_renderers::initialize_logging();
 
-    let instance = wgpu::Instance::new(wgpu::Backends::all()); // TODO: test more backends?
+    // Get a wgpu::Instance
+    let requested_backends =
+        wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
+    let instance = wgpu::Instance::new(requested_backends);
 
-    eprintln!("Available adapters:");
+    // Report adapters that we *could* pick
+    eprintln!("Available adapters (backend filter = {requested_backends:?}):");
     for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
         eprintln!("  {:?}", adapter.get_info());
     }
 
+    // Pick an adapter.
     // TODO: Replace this with
     //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
     // once we have fixed https://github.com/kpreid/all-is-cubes/issues/173 which seemingly
@@ -40,7 +45,8 @@ pub async fn main() -> test_renderers::HarnessResult {
         eprintln!("No adapter specified via WGPU_ADAPTER_NAME; picking automatically.");
         adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
+                power_preference: wgpu::util::power_preference_from_env()
+                    .unwrap_or(wgpu::PowerPreference::HighPerformance),
                 compatible_surface: None,
                 force_fallback_adapter: false,
             })

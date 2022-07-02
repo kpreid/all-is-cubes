@@ -91,20 +91,33 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
         window.inner_size(),
     ));
 
-    let instance = wgpu::Instance::new(wgpu::Backends::all());
+    let instance = wgpu::Instance::new(
+        wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all),
+    );
+
     // Safety: create_surface specifies that the window must be kept alive
     // as long as the surface is. We will do that by keeping them both in
     // the `DesktopSession` struct. TODO: Make this more robust by having
     // the renderer jointly own the window via `Arc`.
     let surface = unsafe { instance.create_surface(&window) };
-    let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        })
-        .await
+
+    // Pick an adapter.
+    let mut adapter: Option<wgpu::Adapter> =
+        wgpu::util::initialize_adapter_from_env(&instance, wgpu::Backends::all());
+    if adapter.is_none() {
+        adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::util::power_preference_from_env()
+                    .unwrap_or(wgpu::PowerPreference::HighPerformance),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await;
+    }
+    let adapter = adapter
         .ok_or_else(|| anyhow::format_err!("Could not request suitable graphics adapter"))?;
+    log::debug!("Adapter: {:?}", adapter.get_info());
+
     let renderer = SurfaceRenderer::new(
         StandardCameras::from_session(&session, viewport_cell.as_source())?,
         surface,
