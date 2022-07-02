@@ -3103,6 +3103,7 @@ dependencies = [
  "send_wrapper",
  "serde",
  "serde_json",
+ "simplelog",
  "tinytemplate",
  "tokio",
  "wgpu",

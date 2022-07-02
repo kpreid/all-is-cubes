@@ -82,6 +82,9 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal || verbose {
+        // Note: Something like this log configuration also appears in other binaries.
+        // Unclear how to deduplicate since we don't want to have a library-level dep on
+        // simplelog.
         use simplelog::LevelFilter::{Debug, Off, Trace};
         simplelog::TermLogger::init(
             match verbose {

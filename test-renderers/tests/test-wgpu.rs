@@ -20,6 +20,8 @@ use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main]
 pub async fn main() -> test_renderers::HarnessResult {
+    test_renderers::initialize_logging();
+
     let instance = wgpu::Instance::new(wgpu::Backends::all()); // TODO: test more backends?
 
     eprintln!("Available adapters:");

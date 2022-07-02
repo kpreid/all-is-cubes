@@ -37,6 +37,8 @@ use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() -> test_renderers::HarnessResult {
+    test_renderers::initialize_logging();
+
     // luminance-glfw unconditionally calls glfw::init and supplies a fixed error callback
     // which would panic, but we can do it ourselves to find out whether the next one would
     // succeed.

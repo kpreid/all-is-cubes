@@ -11,6 +11,8 @@ use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main]
 pub async fn main() -> test_renderers::HarnessResult {
+    test_renderers::initialize_logging();
+
     test_renderers::harness_main(
         test_renderers::HarnessArgs::parse(),
         RendererId::Raytracer,
