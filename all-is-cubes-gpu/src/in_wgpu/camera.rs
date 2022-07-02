@@ -32,7 +32,7 @@ pub(crate) struct ShaderSpaceCamera {
     light_option: i32,
 
     /// Color for the fog.
-    fog_color: PaddedVec3,
+    fog_color: [f32; 3],
     /// Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
     fog_mode_blend: f32,
     /// How far out should be fully fogged?
@@ -42,7 +42,7 @@ pub(crate) struct ShaderSpaceCamera {
     exposure: f32,
 
     /// pad out to multiple of vec4<something32>
-    _padding: i32,
+    _padding: [i32; 2],
 }
 
 impl ShaderSpaceCamera {
