@@ -28,7 +28,7 @@ impl From<wgpu::SurfaceError> for GraphicsResourceError {
 
 /// A vector of 3 f32s padded to resemble a vector of 4, to satisfy
 /// GPU alignment expectations.
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct PaddedVec3 {
     pub data: [f32; 3],

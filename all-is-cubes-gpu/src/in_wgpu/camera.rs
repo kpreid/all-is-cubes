@@ -13,7 +13,7 @@ use crate::in_wgpu::glue::PaddedVec3;
 /// uniform buffer to the `blocks-and-lines.wgsl` shader. Also includes some miscellaneous
 /// data for rendering [`Space`], which hasn't yet demonstrated enough distinction
 /// to be worth putting in a separate buffer.
-#[repr(C)]
+#[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ShaderSpaceCamera {
     projection_matrix: [[f32; 4]; 4],
@@ -97,7 +97,7 @@ const OPENGL_TO_WGPU_PROJECTION: Matrix4<f64> = Matrix4::new(
 /// Information corresponding to [`Camera`] (or, for the moment, just [`GraphicsOptions`])
 /// but in a form suitable for passing in a uniform buffer to the `postprocess.wgsl`
 /// shader.
-#[repr(C)]
+#[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ShaderPostprocessCamera {
     tone_mapping_id: i32,
