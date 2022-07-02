@@ -182,7 +182,7 @@ async fn fog(mut context: RenderTestContext, fog: FogOption) {
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     context
-        .render_comparison_test(10, scene, Overlays::NONE)
+        .render_comparison_test(15, scene, Overlays::NONE)
         .await;
 }
 
