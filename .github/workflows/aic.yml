@@ -2,11 +2,7 @@ name: AIC Build, Test, Deploy
 
 permissions: {}
 
-on:
-  push:
-    branches: [ main, pages-alt ]
-  pull_request:
-    branches: [ main ]
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
