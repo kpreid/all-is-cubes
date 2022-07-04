@@ -5,9 +5,10 @@
 
 // Mirrors `struct ShaderSpaceCamera` on the Rust side.
 struct ShaderSpaceCamera {
-    // For WebGL compatibility, we *must not* use any bare `f32`s
-    // (if we expect them to be packed next to other fields; anyway);
-    // everything is padded out to be a vec4 even if it's a single component.
+    // TODO: Due to <https://github.com/gfx-rs/naga/issues/2000>
+    // we must avoid any situation where a scalar is packed after a vec3 because
+    // that will be mis-translated to Metal as having padding.
+    // Once that is fixed, we can split apart these awkwardly combined vec4s.
     @location(0) projection: mat4x4<f32>,
     @location(1) view_matrix: mat4x4<f32>,
     @location(2) view_position: vec3<f32>,
