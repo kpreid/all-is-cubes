@@ -9,12 +9,12 @@ struct ShaderSpaceCamera {
     // we must avoid any situation where a scalar is packed after a vec3 because
     // that will be mis-translated to Metal as having padding.
     // Once that is fixed, we can split apart these awkwardly combined vec4s.
-    @location(0) projection: mat4x4<f32>,
-    @location(1) view_matrix: mat4x4<f32>,
-    @location(2) view_position: vec3<f32>,
-    @location(3) light_lookup_offset_and_option: vec4<i32>, // vec3 + 1
-    @location(4) fog_color_and_fog_mode_blend: vec4<f32>, // vec3 + 1
-    @location(5) fog_distance_and_exposure: vec4<f32>, // last two components unused
+    projection: mat4x4<f32>,
+    view_matrix: mat4x4<f32>,
+    view_position: vec3<f32>,
+    light_lookup_offset_and_option: vec4<i32>, // vec3 + 1
+    fog_color_and_fog_mode_blend: vec4<f32>, // vec3 + 1
+    fog_distance_and_exposure: vec4<f32>, // last two components unused
 };
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.

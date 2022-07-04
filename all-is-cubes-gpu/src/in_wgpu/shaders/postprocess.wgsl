@@ -5,9 +5,9 @@
 
 // Mirrors `struct ShaderPostprocessCamera` on the Rust side.
 struct ShaderPostprocessCamera {
-    @location(0) tone_mapping_id: i32,
-    @location(1) scene_texture_valid: i32,
-    @location(2) _padding: vec2<i32>,
+    tone_mapping_id: i32,
+    scene_texture_valid: i32,
+    _padding: vec2<i32>,
 };
 
 
