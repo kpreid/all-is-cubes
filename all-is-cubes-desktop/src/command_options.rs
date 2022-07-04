@@ -5,7 +5,6 @@
 
 use std::ffi::OsStr;
 use std::fmt::Write as _;
-use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
@@ -210,10 +209,10 @@ pub fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
 
 pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'static str> {
     if let Some(extension) = output_path.extension() {
-        match extension.as_bytes() {
+        match extension.to_str() {
             // When updating this match, also update the docs for output_file!
-            b"png" | b"PNG" => return Ok(RecordFormat::PngOrApng),
-            b"apng" | b"APNG" => return Ok(RecordFormat::PngOrApng),
+            Some("png" | "PNG") => return Ok(RecordFormat::PngOrApng),
+            Some("apng" | "APNG") => return Ok(RecordFormat::PngOrApng),
             _ => {}
         }
     }
