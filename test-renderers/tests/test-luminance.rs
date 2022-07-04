@@ -39,10 +39,11 @@ use test_renderers::{RendererFactory, RendererId};
 pub async fn main() -> test_renderers::HarnessResult {
     test_renderers::initialize_logging();
 
-    // Kludge: Trying to create a window on a headless macOS (GitHub Actions CI) segfaults.
+    // Kludge: Trying to create a window on a headless macOS (GitHub Actions CI) segfaults,
+    // and on Windows produces a GLFW error panic. (On Linux it fails gracefully.)
     // This isn't something worth digging in to fixing for now, so ignore it.
-    if std::env::var("CI").is_ok() && cfg!(target_os = "macos") {
-        eprintln!("Skipping rendering tests under macOS CI.");
+    if std::env::var("CI").is_ok() && cfg!(any(target_os = "macos", target_os = "windows")) {
+        eprintln!("Skipping rendering tests under CI.");
         return ExitCode::SUCCESS;
     }
 
