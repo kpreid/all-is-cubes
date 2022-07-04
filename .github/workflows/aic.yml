@@ -11,18 +11,43 @@ jobs:
   build:
     strategy:
       matrix:
+        # This matrix doesn't do any actual Cartesian products, but instead has a
+        # basic configuration (Linux, stable Rust, using lockfile) and also tries
+        # changing one of those parameters but not the others.
         include:
-          - toolchain: stable
+          # This is the configuration we use for the wasm build and exhaustive tests.
+          - os: ubuntu-latest
+            toolchain: stable
             depversions: locked
-            experimental: false
-          - toolchain: nightly
+            primary: true
+          # Additional configurations to try:
+
+          # Windows -- TODO: This doesn't work because it doesn't find npm, even if I use actions/setup-node
+          # - os: windows-latest
+          #   toolchain: stable
+          #   depversions: locked
+          #   primary: false
+          
+          # macOS
+          - os: macos-latest
+            toolchain: stable
             depversions: locked
-            experimental: true
-          - toolchain: stable
+            primary: false
+          
+          # Nightly Rust
+          - os: ubuntu-latest
+            toolchain: nightly
+            depversions: locked
+            primary: false
+          
+          # Updated dependencies
+          - os: ubuntu-latest
+            toolchain: stable
             depversions: latest
-            experimental: true
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.experimental }}
+            primary: false
+
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ !matrix.primary }}
 
     steps:
     - uses: actions/checkout@v2
@@ -36,6 +61,7 @@ jobs:
           components: rustfmt, clippy
 
     - name: Install native libraries
+      if: ${{ runner.os == 'Linux' }}
       run: |
           sudo apt update
           sudo apt-get -y install libxrandr-dev xorg-dev libglfw3-dev 
@@ -49,9 +75,11 @@ jobs:
     - name: Install wasm-pack
       # Use workspace target directory for cargo install's build,
       # so that the build of wasm-pack will be cached by rust-cache action.
-      run: CARGO_TARGET_DIR=`pwd`/target cargo install wasm-pack
+      run: cargo install wasm-pack
+      env:
+        CARGO_TARGET_DIR: target/
 
-    # Run tests in `test-more` mode in the "normal" matrix configuration, and
+    # Run tests in `test-more` mode in the "primary" matrix configuration, and
     # run them in the faster mode (which does not try disabling/enabling
     # features) for all other variations.
     # This is because the exhaustive tests are intended to catch bugs in our own
@@ -63,18 +91,22 @@ jobs:
     # TODO: aic_disable_wgpu_comparison=1 is a temporary kludge to deal with the quirks
     # of software rendering. Take it out and make the wgpu render tests pass properly.
     - name: Run basic tests
-      if: ${{ matrix.experimental }}
-      run: aic_disable_wgpu_comparison=1 cargo xtask test
+      if: ${{ !matrix.primary }}
+      run: cargo xtask test
+      env:
+        aic_disable_wgpu_comparison: 1 
     - name: Run exhaustive tests
-      if: ${{ !matrix.experimental }}
-      run: aic_disable_wgpu_comparison=1 cargo xtask test-more
+      if: ${{ matrix.primary }}
+      run: cargo xtask test-more
+      env:
+        aic_disable_wgpu_comparison: 1
     
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
-      if: ${{ always() && matrix.toolchain == 'stable' && matrix.depversions == 'locked' }}
+      if: ${{ always() }}
       uses: actions/upload-artifact@v3
       with:
-        name: test-renderers-output
+        name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
           target/test-renderers-*/
           test-renderers/expected/
@@ -88,7 +120,7 @@ jobs:
     # Save wasm build so that we can optionally deploy it without rebuilding
     # (but only for the stablest matrix version)
     - name: Save wasm dist artifact
-      if: ${{ matrix.toolchain == 'stable' && matrix.depversions == 'locked' }}
+      if: ${{ matrix.primary }}
       uses: actions/upload-artifact@v3
       with:
         name: wasm-dist
