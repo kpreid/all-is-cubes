@@ -108,16 +108,19 @@ where
         self.chunks.get(&position)
     }
 
-    /// Re-triangulate all blocks that need it, and the nearest chunks that need it.
+    /// Recompute meshes of all blocks that need it, and the nearest chunks that need it.
     ///
     /// * `camera`'s view position is used to choose what to update and for depth
     ///    ordering; its graphics options are used for triangulation and view distance.
     /// * `deadline` is the approximate time at which this should stop.
-    /// * `chunk_render_updater` is called for every retriangulated chunk.
+    /// * `chunk_render_updater` is called for every re-meshed chunk.
     /// * `indices_only_updater` is called when a chunk's indices, only, have been
     ///    reordered.
     ///
     /// Returns performance information and the chunk the camera is located in.
+    ///
+    /// TODO: The updaters should be changed to be one value instead of two, so that
+    /// they can share mutable state if needed. This will benefit the wgpu renderer.
     pub fn update_blocks_and_some_chunks<CF, IF>(
         &mut self,
         camera: &Camera,
@@ -127,8 +130,8 @@ where
         mut indices_only_updater: IF,
     ) -> CsmUpdateInfo
     where
-        CF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
-        IF: FnMut(&SpaceMesh<Vert, Tex::Tile>, &mut D),
+        CF: FnMut(ChunkMeshUpdate<'_, D, Vert, Tex::Tile, CHUNK_SIZE>),
+        IF: FnMut(ChunkMeshUpdate<'_, D, Vert, Tex::Tile, CHUNK_SIZE>),
     {
         let update_start_time = Instant::now();
 
@@ -228,7 +231,7 @@ where
                     &self.block_meshes,
                 );
                 let compute_end_update_start = Instant::now();
-                chunk_render_updater(&chunk.mesh, &mut chunk.render_data);
+                chunk_render_updater(chunk.borrow_for_update());
 
                 chunk_mesh_generation_times +=
                     TimeStats::one(compute_end_update_start.duration_since(this_chunk_start_time));
@@ -242,7 +245,7 @@ where
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
             if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>().unwrap()) {
-                indices_only_updater(&chunk.mesh, &mut chunk.render_data);
+                indices_only_updater(chunk.borrow_for_update());
                 Some(Instant::now())
             } else {
                 None
@@ -484,6 +487,14 @@ where
         &self.mesh
     }
 
+    fn borrow_for_update(&mut self) -> ChunkMeshUpdate<'_, D, Vert, Tex::Tile, CHUNK_SIZE> {
+        ChunkMeshUpdate {
+            position: self.position,
+            mesh: &self.mesh,
+            render_data: &mut self.render_data,
+        }
+    }
+
     fn recompute_mesh(
         &mut self,
         chunk_todo: &mut ChunkTodo,
@@ -547,6 +558,18 @@ where
             .copied()
             .any(|(index, version)| block_meshes.versioning[usize::from(index)] != version)
     }
+}
+
+/// Provides mutable access to the render data of type `D` in a [`ChunkMesh`].
+///
+/// This struct is provided to the callbacks of
+/// [`ChunkedSpaceMesh::update_blocks_and_some_chunks()`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ChunkMeshUpdate<'a, D, V, T, const CHUNK_SIZE: GridCoordinate> {
+    pub position: ChunkPos<CHUNK_SIZE>,
+    pub mesh: &'a SpaceMesh<V, T>,
+    pub render_data: &'a mut D,
 }
 
 /// [`ChunkedSpaceMesh`]'s set of things that need recomputing.
@@ -800,8 +823,8 @@ mod tests {
             indices_only_updater: IF,
         ) -> CsmUpdateInfo
         where
-            CF: FnMut(&SpaceMesh<BlockVertex, NoTextures>, &mut ()),
-            IF: FnMut(&SpaceMesh<BlockVertex, NoTextures>, &mut ()),
+            CF: FnMut(ChunkMeshUpdate<'_, (), BlockVertex, NoTextures, 16>),
+            IF: FnMut(ChunkMeshUpdate<'_, (), BlockVertex, NoTextures, 16>),
         {
             self.csm.update_blocks_and_some_chunks(
                 &self.camera,
@@ -818,7 +841,7 @@ mod tests {
     #[test]
     fn basic_chunk_presence() {
         let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1));
-        tester.update(|_, _| {}, |_, _| {});
+        tester.update(|_| {}, |__| {});
         assert_ne!(None, tester.csm.chunk(ChunkPos::new(0, 0, 0)));
         // There should not be a chunk where there's no Space
         assert_eq!(None, tester.csm.chunk(ChunkPos::new(1, 0, 0)));
@@ -829,8 +852,8 @@ mod tests {
     fn sort_view_every_frame_only_if_transparent() {
         let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1));
         tester.update(
-            |_, _| {},
-            |_, _| {
+            |_| {},
+            |_| {
                 panic!("Should not have called indices_only_updater");
             },
         );
@@ -844,16 +867,16 @@ mod tests {
             .unwrap();
         let mut did_call = false;
         tester.update(
-            |_, _| {},
-            |_, _| {
+            |_| {},
+            |_| {
                 did_call = true;
             },
         );
         assert!(did_call, "Expected indices_only_updater");
         did_call = false;
         tester.update(
-            |_, _| {},
-            |_, _| {
+            |_| {},
+            |_| {
                 did_call = true;
             },
         );
@@ -878,7 +901,7 @@ mod tests {
         tester.camera.set_options(options.clone());
 
         let mut vertices = None;
-        tester.update(|mesh, _| vertices = Some(mesh.vertices().len()), |_, _| {});
+        tester.update(|u| vertices = Some(u.mesh.vertices().len()), |_| {});
         assert_eq!(vertices, Some(24));
 
         // Change options so that the mesh should disappear
@@ -886,7 +909,7 @@ mod tests {
         tester.camera.set_options(options.clone());
 
         vertices = None;
-        tester.update(|mesh, _| vertices = Some(mesh.vertices().len()), |_, _| {});
+        tester.update(|u| vertices = Some(u.mesh.vertices().len()), |_| {});
         assert_eq!(vertices, Some(0));
     }
 }

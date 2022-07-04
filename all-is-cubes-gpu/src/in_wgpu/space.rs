@@ -14,8 +14,8 @@ use all_is_cubes::camera::Camera;
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::listen::Listener;
 use all_is_cubes::math::{FaceMap, GridCoordinate, GridPoint, Rgb};
-use all_is_cubes::mesh::chunked_mesh::ChunkedSpaceMesh;
-use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
+use all_is_cubes::mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
+use all_is_cubes::mesh::DepthOrdering;
 use all_is_cubes::space::{Grid, Space, SpaceChange};
 use all_is_cubes::universe::URef;
 
@@ -38,6 +38,7 @@ pub(crate) struct SpaceRenderer {
     /// A debugging label for the space's render pass.
     /// (Derived from constructor's space_label)
     render_pass_label: String,
+    space_label: String,
 
     /// Tracks information we need to update from the `Space`.
     /// Note that `self.csm` has its own todo listener too.
@@ -123,6 +124,7 @@ impl SpaceRenderer {
         Ok(SpaceRenderer {
             todo: todo_rc,
             render_pass_label: format!("{space_label} render_pass"),
+            space_label,
             sky_color: space_borrowed.physics().sky_color,
             block_texture,
             light_texture,
@@ -184,12 +186,12 @@ impl SpaceRenderer {
             camera,
             &mut self.block_texture,
             deadline, // TODO: decrease deadline by some guess at texture writing time
-            |mesh, render_data| {
-                update_chunk_buffers(rcbwp.borrow_mut().reborrow(), mesh, render_data);
+            |u| {
+                update_chunk_buffers(rcbwp.borrow_mut().reborrow(), u, &self.space_label);
             },
-            |mesh, render_data| {
-                if let Some(index_buf) = render_data.as_ref().and_then(|b| b.index_buf.get()) {
-                    let index_buf_bytes = bytemuck::cast_slice::<u32, u8>(mesh.indices());
+            |u| {
+                if let Some(index_buf) = u.render_data.as_ref().and_then(|b| b.index_buf.get()) {
+                    let index_buf_bytes = bytemuck::cast_slice::<u32, u8>(u.mesh.indices());
                     if let Some(len) = index_buf_bytes
                         .len()
                         .try_into()
@@ -378,24 +380,26 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
 /// Copy [`SpaceMesh`] data to GPU buffers.
 fn update_chunk_buffers(
     mut bwp: BeltWritingParts<'_, '_>,
-    new_mesh: &SpaceMesh<WgpuBlockVertex, AtlasTile>,
-    buffers: &mut Option<ChunkBuffers>,
+    update: ChunkMeshUpdate<'_, Option<ChunkBuffers>, WgpuBlockVertex, AtlasTile, CHUNK_SIZE>,
+    space_label: &str,
 ) {
-    let new_vertices_data: &[u8] = bytemuck::cast_slice::<WgpuBlockVertex, u8>(new_mesh.vertices());
-    // TODO: assert INDEX_FORMAT matches this type
-    let new_indices_data: &[u8] = bytemuck::cast_slice::<u32, u8>(new_mesh.indices());
-
-    if new_mesh.is_empty() {
+    if update.mesh.is_empty() {
         // No action needed
         return;
     }
 
-    let buffers = buffers.get_or_insert_with(ChunkBuffers::default);
+    let new_vertices_data: &[u8] =
+        bytemuck::cast_slice::<WgpuBlockVertex, u8>(update.mesh.vertices());
+    // TODO: assert INDEX_FORMAT matches this type
+    let new_indices_data: &[u8] = bytemuck::cast_slice::<u32, u8>(update.mesh.indices());
+
+    let position: [GridCoordinate; 3] = update.position.0.into();
+    let buffers = update.render_data.get_or_insert_with(ChunkBuffers::default);
     buffers.vertex_buf.write_with_resizing(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
             // TODO: Get the space's label and chunk coordinates here (cheaply)
-            label: Some("Chunk vertex buffer"),
+            label: Some(&format!("{space_label} chunk vertex {position:?}")),
             contents: new_vertices_data,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         },
@@ -403,7 +407,7 @@ fn update_chunk_buffers(
     buffers.index_buf.write_with_resizing(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
-            label: Some("Chunk index buffer"),
+            label: Some(&format!("{space_label} chunk index {position:?}")),
             contents: new_indices_data,
             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         },
