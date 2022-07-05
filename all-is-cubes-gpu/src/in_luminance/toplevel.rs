@@ -384,7 +384,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         let end_time = Instant::now();
         Ok(RenderInfo {
             update: UpdateInfo {
-                total_time: start_frame_time.duration_since(update_to_draw_time),
+                total_time: update_to_draw_time.duration_since(start_frame_time),
                 prep_time: update_prep_to_space_update_time.duration_since(start_frame_time),
                 lines_time: update_to_draw_time.duration_since(space_update_to_lines_time),
                 submit_time: None,
