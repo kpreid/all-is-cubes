@@ -23,7 +23,7 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["rayon
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 anyhow = "1.0"
-bytemuck = { version = "1.7.2", default-features = false }
+bytemuck = { version = "1.10.0", default-features = false }
 clap = { version = "3.1.1", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }
 # Note: keep crossterm in sync with tui's crossterm dependency.
 crossterm = "0.23.2"
