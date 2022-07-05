@@ -176,7 +176,7 @@ dependencies = [
  "once_cell",
  "rand 0.8.5",
  "raw-window-handle",
- "send_wrapper",
+ "send_wrapper 0.5.0",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
@@ -2772,6 +2772,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "930c0acf610d3fdb5e2ab6213019aaa04e227ebe9547b0649ba599b16d788bd7"
 
 [[package]]
+name = "send_wrapper"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
+
+[[package]]
 name = "serde"
 version = "1.0.138"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3106,7 +3112,7 @@ dependencies = [
  "luminance",
  "luminance-gl",
  "luminance-glfw",
- "send_wrapper",
+ "send_wrapper 0.6.0",
  "serde",
  "serde_json",
  "simplelog",
