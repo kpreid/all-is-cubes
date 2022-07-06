@@ -3,7 +3,7 @@ Kevin Reid <kpreid@switchb.org>
 Recursive voxel game.
 
 USAGE:
-    all-is-cubes [OPTIONS] [FILE]
+    all-is-cubes[EXE] [OPTIONS] [FILE]
 
 ARGS:
     <FILE>
