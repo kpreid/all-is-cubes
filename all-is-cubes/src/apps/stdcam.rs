@@ -250,6 +250,7 @@ impl StandardCameras {
         }
     }
 
+    /// Returns current graphics options as of the last [`update()`](Self::update).
     pub fn graphics_options(&self) -> &GraphicsOptions {
         self.cameras.world.options()
     }

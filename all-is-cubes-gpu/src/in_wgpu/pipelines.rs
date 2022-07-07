@@ -50,12 +50,17 @@ static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
 
 impl Pipelines {
-    // TODO: wants graphics options to configure shader?
     pub fn new(
         device: &wgpu::Device,
         linear_scene_texture_format: wgpu::TextureFormat,
         graphics_options: ListenableSource<GraphicsOptions>,
     ) -> Self {
+        // TODO: This is a hazard we should remove. `Pipelines` needs to be consistent with
+        // other objects (in particular, pipeline versus framebuffer sample_count), and so
+        // the graphics options used to make that decision should be fetched in exactly one
+        // place to ensure that no skew occurs.
+        let current_graphics_options = graphics_options.get();
+
         let shader = create_wgsl_module_from_reloadable(
             device,
             "blocks-and-lines",
@@ -128,6 +133,12 @@ impl Pipelines {
             conservative: false,
         };
 
+        let multisample = wgpu::MultisampleState {
+            count: FramebufferTextures::sample_count_from_options(&current_graphics_options),
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        };
+
         let opaque_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Pipelines::opaque_render_pipeline"),
@@ -154,7 +165,7 @@ impl Pipelines {
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
-                multisample: wgpu::MultisampleState::default(), // default = off
+                multisample,
                 multiview: None,
             });
 
@@ -169,7 +180,7 @@ impl Pipelines {
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
-                    entry_point: match graphics_options.get().transparency {
+                    entry_point: match current_graphics_options.transparency {
                         TransparencyOption::Volumetric => "block_fragment_transparent_volumetric",
                         TransparencyOption::Surface | TransparencyOption::Threshold(_) => {
                             "block_fragment_transparent_surface"
@@ -204,7 +215,7 @@ impl Pipelines {
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
-                multisample: wgpu::MultisampleState::default(), // default = off
+                multisample,
                 multiview: None,
             });
 
@@ -244,7 +255,7 @@ impl Pipelines {
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
-                multisample: wgpu::MultisampleState::default(), // default = off
+                multisample,
                 multiview: None,
             });
 

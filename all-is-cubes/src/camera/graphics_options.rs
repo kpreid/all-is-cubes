@@ -54,6 +54,11 @@ pub struct GraphicsOptions {
     /// [renderer]: crate::camera::HeadlessRenderer
     pub show_ui: bool,
 
+    /// Whether to apply antialiasing techniques.
+    ///
+    /// TODO: Not implemented in raytracer
+    pub antialiasing: AntialiasingOption,
+
     /// Whether to use frustum culling for drawing only in-view chunks and objects.
     ///
     /// This option is for debugging and performance testing and should not have any
@@ -97,6 +102,7 @@ impl Default for GraphicsOptions {
             lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
             show_ui: true,
+            antialiasing: AntialiasingOption::default(),
             use_frustum_culling: true,
             debug_info_text: true,
             debug_chunk_boxes: false,
@@ -233,5 +239,33 @@ impl TransparencyOption {
     #[doc(hidden)] // TODO: make public/documented?
     pub fn will_output_alpha(&self) -> bool {
         !matches!(self, Self::Threshold(_))
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
+pub enum AntialiasingOption {
+    /// Do not apply antialiasing. Every pixel of the rendered image will be the exact
+    /// color of some part of the world, rather than a combination of adjacent parts.
+    #[default]
+    None,
+    /// If [multisample anti-aliasing](https://en.wikipedia.org/wiki/Multisample_anti-aliasing)
+    /// or similar functionality is available, allowing relatively cheap antialiasing,
+    /// then enable it.
+    IfCheap,
+    /// Always perform antialiasing, even if it is expensive.
+    Always,
+}
+
+impl AntialiasingOption {
+    /// True if GPU renderers should enable multisampling
+    #[doc(hidden)]
+    pub fn is_msaa(&self) -> bool {
+        match self {
+            Self::None => false,
+            Self::IfCheap => true,
+            Self::Always => true,
+        }
     }
 }

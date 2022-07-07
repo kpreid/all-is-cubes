@@ -1,5 +1,6 @@
 use std::fmt;
 
+use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 
@@ -136,7 +137,7 @@ impl OriginDimensions for DrawableTexture {
 /// current viewport (surface) size and must be entirely recreated if it changes.
 ///
 /// The details of this structure are likely to change in parallel with
-/// [`super::EverythingRenderer`].
+/// [`super::EverythingRenderer`]. TODO: Find a better code organization.
 #[derive(Debug)]
 pub(crate) struct FramebufferTextures {
     /// Framebuffer/viewport size, remembered for comparison purposes.
@@ -150,8 +151,17 @@ pub(crate) struct FramebufferTextures {
     pub(crate) linear_scene_texture_view: wgpu::TextureView,
     pub(crate) linear_scene_texture_format: wgpu::TextureFormat,
 
+    /// If multisampling is enabled, provides the “resolve target” companion to
+    /// `linear_scene_texture_view`. This texture has a sample_count of 1, is
+    /// automatically written to when we do multisampled rendering, and is the *input*
+    /// to postprocessing. If multisampling is not enabled, we use the
+    /// `linear_scene_texture_view` directly as input to postprocessing.
+    pub(crate) linear_scene_resolved: Option<wgpu::TextureView>,
+
     /// Depth texture to pair with `linear_scene_texture`.
     pub(crate) depth_texture_view: wgpu::TextureView,
+
+    pub(crate) sample_count: u32,
 }
 
 impl FramebufferTextures {
@@ -167,6 +177,7 @@ impl FramebufferTextures {
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         linear_scene_texture_format: wgpu::TextureFormat,
+        sample_count: u32,
     ) -> Self {
         let size = wgpu::Extent3d {
             width: config.width,
@@ -177,7 +188,7 @@ impl FramebufferTextures {
             label: Some("linear_scene_texture"),
             size,
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: linear_scene_texture_format,
             usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
@@ -186,7 +197,7 @@ impl FramebufferTextures {
             label: Some("depth_texture"),
             size,
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
@@ -194,24 +205,94 @@ impl FramebufferTextures {
 
         Self {
             size,
+            linear_scene_resolved: if sample_count > 1 {
+                Some(
+                    device
+                        .create_texture(&wgpu::TextureDescriptor {
+                            label: Some("linear_scene_texture_resolve_target"),
+                            size: wgpu::Extent3d {
+                                width: config.width,
+                                height: config.height,
+                                depth_or_array_layers: 1,
+                            },
+                            mip_level_count: 1,
+                            sample_count: 1,
+                            dimension: wgpu::TextureDimension::D2,
+                            format: linear_scene_texture_format,
+                            usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
+                        })
+                        .create_view(&wgpu::TextureViewDescriptor::default()),
+                )
+            } else {
+                None
+            },
             linear_scene_texture_format,
             linear_scene_texture_view: linear_scene_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             depth_texture_view: depth_texture.create_view(&Default::default()),
+            sample_count,
+        }
+    }
+
+    pub(crate) fn sample_count_from_options(options: &GraphicsOptions) -> u32 {
+        if options.antialiasing.is_msaa() {
+            4
+        } else {
+            1
+        }
+    }
+
+    /// Returns the color attachment for rendering the scene, taking into account
+    /// considerations for multisampling.
+    pub(crate) fn color_attachment_for_scene(
+        &self,
+        color_load_op: wgpu::LoadOp<wgpu::Color>,
+    ) -> wgpu::RenderPassColorAttachment<'_> {
+        wgpu::RenderPassColorAttachment {
+            view: &self.linear_scene_texture_view,
+            resolve_target: self.linear_scene_resolved.as_ref(),
+            ops: wgpu::Operations {
+                load: color_load_op,
+                store: true,
+            },
+        }
+    }
+
+    pub(crate) fn scene_for_postprocessing_input(&self) -> &wgpu::TextureView {
+        if let Some(resolved) = &self.linear_scene_resolved {
+            resolved
+        } else {
+            &self.linear_scene_texture_view
         }
     }
 
     /// Update `self` to be as if it had been recreated with [`Self::new()`]
     /// if any input is different in a way that requires it.
-    pub(crate) fn resize(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
+    ///
+    /// Returns whether any update was made.
+    pub(crate) fn rebuild_if_changed(
+        &mut self,
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+        options: &GraphicsOptions,
+    ) -> bool {
         let new_size = wgpu::Extent3d {
             width: config.width,
             height: config.height,
             depth_or_array_layers: 1,
         };
+        let new_sample_count = Self::sample_count_from_options(options);
 
-        if new_size != self.size {
-            *self = Self::new(device, config, self.linear_scene_texture_format);
+        if new_size != self.size || new_sample_count != self.sample_count {
+            *self = Self::new(
+                device,
+                config,
+                self.linear_scene_texture_format,
+                new_sample_count,
+            );
+            true
+        } else {
+            false
         }
     }
 }

@@ -200,6 +200,7 @@ impl EverythingRenderer {
         adapter: &wgpu::Adapter,
     ) -> Self {
         let viewport = cameras.viewport();
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -234,7 +235,12 @@ impl EverythingRenderer {
             wgpu::TextureFormat::Rgba8UnormSrgb
         };
 
-        let fb = FramebufferTextures::new(&device, &config, linear_scene_texture_format);
+        let fb = FramebufferTextures::new(
+            &device,
+            &config,
+            linear_scene_texture_format,
+            FramebufferTextures::sample_count_from_options(cameras.graphics_options()),
+        );
 
         let postprocess_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -401,7 +407,8 @@ impl EverythingRenderer {
                 conservative: false,
             },
             depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(), // default = off
+            // default = off. No need for multisampling since we are not drawing triangles here.
+            multisample: wgpu::MultisampleState::default(),
             multiview: None,
         })
     }
@@ -430,8 +437,6 @@ impl EverythingRenderer {
                 self.config.width = size.x;
                 self.config.height = size.y;
 
-                self.fb.resize(&self.device, &self.config);
-
                 self.info_text_texture.resize(
                     &self.device,
                     Some("info_text_texture"),
@@ -439,6 +444,14 @@ impl EverythingRenderer {
                         .nominal_size
                         .map(|component| (component as u32).max(1)),
                 );
+            }
+
+            // Might need updates based on size or options, so ask it to check unconditionally.
+            if self.fb.rebuild_if_changed(
+                &self.device,
+                &self.config,
+                self.cameras.graphics_options(),
+            ) {
                 self.postprocess_bind_group = None;
             }
         }
@@ -624,7 +637,6 @@ impl EverythingRenderer {
         &mut self,
         queue: &wgpu::Queue,
     ) -> Result<DrawInfo, GraphicsResourceError> {
-        let output_view = &self.fb.linear_scene_texture_view;
         let depth_texture_view = &self.fb.depth_texture_view;
         let mut encoder = self
             .device
@@ -641,8 +653,7 @@ impl EverythingRenderer {
         let world_draw_info = if let Some(sr) = &self.space_renderers.world {
             let camera = &self.cameras.cameras().world;
             sr.draw(
-                output_view,
-                depth_texture_view,
+                &self.fb,
                 queue,
                 &mut encoder,
                 &self.pipelines,
@@ -667,14 +678,7 @@ impl EverythingRenderer {
         if let (Some(sr), 1..) = (&self.space_renderers.world, self.lines_vertex_count) {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("debug lines"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: output_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
+                color_attachments: &[Some(self.fb.color_attachment_for_scene(wgpu::LoadOp::Load))],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: depth_texture_view,
                     depth_ops: Some(wgpu::Operations {
@@ -699,8 +703,7 @@ impl EverythingRenderer {
         let lines_to_ui_time = Instant::now();
         let ui_draw_info = if let Some(sr) = &self.space_renderers.ui {
             sr.draw(
-                output_view,
-                depth_texture_view,
+                &self.fb,
                 queue,
                 &mut encoder,
                 &self.pipelines,
@@ -809,7 +812,7 @@ impl EverythingRenderer {
                             wgpu::BindGroupEntry {
                                 binding: 2,
                                 resource: wgpu::BindingResource::TextureView(
-                                    &self.fb.linear_scene_texture_view,
+                                    self.fb.scene_for_postprocessing_input(),
                                 ),
                             },
                             wgpu::BindGroupEntry {

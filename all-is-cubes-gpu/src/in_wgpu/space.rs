@@ -18,6 +18,7 @@ use all_is_cubes::mesh::DepthOrdering;
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::universe::URef;
 
+use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::vertex::WgpuLinesVertex;
@@ -254,8 +255,7 @@ impl SpaceRenderer {
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &self,
-        output_view: &wgpu::TextureView,
-        depth_texture_view: &wgpu::TextureView,
+        fb: &FramebufferTextures,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         pipelines: &Pipelines,
@@ -281,16 +281,9 @@ impl SpaceRenderer {
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some(&self.render_pass_label),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: output_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: color_load_op,
-                    store: true,
-                },
-            })],
+            color_attachments: &[Some(fb.color_attachment_for_scene(color_load_op))],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_texture_view,
+                view: &fb.depth_texture_view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
                     store: store_depth,
