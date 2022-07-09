@@ -136,7 +136,7 @@ where
         let update_start_time = Instant::now();
 
         let graphics_options = camera.options();
-        let mesh_options = MeshOptions::new(graphics_options, Vert::WANTS_LIGHT);
+        let mesh_options = MeshOptions::new(graphics_options);
         let view_point = camera.view_position();
         let view_chunk = point_to_chunk(view_point);
         self.view_chunk = view_chunk;
@@ -632,7 +632,7 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
                         });
                     }
                     SpaceChange::Lighting(_p) => {
-                        // TODO: We should optionally track light updates as chunk updates if Vert::WANTS_LIGHT is true.
+                        // Meshes are not affected by light
                     }
                     SpaceChange::Number(index) => {
                         if !todo.all_blocks_and_chunks {

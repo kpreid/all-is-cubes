@@ -2,9 +2,8 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
-use all_is_cubes::math::{Face7, GridPoint};
+use all_is_cubes::math::GridPoint;
 use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
-use all_is_cubes::space::PackedLight;
 
 use crate::DebugLineVertex;
 
@@ -94,7 +93,6 @@ impl From<BlockVertex> for WgpuBlockVertex {
 impl GfxVertex for WgpuBlockVertex {
     type Coordinate = f32;
     type BlockInst = Vector3<f32>;
-    const WANTS_LIGHT: bool = false;
 
     #[inline]
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
@@ -102,7 +100,7 @@ impl GfxVertex for WgpuBlockVertex {
     }
 
     #[inline]
-    fn instantiate_vertex(&mut self, cube: Self::BlockInst, _lighting: PackedLight) {
+    fn instantiate_vertex(&mut self, cube: Self::BlockInst) {
         self.position[0] += cube.x;
         self.position[1] += cube.y;
         self.position[2] += cube.z;
@@ -112,11 +110,6 @@ impl GfxVertex for WgpuBlockVertex {
     #[inline]
     fn position(&self) -> Point3<Self::Coordinate> {
         Point3::from(self.position)
-    }
-
-    #[inline]
-    fn face(&self) -> Face7 {
-        Face7::from_discriminant(self.normal as u8).unwrap_or(Face7::Within)
     }
 }
 

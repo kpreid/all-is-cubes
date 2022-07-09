@@ -19,7 +19,7 @@ criterion_group!(benches, mesh_benches);
 criterion_main!(benches);
 
 fn mesh_benches(c: &mut Criterion) {
-    let options = &MeshOptions::new(&GraphicsOptions::default(), false);
+    let options = &MeshOptions::new(&GraphicsOptions::default());
 
     c.bench_function("block, checkerboard", |b| {
         let mut universe = Universe::new();

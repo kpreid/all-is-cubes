@@ -7,8 +7,7 @@ use std::fmt;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
-use crate::math::{Face6, Face7, FreeCoordinate, GridPoint, Rgba};
-use crate::space::PackedLight;
+use crate::math::{Face6, FreeCoordinate, GridPoint, Rgba};
 use crate::util::{ConciseDebug, CustomFormat as _};
 
 /// Numeric type used to store texture coordinates in vertices.
@@ -116,11 +115,6 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
     /// [`Self::instantiate_vertex`].
     type BlockInst: Copy;
 
-    /// Whether the triangulator should compute light values for this vertex type.
-    /// If this is false, the `lighting` parameter to `instantiate_vertex` will be a
-    /// constant unrelated to actual light conditions.
-    const WANTS_LIGHT: bool;
-
     /// Prepare the information needed to instantiate vertices of one block.
     /// Currently, this constitutes the location of that block, and hence this function
     /// is responsible for any necessary numeric conversion.
@@ -128,23 +122,18 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
 
     /// Transforms a vertex belonging to a general model of a block to its instantiation
     /// in a specific location in space and lighting conditions.
-    fn instantiate_vertex(&mut self, block: Self::BlockInst, lighting: PackedLight);
+    fn instantiate_vertex(&mut self, block: Self::BlockInst);
 
     /// Returns the position of this vertex.
     ///
     /// Note: This is used to perform depth sorting for transparent vertices.
     fn position(&self) -> Point3<Self::Coordinate>;
-
-    /// Returns the normal of this vertex, expressed as a [`Face7`],
-    /// with [`Face7::Within`] representing any error cases.
-    fn face(&self) -> Face7;
 }
 
 /// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
 impl GfxVertex for BlockVertex {
     type Coordinate = FreeCoordinate;
     type BlockInst = Vector3<FreeCoordinate>;
-    const WANTS_LIGHT: bool = false;
 
     fn position(&self) -> Point3<FreeCoordinate> {
         self.position
@@ -156,12 +145,7 @@ impl GfxVertex for BlockVertex {
     }
 
     #[inline]
-    fn instantiate_vertex(&mut self, offset: Self::BlockInst, _lighting: PackedLight) {
+    fn instantiate_vertex(&mut self, offset: Self::BlockInst) {
         self.position += offset;
-    }
-
-    #[inline]
-    fn face(&self) -> Face7 {
-        self.face.into()
     }
 }

@@ -7,9 +7,9 @@ use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::math::{Face7, FaceMap, GridCoordinate, GridRotation};
+use crate::math::{Face7, GridCoordinate, GridRotation};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
-use crate::space::{BlockIndex, Grid, PackedLight, Space};
+use crate::space::{BlockIndex, Grid, Space};
 
 /// Computes a triangle mesh of a [`Space`].
 ///
@@ -165,7 +165,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
         &mut self,
         space: &Space,
         bounds: Grid,
-        options: &MeshOptions,
+        _options: &MeshOptions,
         mut block_meshes: P,
     ) where
         P: BlockMeshProvider<'p, V, T>,
@@ -207,20 +207,6 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 
             let inst = V::instantiate_block(cube);
 
-            let light_neighborhood = if V::WANTS_LIGHT {
-                if options.use_space_light {
-                    // Note: This is not sufficient neighborhood data for smooth lighting,
-                    // but vertex lighting in general can't do smooth lighting unless we pack
-                    // the neighborhood into each vertex, which isn't currently in any plans.
-                    FaceMap::from_fn(|f| space.get_lighting(cube + f.normal_vector()))
-                } else {
-                    FaceMap::repeat(PackedLight::ONE)
-                }
-            } else {
-                // Not read; hopefully the optimizer throws it out.
-                FaceMap::repeat(PackedLight::ONE)
-            };
-
             for face in Face7::ALL {
                 let face_mesh = &block_mesh.faces[face];
                 if face_mesh.is_empty() {
@@ -249,14 +235,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                     .expect("vertex index overflow");
                 self.vertices.extend(face_mesh.vertices.iter());
                 for vertex in &mut self.vertices[index_offset_usize..] {
-                    vertex.instantiate_vertex(
-                        inst,
-                        if V::WANTS_LIGHT {
-                            light_neighborhood[vertex.face()]
-                        } else {
-                            PackedLight::ONE
-                        },
-                    );
+                    vertex.instantiate_vertex(inst);
                 }
                 self.indices
                     .extend(face_mesh.indices_opaque.iter().map(|i| i + index_offset));

@@ -13,7 +13,7 @@
 //! be the more commonly used term — at least among those who don't say “meshing”
 //! instead.
 
-use crate::camera::{GraphicsOptions, LightingOption, TransparencyOption};
+use crate::camera::{GraphicsOptions, TransparencyOption};
 
 mod block_vertex;
 pub use block_vertex::*;
@@ -42,24 +42,13 @@ mod tests;
 pub struct MeshOptions {
     /// Input to TransparencyOption::limit_alpha.
     transparency: TransparencyOption,
-    /// Whether to copy light from the space to the vertices (true), or substitute
-    /// [`Rgb::ONE`](crate::math::Rgb::ONE) (false).
-    use_space_light: bool,
 }
 
 impl MeshOptions {
     /// Take the options relevant to mesh generation from the given [`GraphicsOptions`].
-    pub fn new(graphics_options: &GraphicsOptions, vertex_will_use_space_light: bool) -> Self {
+    pub fn new(graphics_options: &GraphicsOptions) -> Self {
         Self {
             transparency: graphics_options.transparency.clone(),
-
-            // use_space_light should only be true if the information is going to be used, which
-            // is determined by both GraphicsOptions and the vertex type.
-            use_space_light: vertex_will_use_space_light
-                && match graphics_options.lighting_display {
-                    LightingOption::None => false,
-                    LightingOption::Flat | LightingOption::Smooth => true,
-                },
         }
     }
 
@@ -69,7 +58,6 @@ impl MeshOptions {
     pub fn dont_care_for_test() -> Self {
         Self {
             transparency: TransparencyOption::Volumetric,
-            use_space_light: true,
         }
     }
 }

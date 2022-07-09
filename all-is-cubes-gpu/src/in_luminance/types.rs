@@ -6,9 +6,8 @@
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use luminance::{Semantics, Vertex};
 
-use all_is_cubes::math::{Face7, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgba};
+use all_is_cubes::math::{FreeCoordinate, GridPoint, Rgba};
 use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
-use all_is_cubes::space::PackedLight;
 
 /// Module to isolate the `luminance::backend` traits which have conflicting names.
 mod backend {
@@ -245,7 +244,6 @@ impl From<BlockVertex> for LumBlockVertex {
 impl GfxVertex for LumBlockVertex {
     type Coordinate = f32;
     type BlockInst = Vector3<f32>;
-    const WANTS_LIGHT: bool = false;
 
     #[inline]
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
@@ -253,7 +251,7 @@ impl GfxVertex for LumBlockVertex {
     }
 
     #[inline]
-    fn instantiate_vertex(&mut self, cube: Self::BlockInst, _lighting: PackedLight) {
+    fn instantiate_vertex(&mut self, cube: Self::BlockInst) {
         self.position.repr[0] += cube.x;
         self.position.repr[1] += cube.y;
         self.position.repr[2] += cube.z;
@@ -263,12 +261,6 @@ impl GfxVertex for LumBlockVertex {
     #[inline]
     fn position(&self) -> Point3<Self::Coordinate> {
         Point3::from(self.position.repr)
-    }
-
-    #[inline]
-    fn face(&self) -> Face7 {
-        let normal: GridVector = Vector3::from(self.normal.repr).map(|c| c as GridCoordinate);
-        Face7::try_from(normal).unwrap_or(Face7::Within)
     }
 }
 
@@ -304,7 +296,7 @@ impl DebugLineVertex for LinesVertex {
 mod tests {
     use super::*;
     use all_is_cubes::cgmath::Vector3;
-    use all_is_cubes::math::{Face6, Rgb};
+    use all_is_cubes::math::Face6;
 
     #[test]
     fn vertex_dummy() {
@@ -332,10 +324,7 @@ mod tests {
             coloring: Coloring::Solid(Rgba::new(7.0, 8.0, 9.0, 0.5)),
         };
         let mut vertex = LumBlockVertex::from(block_vertex);
-        vertex.instantiate_vertex(
-            LumBlockVertex::instantiate_block(Point3::new(10, 20, 30)),
-            Rgb::new(1.0, 0.0, 2.0).into(),
-        );
+        vertex.instantiate_vertex(LumBlockVertex::instantiate_block(Point3::new(10, 20, 30)));
         assert_eq!(vertex.position.repr, [11., 22.1, 33.]);
         assert_eq!(vertex.cube.repr, [10., 20., 30.]);
         assert_eq!(vertex.normal.repr, [1.0, 0.0, 0.0]);
