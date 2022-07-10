@@ -282,11 +282,12 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     fn sort_and_store_transparent_indices(&mut self, transparent_indices: Vec<u32>) {
         self.opaque_range = 0..self.indices.len();
 
-        if transparent_indices.is_empty() {
-            // Trivial case -- nothing to sort
-            for range in self.transparent_ranges.iter_mut() {
-                *range = 0..0;
-            }
+        if !V::WANTS_DEPTH_SORTING || transparent_indices.is_empty() {
+            // Either there is nothing to sort (and all ranges will be length 0),
+            // or the destination doesn't want sorting anyway. In either case, write the
+            // indices once and fill out transparent_ranges with copies of that range.
+            let range = extend_giving_range(&mut self.indices, transparent_indices);
+            self.transparent_ranges.fill(range);
         } else {
             // Precompute midpoints (as sort keys) of all of the transparent quads.
             // This does assume that the input `BlockMesh`es contain strictly quads
@@ -358,6 +359,9 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// Note that in the current implementation, the return value is `true` even if no
     /// reordering occurred, unless there is nothing to sort. This may be improved in the future.
     pub fn depth_sort_for_view(&mut self, view_position: Point3<V::Coordinate>) -> bool {
+        if !V::WANTS_DEPTH_SORTING {
+            return false;
+        }
         let range = self.transparent_range(DepthOrdering::Within);
         if range.len() < 12 {
             // No point in sorting unless there's at least two quads.

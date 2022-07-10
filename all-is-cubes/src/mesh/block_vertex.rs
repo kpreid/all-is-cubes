@@ -108,6 +108,17 @@ impl fmt::Debug for Coloring {
 /// [`Space`]: crate::space::Space
 /// [`SpaceMesh`]: crate::mesh::SpaceMesh
 pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
+    /// Whether [`SpaceMesh`]es should provide pre-sorted vertex index slices to allow
+    /// back-to-front drawing order based on viewing ranges.
+    ///
+    /// Design note: Strictly speaking, this doesn't need to be static and could be part
+    /// of [`MeshOptions`]. However, we currently have no reason to complicate run-time
+    /// data flow that way.
+    ///
+    /// [`SpaceMesh`]: crate::mesh::SpaceMesh
+    /// [`MeshOptions`]: crate::mesh::MeshOptions
+    const WANTS_DEPTH_SORTING: bool;
+
     /// Number type for the vertex position coordinates.
     type Coordinate: cgmath::BaseFloat;
 
@@ -132,6 +143,7 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
 
 /// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
 impl GfxVertex for BlockVertex {
+    const WANTS_DEPTH_SORTING: bool = true;
     type Coordinate = FreeCoordinate;
     type BlockInst = Vector3<FreeCoordinate>;
 

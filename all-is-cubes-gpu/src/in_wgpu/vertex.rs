@@ -91,6 +91,7 @@ impl From<BlockVertex> for WgpuBlockVertex {
 }
 
 impl GfxVertex for WgpuBlockVertex {
+    const WANTS_DEPTH_SORTING: bool = true;
     type Coordinate = f32;
     type BlockInst = Vector3<f32>;
 

@@ -242,6 +242,7 @@ impl From<BlockVertex> for LumBlockVertex {
 }
 
 impl GfxVertex for LumBlockVertex {
+    const WANTS_DEPTH_SORTING: bool = true;
     type Coordinate = f32;
     type BlockInst = Vector3<f32>;
 
