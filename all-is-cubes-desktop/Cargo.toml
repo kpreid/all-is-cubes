@@ -32,7 +32,7 @@ directories-next = "2.0.0"
 dot_vox = "4.1.0" # TODO: belongs in a separate import/export lib
 futures = { version = "0.3.17", default-features = false, features = ["std", "executor"] }
 glfw = "0.44.0"
-gltf-json = { version = "1.0.0", default-features = false, features = ["names"] } # TODO: belongs in a separate import/export lib
+gltf-json = { version = "1.0.0", default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] } # TODO: belongs in a separate import/export lib
 image = { version = "0.24.2", default-features = false }
 indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::mem::size_of;
 
 use bytemuck::offset_of;
+use gltf_json::extras::Void;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
@@ -192,6 +193,23 @@ impl Materials {
                     alpha_mode: Valid(gltf_json::material::AlphaMode::Blend),
                     double_sided: false,
                     pbr_metallic_roughness,
+                    extensions: Some(gltf_json::extensions::material::Material {
+                        volume: Some(gltf_json::extensions::material::Volume {
+                            thickness_factor: gltf_json::extensions::material::ThicknessFactor(1.0),
+                            thickness_texture: None,
+                            attenuation_distance:
+                                gltf_json::extensions::material::AttenuationDistance::default(),
+                            attenuation_color:
+                                gltf_json::extensions::material::AttenuationColor::default(),
+                            extras: Void::default(),
+                        }),
+                        transmission: Some(gltf_json::extensions::material::Transmission {
+                            transmission_factor:
+                                gltf_json::extensions::material::TransmissionFactor::default(),
+                            transmission_texture: None,
+                            extras: Void::default(),
+                        }),
+                    }),
                     ..gltf_json::Material::default()
                 },
             ),
