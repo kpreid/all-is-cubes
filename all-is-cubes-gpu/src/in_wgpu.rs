@@ -573,12 +573,18 @@ impl EverythingRenderer {
                     cursor,
                 );
             }
+
             gather_debug_lines(
                 self.cameras.character().map(|c| c.borrow()).as_deref(),
                 self.cameras.graphics_options(),
                 &mut v,
                 cursor_result,
             );
+
+            // Chunk debug -- not currently part of gather_debug_lines
+            if let Some(r) = &self.space_renderers.world {
+                r.debug_lines(&self.cameras.cameras().world, &mut v);
+            }
 
             self.lines_buffer.write_with_resizing(
                 bwp.reborrow(),

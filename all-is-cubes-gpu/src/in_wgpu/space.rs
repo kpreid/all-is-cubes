@@ -7,13 +7,14 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
 
-use all_is_cubes::cgmath::{EuclideanSpace, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace, Point3, Transform, Vector3};
+use all_is_cubes::content::palette;
 use instant::Instant;
 
 use all_is_cubes::camera::Camera;
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::listen::Listener;
-use all_is_cubes::math::{FaceMap, GridCoordinate, GridPoint, Rgb};
+use all_is_cubes::math::{Aab, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
 use all_is_cubes::mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
 use all_is_cubes::mesh::DepthOrdering;
 use all_is_cubes::space::{Grid, Space, SpaceChange};
@@ -21,13 +22,16 @@ use all_is_cubes::universe::URef;
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};
 use crate::in_wgpu::pipelines::Pipelines;
+use crate::in_wgpu::vertex::WgpuLinesVertex;
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
     camera::ShaderSpaceCamera,
     glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
-use crate::{GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo};
+use crate::{
+    wireframe_vertices, DebugLineVertex, GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo,
+};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -350,6 +354,48 @@ impl SpaceRenderer {
     /// Returns the camera, to allow additional drawing in the same coordinate system.
     pub(crate) fn camera_bind_group(&self) -> &wgpu::BindGroup {
         &self.camera_bind_group
+    }
+
+    /// Generate debug lines for the current state of the renderer, assuming
+    /// draw() was just called.
+    pub(crate) fn debug_lines(&self, camera: &Camera, v: &mut Vec<WgpuLinesVertex>) {
+        if camera.options().debug_chunk_boxes {
+            // TODO: remember view direction mask instead of rerequesting it?
+            for chunk in self
+                .csm
+                .chunk_chart()
+                .chunks(self.csm.view_chunk(), camera.view_direction_mask())
+            {
+                wireframe_vertices::<WgpuLinesVertex, _, _>(
+                    v,
+                    palette::DEBUG_CHUNK_MAJOR,
+                    &Aab::from(chunk.grid()),
+                );
+            }
+
+            // Frame the nearest chunk in detail
+            let chunk_origin = self
+                .csm
+                .view_chunk()
+                .grid()
+                .lower_bounds()
+                .map(FreeCoordinate::from);
+            for face in Face6::ALL {
+                let m = face.matrix(CHUNK_SIZE);
+                for i in 1..CHUNK_SIZE {
+                    let mut push = |p| {
+                        v.push(WgpuLinesVertex::from_position_color(
+                            m.transform_point(p).map(FreeCoordinate::from) + chunk_origin.to_vec(),
+                            palette::DEBUG_CHUNK_MINOR,
+                        ));
+                    };
+                    push(Point3::new(i, 0, 0));
+                    push(Point3::new(i, CHUNK_SIZE, 0));
+                    push(Point3::new(0, i, 0));
+                    push(Point3::new(CHUNK_SIZE, i, 0));
+                }
+            }
+        }
     }
 }
 
