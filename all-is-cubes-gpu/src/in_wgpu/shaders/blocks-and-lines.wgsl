@@ -315,36 +315,28 @@ fn get_diffuse_color(in: BlockFragmentInput) -> vec4<f32> {
     }
 }
 
-@fragment
-fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    let diffuse_color: vec4<f32> = get_diffuse_color(in);
-    
-    // Lighting
-    let lit_color = diffuse_color * vec4<f32>(lighting(in), 1.0);
-
+// Apply the effects of distance fog and camera exposure.
+// These effects are independent of alpha and therefore the input and output is RGB.
+fn apply_fog_and_exposure(lit_color: vec3<f32>, fog_mix: f32) -> vec3<f32> {
     // Fog
-    let fogged_color = vec4<f32>(mix(lit_color.rgb, camera.fog_color_and_fog_mode_blend.rgb, in.fog_mix), lit_color.a);
+    let fogged_color = mix(lit_color, camera.fog_color_and_fog_mode_blend.rgb, fog_mix);
 
     // Exposure/eye adaptation
-    let exposed_color = vec4<f32>(fogged_color.rgb * camera.fog_distance_and_exposure[1], fogged_color.a);
+    let exposed_color = fogged_color.rgb * camera.fog_distance_and_exposure[1];
 
     return exposed_color;
 }
 
 @fragment
+fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
+    let lit_color: vec3<f32> = get_diffuse_color(in).rgb * lighting(in);
+    return vec4<f32>(apply_fog_and_exposure(lit_color, in.fog_mix), 1.0);
+}
+
+@fragment
 fn block_fragment_transparent(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    let diffuse_color: vec4<f32> = get_diffuse_color(in);
-    
-    // Lighting
-    let lit_color = diffuse_color * vec4<f32>(lighting(in), 1.0);
-
-    // Fog
-    let fogged_color = vec4<f32>(mix(lit_color.rgb, camera.fog_color_and_fog_mode_blend.rgb, in.fog_mix), lit_color.a);
-
-    // Exposure/eye adaptation
-    let exposed_color = vec4<f32>(fogged_color.rgb * camera.fog_distance_and_exposure[1], fogged_color.a);
-
-    // Multiply color channels by alpha because our blend function choice is premultiplied alpha.
+    let lit_color = get_diffuse_color(in) * vec4<f32>(lighting(in), 1.0);
+    let exposed_color = vec4<f32>(apply_fog_and_exposure(lit_color.rgb, in.fog_mix), lit_color.a);
     return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
 }
 
