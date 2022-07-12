@@ -95,6 +95,12 @@ struct BlockFragmentInput {
     @location(4) clamp_min: vec3<f32>,
     @location(5) clamp_max: vec3<f32>,
     @location(6) fog_mix: f32,
+    // Position of the fragment relative to the cube it belongs to.
+    // Range of 0.0 to 1.0 inclusive.
+    @location(7) position_in_cube: vec3<f32>,
+    // Direction vector, in the world coordinate system, which points
+    // from the camera position to this fragment.
+    @location(8) camera_ray_direction: vec3<f32>,
 };
 
 @vertex
@@ -121,6 +127,11 @@ fn block_vertex_main(
         input.clamp_min,
         input.clamp_max,
         compute_fog(input.position),
+        input.position - input.cube,
+        // camera_ray_direction:
+        // Note that we do not normalize this vector: by keeping things linear, we
+        // allow linear interpolation between vertices to get the right answer.
+        input.position - camera.view_position,
     );
 }
 
@@ -129,6 +140,37 @@ fn block_vertex_main(
 // Modulo, not remainder (matches GLSL builtin mod())
 fn modulo(a: f32, b: f32) -> f32 {
     return ((a % b) + 1.0) % b;
+}
+
+// Find the smallest positive `t` such that `s + t * ds` is an integer,
+// given that `s` is in the range 0 to 1.
+//
+// If `ds` is zero, returns positive infinity; this is a useful answer because
+// it means that the less-than comparisons in the raycast algorithm will never
+// pick the corresponding axis. If any input is NaN, returns NaN.
+//
+// The canonical version of this algorithm is
+// `all_is_cubes::raycast::scale_to_integer_step`.
+// TODO: Add crosscheck test cases once we have the ability to run shader unit tests.
+fn partial_scale_to_integer_step(s: f32, ds: f32) -> f32 {
+    var s = s;
+    var ds = ds;
+    s = clamp(s, 0.0, 1.0);  // Out of bounds may appear on triangle edges
+    if (sign(ds) < 0.0) {
+        s = 1.0 - s;
+        ds = -ds;
+        // Note: This will not act on a negative zero.
+        // That must be handled separately.
+    }
+    // problem is now s + t * ds = 1
+    var result = (1.0 - s) / ds;
+
+    // Fix sign error in case of negative zero.
+    if s < 0.0 {
+        result *= -1.0;
+    }
+
+    return result;
 }
 
 // Given integer cube coordinates, fetch and unpack a light_texture RGB value.
@@ -327,15 +369,57 @@ fn apply_fog_and_exposure(lit_color: vec3<f32>, fog_mix: f32) -> vec3<f32> {
     return exposed_color;
 }
 
+fn volumetric_transparency(in: BlockFragmentInput, starting_alpha: f32) -> f32 {
+    if (starting_alpha < 1.0) {
+        // Apply volumetric opacity.
+        //
+        // This is a very crude approximation of future support for more general
+        // volumetric/raytraced blocks.
+        
+        // Run a minimal version of the same raycasting algorithm we use on the CPU side.
+        let t_delta = vec3<f32>(
+            partial_scale_to_integer_step(in.position_in_cube.x, in.camera_ray_direction.x),
+            partial_scale_to_integer_step(in.position_in_cube.y, in.camera_ray_direction.y),
+            partial_scale_to_integer_step(in.position_in_cube.z, in.camera_ray_direction.z)
+        );
+        // t_delta now represents the distance, in units of
+        // length(in.camera_ray_direction), to the next cube face. Normalize this
+        // to obtain a length through the volume.
+        let exit_t = min(t_delta.x, min(t_delta.y, t_delta.z));
+        let thickness = exit_t * length(in.camera_ray_direction);
+
+        // Convert alpha to transmittance (light transmitted / light received).
+        let transmittance = 1.0 - starting_alpha;
+        // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
+        let adj_transmittance = pow(transmittance, thickness);
+        // Convert back to alpha.
+        return 1.0 - adj_transmittance;
+    } else {
+        return 1.0;
+    }
+}
+
+// Entry point for opaque geometry.
 @fragment
 fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let lit_color: vec3<f32> = get_diffuse_color(in).rgb * lighting(in);
     return vec4<f32>(apply_fog_and_exposure(lit_color, in.fog_mix), 1.0);
 }
 
+// Entry point for transparency under TransparencyOption::Surface.
 @fragment
-fn block_fragment_transparent(in: BlockFragmentInput) -> @location(0) vec4<f32> {
+fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let lit_color = get_diffuse_color(in) * vec4<f32>(lighting(in), 1.0);
+    let exposed_color = vec4<f32>(apply_fog_and_exposure(lit_color.rgb, in.fog_mix), lit_color.a);
+    return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
+}
+
+// Entry point for transparency under TransparencyOption::Volumetric.
+@fragment
+fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0) vec4<f32> {
+    var diffuse_color = get_diffuse_color(in);
+    diffuse_color.a = volumetric_transparency(in, diffuse_color.a);
+    let lit_color = diffuse_color * vec4<f32>(lighting(in), 1.0);
     let exposed_color = vec4<f32>(apply_fog_and_exposure(lit_color.rgb, in.fog_mix), lit_color.a);
     return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
 }

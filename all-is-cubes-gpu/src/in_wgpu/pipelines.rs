@@ -1,6 +1,11 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
+use std::mem;
+
+use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::camera::TransparencyOption;
+use all_is_cubes::listen::ListenableSource;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::listen::DirtyFlag;
@@ -22,8 +27,10 @@ use crate::reloadable::{reloadable_str, Reloadable};
 /// of more things, or stay scoped to "only the 3D world rendering".
 #[derive(Debug)]
 pub(crate) struct Pipelines {
-    /// Tracks whether we need to reload shaders from disk.
-    shader_dirty: DirtyFlag,
+    /// Tracks whether we need to rebuild pipelines for any reasons.
+    dirty: DirtyFlag,
+
+    graphics_options: ListenableSource<GraphicsOptions>,
 
     /// Layout for the camera buffer.
     pub(crate) camera_bind_group_layout: wgpu::BindGroupLayout,
@@ -46,7 +53,11 @@ static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
 
 impl Pipelines {
     // TODO: wants graphics options to configure shader?
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        linear_scene_texture_format: wgpu::TextureFormat,
+        graphics_options: ListenableSource<GraphicsOptions>,
+    ) -> Self {
         let shader = create_wgsl_module_from_reloadable(
             device,
             "blocks-and-lines",
@@ -132,7 +143,7 @@ impl Pipelines {
                     module: &shader,
                     entry_point: "block_fragment_opaque",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: surface_format,
+                        format: linear_scene_texture_format,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -160,9 +171,15 @@ impl Pipelines {
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
-                    entry_point: "block_fragment_transparent",
+                    entry_point: match graphics_options.get().transparency {
+                        TransparencyOption::Volumetric => "block_fragment_transparent_volumetric",
+                        TransparencyOption::Surface | TransparencyOption::Threshold(_) => {
+                            "block_fragment_transparent_surface"
+                        }
+                        ref t => panic!("unimplemented transparency option {t:?}"),
+                    },
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: surface_format,
+                        format: linear_scene_texture_format,
                         // Note that this blending configuration is for premultiplied alpha.
                         // The fragment shader is responsible for producing premultiplied alpha outputs.
                         blend: Some(wgpu::BlendState {
@@ -213,7 +230,7 @@ impl Pipelines {
                     module: &shader,
                     entry_point: "lines_fragment",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: surface_format,
+                        format: linear_scene_texture_format,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -234,9 +251,11 @@ impl Pipelines {
             });
 
         Self {
-            shader_dirty: DirtyFlag::listening(false, |l| {
-                BLOCKS_AND_LINES_SHADER.as_source().listen(l)
+            dirty: DirtyFlag::listening(false, |l| {
+                BLOCKS_AND_LINES_SHADER.as_source().listen(l.clone());
+                graphics_options.listen(l);
             }),
+            graphics_options,
             camera_bind_group_layout,
             space_texture_bind_group_layout,
             opaque_render_pipeline,
@@ -246,14 +265,22 @@ impl Pipelines {
         }
     }
 
-    pub(crate) fn recompile_if_changed(
+    pub(crate) fn rebuild_if_changed(
         &mut self,
         device: &wgpu::Device,
-        surface_format: wgpu::TextureFormat,
+        linear_scene_texture_format: wgpu::TextureFormat,
     ) {
-        if self.shader_dirty.get_and_clear() {
-            // TODO: slightly less efficient than it could be since it rebuilds the layouts too
-            *self = Self::new(device, surface_format);
+        if self.dirty.get_and_clear() {
+            // TODO: Maybe we should split shader compilation and other changes, and keep the
+            // non-dependent parts.
+            *self = Self::new(
+                device,
+                linear_scene_texture_format,
+                mem::replace(
+                    &mut self.graphics_options,
+                    ListenableSource::constant(Default::default()),
+                ),
+            );
         }
     }
 }

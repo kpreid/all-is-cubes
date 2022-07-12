@@ -296,7 +296,11 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::postprocess_bind_group_layout"),
             });
 
-        let pipelines = Pipelines::new(&device, linear_scene_texture_format);
+        let pipelines = Pipelines::new(
+            &device,
+            linear_scene_texture_format,
+            cameras.graphics_options_source(),
+        );
 
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
@@ -466,7 +470,7 @@ impl EverythingRenderer {
             );
         }
         self.pipelines
-            .recompile_if_changed(&self.device, self.config.format);
+            .rebuild_if_changed(&self.device, self.linear_scene_texture_format);
 
         // Identify spaces to be rendered
         let ws = self.cameras.world_space().snapshot(); // TODO: ugly
