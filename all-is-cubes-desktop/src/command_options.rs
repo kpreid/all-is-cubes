@@ -163,10 +163,10 @@ static GRAPHICS_HELP_LONG: Lazy<String> = Lazy::new(|| {
 #[non_exhaustive]
 pub enum GraphicsType {
     // These variants are sorted for the benefit of the help text presentation.
-    #[clap(help = "Open a window (uses OpenGL)")]
+    #[clap(help = "Open a window (uses GPU rendering)")]
     Window,
-    #[clap(help = "EXPERIMENTAL: Open a window (uses `wgpu` for GPU)")]
-    WindowWgpu,
+    #[clap(help = "Open a window (uses GPU with OpenGL backend)")]
+    WindowGl,
     #[clap(help = "EXPERIMENTAL: Open a window (uses CPU raytracing)")]
     WindowRt,
     #[clap(help = "Colored text in this terminal (uses raytracing)")]

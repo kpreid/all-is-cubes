@@ -22,8 +22,8 @@ pub struct OptionsInUrl {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum RendererOption {
-    #[default] // TODO: change to Wgpu when that works better
     Luminance,
+    #[default]
     Wgpu,
 }
 
@@ -80,7 +80,7 @@ mod tests {
             OptionsInUrl {
                 template: UniverseTemplate::default(),
                 graphics_options: GraphicsOptions::default(),
-                renderer: RendererOption::Luminance,
+                renderer: RendererOption::Wgpu,
             },
         )
     }

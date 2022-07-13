@@ -176,12 +176,12 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     match graphics_type {
-        GraphicsType::Window => glfw_main_loop(create_glfw_desktop_session(
+        GraphicsType::WindowGl => glfw_main_loop(create_glfw_desktop_session(
             session,
             &title_and_version(),
             display_size,
         )?),
-        GraphicsType::WindowWgpu => {
+        GraphicsType::Window => {
             let event_loop = winit::event_loop::EventLoop::new();
             let dsession = block_on(create_winit_wgpu_desktop_session(
                 session,
