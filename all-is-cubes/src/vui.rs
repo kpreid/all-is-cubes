@@ -12,7 +12,7 @@ use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
 use ordered_float::NotNan;
 
 use crate::apps::{ControlMessage, InputProcessor};
-use crate::camera::{FogOption, GraphicsOptions, ViewTransform};
+use crate::camera::{FogOption, GraphicsOptions, ViewTransform, Viewport};
 use crate::character::{Character, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
@@ -59,17 +59,19 @@ pub(crate) struct Vui {
 impl Vui {
     /// `input_processor` is the `InputProcessor` whose state may be reflected on the HUD.
     /// `character_source` reports the `Character` whose inventory should be displayed.
+    ///
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
-    /// multitasking. It may be blocked on from a synchronous context.
+    /// multitasking. It may safely be blocked on from a synchronous context.
     pub async fn new(
         input_processor: &InputProcessor,
         character_source: ListenableSource<Option<URef<Character>>>,
         paused: ListenableSource<bool>,
         graphics_options: ListenableSource<GraphicsOptions>,
         control_channel: mpsc::SyncSender<ControlMessage>,
+        viewport_source: ListenableSource<Viewport>,
     ) -> Self {
         let mut universe = Universe::new();
         // TODO: take YieldProgress as a parameter
@@ -89,6 +91,7 @@ impl Vui {
                 control_channel,
                 graphics_options,
             },
+            viewport_source.snapshot(),
         );
 
         Self {
@@ -201,6 +204,7 @@ mod tests {
             ListenableSource::constant(false),
             ListenableSource::constant(GraphicsOptions::default()),
             mpsc::sync_channel(1).0,
+            ListenableSource::constant(Viewport::ARBITRARY),
         ))
     }
 

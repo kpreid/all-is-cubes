@@ -83,10 +83,11 @@ pub(crate) fn create_window(
 pub(crate) async fn create_winit_wgpu_desktop_session(
     session: Session,
     window: Window,
+    viewport_cell: ListenableCell<Viewport>,
 ) -> Result<DesktopSession<SurfaceRenderer, Window>, anyhow::Error> {
     let start_time = Instant::now();
 
-    let viewport_cell = ListenableCell::new(physical_size_to_viewport(
+    viewport_cell.set(physical_size_to_viewport(
         window.scale_factor(),
         window.inner_size(),
     ));
@@ -146,10 +147,11 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
 pub(crate) fn create_winit_rt_desktop_session(
     session: Session,
     window: Window,
+    viewport_cell: ListenableCell<Viewport>,
 ) -> Result<DesktopSession<RtRenderer, softbuffer::GraphicsContext<Window>>, anyhow::Error> {
     let start_time = Instant::now();
 
-    let viewport_cell = ListenableCell::new(physical_size_to_viewport(
+    viewport_cell.set(physical_size_to_viewport(
         window.scale_factor(),
         window.inner_size(),
     ));

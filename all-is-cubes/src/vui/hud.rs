@@ -12,7 +12,7 @@ use embedded_graphics::Drawable as _;
 
 use crate::apps::{ControlMessage, InputProcessor};
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
-use crate::camera::GraphicsOptions;
+use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
@@ -34,8 +34,7 @@ pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFo
 /// Knows where and how to place graphics within the HUD space, but does not store
 /// the space or any related state itself; depends only on the screen size and other
 /// parameters not primarily dependent on user interaction. This split is intended to
-/// simplify the problem of adapting to size changes (though right now there is no
-/// actual such handling).
+/// simplify the problem of adapting to size changes.
 ///
 /// TODO: Since introducing widgets, HudLayout does much less work. Think about whether it should exist.
 #[derive(Clone, Debug, PartialEq)]
@@ -44,18 +43,18 @@ pub(crate) struct HudLayout {
     pub(crate) toolbar_positions: usize,
 }
 
-// TODO: This will probably not make sense once we have aspect ratio adaptations
-impl Default for HudLayout {
-    fn default() -> Self {
+impl HudLayout {
+    /// Construct HudLayout with a grid size that suits the given viewport
+    /// (based on pixel resolution and aspect ratio)
+    fn new(_viewport: Viewport) -> Self {
+        // TODO: actually use viewport input
         Self {
             // Odd width benefits the toolbar and crosshair.
             size: Vector2::new(25, 17),
             toolbar_positions: 10,
         }
     }
-}
 
-impl HudLayout {
     pub(crate) fn grid(&self) -> Grid {
         Grid::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
     }
@@ -116,8 +115,9 @@ pub(super) fn new_hud_space(
     character_source: ListenableSource<Option<URef<Character>>>,
     paused: ListenableSource<bool>,
     hud_inputs: &HudInputs,
+    viewport: Viewport,
 ) -> URef<Space> {
-    let hud_layout = HudLayout::default();
+    let hud_layout = HudLayout::new(viewport);
     let hud_space = hud_layout.new_space(universe, &hud_inputs.hud_blocks);
 
     // Miscellaneous control widgets drawn in the corner

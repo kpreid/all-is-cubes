@@ -9,6 +9,7 @@ use std::ops::ControlFlow;
 use std::sync::mpsc;
 use std::time::Instant;
 
+use all_is_cubes::camera::Viewport;
 use glfw::{Action, Context as _, CursorMode, SwapInterval, WindowEvent, WindowMode};
 use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 
@@ -102,6 +103,7 @@ pub(crate) fn create_glfw_desktop_session(
     session: Session,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
+    viewport_cell: ListenableCell<Viewport>,
 ) -> Result<GlfwSession, anyhow::Error> {
     let start_time = Instant::now();
     let GlfwSurface {
@@ -119,7 +121,7 @@ pub(crate) fn create_glfw_desktop_session(
         Ok((window, events_rx))
     })?;
 
-    let viewport_cell = ListenableCell::new(window_size_as_viewport(&context.window));
+    viewport_cell.set(window_size_as_viewport(&context.window));
     let dsession = DesktopSession {
         renderer: SurfaceRenderer::new(
             context,

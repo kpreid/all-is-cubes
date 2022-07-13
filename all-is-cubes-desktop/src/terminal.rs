@@ -90,9 +90,9 @@ struct FrameOutput {
 pub(crate) fn create_terminal_session(
     session: Session,
     options: TerminalOptions,
+    viewport_cell: ListenableCell<Viewport>,
 ) -> crossterm::Result<DesktopSession<TerminalRenderer, TerminalWindow>> {
-    let viewport_cell =
-        ListenableCell::new(options.viewport_from_terminal_size(rect_size(Rect::default())));
+    viewport_cell.set(options.viewport_from_terminal_size(rect_size(Rect::default())));
     let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
 
     // Generate reusable buffers for scene.

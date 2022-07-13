@@ -113,8 +113,17 @@ fn main() -> Result<(), anyhow::Error> {
         config_files::load_config().expect("Error loading configuration files")
     };
 
+    // This cell will be moved into the session after (possibly) being reset to the actual
+    // window size. This is a kludge because the `Session`'s `Vui` wants to be able to track
+    // the viewport aspect ratio. It would be nice to have a better strategy, but at least
+    // this is mostly confined to initialization.
+    let viewport_cell = ListenableCell::new(Viewport::with_scale(
+        1.0,
+        display_size.unwrap_or_else(Vector2::zero),
+    ));
+
     let start_session_time = Instant::now();
-    let mut session = block_on(Session::new());
+    let mut session = block_on(Session::new(viewport_cell.as_source()));
     session.graphics_options_mut().set(graphics_options);
     let session_done_time = Instant::now();
     log::debug!(
@@ -143,8 +152,12 @@ fn main() -> Result<(), anyhow::Error> {
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
         GraphicsType::WindowGl => {
-            let dsession =
-                create_glfw_desktop_session(session, &title_and_version(), display_size)?;
+            let dsession = create_glfw_desktop_session(
+                session,
+                &title_and_version(),
+                display_size,
+                viewport_cell,
+            )?;
             glfw_main_loop(dsession)
         }
         GraphicsType::Window => {
@@ -152,6 +165,7 @@ fn main() -> Result<(), anyhow::Error> {
             let dsession = block_on(create_winit_wgpu_desktop_session(
                 session,
                 aic_winit::create_window(&event_loop, &title_and_version(), display_size)?,
+                viewport_cell,
             ))?;
             winit_main_loop(event_loop, dsession)
         }
@@ -160,11 +174,13 @@ fn main() -> Result<(), anyhow::Error> {
             let dsession = create_winit_rt_desktop_session(
                 session,
                 aic_winit::create_window(&event_loop, &title_and_version(), display_size)?,
+                viewport_cell,
             )?;
             winit_main_loop(event_loop, dsession)
         }
         GraphicsType::Terminal => {
-            let dsession = create_terminal_session(session, TerminalOptions::default())?;
+            let dsession =
+                create_terminal_session(session, TerminalOptions::default(), viewport_cell)?;
             terminal_main_loop(dsession)
         }
         GraphicsType::Record => {
@@ -173,11 +189,12 @@ fn main() -> Result<(), anyhow::Error> {
             let record_options = options
                 .record_options()
                 .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
-            let (dsession, sr) = create_recording_session(session, &record_options)?;
+            let (dsession, sr) = create_recording_session(session, &record_options, viewport_cell)?;
             record_main(dsession, record_options, sr)
         }
         GraphicsType::Print => {
-            let dsession = create_terminal_session(session, TerminalOptions::default())?;
+            let dsession =
+                create_terminal_session(session, TerminalOptions::default(), viewport_cell)?;
             terminal_print_once(
                 dsession,
                 // TODO: Default display size should be based on terminal width
@@ -192,11 +209,7 @@ fn main() -> Result<(), anyhow::Error> {
                 session,
                 renderer: (),
                 window: (),
-                // dummy value
-                viewport_cell: ListenableCell::new(Viewport::with_scale(
-                    1.0,
-                    display_size.unwrap_or_else(Vector2::zero),
-                )),
+                viewport_cell,
                 clock_source: ClockSource::Instant,
                 recorder: None,
             };

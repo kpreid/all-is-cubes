@@ -11,7 +11,7 @@ use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, StandardCameras};
-use crate::camera::GraphicsOptions;
+use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::{Character, Cursor};
 use crate::inv::ToolError;
 use crate::listen::{ListenableCell, ListenableCellWithLocal, ListenableSource};
@@ -95,7 +95,7 @@ impl Session {
     /// multitasking, while constructing the initial state. It may safely be blocked on
     /// from a synchronous context.
     #[allow(clippy::new_without_default)]
-    pub async fn new() -> Self {
+    pub async fn new(viewport_for_ui: ListenableSource<Viewport>) -> Self {
         let game_universe = Universe::new();
         let game_character = ListenableCellWithLocal::new(None);
         let input_processor = InputProcessor::new();
@@ -110,6 +110,7 @@ impl Session {
                 paused.as_source(),
                 graphics_options.as_source(),
                 control_send,
+                viewport_for_ui,
             )
             .await,
 
@@ -416,7 +417,9 @@ mod tests {
     fn set_universe_async() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
-        let mut session = block_on(Session::new());
+        let mut session = block_on(Session::new(ListenableSource::constant(
+            Viewport::ARBITRARY,
+        )));
         session
             .universe_mut()
             .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))

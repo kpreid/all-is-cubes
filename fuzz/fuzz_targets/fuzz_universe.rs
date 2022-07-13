@@ -6,7 +6,9 @@ use std::time::Instant;
 use futures_executor::block_on;
 
 use all_is_cubes::apps::Session;
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::character::Character;
+use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::space::Space;
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
@@ -14,10 +16,11 @@ use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
 #[derive(Arbitrary, Debug)]
 struct FuzzUniverseTemplate {
     space: Space,
+    viewport: Viewport,
 }
 
 fuzz_target!(|input: FuzzUniverseTemplate| {
-    let mut session = block_on(Session::new());
+    let mut session = block_on(Session::new(ListenableSource::constant(input.viewport)));
 
     // TODO: add some of all kinds of universe objects
     let space = session.universe_mut().insert_anonymous(input.space);

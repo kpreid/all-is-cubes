@@ -8,6 +8,7 @@ use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::behavior::AutoRotate;
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::math::NotNan;
 
@@ -19,8 +20,9 @@ use crate::session::{ClockSource, DesktopSession};
 pub(crate) fn create_recording_session(
     session: Session,
     options: &RecordOptions,
+    viewport_cell: ListenableCell<Viewport>,
 ) -> Result<(DesktopSession<(), ()>, mpsc::Receiver<usize>), anyhow::Error> {
-    let viewport_cell = ListenableCell::new(options.viewport());
+    viewport_cell.set(options.viewport());
     let (recorder, status_receiver) = Recorder::new(
         options.clone(),
         StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap(),

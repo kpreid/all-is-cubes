@@ -348,7 +348,9 @@ mod tests {
 
     #[test]
     fn cameras_follow_character_and_world() {
-        let mut session = block_on(Session::new());
+        let mut session = block_on(Session::new(ListenableSource::constant(
+            Viewport::ARBITRARY,
+        )));
         let mut cameras = StandardCameras::from_session(
             &session,
             ListenableSource::constant(Viewport::ARBITRARY),
@@ -392,7 +394,9 @@ mod tests {
 
     #[test]
     fn cameras_clone() {
-        let session = block_on(Session::new());
+        let session = block_on(Session::new(ListenableSource::constant(
+            Viewport::ARBITRARY,
+        )));
         let mut cameras = StandardCameras::from_session(
             &session,
             ListenableSource::constant(Viewport::ARBITRARY),

@@ -110,7 +110,8 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     app_progress.progress(0.2).await;
     // The main cost of this is constructing the `Vui` instance.
     // TODO: pipe in YieldProgress
-    let session = Session::new().await;
+    let viewport_cell = ListenableCell::new(gui_helpers.canvas_helper().viewport());
+    let session = Session::new(viewport_cell.as_source()).await;
     session.graphics_options_mut().set(graphics_options);
 
     static_dom
@@ -118,7 +119,6 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .append_data("\nInitializing graphics...")?;
     app_progress.progress(0.4).await;
 
-    let viewport_cell = ListenableCell::new(gui_helpers.canvas_helper().viewport());
     let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
     let renderer = match renderer_option {
         RendererOption::Luminance => {
