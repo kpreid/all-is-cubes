@@ -80,7 +80,7 @@ impl Default for TerminalOptions {
 pub fn terminal_main_loop(session: Session, options: TerminalOptions) -> Result<(), anyhow::Error> {
     let mut main = TerminalMain::new(session, options)?;
     main.run()?;
-    main.clean_up_terminal()?; // note this is _also_ run on drop
+    main.dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
     Ok(())
 }
 
@@ -95,20 +95,22 @@ pub fn terminal_print_once(
 ) -> Result<(), anyhow::Error> {
     let mut main = TerminalMain::new(session, options)?;
     main.print_once(display_size)?;
-    main.clean_up_terminal()?; // note this is _also_ run on drop
+    main.dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
     Ok(())
 }
 
 struct TerminalMain {
-    dsession: DesktopSession<TerminalRenderer, ()>,
+    dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
+}
 
-    options: TerminalOptions,
-    tuiout: tui::Terminal<CrosstermBackend<io::Stdout>>,
+/// Fills the window slot of [`DesktopSession`].
+/// Tracks the terminal state and acts as communication channel.
+struct TerminalWindow {
+    tui: tui::Terminal<CrosstermBackend<io::Stdout>>,
     /// True if we should clean up on drop.
     terminal_state_dirty: bool,
-
-    // Tracking terminal state.
-    /// Regionof the terminal the scene is drawn into.
+    /// Region of the terminal the scene is drawn into;
+    /// updated when `tui` layout runs.
     viewport_position: Rect,
 }
 
@@ -120,6 +122,11 @@ struct TerminalRenderer {
     /// Redundant with the RtRenderer's cameras, but is a copy that
     /// isn't hopping around threads.
     cameras: StandardCameras,
+
+    /// Options pertaining to how to draw.
+    ///
+    /// TODO: Unclear whether this belongs in Renderer or Window
+    options: TerminalOptions,
 
     /// The widths of "single characters" according to the terminal's interpretation
     /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
@@ -209,42 +216,27 @@ impl TerminalMain {
                 session,
                 renderer: TerminalRenderer {
                     cameras,
+                    options,
                     widths: HashMap::new(),
                     buffer_reuse_out,
                     render_pipe_in,
                     render_pipe_out,
                 },
-                window: (),
+                window: TerminalWindow {
+                    tui: Terminal::new(CrosstermBackend::new(io::stdout()))?,
+                    viewport_position,
+                    terminal_state_dirty: true,
+                },
                 viewport_cell,
                 clock_source: ClockSource::Instant,
                 recorder: None,
             },
-            options,
-            tuiout: Terminal::new(CrosstermBackend::new(io::stdout()))?,
-            viewport_position,
-            terminal_state_dirty: true,
         })
-    }
-
-    /// Reset terminal state, as before exiting.
-    /// This will be run on drop but errors will not be reported in that case.
-    fn clean_up_terminal(&mut self) -> crossterm::Result<()> {
-        let out = self.tuiout.backend_mut();
-        out.queue(SetAttribute(Attribute::Reset))?;
-        out.queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
-        out.queue(cursor::Show)?;
-        out.queue(crossterm::event::DisableMouseCapture)?;
-        crossterm::terminal::disable_raw_mode()?;
-        self.terminal_state_dirty = false;
-        Ok(())
     }
 
     /// Run the simulation and interactive UI. Returns after user's quit command.
     fn run(&mut self) -> crossterm::Result<()> {
-        self.tuiout
-            .backend_mut()
-            .queue(crossterm::event::EnableMouseCapture)?;
-        self.tuiout.clear()?;
+        self.dsession.window.begin_fullscreen()?;
 
         loop {
             'input: while crossterm::event::poll(Duration::ZERO)? {
@@ -260,6 +252,7 @@ impl TerminalMain {
                         continue 'input;
                     }
                 }
+                let options = &mut self.dsession.renderer.options;
                 match event {
                     Event::Key(
                         KeyEvent {
@@ -275,13 +268,13 @@ impl TerminalMain {
                     Event::Key(KeyEvent {
                         code: KeyCode::Char('n'),
                         modifiers: _,
-                    }) => self.options.colors = self.options.colors.cycle(),
+                    }) => options.colors = options.colors.cycle(),
                     Event::Key(KeyEvent {
                         code: KeyCode::Char('m'),
                         modifiers: _,
                     }) => {
-                        self.options.characters = self.options.characters.cycle();
-                        self.sync_viewport();
+                        options.characters = options.characters.cycle();
+                        sync_viewport(&mut self.dsession);
                     }
                     Event::Key(_) => {}
                     Event::Resize(..) => { /* tui handles this */ }
@@ -319,7 +312,7 @@ impl TerminalMain {
 
             match self.dsession.renderer.render_pipe_out.try_recv() {
                 Ok(frame) => {
-                    self.write_ui(&frame)?;
+                    write_ui(&mut self.dsession, &frame)?;
                     self.write_frame(frame, true)?;
                 }
                 // TODO: Even if we don't have a frame, we might want to update the UI anyway.
@@ -343,9 +336,9 @@ impl TerminalMain {
 
     /// Prints one frame, without clearing the terminal, and returns.
     fn print_once(&mut self, image_size_in_characters: Vector2<u16>) -> crossterm::Result<()> {
-        self.viewport_position =
+        self.dsession.window.viewport_position =
             Rect::new(0, 0, image_size_in_characters.x, image_size_in_characters.y);
-        self.sync_viewport();
+        sync_viewport(&mut self.dsession);
 
         self.send_frame_to_render();
         let frame = self
@@ -359,13 +352,6 @@ impl TerminalMain {
         Ok(())
     }
 
-    fn sync_viewport(&mut self) {
-        self.dsession.viewport_cell.set(
-            self.options
-                .viewport_from_terminal_size(rect_size(self.viewport_position)),
-        );
-    }
-
     fn send_frame_to_render(&mut self) {
         // Fetch and update one of our recirculating renderers.
         let mut renderer = self.dsession.renderer.buffer_reuse_out.recv().unwrap();
@@ -374,7 +360,7 @@ impl TerminalMain {
             .unwrap();
 
         match self.dsession.renderer.render_pipe_in.try_send(FrameInput {
-            options: self.options.clone(),
+            options: self.dsession.renderer.options.clone(),
             scene: renderer,
         }) {
             Ok(()) => {
@@ -387,179 +373,6 @@ impl TerminalMain {
                 // Skip this frame
             }
         }
-    }
-
-    /// Lay out and write the UI using [`tui`] -- everything on screen *except* for
-    /// the raytraced scene.
-    ///
-    /// This function also stores the current scene viewport for future frames.
-    fn write_ui(&mut self, frame: &FrameOutput) -> crossterm::Result<()> {
-        let FrameOutput { info, .. } = frame;
-        let mut viewport_rect = None;
-        self.tuiout.draw(|f| {
-            const HELP_TEXT: &str = "\
-                Move: WS AD EC  Turn: ←→ ↑↓\n\
-                Term color: N   Term chars: M\n\
-                Quit: Esc, ^C, or ^D";
-
-            let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_and_help_rect]: [Rect; 4] =
-                Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Min(1),
-                        Constraint::Length(3),
-                        Constraint::Length(2),
-                        Constraint::Length(3),
-                    ])
-                    .split(f.size())
-                    .try_into()
-                    .unwrap();
-            let [cursor_rect, help_rect]: [Rect; 2] = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Min(0), Constraint::Length(30)])
-                .split(cursor_and_help_rect)
-                .try_into()
-                .unwrap();
-            // Toolbar
-            {
-                const SLOTS: usize = 10; // TODO: link with other UI and gameplay code
-
-                const SELECTED_BLANK: Span<'static> = Span {
-                    content: Cow::Borrowed(" "),
-                    style: STYLE_NONE,
-                };
-                const SELECTED_0: Span<'static> = Span {
-                    content: Cow::Borrowed("1"),
-                    style: Style {
-                        fg: Some(TuiColor::Black),
-                        bg: Some(TuiColor::Red),
-                        ..STYLE_NONE
-                    },
-                };
-                const SELECTED_1: Span<'static> = Span {
-                    content: Cow::Borrowed("2"),
-                    style: Style {
-                        fg: Some(TuiColor::Black),
-                        bg: Some(TuiColor::Yellow),
-                        ..STYLE_NONE
-                    },
-                };
-
-                let slot_rects = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Ratio(1, SLOTS as u32); SLOTS])
-                    .split(toolbar_rect);
-
-                if let Some(character_ref) = self.dsession.session.character().snapshot() {
-                    let character = character_ref.borrow();
-                    let selected_slots = character.selected_slots();
-                    let slots = &character.inventory().slots;
-                    for (i, rect) in slot_rects.into_iter().enumerate() {
-                        let slot = slots.get(i).unwrap_or(&Slot::Empty);
-                        let slot_info = Spans::from(vec![
-                            if selected_slots[0] == i {
-                                SELECTED_0
-                            } else {
-                                SELECTED_BLANK
-                            },
-                            Span::from(format!(" {} ", i)),
-                            if selected_slots[1] == i {
-                                SELECTED_1
-                            } else {
-                                SELECTED_BLANK
-                            },
-                        ]);
-                        let block = tui::widgets::Block::default()
-                            .title(slot_info)
-                            .borders(Borders::ALL);
-                        f.render_widget(
-                            match slot {
-                                // TODO: Use item icon text -- we need a way to access the predefined icons from here
-                                Slot::Empty => Paragraph::new(""),
-                                Slot::Stack(count, item) if count.get() == 1 => {
-                                    Paragraph::new(format!("{:?}", item))
-                                }
-                                Slot::Stack(count, item) => {
-                                    Paragraph::new(format!("{} × {:?}", count, item))
-                                }
-
-                                // Fallback
-                                slot => Paragraph::new(format!("{:?}", slot)),
-                            }
-                            .block(block),
-                            rect,
-                        );
-                    }
-                } else {
-                    // TODO: render blank slots
-                }
-            }
-
-            viewport_rect = Some(viewport_rect_tmp);
-
-            // Graphics info line
-            {
-                let [frame_info_rect, colors_info_rect, render_info_rect]: [Rect; 3] =
-                    Layout::default()
-                        .direction(Direction::Horizontal)
-                        .constraints([
-                            Constraint::Percentage(30),
-                            Constraint::Percentage(30),
-                            Constraint::Percentage(30),
-                        ])
-                        .split(gfx_info_rect)
-                        .try_into()
-                        .unwrap();
-
-                f.render_widget(
-                    Paragraph::new(format!(
-                        "{:5.1} FPS",
-                        self.dsession.session.draw_fps_counter().frames_per_second()
-                    )),
-                    frame_info_rect,
-                );
-
-                f.render_widget(
-                    Paragraph::new(format!(
-                        "Colors: {:?}\nChars: {:?}",
-                        self.options.colors, self.options.characters
-                    )),
-                    colors_info_rect,
-                );
-
-                f.render_widget(
-                    Paragraph::new(format!("{}", info.custom_format(StatusText))),
-                    render_info_rect,
-                );
-            }
-
-            // Cursor info
-            f.render_widget(
-                if let Some(cursor) = self.dsession.session.cursor_result() {
-                    // TODO: design good formatting for cursor data
-                    Paragraph::new(format!(
-                        "{:?} : {}",
-                        cursor.place, cursor.evaluated.attributes.display_name
-                    ))
-                } else {
-                    Paragraph::new("")
-                },
-                cursor_rect,
-            );
-
-            // Help text
-            f.render_widget(Paragraph::new(HELP_TEXT), help_rect);
-        })?;
-
-        // Store latest layout position so it can be used for choosing what size to render and for
-        // independent drawing.
-        let viewport_rect = viewport_rect.expect("layout failed to update");
-        if self.viewport_position != viewport_rect {
-            self.viewport_position = viewport_rect;
-            self.sync_viewport();
-        }
-
-        Ok(())
     }
 
     /// Actually write image data to the terminal.
@@ -580,7 +393,7 @@ impl TerminalMain {
         // For all UI text, we run with that since it should be only minor glitches, but the
         // scene display needs accurate horizontal alignment.
 
-        let backend = self.tuiout.backend_mut();
+        let backend = self.dsession.window.tui.backend_mut();
         backend.queue(cursor::Hide)?;
         backend.queue(SetAttribute(Attribute::Reset))?;
         let mut current_color = None;
@@ -591,7 +404,7 @@ impl TerminalMain {
             .map(|s| s as usize)
             .div_element_wise(options.characters.rays_per_character().map(usize::from));
 
-        let mut rect = self.viewport_position;
+        let mut rect = self.dsession.window.viewport_position;
         // Clamp rect to match the actual image data size, to avoid trying to read the
         // image data out of bounds. (This should be only temporary while resizing.)
         rect.width = rect.width.min(image_size_in_characters.x as u16);
@@ -742,12 +555,222 @@ impl TerminalMain {
     }
 }
 
-impl Drop for TerminalMain {
+impl TerminalWindow {
+    fn begin_fullscreen(&mut self) -> crossterm::Result<()> {
+        self.terminal_state_dirty = true;
+        self.tui
+            .backend_mut()
+            .queue(crossterm::event::EnableMouseCapture)?;
+        self.tui.clear()?;
+        Ok(())
+    }
+
+    /// Reset terminal state, as before exiting.
+    /// This will also be run on drop but errors will not be reported in that case.
+    fn clean_up_terminal(&mut self) -> crossterm::Result<()> {
+        let out = self.tui.backend_mut();
+        out.queue(SetAttribute(Attribute::Reset))?;
+        out.queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
+        out.queue(cursor::Show)?;
+        out.queue(crossterm::event::DisableMouseCapture)?;
+        crossterm::terminal::disable_raw_mode()?;
+        self.terminal_state_dirty = false;
+        Ok(())
+    }
+}
+
+impl Drop for TerminalWindow {
     fn drop(&mut self) {
         if self.terminal_state_dirty {
             let _ = self.clean_up_terminal();
         }
     }
+}
+
+/// Copy session's current viewport state to the viewport cell.
+fn sync_viewport(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) {
+    dsession.viewport_cell.set(
+        dsession
+            .renderer
+            .options
+            .viewport_from_terminal_size(rect_size(dsession.window.viewport_position)),
+    );
+}
+
+/// Lay out and write the UI using [`tui`] -- everything on screen *except* for
+/// the raytraced scene.
+///
+/// This function also stores the current scene viewport for future frames.
+fn write_ui(
+    dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>,
+    frame: &FrameOutput,
+) -> crossterm::Result<()> {
+    let FrameOutput { info, .. } = frame;
+    let mut viewport_rect = None;
+    dsession.window.tui.draw(|f| {
+        const HELP_TEXT: &str = "\
+                Move: WS AD EC  Turn: ←→ ↑↓\n\
+                Term color: N   Term chars: M\n\
+                Quit: Esc, ^C, or ^D";
+
+        let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_and_help_rect]: [Rect; 4] =
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Min(1),
+                    Constraint::Length(3),
+                    Constraint::Length(2),
+                    Constraint::Length(3),
+                ])
+                .split(f.size())
+                .try_into()
+                .unwrap();
+        let [cursor_rect, help_rect]: [Rect; 2] = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Min(0), Constraint::Length(30)])
+            .split(cursor_and_help_rect)
+            .try_into()
+            .unwrap();
+        // Toolbar
+        {
+            const SLOTS: usize = 10; // TODO: link with other UI and gameplay code
+
+            const SELECTED_BLANK: Span<'static> = Span {
+                content: Cow::Borrowed(" "),
+                style: STYLE_NONE,
+            };
+            const SELECTED_0: Span<'static> = Span {
+                content: Cow::Borrowed("1"),
+                style: Style {
+                    fg: Some(TuiColor::Black),
+                    bg: Some(TuiColor::Red),
+                    ..STYLE_NONE
+                },
+            };
+            const SELECTED_1: Span<'static> = Span {
+                content: Cow::Borrowed("2"),
+                style: Style {
+                    fg: Some(TuiColor::Black),
+                    bg: Some(TuiColor::Yellow),
+                    ..STYLE_NONE
+                },
+            };
+
+            let slot_rects = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(1, SLOTS as u32); SLOTS])
+                .split(toolbar_rect);
+
+            if let Some(character_ref) = dsession.session.character().snapshot() {
+                let character = character_ref.borrow();
+                let selected_slots = character.selected_slots();
+                let slots = &character.inventory().slots;
+                for (i, rect) in slot_rects.into_iter().enumerate() {
+                    let slot = slots.get(i).unwrap_or(&Slot::Empty);
+                    let slot_info = Spans::from(vec![
+                        if selected_slots[0] == i {
+                            SELECTED_0
+                        } else {
+                            SELECTED_BLANK
+                        },
+                        Span::from(format!(" {} ", i)),
+                        if selected_slots[1] == i {
+                            SELECTED_1
+                        } else {
+                            SELECTED_BLANK
+                        },
+                    ]);
+                    let block = tui::widgets::Block::default()
+                        .title(slot_info)
+                        .borders(Borders::ALL);
+                    f.render_widget(
+                        match slot {
+                            // TODO: Use item icon text -- we need a way to access the predefined icons from here
+                            Slot::Empty => Paragraph::new(""),
+                            Slot::Stack(count, item) if count.get() == 1 => {
+                                Paragraph::new(format!("{:?}", item))
+                            }
+                            Slot::Stack(count, item) => {
+                                Paragraph::new(format!("{} × {:?}", count, item))
+                            }
+
+                            // Fallback
+                            slot => Paragraph::new(format!("{:?}", slot)),
+                        }
+                        .block(block),
+                        rect,
+                    );
+                }
+            } else {
+                // TODO: render blank slots
+            }
+        }
+
+        viewport_rect = Some(viewport_rect_tmp);
+
+        // Graphics info line
+        {
+            let [frame_info_rect, colors_info_rect, render_info_rect]: [Rect; 3] =
+                Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Percentage(30),
+                        Constraint::Percentage(30),
+                        Constraint::Percentage(30),
+                    ])
+                    .split(gfx_info_rect)
+                    .try_into()
+                    .unwrap();
+
+            f.render_widget(
+                Paragraph::new(format!(
+                    "{:5.1} FPS",
+                    dsession.session.draw_fps_counter().frames_per_second()
+                )),
+                frame_info_rect,
+            );
+
+            f.render_widget(
+                Paragraph::new(format!(
+                    "Colors: {:?}\nChars: {:?}",
+                    dsession.renderer.options.colors, dsession.renderer.options.characters
+                )),
+                colors_info_rect,
+            );
+
+            f.render_widget(
+                Paragraph::new(format!("{}", info.custom_format(StatusText))),
+                render_info_rect,
+            );
+        }
+
+        // Cursor info
+        f.render_widget(
+            if let Some(cursor) = dsession.session.cursor_result() {
+                // TODO: design good formatting for cursor data
+                Paragraph::new(format!(
+                    "{:?} : {}",
+                    cursor.place, cursor.evaluated.attributes.display_name
+                ))
+            } else {
+                Paragraph::new("")
+            },
+            cursor_rect,
+        );
+
+        // Help text
+        f.render_widget(Paragraph::new(HELP_TEXT), help_rect);
+    })?;
+
+    // Store latest layout position so it can be used for choosing what size to render and for
+    // independent drawing.
+    let viewport_rect = viewport_rect.expect("layout failed to update");
+    if dsession.window.viewport_position != viewport_rect {
+        dsession.window.viewport_position = viewport_rect;
+        sync_viewport(dsession);
+    }
+
+    Ok(())
 }
 
 fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
