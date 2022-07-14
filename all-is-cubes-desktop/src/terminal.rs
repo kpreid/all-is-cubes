@@ -39,27 +39,14 @@ pub(crate) use options::TerminalOptions;
 mod output;
 use output::{image_patch_to_character, write_colored_and_measure};
 
-pub(crate) fn terminal_main_loop(
-    session: Session,
-    options: TerminalOptions,
-) -> Result<(), anyhow::Error> {
-    let mut dsession = create_terminal_session(session, options)?;
-    run(&mut dsession)?;
-    dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
-    Ok(())
-}
-
 /// Print the scene to stdout and return, instead of starting any interaction.
 ///
 /// TODO: This shouldn't need to take ownership of the `session`; it does so because it is
 /// built on the same components as [`terminal_main_loop`].
 pub(crate) fn terminal_print_once(
-    session: Session,
-    options: TerminalOptions,
+    mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
     display_size: Vector2<u16>,
 ) -> Result<(), anyhow::Error> {
-    let mut dsession = create_terminal_session(session, options)?;
-
     dsession.window.viewport_position = Rect::new(0, 0, display_size.x, display_size.y);
     sync_viewport(&mut dsession);
 
@@ -205,6 +192,15 @@ pub(crate) fn create_terminal_session(
         clock_source: ClockSource::Instant,
         recorder: None,
     })
+}
+
+/// Run the simulation and interactive UI. Returns after user's quit command.
+pub(crate) fn terminal_main_loop(
+    mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
+) -> Result<(), anyhow::Error> {
+    run(&mut dsession)?;
+    dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
+    Ok(())
 }
 
 /// Run the simulation and interactive UI. Returns after user's quit command.

@@ -46,7 +46,6 @@ mod record;
 use record::record_main;
 mod session;
 mod terminal;
-use terminal::{terminal_main_loop, TerminalOptions};
 
 use crate::aic_glfw::create_glfw_desktop_session;
 use crate::aic_winit::{create_winit_rt_desktop_session, create_winit_wgpu_desktop_session};
@@ -55,7 +54,9 @@ use crate::command_options::{
 };
 use crate::record::{create_recording_session, RecordFormat};
 use crate::session::{ClockSource, DesktopSession};
-use crate::terminal::terminal_print_once;
+use crate::terminal::{
+    create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
+};
 
 // TODO: put version numbers in the title when used as a window title
 static TITLE: &str = "All is Cubes";
@@ -162,7 +163,10 @@ fn main() -> Result<(), anyhow::Error> {
             )?;
             winit_main_loop(event_loop, dsession)
         }
-        GraphicsType::Terminal => terminal_main_loop(session, TerminalOptions::default()),
+        GraphicsType::Terminal => {
+            let dsession = create_terminal_session(session, TerminalOptions::default())?;
+            terminal_main_loop(dsession)
+        }
         GraphicsType::Record => {
             // TODO: record_options validation should just be part of the regular arg parsing
             // (will need a wrapper type)
@@ -172,15 +176,17 @@ fn main() -> Result<(), anyhow::Error> {
             let (dsession, sr) = create_recording_session(session, &record_options)?;
             record_main(dsession, record_options, sr)
         }
-        GraphicsType::Print => terminal_print_once(
-            session,
-            TerminalOptions::default(),
-            // TODO: Default display size should be based on terminal width
-            // (but not necessarily the full height)
-            display_size
-                .unwrap_or_else(|| Vector2::new(80, 24))
-                .map(|component| component.min(u16::MAX.into()) as u16),
-        ),
+        GraphicsType::Print => {
+            let dsession = create_terminal_session(session, TerminalOptions::default())?;
+            terminal_print_once(
+                dsession,
+                // TODO: Default display size should be based on terminal width
+                // (but not necessarily the full height)
+                display_size
+                    .unwrap_or_else(|| Vector2::new(80, 24))
+                    .map(|component| component.min(u16::MAX.into()) as u16),
+            )
+        }
         GraphicsType::Headless => {
             let mut dsession = DesktopSession {
                 session,
