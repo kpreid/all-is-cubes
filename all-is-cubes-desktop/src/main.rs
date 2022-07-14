@@ -53,7 +53,7 @@ use crate::aic_winit::{create_winit_rt_desktop_session, create_winit_wgpu_deskto
 use crate::command_options::{
     determine_record_format, parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
 };
-use crate::record::RecordFormat;
+use crate::record::{create_recording_session, RecordFormat};
 use crate::session::{ClockSource, DesktopSession};
 use crate::terminal::terminal_print_once;
 
@@ -133,12 +133,19 @@ fn main() -> Result<(), anyhow::Error> {
     let universe = create_universe(input_source, precompute_light)?;
     session.set_universe(universe);
 
+    // The graphics type selects not only the kind of 'window' we create, but also the
+    // type of event loop to run. Hence, this match combines
+    // * creating a window
+    // * creating a DesktopSession
+    // * starting the main loop
+    // Note that while its return type is nominally Result<()>, it does not necessarily
+    // ever return “successfully”, so no code should follow it.
     match graphics_type {
-        GraphicsType::WindowGl => glfw_main_loop(create_glfw_desktop_session(
-            session,
-            &title_and_version(),
-            display_size,
-        )?),
+        GraphicsType::WindowGl => {
+            let dsession =
+                create_glfw_desktop_session(session, &title_and_version(), display_size)?;
+            glfw_main_loop(dsession)
+        }
         GraphicsType::Window => {
             let event_loop = winit::event_loop::EventLoop::new();
             let dsession = block_on(create_winit_wgpu_desktop_session(
@@ -156,12 +163,15 @@ fn main() -> Result<(), anyhow::Error> {
             winit_main_loop(event_loop, dsession)
         }
         GraphicsType::Terminal => terminal_main_loop(session, TerminalOptions::default()),
-        GraphicsType::Record => record_main(
-            session,
-            options
+        GraphicsType::Record => {
+            // TODO: record_options validation should just be part of the regular arg parsing
+            // (will need a wrapper type)
+            let record_options = options
                 .record_options()
-                .map_err(|e| e.format(&mut AicDesktopArgs::command()))?,
-        ),
+                .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
+            let (dsession, sr) = create_recording_session(session, &record_options)?;
+            record_main(dsession, record_options, sr)
+        }
         GraphicsType::Print => terminal_print_once(
             session,
             TerminalOptions::default(),

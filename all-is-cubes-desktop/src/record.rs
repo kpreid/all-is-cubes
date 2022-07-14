@@ -20,7 +20,7 @@ mod options;
 use gltf_json::Index;
 pub(crate) use options::*;
 mod record_main;
-pub(crate) use record_main::record_main;
+pub(crate) use record_main::{create_recording_session, record_main};
 mod write_png;
 
 type FrameNumber = usize;

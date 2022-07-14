@@ -1,7 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use std::io::Write;
+use std::sync::mpsc;
 use std::time::Duration;
 
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
@@ -14,42 +14,18 @@ use all_is_cubes::math::NotNan;
 use crate::record::{RecordOptions, Recorder};
 use crate::session::{ClockSource, DesktopSession};
 
-pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<(), anyhow::Error> {
-    let progress_style = ProgressStyle::default_bar()
-        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
-        .on_finish(ProgressFinish::AtCurrentPos);
+// TODO: the status_receiver passing is awkward. Maybe Recorder should just provide it as a broadcast output?
 
-    let mut stderr = std::io::stderr();
-
-    // Modify graphics options to suit recording
-    // TODO: Find a better place to put this policy, and in particular allow the user to
-    // override it if they do want to record the UI.
-    session
-        .graphics_options_mut()
-        .update_mut(|mut graphics_options| {
-            graphics_options.show_ui = false;
-            graphics_options.debug_info_text = false;
-        });
-
-    let viewport = options.viewport();
-
-    if let Some(anim) = &options.animation {
-        if let Some(character_ref) = session.character().snapshot() {
-            // TODO: replace this with a general camera scripting mechanism
-            character_ref.try_modify(|c| {
-                c.add_behavior(AutoRotate {
-                    rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
-                })
-            })?;
-        }
-    }
-
-    let viewport_cell = ListenableCell::new(viewport);
+pub(crate) fn create_recording_session(
+    session: Session,
+    options: &RecordOptions,
+) -> Result<(DesktopSession<(), ()>, mpsc::Receiver<usize>), anyhow::Error> {
+    let viewport_cell = ListenableCell::new(options.viewport());
     let (recorder, status_receiver) = Recorder::new(
         options.clone(),
         StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap(),
     )?;
-    let mut dsession = DesktopSession {
+    let dsession = DesktopSession {
         session,
         renderer: (),
         window: (),
@@ -60,6 +36,40 @@ pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<()
         }),
         recorder: Some(recorder),
     };
+
+    Ok((dsession, status_receiver))
+}
+
+pub(crate) fn record_main(
+    mut dsession: DesktopSession<(), ()>,
+    options: RecordOptions,
+    status_receiver: mpsc::Receiver<usize>,
+) -> Result<(), anyhow::Error> {
+    let progress_style = ProgressStyle::default_bar()
+        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
+        .on_finish(ProgressFinish::AtCurrentPos);
+
+    // Modify graphics options to suit recording
+    // TODO: Find a better place to put this policy, and in particular allow the user to
+    // override it if they do want to record the UI.
+    dsession
+        .session
+        .graphics_options_mut()
+        .update_mut(|mut graphics_options| {
+            graphics_options.show_ui = false;
+            graphics_options.debug_info_text = false;
+        });
+
+    if let Some(anim) = &options.animation {
+        if let Some(character_ref) = dsession.session.character().snapshot() {
+            // TODO: replace this with a general camera scripting mechanism
+            character_ref.try_modify(|c| {
+                c.add_behavior(AutoRotate {
+                    rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
+                })
+            })?;
+        }
+    }
 
     // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
     // (We could move the universe stepping to another thread to get more precise progress updates,
@@ -93,7 +103,7 @@ pub(crate) fn record_main(session: Session, options: RecordOptions) -> Result<()
     }
 
     // Report completion
-    let _ = writeln!(stderr, "\nWrote {}", options.output_path.to_string_lossy());
+    eprintln!("\nWrote {}", options.output_path.to_string_lossy());
 
     Ok(())
 }
