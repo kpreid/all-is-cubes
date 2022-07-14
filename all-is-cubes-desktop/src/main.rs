@@ -20,6 +20,7 @@
 
 use std::time::{Duration, Instant};
 
+use all_is_cubes::universe::Universe;
 use clap::{CommandFactory as _, Parser as _};
 use futures::executor::block_on;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
@@ -122,58 +123,15 @@ fn main() -> Result<(), anyhow::Error> {
             .as_secs_f32()
     );
 
-    let universe_progress_bar = ProgressBar::new(100)
-        .with_style(
-            common_progress_style().template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}%      "),
-        )
-        .with_prefix("Building");
-    universe_progress_bar.set_position(0); // Show bar promptly
-    let yield_progress = {
-        let universe_progress_bar = universe_progress_bar.clone();
-        YieldProgress::new(
-            || std::future::ready(()),
-            move |fraction| universe_progress_bar.set_position((fraction * 100.0) as u64),
-        )
-    };
-    let universe = block_on(async {
-        match input_source.clone() {
-            UniverseSource::Template(template) => template
-                .build(yield_progress, thread_rng().gen())
-                .await
-                .map_err(anyhow::Error::from),
-            UniverseSource::File(path) => {
-                data_files::load_universe_from_file(yield_progress, &path).await
-            }
-        }
-    })?;
-    session.set_universe(universe);
-    universe_progress_bar.finish();
-    let universe_done_time = Instant::now();
-    log::debug!(
-        "Initialized game state with {:?} ({:.3} s)",
-        input_source,
-        universe_done_time
-            .duration_since(session_done_time)
-            .as_secs_f32()
-    );
-
-    // TODO: kludgy condition; this should be a question we ask about the record_options()
-    if precompute_light
+    // TODO: refactor this to work through RecordOptions
+    let precompute_light = precompute_light
         || (graphics_type == GraphicsType::Record
             && output_file
                 .as_ref()
                 .and_then(|f| determine_record_format(f).ok())
-                != Some(RecordFormat::Gltf))
-    {
-        session
-            .character()
-            .snapshot()
-            .expect("no character to record the viewpoint of")
-            .borrow()
-            .space
-            .try_modify(evaluate_light_with_progress)
-            .unwrap();
-    }
+                != Some(RecordFormat::Gltf));
+    let universe = create_universe(input_source, precompute_light)?;
+    session.set_universe(universe);
 
     match graphics_type {
         GraphicsType::WindowGl => glfw_main_loop(create_glfw_desktop_session(
@@ -251,6 +209,56 @@ fn main() -> Result<(), anyhow::Error> {
             Ok(())
         }
     }
+}
+
+/// Perform and log the creation of the universe.
+fn create_universe(
+    input_source: UniverseSource,
+    precompute_light: bool,
+) -> Result<Universe, anyhow::Error> {
+    let start_time = Instant::now();
+    let universe_progress_bar = ProgressBar::new(100)
+        .with_style(
+            common_progress_style().template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}%      "),
+        )
+        .with_prefix("Building");
+    universe_progress_bar.set_position(0);
+    let yield_progress = {
+        let universe_progress_bar = universe_progress_bar.clone();
+        YieldProgress::new(
+            || std::future::ready(()),
+            move |fraction| universe_progress_bar.set_position((fraction * 100.0) as u64),
+        )
+    };
+    let universe = block_on(async {
+        match input_source.clone() {
+            UniverseSource::Template(template) => template
+                .build(yield_progress, thread_rng().gen())
+                .await
+                .map_err(anyhow::Error::from),
+            UniverseSource::File(path) => {
+                data_files::load_universe_from_file(yield_progress, &path).await
+            }
+        }
+    })?;
+    universe_progress_bar.finish();
+    let universe_done_time = Instant::now();
+    log::debug!(
+        "Initialized game state with {:?} ({:.3} s)",
+        input_source,
+        universe_done_time.duration_since(start_time).as_secs_f32()
+    );
+
+    if precompute_light {
+        if let Some(c) = universe.get_default_character() {
+            c.borrow()
+                .space
+                .try_modify(evaluate_light_with_progress)
+                .unwrap();
+        }
+    }
+
+    Ok(universe)
 }
 
 fn evaluate_light_with_progress(space: &mut Space) {
