@@ -43,9 +43,9 @@ pub(crate) fn terminal_main_loop(
     session: Session,
     options: TerminalOptions,
 ) -> Result<(), anyhow::Error> {
-    let mut main = TerminalMain::new(session, options)?;
-    main.run()?;
-    main.dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
+    let mut dsession = create_terminal_session(session, options)?;
+    run(&mut dsession)?;
+    dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
     Ok(())
 }
 
@@ -58,19 +58,28 @@ pub(crate) fn terminal_print_once(
     options: TerminalOptions,
     display_size: Vector2<u16>,
 ) -> Result<(), anyhow::Error> {
-    let mut main = TerminalMain::new(session, options)?;
-    main.print_once(display_size)?;
-    main.dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
-    Ok(())
-}
+    let mut dsession = create_terminal_session(session, options)?;
 
-struct TerminalMain {
-    dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
+    dsession.window.viewport_position = Rect::new(0, 0, display_size.x, display_size.y);
+    sync_viewport(&mut dsession);
+
+    dsession
+        .renderer
+        .send_frame_to_render(&mut dsession.session);
+    let frame = dsession
+        .renderer
+        .render_pipe_out
+        .recv()
+        .expect("Internal error in rendering");
+    dsession.window.write_frame(frame, false)?;
+
+    dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
+    Ok(())
 }
 
 /// Fills the window slot of [`DesktopSession`].
 /// Tracks the terminal state and acts as communication channel.
-struct TerminalWindow {
+pub(crate) struct TerminalWindow {
     tui: tui::Terminal<CrosstermBackend<io::Stdout>>,
 
     /// True if we should clean up on drop.
@@ -90,7 +99,7 @@ struct TerminalWindow {
 ///
 /// TODO: Refactor this 'till we can merge it with the record mode
 /// raytracing.
-struct TerminalRenderer {
+pub(crate) struct TerminalRenderer {
     /// Redundant with the RtRenderer's cameras, but is a copy that
     /// isn't hopping around threads.
     cameras: StandardCameras,
@@ -120,207 +129,179 @@ struct FrameOutput {
     info: RaytraceInfo,
 }
 
-impl TerminalMain {
-    fn new(session: Session, options: TerminalOptions) -> crossterm::Result<Self> {
-        crossterm::terminal::enable_raw_mode()?;
+pub(crate) fn create_terminal_session(
+    session: Session,
+    options: TerminalOptions,
+) -> crossterm::Result<DesktopSession<TerminalRenderer, TerminalWindow>> {
+    let viewport_position = Rect::default();
+    let viewport_cell =
+        ListenableCell::new(options.viewport_from_terminal_size(rect_size(viewport_position)));
+    let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
 
-        let viewport_position = Rect::default();
-        let viewport_cell =
-            ListenableCell::new(options.viewport_from_terminal_size(rect_size(viewport_position)));
-        let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
-
-        // Generate reusable buffers for scene.
-        // They are recirculated through the channels so that one can be updated while another is being raytraced.
-        let number_of_scene_buffers = 3;
-        let (buffer_reuse_in, buffer_reuse_out) =
-            mpsc::sync_channel::<RtRenderer<CharacterRtData>>(number_of_scene_buffers);
-        for _ in 0..number_of_scene_buffers {
-            buffer_reuse_in
-                .send(RtRenderer::new(
-                    cameras.clone(),
-                    Box::new(|v| v),
-                    ListenableSource::constant(()),
-                ))
-                .unwrap();
-        }
-
-        // Create thread for making the raytracing operation concurrent with main loop
-        // Note: this doesn't really need a thread but rayon doesn't have a
-        // "start but don't block on this" operation.
-        let (render_pipe_in, render_thread_in) = mpsc::sync_channel::<FrameInput>(1);
-        let (render_thread_out, render_pipe_out) = mpsc::sync_channel(1);
-        std::thread::Builder::new()
-            .name("raytracer".to_string())
-            .spawn({
-                move || {
-                    while let Ok(FrameInput { options, scene }) = render_thread_in.recv() {
-                        // TODO: it isn't actually correct to use the world camera always,
-                        // once UI exists because it will use the world exposure for UI,
-                        // but this will require a rethink of the raytracer interface.
-                        let camera = &scene.cameras().cameras().world;
-                        let viewport = scene.modified_viewport();
-                        let mut image =
-                            vec![(String::new(), None); viewport.pixel_count().unwrap()];
-                        let info = scene.draw::<ColorCharacterBuf, _, _, _>(
-                            |_| String::new(),
-                            |b| b.output(camera),
-                            &mut image,
-                        );
-                        // Ignore send errors as they just mean we're shutting down or died elsewhere
-                        let _ = render_thread_out.send(FrameOutput {
-                            viewport,
-                            options,
-                            image,
-                            info,
-                        });
-                        let _ = buffer_reuse_in.send(scene);
-                    }
-                }
-            })?;
-
-        Ok(Self {
-            dsession: DesktopSession {
-                session,
-                renderer: TerminalRenderer {
-                    cameras,
-                    options,
-                    buffer_reuse_out,
-                    render_pipe_in,
-                    render_pipe_out,
-                },
-                window: TerminalWindow {
-                    tui: Terminal::new(CrosstermBackend::new(io::stdout()))?,
-                    viewport_position,
-                    terminal_state_dirty: true,
-                    widths: HashMap::new(),
-                },
-                viewport_cell,
-                clock_source: ClockSource::Instant,
-                recorder: None,
-            },
-        })
+    // Generate reusable buffers for scene.
+    // They are recirculated through the channels so that one can be updated while another is being raytraced.
+    let number_of_scene_buffers = 3;
+    let (buffer_reuse_in, buffer_reuse_out) =
+        mpsc::sync_channel::<RtRenderer<CharacterRtData>>(number_of_scene_buffers);
+    for _ in 0..number_of_scene_buffers {
+        buffer_reuse_in
+            .send(RtRenderer::new(
+                cameras.clone(),
+                Box::new(|v| v),
+                ListenableSource::constant(()),
+            ))
+            .unwrap();
     }
 
-    /// Run the simulation and interactive UI. Returns after user's quit command.
-    fn run(&mut self) -> crossterm::Result<()> {
-        self.dsession.window.begin_fullscreen()?;
-
-        loop {
-            'input: while crossterm::event::poll(Duration::ZERO)? {
-                let event = crossterm::event::read()?;
-                if let Some(aic_event) = event_to_key(&event) {
-                    if self
-                        .dsession
-                        .session
-                        .input_processor
-                        .key_momentary(aic_event)
-                    {
-                        // Handled by input_processor
-                        continue 'input;
-                    }
-                }
-                let options = &mut self.dsession.renderer.options;
-                match event {
-                    Event::Key(
-                        KeyEvent {
-                            code: KeyCode::Esc, ..
-                        }
-                        | KeyEvent {
-                            code: KeyCode::Char('c' | 'd'),
-                            modifiers: KeyModifiers::CONTROL,
-                        },
-                    ) => {
-                        return Ok(());
-                    }
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('n'),
-                        modifiers: _,
-                    }) => options.colors = options.colors.cycle(),
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('m'),
-                        modifiers: _,
-                    }) => {
-                        options.characters = options.characters.cycle();
-                        sync_viewport(&mut self.dsession);
-                    }
-                    Event::Key(_) => {}
-                    Event::Resize(..) => { /* tui handles this */ }
-                    Event::Mouse(MouseEvent {
-                        kind,
-                        column,
-                        row,
-                        modifiers: _,
-                    }) => {
-                        // TODO: there's a scaling of nominal_size in viewport_from_terminal_size that we
-                        // need to undo here, but it would be better to directly input the right coordinate
-                        // system. Define a version of mouse_pixel_position which takes sizes directly?
-                        let position =
-                            Point2::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
-                        self.dsession.session.input_processor.mouse_pixel_position(
-                            *self.dsession.viewport_cell.get(),
-                            Some(position),
-                            true,
-                        );
-                        match kind {
-                            MouseEventKind::Down(button) => {
-                                self.dsession.session.click(map_mouse_button(button));
-                            }
-                            MouseEventKind::Up(_)
-                            | MouseEventKind::Drag(_)
-                            | MouseEventKind::Moved
-                            | MouseEventKind::ScrollDown
-                            | MouseEventKind::ScrollUp => {}
-                        }
-                    }
+    // Create thread for making the raytracing operation concurrent with main loop
+    // Note: this doesn't really need a thread but rayon doesn't have a
+    // "start but don't block on this" operation.
+    let (render_pipe_in, render_thread_in) = mpsc::sync_channel::<FrameInput>(1);
+    let (render_thread_out, render_pipe_out) = mpsc::sync_channel(1);
+    std::thread::Builder::new()
+        .name("raytracer".to_string())
+        .spawn({
+            move || {
+                while let Ok(FrameInput { options, scene }) = render_thread_in.recv() {
+                    // TODO: it isn't actually correct to use the world camera always,
+                    // once UI exists because it will use the world exposure for UI,
+                    // but this will require a rethink of the raytracer interface.
+                    let camera = &scene.cameras().cameras().world;
+                    let viewport = scene.modified_viewport();
+                    let mut image = vec![(String::new(), None); viewport.pixel_count().unwrap()];
+                    let info = scene.draw::<ColorCharacterBuf, _, _, _>(
+                        |_| String::new(),
+                        |b| b.output(camera),
+                        &mut image,
+                    );
+                    // Ignore send errors as they just mean we're shutting down or died elsewhere
+                    let _ = render_thread_out.send(FrameOutput {
+                        viewport,
+                        options,
+                        image,
+                        info,
+                    });
+                    let _ = buffer_reuse_in.send(scene);
                 }
             }
+        })?;
 
-            self.dsession.advance_time_and_maybe_step();
+    Ok(DesktopSession {
+        session,
+        renderer: TerminalRenderer {
+            cameras,
+            options,
+            buffer_reuse_out,
+            render_pipe_in,
+            render_pipe_out,
+        },
+        window: TerminalWindow {
+            tui: Terminal::new(CrosstermBackend::new(io::stdout()))?,
+            viewport_position,
+            terminal_state_dirty: true,
+            widths: HashMap::new(),
+        },
+        viewport_cell,
+        clock_source: ClockSource::Instant,
+        recorder: None,
+    })
+}
 
-            match self.dsession.renderer.render_pipe_out.try_recv() {
-                Ok(frame) => {
-                    write_ui(&mut self.dsession, &frame)?;
-                    self.dsession.window.write_frame(frame, true)?;
+/// Run the simulation and interactive UI. Returns after user's quit command.
+/// Caller is responsible for `clean_up_terminal()`.
+fn run(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) -> crossterm::Result<()> {
+    dsession.window.begin_fullscreen()?;
+
+    loop {
+        'input: while crossterm::event::poll(Duration::ZERO)? {
+            let event = crossterm::event::read()?;
+            if let Some(aic_event) = event_to_key(&event) {
+                if dsession.session.input_processor.key_momentary(aic_event) {
+                    // Handled by input_processor
+                    continue 'input;
                 }
-                // TODO: Even if we don't have a frame, we might want to update the UI anyway.
-                Err(mpsc::TryRecvError::Empty) => {}
-                Err(mpsc::TryRecvError::Disconnected) => panic!("render thread died"),
             }
-
-            if self.dsession.session.frame_clock.should_draw() {
-                // TODO: this is the only reason .cameras exists
-                let c = &mut self.dsession.renderer.cameras;
-                c.update();
-                self.dsession.session.update_cursor(&*c);
-
-                self.dsession
-                    .renderer
-                    .send_frame_to_render(&mut self.dsession.session);
-            } else {
-                // TODO: sleep instead of spinning.
-                std::thread::yield_now();
+            let options = &mut dsession.renderer.options;
+            match event {
+                Event::Key(
+                    KeyEvent {
+                        code: KeyCode::Esc, ..
+                    }
+                    | KeyEvent {
+                        code: KeyCode::Char('c' | 'd'),
+                        modifiers: KeyModifiers::CONTROL,
+                    },
+                ) => {
+                    return Ok(());
+                }
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('n'),
+                    modifiers: _,
+                }) => options.colors = options.colors.cycle(),
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('m'),
+                    modifiers: _,
+                }) => {
+                    options.characters = options.characters.cycle();
+                    sync_viewport(dsession);
+                }
+                Event::Key(_) => {}
+                Event::Resize(..) => { /* tui handles this */ }
+                Event::Mouse(MouseEvent {
+                    kind,
+                    column,
+                    row,
+                    modifiers: _,
+                }) => {
+                    // TODO: there's a scaling of nominal_size in viewport_from_terminal_size that we
+                    // need to undo here, but it would be better to directly input the right coordinate
+                    // system. Define a version of mouse_pixel_position which takes sizes directly?
+                    let position =
+                        Point2::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
+                    dsession.session.input_processor.mouse_pixel_position(
+                        *dsession.viewport_cell.get(),
+                        Some(position),
+                        true,
+                    );
+                    match kind {
+                        MouseEventKind::Down(button) => {
+                            dsession.session.click(map_mouse_button(button));
+                        }
+                        MouseEventKind::Up(_)
+                        | MouseEventKind::Drag(_)
+                        | MouseEventKind::Moved
+                        | MouseEventKind::ScrollDown
+                        | MouseEventKind::ScrollUp => {}
+                    }
+                }
             }
         }
-    }
 
-    /// Prints one frame, without clearing the terminal, and returns.
-    fn print_once(&mut self, image_size_in_characters: Vector2<u16>) -> crossterm::Result<()> {
-        self.dsession.window.viewport_position =
-            Rect::new(0, 0, image_size_in_characters.x, image_size_in_characters.y);
-        sync_viewport(&mut self.dsession);
+        dsession.advance_time_and_maybe_step();
 
-        self.dsession
-            .renderer
-            .send_frame_to_render(&mut self.dsession.session);
-        let frame = self
-            .dsession
-            .renderer
-            .render_pipe_out
-            .recv()
-            .expect("Internal error in rendering");
-        self.dsession.window.write_frame(frame, false)?;
+        match dsession.renderer.render_pipe_out.try_recv() {
+            Ok(frame) => {
+                write_ui(dsession, &frame)?;
+                dsession.window.write_frame(frame, true)?;
+            }
+            // TODO: Even if we don't have a frame, we might want to update the UI anyway.
+            Err(mpsc::TryRecvError::Empty) => {}
+            Err(mpsc::TryRecvError::Disconnected) => panic!("render thread died"),
+        }
 
-        Ok(())
+        if dsession.session.frame_clock.should_draw() {
+            // TODO: this is the only reason .cameras exists
+            let c = &mut dsession.renderer.cameras;
+            c.update();
+            dsession.session.update_cursor(&*c);
+
+            dsession
+                .renderer
+                .send_frame_to_render(&mut dsession.session);
+        } else {
+            // TODO: sleep instead of spinning.
+            std::thread::yield_now();
+        }
     }
 }
 
@@ -352,6 +333,7 @@ impl TerminalRenderer {
 impl TerminalWindow {
     fn begin_fullscreen(&mut self) -> crossterm::Result<()> {
         self.terminal_state_dirty = true;
+        crossterm::terminal::enable_raw_mode()?;
         self.tui
             .backend_mut()
             .queue(crossterm::event::EnableMouseCapture)?;
