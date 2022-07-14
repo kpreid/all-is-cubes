@@ -23,11 +23,10 @@ use tui::{backend::CrosstermBackend, Terminal};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::camera::{Camera, Viewport};
-use all_is_cubes::cgmath::{ElementWise as _, InnerSpace, Point2};
-use all_is_cubes::cgmath::{Vector2, Vector3};
+use all_is_cubes::cgmath::{ElementWise as _, Point2, Vector2};
 use all_is_cubes::inv::Slot;
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{FreeCoordinate, Rgba};
+use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{
     CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RaytraceInfo, RtRenderer,
 };
@@ -35,49 +34,15 @@ use all_is_cubes::raytracer::{
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
 use crate::session::{ClockSource, DesktopSession};
 
-/// Options for the terminal UI.
-///
-/// TODO: Migrate all of this into `GraphicsOptions`? Add an extension mechanism?
-/// In any case, we shouldn't have two separately-designed mechanisms, but at most two
-/// parallel ones.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct TerminalOptions {
-    /// Color escapes supported by the terminal.
-    colors: ColorMode,
+mod options;
+pub(crate) use options::TerminalOptions;
+mod output;
+use output::{image_patch_to_character, write_colored_and_measure};
 
-    characters: CharacterMode,
-}
-
-impl TerminalOptions {
-    /// Compute viewport to use for raytracing, given the size in characters of the
-    /// drawing area.
-    fn viewport_from_terminal_size(&self, size: Vector2<u16>) -> Viewport {
-        // max(1) is to keep the projection math from blowing up.
-        // TODO: Remove this and make it more robust instead.
-        let size = size.map(|c| c.max(1));
-        Viewport {
-            framebuffer_size: size
-                .map(u32::from)
-                .mul_element_wise(self.characters.rays_per_character().map(u32::from)),
-
-            // Assume that characters are approximately twice as tall as they are wide.
-            nominal_size: size
-                .map(FreeCoordinate::from)
-                .mul_element_wise(Vector2::new(0.5, 1.0)),
-        }
-    }
-}
-
-impl Default for TerminalOptions {
-    fn default() -> Self {
-        Self {
-            colors: ColorMode::TwoFiftySix, // TODO: default to 16-color mode once we have it implemented
-            characters: CharacterMode::Split,
-        }
-    }
-}
-
-pub fn terminal_main_loop(session: Session, options: TerminalOptions) -> Result<(), anyhow::Error> {
+pub(crate) fn terminal_main_loop(
+    session: Session,
+    options: TerminalOptions,
+) -> Result<(), anyhow::Error> {
     let mut main = TerminalMain::new(session, options)?;
     main.run()?;
     main.dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
@@ -88,7 +53,7 @@ pub fn terminal_main_loop(session: Session, options: TerminalOptions) -> Result<
 ///
 /// TODO: This shouldn't need to take ownership of the `session`; it does so because it is
 /// built on the same components as [`terminal_main_loop`].
-pub fn terminal_print_once(
+pub(crate) fn terminal_print_once(
     session: Session,
     options: TerminalOptions,
     display_size: Vector2<u16>,
@@ -416,7 +381,7 @@ impl TerminalMain {
             }
             let mut x = 0;
             while x < rect.width {
-                let (text, color) = Self::image_patch_to_character(
+                let (text, color) = image_patch_to_character(
                     &options,
                     &*image,
                     Vector2::new(x as usize, y as usize),
@@ -448,110 +413,6 @@ impl TerminalMain {
         backend.queue(SetAttribute(Attribute::Reset))?;
 
         Ok(())
-    }
-
-    fn image_patch_to_character<'i>(
-        options: &TerminalOptions,
-        image: &'i [(String, Option<Rgba>)],
-        char_pos: Vector2<usize>,
-        char_size: Vector2<usize>,
-    ) -> (&'i str, Colors) {
-        let row = char_size.x;
-        // This condition must match TerminalOptions::rays_per_character
-        // TODO: Refactor to read patches separately from picking graphic characters
-        if !matches!(
-            options.characters,
-            CharacterMode::Names | CharacterMode::Shades
-        ) {
-            // TODO: This is a mess
-            let (ref text1, color1) = image[(char_pos.y * 2) * row + char_pos.x];
-            let (_, color2) = image[(char_pos.y * 2 + 1) * row + char_pos.x];
-            if options.colors == ColorMode::None {
-                // Use "black and white" graphic characters — the alternative would be a blank screen.
-
-                let lum1 = color1.unwrap_or(Rgba::TRANSPARENT).luminance();
-                let lum2 = color2.unwrap_or(Rgba::TRANSPARENT).luminance();
-                // Checkerboard dithering.
-                let [threshold1, threshold2] = if char_pos.x % 2 == 0 {
-                    [0.5, 0.7]
-                } else {
-                    [0.7, 0.5]
-                };
-
-                let text = match &options.characters {
-                    CharacterMode::Names | CharacterMode::Shades => unreachable!(),
-                    CharacterMode::Split => match (lum1 > threshold1, lum2 > threshold2) {
-                        // Assume that background is black and foreground is white (this could be an option).
-                        (true, true) => "█",  // U+2588 FULL BLOCK
-                        (true, false) => "▀", // U+2580 UPPER HALF BLOCK
-                        (false, true) => "▄", // U+2584 LOWER HALF BLOCK
-                        (false, false) if lum2 > 0.2 => text1.as_str(),
-                        (false, false) => " ", // U+0020 SPACE
-                    },
-                    CharacterMode::Shapes => {
-                        let avg_lum = ((lum1 + lum2) / 2.0).clamp(0.0, 1.0);
-
-                        if (lum1 - lum2).abs() < 0.05 {
-                            [" ", "░", "▒", "▓", "█"][(avg_lum * 4.999) as usize]
-                            //[" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"][(avg_lum * 8.999) as usize]
-                        } else if lum1 < lum2 {
-                            [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
-                                [(avg_lum * 8.999) as usize]
-                        } else {
-                            [" ", "▔", "▘", "▘", "▀", "▀", "▛", "▛", "█"]
-                                [(avg_lum * 8.999) as usize]
-                        }
-                    }
-                };
-
-                (
-                    text,
-                    Colors {
-                        foreground: None,
-                        background: None,
-                    },
-                )
-            } else {
-                let color1 = options.colors.convert(color1);
-                let color2 = options.colors.convert(color2);
-                if color1 == color2 {
-                    (
-                        // TODO: Offer choice of showing character sometimes. Also use characters for dithering.
-                        " ", // text.as_str(),
-                        Colors {
-                            // Emit color at all only if we're not doing no-colors
-                            foreground: color1.map(|_| Color::Black),
-                            background: color1,
-                        },
-                    )
-                } else {
-                    (
-                        "▄",
-                        Colors {
-                            foreground: color2,
-                            background: color1,
-                        },
-                    )
-                }
-            }
-        } else {
-            let (ref text, color) = image[char_pos.y * row + char_pos.x];
-            match options.characters {
-                CharacterMode::Names => {
-                    let mapped_color = match options.colors.convert(color) {
-                        Some(color) => Colors::new(Color::Black, color),
-                        None => Colors::new(Color::Reset, Color::Reset),
-                    };
-                    (text, mapped_color)
-                }
-                CharacterMode::Shades => (
-                    [" ", "░", "▒", "▓", "█"]
-                        [(color.unwrap_or(Rgba::TRANSPARENT).luminance() * 4.999) as usize],
-                    Colors::new(Color::Reset, Color::Reset),
-                ),
-                CharacterMode::Split | CharacterMode::Shapes => unreachable!(),
-            }
-        }
     }
 }
 
@@ -773,221 +634,6 @@ fn write_ui(
     Ok(())
 }
 
-fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
-    backend: &mut B,
-    width_table: &mut HashMap<String, u16>,
-    current_color: &mut Option<Colors>,
-    wanted_color: Colors,
-    text: &str,
-    max_width: u16,
-) -> Result<u16, io::Error> {
-    if *current_color != Some(wanted_color) {
-        *current_color = Some(wanted_color);
-        backend.queue(SetColors(wanted_color))?;
-    }
-    write_and_measure(backend, width_table, text, max_width)
-}
-
-/// Write a string and report how far this advanced the cursor,
-/// unless the string was previously discovered to advance it more than `max_width`.
-///
-/// `width_table` is used to memoize the previously measured widths. Because of this,
-/// strings should be kept short enough to be repetitive (e.g. single characters).
-///
-/// Returns an error if the string could not be written. If an error was encountered
-/// measuring the width, returns an estimate instead.
-fn write_and_measure<B: tui::backend::Backend + io::Write>(
-    backend: &mut B,
-    width_table: &mut HashMap<String, u16>,
-    text: &str,
-    max_width: u16,
-) -> Result<u16, io::Error> {
-    if text.len() == 1 && (b' '..=b'~').contains(&text.as_bytes()[0]) {
-        // Hardcode the ASCII case.
-        if 1 <= max_width {
-            backend.write_all(text.as_bytes())?;
-        }
-        Ok(1)
-    } else if let Some(&w) = width_table.get(text) {
-        // Use and report already-computed width.
-        if w <= max_width {
-            backend.write_all(text.as_bytes())?;
-        }
-        Ok(w)
-    } else {
-        let before = backend.get_cursor();
-        backend.write_all(text.as_bytes())?;
-        let after = backend.get_cursor();
-
-        // Compute width from cursor position, if available.
-        match (before, after) {
-            (Ok((before_x, before_y)), Ok((after_x, after_y))) => {
-                if before_y == after_y {
-                    match after_x.checked_sub(before_x) {
-                        Some(width) => {
-                            width_table.insert(text.to_owned(), width);
-                            Ok(width)
-                        }
-                        None => {
-                            // Cursor moved leftward. Did we print a backspace, perhaps? Or did we
-                            // end up on the last line and provoke scrolling? No way to recover
-                            // information from this.
-                            // (TODO: Add a text filter that prevents reaching this case by avoiding
-                            // printing control characters.)
-                            Ok(fallback_measure_str(text))
-                        }
-                    }
-                } else {
-                    // The character caused moving to a new line, perhaps because we incorrectly
-                    // assumed its width was not greater than 1 and it was on the right edge.
-                    Ok(fallback_measure_str(text))
-                }
-            }
-            (_, Err(_)) | (Err(_), _) => {
-                // Ignore IO error, which might be a timeout inside get_cursor ... such as due to
-                // high response latency due to running this raytracer on a slow system.
-                Ok(fallback_measure_str(text))
-            }
-        }
-    }
-}
-
-fn fallback_measure_str(text: &str) -> u16 {
-    unicode_width::UnicodeWidthStr::width(text)
-        .try_into()
-        .unwrap_or(u16::MAX)
-}
-
-/// Which type of color control sequences to use.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum ColorMode {
-    None,
-    // TODO: Sixteen,
-    TwoFiftySix,
-    Rgb,
-}
-
-impl ColorMode {
-    fn cycle(self) -> Self {
-        use ColorMode::*;
-        match self {
-            None => TwoFiftySix,
-            TwoFiftySix => Rgb,
-            Rgb => None,
-        }
-    }
-
-    /// Convert RGB color to a Crossterm [`Color`] value according to this mode.
-    ///
-    /// The input and output [`Option`]s have different meanings:
-    ///
-    /// * If the input color is [`None`] then the output is "reset"
-    ///   (i.e. the "not colored" colors).
-    /// * This function returns [`None`] if color is disabled and no color control
-    ///   sequences should be produced — i.e. the input is ignored.
-    fn convert(self, input: Option<Rgba>) -> Option<Color> {
-        match (input, self) {
-            // Mode None produces no output no matter what.
-            (_, ColorMode::None) => None,
-            // Input None means Reset.
-            (None, _) => Some(Color::Reset),
-            // ColorMode::Sixteen => {}
-            (Some(rgba), ColorMode::TwoFiftySix) => {
-                // The 256-color palette consists of
-                // * the original 16 "ANSI" colors,
-                // * a 216-color 6×6×6 RGB color cube (unevenly divided) starting at index 16,
-                // * and a grayscale ramp from index 232 to 255 (without black or white entries).
-                fn srgb_to_216(x: u8) -> u8 {
-                    match x {
-                        0..=47 => 0,    // 0
-                        48..=114 => 1,  // 95
-                        115..=154 => 2, // 135
-                        155..=194 => 3, // 175
-                        195..=234 => 4, // 215
-                        235..=255 => 5, // 255
-                    }
-                }
-                fn srgb_to_gray(x: u8) -> u8 {
-                    // TODO: the ramp is not quite linear-in-sRGB-value at the ends, so this is not
-                    // quite an accurate conversion. We could also get more shades by using the
-                    // grays that appear in the color cube.
-                    let gray_ramp_color = (f32::from(x) / 255. * 25.).round() as u8; // zero to 25
-                    if gray_ramp_color == 0 {
-                        16 // Black from the color cube
-                    } else if gray_ramp_color == 25 {
-                        231 // Bhite from the color cube
-                    } else {
-                        // The contiguous ramp range excludes black and white.
-                        gray_ramp_color + 231
-                    }
-                }
-
-                let luminance = rgba.luminance();
-                // TODO: this is probably not how you calculate saturation
-                let saturation = Vector3::from(rgba.to_rgb())
-                    .map(|component| (component - luminance).abs())
-                    .dot(Vector3::new(1., 1., 1.));
-
-                // Pick the gray ramp (more shades) or the RGB cube based on whether
-                // there is significant saturation (threshold picked arbitrarily).
-                let ansi_color = if saturation < 0.1 {
-                    let srgblum = Rgba::new(luminance, 0., 0., 0.).to_srgb8()[0];
-                    srgb_to_gray(srgblum)
-                } else {
-                    let [r, g, b, _] = rgba.to_srgb8();
-                    16 + (srgb_to_216(r) * 6 + srgb_to_216(g)) * 6 + srgb_to_216(b)
-                };
-
-                Some(Color::AnsiValue(ansi_color))
-            }
-            (Some(rgba), ColorMode::Rgb) => {
-                let [r, g, b, _] = rgba.to_srgb8();
-                let c = Color::Rgb { r, g, b };
-                Some(c)
-            }
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-enum CharacterMode {
-    /// Show the first characters of the names of the blocks.
-    Names,
-
-    /// Use the characters `  ░░▒▒▓▓██` to represent brightnesses.
-    Shades,
-
-    /// Use block drawing characters (e.g. “▄”) for double resolution and squarer pixels.
-    ///
-    /// This may cause artifacts in some terminals, and increases the CPU requirement
-    /// since more rays are used per frame.
-    Split,
-
-    /// If colors are enabled, equivalent to [`CharacterMode::Split`].
-    /// Otherwise, use block drawing characters to approximately represent brightness.
-    Shapes,
-}
-
-impl CharacterMode {
-    fn cycle(self) -> Self {
-        use CharacterMode::*;
-        match self {
-            Names => Shades,
-            Shades => Split,
-            Split => Shapes,
-            Shapes => Names,
-        }
-    }
-
-    fn rays_per_character(&self) -> Vector2<u8> {
-        use CharacterMode::*;
-        match self {
-            Names | Shades => Vector2::new(1, 1),
-            Split | Shapes => Vector2::new(1, 2),
-        }
-    }
-}
-
 /// Output of ColorCharacterBuf
 type TextAndColor = (String, Option<Rgba>);
 
@@ -1051,19 +697,3 @@ const STYLE_NONE: Style = Style {
     add_modifier: Modifier::empty(),
     sub_modifier: Modifier::empty(),
 };
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn viewport_no_panic() {
-        let o = TerminalOptions::default();
-        o.viewport_from_terminal_size((0, 0).into());
-        o.viewport_from_terminal_size((0, 1).into());
-        o.viewport_from_terminal_size((1, 0).into());
-        o.viewport_from_terminal_size((1, 1).into());
-    }
-
-    // TODO: add tests of color calculation
-}
