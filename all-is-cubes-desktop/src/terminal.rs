@@ -72,11 +72,18 @@ struct TerminalMain {
 /// Tracks the terminal state and acts as communication channel.
 struct TerminalWindow {
     tui: tui::Terminal<CrosstermBackend<io::Stdout>>,
+
     /// True if we should clean up on drop.
     terminal_state_dirty: bool,
+
     /// Region of the terminal the scene is drawn into;
     /// updated when `tui` layout runs.
     viewport_position: Rect,
+
+    /// The widths of "single characters" according to the terminal's interpretation
+    /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
+    /// position.
+    widths: HashMap<String, u16>,
 }
 
 /// Fills the renderer slot of [`DesktopSession`].
@@ -92,11 +99,6 @@ struct TerminalRenderer {
     ///
     /// TODO: Unclear whether this belongs in Renderer or Window
     options: TerminalOptions,
-
-    /// The widths of "single characters" according to the terminal's interpretation
-    /// (e.g. emoji might be 2 wide), empirically determined by querying the cursor
-    /// position.
-    widths: HashMap<String, u16>,
 
     buffer_reuse_out: mpsc::Receiver<RtRenderer<CharacterRtData>>,
     render_pipe_in: mpsc::SyncSender<FrameInput>,
@@ -182,7 +184,6 @@ impl TerminalMain {
                 renderer: TerminalRenderer {
                     cameras,
                     options,
-                    widths: HashMap::new(),
                     buffer_reuse_out,
                     render_pipe_in,
                     render_pipe_out,
@@ -191,6 +192,7 @@ impl TerminalMain {
                     tui: Terminal::new(CrosstermBackend::new(io::stdout()))?,
                     viewport_position,
                     terminal_state_dirty: true,
+                    widths: HashMap::new(),
                 },
                 viewport_cell,
                 clock_source: ClockSource::Instant,
@@ -278,7 +280,7 @@ impl TerminalMain {
             match self.dsession.renderer.render_pipe_out.try_recv() {
                 Ok(frame) => {
                     write_ui(&mut self.dsession, &frame)?;
-                    self.write_frame(frame, true)?;
+                    self.dsession.window.write_frame(frame, true)?;
                 }
                 // TODO: Even if we don't have a frame, we might want to update the UI anyway.
                 Err(mpsc::TryRecvError::Empty) => {}
@@ -291,7 +293,9 @@ impl TerminalMain {
                 c.update();
                 self.dsession.session.update_cursor(&*c);
 
-                self.send_frame_to_render();
+                self.dsession
+                    .renderer
+                    .send_frame_to_render(&mut self.dsession.session);
             } else {
                 // TODO: sleep instead of spinning.
                 std::thread::yield_now();
@@ -305,31 +309,35 @@ impl TerminalMain {
             Rect::new(0, 0, image_size_in_characters.x, image_size_in_characters.y);
         sync_viewport(&mut self.dsession);
 
-        self.send_frame_to_render();
+        self.dsession
+            .renderer
+            .send_frame_to_render(&mut self.dsession.session);
         let frame = self
             .dsession
             .renderer
             .render_pipe_out
             .recv()
             .expect("Internal error in rendering");
-        self.write_frame(frame, false)?;
+        self.dsession.window.write_frame(frame, false)?;
 
         Ok(())
     }
+}
 
-    fn send_frame_to_render(&mut self) {
+impl TerminalRenderer {
+    /// Read the latest data from the session (mut be equal to previously provided one)
+    /// and send it off to the raytracing threads.
+    fn send_frame_to_render(&mut self, session: &mut Session) {
         // Fetch and update one of our recirculating renderers.
-        let mut renderer = self.dsession.renderer.buffer_reuse_out.recv().unwrap();
-        renderer
-            .update(self.dsession.session.cursor_result())
-            .unwrap();
+        let mut renderer = self.buffer_reuse_out.recv().unwrap();
+        renderer.update(session.cursor_result()).unwrap();
 
-        match self.dsession.renderer.render_pipe_in.try_send(FrameInput {
-            options: self.dsession.renderer.options.clone(),
+        match self.render_pipe_in.try_send(FrameInput {
+            options: self.options.clone(),
             scene: renderer,
         }) {
             Ok(()) => {
-                self.dsession.session.frame_clock.did_draw();
+                session.frame_clock.did_draw();
             }
             Err(TrySendError::Disconnected(_)) => {
                 // Ignore send errors as they should be detected on the receive side
@@ -338,81 +346,6 @@ impl TerminalMain {
                 // Skip this frame
             }
         }
-    }
-
-    /// Actually write image data to the terminal.
-    ///
-    /// If `draw_into_rect` is true, moves the cursor to fit into `self.viewport_position`.
-    /// If it is false, does not affect the cursor position and uses newlines.
-    fn write_frame(&mut self, frame: FrameOutput, draw_into_rect: bool) -> crossterm::Result<()> {
-        let FrameOutput {
-            viewport,
-            options,
-            image,
-            info: _,
-        } = frame;
-
-        // Now separately draw the frame data. This is done because we want to use a precise
-        // strategy for measuring the width of characters (draw them and read back the cursor
-        // position) whereas tui-rs assumes that `unicode_width`'s answers match the terminal.
-        // For all UI text, we run with that since it should be only minor glitches, but the
-        // scene display needs accurate horizontal alignment.
-
-        let backend = self.dsession.window.tui.backend_mut();
-        backend.queue(cursor::Hide)?;
-        backend.queue(SetAttribute(Attribute::Reset))?;
-        let mut current_color = None;
-
-        // TODO: aim for less number casting
-        let image_size_in_characters = viewport
-            .framebuffer_size
-            .map(|s| s as usize)
-            .div_element_wise(options.characters.rays_per_character().map(usize::from));
-
-        let mut rect = self.dsession.window.viewport_position;
-        // Clamp rect to match the actual image data size, to avoid trying to read the
-        // image data out of bounds. (This should be only temporary while resizing.)
-        rect.width = rect.width.min(image_size_in_characters.x as u16);
-        rect.height = rect.height.min(image_size_in_characters.y as u16);
-
-        for y in 0..rect.height {
-            if draw_into_rect {
-                backend.queue(MoveTo(rect.x, rect.y + y))?;
-            }
-            let mut x = 0;
-            while x < rect.width {
-                let (text, color) = image_patch_to_character(
-                    &options,
-                    &*image,
-                    Vector2::new(x as usize, y as usize),
-                    image_size_in_characters,
-                );
-
-                let width = write_colored_and_measure(
-                    backend,
-                    &mut self.dsession.renderer.widths,
-                    &mut current_color,
-                    color,
-                    text,
-                    rect.width - x,
-                )?;
-                x += width.max(1); // max(1) prevents infinite looping in edge case
-            }
-            if !draw_into_rect {
-                // don't colorize the rest of the line
-                current_color = None;
-                backend.queue(SetAttribute(Attribute::Reset))?;
-
-                backend.write_all(b"\r\n")?;
-            }
-        }
-
-        // If we don't do this, the other text might become wrongly colored.
-        // TODO: Is this actually sufficient if the UI ever has colored parts — that is,
-        // are we agreeing adequately with tui's state tracking?
-        backend.queue(SetAttribute(Attribute::Reset))?;
-
-        Ok(())
     }
 }
 
@@ -436,6 +369,81 @@ impl TerminalWindow {
         out.queue(crossterm::event::DisableMouseCapture)?;
         crossterm::terminal::disable_raw_mode()?;
         self.terminal_state_dirty = false;
+        Ok(())
+    }
+
+    /// Actually write image data to the terminal.
+    ///
+    /// If `draw_into_rect` is true, moves the cursor to fit into `self.viewport_position`.
+    /// If it is false, does not affect the cursor position and uses newlines.
+    fn write_frame(&mut self, frame: FrameOutput, draw_into_rect: bool) -> crossterm::Result<()> {
+        let FrameOutput {
+            viewport,
+            options,
+            image,
+            info: _,
+        } = frame;
+
+        // Now separately draw the frame data. This is done because we want to use a precise
+        // strategy for measuring the width of characters (draw them and read back the cursor
+        // position) whereas tui-rs assumes that `unicode_width`'s answers match the terminal.
+        // For all UI text, we run with that since it should be only minor glitches, but the
+        // scene display needs accurate horizontal alignment.
+
+        let backend = self.tui.backend_mut();
+        backend.queue(cursor::Hide)?;
+        backend.queue(SetAttribute(Attribute::Reset))?;
+        let mut current_color = None;
+
+        // TODO: aim for less number casting
+        let image_size_in_characters = viewport
+            .framebuffer_size
+            .map(|s| s as usize)
+            .div_element_wise(options.characters.rays_per_character().map(usize::from));
+
+        let mut rect = self.viewport_position;
+        // Clamp rect to match the actual image data size, to avoid trying to read the
+        // image data out of bounds. (This should be only temporary while resizing.)
+        rect.width = rect.width.min(image_size_in_characters.x as u16);
+        rect.height = rect.height.min(image_size_in_characters.y as u16);
+
+        for y in 0..rect.height {
+            if draw_into_rect {
+                backend.queue(MoveTo(rect.x, rect.y + y))?;
+            }
+            let mut x = 0;
+            while x < rect.width {
+                let (text, color) = image_patch_to_character(
+                    &options,
+                    &*image,
+                    Vector2::new(x as usize, y as usize),
+                    image_size_in_characters,
+                );
+
+                let width = write_colored_and_measure(
+                    backend,
+                    &mut self.widths,
+                    &mut current_color,
+                    color,
+                    text,
+                    rect.width - x,
+                )?;
+                x += width.max(1); // max(1) prevents infinite looping in edge case
+            }
+            if !draw_into_rect {
+                // don't colorize the rest of the line
+                current_color = None;
+                backend.queue(SetAttribute(Attribute::Reset))?;
+
+                backend.write_all(b"\r\n")?;
+            }
+        }
+
+        // If we don't do this, the other text might become wrongly colored.
+        // TODO: Is this actually sufficient if the UI ever has colored parts — that is,
+        // are we agreeing adequately with tui's state tracking?
+        backend.queue(SetAttribute(Attribute::Reset))?;
+
         Ok(())
     }
 }
