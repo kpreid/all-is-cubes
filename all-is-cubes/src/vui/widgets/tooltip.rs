@@ -20,7 +20,7 @@ use crate::space::{Grid, Space, SpacePhysics};
 use crate::time::Tick;
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
-use crate::vui::{WidgetController, WidgetTransaction};
+use crate::vui::{LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction};
 
 static EMPTY_ARC_STR: Lazy<Arc<str>> = Lazy::new(|| "".into());
 
@@ -178,15 +178,16 @@ impl TooltipContents {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct TooltipController {
+#[derive(Clone, Debug)]
+pub(crate) struct TooltipWidget {
+    width_in_hud: GridCoordinate,
     hud_blocks: Arc<HudBlocks>,
     /// Tracks what we should be displaying and serves as dirty flag.
     state: Arc<Mutex<TooltipState>>,
     text_space: URef<Space>,
 }
 
-impl TooltipController {
+impl TooltipWidget {
     const RESOLUTION: Resolution = 16;
 
     pub(crate) fn new(
@@ -195,7 +196,7 @@ impl TooltipController {
         layout: &HudLayout,
         hud_blocks: Arc<HudBlocks>,
         universe: &mut Universe,
-    ) -> Self {
+    ) -> Arc<Self> {
         let frame = layout.toolbar_text_frame();
         let text_space = Space::builder(Grid::new(
             GridPoint::origin(),
@@ -232,25 +233,49 @@ impl TooltipController {
             })
             .unwrap();
 
-        Self {
+        Arc::new(Self {
+            width_in_hud: layout.toolbar_text_frame().size().x,
             hud_blocks,
             state,
             text_space: text_space_ref,
+        })
+    }
+}
+
+impl Layoutable for TooltipWidget {
+    fn requirements(&self) -> LayoutRequest {
+        LayoutRequest {
+            minimum: GridVector::new(self.width_in_hud, 1, 1),
         }
     }
+}
+
+impl Widget for TooltipWidget {
+    fn controller(
+        self: Arc<Self>,
+        position: &crate::vui::LayoutGrant,
+    ) -> Box<dyn WidgetController> {
+        Box::new(TooltipController { definition: self })
+    }
+}
+
+#[derive(Debug)]
+struct TooltipController {
+    definition: Arc<TooltipWidget>,
 }
 
 impl WidgetController for TooltipController {
     fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         // None if no update is needed
         let text_update: Option<Arc<str>> = self
+            .definition
             .state
             .try_lock()
             .ok()
-            .and_then(|mut state| state.step(&self.hud_blocks, tick));
+            .and_then(|mut state| state.step(&self.definition.hud_blocks, tick));
 
         if let Some(text) = text_update {
-            self.text_space.try_modify(|text_space| {
+            self.definition.text_space.try_modify(|text_space| {
                 let grid = text_space.grid();
                 text_space.fill_uniform(grid, &AIR).unwrap();
 
@@ -261,7 +286,7 @@ impl WidgetController for TooltipController {
                 let text_obj = Text::with_text_style(
                     &text,
                     Point::new(grid.size().x / 2, -1),
-                    MonoTextStyle::new(&HudFont, &self.hud_blocks.text),
+                    MonoTextStyle::new(&HudFont, &self.definition.hud_blocks.text),
                     TextStyleBuilder::new()
                         .baseline(Baseline::Bottom)
                         .alignment(Alignment::Center)

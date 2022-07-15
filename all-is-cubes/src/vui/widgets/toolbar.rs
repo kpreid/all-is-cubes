@@ -21,32 +21,28 @@ use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::Merge as _;
 use crate::universe::{URef, Universe};
+use crate::vui::hud::{HudBlocks, HudLayout};
 use crate::vui::{
-    hud::{HudBlocks, HudLayout},
-    InstallVuiError, WidgetController, WidgetTransaction,
+    InstallVuiError, LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction,
 };
 
-/// Displays inventory contents in toolbar format.
+/// Widget that displays inventory contents in toolbar format.
 ///
 /// TODO: We may or may not want to expand this to handle general inventory viewing
 #[derive(Debug)]
-pub(crate) struct ToolbarController {
+pub(crate) struct Toolbar {
     hud_blocks: Arc<HudBlocks>,
-    todo_change_character: DirtyFlag,
-    todo_inventory: DirtyFlag,
-    /// Which character self.character should be
+    /// Which character we display the inventory of
     character_source: ListenableSource<Option<URef<Character>>>,
-    /// TODO: Generalize to noncharacters
-    character: Option<URef<Character>>,
-    character_listener_gate: Gate,
-    first_slot_position: GridPoint,
     slot_count: usize,
     /// Space for drawing per-slot text labels
     slot_text_space: URef<Space>,
     slot_text_resolution: Resolution,
+    first_slot_position: GridPoint, // TODO: replace with layout
 }
 
-impl ToolbarController {
+impl Toolbar {
+    // TODO: remove this constant when we've removed the hardcoded HudLayout use of it
     pub(crate) const TOOLBAR_STEP: GridCoordinate = 2;
 
     pub fn new(
@@ -54,19 +50,8 @@ impl ToolbarController {
         hud_blocks: Arc<HudBlocks>,
         layout: &HudLayout,
         universe: &mut Universe,
-    ) -> Self {
+    ) -> Arc<Self> {
         let slot_count = layout.toolbar_positions;
-
-        let todo_change_character = DirtyFlag::listening(false, |l| character_source.listen(l));
-        let todo_inventory = DirtyFlag::new(true);
-
-        let character = character_source.snapshot();
-
-        let (character_listener_gate, character_listener) =
-            Listener::<()>::gate(todo_inventory.listener());
-        if let Some(character) = &character {
-            character.borrow().listen(character_listener);
-        }
 
         let slot_text_resolution: Resolution = 32;
         let slot_text_space = universe.insert_anonymous(
@@ -82,21 +67,72 @@ impl ToolbarController {
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
             .build_empty(),
         );
-
-        Self {
+        Arc::new(Self {
             hud_blocks,
-            todo_change_character,
-            todo_inventory,
             character_source,
-            character,
-            character_listener_gate,
-            first_slot_position: layout.first_tool_icon_position(),
-            slot_count,
-            slot_text_space,
             slot_text_resolution,
+            slot_text_space,
+            slot_count,
+            first_slot_position: layout.first_tool_icon_position(),
+        })
+    }
+}
+
+impl Layoutable for Toolbar {
+    fn requirements(&self) -> LayoutRequest {
+        LayoutRequest {
+            minimum: GridVector::new(
+                self.slot_count as GridCoordinate * Self::TOOLBAR_STEP + 1,
+                3,
+                3,
+            ),
         }
     }
+}
 
+impl Widget for Toolbar {
+    fn controller(
+        self: Arc<Self>,
+        _position: &crate::vui::LayoutGrant,
+    ) -> Box<dyn WidgetController> {
+        // TODO: use grant instead of hardcoded layout
+        let todo_change_character =
+            DirtyFlag::listening(false, |l| self.character_source.listen(l));
+        let todo_inventory = DirtyFlag::new(true);
+
+        let character = self.character_source.snapshot();
+
+        let (character_listener_gate, character_listener) =
+            Listener::<()>::gate(todo_inventory.listener());
+        if let Some(character) = &character {
+            character.borrow().listen(character_listener);
+        }
+
+        Box::new(ToolbarController {
+            todo_change_character,
+            todo_inventory,
+            character,
+            character_listener_gate,
+            first_slot_position: self.first_slot_position,
+            definition: self,
+        })
+    }
+}
+
+#[derive(Debug)]
+struct ToolbarController {
+    definition: Arc<Toolbar>,
+    todo_change_character: DirtyFlag,
+    todo_inventory: DirtyFlag,
+    /// Latest character we've fetched from character_source,
+    /// and the character whose inventory changes todo_inventory is tracking
+    /// TODO: Generalize to noncharacters
+    character: Option<URef<Character>>,
+    character_listener_gate: Gate,
+    first_slot_position: GridPoint,
+}
+
+impl ToolbarController {
     fn slot_position(&self, slot_index: usize) -> GridPoint {
         self.first_slot_position + GridVector::unit_x() * 2 * slot_index as GridCoordinate
     }
@@ -110,14 +146,15 @@ impl ToolbarController {
         // Update stack count text.
         // TODO: This needs to stop being direct modification, eventually, at least if
         // we want to have parallel updates.
-        self.slot_text_space.try_modify(|text_space| {
+        // Also, trouble with multiple controllers sharing the same space...
+        self.definition.slot_text_space.try_modify(|text_space| {
             // Erase old text.
             // TODO: Do this incrementally and only-if-different.
             // Maybe we should have a text-updating abstraction for this *and* the tooltip?
             text_space.fill_uniform(text_space.grid(), &AIR).unwrap();
 
             let plane = &mut text_space.draw_target(GridMatrix::FLIP_Y);
-            for index in 0..self.slot_count {
+            for index in 0..self.definition.slot_count {
                 Text::with_text_style(
                     &match slots.get(index).unwrap_or(&Slot::Empty).count() {
                         0 | 1 => String::default(),
@@ -125,7 +162,7 @@ impl ToolbarController {
                     },
                     Point::new(
                         // index + 1 locates the right edge of the space for index
-                        (index as i32 + 1) * i32::from(self.slot_text_resolution),
+                        (index as i32 + 1) * i32::from(self.definition.slot_text_resolution),
                         // baseline tweak to taste
                         -4,
                     ),
@@ -143,7 +180,7 @@ impl ToolbarController {
 
         let mut txn = SpaceTransaction::default();
         for (index, stack) in slots.iter().enumerate() {
-            if index >= self.slot_count {
+            if index >= self.definition.slot_count {
                 // TODO: must clear nonexistent positions, eventually
                 break;
             }
@@ -153,7 +190,12 @@ impl ToolbarController {
             txn.set(
                 position,
                 None,
-                Some(stack.icon(&self.hud_blocks.icons).to_owned().into_owned()),
+                Some(
+                    stack
+                        .icon(&self.definition.hud_blocks.icons)
+                        .to_owned()
+                        .into_owned(),
+                ),
             )?;
             // Draw pointers.
             // TODO: magic number in how many selections we display
@@ -167,7 +209,8 @@ impl ToolbarController {
                     ) << sel
                 })
                 .sum();
-            let brush: &VoxelBrush<'_> = &self.hud_blocks.toolbar_pointer[this_slot_selected_mask];
+            let brush: &VoxelBrush<'_> =
+                &self.definition.hud_blocks.toolbar_pointer[this_slot_selected_mask];
             txn = txn.merge(brush.paint_transaction(position)).unwrap();
         }
 
@@ -177,7 +220,10 @@ impl ToolbarController {
 
 impl WidgetController for ToolbarController {
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
-        let hud_blocks = &self.hud_blocks;
+        let hud_blocks = &self.definition.hud_blocks;
+        let slot_count = self.definition.slot_count;
+        let slot_text_resolution = self.definition.slot_text_resolution;
+
         let mut txn = SpaceTransaction::default();
 
         txn = txn
@@ -188,11 +234,13 @@ impl WidgetController for ToolbarController {
             )
             .unwrap();
         txn = txn
-            .merge(hud_blocks.toolbar_right_cap.paint_transaction(
-                self.slot_position(self.slot_count - 1) + GridVector::new(1, 0, 0),
-            ))
+            .merge(
+                hud_blocks.toolbar_right_cap.paint_transaction(
+                    self.slot_position(slot_count - 1) + GridVector::new(1, 0, 0),
+                ),
+            )
             .unwrap();
-        for index in 0..self.slot_count {
+        for index in 0..slot_count {
             txn = txn
                 .merge(
                     hud_blocks
@@ -213,18 +261,18 @@ impl WidgetController for ToolbarController {
 
         // Place stack-count text blocks. This is done separately because it's easier
         // without getting `draw_target` involved.
-        for index in 0..self.slot_count {
+        for index in 0..slot_count {
             txn.set_overwrite(
                 self.slot_position(index) + GridVector::new(-1, 0, 0),
                 Block::from_primitive(Primitive::Recur {
                     attributes: BlockAttributes::default(),
                     offset: GridPoint::new(
-                        index as GridCoordinate * GridCoordinate::from(self.slot_text_resolution),
+                        index as GridCoordinate * GridCoordinate::from(slot_text_resolution),
                         0,
-                        1 - GridCoordinate::from(self.slot_text_resolution), // align to front face
+                        1 - GridCoordinate::from(slot_text_resolution), // align to front face
                     ),
-                    resolution: self.slot_text_resolution,
-                    space: self.slot_text_space.clone(),
+                    resolution: slot_text_resolution,
+                    space: self.definition.slot_text_space.clone(),
                 }),
             );
         }
@@ -233,7 +281,7 @@ impl WidgetController for ToolbarController {
 
     fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         if self.todo_change_character.get_and_clear() {
-            self.character = self.character_source.snapshot();
+            self.character = self.definition.character_source.snapshot();
 
             let (gate, listener) = Listener::<()>::gate(self.todo_inventory.listener());
             if let Some(character) = &self.character {

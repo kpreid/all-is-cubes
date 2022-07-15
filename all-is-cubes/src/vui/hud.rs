@@ -22,15 +22,12 @@ use crate::math::{Face6, GridCoordinate, GridMatrix, GridPoint, GridRotation, Rg
 use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
-use crate::vui::widgets::{FrameWidget, ToggleButtonVisualState};
-use crate::vui::{
-    layout::LayoutTree,
-    widgets::{
-        CrosshairController, ToggleButtonWidget, ToolbarController, TooltipController, TooltipState,
-    },
-    Icons, Widget, WidgetBehavior, WidgetController,
+use crate::vui::layout::LayoutTree;
+use crate::vui::widgets::{
+    Crosshair, FrameWidget, ToggleButtonVisualState, ToggleButtonWidget, Toolbar, TooltipState,
+    TooltipWidget,
 };
-use crate::vui::{Align, LayoutGrant};
+use crate::vui::{Align, Icons, LayoutGrant, Widget, WidgetBehavior, WidgetController};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -114,9 +111,7 @@ impl HudLayout {
 
     pub(crate) fn first_tool_icon_position(&self) -> GridPoint {
         GridPoint::new(
-            (self.size.x
-                - (self.toolbar_positions as GridCoordinate) * ToolbarController::TOOLBAR_STEP
-                + 1)
+            (self.size.x - (self.toolbar_positions as GridCoordinate) * Toolbar::TOOLBAR_STEP + 1)
                 / 2,
             1,
             1,
@@ -153,30 +148,39 @@ pub(super) fn new_hud_space(
 
     // TODO: this is a legacy kludge which should be replaced by LayoutTree
     let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
-        Box::new(ToolbarController::new(
+        Toolbar::new(
             character_source,
             Arc::clone(&hud_inputs.hud_blocks),
             &hud_layout,
             universe,
-        )),
-        Box::new(CrosshairController::new(
-            hud_layout.crosshair_position(),
+        )
+        .controller(&LayoutGrant {
+            bounds: hud_layout.grid(),
+            gravity: Vector3::new(Align::Center, Align::Low, Align::Center),
+        }),
+        Crosshair::new(
             hud_inputs.hud_blocks.icons[Icons::Crosshair].clone(),
             input_processor.mouselook_mode(),
-        )),
-        Box::new(
-            hud_space
-                .try_modify(|sp| {
-                    TooltipController::new(
-                        Arc::clone(&tooltip_state),
-                        sp,
-                        &hud_layout,
-                        hud_inputs.hud_blocks.clone(),
-                        universe,
-                    )
-                })
-                .expect("hud space mutate"),
-        ),
+        )
+        .controller(&LayoutGrant {
+            bounds: Grid::single_cube(hud_layout.crosshair_position()),
+            gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+        }),
+        hud_space
+            .try_modify(|sp| {
+                TooltipWidget::new(
+                    Arc::clone(&tooltip_state),
+                    sp,
+                    &hud_layout,
+                    hud_inputs.hud_blocks.clone(),
+                    universe,
+                )
+            })
+            .expect("hud space mutate")
+            .controller(&LayoutGrant {
+                bounds: hud_layout.grid(), // TODO: placeholder
+                gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+            }),
     ];
     for controller in hud_widgets {
         hud_space
