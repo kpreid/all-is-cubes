@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use cgmath::{Vector3, Zero as _};
 
-use crate::math::{Face6, GridPoint, GridVector};
+use crate::math::{point_to_enclosing_cube, Face6, GridPoint, GridVector};
 use crate::space::{Grid, SpaceTransaction};
 use crate::transaction::Merge;
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
@@ -122,13 +122,23 @@ impl<T: ?Sized + Layoutable> Layoutable for Arc<T> {
 pub enum LayoutTree<W> {
     /// A single widget.
     Leaf(W),
+
     /// An space laid out like a widget but left empty.
     Spacer(LayoutRequest),
+
     /// Fill the available space with the children arranged along an axis.
     Stack {
         /// Which axis of space to arrange on.
         direction: Face6,
         children: Vec<Arc<LayoutTree<W>>>,
+    },
+
+    /// A custom layout dedicated to the HUD.
+    /// TODO: Find a better abstraction than a variant of `LayoutTree` for this.
+    Hud {
+        crosshair: Arc<LayoutTree<W>>,
+        toolbar: Arc<LayoutTree<W>>,
+        control_bar: Arc<LayoutTree<W>>,
     },
 }
 
@@ -170,6 +180,15 @@ impl<W> LayoutTree<W> {
                 for child in children {
                     child.for_each_leaf(function)
                 }
+            }
+            LayoutTree::Hud {
+                crosshair,
+                toolbar,
+                control_bar,
+            } => {
+                crosshair.for_each_leaf(function);
+                toolbar.for_each_leaf(function);
+                control_bar.for_each_leaf(function);
             }
         }
     }
@@ -223,6 +242,49 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 LayoutTree::Stack {
                     direction,
                     children: positioned_children,
+                }
+            }
+            LayoutTree::Hud {
+                ref crosshair,
+                ref toolbar,
+                ref control_bar,
+            } => {
+                let mut crosshair_pos =
+                    point_to_enclosing_cube(grant.bounds.center()).unwrap(/* TODO: not unwrap */);
+                crosshair_pos.z = 0;
+                let crosshair_bounds = Grid::single_cube(crosshair_pos);
+                // TODO: bounds of toolbar and control_bar should be just small enough to miss the crosshair. Also figure out exactly what their Z range should be
+                LayoutTree::Hud {
+                    crosshair: crosshair.perform_layout(LayoutGrant {
+                        bounds: crosshair_bounds,
+                        gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+                    })?,
+                    toolbar: toolbar.perform_layout(LayoutGrant {
+                        bounds: Grid::from_lower_upper(
+                            [
+                                grant.bounds.lower_bounds().x,
+                                grant.bounds.lower_bounds().y,
+                                0,
+                            ],
+                            [
+                                grant.bounds.upper_bounds().x,
+                                crosshair_bounds.lower_bounds().y,
+                                grant.bounds.upper_bounds().z,
+                            ],
+                        ),
+                        gravity: Vector3::new(Align::Center, Align::Low, Align::Center),
+                    })?,
+                    control_bar: control_bar.perform_layout(LayoutGrant {
+                        bounds: Grid::from_lower_upper(
+                            [
+                                grant.bounds.lower_bounds().x,
+                                crosshair_bounds.upper_bounds().y,
+                                -1,
+                            ],
+                            grant.bounds.upper_bounds(),
+                        ),
+                        gravity: Vector3::new(Align::High, Align::High, Align::Low),
+                    })?,
                 }
             }
         }))
@@ -295,6 +357,18 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
                 LayoutRequest {
                     minimum: accumulator,
                 }
+            }
+            LayoutTree::Hud {
+                ref crosshair,
+                ref toolbar,
+                ref control_bar,
+            } => {
+                // Minimum space is the same as a stack, for now
+                LayoutTree::Stack {
+                    direction: Face6::PY,
+                    children: vec![crosshair.clone(), toolbar.clone(), control_bar.clone()],
+                }
+                .requirements()
             }
         }
     }
