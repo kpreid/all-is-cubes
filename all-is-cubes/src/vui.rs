@@ -47,8 +47,6 @@ pub(crate) struct Vui {
     current_space: ListenableCell<Option<URef<Space>>>,
 
     #[allow(dead_code)] // TODO: not used but probably will be when we have more dynamic UI
-    hud_blocks: Arc<HudBlocks>,
-    #[allow(dead_code)] // TODO: not used but probably will be when we have more dynamic UI
     hud_space: URef<Space>,
 
     character_source: ListenableSource<Option<URef<Character>>>,
@@ -80,25 +78,26 @@ impl Vui {
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
 
         // TODO: terrible mess of tightly coupled parameters
+        let hud_layout = HudLayout::new(viewport_source.snapshot());
+        let hud_inputs = HudInputs {
+            hud_blocks,
+            control_channel,
+            graphics_options,
+            paused,
+            mouselook_mode: input_processor.mouselook_mode(),
+        };
         let hud_space = new_hud_space(
             &mut universe,
             tooltip_state.clone(),
-            input_processor,
             character_source.clone(),
-            paused,
-            &HudInputs {
-                hud_blocks: hud_blocks.clone(),
-                control_channel,
-                graphics_options,
-            },
-            viewport_source.snapshot(),
+            &hud_inputs,
+            &hud_layout,
         );
 
         Self {
             universe,
             current_space: ListenableCell::new(Some(hud_space.clone())),
 
-            hud_blocks,
             hud_space,
 
             changed_character: DirtyFlag::listening(false, |l| character_source.listen(l)),

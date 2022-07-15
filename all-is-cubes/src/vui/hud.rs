@@ -10,7 +10,7 @@ use embedded_graphics::prelude::{Primitive as _, Transform as _};
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Triangle};
 use embedded_graphics::Drawable as _;
 
-use crate::apps::{ControlMessage, InputProcessor};
+use crate::apps::ControlMessage;
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
 use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::Character;
@@ -46,7 +46,7 @@ pub(crate) struct HudLayout {
 impl HudLayout {
     /// Construct HudLayout with a grid size that suits the given viewport
     /// (based on pixel resolution and aspect ratio)
-    fn new(_viewport: Viewport) -> Self {
+    pub fn new(_viewport: Viewport) -> Self {
         // TODO: actually use viewport input
         Self {
             // Odd width benefits the toolbar and crosshair.
@@ -104,6 +104,8 @@ pub(crate) struct HudInputs {
     pub hud_blocks: Arc<HudBlocks>,
     pub control_channel: mpsc::SyncSender<ControlMessage>,
     pub graphics_options: ListenableSource<GraphicsOptions>,
+    pub paused: ListenableSource<bool>,
+    pub mouselook_mode: ListenableSource<bool>,
 }
 
 #[allow(clippy::too_many_arguments, clippy::redundant_clone)]
@@ -111,13 +113,10 @@ pub(super) fn new_hud_space(
     // TODO: terrible mess of tightly coupled parameters
     universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
-    input_processor: &InputProcessor,
     character_source: ListenableSource<Option<URef<Character>>>,
-    paused: ListenableSource<bool>,
     hud_inputs: &HudInputs,
-    viewport: Viewport,
+    hud_layout: &HudLayout,
 ) -> URef<Space> {
-    let hud_layout = HudLayout::new(viewport);
     let hud_space = hud_layout.new_space(universe, &hud_inputs.hud_blocks);
 
     // Miscellaneous control widgets drawn in the corner
@@ -129,7 +128,7 @@ pub(super) fn new_hud_space(
                 children: graphics_options_widgets(hud_inputs),
             }),
             LayoutTree::leaf(ToggleButtonWidget::new(
-                paused,
+                hud_inputs.paused.clone(),
                 |&value| value,
                 |state| hud_inputs.hud_blocks.icons[Icons::PauseButton(state)].clone(),
                 {
@@ -140,7 +139,7 @@ pub(super) fn new_hud_space(
                 },
             )),
             LayoutTree::leaf(ToggleButtonWidget::new(
-                input_processor.mouselook_mode(),
+                hud_inputs.mouselook_mode.clone(),
                 |&value| value,
                 |state| hud_inputs.hud_blocks.icons[Icons::MouselookButton(state)].clone(),
                 {
@@ -177,7 +176,7 @@ pub(super) fn new_hud_space(
     let hud_widget_tree: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Hud {
         crosshair: LayoutTree::leaf(Crosshair::new(
             hud_inputs.hud_blocks.icons[Icons::Crosshair].clone(),
-            input_processor.mouselook_mode(),
+            hud_inputs.mouselook_mode.clone(),
         )),
         toolbar: Arc::new(LayoutTree::Stack {
             direction: Face6::PY,
