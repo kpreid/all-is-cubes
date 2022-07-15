@@ -20,7 +20,7 @@ use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
 use crate::math::{Face6, FreeCoordinate, GridCoordinate, GridMatrix, GridRotation, Rgba};
 use crate::space::{Grid, Space, SpacePhysics};
-use crate::universe::{URef, Universe};
+use crate::universe::{URef, Universe, UniverseIndex};
 use crate::util::YieldProgress;
 use crate::vui::layout::LayoutTree;
 use crate::vui::widgets::{
@@ -50,7 +50,9 @@ impl HudLayout {
         // Note: Dimensions are enforced to be odd so that the crosshair can work.
         // The toolbar is also designed to be odd width when it has an even number of positions.
         let width = 25;
-        let height = ((FreeCoordinate::from(width) / viewport.nominal_aspect_ratio())
+        // we want to ceil() the height because the camera setup makes the height match
+        // the viewport and ignores width, so we want to prefer too-narrow over too-wide
+        let height = ((FreeCoordinate::from(width) / viewport.nominal_aspect_ratio()).ceil()
             as GridCoordinate)
             .max(8);
         let height = height / 2 * 2 + 1; // ensure odd
@@ -97,7 +99,7 @@ impl HudLayout {
             add_frame(grid.upper_bounds().z - 1, Rgba::new(0., 1., 1., 1.));
         }
 
-        universe.insert_anonymous(space)
+        universe.insert("hud".into(), space).unwrap()
     }
 }
 
@@ -113,17 +115,46 @@ pub(crate) struct HudInputs {
     pub mouselook_mode: ListenableSource<bool>,
 }
 
-#[allow(clippy::too_many_arguments, clippy::redundant_clone)]
 pub(super) fn new_hud_space(
-    // TODO: terrible mess of tightly coupled parameters
     universe: &mut Universe,
-    tooltip_state: Arc<Mutex<TooltipState>>,
-    character_source: ListenableSource<Option<URef<Character>>>,
     hud_inputs: &HudInputs,
     hud_layout: &HudLayout,
+    widget_tree: &Arc<LayoutTree<Arc<dyn Widget>>>,
 ) -> URef<Space> {
     let hud_space = hud_layout.new_space(universe, &hud_inputs.hud_blocks);
 
+    // TODO: error handling
+    hud_space
+        .execute(
+            &widget_tree
+                .perform_layout(LayoutGrant::new(hud_layout.grid()))
+                .expect("layout/widget error")
+                .installation()
+                .expect("installation error"),
+        )
+        .expect("transaction error");
+
+    // Initialize lighting
+    hud_space
+        .try_modify(|space| {
+            space.fast_evaluate_light();
+            space.evaluate_light(10, |_| {});
+        })
+        .unwrap();
+
+    hud_space
+}
+
+#[allow(clippy::too_many_arguments, clippy::redundant_clone)]
+pub(super) fn new_hud_widget_tree(
+    // TODO: terrible mess of tightly coupled parameters
+    character_source: ListenableSource<Option<URef<Character>>>,
+    hud_inputs: &HudInputs,
+    hud_layout: &HudLayout,
+    // TODO: stop mutating the universe in widget construction
+    universe: &mut Universe,
+    tooltip_state: Arc<Mutex<TooltipState>>,
+) -> Arc<LayoutTree<Arc<dyn Widget>>> {
     // Miscellaneous control widgets drawn in the corner
     let control_bar_widgets: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Stack {
         direction: Face6::NX,
@@ -165,7 +196,6 @@ pub(super) fn new_hud_space(
     } else {
         control_bar_widgets
     };
-
     let toolbar: Arc<dyn Widget> = Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),
@@ -177,7 +207,6 @@ pub(super) fn new_hud_space(
         hud_inputs.hud_blocks.clone(),
         universe,
     );
-
     let hud_widget_tree: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Hud {
         crosshair: LayoutTree::leaf(Crosshair::new(
             hud_inputs.hud_blocks.icons[Icons::Crosshair].clone(),
@@ -189,27 +218,7 @@ pub(super) fn new_hud_space(
         }),
         control_bar: control_bar_positioning,
     });
-
-    // TODO: error handling
-    hud_space
-        .execute(
-            &hud_widget_tree
-                .perform_layout(LayoutGrant::new(hud_layout.grid()))
-                .expect("layout/widget error")
-                .installation()
-                .expect("installation error"),
-        )
-        .expect("transaction error");
-
-    // Initialize lighting
-    hud_space
-        .try_modify(|space| {
-            space.fast_evaluate_light();
-            space.evaluate_light(10, |_| {});
-        })
-        .unwrap();
-
-    hud_space
+    hud_widget_tree
 }
 
 // TODO: These arguments should be a bundle of UI-setup context

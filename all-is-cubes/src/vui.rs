@@ -20,7 +20,7 @@ use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::Transaction;
-use crate::universe::{URef, Universe, UniverseStepInfo};
+use crate::universe::{URef, Universe, UniverseStepInfo, UniverseTransaction};
 use crate::util::YieldProgress;
 use crate::vui::widgets::TooltipState;
 
@@ -46,8 +46,15 @@ pub(crate) struct Vui {
     /// The space that should be displayed to the user, drawn on top of the world.
     current_space: ListenableCell<Option<URef<Space>>>,
 
-    #[allow(dead_code)] // TODO: not used but probably will be when we have more dynamic UI
+    changed_viewport: DirtyFlag,
+    viewport_source: ListenableSource<Viewport>,
+    /// `HudLayout` computed from `viewport_source`.
+    last_hud_layout: HudLayout,
+
+    hud_widget_tree: Arc<LayoutTree<Arc<dyn Widget>>>,
     hud_space: URef<Space>,
+    /// Ingredients for reconstructing the HUD space on resize
+    hud_inputs: HudInputs,
 
     character_source: ListenableSource<Option<URef<Character>>>,
     changed_character: DirtyFlag,
@@ -78,6 +85,7 @@ impl Vui {
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
 
         // TODO: terrible mess of tightly coupled parameters
+        let changed_viewport = DirtyFlag::listening(false, |l| viewport_source.listen(l));
         let hud_layout = HudLayout::new(viewport_source.snapshot());
         let hud_inputs = HudInputs {
             hud_blocks,
@@ -86,19 +94,26 @@ impl Vui {
             paused,
             mouselook_mode: input_processor.mouselook_mode(),
         };
-        let hud_space = new_hud_space(
-            &mut universe,
-            tooltip_state.clone(),
+        let hud_widget_tree = new_hud_widget_tree(
             character_source.clone(),
             &hud_inputs,
             &hud_layout,
+            &mut universe,
+            tooltip_state.clone(),
         );
+        let hud_space = new_hud_space(&mut universe, &hud_inputs, &hud_layout, &hud_widget_tree);
 
         Self {
             universe,
             current_space: ListenableCell::new(Some(hud_space.clone())),
 
+            changed_viewport,
+            viewport_source,
+            last_hud_layout: hud_layout,
+
+            hud_widget_tree,
             hud_space,
+            hud_inputs,
 
             changed_character: DirtyFlag::listening(false, |l| character_source.listen(l)),
             character_source,
@@ -159,6 +174,27 @@ impl Vui {
         if self.changed_character.get_and_clear() {
             if let Some(character_ref) = &*self.character_source.get() {
                 TooltipState::bind_to_character(&self.tooltip_state, character_ref.clone());
+            }
+        }
+
+        if self.changed_viewport.get_and_clear() {
+            let new_viewport = self.viewport_source.snapshot();
+            let new_layout = HudLayout::new(new_viewport);
+            if new_layout != self.last_hud_layout {
+                log::debug!("resizing VUI to {new_layout:?}");
+                // TODO: Once we have garbage collection working, we can skip explicitly
+                // deleting the old space, in favor of making it anonymous.
+                UniverseTransaction::delete(self.hud_space.name().clone())
+                    .execute(&mut self.universe)
+                    .unwrap();
+                self.hud_space = new_hud_space(
+                    &mut self.universe,
+                    &self.hud_inputs,
+                    &new_layout,
+                    &self.hud_widget_tree,
+                );
+                self.current_space.set(Some(self.hud_space.clone()));
+                self.last_hud_layout = new_layout;
             }
         }
 
