@@ -105,11 +105,6 @@ impl HudLayout {
             1,
         )
     }
-
-    // TODO: Replace this with LayoutTree layout
-    pub(super) fn toolbar_text_frame(&self) -> Grid {
-        Grid::new((0, 3, 0), (self.size.x, 1, 1))
-    }
 }
 
 /// Ad-hoc bundle of elements needed to construct HUD UI widgets.
@@ -183,17 +178,11 @@ pub(super) fn new_hud_space(
         &hud_layout,
         universe,
     );
-    let tooltip: Arc<dyn Widget> = hud_space
-        .try_modify(|sp| {
-            TooltipWidget::new(
-                Arc::clone(&tooltip_state),
-                sp,
-                &hud_layout,
-                hud_inputs.hud_blocks.clone(),
-                universe,
-            )
-        })
-        .expect("hud space mutate");
+    let tooltip: Arc<dyn Widget> = TooltipWidget::new(
+        Arc::clone(&tooltip_state),
+        hud_inputs.hud_blocks.clone(),
+        universe,
+    );
 
     let hud_widget_tree: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Hud {
         crosshair: LayoutTree::leaf(Crosshair::new(

@@ -16,10 +16,10 @@ use crate::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, 
 use crate::character::{Character, CharacterChange};
 use crate::listen::{FnListener, Gate, Listener};
 use crate::math::{GridCoordinate, GridMatrix, GridPoint, GridVector};
-use crate::space::{Grid, Space, SpacePhysics};
+use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
 use crate::universe::{URef, Universe};
-use crate::vui::hud::{HudBlocks, HudFont, HudLayout};
+use crate::vui::hud::{HudBlocks, HudFont};
 use crate::vui::{LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction};
 
 static EMPTY_ARC_STR: Lazy<Arc<str>> = Lazy::new(|| "".into());
@@ -184,6 +184,7 @@ pub(crate) struct TooltipWidget {
     hud_blocks: Arc<HudBlocks>,
     /// Tracks what we should be displaying and serves as dirty flag.
     state: Arc<Mutex<TooltipState>>,
+    /// Space we write the text into.
     text_space: URef<Space>,
 }
 
@@ -192,52 +193,25 @@ impl TooltipWidget {
 
     pub(crate) fn new(
         state: Arc<Mutex<TooltipState>>,
-        space: &mut Space,
-        layout: &HudLayout,
         hud_blocks: Arc<HudBlocks>,
         universe: &mut Universe,
     ) -> Arc<Self> {
-        let frame = layout.toolbar_text_frame();
+        let width_in_hud = 25; // TODO: magic number
         let text_space = Space::builder(Grid::new(
             GridPoint::origin(),
             GridVector::new(
-                frame.size().x * GridCoordinate::from(Self::RESOLUTION),
-                frame.size().y * GridCoordinate::from(Self::RESOLUTION),
+                width_in_hud * GridCoordinate::from(Self::RESOLUTION),
+                GridCoordinate::from(Self::RESOLUTION),
                 2,
             ),
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build_empty();
-        let text_space_ref = universe.insert_anonymous(text_space);
-        let toolbar_text_blocks = space_to_blocks(
-            Self::RESOLUTION,
-            BlockAttributes {
-                // TODO: We need an animation_hint that describes the thing that the text does:
-                // toggling visible/invisible and not wanting to get lighting artifacts that might
-                // result from that. (Though I have a notion to add fade-out, which wants CONTINUOUS
-                // anyway.)
-                //
-                // ...wait, maybe tooltip vanishing should be based on removing the blocks entirely,
-                // instead of _just_ changing the text space. That would cooperate with light
-                // more straightforwardly.
-                animation_hint: AnimationHint::CONTINUOUS,
-                ..BlockAttributes::default()
-            },
-            text_space_ref.clone(),
-        )
-        .unwrap();
-        debug_assert_eq!(toolbar_text_blocks.grid().size(), frame.size());
-        space
-            .fill(frame, |p| {
-                Some(&toolbar_text_blocks[p - frame.lower_bounds().to_vec()])
-            })
-            .unwrap();
-
         Arc::new(Self {
-            width_in_hud: layout.toolbar_text_frame().size().x,
+            width_in_hud,
             hud_blocks,
             state,
-            text_space: text_space_ref,
+            text_space: universe.insert_anonymous(text_space),
         })
     }
 }
@@ -251,20 +225,54 @@ impl Layoutable for TooltipWidget {
 }
 
 impl Widget for TooltipWidget {
-    fn controller(
-        self: Arc<Self>,
-        _position: &crate::vui::LayoutGrant, // TODO: actually use position
-    ) -> Box<dyn WidgetController> {
-        Box::new(TooltipController { definition: self })
+    fn controller(self: Arc<Self>, grant: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
+        Box::new(TooltipController {
+            definition: self,
+            position: grant.bounds,
+        })
     }
 }
 
 #[derive(Debug)]
 struct TooltipController {
     definition: Arc<TooltipWidget>,
+    position: Grid,
 }
 
 impl WidgetController for TooltipController {
+    fn initialize(&mut self) -> Result<WidgetTransaction, crate::vui::InstallVuiError> {
+        let toolbar_text_blocks = space_to_blocks(
+            TooltipWidget::RESOLUTION,
+            BlockAttributes {
+                // TODO: We need an animation_hint that describes the thing that the text does:
+                // toggling visible/invisible and not wanting to get lighting artifacts that might
+                // result from that. (Though I have a notion to add fade-out, which wants CONTINUOUS
+                // anyway.)
+                //
+                // ...wait, maybe tooltip vanishing should be based on removing the blocks entirely,
+                // instead of _just_ changing the text space. That would cooperate with light
+                // more straightforwardly.
+                animation_hint: AnimationHint::CONTINUOUS,
+                ..BlockAttributes::default()
+            },
+            self.definition.text_space.clone(),
+        )
+        .unwrap(); // TODO: should be InstallVuiError but we don't have a good way of constructing it
+
+        let mut txn = SpaceTransaction::default();
+        let origin: GridPoint = self.position.lower_bounds();
+
+        // TODO: there should be a space_to_transaction_copy function or something
+        // to implement this systematically
+        for i in 0..self.position.size().x {
+            txn.set_overwrite(
+                origin + i * GridVector::unit_x(),
+                toolbar_text_blocks[GridPoint::from_vec(i * GridVector::unit_x())].clone(),
+            );
+        }
+        Ok(txn)
+    }
+
     fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         // None if no update is needed
         let text_update: Option<Arc<str>> = self
