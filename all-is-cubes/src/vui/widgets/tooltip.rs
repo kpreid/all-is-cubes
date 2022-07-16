@@ -253,7 +253,7 @@ impl Layoutable for TooltipWidget {
 impl Widget for TooltipWidget {
     fn controller(
         self: Arc<Self>,
-        position: &crate::vui::LayoutGrant,
+        _position: &crate::vui::LayoutGrant, // TODO: actually use position
     ) -> Box<dyn WidgetController> {
         Box::new(TooltipController { definition: self })
     }

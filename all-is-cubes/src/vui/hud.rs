@@ -4,7 +4,7 @@
 use std::convert::TryInto;
 use std::sync::{mpsc, Arc, Mutex};
 
-use cgmath::{Vector2, Vector3};
+use cgmath::Vector2;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Primitive as _, Transform as _};
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Triangle};
@@ -27,7 +27,7 @@ use crate::vui::widgets::{
     Crosshair, FrameWidget, ToggleButtonVisualState, ToggleButtonWidget, Toolbar, TooltipState,
     TooltipWidget,
 };
-use crate::vui::{Align, Icons, LayoutGrant, Widget, WidgetBehavior, WidgetController};
+use crate::vui::{Icons, LayoutGrant, Widget};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -96,19 +96,7 @@ impl HudLayout {
         universe.insert_anonymous(space)
     }
 
-    pub(crate) fn crosshair_position(&self) -> GridPoint {
-        GridPoint::new(self.size.x / 2, self.size.y / 2, 0)
-    }
-
-    pub(crate) fn control_bar_bounds(&self) -> LayoutGrant {
-        let upper = self.grid().upper_bounds();
-        let cp = self.crosshair_position();
-        // TODO: how do we want to habitually construct this?
-        let mut grant = LayoutGrant::new(Grid::from_lower_upper([0, cp.y + 1, -1], upper));
-        grant.gravity = Vector3::new(Align::High, Align::High, Align::Low);
-        grant
-    }
-
+    // TODO: Replace this with LayoutTree layout
     pub(crate) fn first_tool_icon_position(&self) -> GridPoint {
         GridPoint::new(
             (self.size.x - (self.toolbar_positions as GridCoordinate) * Toolbar::TOOLBAR_STEP + 1)
@@ -118,6 +106,7 @@ impl HudLayout {
         )
     }
 
+    // TODO: Replace this with LayoutTree layout
     pub(super) fn toolbar_text_frame(&self) -> Grid {
         Grid::new((0, 3, 0), (self.size.x, 1, 1))
     }
@@ -145,48 +134,6 @@ pub(super) fn new_hud_space(
 ) -> URef<Space> {
     let hud_layout = HudLayout::default();
     let hud_space = hud_layout.new_space(universe, &hud_inputs.hud_blocks);
-
-    // TODO: this is a legacy kludge which should be replaced by LayoutTree
-    let hud_widgets: Vec<Box<dyn WidgetController>> = vec![
-        Toolbar::new(
-            character_source,
-            Arc::clone(&hud_inputs.hud_blocks),
-            &hud_layout,
-            universe,
-        )
-        .controller(&LayoutGrant {
-            bounds: hud_layout.grid(),
-            gravity: Vector3::new(Align::Center, Align::Low, Align::Center),
-        }),
-        Crosshair::new(
-            hud_inputs.hud_blocks.icons[Icons::Crosshair].clone(),
-            input_processor.mouselook_mode(),
-        )
-        .controller(&LayoutGrant {
-            bounds: Grid::single_cube(hud_layout.crosshair_position()),
-            gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
-        }),
-        hud_space
-            .try_modify(|sp| {
-                TooltipWidget::new(
-                    Arc::clone(&tooltip_state),
-                    sp,
-                    &hud_layout,
-                    hud_inputs.hud_blocks.clone(),
-                    universe,
-                )
-            })
-            .expect("hud space mutate")
-            .controller(&LayoutGrant {
-                bounds: hud_layout.grid(), // TODO: placeholder
-                gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
-            }),
-    ];
-    for controller in hud_widgets {
-        hud_space
-            .execute(&WidgetBehavior::installation(controller).expect("initializing widget"))
-            .expect("installing widget");
-    }
 
     // Miscellaneous control widgets drawn in the corner
     let control_bar_widgets: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Stack {
@@ -230,11 +177,41 @@ pub(super) fn new_hud_space(
         control_bar_widgets
     };
 
+    let toolbar: Arc<dyn Widget> = Toolbar::new(
+        character_source,
+        Arc::clone(&hud_inputs.hud_blocks),
+        &hud_layout,
+        universe,
+    );
+    let tooltip: Arc<dyn Widget> = hud_space
+        .try_modify(|sp| {
+            TooltipWidget::new(
+                Arc::clone(&tooltip_state),
+                sp,
+                &hud_layout,
+                hud_inputs.hud_blocks.clone(),
+                universe,
+            )
+        })
+        .expect("hud space mutate");
+
+    let hud_widget_tree: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Hud {
+        crosshair: LayoutTree::leaf(Crosshair::new(
+            hud_inputs.hud_blocks.icons[Icons::Crosshair].clone(),
+            input_processor.mouselook_mode(),
+        )),
+        toolbar: Arc::new(LayoutTree::Stack {
+            direction: Face6::PY,
+            children: vec![LayoutTree::leaf(toolbar), LayoutTree::leaf(tooltip)],
+        }),
+        control_bar: control_bar_positioning,
+    });
+
     // TODO: error handling
     hud_space
         .execute(
-            &control_bar_positioning
-                .perform_layout(hud_layout.control_bar_bounds())
+            &hud_widget_tree
+                .perform_layout(LayoutGrant::new(hud_layout.grid()))
                 .expect("layout/widget error")
                 .installation()
                 .expect("installation error"),
