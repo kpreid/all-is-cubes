@@ -9,7 +9,9 @@ use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::space::Space;
 use crate::transaction::Transaction;
-use crate::universe::{InsertError, ListRefs, URef, Universe, UniverseIndex, UniverseTransaction};
+use crate::universe::{
+    InsertError, ListRefs, Name, RefError, URef, Universe, UniverseIndex, UniverseTransaction,
+};
 
 fn _test_thread_safety()
 where
@@ -124,6 +126,60 @@ fn insert_duplicate_name_via_txn() {
         error.to_string(),
         "Transaction precondition not met: UniverseTransaction: insert(): name already in use"
     );
+}
+
+#[test]
+fn delete_success() {
+    let mut u = Universe::new();
+    let name: Name = "test_thing".into();
+    let blocks: [Block; 2] = make_some_blocks();
+
+    let ref_1 = u
+        .insert(name.clone(), BlockDef::new(blocks[0].clone()))
+        .unwrap();
+    let _ = ref_1.try_borrow().unwrap();
+
+    UniverseTransaction::delete(name.clone())
+        .execute(&mut u)
+        .unwrap();
+    assert_eq!(
+        ref_1
+            .try_borrow()
+            .expect_err("should be no longer reachable by ref"),
+        RefError::Gone(name.clone()),
+    );
+
+    // Now insert a new thing under the same name, and it should not be considered the same.
+    // (Note: We might make this possible in the future, but it'll be required to be done with
+    // the ref in hand, not by name.)
+    let ref_2 = u
+        .insert(name.clone(), BlockDef::new(blocks[1].clone()))
+        .unwrap();
+    assert_eq!(
+        ref_1.try_borrow().expect_err("should not be resurrected"),
+        RefError::Gone(name),
+    );
+    let _ = ref_2.try_borrow().unwrap();
+}
+
+/// Anonymous members are strictly garbage collected, and cannot be deleted.
+#[test]
+fn delete_anonymous_fails() {
+    let mut u = Universe::new();
+    let name = u.insert_anonymous(BlockDef::new(AIR)).name().clone();
+    UniverseTransaction::delete(name)
+        .execute(&mut u)
+        .unwrap_err();
+}
+
+#[test]
+fn delete_nonexistent_fails() {
+    let mut u = Universe::new();
+    let name: Name = "test_thing".into();
+
+    UniverseTransaction::delete(name)
+        .execute(&mut u)
+        .unwrap_err();
 }
 
 #[test]

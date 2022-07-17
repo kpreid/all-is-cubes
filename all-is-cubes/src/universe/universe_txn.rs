@@ -327,6 +327,20 @@ impl UniverseTransaction {
         )
     }
 
+    /// Delete this member from the universe.
+    ///
+    /// All existing references will become [`RefError::Gone`], even if the same name is
+    /// later added.
+    ///
+    /// This transaction will fail if the member does not exist, or if it is anonymous
+    /// (only named entries can be deleted). In the future, there may be a policy such that
+    /// in-use items cannot be deleted.
+    ///
+    /// [`RefError::Gone`]: crate::universe::RefError::Gone
+    pub fn delete(name: Name) -> Self {
+        Self::from_member_txn(name, MemberTxn::Delete)
+    }
+
     /// If this transaction contains any operations that are on a specific member of a
     /// universe, then returns the ID of that universe.
     // TODO: make public?
@@ -436,7 +450,10 @@ enum MemberTxn {
     /// Note: Currently, they are not all [`Clone`].
     /// As a consequence, this transaction can only be used once.
     Insert(InsertGimmick),
-    // TODO: Delete,
+    /// Delete this member from the universe.
+    ///
+    /// See [`UniverseTransaction::delete()`] for full documentation.
+    Delete,
 }
 
 #[derive(Debug)]
@@ -477,6 +494,23 @@ impl MemberTxn {
                 }
                 Ok(MemberCommitCheck(None))
             }
+            MemberTxn::Delete => {
+                if let Name::Specific(_) = name {
+                    if universe.get_any(name).is_some() {
+                        Ok(MemberCommitCheck(None))
+                    } else {
+                        Err(PreconditionFailed {
+                            location: "UniverseTransaction",
+                            problem: "delete(): no member by that name",
+                        })
+                    }
+                } else {
+                    Err(PreconditionFailed {
+                        location: "UniverseTransaction",
+                        problem: "delete(): cannot be used on anonymous members",
+                    })
+                }
+            }
         }
     }
 
@@ -511,6 +545,12 @@ impl MemberTxn {
                 .map_err(CommitError::catch::<Self, _>)?;
                 Ok(())
             }
+            MemberTxn::Delete => {
+                assert!(check.is_none());
+                let did_delete = universe.delete(name);
+                assert!(did_delete);
+                Ok(())
+            }
         }
     }
 
@@ -519,7 +559,7 @@ impl MemberTxn {
         use MemberTxn::*;
         match self {
             Modify(t) => t.transaction_as_debug(),
-            Noop | Insert(_) => self,
+            Noop | Insert(_) | Delete => self,
         }
     }
 
@@ -527,7 +567,7 @@ impl MemberTxn {
         use MemberTxn::*;
         match self {
             Modify(t) => t.universe_id(),
-            Noop | Insert(_) => None,
+            Noop | Insert(_) | Delete => None,
         }
     }
 }
@@ -544,6 +584,9 @@ impl Merge for MemberTxn {
             (Modify(t1), Modify(t2)) => Ok(MemberMergeCheck(Some(t1.check_merge(t2)?))),
             // Insert conflicts with everything
             (Insert(_), _) | (_, Insert(_)) => Err(TransactionConflict {}),
+            // Delete merges with itself alone
+            (Delete, Delete) => Ok(MemberMergeCheck(None)),
+            (Delete, _) | (_, Delete) => Err(TransactionConflict {}),
         }
     }
 
@@ -560,8 +603,12 @@ impl Merge for MemberTxn {
             (Modify(t1), Modify(t2)) => {
                 Modify(t1.commit_merge(t2, check.expect("missing check value")))
             }
-            (Insert(_), _) | (_, Insert(_)) => {
-                panic!("Invalid merge check: tried to merge a MemberTxn::Insert");
+            (t @ Delete, Delete) => t,
+            (a @ Insert(_), b) | (a, b @ Insert(_)) | (a @ Delete, b) | (a, b @ Delete) => {
+                panic!(
+                    "Invalid merge check: tried to merge {a:?} with {b:?}, \
+                    which are not mergeable"
+                );
             }
         }
     }

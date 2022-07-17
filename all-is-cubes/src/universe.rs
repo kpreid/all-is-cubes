@@ -201,6 +201,24 @@ impl Universe {
         self.insert(name, value)
             .expect("shouldn't happen: newly created anonym already in use")
     }
+
+    /// Delete a member.
+    /// Use [`UniverseTransaction::delete()`] as the public interface to this.
+    ///
+    /// Returns whether the entry actually existed
+    pub(crate) fn delete(&mut self, name: &Name) -> bool {
+        let Self {
+            blocks,
+            characters,
+            spaces,
+            id: _,
+            next_anonym: _,
+        } = self;
+
+        blocks.remove(name).is_some()
+            || characters.remove(name).is_some()
+            || spaces.remove(name).is_some()
+    }
 }
 
 impl fmt::Debug for Universe {
