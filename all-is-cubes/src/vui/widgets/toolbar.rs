@@ -21,7 +21,7 @@ use crate::space::{Grid, Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::Merge as _;
 use crate::universe::{URef, Universe};
-use crate::vui::hud::{HudBlocks, HudLayout};
+use crate::vui::hud::HudBlocks;
 use crate::vui::{
     InstallVuiError, LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction,
 };
@@ -38,21 +38,18 @@ pub(crate) struct Toolbar {
     /// Space for drawing per-slot text labels
     slot_text_space: URef<Space>,
     slot_text_resolution: Resolution,
-    first_slot_position: GridPoint, // TODO: replace with layout
 }
 
 impl Toolbar {
-    // TODO: remove this constant when we've removed the hardcoded HudLayout use of it
-    pub(crate) const TOOLBAR_STEP: GridCoordinate = 2;
+    // Stride between individual tool icon positions.
+    const TOOLBAR_STEP: GridCoordinate = 2;
 
     pub fn new(
         character_source: ListenableSource<Option<URef<Character>>>,
         hud_blocks: Arc<HudBlocks>,
-        layout: &HudLayout,
+        slot_count: usize,
         universe: &mut Universe,
     ) -> Arc<Self> {
-        let slot_count = layout.toolbar_positions;
-
         let slot_text_resolution: Resolution = 32;
         let slot_text_space = universe.insert_anonymous(
             Space::builder(Grid::new(
@@ -73,7 +70,6 @@ impl Toolbar {
             slot_text_resolution,
             slot_text_space,
             slot_count,
-            first_slot_position: layout.first_tool_icon_position(),
         })
     }
 }
@@ -91,11 +87,9 @@ impl Layoutable for Toolbar {
 }
 
 impl Widget for Toolbar {
-    fn controller(
-        self: Arc<Self>,
-        _position: &crate::vui::LayoutGrant,
-    ) -> Box<dyn WidgetController> {
-        // TODO: use grant instead of hardcoded layout
+    fn controller(self: Arc<Self>, grant: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
+        let bounds = grant.bounds;
+
         let todo_change_character =
             DirtyFlag::listening(false, |l| self.character_source.listen(l));
         let todo_inventory = DirtyFlag::new(true);
@@ -113,7 +107,14 @@ impl Widget for Toolbar {
             todo_inventory,
             character,
             character_listener_gate,
-            first_slot_position: self.first_slot_position,
+            // TODO: obey gravity when positioning within the grant
+            first_slot_position: GridPoint::new(
+                (bounds.lower_bounds().x + bounds.upper_bounds().x) / 2
+                    - (self.slot_count as GridCoordinate) * Toolbar::TOOLBAR_STEP / 2
+                    + 1,
+                bounds.lower_bounds().y + 1,
+                bounds.lower_bounds().z + 1,
+            ),
             definition: self,
         })
     }

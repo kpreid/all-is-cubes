@@ -18,7 +18,7 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
-use crate::math::{Face6, GridCoordinate, GridMatrix, GridPoint, GridRotation, Rgba};
+use crate::math::{Face6, GridCoordinate, GridMatrix, GridRotation, Rgba};
 use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
@@ -95,16 +95,6 @@ impl HudLayout {
 
         universe.insert_anonymous(space)
     }
-
-    // TODO: Replace this with LayoutTree layout
-    pub(crate) fn first_tool_icon_position(&self) -> GridPoint {
-        GridPoint::new(
-            (self.size.x - (self.toolbar_positions as GridCoordinate) * Toolbar::TOOLBAR_STEP + 1)
-                / 2,
-            1,
-            1,
-        )
-    }
 }
 
 /// Ad-hoc bundle of elements needed to construct HUD UI widgets.
@@ -175,7 +165,7 @@ pub(super) fn new_hud_space(
     let toolbar: Arc<dyn Widget> = Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),
-        &hud_layout,
+        hud_layout.toolbar_positions,
         universe,
     );
     let tooltip: Arc<dyn Widget> = TooltipWidget::new(
