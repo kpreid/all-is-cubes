@@ -18,7 +18,7 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
-use crate::math::{Face6, GridCoordinate, GridMatrix, GridRotation, Rgba};
+use crate::math::{Face6, FreeCoordinate, GridCoordinate, GridMatrix, GridRotation, Rgba};
 use crate::space::{Grid, Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
@@ -46,11 +46,16 @@ pub(crate) struct HudLayout {
 impl HudLayout {
     /// Construct HudLayout with a grid size that suits the given viewport
     /// (based on pixel resolution and aspect ratio)
-    pub fn new(_viewport: Viewport) -> Self {
-        // TODO: actually use viewport input
+    pub fn new(viewport: Viewport) -> Self {
+        // Note: Dimensions are enforced to be odd so that the crosshair can work.
+        // The toolbar is also designed to be odd width when it has an even number of positions.
+        let width = 25;
+        let height = ((FreeCoordinate::from(width) / viewport.nominal_aspect_ratio())
+            as GridCoordinate)
+            .max(8);
+        let height = height / 2 * 2 + 1; // ensure odd
         Self {
-            // Odd width benefits the toolbar and crosshair.
-            size: Vector2::new(25, 17),
+            size: Vector2::new(width, height),
             toolbar_positions: 10,
         }
     }
@@ -418,6 +423,30 @@ impl HudBlocks {
                     .try_into()
                     .unwrap()
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hud_layout_sizes() {
+        let cases: Vec<([u32; 2], [i32; 2])> =
+            vec![([800, 600], [25, 19]), ([1000, 600], [25, 15])];
+        let mut failed = 0;
+        for (nominal_viewport, expected_size) in cases {
+            let actual_size =
+                HudLayout::new(Viewport::with_scale(1.0, nominal_viewport.into())).size;
+            let actual_size: [i32; 2] = actual_size.into();
+            if actual_size != expected_size {
+                println!("{nominal_viewport:?} expected to produce {expected_size:?}; got {actual_size:?}");
+                failed += 1;
+            }
+        }
+        if failed > 0 {
+            panic!("{failed} cases failed");
         }
     }
 }
