@@ -430,6 +430,23 @@ impl Viewport {
     // invertible transform.
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Viewport {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Viewport {
+            nominal_size: Vector2::new(u.arbitrary()?, u.arbitrary()?),
+            framebuffer_size: Vector2::new(u.arbitrary()?, u.arbitrary()?),
+        })
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::and(
+            <[u32; 2]>::size_hint(depth),
+            <[FreeCoordinate; 2]>::size_hint(depth),
+        )
+    }
+}
+
 /// Calculate an “eye position” (camera position) to view the entire given `grid`.
 ///
 /// `direction` points in the direction the camera should be relative to the space.
