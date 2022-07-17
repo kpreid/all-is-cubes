@@ -158,20 +158,20 @@ pub enum InstallVuiError {
     /// The widget attempted to modify space outside its assigned bounds.
     #[error(
         "widget attempted to write out of bounds\n\
-        widget: {widget:?}\n\
         grant: {grant:?}\n\
         attempted write: {erroneous:?}\n\
+        widget: {widget:?}\n\
     "
     )]
     OutOfBounds {
-        /// The widget.
-        widget: Arc<dyn Widget>,
-
         /// The region given to the widget.
         grant: LayoutGrant,
 
         /// The region the widget attempted to modify.
         erroneous: Grid,
+
+        /// The widget.
+        widget: Arc<dyn Widget>,
     },
 }
 
