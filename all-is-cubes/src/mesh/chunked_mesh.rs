@@ -59,6 +59,11 @@ where
 
     /// The [`MeshOptions`] specified by the last [`Camera`] provided.
     last_mesh_options: Option<MeshOptions>,
+
+    /// Most recent time at which we reset to no data.
+    zero_time: Instant,
+    /// Earliest time prior to `zero_time` at which we finished everything in the queue.
+    complete_time: Option<Instant>,
 }
 
 impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<D, Vert, Tex, CHUNK_SIZE>
@@ -83,6 +88,8 @@ where
             view_chunk: ChunkPos(Point3::new(0, 0, 0)),
             chunks_were_missing: true,
             last_mesh_options: None,
+            zero_time: Instant::now(),
+            complete_time: None,
         }
     }
 
@@ -176,6 +183,9 @@ where
             self.block_meshes.clear();
             // We don't need to clear self.chunks because they will automatically be considered
             // stale by the new block versioning value.
+
+            self.zero_time = Instant::now();
+            self.complete_time = None;
         }
 
         self.chunk_chart.resize_if_needed(camera.view_distance());
@@ -190,6 +200,7 @@ where
             // TODO: don't hardcode this figure here, let the caller specify it
             deadline - Duration::from_micros(500),
         );
+        let all_done_with_blocks = todo.blocks.is_empty();
 
         // We are now done with todo preparation, and block mesh updates,
         // and can start updating chunk meshes.
@@ -265,6 +276,16 @@ where
         };
 
         // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
+
+        if all_done_with_blocks && !chunks_are_missing && self.complete_time.is_none() {
+            let t = Instant::now();
+            log::debug!(
+                "SpaceRenderer({space}): all meshes done in {time}",
+                space = self.space().name(),
+                time = t.duration_since(self.zero_time).custom_format(StatusText)
+            );
+            self.complete_time = Some(t);
+        }
 
         CsmUpdateInfo {
             total_time: depth_sort_end_time
