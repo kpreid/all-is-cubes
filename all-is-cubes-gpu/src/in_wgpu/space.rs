@@ -74,6 +74,9 @@ struct ChunkBuffers {
 const INDEX_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
 
 impl SpaceRenderer {
+    /// TODO: Simplify callers by making it possible to create a SpaceRenderer without a space.
+    /// Besides simpler initialization, this will also allow reusing allocated resources across a
+    /// period of no space.
     pub fn new(
         space: URef<Space>,
         space_label: String,
@@ -86,24 +89,13 @@ impl SpaceRenderer {
         let block_texture = AtlasAllocator::new(&space_label, device, queue)?;
         let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.grid());
 
-        let space_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &pipelines.space_texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&block_texture.texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&block_texture.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&light_texture.texture_view),
-                },
-            ],
-            label: Some(&format!("{space_label} space_bind_group")),
-        });
+        let space_bind_group = create_space_bind_group(
+            &space_label,
+            device,
+            pipelines,
+            &block_texture,
+            &light_texture,
+        );
 
         let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(&format!("{space_label} camera_buffer")),
@@ -121,12 +113,11 @@ impl SpaceRenderer {
             label: Some(&format!("{space_label} camera_bind_group")),
         });
 
-        let todo = SpaceRendererTodo::default();
-        let todo_rc = Arc::new(Mutex::new(todo));
-        space_borrowed.listen(TodoListener(Arc::downgrade(&todo_rc)));
+        let todo = Arc::new(Mutex::new(SpaceRendererTodo::default()));
+        space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
 
         Ok(SpaceRenderer {
-            todo: todo_rc,
+            todo,
             render_pass_label: format!("{space_label} render_pass"),
             space_label,
             sky_color: space_borrowed.physics().sky_color,
@@ -139,8 +130,50 @@ impl SpaceRenderer {
         })
     }
 
-    pub fn space(&self) -> &URef<Space> {
-        self.csm.space()
+    /// Replace the space being rendered, while preserving some of the resources used to render it.
+    ///
+    /// This is not a minimum-effort operation and should be thought of as an optimized
+    /// variant of building a new [`SpaceRenderer`] from scratch. However, it does check if the
+    /// given space is equal to the current space before doing anything.
+    pub(crate) fn set_space(
+        &mut self,
+        device: &wgpu::Device,
+        pipelines: &Pipelines,
+        space: &URef<Space>,
+    ) {
+        if self.csm.space() == space {
+            return;
+        }
+
+        // Destructuring to explicitly skip or handle each field.
+        let SpaceRenderer {
+            render_pass_label: _,
+            space_label,
+            todo,
+            sky_color,
+            block_texture,
+            light_texture,
+            camera_buffer: _,
+            camera_bind_group: _,
+            space_bind_group,
+            csm,
+        } = self;
+
+        let space_borrowed = space.borrow();
+
+        *todo = {
+            let todo = Arc::new(Mutex::new(SpaceRendererTodo::default()));
+            space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
+            todo
+        };
+        // TODO: rescue ChunkChart and maybe block meshes from the old `csm`.
+        *csm = ChunkedSpaceMesh::new(space.clone());
+        *sky_color = space_borrowed.physics().sky_color;
+        // TODO: don't replace light texture if the size is the same
+        *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.grid());
+        // bind group must be recreated for new light texture
+        *space_bind_group =
+            create_space_bind_group(space_label, device, pipelines, block_texture, light_texture);
     }
 
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
@@ -397,6 +430,33 @@ impl SpaceRenderer {
             }
         }
     }
+}
+
+fn create_space_bind_group(
+    space_label: &str,
+    device: &wgpu::Device,
+    pipelines: &Pipelines,
+    block_texture: &AtlasAllocator,
+    light_texture: &SpaceLightTexture,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &pipelines.space_texture_bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&block_texture.texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&block_texture.sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(&light_texture.texture_view),
+            },
+        ],
+        label: Some(&format!("{space_label} space_bind_group")),
+    })
 }
 
 /// TODO: this probably should be a method on the camera

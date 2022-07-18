@@ -19,7 +19,8 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, Drawable};
 use all_is_cubes::listen::DirtyFlag;
-use wgpu::BufferDescriptor;
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::URef;
 
 use crate::{
     gather_debug_lines,
@@ -330,7 +331,7 @@ impl EverythingRenderer {
             ),
             postprocess_bind_group_layout,
             postprocess_bind_group: None,
-            postprocess_camera_buffer: device.create_buffer(&BufferDescriptor {
+            postprocess_camera_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("EverythingRenderer::postprocess_camera_buffer"),
                 size: std::mem::size_of::<ShaderPostprocessCamera>()
                     .try_into()
@@ -481,36 +482,20 @@ impl EverythingRenderer {
 
         // Ensure SpaceRenderers are pointing at those spaces
         // TODO: we should be able to express this as something like "Layers::for_each_zip()"
-        if self.space_renderers.world.as_ref().map(|sr| sr.space()) != spaces_to_render.world {
-            self.space_renderers.world = spaces_to_render
-                .world
-                .cloned()
-                .map(|space| {
-                    SpaceRenderer::new(
-                        space,
-                        String::from("world"),
-                        &self.device,
-                        queue,
-                        &self.pipelines,
-                    )
-                })
-                .transpose()?;
-        }
-        if self.space_renderers.ui.as_ref().map(|sr| sr.space()) != spaces_to_render.ui {
-            self.space_renderers.ui = spaces_to_render
-                .ui
-                .cloned()
-                .map(|space| {
-                    SpaceRenderer::new(
-                        space,
-                        String::from("ui"),
-                        &self.device,
-                        queue,
-                        &self.pipelines,
-                    )
-                })
-                .transpose()?;
-        }
+        Self::update_space_renderer(
+            &mut self.space_renderers.world,
+            spaces_to_render.world,
+            &self.device,
+            queue,
+            &self.pipelines,
+        )?;
+        Self::update_space_renderer(
+            &mut self.space_renderers.ui,
+            spaces_to_render.ui,
+            &self.device,
+            queue,
+            &self.pipelines,
+        )?;
 
         let mut encoder = self
             .device
@@ -611,6 +596,36 @@ impl EverythingRenderer {
             submit_time: Some(finish_update_time.duration_since(lines_to_submit_time)),
             spaces: space_infos,
         })
+    }
+
+    /// Create, or set the space of, a [`SpaceRenderer`].
+    fn update_space_renderer(
+        renderer: &mut Option<SpaceRenderer>,
+        space: Option<&URef<Space>>,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        pipelines: &Pipelines,
+    ) -> Result<(), GraphicsResourceError> {
+        match (renderer, space) {
+            (None, None) => {}
+            (r @ None, Some(space)) => {
+                *r = Some(SpaceRenderer::new(
+                    space.clone(),
+                    String::from("world"),
+                    device,
+                    queue,
+                    pipelines,
+                )?);
+            }
+            (Some(r), Some(space)) => {
+                r.set_space(device, pipelines, space);
+            }
+            (r @ Some(_), None) => {
+                // TODO: Make SpaceRenderer able to handle nonexistence of a space
+                *r = None;
+            }
+        }
+        Ok(())
     }
 
     /// Render the current scene content to the linear scene texture,
