@@ -4,6 +4,7 @@
 use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::fmt;
+use std::num::NonZeroU32;
 use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::Point3;
@@ -359,9 +360,9 @@ struct VersionedBlockMeshes<Vert, Tile> {
 
     /// Version IDs used to track whether chunks have stale block meshes.
     /// Indices are block indices and values are version numbers.
-    versioning: Vec<u32>,
+    versioning: Vec<BlockMeshVersion>,
 
-    last_version_counter: u32,
+    last_version_counter: NonZeroU32,
 }
 
 impl<Vert, Tile> VersionedBlockMeshes<Vert, Tile>
@@ -373,7 +374,7 @@ where
         Self {
             meshes: Vec::new(),
             versioning: Vec::new(),
-            last_version_counter: 0,
+            last_version_counter: NonZeroU32::new(u32::MAX).unwrap(),
         }
     }
 
@@ -408,7 +409,10 @@ where
             return TimeStats::default();
         }
 
-        self.last_version_counter = self.last_version_counter.wrapping_add(1);
+        self.last_version_counter = match self.last_version_counter.get().checked_add(1) {
+            None => NonZeroU32::new(1).unwrap(),
+            Some(n) => NonZeroU32::new(n).unwrap(),
+        };
         let block_data = space.block_data();
 
         // Update the vector length to match the space.
@@ -423,7 +427,8 @@ where
                 let added = old_length..new_length;
                 self.meshes
                     .extend(added.clone().map(|_| BlockMesh::default()));
-                self.versioning.extend(added.map(|_| 0));
+                self.versioning
+                    .extend(added.map(|_| BlockMeshVersion::NotReady));
             }
             Ordering::Equal => {}
         }
@@ -462,9 +467,11 @@ where
                 // never reuses textures. (If it did, we'd need to consider what we want to do
                 // about stale chunks with fresh textures, which might have geometry gaps or
                 // otherwise be obviously inconsistent.)
-                if new_block_mesh != *current_mesh {
+                if new_block_mesh != *current_mesh
+                    || self.versioning[index] == BlockMeshVersion::NotReady
+                {
                     *current_mesh = new_block_mesh;
-                    self.versioning[index] = self.last_version_counter;
+                    self.versioning[index] = BlockMeshVersion::Numbered(self.last_version_counter);
                 } else {
                     // The new mesh is identical to the old one (which might happen because
                     // interior voxels or non-rendered attributes were changed), so don't invalidate
@@ -486,6 +493,19 @@ where
     }
 }
 
+/// Together with a [`BlockIndex`], uniquely identifies a block mesh.
+/// Used to determine when chunk meshes need updating.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum BlockMeshVersion {
+    /// The block mesh hasn't been computed yet and this is the placeholder mesh.
+    /// Special because it's never assigned as a "good" version number.
+    NotReady,
+    /// A specific version.
+    /// u32 is sufficient size because we are extremely unlikely to wrap around u32 space
+    /// in the course of a single batch of updates unless we're perpetually behind.
+    Numbered(NonZeroU32),
+}
+
 /// Stores a [`SpaceMesh`] covering one chunk of a [`Space`], caller-provided rendering
 /// data, and incidentals.
 #[derive(Debug, Eq, PartialEq)]
@@ -496,7 +516,7 @@ where
     position: ChunkPos<CHUNK_SIZE>,
     mesh: SpaceMesh<Vert, Tex::Tile>,
     pub render_data: D,
-    block_dependencies: Vec<(BlockIndex, u32)>,
+    block_dependencies: Vec<(BlockIndex, BlockMeshVersion)>,
 }
 
 impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkMesh<D, Vert, Tex, CHUNK_SIZE>
