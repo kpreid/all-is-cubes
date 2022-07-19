@@ -15,7 +15,6 @@ use web_sys::{
     console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,
     HtmlProgressElement, KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
 };
-use winit::platform::web::WindowBuilderExtWebSys as _;
 
 use all_is_cubes::apps::{Key, Session, StandardCameras};
 use all_is_cubes::camera::Viewport;
@@ -138,22 +137,9 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
             WebRenderer::Luminance(renderer)
         }
         RendererOption::Wgpu => {
-            let event_loop = winit::event_loop::EventLoop::new(); // note: discarding this, hopefully harmlessly
-            let canvas = gui_helpers.canvas_helper().canvas();
-            let winit_window = winit::window::WindowBuilder::new()
-                .with_canvas(Some(canvas.clone()))
-                .build(&event_loop)
-                .unwrap();
-            // Undo the things winit did
-            let _ = canvas.style().remove_property("width");
-            let _ = canvas.style().remove_property("height");
-            gui_helpers.canvas_helper().update_viewport();
-
             let wgpu_instance = wgpu::Instance::new(wgpu::Backends::all());
-            // Safety: create_surface specifies that the "window" must be kept alive
-            // as long as the surface is. In this case, that's the canvas element, which we
-            // will never remove (and in any case, almost certainly isn't going to cause UB).
-            let surface = unsafe { wgpu_instance.create_surface(&winit_window) };
+            let surface =
+                wgpu_instance.create_surface_from_canvas(&gui_helpers.canvas_helper().canvas());
             // TODO: we lost the 'request no MSAA' feature
             let adapter = wgpu_instance
                 .request_adapter(&wgpu::RequestAdapterOptions {
@@ -162,9 +148,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
                     force_fallback_adapter: false,
                 })
                 .await
-                .ok_or_else(|| {
-                    Error::new("Could not request suitable graphics adapter")
-                })?;
+                .ok_or_else(|| Error::new("Could not request suitable graphics adapter"))?;
             let renderer = in_wgpu::SurfaceRenderer::new(cameras, surface, &adapter)
                 .await
                 .map_err(|e| Error::new(&format!("did not initialize GPU: {}", e)))?;

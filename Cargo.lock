@@ -185,7 +185,6 @@ dependencies = [
  "wasm-bindgen-test",
  "web-sys",
  "wgpu",
- "winit",
 ]
 
 [[package]]

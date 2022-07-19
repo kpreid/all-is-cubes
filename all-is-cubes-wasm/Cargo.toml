@@ -46,10 +46,6 @@ send_wrapper = "0.5.0"
 wasm-bindgen = "0.2.70"
 wasm-bindgen-futures =  "0.4.28"
 wgpu = { version = "0.13.0", features = ["webgl"] }
-# Using winit to provide an canvas window-handle only, not events (for now).
-# Note: "x11" feature specified ("wayland" is an alternative) so that the package will
-# not refuse to build on unix (which we use for running some unit tests).
-winit = { version = "0.26.1", default-features = false, features = ["x11"] }
 
 [dependencies.web-sys]
 version = "0.3.22"
