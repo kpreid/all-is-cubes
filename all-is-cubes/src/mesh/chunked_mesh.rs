@@ -209,12 +209,12 @@ where
         let block_update_to_chunk_scan_time = Instant::now();
 
         // Update some chunk geometry.
-        let chunk_grid = space.grid().divide(CHUNK_SIZE);
+        let chunk_bounds = space.bounds().divide(CHUNK_SIZE);
         let mut chunk_mesh_generation_times = TimeStats::default();
         let mut chunk_mesh_callback_times = TimeStats::default();
         let mut chunks_are_missing = false;
         for p in self.chunk_chart.chunks(view_chunk, OctantMask::ALL) {
-            if !chunk_grid.contains_cube(p.0) {
+            if !chunk_bounds.contains_cube(p.0) {
                 // Chunk not in the Space
                 continue;
             }
@@ -449,7 +449,7 @@ where
             // TODO: Consider re-introducing approximate cost measurement
             // to hit the deadline better.
             // cost += match &new_evaluated_block.voxels {
-            //     Some(voxels) => voxels.grid().volume(),
+            //     Some(voxels) => voxels.bounds().volume(),
             //     None => 1,
             // };
 
@@ -554,7 +554,7 @@ where
         block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>,
     ) {
         let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
-        let bounds = self.position.grid();
+        let bounds = self.position.bounds();
         self.mesh
             .compute(space, bounds, options, &*block_meshes.meshes);
 

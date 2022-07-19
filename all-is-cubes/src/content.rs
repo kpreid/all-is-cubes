@@ -85,7 +85,7 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
         .map(|(i, color)| {
             let mut block_space = Space::for_block(resolution).build_empty();
             block_space
-                .fill_uniform(block_space.grid(), Block::from(color))
+                .fill_uniform(block_space.bounds(), Block::from(color))
                 .unwrap();
             axes(&mut block_space).unwrap();
             for face in Face6::ALL {
@@ -158,11 +158,11 @@ pub fn make_slab(universe: &mut Universe, numerator: Resolution, denominator: Re
 ///
 /// ```
 /// use all_is_cubes::block::AIR;
-/// use all_is_cubes::math::Grid;
+/// use all_is_cubes::math::GridAab;
 /// use all_is_cubes::space::Space;
 /// use all_is_cubes::content::axes;
 ///
-/// let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));
+/// let mut space = Space::empty(GridAab::new((-10, -10, -10), (21, 21, 21)));
 /// axes(&mut space);
 ///
 /// assert_ne!(space[(10, 0, 0)], AIR);
@@ -177,7 +177,7 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
         let axis = face.axis_number();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
-            .within_grid(space.grid());
+            .within(space.bounds());
         for step in raycaster {
             let i = step.cube_ahead()[axis] * direction; // always positive
             let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);

@@ -7,12 +7,12 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{Point3, Vector2};
 use all_is_cubes::chunking::{ChunkChart, ChunkPos, OctantMask};
-use all_is_cubes::math::Grid;
+use all_is_cubes::math::GridAab;
 
 /// Test the performance of strategies to choose chunks to draw.
 pub fn cull_bench(c: &mut Criterion) {
     let chart = ChunkChart::<16>::new(200.0);
-    let bounds = Grid::from_lower_upper([-100, -30, -100], [100, 30, 100]);
+    let bounds = GridAab::from_lower_upper([-100, -30, -100], [100, 30, 100]);
     let chunked_bounds = bounds.divide(16);
     let mut camera = Camera::new(
         GraphicsOptions::default(),
@@ -49,7 +49,7 @@ pub fn cull_bench(c: &mut Criterion) {
                 .chunks(ChunkPos(Point3::new(0, 0, 0)), OctantMask::ALL)
                 .rev()
             {
-                if camera.aab_in_view(p.grid().into()) && chunked_bounds.contains_cube(p.0) {
+                if camera.aab_in_view(p.bounds().into()) && chunked_bounds.contains_cube(p.0) {
                     matched += 1;
                 }
             }
@@ -65,7 +65,7 @@ pub fn cull_bench(c: &mut Criterion) {
                 .chunks(ChunkPos(Point3::new(0, 0, 0)), OctantMask::ALL)
                 .rev()
             {
-                if chunked_bounds.contains_cube(p.0) && camera.aab_in_view(p.grid().into()) {
+                if chunked_bounds.contains_cube(p.0) && camera.aab_in_view(p.bounds().into()) {
                     matched += 1;
                 }
             }
@@ -81,7 +81,7 @@ pub fn cull_bench(c: &mut Criterion) {
                 .chunks(ChunkPos(Point3::new(0, 0, 0)), camera.view_direction_mask())
                 .rev()
             {
-                if camera.aab_in_view(p.grid().into()) && chunked_bounds.contains_cube(p.0) {
+                if camera.aab_in_view(p.bounds().into()) && chunked_bounds.contains_cube(p.0) {
                     matched += 1;
                 }
             }
@@ -97,7 +97,7 @@ pub fn cull_bench(c: &mut Criterion) {
                 .chunks(ChunkPos(Point3::new(0, 0, 0)), camera.view_direction_mask())
                 .rev()
             {
-                if chunked_bounds.contains_cube(p.0) && camera.aab_in_view(p.grid().into()) {
+                if chunked_bounds.contains_cube(p.0) && camera.aab_in_view(p.bounds().into()) {
                     matched += 1;
                 }
             }

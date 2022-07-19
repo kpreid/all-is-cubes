@@ -20,7 +20,7 @@ use all_is_cubes::{
     },
     inv::Tool,
     linking::InGenError,
-    math::{Face6, Grid, GridMatrix, GridVector},
+    math::{Face6, GridAab, GridMatrix, GridVector},
     space::{Space, SpacePhysics, SpaceTransaction},
     transaction::{Merge, Transaction as _},
     universe::Universe,
@@ -151,7 +151,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     };
 
     let size = tree.requirements().minimum;
-    let bounds = Grid::new([0, 0, 0], size);
+    let bounds = GridAab::new([0, 0, 0], size);
 
     let mut space = Space::builder(bounds)
         .physics({

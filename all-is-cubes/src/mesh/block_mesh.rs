@@ -11,7 +11,8 @@ use std::fmt::Debug;
 use crate::block::{EvaluatedBlock, Evoxel};
 use crate::content::palette;
 use crate::math::{
-    Face6, Face7, FaceMap, FreeCoordinate, Grid, GridArray, GridCoordinate, OpacityCategory, Rgba,
+    Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
+    Rgba,
 };
 use crate::mesh::{
     copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
@@ -225,8 +226,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // This dodges some integer overflow cases on bad input.
             // TODO: Add a test for this case
             if voxels
-                .grid()
-                .intersection(Grid::for_block(block.resolution))
+                .bounds()
+                .intersection(GridAab::for_block(block.resolution))
                 .is_none()
             {
                 return BlockMesh::default();
@@ -258,9 +259,9 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                 // Rotate the voxel array's extent into our local coordinate system, so we can find
                 // out what range to iterate over.
                 // TODO: Avoid using a matrix inversion
-                // TODO: Intersect the input voxels.grid() with the block bounds so we don't scan *more* than we should.
+                // TODO: Intersect the input voxels.bounds() with the block bounds so we don't scan *more* than we should.
                 let rotated_voxel_range = voxels
-                    .grid()
+                    .bounds()
                     .transform(face.matrix(block_resolution).inverse_transform().unwrap())
                     .unwrap();
 

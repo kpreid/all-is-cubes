@@ -14,7 +14,7 @@ use crate::drawing::VoxelBrush;
 use crate::listen::Sink;
 use crate::math::{GridPoint, Rgba};
 use crate::space::{
-    Grid, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
+    GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
 };
 use crate::time::Tick;
 use crate::universe::{RefError, Universe, UniverseIndex as _, UniverseTransaction};
@@ -28,11 +28,11 @@ fn initial_state_consistency() {
     Space::empty_positive(1, 0, 0).consistency_check();
     Space::empty_positive(1, 1, 1).consistency_check();
     Space::empty_positive(10, 20, 30).consistency_check();
-    Space::empty(Grid::new([1, 2, 3], [10, 20, 30])).consistency_check();
-    Space::builder(Grid::new([1, 2, 3], [10, 20, 30]))
+    Space::empty(GridAab::new([1, 2, 3], [10, 20, 30])).consistency_check();
+    Space::builder(GridAab::new([1, 2, 3], [10, 20, 30]))
         .build_empty()
         .consistency_check();
-    Space::builder(Grid::new([1, 2, 3], [10, 20, 30]))
+    Space::builder(GridAab::new([1, 2, 3], [10, 20, 30]))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build_empty()
         .consistency_check();
@@ -58,8 +58,8 @@ fn set_success() {
 fn set_failure_out_of_bounds() {
     let [block] = make_some_blocks();
     let pt = GridPoint::new(1, 0, 0);
-    let ptg = Grid::single_cube(pt);
-    let space_bounds = Grid::new([0, 0, 0], [1, 1, 1]);
+    let ptg = GridAab::single_cube(pt);
+    let space_bounds = GridAab::new([0, 0, 0], [1, 1, 1]);
     let mut space = Space::empty(space_bounds);
 
     let error = Err(SetCubeError::OutOfBounds {
@@ -116,12 +116,12 @@ fn set_failure_too_many() {
 fn set_error_format() {
     assert_eq!(
         SetCubeError::OutOfBounds {
-            modification: Grid::single_cube(GridPoint::new(1, 2, 3)),
-            space_bounds: Grid::new([0, 0, 0], [2, 2, 2])
+            modification: GridAab::single_cube(GridPoint::new(1, 2, 3)),
+            space_bounds: GridAab::new([0, 0, 0], [2, 2, 2])
         }
         .to_string(),
         // TODO: simplify the single cube case
-        "Grid(1..2, 2..3, 3..4) is outside of the bounds Grid(0..2, 0..2, 0..2)"
+        "GridAab(1..2, 2..3, 3..4) is outside of the bounds GridAab(0..2, 0..2, 0..2)"
     );
     assert_eq!(
         SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone("foo".into())))
@@ -231,15 +231,15 @@ fn extract_out_of_bounds() {
     space.set((0, 0, 0), &block_0).unwrap();
     space.set((1, 0, 0), &block_1).unwrap();
 
-    let extract_grid = Grid::new((1, 0, 0), (1, 2, 1));
-    let extracted = space.extract(extract_grid, |_index, block_data, _lighting| {
+    let extract_bounds = GridAab::new((1, 0, 0), (1, 2, 1));
+    let extracted = space.extract(extract_bounds, |_index, block_data, _lighting| {
         // TODO: arrange to sanity check index and lighting
         let block = block_data.block().clone();
         assert_eq!(block.evaluate().unwrap(), block_data.evaluated);
         block
     });
 
-    assert_eq!(extracted.grid(), extract_grid);
+    assert_eq!(extracted.bounds(), extract_bounds);
     assert_eq!(&extracted[(1, 0, 0)], &block_1);
     assert_eq!(&extracted[(1, 1, 0)], &AIR);
 }
@@ -247,13 +247,13 @@ fn extract_out_of_bounds() {
 #[test]
 fn fill_out_of_bounds() {
     let mut space = Space::empty_positive(2, 1, 1);
-    let fill_grid = Grid::new((1, 0, 0), (1, 2, 1));
-    let result = space.fill(fill_grid, |_| None::<Block>);
+    let fill_bounds = GridAab::new((1, 0, 0), (1, 2, 1));
+    let result = space.fill(fill_bounds, |_| None::<Block>);
     assert_eq!(
         result,
         Err(SetCubeError::OutOfBounds {
-            modification: fill_grid,
-            space_bounds: Grid::new([0, 0, 0], [2, 1, 1])
+            modification: fill_bounds,
+            space_bounds: GridAab::new([0, 0, 0], [2, 1, 1])
         })
     );
 }
@@ -262,11 +262,11 @@ fn fill_out_of_bounds() {
 #[test]
 fn fill_entire_space() {
     let [block] = make_some_blocks();
-    let grid = Grid::new((0, 3, 0), (25 * 16, 16, 2));
-    let mut space = Space::empty(grid);
-    space.fill(grid, |_| Some(&block)).unwrap();
+    let bounds = GridAab::new((0, 3, 0), (25 * 16, 16, 2));
+    let mut space = Space::empty(bounds);
+    space.fill(bounds, |_| Some(&block)).unwrap();
     space.consistency_check();
-    for cube in grid.interior_iter() {
+    for cube in bounds.interior_iter() {
         assert_eq!(&space[cube], &block);
     }
 }
@@ -275,17 +275,17 @@ fn fill_entire_space() {
 #[test]
 fn fill_uniform_entire_space() {
     let [block] = make_some_blocks();
-    let grid = Grid::new((0, 3, 0), (25 * 16, 16, 2));
-    let mut space = Space::empty(grid);
+    let bounds = GridAab::new((0, 3, 0), (25 * 16, 16, 2));
+    let mut space = Space::empty(bounds);
     let sink = Sink::new();
     space.listen(sink.listener());
 
-    space.fill_uniform(grid, &block).unwrap();
+    space.fill_uniform(bounds, &block).unwrap();
 
     assert_eq!(sink.drain(), vec![SpaceChange::EveryBlock]);
 
     space.consistency_check();
-    for cube in grid.interior_iter() {
+    for cube in bounds.interior_iter() {
         assert_eq!(&space[cube], &block);
     }
 }
@@ -296,8 +296,8 @@ fn fill_uniform_entire_space() {
 #[test]
 fn replace_last_block_regression() {
     let [block] = make_some_blocks();
-    let grid = Grid::new([0, 0, 0], [3, 1, 1]);
-    let mut space = Space::empty(grid);
+    let bounds = GridAab::new([0, 0, 0], [3, 1, 1]);
+    let mut space = Space::empty(bounds);
     for i in 0..3 {
         space.set([i, 0, 0], &block).unwrap();
         space.consistency_check();
@@ -346,7 +346,7 @@ fn space_debug() {
         format!("{:#?}\n", space),
         indoc! {"
             Space {
-                grid: Grid(
+                bounds: GridAab(
                     0..1,
                     0..1,
                     0..1,

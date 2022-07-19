@@ -21,7 +21,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    cube_to_midpoint, Face6, FreeCoordinate, Grid, GridCoordinate, GridMatrix, GridPoint,
+    cube_to_midpoint, Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint,
     GridRotation, GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::Space;
@@ -245,7 +245,7 @@ pub async fn install_demo_blocks(
                 // Support legs, identifying the down / -Y direction.
                 let leg = Block::from(palette::STEEL);
                 space.fill_uniform(
-                    Grid::new(
+                    GridAab::new(
                         [resolution_g / 2 - 1, 0, resolution_g / 2 - 1],
                         [2, resolution_g / 2, 2],
                     ),
@@ -254,7 +254,7 @@ pub async fn install_demo_blocks(
 
                 // Arrow body
                 let base_body_color = rgb_const!(0.5, 0.5, 0.5);
-                space.fill(space.grid(), |p| {
+                space.fill(space.bounds(), |p| {
                     // TODO: We really need better procgen tools
                     let p2 = p * 2 + one_diagonal - center_point_doubled;
                     let r = p2
@@ -343,7 +343,7 @@ pub async fn install_demo_blocks(
                 // Sign board
                 {
                     // space.fill_uniform(
-                    //     Grid::from_lower_upper([0, 8, 15], [16, 16, 16]),
+                    //     GridAab::from_lower_upper([0, 8, 15], [16, 16, 16]),
                     //     &sign_backing,
                     // )?;
                     let mut plane = space.draw_target(GridMatrix::from_translation([
@@ -504,7 +504,7 @@ pub(crate) fn gradient_lookup(gradient: &[Block], value: f32) -> &Block {
     &gradient[((value * gradient.len() as f32) as usize).clamp(0, gradient.len() - 1)]
 }
 
-/// Compute the cube's distance from the midpoint of the Y axis of the block grid.
+/// Compute the cube's distance from the midpoint of the Y axis of the block volume.
 ///
 /// If the resolution is even, then the centermost 4 cubes all have a distance of 1.
 /// If the resolution is odd, then there is only 1 cube that has a distance of 1.

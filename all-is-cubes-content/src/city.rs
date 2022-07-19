@@ -24,7 +24,7 @@ use all_is_cubes::inv::Slot;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, Grid, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint, GridRotation,
     GridVector, Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
@@ -61,12 +61,12 @@ pub(crate) async fn demo_city(
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
     let underground_floor_y = -5;
     let radius_xz = 80;
-    let grid = Grid::from_lower_upper(
+    let bounds = GridAab::from_lower_upper(
         (-radius_xz, -ground_depth, -radius_xz),
         (radius_xz, sky_height, radius_xz),
     );
 
-    let mut planner = CityPlanner::new(grid);
+    let mut planner = CityPlanner::new(bounds);
 
     // Prepare brushes.
     let lamp_brush = VoxelBrush::new(vec![
@@ -77,17 +77,17 @@ pub(crate) async fn demo_city(
     ]);
 
     // Construct space.
-    let mut space = Space::builder(grid)
+    let mut space = Space::builder(bounds)
         .sky_color(Rgb::new(0.9, 0.9, 1.4))
         .light_physics(LightPhysics::None) // disable until we are done with bulk updates
         .spawn({
             // TODO: Add incremental spawn configuration to SpaceBuilder?
-            let mut spawn = Spawn::default_for_new_space(grid);
-            spawn.set_bounds(Grid::from_lower_upper(
+            let mut spawn = Spawn::default_for_new_space(bounds);
+            spawn.set_bounds(GridAab::from_lower_upper(
                 [-road_radius, 1, 0],
                 [road_radius + 1, sky_height, 17],
             ));
-            //spawn.set_eye_position(grid.center() + Vector3::new(0.5, 2.91, 8.5));
+            //spawn.set_eye_position(bounds.center() + Vector3::new(0.5, 2.91, 8.5));
             // Initial inventory contents. TODO: Make a better list.
             let mut inventory = vec![
                 Tool::RemoveBlock { keep: true }.into(),
@@ -125,7 +125,7 @@ pub(crate) async fn demo_city(
             .set_scale(4.0);
         let grass_threshold = 1.2;
         space.fill(
-            Grid::from_lower_upper((-radius_xz, 1, -radius_xz), (radius_xz, 2, radius_xz)),
+            GridAab::from_lower_upper((-radius_xz, 1, -radius_xz), (radius_xz, 2, radius_xz)),
             |cube| {
                 if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
                     return None;
@@ -151,7 +151,7 @@ pub(crate) async fn demo_city(
             GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
         let rotations = [other_side_of_road, road_aligned_rotation];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
-            .within_grid(space.grid());
+            .within(space.bounds());
         let curb_y = GridVector::unit_y();
         for (i, step) in raycaster.enumerate() {
             let i = i as GridCoordinate;
@@ -224,7 +224,7 @@ pub(crate) async fn demo_city(
     );
 
     // Landscape filling one quadrant
-    let landscape_region = Grid::from_lower_upper(
+    let landscape_region = GridAab::from_lower_upper(
         [-radius_xz, -ground_depth * 8 / 10, -radius_xz],
         [-exhibit_front_radius, sky_height, -exhibit_front_radius],
     );
@@ -258,7 +258,7 @@ pub(crate) async fn demo_city(
             .expect("exhibit generation failure. TODO: place an error marker and continue instead");
         exhibit_progress.progress(0.7).await;
 
-        let exhibit_footprint = exhibit_space.grid();
+        let exhibit_footprint = exhibit_space.bounds();
 
         let enclosure_footprint = exhibit_footprint.expand(FaceMap::repeat(1));
 
@@ -269,7 +269,7 @@ pub(crate) async fn demo_city(
         let plot = exhibit_footprint.transform(plot_transform).unwrap();
 
         // Mark the exhibit bounds
-        let enclosure = Grid::from_lower_upper(
+        let enclosure = GridAab::from_lower_upper(
             plot.lower_bounds().map(|x| x - 1),
             [
                 plot.upper_bounds().x + 1,
@@ -288,7 +288,7 @@ pub(crate) async fn demo_city(
             0,
             exhibit_footprint.upper_bounds().z + 1,
         ]);
-        let truncated_name_grid = draw_text_in_blocks(
+        let truncated_name_bounds = draw_text_in_blocks(
             universe,
             &mut space,
             32,
@@ -302,7 +302,7 @@ pub(crate) async fn demo_city(
             ),
         )?; // TODO: on failure, place an error marker and continue
         space.fill_uniform(
-            truncated_name_grid
+            truncated_name_bounds
                 .transform(
                     plot_transform * name_transform * GridMatrix::from_translation([0, 0, -1]),
                 )
@@ -366,11 +366,11 @@ pub(crate) struct Exhibit {
 /// Tracks available land while the city is being generated.
 #[derive(Clone, Debug, PartialEq)]
 struct CityPlanner {
-    space_grid: Grid,
+    space_bounds: GridAab,
     /// Count of blocks beyond the origin that are included in the city space.
-    city_radius: GridCoordinate, // TODO redundant with grid
+    city_radius: GridCoordinate, // TODO redundant with space_bounds
     /// Each plot/exhibit that has already been placed. (This could be a spatial data structure but we're not that big yet.)
-    occupied_plots: Vec<Grid>,
+    occupied_plots: Vec<GridAab>,
 }
 
 impl CityPlanner {
@@ -379,11 +379,11 @@ impl CityPlanner {
     const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS + 2;
     const GAP_BETWEEN_PLOTS: GridCoordinate = 1;
 
-    pub fn new(space_grid: Grid) -> Self {
-        let city_radius = space_grid.upper_bounds().x; // TODO: compare everything and take the max
+    pub fn new(space_bounds: GridAab) -> Self {
+        let city_radius = space_bounds.upper_bounds().x; // TODO: compare everything and take the max
 
         let mut occupied_plots = Vec::new();
-        let road = Grid::from_lower_upper(
+        let road = GridAab::from_lower_upper(
             [-Self::LAMP_POSITION_RADIUS, 0, -city_radius],
             [Self::LAMP_POSITION_RADIUS + 1, 2, city_radius + 1],
         );
@@ -393,13 +393,13 @@ impl CityPlanner {
                 .unwrap(),
         );
         Self {
-            space_grid,
+            space_bounds,
             city_radius,
             occupied_plots,
         }
     }
 
-    pub fn find_plot(&mut self, plot_shape: Grid) -> Option<GridMatrix> {
+    pub fn find_plot(&mut self, plot_shape: GridAab) -> Option<GridMatrix> {
         // TODO: We'd like to resume the search from _when we left off_, but that's tricky since a
         // smaller plot might fit where a large one didn't. So, quadratic search it is for now.
         for d in 0..=self.city_radius {
@@ -429,7 +429,7 @@ impl CityPlanner {
                         .transform(transform)
                         .expect("can't happen: city plot transformation failure");
 
-                    if !self.space_grid.contains_grid(transformed) {
+                    if !self.space_bounds.contains_box(transformed) {
                         continue 'search;
                     }
 
@@ -450,11 +450,11 @@ impl CityPlanner {
         None
     }
 
-    fn y_range(&self, lower_y: GridCoordinate, upper_y: GridCoordinate) -> Grid {
-        let mut lower = self.space_grid.lower_bounds();
-        let mut upper = self.space_grid.upper_bounds();
+    fn y_range(&self, lower_y: GridCoordinate, upper_y: GridCoordinate) -> GridAab {
+        let mut lower = self.space_bounds.lower_bounds();
+        let mut upper = self.space_bounds.upper_bounds();
         lower.y = lower_y;
         upper.y = upper_y;
-        Grid::from_lower_upper(lower, upper)
+        GridAab::from_lower_upper(lower, upper)
     }
 }

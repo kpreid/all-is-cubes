@@ -7,7 +7,7 @@ use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::math::{Face7, Grid, GridCoordinate, GridRotation};
+use crate::math::{Face7, GridAab, GridCoordinate, GridRotation};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 use crate::space::{BlockIndex, Space};
 
@@ -18,7 +18,7 @@ use crate::space::{BlockIndex, Space};
 #[inline]
 pub fn triangulate_space<'p, V, T, P>(
     space: &Space,
-    bounds: Grid,
+    bounds: GridAab,
     options: &MeshOptions,
     block_meshes: P,
 ) -> SpaceMesh<V, T>
@@ -164,7 +164,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     pub fn compute<'p, P>(
         &mut self,
         space: &Space,
-        bounds: Grid,
+        bounds: GridAab,
         _options: &MeshOptions,
         mut block_meshes: P,
     ) where

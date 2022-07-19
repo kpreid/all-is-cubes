@@ -4,7 +4,7 @@
 //! Cloud generation.
 
 use all_is_cubes::block::{Block, BlockCollision, AIR};
-use all_is_cubes::math::{Grid, GridCoordinate, GridPoint, NotNan, Rgb};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, NotNan, Rgb};
 use all_is_cubes::space::{SetCubeError, Space};
 
 use crate::noise::NoiseFnExt;
@@ -15,7 +15,7 @@ use crate::noise::NoiseFnExt;
 /// `density` should be in the approximate range 0 to 1, where 0 or less is no clouds.
 ///
 /// TODO: Use named block definitions or not?
-pub fn clouds(region: Grid, space: &mut Space, density: f32) -> Result<(), SetCubeError> {
+pub fn clouds(region: GridAab, space: &mut Space, density: f32) -> Result<(), SetCubeError> {
     let large_noise = noise::Perlin::default();
     let large_noise = noise::ScalePoint::new(&large_noise).set_scale(0.02);
     let large_noise = noise::ScaleBias::new(&large_noise).set_scale(10.0);

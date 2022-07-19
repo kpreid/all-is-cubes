@@ -14,7 +14,7 @@ use all_is_cubes::behavior::{Behavior, BehaviorContext};
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{cube_to_midpoint, Grid, GridArray, GridPoint, GridVector};
+use all_is_cubes::math::{cube_to_midpoint, GridAab, GridArray, GridPoint, GridVector};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
@@ -50,9 +50,9 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
         }
     }
 
-    fn paint(&self, grid: Grid) -> SpaceTransaction {
+    fn paint(&self, bounds: GridAab) -> SpaceTransaction {
         let mut txn = SpaceTransaction::default();
-        for cube in grid.interior_iter() {
+        for cube in bounds.interior_iter() {
             let block = (self.function)(cube, self.frame);
             txn.set(cube, None, Some(block.clone())).unwrap();
         }
@@ -70,7 +70,7 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> Behavior<Sp
             mut_self.accumulator -= mut_self.frame_period;
             mut_self.frame = mut_self.frame.wrapping_add(1);
 
-            let paint_txn = mut_self.paint(context.host.grid());
+            let paint_txn = mut_self.paint(context.host.bounds());
             context
                 .replace_self(mut_self)
                 .merge(context.bind_host(paint_txn))
@@ -116,7 +116,7 @@ pub(crate) struct Fire {
 }
 
 impl Fire {
-    pub(crate) fn new(bounds: Grid) -> Self {
+    pub(crate) fn new(bounds: GridAab) -> Self {
         let rng = Xoshiro256Plus::seed_from_u64(2385993827);
         let blocks = [
             AIR,
@@ -142,11 +142,11 @@ impl Fire {
         }
 
         // To ripple changes upward, we need to iterate downward
-        let grid = self.fire_state.grid();
-        let y0 = grid.lower_bounds().y;
-        for z in grid.z_range() {
-            for y in grid.y_range().rev() {
-                for x in grid.x_range() {
+        let bounds = self.fire_state.bounds();
+        let y0 = bounds.lower_bounds().y;
+        for z in bounds.z_range() {
+            for y in bounds.y_range().rev() {
+                for x in bounds.x_range() {
                     let cube = GridPoint::new(x, y, z);
                     self.fire_state[cube] = if y == y0 {
                         (self.fire_state[cube] + self.rng.gen_range(0..3))
@@ -169,7 +169,7 @@ impl Fire {
 
     fn paint(&self) -> SpaceTransaction {
         let mut txn = SpaceTransaction::default();
-        for cube in self.fire_state.grid().interior_iter() {
+        for cube in self.fire_state.bounds().interior_iter() {
             let block: &Block = &self.blocks[self.fire_state[cube] as usize];
             txn.set(cube, None, Some(block.clone())).unwrap();
         }

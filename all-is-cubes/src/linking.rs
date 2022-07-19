@@ -274,7 +274,7 @@ impl From<GenError> for InGenError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::Grid;
+    use crate::math::GridAab;
 
     fn _test_gen_error_is_sync()
     where
@@ -286,8 +286,8 @@ mod tests {
     #[test]
     fn gen_error_message() {
         let set_cube_error = SetCubeError::OutOfBounds {
-            modification: Grid::for_block(1),
-            space_bounds: Grid::for_block(3),
+            modification: GridAab::for_block(1),
+            space_bounds: GridAab::for_block(3),
         };
         let e = GenError::failure(set_cube_error.clone(), "x".into());
         assert_eq!(
@@ -311,8 +311,8 @@ mod tests {
         }
         fn b() -> Result<(), InGenError> {
             Err(SetCubeError::OutOfBounds {
-                modification: Grid::for_block(1),
-                space_bounds: Grid::for_block(1),
+                modification: GridAab::for_block(1),
+                space_bounds: GridAab::for_block(1),
             })?;
             Ok(())
         }

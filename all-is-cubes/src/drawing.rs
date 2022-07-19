@@ -15,7 +15,7 @@
 //!     text will be upside-down unless the chosen transformation inverts Y (or
 //!     otherwise transforms to suit the orientation the text is being viewed from).
 //! *   Coordinates are considered to refer to pixel centers rather than low corners,
-//!     and rectangles have inclusive upper bounds (whereas our [`Grid`]s have
+//!     and rectangles have inclusive upper bounds (whereas our [`GridAab`]s have
 //!     exclusive upper bounds).
 
 use cgmath::{EuclideanSpace as _, Transform as _};
@@ -31,7 +31,7 @@ use std::ops::{Range, RangeInclusive};
 pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
-use crate::math::{Face7, Grid, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
+use crate::math::{Face7, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
@@ -119,17 +119,17 @@ impl<C> Dimensions for DrawingPlane<'_, Space, C> {
         // Invert our coordinate transform to bring the space's bounds into the drawing
         // coordinate system. If the transform fails, return a 1×1×1 placeholder rather
         // than panic.
-        let grid = self
+        let bounds = self
             .transform
             .inverse_transform()
-            .and_then(|t| self.space.grid().transform(t))
-            .unwrap_or_else(|| Grid::for_block(1));
+            .and_then(|t| self.space.bounds().transform(t))
+            .unwrap_or_else(|| GridAab::for_block(1));
 
-        let size = grid.unsigned_size();
+        let size = bounds.unsigned_size();
         Rectangle {
             top_left: Point {
-                x: grid.lower_bounds().x,
-                y: grid.upper_bounds().y,
+                x: bounds.lower_bounds().x,
+                y: bounds.upper_bounds().y,
             },
             size: Size {
                 width: size.x,
@@ -316,15 +316,15 @@ impl<'a> VoxelBrush<'a> {
     /// TODO: This does not currently report behaviors but it should, once they have
     /// formalized regions of attachment.
     ///
-    /// TODO: Handle the case where the total volume is too large. (Maybe Grid should lose
-    /// that restriction.)
-    pub(crate) fn bounds(&self) -> Option<Grid> {
-        let mut bounds: Option<Grid> = None;
+    /// TODO: Handle the case where the total volume is too large. (Maybe GridAab should
+    /// lose that restriction.)
+    pub(crate) fn bounds(&self) -> Option<GridAab> {
+        let mut bounds: Option<GridAab> = None;
         for &(cube, _) in self.0.iter() {
             if let Some(bounds) = &mut bounds {
-                *bounds = (*bounds).union(Grid::single_cube(cube)).unwrap();
+                *bounds = (*bounds).union(GridAab::single_cube(cube)).unwrap();
             } else {
-                bounds = Some(Grid::single_cube(cube));
+                bounds = Some(GridAab::single_cube(cube));
             }
         }
         bounds
@@ -399,18 +399,18 @@ where
     let bbox = object.bounding_box();
     let top_left_2d = bbox.top_left;
     let bottom_right_2d = bbox.bottom_right().unwrap_or(top_left_2d);
-    // Compute corners as Grid knows them. Note that the Y coordinate is flipped because
-    // for text drawing, embedded_graphics assumes a Y-down coordinate system.
+    // Compute corners as GridAab knows them. Note that the Y coordinate is flipped
+    // because for text drawing, embedded_graphics assumes a Y-down coordinate system.
     // TODO: Instead, apply matrix transform to bounds
-    let drawing_grid = Grid::from_lower_upper(
+    let drawing_bounds = GridAab::from_lower_upper(
         [top_left_2d.x, -bottom_right_2d.y, z_range.start],
         [bottom_right_2d.x, -top_left_2d.y, z_range.end],
     );
     if false {
-        dbg!(top_left_2d, bottom_right_2d, drawing_grid);
+        dbg!(top_left_2d, bottom_right_2d, drawing_bounds);
     }
 
-    let mut drawing_space = Space::builder(drawing_grid)
+    let mut drawing_space = Space::builder(drawing_bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build_empty();
     object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
@@ -533,7 +533,7 @@ mod tests {
             &drawable,
         )
         .unwrap();
-        assert_eq!(space.grid(), Grid::new((0, -1, 0), (1, 1, 1)));
+        assert_eq!(space.bounds(), GridAab::new((0, -1, 0), (1, 1, 1)));
         if let &block::Primitive::Recur {
             space: ref block_space_ref,
             offset,
@@ -568,7 +568,7 @@ mod tests {
             &drawable,
         )
         .unwrap();
-        assert_eq!(space.grid(), Grid::new((-1, 0, 0), (1, 1, 1)));
+        assert_eq!(space.bounds(), GridAab::new((-1, 0, 0), (1, 1, 1)));
         if let block::Primitive::Recur {
             space: block_space_ref,
             offset,

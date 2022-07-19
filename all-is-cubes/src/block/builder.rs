@@ -174,7 +174,7 @@ impl<C> BlockBuilder<C> {
     {
         let mut space = Space::for_block(resolution).build_empty();
         // TODO: Teach the SpaceBuilder to accept a function in the same way
-        space.fill(space.grid(), |point| Some(function(point)))?;
+        space.fill(space.bounds(), |point| Some(function(point)))?;
         Ok(self.voxels_ref(resolution, universe.insert_anonymous(space)))
     }
 

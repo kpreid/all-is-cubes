@@ -132,7 +132,7 @@ impl<'a, D: RtBlockData> SurfaceIter<'a, D> {
             block_raycaster: ray
                 .cast()
                 // Expand volume on the far side so that we can get a final step *with* t distance
-                .within_grid(rt.cubes.grid()),
+                .within(rt.cubes.bounds()),
             state: SurfaceIterState::Initial,
             current_block: None,
             blocks: &rt.blocks,
@@ -163,7 +163,7 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
                         // Do this by expanding the raycast bounds by one cube.
                         self.block_raycaster.remove_bound();
                         self.block_raycaster
-                            .set_bound(self.array.grid().expand(FaceMap::repeat(1)));
+                            .set_bounds(self.array.bounds().expand(FaceMap::repeat(1)));
 
                         self.state = SurfaceIterState::EnteredSpace;
                     }
@@ -214,7 +214,7 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
 
                 self.current_block = Some(VoxelSurfaceIter {
                     voxel_ray: sub_ray,
-                    voxel_raycaster: sub_ray.cast().within_grid(array.grid()),
+                    voxel_raycaster: sub_ray.cast().within(array.bounds()),
                     block_data,
                     antiscale,
                     array,
@@ -332,7 +332,7 @@ mod tests {
     use crate::block::Block;
     use crate::camera::GraphicsOptions;
     use crate::content::{make_slab, palette};
-    use crate::math::Grid;
+    use crate::math::GridAab;
     use crate::space::Space;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
@@ -342,7 +342,7 @@ mod tests {
     fn surface_iter_smoke_test() {
         let universe = &mut Universe::new();
 
-        let mut space = Space::builder(Grid::new([0, 0, 0], [1, 3, 1])).build_empty();
+        let mut space = Space::builder(GridAab::new([0, 0, 0], [1, 3, 1])).build_empty();
 
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
         space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
@@ -397,7 +397,7 @@ mod tests {
     /// Test that exiting a block at the edge of the space still reports the exit t-distance.
     #[test]
     fn surface_iter_exit_block_at_end_of_space() {
-        let mut space = Space::builder(Grid::new([0, 0, 0], [1, 1, 1])).build_empty();
+        let mut space = Space::builder(GridAab::new([0, 0, 0], [1, 1, 1])).build_empty();
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
         space.set([0, 0, 0], Block::from(solid_test_color)).unwrap();
 

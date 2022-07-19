@@ -107,8 +107,8 @@ fn print_space_impl<F: FnMut(&str)>(
     );
     camera.set_view_transform(
         Decomposed::look_at_rh(
-            eye_for_look_at(space.grid(), direction.into()),
-            space.grid().center(),
+            eye_for_look_at(space.bounds(), direction.into()),
+            space.bounds().center(),
             Vector3::new(0., 1., 0.),
         )
         .inverse_transform()
@@ -196,7 +196,7 @@ mod tests {
         let mut universe = Universe::new();
         let mut block_space = Space::empty_positive(4, 2, 4);
         block_space
-            .fill_uniform(block_space.grid(), Block::from(Rgba::WHITE))
+            .fill_uniform(block_space.bounds(), Block::from(Rgba::WHITE))
             .unwrap();
         let space_ref = universe.insert_anonymous(block_space);
         let partial_block = Block::builder()

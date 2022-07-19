@@ -15,14 +15,14 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::Listener;
 use all_is_cubes::math::{
-    Aab, Face6, FaceMap, FreeCoordinate, Grid, GridCoordinate, GridPoint, Rgb,
+    Aab, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, Rgb,
 };
 use all_is_cubes::mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
 use all_is_cubes::mesh::DepthOrdering;
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::universe::URef;
 
-use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};
+use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::vertex::WgpuLinesVertex;
 use crate::in_wgpu::{
@@ -89,7 +89,7 @@ impl SpaceRenderer {
         let space_borrowed = space.borrow();
 
         let block_texture = AtlasAllocator::new(&space_label, device, queue)?;
-        let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.grid());
+        let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.bounds());
 
         let space_bind_group = create_space_bind_group(
             &space_label,
@@ -172,7 +172,7 @@ impl SpaceRenderer {
         *csm = ChunkedSpaceMesh::new(space.clone());
         *sky_color = space_borrowed.physics().sky_color;
         // TODO: don't replace light texture if the size is the same
-        *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.grid());
+        *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.bounds());
         // bind group must be recreated for new light texture
         *space_bind_group =
             create_space_bind_group(space_label, device, pipelines, block_texture, light_texture);
@@ -209,7 +209,7 @@ impl SpaceRenderer {
             for cube in set.drain() {
                 light_update_count +=
                     self.light_texture
-                        .update(queue, space, Grid::new(cube, [1, 1, 1]));
+                        .update(queue, space, GridAab::new(cube, [1, 1, 1]));
             }
         } else {
             light_update_count += self.light_texture.update_all(queue, space);
@@ -404,7 +404,7 @@ impl SpaceRenderer {
                 wireframe_vertices::<WgpuLinesVertex, _, _>(
                     v,
                     palette::DEBUG_CHUNK_MAJOR,
-                    &Aab::from(chunk.grid()),
+                    &Aab::from(chunk.bounds()),
                 );
             }
 
@@ -412,7 +412,7 @@ impl SpaceRenderer {
             let chunk_origin = self
                 .csm
                 .view_chunk()
-                .grid()
+                .bounds()
                 .lower_bounds()
                 .map(FreeCoordinate::from);
             for face in Face6::ALL {
@@ -463,7 +463,7 @@ fn create_space_bind_group(
 
 /// TODO: this probably should be a method on the camera
 fn cull(camera: &Camera, chunk: ChunkPos<CHUNK_SIZE>) -> bool {
-    camera.options().use_frustum_culling && !camera.aab_in_view(chunk.grid().into())
+    camera.options().use_frustum_culling && !camera.aab_in_view(chunk.bounds().into())
 }
 
 fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuffers) {
@@ -571,15 +571,15 @@ struct SpaceLightTexture {
     texture: wgpu::Texture,
     texture_view: wgpu::TextureView,
     /// The region of cube coordinates for which there are valid texels.
-    texture_grid: Grid,
+    texture_bounds: GridAab,
 }
 
 impl SpaceLightTexture {
     /// Construct a new `SpaceLightTexture` for the specified size of [`Space`],
     /// with no data.
-    pub fn new(label_prefix: &str, device: &wgpu::Device, grid: Grid) -> Self {
+    pub fn new(label_prefix: &str, device: &wgpu::Device, bounds: GridAab) -> Self {
         // Boundary of 1 extra cube automatically captures sky light.
-        let texture_grid = grid.expand(FaceMap {
+        let texture_bounds = bounds.expand(FaceMap {
             px: 1,
             py: 1,
             pz: 1,
@@ -589,7 +589,7 @@ impl SpaceLightTexture {
             within: 0,
         });
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: size_vector_to_extent(texture_grid.size()),
+            size: size_vector_to_extent(texture_bounds.size()),
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
@@ -600,15 +600,15 @@ impl SpaceLightTexture {
         Self {
             texture_view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
             texture,
-            texture_grid,
+            texture_bounds,
         }
     }
 
     /// Copy the specified region of light data.
-    pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: Grid) -> usize {
+    pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
         let mut data: Vec<[u8; 4]> = Vec::with_capacity(region.volume());
         // TODO: Enable circular operation and eliminate the need for the offset of the
-        // coordinates (texture_grid.lower_bounds() and light_offset in the shader)
+        // coordinates (texture_bounds.lower_bounds() and light_offset in the shader)
         // by doing a coordinate wrap-around -- the shader and the Space will agree
         // on coordinates modulo the texture size, and this upload will need to be broken
         // into up to 8 pieces.
@@ -620,7 +620,7 @@ impl SpaceLightTexture {
             }
         }
 
-        write_texture_by_grid(
+        write_texture_by_aab(
             queue,
             &self.texture,
             region.translate(self.light_lookup_offset()),
@@ -631,11 +631,11 @@ impl SpaceLightTexture {
     }
 
     pub fn update_all(&mut self, queue: &wgpu::Queue, space: &Space) -> usize {
-        self.update(queue, space, self.texture_grid);
-        self.texture_grid.volume()
+        self.update(queue, space, self.texture_bounds);
+        self.texture_bounds.volume()
     }
 
     fn light_lookup_offset(&self) -> Vector3<i32> {
-        -self.texture_grid.lower_bounds().to_vec()
+        -self.texture_bounds.lower_bounds().to_vec()
     }
 }

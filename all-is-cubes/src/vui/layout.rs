@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use cgmath::{Vector3, Zero as _};
 
-use crate::math::{point_to_enclosing_cube, Face6, Grid, GridPoint, GridVector};
+use crate::math::{point_to_enclosing_cube, Face6, GridAab, GridPoint, GridVector};
 use crate::space::SpaceTransaction;
 use crate::transaction::Merge as _;
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
@@ -29,7 +29,7 @@ pub struct LayoutRequest {
 #[non_exhaustive]
 pub struct LayoutGrant {
     /// The widget may have exclusive access to this volume.
-    pub bounds: Grid,
+    pub bounds: GridAab,
 
     /// Preferred alignment for non-stretchy widgets.
     pub gravity: Gravity,
@@ -37,7 +37,7 @@ pub struct LayoutGrant {
 
 impl LayoutGrant {
     /// Construct a `LayoutGrant` from scratch, such as to begin layout.
-    pub fn new(bounds: Grid) -> Self {
+    pub fn new(bounds: GridAab) -> Self {
         LayoutGrant {
             bounds,
             gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
@@ -59,7 +59,7 @@ impl LayoutGrant {
             };
         }
         LayoutGrant {
-            bounds: Grid::new(origin, sizes),
+            bounds: GridAab::new(origin, sizes),
             gravity: self.gravity,
         }
     }
@@ -252,7 +252,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 let mut crosshair_pos =
                     point_to_enclosing_cube(grant.bounds.center()).unwrap(/* TODO: not unwrap */);
                 crosshair_pos.z = 0;
-                let crosshair_bounds = Grid::single_cube(crosshair_pos);
+                let crosshair_bounds = GridAab::single_cube(crosshair_pos);
                 // TODO: bounds of toolbar and control_bar should be just small enough to miss the crosshair. Also figure out exactly what their Z range should be
                 LayoutTree::Hud {
                     crosshair: crosshair.perform_layout(LayoutGrant {
@@ -260,7 +260,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                         gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
                     })?,
                     toolbar: toolbar.perform_layout(LayoutGrant {
-                        bounds: Grid::from_lower_upper(
+                        bounds: GridAab::from_lower_upper(
                             [
                                 grant.bounds.lower_bounds().x,
                                 grant.bounds.lower_bounds().y,
@@ -275,7 +275,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                         gravity: Vector3::new(Align::Center, Align::Low, Align::Center),
                     })?,
                     control_bar: control_bar.perform_layout(LayoutGrant {
-                        bounds: Grid::from_lower_upper(
+                        bounds: GridAab::from_lower_upper(
                             [
                                 grant.bounds.lower_bounds().x,
                                 crosshair_bounds.upper_bounds().y,
@@ -320,7 +320,7 @@ pub(super) fn validate_widget_transaction(
     match transaction.bounds() {
         None => Ok(()),
         Some(txn_bounds) => {
-            if grant.bounds.contains_grid(txn_bounds) {
+            if grant.bounds.contains_box(txn_bounds) {
                 Ok(())
             } else {
                 // TODO: This being InstallVuiError isn't great if we might want to validate
@@ -417,7 +417,7 @@ mod tests {
                 LayoutTree::leaf(LT::new("c", [1, 1, 1])),
             ],
         };
-        let grant = LayoutGrant::new(Grid::new([10, 10, 10], [10, 10, 10]));
+        let grant = LayoutGrant::new(GridAab::new([10, 10, 10], [10, 10, 10]));
         assert_eq!(
             tree.perform_layout(grant)
                 .unwrap()
@@ -427,21 +427,21 @@ mod tests {
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([10, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::new([10, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([11, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::new([11, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("c", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([12, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::new([12, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 }
@@ -461,7 +461,7 @@ mod tests {
                 LayoutTree::leaf(LT::new("b", [1, 1, 1])),
             ],
         };
-        let grant = LayoutGrant::new(Grid::new([10, 10, 10], [10, 10, 10]));
+        let grant = LayoutGrant::new(GridAab::new([10, 10, 10], [10, 10, 10]));
         assert_eq!(
             tree.perform_layout(grant)
                 .unwrap()
@@ -471,14 +471,14 @@ mod tests {
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([10, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::new([10, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: Grid::new([14, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::new([14, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 }

@@ -8,7 +8,7 @@ use std::fmt;
 use cgmath::{Vector4, Zero as _};
 
 use crate::block::{BlockAttributes, BlockCollision, Resolution};
-use crate::math::{Grid, GridArray, OpacityCategory, Rgba};
+use crate::math::{GridAab, GridArray, OpacityCategory, Rgba};
 use crate::universe::RefError;
 use crate::util::{ConciseDebug, CustomFormat};
 
@@ -34,7 +34,7 @@ pub struct EvaluatedBlock {
     ///
     /// This array may be smaller than the dimensions implied by [`Self::resolution`];
     /// in which case the out-of-bounds space should be treated as [`Evoxel::AIR`].
-    /// The logical bounds are always the cube computed by [`Grid::for_block`].
+    /// The logical bounds are always the cube computed by [`GridAab::for_block`].
     pub voxels: Option<GridArray<Evoxel>>,
 
     /// If [`Self::voxels`] is present, then this is the voxel resolution (number of
@@ -95,7 +95,7 @@ impl EvaluatedBlock {
                 None
             } else {
                 Some(
-                    GridArray::from_elements(Grid::for_block(1), [color.opacity_category()])
+                    GridArray::from_elements(GridAab::for_block(1), [color.opacity_category()])
                         .unwrap(),
                 )
             },
@@ -113,31 +113,31 @@ impl EvaluatedBlock {
         // TODO: The color sum actually needs to be weighted by alpha. (Too bad we're not using premultiplied alpha.)
         // TODO: Should not be counting interior voxels for the color, only visible surfaces.
         let mut color_sum: Vector4<f32> = Vector4::zero();
-        for position in voxels.grid().interior_iter() {
+        for position in voxels.bounds().interior_iter() {
             color_sum += voxels[position].color.into();
         }
 
-        let full_block_grid = Grid::for_block(resolution);
+        let full_block_bounds = GridAab::for_block(resolution);
         EvaluatedBlock {
             attributes,
             // The single color is the mean of the actual block colors.
             color: Rgba::try_from(
-                (color_sum.truncate() / (voxels.grid().volume() as f32))
-                    .extend(color_sum.w / (full_block_grid.volume() as f32)),
+                (color_sum.truncate() / (voxels.bounds().volume() as f32))
+                    .extend(color_sum.w / (full_block_bounds.volume() as f32)),
             )
             .expect("Recursive block color computation produced NaN"),
             resolution,
             // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
-            opaque: voxels.grid() == full_block_grid
-                && voxels.grid().interior_iter().all(
+            opaque: voxels.bounds() == full_block_bounds
+                && voxels.bounds().interior_iter().all(
                     #[inline(always)]
                     |p| voxels[p].color.fully_opaque(),
                 ),
-            visible: voxels.grid().interior_iter().any(
+            visible: voxels.bounds().interior_iter().any(
                 #[inline(always)]
                 |p| !voxels[p].color.fully_transparent(),
             ),
-            voxel_opacity_mask: Some(GridArray::from_fn(voxels.grid(), |p| {
+            voxel_opacity_mask: Some(GridArray::from_fn(voxels.bounds(), |p| {
                 voxels[p].color.opacity_category()
             })),
 

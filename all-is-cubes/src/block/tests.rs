@@ -22,7 +22,7 @@ use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::{NullListener, Sink};
 use crate::math::{
-    Face6, Grid, GridArray, GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba,
+    Face6, GridAab, GridArray, GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba,
 };
 use crate::space::{Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
@@ -100,7 +100,7 @@ fn evaluate_opaque_atom_and_attributes() {
     assert_eq!(e.visible, true);
     assert_eq!(
         e.voxel_opacity_mask,
-        GridArray::from_elements(Grid::for_block(1), [OpacityCategory::Opaque])
+        GridArray::from_elements(GridAab::for_block(1), [OpacityCategory::Opaque])
     )
 }
 
@@ -115,7 +115,7 @@ fn evaluate_transparent_atom() {
     assert_eq!(e.visible, true);
     assert_eq!(
         e.voxel_opacity_mask,
-        GridArray::from_elements(Grid::for_block(1), [OpacityCategory::Partial])
+        GridArray::from_elements(GridAab::for_block(1), [OpacityCategory::Partial])
     )
 }
 
@@ -155,14 +155,17 @@ fn evaluate_voxels_checked_individually() {
     assert_eq!(e.attributes, attributes);
     assert_eq!(
         e.voxels,
-        Some(GridArray::from_fn(Grid::for_block(resolution), |point| {
-            let point = point.cast::<f32>().unwrap();
-            Evoxel {
-                color: Rgba::new(point.x, point.y, point.z, 1.0),
-                selectable: true,
-                collision: BlockCollision::Hard,
+        Some(GridArray::from_fn(
+            GridAab::for_block(resolution),
+            |point| {
+                let point = point.cast::<f32>().unwrap();
+                Evoxel {
+                    color: Rgba::new(point.x, point.y, point.z, 1.0),
+                    selectable: true,
+                    collision: BlockCollision::Hard,
+                }
             }
-        }))
+        ))
     );
     assert_eq!(e.color, Rgba::new(0.5, 0.5, 0.5, 1.0));
     assert_eq!(e.resolution, resolution);
@@ -171,7 +174,7 @@ fn evaluate_voxels_checked_individually() {
     assert_eq!(
         e.voxel_opacity_mask,
         GridArray::from_elements(
-            Grid::for_block(resolution),
+            GridAab::for_block(resolution),
             vec![OpacityCategory::Opaque; (resolution as usize).pow(3)]
         )
     )
@@ -244,7 +247,7 @@ fn evaluate_voxels_partial_not_filling() {
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(2, 4, 4);
     space
-        .fill_uniform(space.grid(), Block::from(Rgba::WHITE))
+        .fill_uniform(space.bounds(), Block::from(Rgba::WHITE))
         .unwrap();
     let space_ref = universe.insert_anonymous(space);
     let block = Block::builder()
@@ -267,7 +270,7 @@ fn evaluate_voxels_zero_resolution() {
     let mut space = Space::for_block(1).build_empty();
     // This block should *not* appear in the result.
     space
-        .fill_uniform(space.grid(), Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)))
+        .fill_uniform(space.bounds(), Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)))
         .unwrap();
     let space_ref = universe.insert_anonymous(space);
     let block = Block::builder()
@@ -290,7 +293,7 @@ fn recur_with_offset() {
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(resolution * 2, resolution, resolution);
     space
-        .fill(space.grid(), |point| {
+        .fill(space.bounds(), |point| {
             let point = point.cast::<f32>().unwrap();
             Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
         })
@@ -307,7 +310,7 @@ fn recur_with_offset() {
     assert_eq!(
         e.voxels,
         Some(GridArray::from_fn(
-            Grid::for_block(resolution as Resolution),
+            GridAab::for_block(resolution as Resolution),
             |point| {
                 let point = (point + offset).cast::<f32>().unwrap();
                 Evoxel {
@@ -328,7 +331,7 @@ fn indirect_equivalence() {
     // TODO: BlockGen should support constructing indirects (by default, even)
     // and we can use the more concise version
     space
-        .fill(space.grid(), |point| {
+        .fill(space.bounds(), |point| {
             let point = point.cast::<f32>().unwrap();
             Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
         })
@@ -523,7 +526,7 @@ fn builder_voxels_from_fn() {
     );
 
     // Check the space's characteristics
-    assert_eq!(space_ref.borrow().grid(), Grid::for_block(resolution));
+    assert_eq!(space_ref.borrow().bounds(), GridAab::for_block(resolution));
     assert_eq!(
         space_ref.borrow().physics(),
         &SpacePhysics::DEFAULT_FOR_BLOCK

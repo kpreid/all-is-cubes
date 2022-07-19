@@ -19,7 +19,7 @@ use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::{
-    Face6, FreeCoordinate, Grid, GridArray, GridCoordinate, GridMatrix, GridPoint, NotNan, Rgb,
+    Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix, GridPoint, NotNan, Rgb,
 };
 use crate::time::Tick;
 use crate::transaction::{Merge, Transaction as _};
@@ -45,7 +45,7 @@ mod tests;
 /// Container for [`Block`]s arranged in three-dimensional space. The main “game world”
 /// data structure.
 pub struct Space {
-    grid: Grid,
+    bounds: GridAab,
 
     /// Lookup from `Block` value to the index by which it is represented in
     /// the array.
@@ -55,7 +55,7 @@ pub struct Space {
 
     /// The blocks in the space, stored compactly:
     ///
-    /// * Coordinates are transformed to indices by [`Grid::index`].
+    /// * Coordinates are transformed to indices by [`GridAab::index`].
     /// * Each element is an index into [`Self::block_data`].
     // TODO: Consider making this use different integer types depending on how
     // many blocks there are, so we can save memory in simple spaces but not have
@@ -111,7 +111,7 @@ impl fmt::Debug for Space {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Make the assumption that a Space is too big to print in its entirety.
         fmt.debug_struct("Space")
-            .field("grid", &self.grid)
+            .field("bounds", &self.bounds)
             .field("block_data", &self.block_data)
             .field("physics", &self.physics)
             .field("behaviors", &self.behaviors)
@@ -138,37 +138,37 @@ impl Space {
     /// Returns a [`SpaceBuilder`] configured for a block,
     /// which may be used to construct a new [`Space`].
     ///
-    /// This means that its bounds are as per [`Grid::for_block()`], and its
+    /// This means that its bounds are as per [`GridAab::for_block()`], and its
     /// [`physics`](Self::physics) is [`SpacePhysics::DEFAULT_FOR_BLOCK`].
     pub fn for_block(resolution: Resolution) -> SpaceBuilder {
-        SpaceBuilder::new(Grid::for_block(resolution)).physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+        SpaceBuilder::new(GridAab::for_block(resolution)).physics(SpacePhysics::DEFAULT_FOR_BLOCK)
     }
 
-    /// Returns a [`SpaceBuilder`] with the given grid and all default values,
+    /// Returns a [`SpaceBuilder`] with the given bounds and all default values,
     /// which may be used to construct a new [`Space`].
-    pub fn builder(grid: Grid) -> SpaceBuilder {
-        SpaceBuilder::new(grid)
+    pub fn builder(bounds: GridAab) -> SpaceBuilder {
+        SpaceBuilder::new(bounds)
     }
 
     /// Constructs a [`Space`] that is entirely filled with [`AIR`].
     ///
-    /// Equivalent to `Space::builder(grid).build_empty()`
-    pub fn empty(grid: Grid) -> Space {
-        Space::builder(grid).build_empty()
+    /// Equivalent to `Space::builder(bounds).build_empty()`
+    pub fn empty(bounds: GridAab) -> Space {
+        Space::builder(bounds).build_empty()
     }
 
     /// Implementation of [`SpaceBuilder`]'s terminal methods.
     fn new_from_builder(builder: SpaceBuilder) -> Self {
         let SpaceBuilder {
-            grid,
+            bounds,
             spawn,
             physics,
         } = builder;
 
-        let volume = grid.volume();
+        let volume = bounds.volume();
 
         Space {
-            grid,
+            bounds,
             block_to_index: {
                 let mut map = HashMap::new();
                 if volume > 0 {
@@ -186,14 +186,14 @@ impl Space {
             },
             contents: vec![0; volume].into_boxed_slice(),
 
-            lighting: physics.light.initialize_lighting(grid),
+            lighting: physics.light.initialize_lighting(bounds),
             packed_sky_color: physics.sky_color.into(),
             light_update_queue: LightUpdateQueue::new(),
             last_light_updates: Vec::new(),
 
             physics,
             behaviors: BehaviorSet::new(),
-            spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(grid)),
+            spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
             cubes_wanting_ticks: HashSet::new(),
             notifier: Notifier::new(),
             todo: Default::default(),
@@ -203,7 +203,7 @@ impl Space {
     /// Constructs a `Space` that is entirely empty and whose coordinate system
     /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
     pub fn empty_positive(wx: GridCoordinate, wy: GridCoordinate, wz: GridCoordinate) -> Space {
-        Space::empty(Grid::new((0, 0, 0), (wx, wy, wz)))
+        Space::empty(GridAab::new((0, 0, 0), (wx, wy, wz)))
     }
 
     /// Registers a listener for mutations of this space.
@@ -211,10 +211,10 @@ impl Space {
         self.notifier.listen(listener)
     }
 
-    /// Returns the [`Grid`] describing the bounds of this space; no blocks may exist
+    /// Returns the [`GridAab`] describing the bounds of this space; no blocks may exist
     /// outside it.
-    pub fn grid(&self) -> Grid {
-        self.grid
+    pub fn bounds(&self) -> GridAab {
+        self.bounds
     }
 
     /// Returns the internal unstable numeric ID for the block at the given position,
@@ -226,25 +226,25 @@ impl Space {
     /// may be renumbered after any mutation.
     #[inline(always)]
     pub fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
-        self.grid
+        self.bounds
             .index(position.into())
             .map(|contents_index| self.contents[contents_index])
     }
 
     /// Copy data out of a portion of the space in a caller-chosen format.
     ///
-    /// If the provided [`Grid`] contains portions outside of this space's grid,
+    /// If the provided [`GridAab`] contains portions outside of this space's bounds,
     /// those positions in the output will be treated as if they are filled with [`AIR`]
     /// and lit by [`SpacePhysics::sky_color`].
     pub fn extract<V>(
         &self,
-        subgrid: Grid,
+        subgrid: GridAab,
         mut extractor: impl FnMut(Option<BlockIndex>, &SpaceBlockData, PackedLight) -> V,
     ) -> GridArray<V> {
         GridArray::from_fn(subgrid, |cube| {
             // TODO: Implement an iterator over the indexes (which is not just
-            // interior_iter().enumerate() because it's a sub-grid).
-            match self.grid.index(cube) {
+            // interior_iter().enumerate() because it's a sub-region).
+            match self.bounds.index(cube) {
                 Some(cube_index) => {
                     let block_index = self.contents[cube_index];
                     extractor(
@@ -266,7 +266,7 @@ impl Space {
     /// Gets the [`EvaluatedBlock`] of the block in this space at the given position.
     #[inline(always)]
     pub fn get_evaluated(&self, position: impl Into<GridPoint>) -> &EvaluatedBlock {
-        if let Some(index) = self.grid.index(position) {
+        if let Some(index) = self.bounds.index(position) {
             &self.block_data[self.contents[index] as usize].evaluated
         } else {
             &AIR_EVALUATED
@@ -288,7 +288,7 @@ impl Space {
         match self.physics.light {
             LightPhysics::None => PackedLight::ONE,
             _ => self
-                .grid
+                .bounds
                 .index(position.into())
                 .map(|contents_index| self.lighting[contents_index])
                 .unwrap_or(self.packed_sky_color),
@@ -324,7 +324,7 @@ impl Space {
         // TODO: Is the `Cow` actually gaining us any performance, now that `Block` is an Arc-like type?
         block: Cow<'_, Block>,
     ) -> Result<bool, SetCubeError> {
-        if let Some(contents_index) = self.grid.index(position) {
+        if let Some(contents_index) = self.bounds.index(position) {
             let old_block_index = self.contents[contents_index];
             let old_block = &self.block_data[old_block_index as usize].block;
             if *old_block == *block {
@@ -388,8 +388,8 @@ impl Space {
             Ok(true)
         } else {
             Err(SetCubeError::OutOfBounds {
-                modification: Grid::single_cube(position),
-                space_bounds: self.grid,
+                modification: GridAab::single_cube(position),
+                space_bounds: self.bounds,
             })
         }
     }
@@ -441,19 +441,19 @@ impl Space {
     /// the existing block is left unchanged.
     ///
     /// The operation will stop on the first error, potentially leaving some blocks
-    /// replaced. (Exception: If the `grid` extends outside of
-    /// [`self.grid()`](Self::grid), that will always be rejected before any changes are
-    /// made.)
+    /// replaced. (Exception: If the `region` extends outside of
+    /// [`self.bounds()`](Self::bounds), that will always be rejected before any changes
+    /// are made.)
     ///
     /// ```
     /// use all_is_cubes::block::{AIR, Block};
-    /// use all_is_cubes::math::{Grid, Rgba};
+    /// use all_is_cubes::math::{GridAab, Rgba};
     /// use all_is_cubes::space::Space;
     ///
     /// let mut space = Space::empty_positive(10, 10, 10);
     /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
     ///
-    /// space.fill(Grid::new((0, 0, 0), (2, 1, 1)), |_point| Some(&a_block)).unwrap();
+    /// space.fill(GridAab::new((0, 0, 0), (2, 1, 1)), |_point| Some(&a_block)).unwrap();
     ///
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// assert_eq!(space[(1, 0, 0)], a_block);
@@ -463,15 +463,15 @@ impl Space {
     /// TODO: Support providing the previous block as a parameter (take cues from `extract`).
     ///
     /// See also [`Space::fill_uniform`] for filling a region with one block.
-    pub fn fill<F, B>(&mut self, region: Grid, mut function: F) -> Result<(), SetCubeError>
+    pub fn fill<F, B>(&mut self, region: GridAab, mut function: F) -> Result<(), SetCubeError>
     where
         F: FnMut(GridPoint) -> Option<B>,
         B: std::borrow::Borrow<Block>,
     {
-        if !self.grid.contains_grid(region) {
+        if !self.bounds.contains_box(region) {
             return Err(SetCubeError::OutOfBounds {
                 modification: region,
-                space_bounds: self.grid,
+                space_bounds: self.bounds,
             });
         }
         for cube in region.interior_iter() {
@@ -490,13 +490,13 @@ impl Space {
     ///
     /// ```
     /// use all_is_cubes::block::{AIR, Block};
-    /// use all_is_cubes::math::{Grid, Rgba};
+    /// use all_is_cubes::math::{GridAab, Rgba};
     /// use all_is_cubes::space::Space;
     ///
     /// let mut space = Space::empty_positive(10, 10, 10);
     /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
     ///
-    /// space.fill_uniform(Grid::new((0, 0, 0), (2, 1, 1)), &a_block).unwrap();
+    /// space.fill_uniform(GridAab::new((0, 0, 0), (2, 1, 1)), &a_block).unwrap();
     ///
     /// assert_eq!(&space[(0, 0, 0)], &a_block);
     /// assert_eq!(&space[(1, 0, 0)], &a_block);
@@ -506,15 +506,15 @@ impl Space {
     /// See also [`Space::fill`] for non-uniform fill and bulk copies.
     pub fn fill_uniform<'b>(
         &mut self,
-        region: Grid,
+        region: GridAab,
         block: impl Into<Cow<'b, Block>>,
     ) -> Result<(), SetCubeError> {
-        if !self.grid.contains_grid(region) {
+        if !self.bounds.contains_box(region) {
             Err(SetCubeError::OutOfBounds {
                 modification: region,
-                space_bounds: self.grid,
+                space_bounds: self.bounds,
             })
-        } else if self.grid() == region {
+        } else if self.bounds() == region {
             // We're overwriting the entire space, so we might as well re-initialize it.
             let block = block.into();
             let new_block_index = 0;
@@ -674,7 +674,7 @@ impl Space {
         let old_physics = std::mem::replace(&mut self.physics, physics);
         if self.physics.light != old_physics.light {
             // TODO: == comparison is too broad once there are parameters -- might be a minor change of color etc.
-            self.lighting = self.physics.light.initialize_lighting(self.grid);
+            self.lighting = self.physics.light.initialize_lighting(self.bounds);
 
             match self.physics.light {
                 LightPhysics::None => {
@@ -834,7 +834,7 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     /// use [`Space::set`] or [`Space::fill`] to modify blocks.
     #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
-        if let Some(index) = self.grid.index(position) {
+        if let Some(index) = self.bounds.index(position) {
             &self.block_data[self.contents[index] as usize].block
         } else {
             &AIR
@@ -845,7 +845,7 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
 impl VisitRefs for Space {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         let Space {
-            grid: _,
+            bounds: _,
             block_to_index: _,
             block_data,
             contents: _,
@@ -1054,8 +1054,8 @@ pub enum SetCubeError {
     /// The given cube or region is out of the bounds of this Space.
     #[error("{:?} is outside of the bounds {:?}", .modification, .space_bounds)]
     OutOfBounds {
-        modification: Grid,
-        space_bounds: Grid,
+        modification: GridAab,
+        space_bounds: GridAab,
     },
     /// [`Block::evaluate`] failed on a new block type.
     #[error("block evaluation failed: {0}")]

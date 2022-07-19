@@ -7,7 +7,7 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{Grid, GridCoordinate, GridPoint};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
@@ -38,10 +38,10 @@ pub(crate) fn menger_sponge(
         .voxels_ref(block_resolution, universe.insert_anonymous(block_space))
         .build();
 
-    let space_grid = Grid::for_block(3u8.pow(world_levels.into()));
-    let mut space = Space::builder(space_grid)
+    let space_bounds = GridAab::for_block(3u8.pow(world_levels.into()));
+    let mut space = Space::builder(space_bounds)
         .spawn({
-            let mut spawn = Spawn::looking_at_space(space_grid, [0., 0.5, 1.]);
+            let mut spawn = Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]);
             spawn.set_inventory(
                 [
                     free_editing_starter_inventory(true),
@@ -74,7 +74,7 @@ where
         function(lower_corner)?;
     } else {
         let size_of_next_level: GridCoordinate = 3_i32.pow((level - 1).into());
-        for which_section in Grid::for_block(3).interior_iter() {
+        for which_section in GridAab::for_block(3).interior_iter() {
             let Point3 { x, y, z } = which_section.map(|c| u8::from(c.rem_euclid(2) == 1));
             if x + y + z <= 1 {
                 let section_corner = lower_corner + which_section.to_vec() * size_of_next_level;

@@ -20,7 +20,7 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::EphemeralOpaque;
 use crate::listen::{DirtyFlag, ListenableSource};
-use crate::math::{Grid, GridMatrix, GridPoint, GridVector};
+use crate::math::{GridAab, GridMatrix, GridPoint, GridVector};
 use crate::space::SpaceTransaction;
 use crate::time::Tick;
 use crate::vui::{
@@ -219,7 +219,7 @@ impl<D: Clone + Debug + Send + Sync + 'static> WidgetController for ToggleButton
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             Arc::new(ActivatableRegion {
-                region: Grid::single_cube(self.position),
+                region: GridAab::single_cube(self.position),
                 effect: self.definition.action.clone(),
             }),
         )))

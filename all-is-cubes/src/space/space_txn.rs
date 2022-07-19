@@ -11,7 +11,7 @@ use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::math::{GridCoordinate, GridMatrix, GridPoint};
-use crate::space::{Grid, SetCubeError, Space};
+use crate::space::{GridAab, SetCubeError, Space};
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
@@ -154,22 +154,22 @@ impl SpaceTransaction {
     /// TODO: This does not currently report behaviors but it should, once they have
     /// formalized regions of attachment.
     ///
-    /// TODO: Handle the case where the total volume is too large. (Maybe Grid should lose
+    /// TODO: Handle the case where the total volume is too large. (Maybe GridAab should lose
     /// that restriction.)
-    pub(crate) fn bounds(&self) -> Option<Grid> {
+    pub(crate) fn bounds(&self) -> Option<GridAab> {
         // Destructuring to statically check that we consider all fields.
         let Self {
             cubes,
             behaviors: _,
         } = self;
 
-        let mut bounds: Option<Grid> = None;
+        let mut bounds: Option<GridAab> = None;
         for &cube_array in cubes.keys() {
             let cube = GridPoint::from(cube_array);
             if let Some(bounds) = &mut bounds {
-                *bounds = (*bounds).union(Grid::single_cube(cube)).unwrap();
+                *bounds = (*bounds).union(GridAab::single_cube(cube)).unwrap();
             } else {
-                bounds = Some(Grid::single_cube(cube));
+                bounds = Some(GridAab::single_cube(cube));
             }
         }
         bounds
@@ -192,7 +192,7 @@ impl Transaction<Space> for SpaceTransaction {
             },
         ) in &self.cubes
         {
-            if let Some(cube_index) = space.grid().index(cube) {
+            if let Some(cube_index) = space.bounds().index(cube) {
                 if let Some(old) = old {
                     // Raw lookup because we already computed the index for a bounds check
                     // (TODO: Put this in a function, like get_block_index)
@@ -401,7 +401,7 @@ mod tests {
     use crate::block::AIR;
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
-    use crate::math::Grid;
+    use crate::math::GridAab;
     use crate::transaction::TransactionTester;
 
     use super::*;
@@ -553,7 +553,7 @@ mod tests {
 
         let signal = Arc::new(AtomicU32::new(0));
         space.add_behavior(ActivatableRegion {
-            region: Grid::single_cube(cube),
+            region: GridAab::single_cube(cube),
             // TODO: This sure is clunky
             effect: EphemeralOpaque::from(Arc::new({
                 let signal = signal.clone();
@@ -632,7 +632,7 @@ mod tests {
             })
             .target(|| {
                 // This space makes the test transactions at [0, 0, 0] out of bounds
-                Space::builder(Grid::new([1, 0, 0], [1, 1, 1])).build_empty()
+                Space::builder(GridAab::new([1, 0, 0], [1, 1, 1])).build_empty()
             })
             // TODO: more spaces
             .test();
@@ -647,7 +647,7 @@ mod tests {
     fn bounds_single_cube() {
         assert_eq!(
             SpaceTransaction::set_cube([-7, 3, 5], None, Some(AIR)).bounds(),
-            Some(Grid::single_cube(GridPoint::new(-7, 3, 5)))
+            Some(GridAab::single_cube(GridPoint::new(-7, 3, 5)))
         );
     }
 
@@ -657,7 +657,7 @@ mod tests {
         let t2 = SpaceTransaction::set_cube([10, 3, 5], None, Some(AIR));
         assert_eq!(
             t1.merge(t2).unwrap().bounds(),
-            Some(Grid::from_lower_upper([-7, 3, 5], [11, 4, 6]))
+            Some(GridAab::from_lower_upper([-7, 3, 5], [11, 4, 6]))
         );
     }
 }

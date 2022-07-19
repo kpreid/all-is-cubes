@@ -201,8 +201,8 @@ where
         ray
     );
 
-    // Note: no `.within_grid()` because that would not work when the leading corner is
-    // not within the grid. We could expand the grid slightly (while considering overflow
+    // Note: no `.within()` because that would not work when the leading corner is not
+    // within the bounds. We could expand the bounds slightly (while considering overflow
     // cases), but this would be an optimization which only affects the unusual case of
     // being out of bounds, so it's not worth doing unless we specifically expect to have
     // many bodies outside a space and occasionally inside.
@@ -546,7 +546,7 @@ pub(crate) fn nudge_on_ray(
 mod tests {
     use crate::block::{Block, AIR};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::{point_to_enclosing_cube, Grid};
+    use crate::math::{point_to_enclosing_cube, GridAab};
     use crate::raytracer::print_space;
     use crate::universe::Universe;
 
@@ -765,7 +765,7 @@ mod tests {
 
                 let enclosing = nudged_aab.round_up_to_grid();
                 if backward {
-                    let expected_enclosing = Grid::single_cube(
+                    let expected_enclosing = GridAab::single_cube(
                         point_to_enclosing_cube(segment.unit_endpoint()).unwrap(),
                     );
                     assert_eq!(

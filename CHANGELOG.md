@@ -37,6 +37,11 @@
     - Breaking: The `linking::BlockModule` trait now requires the [`exhaust::Exhaust`](https://docs.rs/exhaust/latest/exhaust/trait.Exhaust.html) trait in place of `strum::IntoEnumIterator`. This allows implementors to use enums with fields (or non-enums).
     - Breaking: `raytracer::SpaceRaytracer::trace_scene_to_image()` now expects a buffer rather than allocating one.
 
+    - Renamed: `space::Grid` is now `math::GridAab`.
+        - Methods named `grid()` that return the bounding box of something are now called `bounds()`.
+        - `Grid::contains_grid()` is now `GridAab::contains_box()`.
+        - `Raycaster::within_grid()` is now `Raycaster::within()`.
+    
     - Renamed: `math::Face` is now `math::Face7`.
     - Renamed: `apps::AllIsCubesAppState` to `apps::Session`.
     - Renamed: `transaction::UniverseTransaction` is now `universe::UniverseTransaction`.

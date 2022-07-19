@@ -311,7 +311,7 @@ mod tests {
         let mut tex = GltfTextureAllocator::new();
         let blocks = triangulate_blocks(space, &mut tex, options);
         let mesh: SpaceMesh<GltfVertex, GltfTextureRef> =
-            triangulate_space(space, space.grid(), options, &*blocks);
+            triangulate_space(space, space.bounds(), options, &*blocks);
 
         let index = writer.add_mesh("mesh".into(), &mesh);
 

@@ -11,7 +11,9 @@ use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::{GenError, InGenError};
-use all_is_cubes::math::{FreeCoordinate, Grid, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
+use all_is_cubes::math::{
+    FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb, Rgba,
+};
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
@@ -183,18 +185,18 @@ fn cornell_box() -> Result<Space, InGenError> {
     // scale to something else entirely.
     let box_size = 55;
     // Add one block to all sides for wall thickness.
-    let grid = Grid::new(
+    let bounds = GridAab::new(
         (-1, -1, -1),
         GridVector::new(1, 1, 1) * box_size + GridVector::new(2, 2, 2),
     );
-    let mut space = Space::builder(grid)
+    let mut space = Space::builder(bounds)
         // There shall be no light but that which we make for ourselves!
         .sky_color(Rgb::ZERO)
         .light_physics(LightPhysics::Rays {
             maximum_distance: (box_size * 2).try_into().unwrap_or(u16::MAX),
         })
         .spawn({
-            let mut spawn = Spawn::default_for_new_space(grid);
+            let mut spawn = Spawn::default_for_new_space(bounds);
             spawn.set_inventory(free_editing_starter_inventory(true));
             spawn.set_eye_position(Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into());
             spawn
@@ -211,22 +213,22 @@ fn cornell_box() -> Result<Space, InGenError> {
         .build();
 
     // Floor.
-    space.fill_uniform(Grid::new((0, -1, 0), (box_size, 1, box_size)), &white)?;
+    space.fill_uniform(GridAab::new((0, -1, 0), (box_size, 1, box_size)), &white)?;
     // Ceiling.
-    space.fill_uniform(Grid::new((0, box_size, 0), (box_size, 1, box_size)), &white)?;
+    space.fill_uniform(GridAab::new((0, box_size, 0), (box_size, 1, box_size)), &white)?;
     // Light in ceiling.
-    space.fill_uniform(Grid::from_lower_upper((21, box_size, 23), (34, box_size + 1, 33)), &light)?;
+    space.fill_uniform(GridAab::from_lower_upper((21, box_size, 23), (34, box_size + 1, 33)), &light)?;
     // Back wall.
-    space.fill_uniform(Grid::new((0, 0, -1), (box_size, box_size, 1)), &white)?;
+    space.fill_uniform(GridAab::new((0, 0, -1), (box_size, box_size, 1)), &white)?;
     // Right wall (green).
-    space.fill_uniform(Grid::new((box_size, 0, 0), (1, box_size, box_size)), &green)?;
+    space.fill_uniform(GridAab::new((box_size, 0, 0), (1, box_size, box_size)), &green)?;
     // Left wall (red).
-    space.fill_uniform(Grid::new((-1, 0, 0), (1, box_size, box_size)), &red)?;
+    space.fill_uniform(GridAab::new((-1, 0, 0), (1, box_size, box_size)), &red)?;
 
     // Block #1
-    space.fill_uniform(Grid::new((29, 0, 36), (16, 16, 15)), &white)?;
+    space.fill_uniform(GridAab::new((29, 0, 36), (16, 16, 15)), &white)?;
     // Block #2
-    space.fill_uniform(Grid::new((10, 0, 13), (18, 33, 15)), &white)?;
+    space.fill_uniform(GridAab::new((10, 0, 13), (18, 33, 15)), &white)?;
 
     // TODO: Explicitly define camera position (needs a means to do so).
 
@@ -244,7 +246,7 @@ fn cornell_box() -> Result<Space, InGenError> {
 async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenError> {
     assert!(shell_radius > planet_radius);
     let space_radius = shell_radius + 1; // TODO check off-by-one consistency
-    let bounds = Grid::new(
+    let bounds = GridAab::new(
         GridPoint::new(-1, -1, -1) * space_radius.into(),
         GridVector::new(1, 1, 1) * (space_radius * 2 + 1).into(),
     );
@@ -297,7 +299,7 @@ async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InG
 
     // Inner surface.
     space.fill(
-        Grid::from_lower_upper(
+        GridAab::from_lower_upper(
             GridPoint::new(-1, -1, -1) * planet_radius,
             GridPoint::new(1, 1, 1) * planet_radius,
         ),
@@ -334,10 +336,10 @@ async fn arbitrary_space(
         match r {
             Ok(mut space) => {
                 // Patch spawn position to be reasonable
-                let grid = space.grid();
+                let bounds = space.bounds();
                 let mut spawn = space.spawn().clone();
-                spawn.set_bounds(grid.expand(FaceMap::repeat(20)));
-                spawn.set_eye_position(grid.center());
+                spawn.set_bounds(bounds.expand(FaceMap::repeat(20)));
+                spawn.set_eye_position(bounds.center());
                 space.set_spawn(spawn);
 
                 // Patch physics to be reasonable

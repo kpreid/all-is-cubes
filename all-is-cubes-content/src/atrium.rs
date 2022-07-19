@@ -16,8 +16,8 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, Face7, FaceMap, FreeCoordinate, Grid, GridArray, GridCoordinate, GridMatrix, GridPoint,
-    GridRotation, GridVector, Rgb,
+    Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
+    GridPoint, GridRotation, GridVector, Rgb,
 };
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics};
@@ -44,7 +44,7 @@ pub(crate) async fn atrium(
     let large_arch_count = Vector3::new(1, 0, 5); // x, dummy y, z
     let floor_count = 4;
 
-    let origin = Grid::new([0, 0, 0], [1, 1, 1]);
+    let origin = GridAab::new([0, 0, 0], [1, 1, 1]);
     let atrium_footprint = origin.expand(FaceMap::symmetric([
         ((between_large_arches + WALL) * large_arch_count.x) / 2 - WALL,
         0,
@@ -58,7 +58,7 @@ pub(crate) async fn atrium(
     let balcony_floor_pos = GridVector::new(0, ceiling_height + WALL, 0);
     let top_floor_pos = GridVector::new(0, (ceiling_height + WALL) * 2, 0);
 
-    let space_grid = outer_walls_footprint
+    let space_bounds = outer_walls_footprint
         .expand(FaceMap::default().with(Face7::PY, ceiling_height * floor_count));
 
     let floor_with_cutout = |mut p: GridPoint| {
@@ -70,10 +70,10 @@ pub(crate) async fn atrium(
         }
     };
 
-    let mut space = Space::builder(space_grid)
+    let mut space = Space::builder(space_bounds)
         .spawn({
             // TODO: default_for_new_space isn't really doing anything for us here
-            let mut spawn = Spawn::default_for_new_space(space_grid);
+            let mut spawn = Spawn::default_for_new_space(space_bounds);
             spawn.set_eye_position(Point3::new(
                 0.5,
                 1.91 + FreeCoordinate::from(ceiling_height + 2),
@@ -87,7 +87,7 @@ pub(crate) async fn atrium(
 
     // Outer walls
     four_walls(
-        space_grid,
+        space_bounds,
         |_origin, direction, _length, wall_excluding_corners| -> Result<(), InGenError> {
             space.fill_uniform(
                 wall_excluding_corners,
@@ -299,7 +299,7 @@ fn arch_row(
 
         fill_space_transformed(
             |p, block| map_text_block(pattern[p], blocks, p, block),
-            pattern.grid(),
+            pattern.bounds(),
             space,
             GridMatrix::from_translation(column_base.to_vec())
                 * rotation.to_positive_octant_matrix(1),
@@ -311,7 +311,7 @@ fn arch_row(
 // TODO: figure out what the general version of this is and move it elsewhere
 fn fill_space_transformed(
     src: impl Fn(GridPoint, Block) -> Block,
-    src_grid: Grid,
+    src_bounds: GridAab,
     dst: &mut Space,
     src_to_dst_transform: GridMatrix,
 ) -> Result<(), SetCubeError> {
@@ -320,7 +320,7 @@ fn fill_space_transformed(
     let (block_rotation, _) = src_to_dst_transform
         .decompose()
         .expect("could not decompose transform");
-    for cube in src_grid
+    for cube in src_bounds
         .transform(src_to_dst_transform)
         .unwrap()
         .interior_iter()
@@ -539,7 +539,7 @@ async fn install_atrium_blocks(
                     // Use a darker color to dampen the effect of interior light
                     let body_block = Block::from(palette::STEEL * 0.2);
                     space.fill(
-                        Grid::from_lower_upper(
+                        GridAab::from_lower_upper(
                             [0, 0, 0],
                             [resolution_g, resolution_g / 2, resolution_g],
                         ),
@@ -555,7 +555,7 @@ async fn install_atrium_blocks(
                     let fire_inset = 2;
                     if false {
                         // TODO: Actually enable the fire. We need graphics optimizations for animation first, or this will swamp chunk updating capacity.
-                        space.add_behavior(Fire::new(Grid::from_lower_upper(
+                        space.add_behavior(Fire::new(GridAab::from_lower_upper(
                             // Vertical overlap will be overwritten, making a bowl shape
                             [fire_inset, resolution_g / 2 - 2, fire_inset],
                             [
@@ -589,7 +589,7 @@ fn generate_arch<'b>(
         let arch_opening_height = resolution_g * height_blocks;
         let arch_center_z_doubled = resolution_g * (width_blocks - 1) /* midpoint assuming odd width */
             + resolution_g * 3 /* offset by a block and a half */;
-        let mut space = Space::builder(Grid::from_lower_upper(
+        let mut space = Space::builder(GridAab::from_lower_upper(
             [0, 0, 0],
             [
                 resolution_g,
@@ -599,7 +599,7 @@ fn generate_arch<'b>(
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build_empty();
-        space.fill(space.grid(), |p| {
+        space.fill(space.bounds(), |p| {
             // Flip middle of first block, so that the arch to our left appears on it
             let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {
                 resolution_g - 1 - p.z

@@ -13,7 +13,7 @@ use cgmath::Vector3;
 
 use crate::block::Evoxel;
 use crate::content::palette;
-use crate::math::{Grid, GridArray};
+use crate::math::{GridAab, GridArray};
 use crate::mesh::TextureCoordinate;
 
 /// Color data accepted by [`TextureAllocator`].
@@ -29,22 +29,22 @@ pub trait TextureAllocator {
     /// Allocate a tile, whose range of texels will be reserved for use as long as the
     /// `Tile` value, and its clones, are not dropped.
     ///
-    /// The given [`Grid`] specifies the desired size of the allocation;
-    /// its translation does not affect the size but may be used to make texture
-    /// coordinates convenient.
+    /// The given [`GridAab`] specifies the desired size of the allocation;
+    /// its translation does not affect the size but may be used to make the resulting
+    /// texture coordinate transformation convenient for the caller.
     ///
     /// Returns [`None`] if no space is available for another tile.
-    fn allocate(&mut self, texel_grid: Grid) -> Option<Self::Tile>;
+    fn allocate(&mut self, bounds: GridAab) -> Option<Self::Tile>;
 }
 
 /// 3D texture slice to paint a block's voxels in. When all clones of this value are
 /// dropped, the texture allocation will be released and the texture coordinates may
 /// be reused for different data.
 pub trait TextureTile: Clone {
-    /// Returns the [`Grid`] originally passed to the texture allocator for this tile.
-    fn grid(&self) -> Grid;
+    /// Returns the [`GridAab`] originally passed to the texture allocator for this tile.
+    fn bounds(&self) -> GridAab;
 
-    /// Transform a coordinate in the coordinate system of, and within, [`Self::grid()`]
+    /// Transform a coordinate in the coordinate system of, and within, [`Self::bounds()`]
     /// (that is, where 1 unit = 1 texel) into texture coordinates suitable for the
     /// target [`GfxVertex`](super::GfxVertex) type.
     fn grid_to_texcoord(
@@ -54,7 +54,7 @@ pub trait TextureTile: Clone {
 
     /// Write texture data as RGBA color.
     ///
-    /// `data` must be of length `self.grid().volume()`.
+    /// `data` must be of length `self.bounds().volume()`.
     /// TODO: Replace it with a GridArray (requires changing the ordering).
     fn write(&mut self, data: &[Texel]);
 }
@@ -64,7 +64,7 @@ pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
     voxels: &GridArray<Evoxel>,
 ) -> Option<A::Tile> {
     texture_allocator
-        .allocate(voxels.grid())
+        .allocate(voxels.bounds())
         .map(|mut texture| {
             copy_voxels_into_existing_texture(voxels, &mut texture);
             texture
@@ -75,13 +75,13 @@ pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(
     voxels: &GridArray<Evoxel>,
     texture: &mut T,
 ) {
-    let grid = voxels.grid();
-    let mut texels: Vec<Texel> = Vec::with_capacity(grid.volume());
+    let bounds = voxels.bounds();
+    let mut texels: Vec<Texel> = Vec::with_capacity(bounds.volume());
     // TODO: Teach GridArray about alternate array orderings so that we can express
     // this as a map-and-shuffle operation instead of a special loop.
-    for z in grid.z_range() {
-        for y in grid.y_range() {
-            for x in grid.x_range() {
+    for z in bounds.z_range() {
+        for y in bounds.y_range() {
+            for x in bounds.x_range() {
                 texels.push(
                     voxels
                         .get([x, y, z])
@@ -106,13 +106,13 @@ pub struct NoTextures;
 impl TextureAllocator for NoTextures {
     type Tile = NoTextures;
 
-    fn allocate(&mut self, _: Grid) -> Option<Self::Tile> {
+    fn allocate(&mut self, _: GridAab) -> Option<Self::Tile> {
         None
     }
 }
 
 impl TextureTile for NoTextures {
-    fn grid(&self) -> Grid {
+    fn bounds(&self) -> GridAab {
         unimplemented!()
     }
 
@@ -164,12 +164,12 @@ impl Default for TestTextureAllocator {
 impl TextureAllocator for TestTextureAllocator {
     type Tile = TestTextureTile;
 
-    fn allocate(&mut self, texel_grid: Grid) -> Option<Self::Tile> {
+    fn allocate(&mut self, bounds: GridAab) -> Option<Self::Tile> {
         if self.count_allocated == self.capacity {
             None
         } else {
             self.count_allocated += 1;
-            Some(TestTextureTile { texel_grid })
+            Some(TestTextureTile { bounds })
         }
     }
 }
@@ -180,12 +180,12 @@ impl TextureAllocator for TestTextureAllocator {
 #[derive(Clone, Debug, PartialEq)]
 #[doc(hidden)]
 pub struct TestTextureTile {
-    texel_grid: Grid,
+    bounds: GridAab,
 }
 
 impl TextureTile for TestTextureTile {
-    fn grid(&self) -> Grid {
-        self.texel_grid
+    fn bounds(&self) -> GridAab {
+        self.bounds
     }
 
     fn grid_to_texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
@@ -196,7 +196,7 @@ impl TextureTile for TestTextureTile {
         // Validate data size.
         assert_eq!(
             data.len(),
-            self.texel_grid.volume(),
+            self.bounds.volume(),
             "tile data did not match resolution"
         );
     }
@@ -209,14 +209,14 @@ mod tests {
     /// Test the [`TestTextureAllocator`].
     #[test]
     fn test_texture_allocator() {
-        let grid = Grid::for_block(7);
+        let bounds = GridAab::for_block(7);
         let mut allocator = TestTextureAllocator::new();
         assert_eq!(allocator.count_allocated(), 0);
-        assert!(allocator.allocate(grid).is_some());
-        assert!(allocator.allocate(grid).is_some());
+        assert!(allocator.allocate(bounds).is_some());
+        assert!(allocator.allocate(bounds).is_some());
         assert_eq!(allocator.count_allocated(), 2);
         allocator.set_capacity(3);
-        assert!(allocator.allocate(grid).is_some());
-        assert!(allocator.allocate(grid).is_none());
+        assert!(allocator.allocate(bounds).is_some());
+        assert!(allocator.allocate(bounds).is_none());
     }
 }

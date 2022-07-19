@@ -26,7 +26,7 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::Listener;
 use all_is_cubes::math::{
-    Aab, Face6, FaceMap, FreeCoordinate, Grid, GridCoordinate, GridPoint, Rgb, Rgba,
+    Aab, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, Rgb, Rgba,
 };
 use all_is_cubes::mesh::chunked_mesh::{ChunkMesh, ChunkedSpaceMesh};
 use all_is_cubes::mesh::{DepthOrdering, SpaceMesh};
@@ -118,7 +118,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
 
         if self.light_texture.is_none() {
             todo.light = None; // signal to update everything
-            self.light_texture = Some(SpaceLightTexture::new(context, space.grid())?);
+            self.light_texture = Some(SpaceLightTexture::new(context, space.bounds())?);
         }
         let light_texture = self.light_texture.as_mut().unwrap();
 
@@ -128,12 +128,12 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         if let Some(set) = &mut todo.light {
             // TODO: work in larger, ahem, chunks
             for cube in set.drain() {
-                light_texture.update(space, Grid::new(cube, [1, 1, 1]))?;
+                light_texture.update(space, GridAab::new(cube, [1, 1, 1]))?;
                 light_update_count += 1;
             }
         } else {
             light_texture.update_all(space)?;
-            light_update_count += space.grid().volume();
+            light_update_count += space.bounds().volume();
             todo.light = Some(HashSet::new());
         }
         let end_light_update = Instant::now();
@@ -180,7 +180,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                     wireframe_vertices::<LinesVertex, _, _>(
                         &mut v,
                         palette::DEBUG_CHUNK_MAJOR,
-                        &Aab::from(chunk.grid()),
+                        &Aab::from(chunk.bounds()),
                     );
                 }
 
@@ -304,7 +304,7 @@ impl<'a, Backend: AicLumBackend> SpaceRendererOutput<'a, Backend> {
 }
 impl<'a, Backend: AicLumBackend> SpaceRendererOutputData<'a, Backend> {
     fn cull(&self, chunk: ChunkPos<CHUNK_SIZE>) -> bool {
-        self.camera.options().use_frustum_culling && !self.camera.aab_in_view(chunk.grid().into())
+        self.camera.options().use_frustum_culling && !self.camera.aab_in_view(chunk.bounds().into())
     }
 }
 impl<'a, Backend: AicLumBackend> SpaceRendererBound<'a, Backend> {
@@ -571,18 +571,18 @@ impl Listener<SpaceChange> for TodoListener {
 struct SpaceLightTexture<Backend: AicLumBackend> {
     texture: Texture<Backend, Dim3, NormRGBA8UI>,
     /// The region of cube coordinates for which there are valid texels.
-    texture_grid: Grid,
+    texture_bounds: GridAab,
 }
 
 impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
     /// Construct a new `SpaceLightTexture` for the specified size of [`Space`],
     /// with no data.
-    pub fn new<C>(context: &mut C, grid: Grid) -> Result<Self, TextureError>
+    pub fn new<C>(context: &mut C, bounds: GridAab) -> Result<Self, TextureError>
     where
         C: GraphicsContext<Backend = Backend>,
     {
         // Boundary of 1 extra cube automatically captures sky light.
-        let texture_grid = grid.expand(FaceMap {
+        let texture_bounds = bounds.expand(FaceMap {
             px: 1,
             py: 1,
             pz: 1,
@@ -592,18 +592,18 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
             within: 0,
         });
         let texture = context.new_texture(
-            texture_grid.unsigned_size().into(),
+            texture_bounds.unsigned_size().into(),
             Sampler::default(), // sampler options don't matter because we're using texelFetch()
             TexelUpload::reserve(0),
         )?;
         Ok(Self {
             texture,
-            texture_grid,
+            texture_bounds,
         })
     }
 
     /// Copy the specified region of light data.
-    pub fn update(&mut self, space: &Space, region: Grid) -> Result<(), TextureError> {
+    pub fn update(&mut self, space: &Space, region: GridAab) -> Result<(), TextureError> {
         let mut data = Vec::with_capacity(region.volume());
         // TODO: Enable circular operation and eliminate the need for the offset of the
         // coordinates (texture_grid.lower_bounds() and light_offset in the shader)
@@ -618,7 +618,7 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
             }
         }
         self.texture.upload_part(
-            (region.lower_bounds() - self.texture_grid.lower_bounds())
+            (region.lower_bounds() - self.texture_bounds.lower_bounds())
                 .map(|s| s as u32)
                 .into(),
             region.unsigned_size().into(),
@@ -627,7 +627,7 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
     }
 
     pub fn update_all(&mut self, space: &Space) -> Result<(), TextureError> {
-        self.update(space, self.texture_grid)
+        self.update(space, self.texture_bounds)
     }
 
     fn bind<'a>(
@@ -636,7 +636,7 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
     ) -> Result<SpaceLightTextureBound<'a, Backend>, PipelineError> {
         Ok(SpaceLightTextureBound {
             texture: pipeline.bind_texture(&mut self.texture)?,
-            offset: -self.texture_grid.lower_bounds().to_vec(),
+            offset: -self.texture_bounds.lower_bounds().to_vec(),
         })
     }
 }

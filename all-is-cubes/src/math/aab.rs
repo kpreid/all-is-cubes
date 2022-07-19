@@ -7,12 +7,12 @@ use std::iter::FusedIterator;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
 
-use crate::math::{Face6, FreeCoordinate, Geometry, Grid, GridCoordinate, GridPoint, Rgba};
+use crate::math::{Face6, FreeCoordinate, Geometry, GridAab, GridCoordinate, GridPoint, Rgba};
 
 /// Axis-Aligned Box data type.
 ///
 /// Note that this has continuous coordinates, and a discrete analogue exists as
-/// [`Grid`](crate::math::Grid).
+/// [`GridAab`].
 #[derive(Copy, Clone, PartialEq)]
 pub struct Aab {
     // TODO: Should we be using NotNan coordinates?
@@ -72,7 +72,7 @@ impl Aab {
         Self { lower_bounds, upper_bounds, sizes }
     }
 
-    /// Returns the AAB of a given cube in the interpretation used by [`Grid`] and
+    /// Returns the AAB of a given cube in the interpretation used by [`GridAab`] and
     /// [`Space`](crate::space::Space); that is, a unit cube extending in the positive
     /// directions from the given point.
     ///
@@ -208,7 +208,7 @@ impl Aab {
     /// Enlarges the AAB by moving each face outward by the specified distance.
     ///
     /// Panics if the distance is negative or NaN.
-    /// (TODO: Change that, and reconcile the incidental differences with Grid::expand.)
+    /// (TODO: Change that, and reconcile the incidental differences with [`GridAab::expand()`].)
     ///
     /// ```
     /// use all_is_cubes::math::Aab;
@@ -251,28 +251,28 @@ impl Aab {
         leading_corner
     }
 
-    /// Construct the [`Grid`] containing all cubes this [`Aab`] intersects.
+    /// Construct the [`GridAab`] containing all cubes this [`Aab`] intersects.
     ///
     /// Grid cubes are considered to be half-open ranges, so, for example, an [`Aab`] with
     /// exact integer bounds on some axis will convert exactly as one might intuitively
     /// expect, while non-integer bounds will be rounded outward:
     ///
     /// ```
-    /// use all_is_cubes::math::{Aab, Grid};
+    /// use all_is_cubes::math::{Aab, GridAab};
     ///
-    /// let grid = Aab::from_lower_upper([3.0, 0.5, 0.0], [5.0, 1.5, 1.0])
+    /// let grid_aab = Aab::from_lower_upper([3.0, 0.5, 0.0], [5.0, 1.5, 1.0])
     ///     .round_up_to_grid();
-    /// assert_eq!(grid, Grid::from_lower_upper([3, 0, 0], [5, 2, 1]));
+    /// assert_eq!(grid_aab, GridAab::from_lower_upper([3, 0, 0], [5, 2, 1]));
     ///
-    /// assert!(grid.contains_cube([4, 1, 0]));
-    /// assert!(!grid.contains_cube([5, 1, 0]));
+    /// assert!(grid_aab.contains_cube([4, 1, 0]));
+    /// assert!(!grid_aab.contains_cube([5, 1, 0]));
     /// ```
     ///
     /// If the floating-point coordinates are out of [`GridCoordinate`]'s numeric range,
     /// then they will be clamped.
     ///
     /// ```
-    /// # use all_is_cubes::math::{Aab, Grid};
+    /// # use all_is_cubes::math::{Aab, GridAab};
     /// use all_is_cubes::math::{FreeCoordinate, GridCoordinate};
     ///
     /// assert_eq!(
@@ -280,20 +280,20 @@ impl Aab {
     ///         [3.0, 0.0, 0.0],
     ///         [(GridCoordinate::MAX as FreeCoordinate) * 10.0, 1.0, 1.0],
     ///     ).round_up_to_grid(),
-    ///     Grid::from_lower_upper([3, 0, 0], [GridCoordinate::MAX, 1, 1]),
+    ///     GridAab::from_lower_upper([3, 0, 0], [GridCoordinate::MAX, 1, 1]),
     /// );
     /// assert_eq!(
     ///     Aab::from_lower_upper(
     ///         [3.0, 0.0, 0.0],
     ///         [FreeCoordinate::INFINITY, 1.0, 1.0],
     ///     ).round_up_to_grid(),
-    ///     Grid::from_lower_upper([3, 0, 0], [GridCoordinate::MAX, 1, 1]),
+    ///     GridAab::from_lower_upper([3, 0, 0], [GridCoordinate::MAX, 1, 1]),
     /// );
     /// ```
     ///
     /// (There is no handling of NaN, because [`Aab`] does not allow NaN values.)
-    pub fn round_up_to_grid(self) -> Grid {
-        Grid::from_lower_upper(
+    pub fn round_up_to_grid(self) -> GridAab {
+        GridAab::from_lower_upper(
             self.lower_bounds.map(|c| c.floor() as GridCoordinate),
             self.upper_bounds.map(|c| c.ceil() as GridCoordinate),
         )
@@ -359,7 +359,8 @@ mod tests {
     use super::*;
 
     #[test]
-    /// Test `Debug` formatting. Note this should be similar to the [`Grid`] formatting.
+    /// Test `Debug` formatting. Note this should be similar to the [`GridAab`]
+    /// formatting.
     fn aab_debug() {
         let aab = Aab::new(1.0000001, 2.0, 3.0, 4.0, 5.0, 6.0);
         assert_eq!(

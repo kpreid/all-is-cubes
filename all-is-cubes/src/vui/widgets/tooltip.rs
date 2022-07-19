@@ -15,7 +15,7 @@ use once_cell::sync::Lazy;
 use crate::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
 use crate::character::{Character, CharacterChange};
 use crate::listen::{FnListener, Gate, Listener};
-use crate::math::{Grid, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
 use crate::universe::{URef, Universe};
@@ -197,7 +197,7 @@ impl TooltipWidget {
         universe: &mut Universe,
     ) -> Arc<Self> {
         let width_in_hud = 25; // TODO: magic number
-        let text_space = Space::builder(Grid::new(
+        let text_space = Space::builder(GridAab::new(
             GridPoint::origin(),
             GridVector::new(
                 width_in_hud * GridCoordinate::from(Self::RESOLUTION),
@@ -236,7 +236,7 @@ impl Widget for TooltipWidget {
 #[derive(Debug)]
 struct TooltipController {
     definition: Arc<TooltipWidget>,
-    position: Grid,
+    position: GridAab,
 }
 
 impl WidgetController for TooltipController {
@@ -284,8 +284,8 @@ impl WidgetController for TooltipController {
 
         if let Some(text) = text_update {
             self.definition.text_space.try_modify(|text_space| {
-                let grid = text_space.grid();
-                text_space.fill_uniform(grid, &AIR).unwrap();
+                let bounds = text_space.bounds();
+                text_space.fill_uniform(bounds, &AIR).unwrap();
 
                 // Note on dimensions: HudFont is currently 13 pixels tall, and we're using
                 // the standard 16-voxel space resolution, and hud_blocks.text has a 1-pixel border,
@@ -293,7 +293,7 @@ impl WidgetController for TooltipController {
                 // the top edge.
                 let text_obj = Text::with_text_style(
                     &text,
-                    Point::new(grid.size().x / 2, -1),
+                    Point::new(bounds.size().x / 2, -1),
                     MonoTextStyle::new(&HudFont, &self.definition.hud_blocks.text),
                     TextStyleBuilder::new()
                         .baseline(Baseline::Bottom)

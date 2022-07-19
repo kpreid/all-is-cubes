@@ -18,7 +18,7 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
-use crate::math::{Face6, FreeCoordinate, Grid, GridCoordinate, GridMatrix, GridRotation, Rgba};
+use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridRotation, Rgba};
 use crate::space::{Space, SpacePhysics};
 use crate::universe::{URef, Universe, UniverseIndex};
 use crate::util::YieldProgress;
@@ -44,7 +44,7 @@ pub(crate) struct HudLayout {
 }
 
 impl HudLayout {
-    /// Construct HudLayout with a grid size that suits the given viewport
+    /// Construct HudLayout with a size that suits the given viewport
     /// (based on pixel resolution and aspect ratio)
     pub fn new(viewport: Viewport) -> Self {
         // Note: Dimensions are enforced to be odd so that the crosshair can work.
@@ -62,8 +62,8 @@ impl HudLayout {
         }
     }
 
-    pub(crate) fn grid(&self) -> Grid {
-        Grid::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
+    pub(crate) fn bounds(&self) -> GridAab {
+        GridAab::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
     }
 
     // TODO: taking the entire Universe doesn't seem like the best interface
@@ -75,8 +75,8 @@ impl HudLayout {
         _hud_blocks: &HudBlocks,
     ) -> URef<Space> {
         let Vector2 { x: w, y: h } = self.size;
-        let grid = self.grid();
-        let mut space = Space::builder(grid)
+        let bounds = self.bounds();
+        let mut space = Space::builder(bounds)
             .physics(SpacePhysics {
                 sky_color: palette::HUD_SKY,
                 ..SpacePhysics::default()
@@ -88,15 +88,15 @@ impl HudLayout {
             let mut add_frame = |z, color| {
                 let frame_block = Block::from(color);
                 space
-                    .fill_uniform(Grid::new((0, 0, z), (w, h, 1)), frame_block)
+                    .fill_uniform(GridAab::new((0, 0, z), (w, h, 1)), frame_block)
                     .unwrap();
                 space
-                    .fill_uniform(Grid::new((1, 1, z), (w - 2, h - 2, 1)), &AIR)
+                    .fill_uniform(GridAab::new((1, 1, z), (w - 2, h - 2, 1)), &AIR)
                     .unwrap();
             };
-            add_frame(grid.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
+            add_frame(bounds.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
             add_frame(-1, Rgba::new(0.5, 0.5, 0.5, 1.));
-            add_frame(grid.upper_bounds().z - 1, Rgba::new(0., 1., 1., 1.));
+            add_frame(bounds.upper_bounds().z - 1, Rgba::new(0., 1., 1., 1.));
         }
 
         universe.insert("hud".into(), space).unwrap()
@@ -127,7 +127,7 @@ pub(super) fn new_hud_space(
     hud_space
         .execute(
             &widget_tree
-                .perform_layout(LayoutGrant::new(hud_layout.grid()))
+                .perform_layout(LayoutGrant::new(hud_layout.bounds()))
                 .expect("layout/widget error")
                 .installation()
                 .expect("installation error"),
@@ -316,10 +316,10 @@ impl HudBlocks {
         let frame_count = 4;
         let frame_spacing_blocks = 2;
 
-        let toolbar_frame_block_grid =
-            Grid::new([-1, -1, -1], [1 + frame_count * frame_spacing_blocks, 3, 3]);
-        let toolbar_frame_voxel_grid = toolbar_frame_block_grid.multiply(resolution_g);
-        let mut toolbar_drawing_space = Space::builder(toolbar_frame_voxel_grid)
+        let toolbar_frame_block_bounds =
+            GridAab::new([-1, -1, -1], [1 + frame_count * frame_spacing_blocks, 3, 3]);
+        let toolbar_frame_voxel_bounds = toolbar_frame_block_bounds.multiply(resolution_g);
+        let mut toolbar_drawing_space = Space::builder(toolbar_frame_voxel_bounds)
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
             .build_empty();
 
@@ -396,7 +396,7 @@ impl HudBlocks {
         .unwrap();
 
         // TODO: Make this a feature of VoxelBrush?
-        let slice_drawing = |points: Grid| {
+        let slice_drawing = |points: GridAab| {
             VoxelBrush::new(
                 points
                     .interior_iter()
@@ -408,14 +408,14 @@ impl HudBlocks {
         Self {
             icons,
             text: text_brush,
-            toolbar_middle: slice_drawing(Grid::from_lower_upper((0, -1, -1), (1, 2, 2))),
-            toolbar_divider: slice_drawing(Grid::from_lower_upper((1, -1, -1), (2, 2, 2)))
+            toolbar_middle: slice_drawing(GridAab::from_lower_upper((0, -1, -1), (1, 2, 2))),
+            toolbar_divider: slice_drawing(GridAab::from_lower_upper((1, -1, -1), (2, 2, 2)))
                 .translate((-1, 0, 0)),
-            toolbar_left_cap: slice_drawing(Grid::from_lower_upper((-1, -1, -1), (0, 2, 2)))
+            toolbar_left_cap: slice_drawing(GridAab::from_lower_upper((-1, -1, -1), (0, 2, 2)))
                 .translate((1, 0, 0)),
             // Right cap comes from the right end of the frames
             toolbar_right_cap: slice_drawing(
-                Grid::from_lower_upper((1, -1, -1), (2, 2, 2)).translate([
+                GridAab::from_lower_upper((1, -1, -1), (2, 2, 2)).translate([
                     frame_spacing_blocks * (frame_count - 1),
                     0,
                     0,
@@ -425,7 +425,7 @@ impl HudBlocks {
             toolbar_pointer: {
                 (0..frame_count)
                     .map(|i| {
-                        slice_drawing(Grid::new([i * frame_spacing_blocks, 1, -1], [1, 1, 3]))
+                        slice_drawing(GridAab::new([i * frame_spacing_blocks, 1, -1], [1, 1, 3]))
                             .translate([-(i * frame_spacing_blocks), 0, 0])
                     })
                     .collect::<Vec<_>>()

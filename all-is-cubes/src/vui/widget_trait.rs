@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
 use crate::inv::EphemeralOpaque;
-use crate::math::Grid;
+use crate::math::GridAab;
 use crate::space::{Space, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::{Merge as _, TransactionConflict};
@@ -175,7 +175,7 @@ pub enum InstallVuiError {
         grant: LayoutGrant,
 
         /// The region the widget attempted to modify.
-        erroneous: Grid,
+        erroneous: GridAab,
 
         /// The widget.
         widget: Arc<dyn Widget>,
@@ -191,7 +191,7 @@ pub enum InstallVuiError {
 /// TODO: Make the better version of this public
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ActivatableRegion {
-    pub(crate) region: Grid,
+    pub(crate) region: GridAab,
     pub(crate) effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 

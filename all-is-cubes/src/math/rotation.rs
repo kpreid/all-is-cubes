@@ -284,14 +284,14 @@ impl GridRotation {
     /// Expresses this rotation as a matrix which rotates “in place” the
     /// points within the volume defined by coordinates in the range [0, size].
     ///
-    /// That is, a `Grid` of that volume will be unchanged by rotation:
+    /// That is, a [`GridAab`] of that volume will be unchanged by rotation:
     ///
     /// ```
-    /// use all_is_cubes::math::{Grid, GridRotation};
+    /// use all_is_cubes::math::{GridAab, GridRotation};
     ///
-    /// let grid = Grid::for_block(8);
+    /// let b = GridAab::for_block(8);
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_matrix(8);
-    /// assert_eq!(grid.transform(rotation), Some(grid));
+    /// assert_eq!(b.transform(rotation), Some(b));
     /// ```
     ///
     /// Such matrices are suitable for rotating the voxels of a block, provided
@@ -299,7 +299,7 @@ impl GridRotation {
     /// *not* [`GridMatrix::transform_point`](cgmath::Transform::transform_point)
     /// (due to the lower-corner format of cube coordinates).
     /// ```
-    /// # use all_is_cubes::math::{Grid, GridPoint, GridRotation};
+    /// # use all_is_cubes::math::{GridAab, GridPoint, GridRotation};
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_matrix(4);
     /// assert_eq!(rotation.transform_cube(GridPoint::new(0, 0, 0)), GridPoint::new(3, 0, 0));
     /// assert_eq!(rotation.transform_cube(GridPoint::new(3, 0, 0)), GridPoint::new(3, 0, 3));

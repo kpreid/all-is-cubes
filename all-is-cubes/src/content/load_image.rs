@@ -12,7 +12,7 @@ use image::{DynamicImage, GenericImageView};
 
 use crate::block::Block;
 use crate::drawing::VoxelBrush;
-use crate::math::{Grid, GridPoint, GridRotation, Rgba};
+use crate::math::{GridAab, GridPoint, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
 
 /// Take the pixels of the image and construct a [`Space`] from it.
@@ -37,7 +37,7 @@ where
 
     // Collect all colors so we know the brush sizes and have memoized them
     let mut brushes: HashMap<I::Pixel, VoxelBrush<'b>> = HashMap::new();
-    let mut max_brush: Option<Grid> = None;
+    let mut max_brush: Option<GridAab> = None;
     for (_, _, pixel) in image.pixels() {
         let brush = brushes
             .entry(pixel)
@@ -52,13 +52,13 @@ where
     // Note: This strategy will overestimate the size in case a brush has X/Y size but is
     // never used near the edge. To fix that, we should use a dynamically resized Space
     // instead of this pessimistic choice.
-    let bounds: Grid = Grid::from_lower_upper(
+    let bounds: GridAab = GridAab::from_lower_upper(
         [0, 0, 0],
         [image.width() as i32 - 1, image.height() as i32 - 1, 0],
     )
     .transform(transform)
     .unwrap()
-    .minkowski_sum(max_brush.unwrap_or_else(|| Grid::new([0, 0, 0], [0, 0, 0])))
+    .minkowski_sum(max_brush.unwrap_or_else(|| GridAab::new([0, 0, 0], [0, 0, 0])))
     .unwrap();
 
     let mut space = Space::builder(bounds)
@@ -114,7 +114,10 @@ mod tests {
     fn basic_image() {
         let image = test_image();
         let space = space_from_image(&image, GridRotation::IDENTITY, default_srgb).unwrap();
-        assert_eq!(space.grid(), Grid::from_lower_upper([0, 0, 0], [2, 2, 1]));
+        assert_eq!(
+            space.bounds(),
+            GridAab::from_lower_upper([0, 0, 0], [2, 2, 1])
+        );
         assert_eq!(space[(1, 0, 0)], Block::from(Rgb::new(1., 0., 0.)));
     }
 
@@ -125,7 +128,10 @@ mod tests {
             default_srgb(pixel).translate([10, 0, 0])
         })
         .unwrap();
-        assert_eq!(space.grid(), Grid::from_lower_upper([10, 0, 0], [12, 2, 1]));
+        assert_eq!(
+            space.bounds(),
+            GridAab::from_lower_upper([10, 0, 0], [12, 2, 1])
+        );
         assert_eq!(space[(11, 0, 0)], Block::from(Rgb::new(1., 0., 0.)));
     }
 }

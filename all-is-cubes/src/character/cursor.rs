@@ -28,7 +28,7 @@ pub fn cursor_raycast(
 ) -> Option<Cursor> {
     ray.direction = ray.direction.normalize();
     let space = space_ref.try_borrow().ok()?;
-    for step in ray.cast().within_grid(space.grid()) {
+    for step in ray.cast().within(space.bounds()) {
         if step.t_distance() > maximum_distance {
             break;
         }

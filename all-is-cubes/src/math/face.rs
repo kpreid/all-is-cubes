@@ -1,7 +1,7 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-//! Grid unit vectors: the [`Face6`] and [`Face7`] types.
+//! Axis-aligned unit vectors: the [`Face6`] and [`Face7`] types.
 //! This module is private but reexported by its parent.
 
 use std::ops::{Index, IndexMut};

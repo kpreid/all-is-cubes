@@ -134,14 +134,14 @@ impl Vui {
     /// TODO: This is not a method because the code structure makes it inconvenient for
     /// renderers to get access to `Vui` itself. Add some other communication path.
     pub fn view_transform(space: &Space, fov_y: Deg<FreeCoordinate>) -> ViewTransform {
-        let grid = space.grid();
-        let mut ui_center = grid.center();
+        let bounds = space.bounds();
+        let mut ui_center = bounds.center();
 
         // Arrange a view distance which will place the Z=0 plane sized to fill the viewport
         // (at least vertically, as we don't have aspect ratio support yet).
         ui_center.z = 0.0;
 
-        let view_distance = FreeCoordinate::from(grid.size().y) * (fov_y / 2.).cot() / 2.;
+        let view_distance = FreeCoordinate::from(bounds.size().y) * (fov_y / 2.).cot() / 2.;
         Decomposed::look_at_rh(
             ui_center + Vector3::new(0., 0., view_distance),
             ui_center,

@@ -3,7 +3,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use all_is_cubes::math::Grid;
+use all_is_cubes::math::GridAab;
 use all_is_cubes::raycast::Raycaster;
 
 pub fn raycast_bench(c: &mut Criterion) {
@@ -27,36 +27,36 @@ pub fn raycast_bench(c: &mut Criterion) {
         b.iter(|| Raycaster::new(black_box((0.0, -0.25, -0.5)), black_box((1.0, 1.0, 1.0))))
     });
 
-    c.bench_function("raycast: initialization with grid (inside)", |b| {
+    c.bench_function("raycast: initialization with bounds (inside)", |b| {
         b.iter(|| {
             Raycaster::new(black_box((0.0, -0.25, -0.5)), black_box((1.0, 1.0, 1.0)))
-                .within_grid(Grid::new((-1, -2, -3), (4, 5, 6)))
+                .within(GridAab::new((-1, -2, -3), (4, 5, 6)))
         })
     });
 
-    c.bench_function("raycast: initialization with grid (outside)", |b| {
+    c.bench_function("raycast: initialization with bounds (outside)", |b| {
         b.iter(|| {
             Raycaster::new(black_box((0.0, -0.25, -0.5)), black_box((1.0, 1.0, 1.0)))
-                .within_grid(Grid::new((101, 102, 103), (4, 5, 6)))
+                .within(GridAab::new((101, 102, 103), (4, 5, 6)))
         })
     });
 
-    c.bench_function("raycast: many steps inside a grid", |b| {
+    c.bench_function("raycast: many steps inside bounds", |b| {
         b.iter(|| {
             let mut raycaster =
                 Raycaster::new(black_box((0.5, 0.5, 0.5)), black_box((1.0, 0.3, 0.7)))
-                    .within_grid(Grid::new((0, 0, 0), (100, 1000, 1000)));
+                    .within(GridAab::new((0, 0, 0), (100, 1000, 1000)));
             for _ in 1..100 {
                 black_box(raycaster.next());
             }
         })
     });
 
-    c.bench_function("raycast: many steps from outside a grid", |b| {
+    c.bench_function("raycast: many steps from outside bounds", |b| {
         b.iter(|| {
             let mut raycaster =
                 Raycaster::new(black_box((-50.0, 0.5, 0.5)), black_box((1.0, 0.3, 0.7)))
-                    .within_grid(Grid::new((0, 0, 0), (100, 1000, 1000)));
+                    .within(GridAab::new((0, 0, 0), (100, 1000, 1000)));
             for _ in 1..100 {
                 black_box(raycaster.next());
             }

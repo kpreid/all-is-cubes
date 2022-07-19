@@ -18,7 +18,7 @@ mod tests {
     use super::*;
     use crate::block::{Resolution, AIR};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::{Aab, CubeFace, Face7, Geometry, Grid, GridPoint};
+    use crate::math::{Aab, CubeFace, Face7, Geometry, GridAab, GridPoint};
     use crate::space::{Space, SpacePhysics};
     use crate::time::Tick;
     use crate::universe::Universe;
@@ -187,9 +187,9 @@ mod tests {
     #[test]
     fn no_passing_through_blocks() {
         // Construct cubical box. TODO: worldgen utilities for this?
-        let mut space = Space::empty(Grid::new((-1, -1, -1), (3, 3, 3)));
+        let mut space = Space::empty(GridAab::new((-1, -1, -1), (3, 3, 3)));
         let [wall_block] = make_some_blocks();
-        space.fill_uniform(space.grid(), &wall_block).unwrap();
+        space.fill_uniform(space.bounds(), &wall_block).unwrap();
         space.set([0, 0, 0], &AIR).unwrap();
 
         let one_test = |velocity: Vector3<FreeCoordinate>| {

@@ -354,7 +354,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SpaceRaytracer")
             .field("blocks.len", &self.blocks.len())
-            .field("cubes.grid", &self.cubes.grid())
+            .field("cubes.bounds", &self.cubes.bounds())
             .field("graphics_options", &self.graphics_options)
             .field("custom_options", &self.custom_options)
             .field("sky_color", &self.sky_color)
@@ -399,7 +399,7 @@ impl CustomFormat<StatusText> for RaytraceInfo {
 /// Get cube data out of [`Space`].
 #[inline]
 fn prepare_cubes(space: &Space) -> GridArray<TracingCubeData> {
-    space.extract(space.grid(), |index, block_data, lighting| {
+    space.extract(space.bounds(), |index, block_data, lighting| {
         TracingCubeData {
             block_index: index.unwrap(),
             lighting,

@@ -4,7 +4,7 @@
 //! [`GltfTextureAllocator`], produces glTF-compatible textures for blocks.
 
 use all_is_cubes::cgmath::Vector3;
-use all_is_cubes::math::Grid;
+use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
 #[derive(Debug)]
@@ -19,8 +19,8 @@ impl GltfTextureAllocator {
 impl TextureAllocator for GltfTextureAllocator {
     type Tile = GltfTextureRef;
 
-    fn allocate(&mut self, _grid: Grid) -> Option<GltfTextureRef> {
-        //let result = GltfTextureRef { grid };
+    fn allocate(&mut self, _bounds: GridAab) -> Option<GltfTextureRef> {
+        //let result = GltfTextureRef { bounds };
         //Some(result)
         None // TODO: placeholder
     }
@@ -28,7 +28,7 @@ impl TextureAllocator for GltfTextureAllocator {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct GltfTextureRef {
-    pub(crate) grid: Grid,
+    pub(crate) bounds: GridAab,
 }
 
 impl TextureTile for GltfTextureRef {
@@ -36,8 +36,8 @@ impl TextureTile for GltfTextureRef {
         // TODO: write textures
     }
 
-    fn grid(&self) -> Grid {
-        self.grid
+    fn bounds(&self) -> GridAab {
+        self.bounds
     }
 
     fn grid_to_texcoord(

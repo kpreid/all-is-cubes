@@ -5,25 +5,25 @@ use cgmath::{EuclideanSpace, InnerSpace, Point3};
 
 use crate::character::Spawn;
 use crate::math::{FreeCoordinate, Rgb};
-use crate::space::{Grid, LightPhysics, Space, SpacePhysics};
+use crate::space::{GridAab, LightPhysics, Space, SpacePhysics};
 
 /// Tool for constructing new [`Space`]s.
 ///
-/// To create one, call [`Space::builder(grid)`](Space::builder).
+/// To create one, call [`Space::builder()`](Space::builder).
 ///
 /// TODO: Allow specifying behaviors and initial block contents.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
 pub struct SpaceBuilder {
-    pub(super) grid: Grid,
+    pub(super) bounds: GridAab,
     pub(super) spawn: Option<Spawn>,
     pub(super) physics: SpacePhysics,
 }
 
 impl SpaceBuilder {
-    pub(super) const fn new(grid: Grid) -> Self {
+    pub(super) const fn new(bounds: GridAab) -> Self {
         Self {
-            grid,
+            bounds,
             spawn: None,
             physics: SpacePhysics::DEFAULT,
         }
@@ -69,10 +69,10 @@ impl SpaceBuilder {
             "spawn_position must be finite"
         );
 
-        let grid = self.grid;
+        let bounds = self.bounds;
         let mut spawn = self
             .spawn
-            .unwrap_or_else(|| Spawn::default_for_new_space(grid));
+            .unwrap_or_else(|| Spawn::default_for_new_space(bounds));
         spawn.set_eye_position(position);
         self.spawn = Some(spawn);
         self
@@ -93,8 +93,8 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
 
         // TODO: Should be reusing GridArray as Arbitrary for this.
 
-        let grid = Grid::arbitrary_with_max_volume(u, 2048)?;
-        let mut space = Space::builder(grid)
+        let bounds = GridAab::arbitrary_with_max_volume(u, 2048)?;
+        let mut space = Space::builder(bounds)
             .physics(u.arbitrary()?)
             .spawn(u.arbitrary()?)
             .build_empty();
@@ -110,7 +110,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
         // Fill space with blocks
         let mut failure = None;
         space
-            .fill(space.grid(), |_| {
+            .fill(space.bounds(), |_| {
                 match u.choose(&blocks) {
                     Ok(block) => Some(block),
                     Err(e) => {

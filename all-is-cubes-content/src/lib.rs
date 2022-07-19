@@ -39,7 +39,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::{draw_to_blocks, VoxelColor};
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    cube_to_midpoint, point_to_enclosing_cube, Face6, FaceMap, FreeCoordinate, Grid, GridArray,
+    cube_to_midpoint, point_to_enclosing_cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray,
     GridCoordinate, GridMatrix, GridPoint, GridVector,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceTransaction};
@@ -78,7 +78,7 @@ fn draw_text_in_blocks<'a, C: Clone + VoxelColor<'a>>(
     max_length_in_blocks: GridCoordinate,
     transform: GridMatrix,
     text: &Text<'a, MonoTextStyle<'a, C>>,
-) -> Result<Grid, InGenError> {
+) -> Result<GridAab, InGenError> {
     let resolution_g: GridCoordinate = resolution.into();
     let character_height = text.character_style.font.character_size.height as GridCoordinate;
     let text_width_in_voxels = text.bounding_box().size.width as GridCoordinate;
@@ -100,12 +100,12 @@ fn draw_text_in_blocks<'a, C: Clone + VoxelColor<'a>>(
             (character_height - resolution_g) / 2,
         )),
     )?;
-    let truncated_block_grid = name_blocks
-        .grid()
-        .intersection(Grid::new([0, 0, 0], [max_length_in_blocks, 1, 1]))
+    let truncated_block_box = name_blocks
+        .bounds()
+        .intersection(GridAab::new([0, 0, 0], [max_length_in_blocks, 1, 1]))
         .unwrap();
-    space_to_space_copy(&name_blocks, truncated_block_grid, space, transform)?;
-    Ok(truncated_block_grid)
+    space_to_space_copy(&name_blocks, truncated_block_box, space, transform)?;
+    Ok(truncated_block_box)
 }
 
 /// Create a function to define texture in a block, based on a set of points
@@ -133,7 +133,7 @@ pub(crate) fn voronoi_pattern<'a>(
     // goals of this function.
 
     let mut pattern: GridArray<(FreeCoordinate, &Block)> =
-        GridArray::from_fn(Grid::for_block(resolution), |_| (f64::INFINITY, &AIR));
+        GridArray::from_fn(GridAab::for_block(resolution), |_| (f64::INFINITY, &AIR));
     let mut flood_fill_todo = HashSet::new();
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);
@@ -182,9 +182,9 @@ pub(crate) fn voronoi_pattern<'a>(
 /// TODO: There is probably other worldgen code that should be using this now that we've invented it.
 ///
 /// TODO: Change the callback value to a struct
-pub(crate) fn four_walls<F, E>(bounding_box: Grid, mut f: F) -> Result<(), E>
+pub(crate) fn four_walls<F, E>(bounding_box: GridAab, mut f: F) -> Result<(), E>
 where
-    F: FnMut(GridPoint, Face6, GridCoordinate, Grid) -> Result<(), E>,
+    F: FnMut(GridPoint, Face6, GridCoordinate, GridAab) -> Result<(), E>,
 {
     let interior = bounding_box.expand(FaceMap::symmetric([-1, 0, -1]));
     let low = bounding_box.lower_bounds();
@@ -215,7 +215,7 @@ where
 // TODO: this should probably be in main all-is-cubes crate
 fn space_to_space_copy(
     src: &Space,
-    src_grid: Grid,
+    src_bounds: GridAab,
     dst: &mut Space,
     src_to_dst_transform: GridMatrix,
 ) -> Result<(), SetCubeError> {
@@ -224,7 +224,7 @@ fn space_to_space_copy(
     let (block_rotation, _) = src_to_dst_transform
         .decompose()
         .expect("could not decompose transform");
-    dst.fill(src_grid.transform(src_to_dst_transform).unwrap(), |p| {
+    dst.fill(src_bounds.transform(src_to_dst_transform).unwrap(), |p| {
         Some(
             src[dst_to_src_transform.transform_cube(p)]
                 .clone()
@@ -236,7 +236,7 @@ fn space_to_space_copy(
 /// As [`space_to_space_copy`], but producing a transaction.
 pub(crate) fn space_to_transaction_copy(
     src: &Space,
-    src_grid: Grid,
+    src_bounds: GridAab,
     src_to_dst_transform: GridMatrix,
 ) -> SpaceTransaction {
     // TODO: don't panic
@@ -245,7 +245,7 @@ pub(crate) fn space_to_transaction_copy(
         .expect("could not decompose transform");
 
     let mut txn = SpaceTransaction::default();
-    for cube in src_grid.interior_iter() {
+    for cube in src_bounds.interior_iter() {
         // TODO: provide control over what the old-values are
         txn.set(
             src_to_dst_transform.transform_cube(cube),

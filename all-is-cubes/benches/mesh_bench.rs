@@ -5,7 +5,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::math::{Grid, Rgba};
+use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::mesh::{
     triangulate_block, triangulate_blocks, triangulate_space, BlockMeshes, BlockVertex,
     MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile,
@@ -60,7 +60,7 @@ fn mesh_benches(c: &mut Criterion) {
         // are shared between all cases.
         b.iter_batched_ref(
             || (),
-            |()| triangulate_space(&space, space.grid(), options, &*block_meshes),
+            |()| triangulate_space(&space, space.bounds(), options, &*block_meshes),
             BatchSize::SmallInput,
         );
     });
@@ -70,7 +70,7 @@ fn mesh_benches(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let mut buffer = SpaceMesh::new();
-                buffer.compute(&space, space.grid(), options, &*block_meshes);
+                buffer.compute(&space, space.bounds(), options, &*block_meshes);
                 // Sanity check that we're actually rendering as much as we expect.
                 assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
                 buffer
@@ -81,7 +81,7 @@ fn mesh_benches(c: &mut Criterion) {
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
                 // and so this will become a meaningful benchmark of how much CPU time we're
                 // spending or saving on that.
-                buffer.compute(&space, space.grid(), options, &*block_meshes)
+                buffer.compute(&space, space.bounds(), options, &*block_meshes)
             },
             BatchSize::SmallInput,
         );
@@ -94,7 +94,7 @@ fn mesh_benches(c: &mut Criterion) {
         let (space, block_meshes) = checkerboard_space_bench_setup(options, true);
         b.iter_batched_ref(
             || (),
-            |()| triangulate_space(&space, space.grid(), options, &*block_meshes),
+            |()| triangulate_space(&space, space.bounds(), options, &*block_meshes),
             BatchSize::SmallInput,
         );
     });
@@ -125,10 +125,10 @@ fn checkerboard_block(universe: &mut Universe, voxels: [Block; 2]) -> Block {
 }
 
 fn checkerboard_space(blocks: [Block; 2]) -> Space {
-    let grid = Grid::new([0, 0, 0], [16, 16, 16]);
-    let mut space = Space::empty(grid);
+    let bounds = GridAab::new([0, 0, 0], [16, 16, 16]);
+    let mut space = Space::empty(bounds);
     space
-        .fill(grid, |p| {
+        .fill(bounds, |p| {
             Some(&blocks[((p.x + p.y + p.z) as usize).rem_euclid(blocks.len())])
         })
         .unwrap();

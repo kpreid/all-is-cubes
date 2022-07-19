@@ -8,7 +8,7 @@ use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::content::free_editing_starter_inventory;
 use crate::linking::InGenError;
-use crate::math::{Face7, FaceMap, Grid, Rgb};
+use crate::math::{Face7, FaceMap, GridAab, Rgb};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 
@@ -25,7 +25,7 @@ pub fn lighting_bench_space(_universe: &mut Universe) -> Result<Space, InGenErro
     let side_length_in_blocks = section_spacing * array_side_length + margin;
     let yup = 4;
     let ydown = 10;
-    let space_bounds = Grid::from_lower_upper(
+    let space_bounds = GridAab::from_lower_upper(
         [0, -ydown - 1, 0],
         [side_length_in_blocks, yup + 1, side_length_in_blocks],
     );
@@ -52,7 +52,7 @@ pub fn lighting_bench_space(_universe: &mut Universe) -> Result<Space, InGenErro
             // Independent RNG for each section, so that the number of values used doesn't
             // affect the next section.
             let mut rng = Xoshiro256Plus::seed_from_u64((sx + sz * array_side_length) as u64);
-            let section_bounds = Grid::new(
+            let section_bounds = GridAab::new(
                 [
                     margin + sx * section_spacing,
                     -ydown + 1,

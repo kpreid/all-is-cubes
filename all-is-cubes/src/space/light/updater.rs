@@ -16,7 +16,7 @@ use crate::block::EvaluatedBlock;
 use crate::math::{Face6, Face7, FaceMap, FreeCoordinate, Geometry, GridPoint, NotNan, Rgb};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::LightUpdateRayInfo;
-use crate::space::{Grid, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
+use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
 use crate::util::{CustomFormat, StatusText};
 
 /// This parameter determines to what degree absorption of light due to a block surface's
@@ -85,7 +85,7 @@ impl Space {
             return;
         }
 
-        if self.grid().contains_cube(cube) {
+        if self.bounds().contains_cube(cube) {
             self.light_update_queue
                 .insert(LightUpdateRequest { priority, cube });
         }
@@ -132,7 +132,7 @@ impl Space {
         if difference_priority > 0 {
             cost += 200;
             // TODO: compute index only once
-            self.lighting[self.grid().index(cube).unwrap()] = new_light_value;
+            self.lighting[self.bounds().index(cube).unwrap()] = new_light_value;
             self.notifier.notify(SpaceChange::Lighting(cube));
 
             // The light algorithm, in its current form, can spend a very long time
@@ -200,7 +200,7 @@ impl Space {
                     continue;
                 }
                 let mut ray_state = LightRayState::new(cube, ray, ray_weight_by_faces);
-                let raycaster = ray_state.translated_ray.cast().within_grid(self.grid());
+                let raycaster = ray_state.translated_ray.cast().within(self.bounds());
 
                 'raycast: for hit in raycaster {
                     cube_buffer.cost += 1;
@@ -240,13 +240,13 @@ impl Space {
             return;
         }
 
-        let grid = self.grid();
-        for x in grid.x_range() {
-            for z in grid.z_range() {
+        let bounds = self.bounds();
+        for x in bounds.x_range() {
+            for z in bounds.z_range() {
                 let mut covered = false;
-                for y in grid.y_range().rev() {
+                for y in bounds.y_range().rev() {
                     let cube = GridPoint::new(x, y, z);
-                    let index = grid.index(cube).unwrap();
+                    let index = bounds.index(cube).unwrap();
 
                     let this_cube_evaluated =
                         &self.block_data[self.contents[index] as usize].evaluated;
@@ -285,11 +285,11 @@ impl Space {
 
 impl LightPhysics {
     /// Generate the lighting data array that a newly created empty [`Space`] should have.
-    pub(crate) fn initialize_lighting(&self, grid: Grid) -> Box<[PackedLight]> {
+    pub(crate) fn initialize_lighting(&self, bounds: GridAab) -> Box<[PackedLight]> {
         match self {
             LightPhysics::None => Box::new([]),
             LightPhysics::Rays { .. } => {
-                vec![PackedLight::NO_RAYS; grid.volume()].into_boxed_slice()
+                vec![PackedLight::NO_RAYS; bounds.volume()].into_boxed_slice()
             }
         }
     }

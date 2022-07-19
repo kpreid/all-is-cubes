@@ -12,7 +12,7 @@ use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
 use crate::math::{
     Face6::{self, *},
-    Face7, FaceMap, FreeCoordinate, Grid, GridPoint, GridRotation, Rgba,
+    Face7, FaceMap, FreeCoordinate, GridAab, GridPoint, GridRotation, Rgba,
 };
 use crate::mesh::BlockMesh;
 use crate::space::{Space, SpacePhysics};
@@ -78,7 +78,7 @@ fn triangulate_blocks_and_space(
     let mut tex = TestTextureAllocator::new();
     let block_meshes = triangulate_blocks(space, &mut tex, options);
     let space_mesh: SpaceMesh<BlockVertex, TestTextureTile> =
-        triangulate_space(space, space.grid(), options, &*block_meshes);
+        triangulate_space(space, space.bounds(), options, &*block_meshes);
     (tex, block_meshes, space_mesh)
 }
 
@@ -99,7 +99,7 @@ fn non_uniform_fill(cube: GridPoint) -> &'static Block {
 fn excludes_hidden_faces_of_blocks() {
     let mut space = Space::empty_positive(2, 2, 2);
     space
-        .fill(space.grid(), |p| Some(non_uniform_fill(p)))
+        .fill(space.bounds(), |p| Some(non_uniform_fill(p)))
         .unwrap();
     let (_, _, space_mesh) = triangulate_blocks_and_space(&space);
 
@@ -138,7 +138,7 @@ fn no_panic_on_missing_blocks() {
     space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
     triangulate_space(
         &space,
-        space.grid(),
+        space.bounds(),
         &MeshOptions::dont_care_for_test(),
         &*block_meshes,
     );
@@ -230,7 +230,7 @@ fn shrunken_box_has_no_extras() {
     let mut u = Universe::new();
     let less_than_full_block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {
-            if Grid::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
+            if GridAab::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
                 non_uniform_fill(cube)
             } else {
                 &AIR
@@ -292,7 +292,7 @@ fn shrunken_box_uniform_color() {
     let filler_block = Block::from(Rgba::new(0.0, 1.0, 0.5, 1.0));
     let less_than_full_block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {
-            if Grid::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
+            if GridAab::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
                 &filler_block
             } else {
                 &AIR
@@ -431,12 +431,12 @@ fn fully_opaque_partial_block() {
     let block = Block::builder()
         .voxels_ref(8, {
             // The dimensions don't meet the PX face.
-            let mut block_space = Space::builder(Grid::new([0, 0, 0], [4, 8, 8]))
+            let mut block_space = Space::builder(GridAab::new([0, 0, 0], [4, 8, 8]))
                 .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                 .build_empty();
             // But the blocks are all opaque.
             block_space
-                .fill_uniform(block_space.grid(), Block::from(Rgba::WHITE))
+                .fill_uniform(block_space.bounds(), Block::from(Rgba::WHITE))
                 .unwrap();
             u.insert_anonymous(block_space)
         })

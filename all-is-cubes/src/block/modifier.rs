@@ -9,7 +9,7 @@ use crate::block::{
 };
 use crate::drawing::VoxelBrush;
 use crate::listen::Listener;
-use crate::math::{Face6, Grid, GridArray, GridCoordinate, GridRotation, Rgb, Rgba};
+use crate::math::{Face6, GridAab, GridArray, GridCoordinate, GridRotation, Rgb, Rgba};
 use crate::universe::{RefVisitor, VisitRefs};
 
 /// Modifiers can be applied to a [`Block`] to change the result of
@@ -100,13 +100,13 @@ impl Modifier {
                     EvaluatedBlock {
                         voxels: value.voxels.map(|voxels| {
                             GridArray::from_fn(
-                                voxels.grid().transform(inner_to_outer).unwrap(),
+                                voxels.bounds().transform(inner_to_outer).unwrap(),
                                 |cube| voxels[outer_to_inner.transform_cube(cube)],
                             )
                         }),
                         voxel_opacity_mask: value.voxel_opacity_mask.map(|mask| {
                             GridArray::from_fn(
-                                mask.grid().transform(inner_to_outer).unwrap(),
+                                mask.bounds().transform(inner_to_outer).unwrap(),
                                 |cube| mask[outer_to_inner.transform_cube(cube)],
                             )
                         }),
@@ -138,9 +138,9 @@ impl Modifier {
                 )?;
 
                 let (original_bounds, effective_resolution) = match value.voxels.as_ref() {
-                    Some(array) => (array.grid(), value.resolution),
+                    Some(array) => (array.bounds(), value.resolution),
                     // Treat color blocks as having a resolution of 16. TODO: Improve on this hardcoded constant.
-                    None => (Grid::for_block(16), 16),
+                    None => (GridAab::for_block(16), 16),
                 };
 
                 // For now, our strategy is to work in units of the block's resolution.
@@ -150,9 +150,9 @@ impl Modifier {
                 let translation_in_res = direction.normal_vector() * distance_in_res;
 
                 // This will be None if the displacement puts the block entirely out of view.
-                let displaced_bounds: Option<Grid> = original_bounds
+                let displaced_bounds: Option<GridAab> = original_bounds
                     .translate(translation_in_res)
-                    .intersection(Grid::for_block(effective_resolution));
+                    .intersection(GridAab::for_block(effective_resolution));
 
                 let animation_action = if displaced_bounds.is_none() && velocity >= 0 {
                     // Displaced to invisibility; turn into just plain air.
@@ -287,7 +287,7 @@ mod tests {
     use crate::block::{BlockAttributes, BlockCollision, Evoxel, Primitive, AIR};
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::drawing::VoxelBrush;
-    use crate::math::{Grid, GridPoint, OpacityCategory, Rgba};
+    use crate::math::{GridAab, GridPoint, OpacityCategory, Rgba};
     use crate::space::Space;
     use crate::time::Tick;
     use crate::universe::Universe;
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn rotate_evaluation() {
         let resolution = 2;
-        let block_grid = Grid::for_block(resolution);
+        let block_bounds = GridAab::for_block(resolution);
         let rotation = GridRotation::RYXZ;
         let mut universe = Universe::new();
         let color_fn = |cube: GridPoint| {
@@ -347,7 +347,7 @@ mod tests {
             EvaluatedBlock {
                 attributes: BlockAttributes::default(),
                 color: rgba_const!(0.5, 0.5, 0.5, 0.5),
-                voxels: Some(GridArray::from_fn(block_grid, |cube| {
+                voxels: Some(GridArray::from_fn(block_bounds, |cube| {
                     Evoxel {
                         color: rotated_color_fn(cube),
                         selectable: true,
@@ -357,7 +357,7 @@ mod tests {
                 resolution: 2,
                 opaque: false,
                 visible: true,
-                voxel_opacity_mask: Some(GridArray::from_fn(block_grid, |cube| {
+                voxel_opacity_mask: Some(GridArray::from_fn(block_bounds, |cube| {
                     if cube.x == 0 {
                         OpacityCategory::Opaque
                     } else {
@@ -404,7 +404,7 @@ mod tests {
         };
         let moved = modifier.attach(original.clone());
 
-        let expected_bounds = Grid::new([0, 8, 0], [16, 8, 16]);
+        let expected_bounds = GridAab::new([0, 8, 0], [16, 8, 16]);
 
         let ev_original = original.evaluate().unwrap();
         assert_eq!(
@@ -447,7 +447,7 @@ mod tests {
         };
         let moved = modifier.attach(original.clone());
 
-        let expected_bounds = Grid::new([0, 1, 0], [2, 1, 2]);
+        let expected_bounds = GridAab::new([0, 1, 0], [2, 1, 2]);
 
         let ev_original = original.evaluate().unwrap();
         assert_eq!(
@@ -495,7 +495,7 @@ mod tests {
     fn move_block_test(direction: Face6, velocity: i16, checker: impl FnOnce(&Space, &Block)) {
         let [block] = make_some_blocks();
         let mut space =
-            Space::builder(Grid::from_lower_upper([-1, -1, -1], [2, 2, 2])).build_empty();
+            Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2])).build_empty();
         let [move_out, move_in] = Modifier::paired_move(direction, 0, velocity);
         space
             .set([0, 0, 0], move_out.attach(block.clone()))

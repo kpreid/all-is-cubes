@@ -5,7 +5,7 @@ use cgmath::{Point3, Vector3};
 
 use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
-use crate::math::{Face6, FreeCoordinate, Grid, NotNan};
+use crate::math::{Face6, FreeCoordinate, GridAab, NotNan};
 use crate::universe::{RefVisitor, VisitRefs};
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
@@ -17,7 +17,7 @@ use crate::universe::{RefVisitor, VisitRefs};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Spawn {
     /// Volume which is permitted to be occupied.
-    pub(super) bounds: Grid,
+    pub(super) bounds: GridAab,
 
     /// Desired eye position, in cube coordinates.
     pub(super) eye_position: Option<Point3<NotNan<FreeCoordinate>>>,
@@ -39,9 +39,9 @@ impl Spawn {
     /// outside the space looking in or to be within it at some particular position.
     /// Come up with some kind of hint that we can use to configure this better without
     /// necessarily mandating a specification.
-    pub fn default_for_new_space(grid: Grid) -> Self {
+    pub fn default_for_new_space(bounds: GridAab) -> Self {
         Spawn {
-            bounds: grid.abut(Face6::PZ, 40).unwrap_or(grid),
+            bounds: bounds.abut(Face6::PZ, 40).unwrap_or(bounds),
             eye_position: None,
             look_direction: Vector3::new(notnan!(0.), notnan!(0.), notnan!(-1.)),
             inventory: vec![],
@@ -57,7 +57,7 @@ impl Spawn {
     /// TODO: This needs better-defined FOV/distance considerations before making it public
     #[doc(hidden)]
     pub fn looking_at_space(
-        space_bounds: Grid,
+        space_bounds: GridAab,
         direction: impl Into<Vector3<FreeCoordinate>>,
     ) -> Self {
         let direction = direction.into();
@@ -79,7 +79,7 @@ impl Spawn {
         });
     }
 
-    pub fn set_bounds(&mut self, bounds: Grid) {
+    pub fn set_bounds(&mut self, bounds: GridAab) {
         self.bounds = bounds;
     }
 
@@ -117,7 +117,7 @@ impl VisitRefs for Spawn {
 impl<'a> arbitrary::Arbitrary<'a> for Spawn {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
-            bounds: Grid::arbitrary(u)?,
+            bounds: GridAab::arbitrary(u)?,
             eye_position: if u.arbitrary()? {
                 Some(Point3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
             } else {
@@ -134,7 +134,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Spawn {
             Arbitrary,
         };
         and(
-            and(Grid::size_hint(depth), bool::size_hint(depth)),
+            and(GridAab::size_hint(depth), bool::size_hint(depth)),
             and_all(&[<f64 as Arbitrary>::size_hint(depth); 6]),
         )
     }

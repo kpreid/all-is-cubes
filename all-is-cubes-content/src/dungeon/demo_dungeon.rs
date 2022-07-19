@@ -15,7 +15,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    point_to_enclosing_cube, Face6, Face7, FaceMap, Grid, GridArray, GridCoordinate, GridPoint,
+    point_to_enclosing_cube, Face6, Face7, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint,
     GridRotation, GridVector, Rgb,
 };
 use all_is_cubes::rgb_const;
@@ -35,8 +35,8 @@ struct DemoRoom {
 
     /// In a *relative* room coordinate system (1 unit = 1 room box),
     /// how big is this room? Occupying multiple rooms' space if this
-    /// is not equal to `Grid::for_block(1)`.
-    extended_bounds: Grid,
+    /// is not equal to `GridAab::for_block(1)`.
+    extended_bounds: GridAab,
 
     /// Which faces have doors-to-corridors in them.
     door_faces: FaceMap<bool>,
@@ -50,7 +50,7 @@ struct DemoRoom {
 
 impl DemoRoom {
     /// Area of dungeon-room-cubes this room data actually occupies
-    fn extended_map_bounds(&self) -> Grid {
+    fn extended_map_bounds(&self) -> GridAab {
         self.extended_bounds
     }
 }
@@ -67,7 +67,7 @@ struct DemoTheme {
     dungeon_grid: DungeonGrid,
     /// Same coordinate system as `dungeon_grid.room_box`.
     /// Pick 2 out of 3 axes to define the bounds of a corridor/doorway on the third axis.
-    corridor_box: Grid,
+    corridor_box: GridAab,
     blocks: BlockProvider<DungeonBlocks>,
     wall_block: Block,
     lamp_block: Block,
@@ -80,7 +80,7 @@ impl DemoTheme {
         &self,
         wall_block: Option<&Block>,
         space: &mut Space,
-        interior: Grid,
+        interior: GridAab,
     ) -> Result<(), InGenError> {
         let wall_block = wall_block.unwrap_or(&self.wall_block);
 
@@ -137,12 +137,12 @@ impl DemoTheme {
             let corridor_box = self
                 .corridor_box
                 .translate(self.dungeon_grid.room_translation(room_position));
-            // TODO: Add Grid operations to make this easier
+            // TODO: Add GridAab operations to make this easier
             let mut lower = corridor_box.lower_bounds();
             let mut upper = corridor_box.upper_bounds();
             lower[passage_axis] = room_1_box.upper_bounds()[passage_axis];
             upper[passage_axis] = room_2_box.lower_bounds()[passage_axis];
-            Grid::from_lower_upper(lower, upper)
+            GridAab::from_lower_upper(lower, upper)
         };
 
         // Cut doorway
@@ -169,7 +169,7 @@ impl DemoTheme {
     /// Box of the room, in space coordinates, that might be smaller or bigger than the
     /// DungeonGrid's box.
     /// TODO: Should we teach DungeonGrid to help with this?
-    fn actual_room_box(&self, room_position: GridPoint, room_data: &DemoRoom) -> Grid {
+    fn actual_room_box(&self, room_position: GridPoint, room_data: &DemoRoom) -> GridAab {
         if room_data.corridor_only {
             self.corridor_box
                 .translate(self.dungeon_grid.room_translation(room_position))
@@ -250,8 +250,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                     floor_layer.abut(direction, -1).unwrap().center(),
                                 )
                                 .unwrap();
-                                let bridge_box = Grid::single_cube(midpoint)
-                                    .union(Grid::single_cube(wall_cube))
+                                let bridge_box = GridAab::single_cube(midpoint)
+                                    .union(GridAab::single_cube(wall_cube))
                                     .unwrap();
                                 space.fill_uniform(
                                     bridge_box,
@@ -293,7 +293,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 let mut window_pos =
                                     origin + along_wall.normal_vector() * (midpoint + step);
                                 window_pos.y = window_y;
-                                if let Some(window_box) = Grid::new(window_pos, [1, 3, 1])
+                                if let Some(window_box) = GridAab::new(window_pos, [1, 3, 1])
                                     .intersection(wall_excluding_corners_box)
                                 {
                                     space.fill_uniform(window_box, &self.window_glass_block)?;
@@ -329,7 +329,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Set spawn.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
                 if matches!(room_data.maze_field_type, FieldType::Start) {
-                    let mut spawn = Spawn::default_for_new_space(space.grid());
+                    let mut spawn = Spawn::default_for_new_space(space.bounds());
                     spawn.set_bounds(interior);
                     spawn.set_inventory(vec![
                         Tool::RemoveBlock { keep: true }.into(),
@@ -365,7 +365,7 @@ pub(crate) async fn demo_dungeon(
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
     let dungeon_grid = DungeonGrid {
-        room_box: Grid::new([0, 0, 0], [9, 5, 9]),
+        room_box: GridAab::new([0, 0, 0], [9, 5, 9]),
         room_wall_thickness: FaceMap::repeat(1),
         gap_between_walls: Vector3::new(1, 1, 1),
     };
@@ -374,7 +374,7 @@ pub(crate) async fn demo_dungeon(
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     let theme = DemoTheme {
         dungeon_grid: dungeon_grid.clone(),
-        corridor_box: Grid::new([3, 0, 3], [3, 3, 3]),
+        corridor_box: GridAab::new([3, 0, 3], [3, 3, 3]),
         blocks: BlockProvider::using(universe)?,
         // TODO: use more appropriate blocks
         wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),
@@ -391,14 +391,14 @@ pub(crate) async fn demo_dungeon(
     let maze = maze_to_array(&maze);
 
     // Expand bounds to allow for extra-tall rooms.
-    let expanded_bounds = maze.grid().expand(FaceMap::symmetric([0, 1, 0]));
+    let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
 
     let dungeon_map = GridArray::from_fn(expanded_bounds, |room_position| {
         let maze_field = maze.get(room_position)?;
 
         let corridor_only = rng.gen_bool(0.5);
 
-        let mut extended_bounds = Grid::for_block(1);
+        let mut extended_bounds = GridAab::for_block(1);
         // Optional high ceiling
         if !corridor_only && rng.gen_bool(0.25) {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::PY, 1));
@@ -420,7 +420,7 @@ pub(crate) async fn demo_dungeon(
             FaceMap::from_fn(|face| {
                 // Create windows only if they look into space outside the maze
                 let adjacent = m2gp(maze_field.coordinates) + face.normal_vector();
-                if maze.grid().contains_cube(adjacent) || corridor_only || face == Face7::NY {
+                if maze.bounds().contains_cube(adjacent) || corridor_only || face == Face7::NY {
                     false
                 } else if face == Face7::PY {
                     // ceilings are more common overall and we want more internally-lit ones
@@ -438,7 +438,7 @@ pub(crate) async fn demo_dungeon(
             // contains_cube() check is to work around the maze generator sometimes producing
             // out-of-bounds passages.
             door_faces[face] =
-                maze_field.has_passage(&direction) && maze.grid().contains_cube(neighbor);
+                maze_field.has_passage(&direction) && maze.bounds().contains_cube(neighbor);
         }
 
         Some(DemoRoom {
@@ -453,7 +453,7 @@ pub(crate) async fn demo_dungeon(
     });
 
     let space_bounds = dungeon_grid
-        .minimum_space_for_rooms(dungeon_map.grid())
+        .minimum_space_for_rooms(dungeon_map.bounds())
         .expand(FaceMap::symmetric([30, 1, 30]));
     let mut space = Space::builder(space_bounds)
         .sky_color(palette::DAY_SKY_COLOR * 2.0)
@@ -466,7 +466,7 @@ pub(crate) async fn demo_dungeon(
             let mut u = space_bounds.upper_bounds();
             l.y = -1;
             u.y = 0;
-            Grid::from_lower_upper(l, u)
+            GridAab::from_lower_upper(l, u)
         },
         &landscape_blocks[LandscapeBlocks::Grass],
     )?;
@@ -474,7 +474,7 @@ pub(crate) async fn demo_dungeon(
         {
             let mut u = space_bounds.upper_bounds();
             u.y = -1;
-            Grid::from_lower_upper(space_bounds.lower_bounds(), u)
+            GridAab::from_lower_upper(space_bounds.lower_bounds(), u)
         },
         &landscape_blocks[LandscapeBlocks::Dirt],
     )?;

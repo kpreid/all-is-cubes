@@ -2,7 +2,7 @@
 use libfuzzer_sys::fuzz_target;
 extern crate all_is_cubes;
 
-use all_is_cubes::math::Grid;
+use all_is_cubes::math::GridAab;
 use all_is_cubes::raycast::Raycaster;
 
 const PRINT: bool = false;
@@ -11,11 +11,11 @@ fuzz_target!(|input: (bool, [f64; 3], [f64; 3])| {
     if PRINT {
         println!("Inputs: {input:?}");
     }
-    let (use_grid, origin, direction) = input;
+    let (use_bounds, origin, direction) = input;
 
-    let grid = Grid::from_lower_upper([-10, -20, -30], [10, 20, 30]);
-    let raycaster = if use_grid {
-        Raycaster::new(origin, direction).within_grid(grid)
+    let bounds = GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30]);
+    let raycaster = if use_bounds {
+        Raycaster::new(origin, direction).within(bounds)
     } else {
         Raycaster::new(origin, direction)
     };
@@ -28,8 +28,8 @@ fuzz_target!(|input: (bool, [f64; 3], [f64; 3])| {
         if PRINT {
             println!("Step: {step:?}");
         }
-        if use_grid {
-            assert!(grid.contains_cube(step.cube_ahead()));
+        if use_bounds {
+            assert!(bounds.contains_cube(step.cube_ahead()));
         }
     }
 });

@@ -2,7 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use all_is_cubes::cgmath::EuclideanSpace;
-use all_is_cubes::math::{Grid, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector};
 
 /// An octree that knows how to allocate box regions of itself. It stores no other data.
 #[derive(Clone, Debug)]
@@ -42,7 +42,7 @@ impl Alloctree {
     /// The returned handle **does not deallocate on drop**, because this tree does not
     /// implement interior mutability; it is the caller's responsibility to provide such
     /// functionality if needed.
-    pub fn allocate(&mut self, request: Grid) -> Option<AlloctreeHandle> {
+    pub fn allocate(&mut self, request: GridAab) -> Option<AlloctreeHandle> {
         if !fits(request, self.size_exponent) {
             // Too big, can never fit.
             return None;
@@ -65,9 +65,9 @@ impl Alloctree {
     }
 
     /// Returns the region that could be allocated within.
-    pub fn bounds(&self) -> Grid {
+    pub fn bounds(&self) -> GridAab {
         let size = expsize(self.size_exponent);
-        Grid::new([0, 0, 0], [size, size, size])
+        GridAab::new([0, 0, 0], [size, size, size])
     }
 
     pub fn occupied_volume(&self) -> usize {
@@ -97,7 +97,7 @@ impl AlloctreeNode {
         &mut self,
         size_exponent: u8,
         low_corner: GridPoint,
-        request: Grid,
+        request: GridAab,
     ) -> Option<AlloctreeHandle> {
         // eprintln!(
         //     "allocate(2^{} = {}, {:?})",
@@ -165,7 +165,7 @@ impl AlloctreeNode {
 
                 children
                     .iter_mut()
-                    .zip(Grid::new([0, 0, 0], [2, 2, 2]).interior_iter())
+                    .zip(GridAab::new([0, 0, 0], [2, 2, 2]).interior_iter())
                     .filter_map(|(child, child_position)| {
                         child.allocate(
                             size_exponent - 1,
@@ -191,7 +191,7 @@ impl AlloctreeNode {
                 debug_assert!(size_exponent > 0, "tree is deeper than size");
                 let child_size = expsize(size_exponent - 1);
                 let which_child = relative_low_corner.map(|c| c.div_euclid(child_size));
-                let child_index = Grid::new([0, 0, 0], [2, 2, 2])
+                let child_index = GridAab::new([0, 0, 0], [2, 2, 2])
                     .index(which_child)
                     .expect("Alloctree::free: out of bounds");
                 children[child_index].free(
@@ -211,14 +211,14 @@ impl AlloctreeNode {
 #[non_exhaustive]
 pub struct AlloctreeHandle {
     /// Allocated region — this is the region to write into.
-    pub allocation: Grid,
-    /// Coordinate translation from the originally requested [`Grid`] to the location
+    pub allocation: GridAab,
+    /// Coordinate translation from the originally requested [`GridAab`] to the location
     /// allocated for it.
     pub offset: GridVector,
 }
 
-/// Test if the given [`Grid`] fits in a cube of the given size.
-fn fits(request: Grid, size_exponent: u8) -> bool {
+/// Test if the given [`GridAab`] fits in a cube of the given size.
+fn fits(request: GridAab, size_exponent: u8) -> bool {
     let size = request.size();
     let max_edge_length = size.x.max(size.y).max(size.z);
     max_edge_length <= expsize(size_exponent)
@@ -236,7 +236,7 @@ mod tests {
     #[track_caller]
     fn check_no_overlaps(
         t: &mut Alloctree,
-        requests: impl IntoIterator<Item = Grid>,
+        requests: impl IntoIterator<Item = GridAab>,
     ) -> Vec<AlloctreeHandle> {
         let mut handles: Vec<AlloctreeHandle> = Vec::new();
         for request in requests {
@@ -270,12 +270,12 @@ mod tests {
     fn basic_complete_fill() {
         let mut t = Alloctree::new(5); // side length 2^5 cube = eight side length 16 cubes
         let _allocations: Vec<AlloctreeHandle> = (0..8)
-            .map(|i| match t.allocate(Grid::for_block(16)) {
+            .map(|i| match t.allocate(GridAab::for_block(16)) {
                 Some(val) => val,
                 None => panic!("basic_complete_fill allocation failure for #{}", i),
             })
             .collect();
-        assert_eq!(None, t.allocate(Grid::for_block(16)));
+        assert_eq!(None, t.allocate(GridAab::for_block(16)));
     }
 
     /// Repeatedly free and try to allocate the same space again.
@@ -283,7 +283,7 @@ mod tests {
     fn free_and_allocate_again() {
         let mut t = Alloctree::new(6); // side length 2^6 cube = 64 side length 16 cubes
         let mut allocations: Vec<Option<AlloctreeHandle>> = (0..64)
-            .map(|i| match t.allocate(Grid::for_block(16)) {
+            .map(|i| match t.allocate(GridAab::for_block(16)) {
                 Some(val) => Some(val),
                 None => panic!(
                     "free_and_allocate_again initial allocation failure for #{}",
@@ -294,7 +294,7 @@ mod tests {
 
         for h in allocations.iter_mut() {
             t.free(h.take().unwrap());
-            *h = Some(t.allocate(Grid::for_block(16)).unwrap());
+            *h = Some(t.allocate(GridAab::for_block(16)).unwrap());
         }
     }
 
@@ -304,9 +304,9 @@ mod tests {
         check_no_overlaps(
             &mut t,
             [
-                Grid::for_block(16),
-                Grid::for_block(16),
-                Grid::for_block(16),
+                GridAab::for_block(16),
+                GridAab::for_block(16),
+                GridAab::for_block(16),
             ],
         );
     }

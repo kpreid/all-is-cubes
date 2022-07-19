@@ -6,7 +6,7 @@ use criterion::{
 };
 
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::math::Grid;
+use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::transaction::Transaction;
 
@@ -14,10 +14,10 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
 
     for &mutation_size in &[1, 4, 64] {
-        let grid = Grid::new([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
-        let bigger_grid = grid.multiply(2);
+        let bounds = GridAab::new([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
+        let bigger_bounds = bounds.multiply(2);
         let size_description = format!("{}×{}×{}", mutation_size, mutation_size, mutation_size);
-        let mutation_volume = grid.volume();
+        let mutation_volume = bounds.volume();
         group.throughput(Throughput::Elements(mutation_volume as u64));
 
         group.bench_function(
@@ -25,9 +25,9 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
-                    || Space::empty(grid),
+                    || Space::empty(bounds),
                     |mut space| {
-                        space.fill(space.grid(), |_| Some(&block)).unwrap();
+                        space.fill(space.bounds(), |_| Some(&block)).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -39,9 +39,9 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
-                    || Space::empty(bigger_grid),
+                    || Space::empty(bigger_bounds),
                     |mut space| {
-                        space.fill(grid, |_| Some(&block)).unwrap();
+                        space.fill(bounds, |_| Some(&block)).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -53,9 +53,9 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
-                    || Space::empty(grid),
+                    || Space::empty(bounds),
                     |mut space| {
-                        space.fill_uniform(space.grid(), &block).unwrap();
+                        space.fill_uniform(space.bounds(), &block).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -67,9 +67,9 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
-                    || Space::empty(bigger_grid),
+                    || Space::empty(bigger_bounds),
                     |mut space| {
-                        space.fill_uniform(grid, &block).unwrap();
+                        space.fill_uniform(bounds, &block).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -81,7 +81,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
-                    || Space::empty(grid),
+                    || Space::empty(bounds),
                     |mut space| {
                         for x in 0..mutation_size {
                             for y in 0..mutation_size {
@@ -101,7 +101,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
-                    || Space::empty(grid),
+                    || Space::empty(bounds),
                     |mut space| {
                         let mut txn = SpaceTransaction::default();
                         for x in 0..mutation_size {
@@ -121,14 +121,14 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn grid_bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Grid");
+pub fn grid_aab_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("GridAab");
 
-    let grid = Grid::new([0, 0, 0], [256, 256, 256]);
-    group.throughput(Throughput::Elements(grid.volume() as u64));
-    group.bench_function("Grid::interior_iter", |b| {
+    let aab = GridAab::new([0, 0, 0], [256, 256, 256]);
+    group.throughput(Throughput::Elements(aab.volume() as u64));
+    group.bench_function("GridAab::interior_iter", |b| {
         b.iter(|| {
-            for cube in grid.interior_iter() {
+            for cube in aab.interior_iter() {
                 black_box(cube);
             }
         })
@@ -137,5 +137,5 @@ pub fn grid_bench(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, space_bulk_mutation, grid_bench);
+criterion_group!(benches, space_bulk_mutation, grid_aab_bench);
 criterion_main!(benches);

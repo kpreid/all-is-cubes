@@ -133,7 +133,7 @@ impl GridMatrix {
     /// integer arithmetic is being used.
     ///
     /// This operation thus transforms the standard positive-octant unit cube identified
-    /// by its most negative corner the same way as the [`Grid::single_cube`] containing
+    /// by its most negative corner the same way as the [`GridAab::single_cube`] containing
     /// that cube.
     ///
     /// ```
@@ -151,7 +151,7 @@ impl GridMatrix {
     /// assert_eq!(reflected.transform_cube(GridPoint::new(1, 5, 5)), GridPoint::new(8, 5, 5));
     /// ```
     ///
-    /// [`Grid::single_cube`]: crate::math::Grid::single_cube
+    /// [`GridAab::single_cube`]: crate::math::GridAab::single_cube
     #[inline]
     pub fn transform_cube(&self, cube: GridPoint) -> GridPoint {
         self.transform_point(cube + Vector3::new(1, 1, 1))

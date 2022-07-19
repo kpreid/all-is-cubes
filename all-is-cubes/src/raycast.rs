@@ -11,7 +11,7 @@
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use crate::math::{
-    point_to_enclosing_cube, CubeFace, Face7, FreeCoordinate, Geometry, Grid, GridCoordinate,
+    point_to_enclosing_cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate,
     GridPoint, Rgba,
 };
 
@@ -116,7 +116,9 @@ impl Geometry for Ray {
 /// Iterator over grid positions that intersect a given ray.
 ///
 /// The grid is of unit cubes which are identified by the integer coordinates of
-/// their most negative corners, the same definition used by `Space` and `Grid`.
+/// their most negative corners, the same definition used by [`Space`] and [`GridAab`].
+///
+/// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, PartialEq)]
 pub struct Raycaster {
     // Implementation notes:
@@ -155,8 +157,8 @@ pub struct Raycaster {
     /// The t_max value used in the previous step; thus, the position along the
     /// ray where we passed through last_face.
     last_t_distance: FreeCoordinate,
-    /// Grid to filter our outputs to. This makes the iteration finite.
-    grid: Option<Grid>,
+    /// Bounds to filter our outputs to within. This makes the iteration finite.
+    bounds: Option<GridAab>,
 }
 
 impl Raycaster {
@@ -166,8 +168,8 @@ impl Raycaster {
     /// but may affect calculation precision, so should not be especially large or small.
     /// It also appears as the scale of the output field [`RaycastStep::t_distance`].
     ///
-    /// Note that this is an infinite iterator by default. Use `.within_grid()` to
-    /// restrict it.
+    /// Note that this is an infinite iterator by default. Use [`.within()`](Self::within)
+    /// to restrict it.
     ///
     /// ```
     /// use all_is_cubes::math::GridPoint;
@@ -192,7 +194,7 @@ impl Raycaster {
 
     fn new_impl(origin: Point3<FreeCoordinate>, direction: Vector3<FreeCoordinate>) -> Self {
         // If there is no enclosing cube then the current cube is undefined so we cannot make
-        // meaningful progress. (In the event of within_grid(), we could in theory have a
+        // meaningful progress. (In the event of within(), we could in theory have a
         // suitably bounded interpretation, but that is not of practical interest.)
         let cube = match point_to_enclosing_cube(origin) {
             Some(cube) => cube,
@@ -207,7 +209,7 @@ impl Raycaster {
                     t_delta: Vector3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY),
                     last_face: Face7::Within,
                     last_t_distance: 0.0,
-                    grid: None,
+                    bounds: None,
                 };
             }
         };
@@ -221,42 +223,42 @@ impl Raycaster {
             t_delta: direction.map(|x| x.abs().recip()),
             last_face: Face7::Within,
             last_t_distance: 0.0,
-            grid: None,
+            bounds: None,
         }
     }
 
-    /// Restrict the cubes iterated over to those which lie within the given [`Grid`].
+    /// Restrict the cubes iterated over to those which lie within the given [`GridAab`].
     ///
     /// This makes the iterator finite: [`next()`](Self::next) will return [`None`]
-    /// forevermore once there are no more cubes intersecting the grid to report.
+    /// forevermore once there are no more cubes intersecting the bounds to report.
     #[must_use]
-    pub fn within_grid(mut self, grid: Grid) -> Self {
-        self.set_bound(grid);
+    pub fn within(mut self, bounds: GridAab) -> Self {
+        self.set_bounds(bounds);
         self
     }
 
-    /// Like `within_grid` but not moving self.
+    /// Like [`Self::within`] but not moving self.
     ///
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
-    pub(crate) fn set_bound(&mut self, grid: Grid) {
-        if self.grid == None {
-            self.grid = Some(grid);
+    pub(crate) fn set_bounds(&mut self, bounds: GridAab) {
+        if self.bounds == None {
+            self.bounds = Some(bounds);
         } else {
-            unimplemented!("multiple uses of .within_grid()");
+            unimplemented!("multiple uses of .within()");
         }
         self.fast_forward();
     }
 
-    /// Cancels a previous [`Raycaster::within_grid`], allowing the raycast to proceed
+    /// Cancels a previous [`Raycaster::within`], allowing the raycast to proceed
     /// an arbitrary distance.
     ///
-    /// Note: The effect of calling `within_grid()` and then `remove_bound()` without an
+    /// Note: The effect of calling `within()` and then `remove_bound()` without an
     /// intervening `next()` is not currently guaranteed.
     ///
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
 
     pub(crate) fn remove_bound(&mut self) {
-        self.grid = None;
+        self.bounds = None;
     }
 
     #[inline(always)]
@@ -326,25 +328,25 @@ impl Raycaster {
         && self.t_max[..].iter().any(|t| t.is_finite())
     }
 
-    /// Returns whether `self.bounds` is outside of `self.grid`.
+    /// Returns whether `self.cube` is outside of `self.bounds`.
     ///
     /// If `direction` is `1`, only the bounds relevant to _exiting_ are tested.
     /// If `-1`, only the bounds relevant to entering.
     #[inline(always)]
     fn is_out_of_bounds(&self, direction: GridCoordinate) -> bool {
-        if let Some(grid) = self.grid {
+        if let Some(bounds) = self.bounds {
             for axis in 0..3 {
                 let direction_on_axis = self.step[axis] * direction;
                 // If direction_on_axis is zero, we test both sides. This handles the case
                 // where a ray that has zero component in that axis either always or never
                 // intersects that axis.
                 if direction_on_axis >= 0 {
-                    if self.cube[axis] >= grid.upper_bounds()[axis] {
+                    if self.cube[axis] >= bounds.upper_bounds()[axis] {
                         return true;
                     }
                 }
                 if direction_on_axis <= 0 {
-                    if self.cube[axis] < grid.lower_bounds()[axis] {
+                    if self.cube[axis] < bounds.lower_bounds()[axis] {
                         return true;
                     }
                 }
@@ -353,22 +355,22 @@ impl Raycaster {
         false
     }
 
-    /// In the case where the current position is outside the grid but might intersect
-    /// the grid later, attempt to move the position to intersect sooner.
+    /// In the case where the current position is outside the bounds but might intersect
+    /// the bounds later, attempt to move the position to intersect sooner.
     #[inline(always)]
     fn fast_forward(&mut self) {
-        let grid: Grid = self.grid.unwrap();
+        let bounds: GridAab = self.bounds.unwrap();
 
         // Find the point which is the origin of all three planes that we want to
         // intersect with. (Strictly speaking, this could be combined with the next
         // loop, but it seems more elegant to have a well-defined point.)
-        let mut plane_origin = grid.lower_bounds();
+        let mut plane_origin = bounds.lower_bounds();
         for axis in 0..3 {
             if self.step[axis] < 0 {
                 // Iff the ray is going negatively, then we must use the upper bound
                 // for the plane origin in this axis. Otherwise, either it doesn't
                 // matter (parallel) or should be lower bound.
-                plane_origin[axis] = grid.upper_bounds()[axis];
+                plane_origin[axis] = bounds.upper_bounds()[axis];
             }
         }
 
@@ -393,7 +395,7 @@ impl Raycaster {
             let t_start = if t_start.is_finite() { t_start } else { max_t };
             let mut new_state = self.ray.advance(t_start).cast();
 
-            new_state.grid = Some(grid); // .within_grid() would recurse
+            new_state.bounds = Some(bounds); // .within() would recurse
 
             // Adapt t values
             new_state.t_max = new_state.t_max.map(|t| t + t_start);
@@ -422,7 +424,7 @@ impl Iterator for Raycaster {
             }
 
             if self.is_out_of_bounds(1) {
-                // We are past the bounds of the grid. There will never again be a cube to report.
+                // We are past the bounds. There will never again be a cube to report.
                 // Prevent extraneous next() calls from doing any stepping that could overflow
                 // by reusing the emit_current logic.
                 self.emit_current = true;
@@ -430,7 +432,7 @@ impl Iterator for Raycaster {
             }
 
             if self.is_out_of_bounds(-1) {
-                // We have not yet intersected the grid volume.
+                // We have not yet intersected the bounds.
                 continue;
             }
 
@@ -966,18 +968,17 @@ mod tests {
     }
 
     /// Regression test (found by fuzzing) for being outside of integer
-    /// range while also using within_grid().
+    /// range while also using within().
     #[test]
-    fn start_outside_of_integer_range_with_grid() {
-        let grid = Grid::new([0, 0, 0], [10, 10, 10]);
+    fn start_outside_of_integer_range_with_bounds() {
+        let bounds = GridAab::new([0, 0, 0], [10, 10, 10]);
         assert_no_steps(
-            Raycaster::new(Point3::new(0., 1e303, 0.), Vector3::new(0., -1e303, 0.))
-                .within_grid(grid),
+            Raycaster::new(Point3::new(0., 1e303, 0.), Vector3::new(0., -1e303, 0.)).within(bounds),
         );
     }
 
     /// If we start inside the range of `GridCoordinate`s and exit, this should
-    /// stop (as if we were `within_grid` the entire space) rather than panicking.
+    /// stop (as if we were `within()` the entire space) rather than panicking.
     #[test]
     fn exiting_integer_range() {
         assert_steps_option(
@@ -1003,10 +1004,10 @@ mod tests {
     }
 
     #[test]
-    fn within_grid() {
-        // Ray oriented diagonally on the -X side of a grid that is short on the X axis.
+    fn within_bounds() {
+        // Ray oriented diagonally on the -X side of bounds that are short on the X axis.
         let mut r = Raycaster::new(Point3::new(0.0, -0.25, -0.5), Vector3::new(1.0, 1.0, 1.0))
-            .within_grid(Grid::new(Point3::new(2, -10, -10), [2, 20, 20]));
+            .within(GridAab::new(Point3::new(2, -10, -10), [2, 20, 20]));
         assert_steps_option(
             &mut r,
             vec![
@@ -1028,12 +1029,12 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "not implemented: multiple uses of .within_grid()")]
-    fn within_grid_twice() {
-        let grid = Grid::new(Point3::new(2, -10, -10), [2, 20, 20]);
+    #[should_panic(expected = "not implemented: multiple uses of .within()")]
+    fn within_twice() {
+        let bounds = GridAab::new(Point3::new(2, -10, -10), [2, 20, 20]);
         let _ = Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
-            .within_grid(grid)
-            .within_grid(grid);
+            .within(bounds)
+            .within(bounds);
     }
 
     /// An example of an axis-aligned ray that wasn't working.
@@ -1052,17 +1053,17 @@ mod tests {
         );
     }
 
-    /// within_grid wasn't working for axis-aligned rays that don't intersect the world,
+    /// within() wasn't working for axis-aligned rays that don't intersect the world,
     /// which should produce zero steps.
     #[test]
     fn regression_test_2() {
-        let grid = Grid::new(Point3::new(0, 0, 0), [10, 10, 10]);
+        let bounds = GridAab::new(Point3::new(0, 0, 0), [10, 10, 10]);
         assert_steps_option(
             &mut Raycaster::new(
                 Point3::new(18.166666666666668, 4.666666666666666, -3.0),
                 Vector3::new(0.0, 0.0, 16.0),
             )
-            .within_grid(grid),
+            .within(bounds),
             vec![None],
         );
     }
@@ -1082,7 +1083,7 @@ mod tests {
                 ),
                 Vector3::new(1.1036366354256313e-305, 0.0, 8589152896.000092),
             )
-            .within_grid(Grid::from_lower_upper([-10, -20, -30], [10, 20, 30])),
+            .within(GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30])),
             vec![step(0, 0, -30, Face7::NZ, 0.010000000000000002)],
         );
     }
@@ -1100,10 +1101,10 @@ mod tests {
 
     #[test]
     fn intersection_point_random_test() {
-        // A one-cube grid, so that all possible rays should either intersect
+        // A one-cube box, so that all possible rays should either intersect
         // exactly this cube, or none at all.
-        let grid = Grid::new([0, 0, 0], [1, 1, 1]);
-        let ray_origins: Aab = grid.expand(FaceMap::repeat(1)).into();
+        let bounds = GridAab::new([0, 0, 0], [1, 1, 1]);
+        let ray_origins: Aab = bounds.expand(FaceMap::repeat(1)).into();
 
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for _ in 0..1000 {
@@ -1113,7 +1114,7 @@ mod tests {
                     .random_point(&mut rng)
                     .to_vec(),
             );
-            let steps: Vec<RaycastStep> = ray.cast().within_grid(grid).collect();
+            let steps: Vec<RaycastStep> = ray.cast().within(bounds).collect();
             match &steps[..] {
                 [] => {}
                 [step] => {

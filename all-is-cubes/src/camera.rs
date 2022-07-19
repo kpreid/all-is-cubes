@@ -12,7 +12,7 @@ use itertools::Itertools as _;
 use ordered_float::NotNan;
 
 use crate::chunking::OctantMask;
-use crate::math::{Aab, FreeCoordinate, Grid, Rgba};
+use crate::math::{Aab, FreeCoordinate, GridAab, Rgba};
 use crate::raycast::Ray;
 
 mod graphics_options;
@@ -446,18 +446,21 @@ impl<'a> arbitrary::Arbitrary<'a> for Viewport {
     }
 }
 
-/// Calculate an “eye position” (camera position) to view the entire given `grid`.
+/// Calculate an “eye position” (camera position) to view the entire given `bounds`.
 ///
 /// `direction` points in the direction the camera should be relative to the space.
 ///
 /// TODO: This function does not yet consider the effects of field-of-view,
 /// and it will need additional parameters to do so.
-pub fn eye_for_look_at(grid: Grid, direction: Vector3<FreeCoordinate>) -> Point3<FreeCoordinate> {
+pub fn eye_for_look_at(
+    bounds: GridAab,
+    direction: Vector3<FreeCoordinate>,
+) -> Point3<FreeCoordinate> {
     let mut space_radius: FreeCoordinate = 0.0;
     for axis in 0..3 {
-        space_radius = space_radius.max(grid.size()[axis].into());
+        space_radius = space_radius.max(bounds.size()[axis].into());
     }
-    grid.center() + direction.normalize() * space_radius // TODO: allow for camera FoV
+    bounds.center() + direction.normalize() * space_radius // TODO: allow for camera FoV
 }
 
 /// A view frustum, represented by its corner points.

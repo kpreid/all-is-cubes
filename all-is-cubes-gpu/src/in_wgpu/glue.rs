@@ -12,7 +12,7 @@ use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
 
 use all_is_cubes::cgmath::{Point3, Vector3};
-use all_is_cubes::math::{Grid, GridCoordinate, Rgba};
+use all_is_cubes::math::{GridAab, GridCoordinate, Rgba};
 
 use crate::reloadable::Reloadable;
 use crate::GraphicsResourceError;
@@ -77,15 +77,15 @@ pub(crate) fn create_wgsl_module_from_reloadable(
     })
 }
 
-/// Write to a texture, with the region written specified by a [`Grid`].
+/// Write to a texture, with the region written specified by a [`GridAab`].
 ///
 /// `T` must be a single texel of the appropriate format.
 ///
 /// Panics if `region` has any negative coordinates.
-pub fn write_texture_by_grid<T: Pod>(
+pub fn write_texture_by_aab<T: Pod>(
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
-    region: Grid,
+    region: GridAab,
     data: &[T],
 ) {
     let volume = region.volume();

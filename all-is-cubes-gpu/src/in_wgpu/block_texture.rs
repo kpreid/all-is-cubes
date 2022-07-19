@@ -10,10 +10,10 @@ use instant::Instant;
 
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::content::palette;
-use all_is_cubes::math::Grid;
+use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
-use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};
+use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
 use crate::BlockTextureInfo;
 use crate::GraphicsResourceError;
@@ -46,8 +46,8 @@ pub struct AtlasTile {
     /// Translation of the requested grid to the actual region within the texture.
     /// (This is always integer but will always be used in a float computation.)
     offset: Vector3<TextureCoordinate>,
-    /// Scale factor to convert from texel grid coordinates (`backing.atlas_grid` and
-    /// `offset`) to GPU texture coordinates where 0.0 and 1.0 are the final size.
+    /// Scale factor to convert from texel grid coordinates to GPU texture coordinates
+    /// where 0.0 and 1.0 are the final size.
     /// In other words, the reciprocal of the overall texture size. This does not
     /// vary per-tile but is stored here for convenience of implementing [`TextureTile`].
     scale: TextureCoordinate,
@@ -106,7 +106,7 @@ impl AtlasAllocator {
         // (If we didn't, wgpu would leave it as [0, 0, 0, 0].)
         // This is mostly useful for debugging since the texture allocation
         // procedure should never actually let unwritten texels appear.
-        write_texture_by_grid(
+        write_texture_by_aab(
             queue,
             &texture,
             alloctree.bounds(),
@@ -151,13 +151,13 @@ impl AtlasAllocator {
                     let backing: &mut TileBacking = &mut strong_backing.lock().unwrap();
                     if backing.dirty {
                         if let Some(data) = backing.data.as_ref() {
-                            let region: Grid = backing
+                            let region: GridAab = backing
                                 .handle
                                 .as_ref()
                                 .expect("can't happen: dead TileBacking")
                                 .allocation;
 
-                            write_texture_by_grid(queue, &self.texture, region, data);
+                            write_texture_by_aab(queue, &self.texture, region, data);
                             backing.dirty = false;
                             count_written += 1;
                         }
@@ -181,9 +181,9 @@ impl AtlasAllocator {
 impl TextureAllocator for AtlasAllocator {
     type Tile = AtlasTile;
 
-    fn allocate(&mut self, requested_grid: Grid) -> Option<AtlasTile> {
+    fn allocate(&mut self, requested_bounds: GridAab) -> Option<AtlasTile> {
         let alloctree = &mut self.backing.lock().unwrap().alloctree;
-        let handle = alloctree.allocate(requested_grid)?;
+        let handle = alloctree.allocate(requested_bounds)?;
         let result = AtlasTile {
             offset: handle.offset.map(|c| c as TextureCoordinate),
             scale: (alloctree.bounds().size().x as TextureCoordinate).recip(),
@@ -200,7 +200,7 @@ impl TextureAllocator for AtlasAllocator {
 }
 
 impl TextureTile for AtlasTile {
-    fn grid(&self) -> Grid {
+    fn bounds(&self) -> GridAab {
         todo!()
     }
 

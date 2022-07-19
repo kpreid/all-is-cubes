@@ -16,7 +16,7 @@ use luminance::texture::{
 };
 
 use all_is_cubes::cgmath::Vector3;
-use all_is_cubes::math::Grid;
+use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
 use crate::in_luminance::types::AicLumBackend;
@@ -46,11 +46,11 @@ where
 /// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
 pub struct LumAtlasTile {
-    /// Translation of the requested grid to the actual region within the texture.
+    /// Translation of the requested bounds to the actual region within the texture.
     /// (This is always integer but will always be used in a float computation.)
     offset: Vector3<TextureCoordinate>,
-    /// Scale factor to convert from texel grid coordinates (`backing.atlas_grid` and
-    /// `offset`) to GPU texture coordinates where 0.0 and 1.0 are the final size.
+    /// Scale factor to convert from texel grid coordinates to GPU texture coordinates
+    /// where 0.0 and 1.0 are the final size.
     /// In other words, the reciprocal of the overall texture size. This does not
     /// vary per-tile but is stored here for convenience of implementing [`TextureTile`].
     scale: TextureCoordinate,
@@ -145,7 +145,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
                 let backing: &mut TileBacking = &mut strong_backing.lock().unwrap();
                 if backing.dirty && error.is_none() {
                     if let Some(data) = backing.data.as_ref() {
-                        let region: Grid = backing
+                        let region: GridAab = backing
                             .handle
                             .as_ref()
                             .expect("can't happen: dead TileBacking")
@@ -186,9 +186,9 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
 impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
     type Tile = LumAtlasTile;
 
-    fn allocate(&mut self, requested_grid: Grid) -> Option<LumAtlasTile> {
+    fn allocate(&mut self, requested_bounds: GridAab) -> Option<LumAtlasTile> {
         let alloctree = &mut self.backing.lock().unwrap().alloctree;
-        let handle = alloctree.allocate(requested_grid)?;
+        let handle = alloctree.allocate(requested_bounds)?;
         let result = LumAtlasTile {
             offset: handle.offset.map(|c| c as TextureCoordinate),
             scale: (alloctree.bounds().size().x as TextureCoordinate).recip(),
@@ -205,7 +205,7 @@ impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
 }
 
 impl TextureTile for LumAtlasTile {
-    fn grid(&self) -> Grid {
+    fn bounds(&self) -> GridAab {
         todo!()
     }
 

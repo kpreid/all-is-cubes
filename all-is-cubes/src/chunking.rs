@@ -12,11 +12,11 @@ use std::sync::Arc;
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::math::{
-    int_magnitude_squared, point_to_enclosing_cube, FreeCoordinate, Grid, GridCoordinate,
+    int_magnitude_squared, point_to_enclosing_cube, FreeCoordinate, GridAab, GridCoordinate,
     GridPoint, GridVector,
 };
 
-/// Type to distinguish chunk coordinates from grid coordinates.
+/// Type to distinguish chunk coordinates from cube coordinates.
 ///
 /// Parameter `CHUNK_SIZE` is the number of cubes along the edge of a chunk.
 /// The consequences are unspecified if it is not positive.
@@ -38,9 +38,9 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
         Self(GridPoint::new(x, y, z))
     }
 
-    /// Returns the bounds of this chunk as a [`Grid`].
-    pub fn grid(self) -> Grid {
-        Grid::new(self.0 * CHUNK_SIZE, (CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE))
+    /// Returns the bounds of this chunk as a [`GridAab`].
+    pub fn bounds(self) -> GridAab {
+        GridAab::new(self.0 * CHUNK_SIZE, (CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE))
     }
 }
 
@@ -153,7 +153,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         for chunk in self.octant_chunks[self.octant_range].iter().copied() {
             max = max.zip(Point3::from_vec(chunk), GridCoordinate::max);
         }
-        let extent = Grid::from_lower_upper(max.map(|c| -c - 1), max.map(|c| c + 2));
+        let extent = GridAab::from_lower_upper(max.map(|c| -c - 1), max.map(|c| c + 2));
         let mut space = crate::space::Space::empty(extent);
         // TODO: use wireframe blocks instead, or something that will highlight the counts better
         let base_octant_chunk = Block::builder()
@@ -190,7 +190,7 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
     // each chunk.
 
-    let candidates = Grid::new(
+    let candidates = GridAab::new(
         (0, 0, 0),
         Vector3::new(1, 1, 1) * (view_distance_in_squared_chunks + 1),
     );
@@ -392,8 +392,8 @@ mod tests {
     #[test]
     fn chunk_consistency() {
         // TODO: this is overkill; sampling the edge cases would be sufficient
-        for cube in Grid::new((-1, -1, -1), (32, 32, 32)).interior_iter() {
-            assert!(cube_to_chunk::<16>(cube).grid().contains_cube(cube));
+        for cube in GridAab::new((-1, -1, -1), (32, 32, 32)).interior_iter() {
+            assert!(cube_to_chunk::<16>(cube).bounds().contains_cube(cube));
         }
     }
 

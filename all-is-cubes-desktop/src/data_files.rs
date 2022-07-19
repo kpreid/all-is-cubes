@@ -16,7 +16,7 @@ use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Grid, GridPoint, Rgb, Rgba};
+use all_is_cubes::math::{GridAab, GridPoint, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{Name, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
@@ -101,7 +101,7 @@ fn convert_dot_vox_model(
     palette_blocks: &[Block],
     model: dot_vox::Model,
 ) -> Result<Space, DotVoxConversionError> {
-    let extent = Grid::new(
+    let extent = GridAab::new(
         [0, 0, 0],
         [
             model.size.x as i32,

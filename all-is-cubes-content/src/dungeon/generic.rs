@@ -5,7 +5,9 @@ use all_is_cubes::util::YieldProgress;
 
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, Vector3};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Face6, FaceMap, Grid, GridArray, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{
+    Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridVector,
+};
 use all_is_cubes::space::Space;
 
 /// Defines the dimensions that dungeon room construction must live within.
@@ -13,12 +15,12 @@ use all_is_cubes::space::Space;
 pub struct DungeonGrid {
     /// The basic room interior which is going to be duplicated to form the room grid.
     /// This _does not_ include the given wall thickness.
-    pub room_box: Grid,
+    pub room_box: GridAab,
     /// Thickness of each wall of the room, located outside of `room_box` but still
     /// belonging to that room and not its neighbors.
     ///
     /// TODO: FaceMap is a _possible_ representation but not the _most robust_ and we
-    /// should instead make this a `Grid` and add a `Grid::minkowski_sum` method.
+    /// should instead make this a `GridAab` and add a `GridAab::minkowski_sum` method.
     pub room_wall_thickness: FaceMap<u16>,
     /// Thickness of the space lying between each pair of rooms, belonging to neither.
     pub gap_between_walls: Vector3<u16>,
@@ -45,19 +47,19 @@ impl DungeonGrid {
         room_position.to_vec().mul_element_wise(self.room_spacing())
     }
 
-    pub fn room_box_including_walls(&self) -> Grid {
+    pub fn room_box_including_walls(&self) -> GridAab {
         self.room_box
             .expand(self.room_wall_thickness.map(|_, c| GridCoordinate::from(c)))
     }
 
-    pub fn room_box_at(&self, room_position: GridPoint) -> Grid {
+    pub fn room_box_at(&self, room_position: GridPoint) -> GridAab {
         self.room_box
             .translate(self.room_translation(room_position))
     }
 
     /// Returns the volume which lies between two rooms and meets their adjoining faces.
     #[allow(dead_code)] // TODO: superseded in use by theme-specific sizes; review if should keep
-    pub fn shared_wall_at(&self, room_position: GridPoint, face: Face6) -> Grid {
+    pub fn shared_wall_at(&self, room_position: GridPoint, face: Face6) -> GridAab {
         self.room_box_at(room_position)
             .abut(
                 face,
@@ -73,12 +75,12 @@ impl DungeonGrid {
     ///
     /// This includes the `room_wall_thickness` of the outermost rooms, but does not
     /// include a `gap_between_walls` outside of that, since that may not be wanted and
-    /// is easy to add using [`Grid::expand`].
+    /// is easy to add using [`GridAab::expand()`].
     ///
     /// TODO: This is off by at least 1 (in the too-big direction); write tests and fix.
-    pub fn minimum_space_for_rooms(&self, rooms: Grid) -> Grid {
+    pub fn minimum_space_for_rooms(&self, rooms: GridAab) -> GridAab {
         let spacing = GridPoint::from_vec(self.room_spacing());
-        let basic_size = Grid::from_lower_upper(
+        let basic_size = GridAab::from_lower_upper(
             rooms.lower_bounds().mul_element_wise(spacing),
             rooms
                 .upper_bounds()
@@ -120,9 +122,9 @@ pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
     let passes = theme.passes();
     for (pass, progress) in (0..passes).zip(progress.split_evenly(passes)) {
         for (room_position, progress) in map
-            .grid()
+            .bounds()
             .interior_iter()
-            .zip(progress.split_evenly(map.grid().volume()))
+            .zip(progress.split_evenly(map.bounds().volume()))
         {
             theme.place_room(
                 space,

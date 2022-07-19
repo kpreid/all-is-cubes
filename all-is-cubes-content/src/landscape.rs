@@ -11,7 +11,7 @@ use all_is_cubes::block::{Block, BlockCollision, Resolution, AIR};
 use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
-    cube_to_midpoint, Aab, FreeCoordinate, Grid, GridCoordinate, GridPoint, GridVector, Rgb,
+    cube_to_midpoint, Aab, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb,
 };
 use all_is_cubes::notnan;
 use all_is_cubes::space::{SetCubeError, Space};
@@ -254,7 +254,7 @@ pub async fn install_landscape_blocks(
 ///
 /// let mut space = Space::empty_positive(10, 10, 10);
 /// wavy_landscape(
-///     space.grid(),
+///     space.bounds(),
 ///     &mut space,
 ///     &BlockProvider::<LandscapeBlocks>::default(),
 ///     1.0,
@@ -262,7 +262,7 @@ pub async fn install_landscape_blocks(
 /// # // TODO: It didn't panic, but how about some assertions?
 /// ```
 pub fn wavy_landscape(
-    region: Grid,
+    region: GridAab,
     space: &mut Space,
     blocks: &BlockProvider<LandscapeBlocks>,
     max_slope: FreeCoordinate,

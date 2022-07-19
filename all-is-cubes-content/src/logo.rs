@@ -14,7 +14,7 @@ use all_is_cubes::{
         },
         VoxelBrush,
     },
-    math::{Face7, FaceMap, Grid, GridMatrix},
+    math::{Face7, FaceMap, GridAab, GridMatrix},
     space::{SetCubeError, Space},
     vui::{
         widgets::OneshotController, LayoutGrant, LayoutRequest, Layoutable, Widget,
@@ -43,7 +43,7 @@ impl Widget for LogoTextLarge {
 
         Box::new(OneshotController(Some(space_to_transaction_copy(
             &drawing_space,
-            drawing_space.grid(),
+            drawing_space.bounds(),
             GridMatrix::from_translation(
                 position.bounds.lower_bounds() - logo_extent.lower_bounds(),
             ),
@@ -59,12 +59,12 @@ pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) -> Result<()
     Ok(())
 }
 
-pub fn logo_text_extent() -> Grid {
+pub fn logo_text_extent() -> GridAab {
     logo_text_drawable(|d| {
         let bounding_box = d.bounding_box();
         let top_left_2d = bounding_box.top_left;
         let bottom_right_2d = bounding_box.bottom_right().unwrap();
-        Grid::from_lower_upper(
+        GridAab::from_lower_upper(
             [top_left_2d.x, -(bottom_right_2d.y - 1), 0],
             [bottom_right_2d.x - 1, -top_left_2d.y, 2],
         )

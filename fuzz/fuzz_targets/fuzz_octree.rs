@@ -1,7 +1,7 @@
 #![no_main]
 extern crate all_is_cubes;
 
-use all_is_cubes::math::Grid;
+use all_is_cubes::math::GridAab;
 use all_is_cubes_gpu::octree_alloc::{Alloctree, AlloctreeHandle};
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
@@ -14,7 +14,7 @@ struct FuzzOctree {
 
 #[derive(Arbitrary, Debug)]
 enum Operation {
-    Allocate(Grid),
+    Allocate(GridAab),
     Free(usize),
 }
 
@@ -47,7 +47,7 @@ fuzz_target!(|input: FuzzOctree| {
 fn validate(tree: &Alloctree, handles: &[AlloctreeHandle]) {
     for (i, h1) in handles.iter().enumerate() {
         assert!(
-            tree.bounds().contains_grid(h1.allocation),
+            tree.bounds().contains_box(h1.allocation),
             "allocation was out of bounds"
         );
         for (j, h2) in handles.iter().enumerate() {

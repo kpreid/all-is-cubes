@@ -16,7 +16,7 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::Slot;
 use crate::listen::{DirtyFlag, Gate, ListenableSource, Listener};
-use crate::math::{Grid, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::Merge as _;
@@ -52,7 +52,7 @@ impl Toolbar {
     ) -> Arc<Self> {
         let slot_text_resolution: Resolution = 32;
         let slot_text_space = universe.insert_anonymous(
-            Space::builder(Grid::new(
+            Space::builder(GridAab::new(
                 GridPoint::origin(),
                 // TODO: shrink vertical axis to fit text, once we've debugged it
                 GridVector::new(
@@ -152,7 +152,7 @@ impl ToolbarController {
             // Erase old text.
             // TODO: Do this incrementally and only-if-different.
             // Maybe we should have a text-updating abstraction for this *and* the tooltip?
-            text_space.fill_uniform(text_space.grid(), &AIR).unwrap();
+            text_space.fill_uniform(text_space.bounds(), &AIR).unwrap();
 
             let plane = &mut text_space.draw_target(GridMatrix::FLIP_Y);
             for index in 0..self.definition.slot_count {

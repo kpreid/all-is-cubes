@@ -5,7 +5,7 @@ use all_is_cubes::cgmath::Vector3;
 use noise::NoiseFn;
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::math::{cube_to_midpoint, Grid, GridArray, GridPoint};
+use all_is_cubes::math::{cube_to_midpoint, GridAab, GridArray, GridPoint};
 
 /// Generates a [`Block`]-shape of noise values from a [`NoiseFn`].
 ///
@@ -22,7 +22,7 @@ pub(crate) fn array_of_noise<O>(
     noise_fn: &impl NoiseFn<[f64; 3]>,
     mut postprocess: impl FnMut(f64) -> O,
 ) -> GridArray<O> {
-    GridArray::from_fn(Grid::for_block(resolution), |cube| {
+    GridArray::from_fn(GridAab::for_block(resolution), |cube| {
         postprocess(noise_fn.get(cube_to_midpoint(cube).into()))
     })
 }

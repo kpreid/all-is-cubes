@@ -210,7 +210,7 @@ mod tests {
 
     impl EquivalenceTester {
         fn new(space: URef<Space>) -> Self {
-            let grid = space.borrow().grid();
+            let bounds = space.borrow().bounds();
 
             // TODO: add tests of changing the options
             let graphics_options = ListenableSource::constant(GraphicsOptions::default());
@@ -225,8 +225,8 @@ mod tests {
             );
             camera.set_view_transform(
                 Decomposed::look_at_rh(
-                    eye_for_look_at(grid, Vector3::unit_z()),
-                    grid.center(),
+                    eye_for_look_at(bounds, Vector3::unit_z()),
+                    bounds.center(),
                     Vector3::new(0., 1., 0.),
                 )
                 .inverse_transform()

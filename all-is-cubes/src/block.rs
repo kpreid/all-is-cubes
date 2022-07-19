@@ -11,7 +11,7 @@ use std::sync::Arc;
 use cgmath::{EuclideanSpace as _, Point3};
 
 use crate::listen::Listener;
-use crate::math::{FreeCoordinate, Grid, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
+use crate::math::{FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::URef;
@@ -319,15 +319,17 @@ impl Block {
                 }
 
                 let resolution_g: GridCoordinate = resolution.into();
-                let full_resolution_grid =
-                    Grid::new(offset, [resolution_g, resolution_g, resolution_g]);
-                let occupied_grid = full_resolution_grid
-                    .intersection(block_space.grid())
-                    .unwrap_or_else(|| Grid::new(offset, [1, 1, 1]) /* arbitrary value */);
+                let full_resolution_bounds =
+                    GridAab::new(offset, [resolution_g, resolution_g, resolution_g]);
+                let occupied_bounds = full_resolution_bounds
+                    .intersection(block_space.bounds())
+                    .unwrap_or_else(
+                        || GridAab::new(offset, [1, 1, 1]), /* arbitrary value */
+                    );
 
                 let voxels = block_space
                     .extract(
-                        occupied_grid,
+                        occupied_bounds,
                         #[inline(always)]
                         |_index, sub_block_data, _lighting| {
                             Evoxel::from_block(sub_block_data.evaluated())
@@ -391,7 +393,7 @@ impl Block {
                 space: ref space_ref,
                 ..
             } => {
-                let relevant_cubes = Grid::for_block(resolution).translate(offset.to_vec());
+                let relevant_cubes = GridAab::for_block(resolution).translate(offset.to_vec());
                 space_ref.try_borrow()?.listen(listener.filter(move |msg| {
                     match msg {
                         SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
@@ -556,14 +558,14 @@ pub(crate) fn recursive_ray(ray: Ray, cube: GridPoint, resolution: Resolution) -
 /// through that block. This is equivalent to
 ///
 /// ```skip
-/// recursive_ray(ray, cube, resolution).cast().within_grid(Grid::for_block(resolution))
+/// recursive_ray(ray, cube, resolution).cast().within(GridAab::for_block(resolution))
 /// ```
 // TODO: Decide whether this is good public API
 #[inline]
 pub(crate) fn recursive_raycast(ray: Ray, cube: GridPoint, resolution: Resolution) -> Raycaster {
     recursive_ray(ray, cube, resolution)
         .cast()
-        .within_grid(Grid::for_block(resolution))
+        .within(GridAab::for_block(resolution))
 }
 
 /// Notification when an [`EvaluatedBlock`] result changes.
@@ -596,16 +598,16 @@ pub fn space_to_blocks(
     space_ref: URef<Space>,
 ) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
-    let source_grid = space_ref
+    let source_bounds = space_ref
         .try_borrow()
         // TODO: Not really the right error since this isn't actually an eval error.
         // Or is it close enough?
         .map_err(EvalBlockError::DataRefIs)?
-        .grid();
-    let destination_grid = source_grid.divide(resolution_g);
+        .bounds();
+    let destination_bounds = source_bounds.divide(resolution_g);
 
-    let mut destination_space = Space::empty(destination_grid);
-    destination_space.fill(destination_grid, move |cube| {
+    let mut destination_space = Space::empty(destination_bounds);
+    destination_space.fill(destination_bounds, move |cube| {
         Some(Block::from_primitive(Primitive::Recur {
             attributes: attributes.clone(),
             offset: GridPoint::from_vec(cube.to_vec() * resolution_g),

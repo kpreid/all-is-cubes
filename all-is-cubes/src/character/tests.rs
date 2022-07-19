@@ -9,7 +9,7 @@ use crate::block::{Block, AIR};
 use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool};
 use crate::listen::Sink;
-use crate::math::{Aab, Face6, Grid, Rgb};
+use crate::math::{Aab, Face6, GridAab, Rgb};
 use crate::physics::BodyTransaction;
 use crate::space::Space;
 use crate::time::Tick;
@@ -26,9 +26,9 @@ fn test_spawn(f: impl Fn(&mut Space) -> Spawn) -> Character {
 
 #[test]
 fn spawn_inferred_position() {
-    let bounds = Grid::new([0, 17, 0], [3, 3, 3]);
+    let bounds = GridAab::new([0, 17, 0], [3, 3, 3]);
     let character = test_spawn(|space| {
-        let mut spawn = Spawn::default_for_new_space(space.grid());
+        let mut spawn = Spawn::default_for_new_space(space.bounds());
         spawn.set_bounds(bounds);
         spawn
     });
@@ -48,7 +48,7 @@ fn spawn_inventory() {
         0.1, 0.2, 0.3
     ))))];
     let character = test_spawn(|space| {
-        let mut spawn = Spawn::default_for_new_space(space.grid());
+        let mut spawn = Spawn::default_for_new_space(space.bounds());
         spawn.set_inventory(inventory_data.clone());
         spawn
     });
@@ -68,7 +68,7 @@ fn spawn_look_direction_default() {
 #[test]
 fn spawn_look_direction() {
     let character = test_spawn(|space| {
-        let mut spawn = Spawn::default_for_new_space(space.grid());
+        let mut spawn = Spawn::default_for_new_space(space.bounds());
         spawn.set_look_direction(Vector3::new(1., 1., -1.));
         spawn
     });
