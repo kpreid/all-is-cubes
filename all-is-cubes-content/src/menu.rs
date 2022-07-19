@@ -151,7 +151,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     };
 
     let size = tree.requirements().minimum;
-    let bounds = GridAab::new([0, 0, 0], size);
+    let bounds = GridAab::from_lower_size([0, 0, 0], size);
 
     let mut space = Space::builder(bounds)
         .physics({

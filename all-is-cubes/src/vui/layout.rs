@@ -59,7 +59,7 @@ impl LayoutGrant {
             };
         }
         LayoutGrant {
-            bounds: GridAab::new(origin, sizes),
+            bounds: GridAab::from_lower_size(origin, sizes),
             gravity: self.gravity,
         }
     }
@@ -417,7 +417,7 @@ mod tests {
                 LayoutTree::leaf(LT::new("c", [1, 1, 1])),
             ],
         };
-        let grant = LayoutGrant::new(GridAab::new([10, 10, 10], [10, 10, 10]));
+        let grant = LayoutGrant::new(GridAab::from_lower_size([10, 10, 10], [10, 10, 10]));
         assert_eq!(
             tree.perform_layout(grant)
                 .unwrap()
@@ -427,21 +427,21 @@ mod tests {
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: GridAab::new([10, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::from_lower_size([10, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: GridAab::new([11, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::from_lower_size([11, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("c", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: GridAab::new([12, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::from_lower_size([12, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 }
@@ -461,7 +461,7 @@ mod tests {
                 LayoutTree::leaf(LT::new("b", [1, 1, 1])),
             ],
         };
-        let grant = LayoutGrant::new(GridAab::new([10, 10, 10], [10, 10, 10]));
+        let grant = LayoutGrant::new(GridAab::from_lower_size([10, 10, 10], [10, 10, 10]));
         assert_eq!(
             tree.perform_layout(grant)
                 .unwrap()
@@ -471,14 +471,14 @@ mod tests {
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: GridAab::new([10, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::from_lower_size([10, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
                     position: LayoutGrant {
-                        bounds: GridAab::new([14, 10, 10], [1, 10, 10]),
+                        bounds: GridAab::from_lower_size([14, 10, 10], [1, 10, 10]),
                         gravity: grant.gravity,
                     },
                 }

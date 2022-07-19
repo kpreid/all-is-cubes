@@ -971,7 +971,7 @@ mod tests {
     /// range while also using within().
     #[test]
     fn start_outside_of_integer_range_with_bounds() {
-        let bounds = GridAab::new([0, 0, 0], [10, 10, 10]);
+        let bounds = GridAab::from_lower_size([0, 0, 0], [10, 10, 10]);
         assert_no_steps(
             Raycaster::new(Point3::new(0., 1e303, 0.), Vector3::new(0., -1e303, 0.)).within(bounds),
         );
@@ -1007,7 +1007,7 @@ mod tests {
     fn within_bounds() {
         // Ray oriented diagonally on the -X side of bounds that are short on the X axis.
         let mut r = Raycaster::new(Point3::new(0.0, -0.25, -0.5), Vector3::new(1.0, 1.0, 1.0))
-            .within(GridAab::new(Point3::new(2, -10, -10), [2, 20, 20]));
+            .within(GridAab::from_lower_size([2, -10, -10], [2, 20, 20]));
         assert_steps_option(
             &mut r,
             vec![
@@ -1031,7 +1031,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "not implemented: multiple uses of .within()")]
     fn within_twice() {
-        let bounds = GridAab::new(Point3::new(2, -10, -10), [2, 20, 20]);
+        let bounds = GridAab::from_lower_size(Point3::new(2, -10, -10), [2, 20, 20]);
         let _ = Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
             .within(bounds)
             .within(bounds);
@@ -1057,7 +1057,7 @@ mod tests {
     /// which should produce zero steps.
     #[test]
     fn regression_test_2() {
-        let bounds = GridAab::new(Point3::new(0, 0, 0), [10, 10, 10]);
+        let bounds = GridAab::from_lower_size(Point3::new(0, 0, 0), [10, 10, 10]);
         assert_steps_option(
             &mut Raycaster::new(
                 Point3::new(18.166666666666668, 4.666666666666666, -3.0),
@@ -1103,7 +1103,7 @@ mod tests {
     fn intersection_point_random_test() {
         // A one-cube box, so that all possible rays should either intersect
         // exactly this cube, or none at all.
-        let bounds = GridAab::new([0, 0, 0], [1, 1, 1]);
+        let bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
         let ray_origins: Aab = bounds.expand(FaceMap::repeat(1)).into();
 
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);

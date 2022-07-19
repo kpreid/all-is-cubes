@@ -41,6 +41,8 @@
         - Methods named `grid()` that return the bounding box of something are now called `bounds()`.
         - `Grid::contains_grid()` is now `GridAab::contains_box()`.
         - `Raycaster::within_grid()` is now `Raycaster::within()`.
+        - `Grid::new()` is now `GridAab::from_lower_size()`.
+        - `Grid::checked_new()` is now `GridAab::checked_from_lower_size()`.
     
     - Renamed: `math::Face` is now `math::Face7`.
     - Renamed: `apps::AllIsCubesAppState` to `apps::Session`.

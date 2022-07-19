@@ -632,7 +632,7 @@ mod tests {
             })
             .target(|| {
                 // This space makes the test transactions at [0, 0, 0] out of bounds
-                Space::builder(GridAab::new([1, 0, 0], [1, 1, 1])).build_empty()
+                Space::builder(GridAab::from_lower_size([1, 0, 0], [1, 1, 1])).build_empty()
             })
             // TODO: more spaces
             .test();

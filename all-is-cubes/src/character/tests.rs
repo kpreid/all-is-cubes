@@ -26,7 +26,7 @@ fn test_spawn(f: impl Fn(&mut Space) -> Spawn) -> Character {
 
 #[test]
 fn spawn_inferred_position() {
-    let bounds = GridAab::new([0, 17, 0], [3, 3, 3]);
+    let bounds = GridAab::from_lower_size([0, 17, 0], [3, 3, 3]);
     let character = test_spawn(|space| {
         let mut spawn = Spawn::default_for_new_space(space.bounds());
         spawn.set_bounds(bounds);

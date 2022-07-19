@@ -101,7 +101,7 @@ fn convert_dot_vox_model(
     palette_blocks: &[Block],
     model: dot_vox::Model,
 ) -> Result<Space, DotVoxConversionError> {
-    let extent = GridAab::new(
+    let extent = GridAab::from_lower_size(
         [0, 0, 0],
         [
             model.size.x as i32,

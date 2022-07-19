@@ -162,15 +162,15 @@ pub fn make_slab(universe: &mut Universe, numerator: Resolution, denominator: Re
 /// use all_is_cubes::space::Space;
 /// use all_is_cubes::content::axes;
 ///
-/// let mut space = Space::empty(GridAab::new((-10, -10, -10), (21, 21, 21)));
+/// let mut space = Space::empty(GridAab::from_lower_upper([-10, -10, -10], [11, 11, 11]));
 /// axes(&mut space);
 ///
-/// assert_ne!(space[(10, 0, 0)], AIR);
-/// assert_ne!(space[(0, 10, 0)], AIR);
-/// assert_ne!(space[(0, 0, 10)], AIR);
-/// assert_ne!(space[(-10, 0, 0)], AIR);
-/// assert_ne!(space[(0, -10, 0)], AIR);
-/// assert_ne!(space[(0, 0, -10)], AIR);
+/// assert_ne!(space[[10, 0, 0]], AIR);
+/// assert_ne!(space[[0, 10, 0]], AIR);
+/// assert_ne!(space[[0, 0, 10]], AIR);
+/// assert_ne!(space[[-10, 0, 0]], AIR);
+/// assert_ne!(space[[0, -10, 0]], AIR);
+/// assert_ne!(space[[0, 0, -10]], AIR);
 /// ```
 pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
     for face in Face6::ALL {

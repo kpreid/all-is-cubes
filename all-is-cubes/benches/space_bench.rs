@@ -14,7 +14,8 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
 
     for &mutation_size in &[1, 4, 64] {
-        let bounds = GridAab::new([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
+        let bounds =
+            GridAab::from_lower_size([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
         let bigger_bounds = bounds.multiply(2);
         let size_description = format!("{}×{}×{}", mutation_size, mutation_size, mutation_size);
         let mutation_volume = bounds.volume();
@@ -124,7 +125,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
 pub fn grid_aab_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("GridAab");
 
-    let aab = GridAab::new([0, 0, 0], [256, 256, 256]);
+    let aab = GridAab::from_lower_size([0, 0, 0], [256, 256, 256]);
     group.throughput(Throughput::Elements(aab.volume() as u64));
     group.bench_function("GridAab::interior_iter", |b| {
         b.iter(|| {

@@ -533,7 +533,10 @@ mod tests {
             &drawable,
         )
         .unwrap();
-        assert_eq!(space.bounds(), GridAab::new((0, -1, 0), (1, 1, 1)));
+        assert_eq!(
+            space.bounds(),
+            GridAab::from_lower_size([0, -1, 0], [1, 1, 1])
+        );
         if let &block::Primitive::Recur {
             space: ref block_space_ref,
             offset,
@@ -568,7 +571,10 @@ mod tests {
             &drawable,
         )
         .unwrap();
-        assert_eq!(space.bounds(), GridAab::new((-1, 0, 0), (1, 1, 1)));
+        assert_eq!(
+            space.bounds(),
+            GridAab::from_lower_size([-1, 0, 0], [1, 1, 1])
+        );
         if let block::Primitive::Recur {
             space: block_space_ref,
             offset,

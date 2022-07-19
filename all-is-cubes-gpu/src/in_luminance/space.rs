@@ -128,7 +128,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
         if let Some(set) = &mut todo.light {
             // TODO: work in larger, ahem, chunks
             for cube in set.drain() {
-                light_texture.update(space, GridAab::new(cube, [1, 1, 1]))?;
+                light_texture.update(space, GridAab::from_lower_size(cube, [1, 1, 1]))?;
                 light_update_count += 1;
             }
         } else {

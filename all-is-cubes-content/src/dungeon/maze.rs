@@ -7,7 +7,7 @@ use all_is_cubes::math::{Face7, GridAab, GridArray, GridPoint};
 
 pub fn maze_to_array(maze: &Maze) -> GridArray<Field> {
     GridArray::from_fn(
-        GridAab::new([0, 0, 0], [maze.size.0, 1, maze.size.1]),
+        GridAab::from_lower_size([0, 0, 0], [maze.size.0, 1, maze.size.1]),
         |p| maze.get_field(&gp2m(p)).unwrap(),
     )
 }

@@ -203,7 +203,7 @@ impl Space {
     /// Constructs a `Space` that is entirely empty and whose coordinate system
     /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
     pub fn empty_positive(wx: GridCoordinate, wy: GridCoordinate, wz: GridCoordinate) -> Space {
-        Space::empty(GridAab::new((0, 0, 0), (wx, wy, wz)))
+        Space::empty(GridAab::from_lower_size([0, 0, 0], [wx, wy, wz]))
     }
 
     /// Registers a listener for mutations of this space.
@@ -453,7 +453,7 @@ impl Space {
     /// let mut space = Space::empty_positive(10, 10, 10);
     /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
     ///
-    /// space.fill(GridAab::new((0, 0, 0), (2, 1, 1)), |_point| Some(&a_block)).unwrap();
+    /// space.fill(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]), |_point| Some(&a_block)).unwrap();
     ///
     /// assert_eq!(space[(0, 0, 0)], a_block);
     /// assert_eq!(space[(1, 0, 0)], a_block);
@@ -496,7 +496,7 @@ impl Space {
     /// let mut space = Space::empty_positive(10, 10, 10);
     /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
     ///
-    /// space.fill_uniform(GridAab::new((0, 0, 0), (2, 1, 1)), &a_block).unwrap();
+    /// space.fill_uniform(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]), &a_block).unwrap();
     ///
     /// assert_eq!(&space[(0, 0, 0)], &a_block);
     /// assert_eq!(&space[(1, 0, 0)], &a_block);

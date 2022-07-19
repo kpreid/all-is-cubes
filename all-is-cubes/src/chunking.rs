@@ -40,7 +40,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
 
     /// Returns the bounds of this chunk as a [`GridAab`].
     pub fn bounds(self) -> GridAab {
-        GridAab::new(self.0 * CHUNK_SIZE, (CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE))
+        GridAab::from_lower_size(self.0 * CHUNK_SIZE, [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE])
     }
 }
 
@@ -190,8 +190,8 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
     // each chunk.
 
-    let candidates = GridAab::new(
-        (0, 0, 0),
+    let candidates = GridAab::from_lower_size(
+        [0, 0, 0],
         Vector3::new(1, 1, 1) * (view_distance_in_squared_chunks + 1),
     );
     let mut octant_chunks: Vec<GridVector> = Vec::with_capacity(candidates.volume());
@@ -392,7 +392,7 @@ mod tests {
     #[test]
     fn chunk_consistency() {
         // TODO: this is overkill; sampling the edge cases would be sufficient
-        for cube in GridAab::new((-1, -1, -1), (32, 32, 32)).interior_iter() {
+        for cube in GridAab::from_lower_size([-1, -1, -1], [32, 32, 32]).interior_iter() {
             assert!(cube_to_chunk::<16>(cube).bounds().contains_cube(cube));
         }
     }

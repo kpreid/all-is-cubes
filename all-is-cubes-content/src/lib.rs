@@ -102,7 +102,10 @@ fn draw_text_in_blocks<'a, C: Clone + VoxelColor<'a>>(
     )?;
     let truncated_block_box = name_blocks
         .bounds()
-        .intersection(GridAab::new([0, 0, 0], [max_length_in_blocks, 1, 1]))
+        .intersection(GridAab::from_lower_size(
+            [0, 0, 0],
+            [max_length_in_blocks, 1, 1],
+        ))
         .unwrap();
     space_to_space_copy(&name_blocks, truncated_block_box, space, transform)?;
     Ok(truncated_block_box)

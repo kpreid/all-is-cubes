@@ -77,7 +77,7 @@ macro_rules! exhibit {
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(name: "Transparency")]
 async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
-    let mut space = Space::empty(GridAab::new([-3, 0, -3], [7, 5, 7]));
+    let mut space = Space::empty(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]));
 
     let colors = [
         Rgb::new(1.0, 0.5, 0.5),
@@ -107,8 +107,8 @@ async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(name: "Voxel Transparency WIP")]
 async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
-    let footprint = GridAab::new([0, 0, 0], [7, 4, 7]);
-    let pool = GridAab::new([1, 0, 1], [5, 2, 5]);
+    let footprint = GridAab::from_lower_size([0, 0, 0], [7, 4, 7]);
+    let pool = GridAab::from_lower_size([1, 0, 1], [5, 2, 5]);
     let mut space = Space::empty(footprint);
 
     let water_voxel = Block::builder()
@@ -188,7 +188,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(name: "Knot")]
 async fn KNOT(this: &Exhibit, universe: &mut Universe) {
-    let footprint = GridAab::new([-2, -2, -1], [5, 5, 3]);
+    let footprint = GridAab::from_lower_size([-2, -2, -1], [5, 5, 3]);
     let resolution = 32;
     let resf = FreeCoordinate::from(resolution);
     let toroidal_radius = resf * 1.5;
@@ -284,7 +284,7 @@ async fn TEXT(_: &Exhibit, universe: &mut Universe) {
 async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
 
-    let footprint = GridAab::new([0, 0, -1], [3, 2, 3]);
+    let footprint = GridAab::from_lower_size([0, 0, -1], [3, 2, 3]);
     let mut space = Space::empty(footprint);
 
     let sweep_block = {
@@ -349,7 +349,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
 async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
     let half_block = make_slab(universe, 2, 4);
 
-    let footprint = GridAab::new([0, 0, 0], [5, 2, 4]);
+    let footprint = GridAab::from_lower_size([0, 0, 0], [5, 2, 4]);
     let mut space = Space::empty(footprint);
 
     for dx in -1..=1 {
@@ -390,7 +390,7 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(name: "Resolutions")]
 async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
-    let footprint = GridAab::new([0, 0, 0], [5, 2, 3]);
+    let footprint = GridAab::from_lower_size([0, 0, 0], [5, 2, 3]);
     let mut space = Space::empty(footprint);
 
     for (i, &resolution) in [1, 2, 3, 8, 16, 32].iter().enumerate() {
@@ -446,7 +446,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(name: "Rotations")]
 async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
-    let mut space = Space::empty(GridAab::new([-2, 0, -2], [5, 5, 5]));
+    let mut space = Space::empty(GridAab::from_lower_size([-2, 0, -2], [5, 5, 5]));
 
     let [_, central_block] = make_some_voxel_blocks(universe);
     let pointing_block = &demo_blocks[DemoBlocks::Arrow];
@@ -517,7 +517,7 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(name: "Colors")]
 async fn COLORS(_: &Exhibit, universe: &mut Universe) {
     let gradient_resolution = 5;
-    let mut space = Space::empty(GridAab::new(
+    let mut space = Space::empty(GridAab::from_lower_size(
         [0, 0, 0],
         [
             gradient_resolution * 2 - 1,
@@ -590,7 +590,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
     let separator_width = 4; // less than room_width/2
     let brightness = 1.0;
 
-    let interior = GridAab::new([0, 0, 0], [room_width, room_height, room_length]);
+    let interior = GridAab::from_lower_size([0, 0, 0], [room_width, room_height, room_length]);
     let mut space = Space::empty(interior.expand(FaceMap::repeat(1)));
 
     fn normalize(color: Rgb) -> Rgb {
@@ -672,7 +672,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
         |origin, direction, _length, wall_excluding_corners| {
             // Corner pillar
             space.fill_uniform(
-                GridAab::new(origin + GridVector::unit_y(), [1, room_height + 1, 1]),
+                GridAab::from_lower_size(origin + GridVector::unit_y(), [1, room_height + 1, 1]),
                 corner
                     .clone()
                     .rotate(GridRotation::from_to(Face6::NZ, direction, Face6::PY).unwrap()),
@@ -685,11 +685,11 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
 
     // Vertical separators
     space.fill_uniform(
-        GridAab::new([0, room_height / 2, 0], [separator_width, 1, room_length]),
+        GridAab::from_lower_size([0, room_height / 2, 0], [separator_width, 1, room_length]),
         &wall_block,
     )?;
     space.fill_uniform(
-        GridAab::new(
+        GridAab::from_lower_size(
             [room_width - separator_width, room_height / 2, 0],
             [separator_width, 1, room_length],
         ),
@@ -698,7 +698,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
 
     // Entrance door
     space.fill_uniform(
-        GridAab::new([room_width / 2 - 1, 0, room_length], [3, 2, 1]),
+        GridAab::from_lower_size([room_width / 2 - 1, 0, room_length], [3, 2, 1]),
         &AIR,
     )?;
 
@@ -727,7 +727,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
         // Separator between different light areas
         if i % 2 == 0 {
             space.fill_uniform(
-                GridAab::new(
+                GridAab::from_lower_size(
                     [room_width - separator_width, 0, z],
                     [separator_width, room_height, 1],
                 ),
@@ -735,7 +735,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
             )?;
         } else {
             space.fill_uniform(
-                GridAab::new([0, 0, z], [separator_width, room_height, 1]),
+                GridAab::from_lower_size([0, 0, z], [separator_width, room_height, 1]),
                 &wall_block,
             )?;
         }
@@ -789,7 +789,7 @@ async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
 async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
     let width = 6;
     let depth = 6;
-    let water_area = GridAab::new([0, -depth, 0], [width, depth, width]);
+    let water_area = GridAab::from_lower_size([0, -depth, 0], [width, depth, width]);
     let mut space = Space::empty(water_area);
     space.fill_uniform(
         water_area,

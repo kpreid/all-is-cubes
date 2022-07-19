@@ -67,7 +67,7 @@ impl Alloctree {
     /// Returns the region that could be allocated within.
     pub fn bounds(&self) -> GridAab {
         let size = expsize(self.size_exponent);
-        GridAab::new([0, 0, 0], [size, size, size])
+        GridAab::from_lower_size([0, 0, 0], [size, size, size])
     }
 
     pub fn occupied_volume(&self) -> usize {
@@ -165,7 +165,7 @@ impl AlloctreeNode {
 
                 children
                     .iter_mut()
-                    .zip(GridAab::new([0, 0, 0], [2, 2, 2]).interior_iter())
+                    .zip(GridAab::from_lower_size([0, 0, 0], [2, 2, 2]).interior_iter())
                     .filter_map(|(child, child_position)| {
                         child.allocate(
                             size_exponent - 1,
@@ -191,7 +191,7 @@ impl AlloctreeNode {
                 debug_assert!(size_exponent > 0, "tree is deeper than size");
                 let child_size = expsize(size_exponent - 1);
                 let which_child = relative_low_corner.map(|c| c.div_euclid(child_size));
-                let child_index = GridAab::new([0, 0, 0], [2, 2, 2])
+                let child_index = GridAab::from_lower_size([0, 0, 0], [2, 2, 2])
                     .index(which_child)
                     .expect("Alloctree::free: out of bounds");
                 children[child_index].free(

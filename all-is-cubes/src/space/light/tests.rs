@@ -187,7 +187,7 @@ fn animation_treated_as_visible() {
 fn reflectance_is_clamped() {
     let over_unity_block = Block::from(rgba_const!(16.0, 1.0, 0.0, 1.0));
     let sky_color = rgb_const!(0.5, 0.5, 0.5);
-    let mut space = Space::builder(GridAab::new([0, 0, 0], [5, 3, 3]))
+    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 3, 3]))
         .sky_color(sky_color)
         .build_empty();
     space.set([1, 1, 1], &over_unity_block).unwrap();

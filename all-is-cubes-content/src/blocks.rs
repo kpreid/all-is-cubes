@@ -245,7 +245,7 @@ pub async fn install_demo_blocks(
                 // Support legs, identifying the down / -Y direction.
                 let leg = Block::from(palette::STEEL);
                 space.fill_uniform(
-                    GridAab::new(
+                    GridAab::from_lower_size(
                         [resolution_g / 2 - 1, 0, resolution_g / 2 - 1],
                         [2, resolution_g / 2, 2],
                     ),

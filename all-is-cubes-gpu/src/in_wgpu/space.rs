@@ -207,9 +207,11 @@ impl SpaceRenderer {
         if let Some(set) = &mut todo.light {
             // TODO: work in larger, ahem, chunks
             for cube in set.drain() {
-                light_update_count +=
-                    self.light_texture
-                        .update(queue, space, GridAab::new(cube, [1, 1, 1]));
+                light_update_count += self.light_texture.update(
+                    queue,
+                    space,
+                    GridAab::from_lower_size(cube, [1, 1, 1]),
+                );
             }
         } else {
             light_update_count += self.light_texture.update_all(queue, space);

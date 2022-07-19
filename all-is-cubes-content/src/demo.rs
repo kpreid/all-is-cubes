@@ -185,8 +185,8 @@ fn cornell_box() -> Result<Space, InGenError> {
     // scale to something else entirely.
     let box_size = 55;
     // Add one block to all sides for wall thickness.
-    let bounds = GridAab::new(
-        (-1, -1, -1),
+    let bounds = GridAab::from_lower_size(
+        [-1, -1, -1],
         GridVector::new(1, 1, 1) * box_size + GridVector::new(2, 2, 2),
     );
     let mut space = Space::builder(bounds)
@@ -213,24 +213,22 @@ fn cornell_box() -> Result<Space, InGenError> {
         .build();
 
     // Floor.
-    space.fill_uniform(GridAab::new((0, -1, 0), (box_size, 1, box_size)), &white)?;
+    space.fill_uniform(GridAab::from_lower_size([0, -1, 0], [box_size, 1, box_size]), &white)?;
     // Ceiling.
-    space.fill_uniform(GridAab::new((0, box_size, 0), (box_size, 1, box_size)), &white)?;
+    space.fill_uniform(GridAab::from_lower_size([0, box_size, 0], [box_size, 1, box_size]), &white)?;
     // Light in ceiling.
-    space.fill_uniform(GridAab::from_lower_upper((21, box_size, 23), (34, box_size + 1, 33)), &light)?;
+    space.fill_uniform(GridAab::from_lower_upper([21, box_size, 23], [34, box_size + 1, 33]), &light)?;
     // Back wall.
-    space.fill_uniform(GridAab::new((0, 0, -1), (box_size, box_size, 1)), &white)?;
+    space.fill_uniform(GridAab::from_lower_size([0, 0, -1], [box_size, box_size, 1]), &white)?;
     // Right wall (green).
-    space.fill_uniform(GridAab::new((box_size, 0, 0), (1, box_size, box_size)), &green)?;
+    space.fill_uniform(GridAab::from_lower_size([box_size, 0, 0], [1, box_size, box_size]), &green)?;
     // Left wall (red).
-    space.fill_uniform(GridAab::new((-1, 0, 0), (1, box_size, box_size)), &red)?;
+    space.fill_uniform(GridAab::from_lower_size([-1, 0, 0], [1, box_size, box_size]), &red)?;
 
     // Block #1
-    space.fill_uniform(GridAab::new((29, 0, 36), (16, 16, 15)), &white)?;
+    space.fill_uniform(GridAab::from_lower_size([29, 0, 36], [16, 16, 15]), &white)?;
     // Block #2
-    space.fill_uniform(GridAab::new((10, 0, 13), (18, 33, 15)), &white)?;
-
-    // TODO: Explicitly define camera position (needs a means to do so).
+    space.fill_uniform(GridAab::from_lower_size([10, 0, 13], [18, 33, 15]), &white)?;
 
     Ok(space)
 }
@@ -246,7 +244,7 @@ fn cornell_box() -> Result<Space, InGenError> {
 async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenError> {
     assert!(shell_radius > planet_radius);
     let space_radius = shell_radius + 1; // TODO check off-by-one consistency
-    let bounds = GridAab::new(
+    let bounds = GridAab::from_lower_size(
         GridPoint::new(-1, -1, -1) * space_radius.into(),
         GridVector::new(1, 1, 1) * (space_radius * 2 + 1).into(),
     );

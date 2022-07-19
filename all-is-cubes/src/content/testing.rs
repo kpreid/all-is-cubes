@@ -52,7 +52,7 @@ pub fn lighting_bench_space(_universe: &mut Universe) -> Result<Space, InGenErro
             // Independent RNG for each section, so that the number of values used doesn't
             // affect the next section.
             let mut rng = Xoshiro256Plus::seed_from_u64((sx + sz * array_side_length) as u64);
-            let section_bounds = GridAab::new(
+            let section_bounds = GridAab::from_lower_size(
                 [
                     margin + sx * section_spacing,
                     -ydown + 1,

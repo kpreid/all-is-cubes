@@ -404,7 +404,7 @@ mod tests {
         };
         let moved = modifier.attach(original.clone());
 
-        let expected_bounds = GridAab::new([0, 8, 0], [16, 8, 16]);
+        let expected_bounds = GridAab::from_lower_size([0, 8, 0], [16, 8, 16]);
 
         let ev_original = original.evaluate().unwrap();
         assert_eq!(
@@ -447,7 +447,7 @@ mod tests {
         };
         let moved = modifier.attach(original.clone());
 
-        let expected_bounds = GridAab::new([0, 1, 0], [2, 1, 2]);
+        let expected_bounds = GridAab::from_lower_size([0, 1, 0], [2, 1, 2]);
 
         let ev_original = original.evaluate().unwrap();
         assert_eq!(

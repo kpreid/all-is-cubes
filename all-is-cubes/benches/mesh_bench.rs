@@ -125,7 +125,7 @@ fn checkerboard_block(universe: &mut Universe, voxels: [Block; 2]) -> Block {
 }
 
 fn checkerboard_space(blocks: [Block; 2]) -> Space {
-    let bounds = GridAab::new([0, 0, 0], [16, 16, 16]);
+    let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 16]);
     let mut space = Space::empty(bounds);
     space
         .fill(bounds, |p| {

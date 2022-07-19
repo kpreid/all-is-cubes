@@ -58,7 +58,7 @@ where
     )
     .transform(transform)
     .unwrap()
-    .minkowski_sum(max_brush.unwrap_or_else(|| GridAab::new([0, 0, 0], [0, 0, 0])))
+    .minkowski_sum(max_brush.unwrap_or_else(|| GridAab::from_lower_size([0, 0, 0], [0, 0, 0])))
     .unwrap();
 
     let mut space = Space::builder(bounds)

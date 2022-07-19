@@ -44,7 +44,7 @@ pub(crate) async fn atrium(
     let large_arch_count = Vector3::new(1, 0, 5); // x, dummy y, z
     let floor_count = 4;
 
-    let origin = GridAab::new([0, 0, 0], [1, 1, 1]);
+    let origin = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
     let atrium_footprint = origin.expand(FaceMap::symmetric([
         ((between_large_arches + WALL) * large_arch_count.x) / 2 - WALL,
         0,

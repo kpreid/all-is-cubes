@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn no_passing_through_blocks() {
         // Construct cubical box. TODO: worldgen utilities for this?
-        let mut space = Space::empty(GridAab::new((-1, -1, -1), (3, 3, 3)));
+        let mut space = Space::empty(GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]));
         let [wall_block] = make_some_blocks();
         space.fill_uniform(space.bounds(), &wall_block).unwrap();
         space.set([0, 0, 0], &AIR).unwrap();

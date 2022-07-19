@@ -197,7 +197,7 @@ impl TooltipWidget {
         universe: &mut Universe,
     ) -> Arc<Self> {
         let width_in_hud = 25; // TODO: magic number
-        let text_space = Space::builder(GridAab::new(
+        let text_space = Space::builder(GridAab::from_lower_size(
             GridPoint::origin(),
             GridVector::new(
                 width_in_hud * GridCoordinate::from(Self::RESOLUTION),

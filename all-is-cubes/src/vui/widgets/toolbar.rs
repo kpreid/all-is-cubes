@@ -52,7 +52,7 @@ impl Toolbar {
     ) -> Arc<Self> {
         let slot_text_resolution: Resolution = 32;
         let slot_text_space = universe.insert_anonymous(
-            Space::builder(GridAab::new(
+            Space::builder(GridAab::from_lower_size(
                 GridPoint::origin(),
                 // TODO: shrink vertical axis to fit text, once we've debugged it
                 GridVector::new(

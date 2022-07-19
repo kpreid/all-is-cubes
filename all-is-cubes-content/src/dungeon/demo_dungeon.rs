@@ -293,8 +293,9 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 let mut window_pos =
                                     origin + along_wall.normal_vector() * (midpoint + step);
                                 window_pos.y = window_y;
-                                if let Some(window_box) = GridAab::new(window_pos, [1, 3, 1])
-                                    .intersection(wall_excluding_corners_box)
+                                if let Some(window_box) =
+                                    GridAab::from_lower_size(window_pos, [1, 3, 1])
+                                        .intersection(wall_excluding_corners_box)
                                 {
                                     space.fill_uniform(window_box, &self.window_glass_block)?;
                                 }
@@ -365,7 +366,7 @@ pub(crate) async fn demo_dungeon(
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
     let dungeon_grid = DungeonGrid {
-        room_box: GridAab::new([0, 0, 0], [9, 5, 9]),
+        room_box: GridAab::from_lower_size([0, 0, 0], [9, 5, 9]),
         room_wall_thickness: FaceMap::repeat(1),
         gap_between_walls: Vector3::new(1, 1, 1),
     };
@@ -374,7 +375,7 @@ pub(crate) async fn demo_dungeon(
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     let theme = DemoTheme {
         dungeon_grid: dungeon_grid.clone(),
-        corridor_box: GridAab::new([3, 0, 3], [3, 3, 3]),
+        corridor_box: GridAab::from_lower_size([3, 0, 3], [3, 3, 3]),
         blocks: BlockProvider::using(universe)?,
         // TODO: use more appropriate blocks
         wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),

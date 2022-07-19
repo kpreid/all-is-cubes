@@ -88,10 +88,10 @@ impl HudLayout {
             let mut add_frame = |z, color| {
                 let frame_block = Block::from(color);
                 space
-                    .fill_uniform(GridAab::new((0, 0, z), (w, h, 1)), frame_block)
+                    .fill_uniform(GridAab::from_lower_size([0, 0, z], [w, h, 1]), frame_block)
                     .unwrap();
                 space
-                    .fill_uniform(GridAab::new((1, 1, z), (w - 2, h - 2, 1)), &AIR)
+                    .fill_uniform(GridAab::from_lower_size([1, 1, z], [w - 2, h - 2, 1]), &AIR)
                     .unwrap();
             };
             add_frame(bounds.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
@@ -317,7 +317,7 @@ impl HudBlocks {
         let frame_spacing_blocks = 2;
 
         let toolbar_frame_block_bounds =
-            GridAab::new([-1, -1, -1], [1 + frame_count * frame_spacing_blocks, 3, 3]);
+            GridAab::from_lower_size([-1, -1, -1], [1 + frame_count * frame_spacing_blocks, 3, 3]);
         let toolbar_frame_voxel_bounds = toolbar_frame_block_bounds.multiply(resolution_g);
         let mut toolbar_drawing_space = Space::builder(toolbar_frame_voxel_bounds)
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
@@ -425,8 +425,11 @@ impl HudBlocks {
             toolbar_pointer: {
                 (0..frame_count)
                     .map(|i| {
-                        slice_drawing(GridAab::new([i * frame_spacing_blocks, 1, -1], [1, 1, 3]))
-                            .translate([-(i * frame_spacing_blocks), 0, 0])
+                        slice_drawing(GridAab::from_lower_size(
+                            [i * frame_spacing_blocks, 1, -1],
+                            [1, 1, 3],
+                        ))
+                        .translate([-(i * frame_spacing_blocks), 0, 0])
                     })
                     .collect::<Vec<_>>()
                     .try_into()

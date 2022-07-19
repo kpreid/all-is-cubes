@@ -230,7 +230,7 @@ fn shrunken_box_has_no_extras() {
     let mut u = Universe::new();
     let less_than_full_block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {
-            if GridAab::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
+            if GridAab::from_lower_size([2, 2, 2], [4, 4, 4]).contains_cube(cube) {
                 non_uniform_fill(cube)
             } else {
                 &AIR
@@ -292,7 +292,7 @@ fn shrunken_box_uniform_color() {
     let filler_block = Block::from(Rgba::new(0.0, 1.0, 0.5, 1.0));
     let less_than_full_block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {
-            if GridAab::new((2, 2, 2), (4, 4, 4)).contains_cube(cube) {
+            if GridAab::from_lower_size([2, 2, 2], [4, 4, 4]).contains_cube(cube) {
                 &filler_block
             } else {
                 &AIR
@@ -431,7 +431,7 @@ fn fully_opaque_partial_block() {
     let block = Block::builder()
         .voxels_ref(8, {
             // The dimensions don't meet the PX face.
-            let mut block_space = Space::builder(GridAab::new([0, 0, 0], [4, 8, 8]))
+            let mut block_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 8, 8]))
                 .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                 .build_empty();
             // But the blocks are all opaque.

@@ -320,11 +320,11 @@ impl Block {
 
                 let resolution_g: GridCoordinate = resolution.into();
                 let full_resolution_bounds =
-                    GridAab::new(offset, [resolution_g, resolution_g, resolution_g]);
+                    GridAab::from_lower_size(offset, [resolution_g, resolution_g, resolution_g]);
                 let occupied_bounds = full_resolution_bounds
                     .intersection(block_space.bounds())
                     .unwrap_or_else(
-                        || GridAab::new(offset, [1, 1, 1]), /* arbitrary value */
+                        || GridAab::from_lower_size(offset, [1, 1, 1]), /* arbitrary value */
                     );
 
                 let voxels = block_space

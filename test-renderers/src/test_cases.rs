@@ -98,7 +98,7 @@ fn u(f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static) -> Option<U
 /// Generate colors which should be every sRGB component value.
 /// This should detect failures of output color mapping.
 async fn color_srgb_ramp(mut context: RenderTestContext) {
-    let bounds = GridAab::new([0, 0, 0], [16 * 2, 16 * 2, 1]);
+    let bounds = GridAab::from_lower_size([0, 0, 0], [16 * 2, 16 * 2, 1]);
     let mut universe = Universe::new();
     let mut space = Space::builder(bounds)
         .light_physics(LightPhysics::None)
@@ -434,7 +434,7 @@ async fn no_update(mut context: RenderTestContext) {
 /// Test (1) an explicitly set sky color, and (2) the info text rendering.
 async fn sky_and_info_text(mut context: RenderTestContext) {
     let mut universe = Universe::new();
-    let space = Space::builder(GridAab::new([0, 0, 0], [1, 1, 1]))
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
         .sky_color(rgb_const!(1.0, 0.5, 0.0))
         .build_empty();
     finish_universe_from_space(&mut universe, space);
@@ -564,7 +564,7 @@ fn unaltered_color_options() -> GraphicsOptions {
 }
 
 fn one_cube_space() -> Space {
-    let bounds = GridAab::new([0, 0, 0], [1, 1, 1]);
+    let bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
     let mut space = Space::builder(bounds)
         .sky_color(rgb_const!(0.5, 0.5, 0.5))
         .spawn(looking_at_one_cube_spawn(bounds))
@@ -589,7 +589,7 @@ fn looking_at_one_cube_spawn(bounds: GridAab) -> Spawn {
 
 /// A simple space to draw something in the UI layer.
 fn ui_space(universe: &mut Universe) -> URef<Space> {
-    let mut ui_space = Space::builder(GridAab::new([0, 0, 0], [4, 4, 4]))
+    let mut ui_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 4, 4]))
         .light_physics(all_is_cubes::space::LightPhysics::None)
         .sky_color(rgb_const!(1.0, 1.0, 0.5)) // blatantly wrong color that should not be seen
         .build_empty();
@@ -602,7 +602,7 @@ fn ui_space(universe: &mut Universe) -> URef<Space> {
 /// Construct a space suitable for testing long-distance rendering (fog).
 async fn fog_test_universe() -> Arc<Universe> {
     let z_length = 60;
-    let bounds = GridAab::new([-30, 0, -z_length], [60, 20, z_length]);
+    let bounds = GridAab::from_lower_size([-30, 0, -z_length], [60, 20, z_length]);
     let mut space = Space::builder(bounds)
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);
@@ -637,7 +637,10 @@ async fn fog_test_universe() -> Arc<Universe> {
         let x = (z * 19i32).rem_euclid(bounds.size().x) + bounds.lower_bounds().x;
 
         space
-            .fill_uniform(GridAab::new([x, 1, z], [1, 10, 1]), &pillar_block)
+            .fill_uniform(
+                GridAab::from_lower_size([x, 1, z], [1, 10, 1]),
+                &pillar_block,
+            )
             .unwrap();
 
         // lamp block placed in front of pillar so that its emission is reflected by the pillar
@@ -654,7 +657,7 @@ async fn fog_test_universe() -> Arc<Universe> {
 
 // Test scene for lighting and tone mapping.
 async fn light_test_universe() -> Arc<Universe> {
-    let bounds = GridAab::new([-10, -10, -1], [20, 20, 5]);
+    let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
     let mut space = Space::builder(bounds)
         .spawn_position(Point3::new(0., 0., 8.))
         .build_empty();
