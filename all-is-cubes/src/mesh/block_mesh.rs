@@ -10,12 +10,14 @@ use std::fmt::Debug;
 
 use crate::block::{EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, OpacityCategory, Rgba};
+use crate::math::{
+    Face6, Face7, FaceMap, FreeCoordinate, Grid, GridArray, GridCoordinate, OpacityCategory, Rgba,
+};
 use crate::mesh::{
     copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
     GreedyMesher, MeshOptions, QuadColoring, TextureAllocator, TextureTile,
 };
-use crate::space::{Grid, GridArray, Space};
+use crate::space::Space;
 
 /// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
 /// by [`Face7`].

@@ -8,8 +8,8 @@ use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::content::free_editing_starter_inventory;
 use crate::linking::InGenError;
-use crate::math::{Face7, FaceMap, Rgb};
-use crate::space::{Grid, LightPhysics, Space, SpacePhysics};
+use crate::math::{Face7, FaceMap, Grid, Rgb};
+use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 
 /// Test space for the `lighting_bench` benchmark.

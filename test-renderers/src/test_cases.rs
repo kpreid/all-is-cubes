@@ -20,8 +20,8 @@ use all_is_cubes::camera::{
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::math::{Face6, FreeCoordinate, GridCoordinate, NotNan, Rgb};
-use all_is_cubes::space::{Grid, LightPhysics, Space};
+use all_is_cubes::math::{Face6, FreeCoordinate, Grid, GridCoordinate, NotNan, Rgb};
+use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::universe::{URef, Universe, UniverseIndex};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;

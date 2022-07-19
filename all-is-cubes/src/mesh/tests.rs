@@ -12,10 +12,10 @@ use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
 use crate::math::{
     Face6::{self, *},
-    Face7, FaceMap, FreeCoordinate, GridPoint, GridRotation, Rgba,
+    Face7, FaceMap, FreeCoordinate, Grid, GridPoint, GridRotation, Rgba,
 };
 use crate::mesh::BlockMesh;
-use crate::space::{Grid, Space, SpacePhysics};
+use crate::space::{Space, SpacePhysics};
 use crate::universe::Universe;
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.

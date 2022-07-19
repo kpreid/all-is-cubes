@@ -21,8 +21,10 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::{NullListener, Sink};
-use crate::math::{Face6, GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba};
-use crate::space::{Grid, GridArray, Space, SpacePhysics, SpaceTransaction};
+use crate::math::{
+    Face6, Grid, GridArray, GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba,
+};
+use crate::space::{Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
 #[test]

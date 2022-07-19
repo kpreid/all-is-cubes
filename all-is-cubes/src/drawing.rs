@@ -31,8 +31,8 @@ use std::ops::{Range, RangeInclusive};
 pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
-use crate::math::{Face7, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
-use crate::space::{Grid, SetCubeError, Space, SpacePhysics, SpaceTransaction};
+use crate::math::{Face7, Grid, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
+use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
 /// Adapter to use a [`Space`] or [`SpaceTransaction`] as a [`DrawTarget`].

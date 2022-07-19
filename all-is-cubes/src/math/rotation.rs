@@ -287,7 +287,7 @@ impl GridRotation {
     /// That is, a `Grid` of that volume will be unchanged by rotation:
     ///
     /// ```
-    /// use all_is_cubes::{math::GridRotation, space::Grid};
+    /// use all_is_cubes::math::{Grid, GridRotation};
     ///
     /// let grid = Grid::for_block(8);
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_matrix(8);
@@ -299,7 +299,7 @@ impl GridRotation {
     /// *not* [`GridMatrix::transform_point`](cgmath::Transform::transform_point)
     /// (due to the lower-corner format of cube coordinates).
     /// ```
-    /// # use all_is_cubes::{math::{GridPoint, GridRotation}, space::Grid};
+    /// # use all_is_cubes::math::{Grid, GridPoint, GridRotation};
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_matrix(4);
     /// assert_eq!(rotation.transform_cube(GridPoint::new(0, 0, 0)), GridPoint::new(3, 0, 0));
     /// assert_eq!(rotation.transform_cube(GridPoint::new(3, 0, 0)), GridPoint::new(3, 0, 3));

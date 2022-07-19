@@ -12,8 +12,7 @@ use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
 
 use all_is_cubes::cgmath::{Point3, Vector3};
-use all_is_cubes::math::{GridCoordinate, Rgba};
-use all_is_cubes::space::Grid;
+use all_is_cubes::math::{Grid, GridCoordinate, Rgba};
 
 use crate::reloadable::Reloadable;
 use crate::GraphicsResourceError;

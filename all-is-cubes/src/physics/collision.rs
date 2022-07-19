@@ -11,10 +11,11 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 use super::POSITION_EPSILON;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution};
 use crate::math::{
-    Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, Rgba,
+    Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridArray, GridCoordinate, GridPoint,
+    Rgba,
 };
 use crate::raycast::{Ray, Raycaster};
-use crate::space::{GridArray, Space};
+use crate::space::Space;
 use crate::util::{ConciseDebug, CustomFormat, MapExtend};
 
 /// An individual collision contact; something in a [`Space`] that a moving [`Aab`]
@@ -545,9 +546,8 @@ pub(crate) fn nudge_on_ray(
 mod tests {
     use crate::block::{Block, AIR};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::point_to_enclosing_cube;
+    use crate::math::{point_to_enclosing_cube, Grid};
     use crate::raytracer::print_space;
-    use crate::space::Grid;
     use crate::universe::Universe;
 
     use super::*;

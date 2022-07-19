@@ -5,10 +5,9 @@ use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::block::{recursive_ray, Evoxel};
 use crate::camera::LightingOption;
-use crate::math::{Face7, FaceMap, FreeCoordinate, GridPoint, Rgb, Rgba};
+use crate::math::{Face7, FaceMap, FreeCoordinate, GridArray, GridPoint, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
-use crate::space::GridArray;
 
 /// Description of a surface the ray passes through (or from the volumetric perspective,
 /// a transition from one material to another).
@@ -333,7 +332,8 @@ mod tests {
     use crate::block::Block;
     use crate::camera::GraphicsOptions;
     use crate::content::{make_slab, palette};
-    use crate::space::{Grid, Space};
+    use crate::math::Grid;
+    use crate::space::Space;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
     use TraceStep::{EnterBlock, EnterSurface, Invisible};

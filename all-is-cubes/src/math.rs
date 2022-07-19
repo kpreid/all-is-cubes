@@ -20,6 +20,8 @@ mod coord;
 pub use coord::*;
 mod face;
 pub use face::*;
+mod grid_aab;
+pub use grid_aab::*;
 mod matrix;
 pub use matrix::*;
 mod rotation;

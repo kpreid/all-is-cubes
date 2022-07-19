@@ -8,8 +8,7 @@ use std::fmt;
 use cgmath::{Vector4, Zero as _};
 
 use crate::block::{BlockAttributes, BlockCollision, Resolution};
-use crate::math::{OpacityCategory, Rgba};
-use crate::space::{Grid, GridArray};
+use crate::math::{Grid, GridArray, OpacityCategory, Rgba};
 use crate::universe::RefError;
 use crate::util::{ConciseDebug, CustomFormat};
 

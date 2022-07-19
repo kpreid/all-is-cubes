@@ -5,8 +5,7 @@ use cgmath::{Point3, Vector3};
 
 use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
-use crate::math::{Face6, FreeCoordinate, NotNan};
-use crate::space::Grid;
+use crate::math::{Face6, FreeCoordinate, Grid, NotNan};
 use crate::universe::{RefVisitor, VisitRefs};
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].

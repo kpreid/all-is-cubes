@@ -12,9 +12,8 @@ use itertools::Itertools as _;
 use ordered_float::NotNan;
 
 use crate::chunking::OctantMask;
-use crate::math::{Aab, FreeCoordinate, Rgba};
+use crate::math::{Aab, FreeCoordinate, Grid, Rgba};
 use crate::raycast::Ray;
-use crate::space::Grid;
 
 mod graphics_options;
 pub use graphics_options::*;

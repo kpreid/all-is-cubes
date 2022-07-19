@@ -12,10 +12,9 @@ use std::sync::Arc;
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::math::{
-    int_magnitude_squared, point_to_enclosing_cube, FreeCoordinate, GridCoordinate, GridPoint,
-    GridVector,
+    int_magnitude_squared, point_to_enclosing_cube, FreeCoordinate, Grid, GridCoordinate,
+    GridPoint, GridVector,
 };
-use crate::space::Grid;
 
 /// Type to distinguish chunk coordinates from grid coordinates.
 ///

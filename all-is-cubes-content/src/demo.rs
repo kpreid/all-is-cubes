@@ -11,8 +11,8 @@ use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::{GenError, InGenError};
-use all_is_cubes::math::{FreeCoordinate, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
-use all_is_cubes::space::{Grid, LightPhysics, Space};
+use all_is_cubes::math::{FreeCoordinate, Grid, GridCoordinate, GridPoint, GridVector, Rgb, Rgba};
+use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
 

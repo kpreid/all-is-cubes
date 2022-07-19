@@ -151,7 +151,7 @@ impl GridMatrix {
     /// assert_eq!(reflected.transform_cube(GridPoint::new(1, 5, 5)), GridPoint::new(8, 5, 5));
     /// ```
     ///
-    /// [`Grid::single_cube`]: crate::space::Grid
+    /// [`Grid::single_cube`]: crate::math::Grid::single_cube
     #[inline]
     pub fn transform_cube(&self, cube: GridPoint) -> GridPoint {
         self.transform_point(cube + Vector3::new(1, 1, 1))

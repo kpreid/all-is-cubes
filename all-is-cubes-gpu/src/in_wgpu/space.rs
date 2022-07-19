@@ -7,17 +7,19 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
 
-use all_is_cubes::cgmath::{EuclideanSpace, Point3, Transform, Vector3};
-use all_is_cubes::content::palette;
 use instant::Instant;
 
 use all_is_cubes::camera::Camera;
+use all_is_cubes::cgmath::{EuclideanSpace, Point3, Transform, Vector3};
 use all_is_cubes::chunking::ChunkPos;
+use all_is_cubes::content::palette;
 use all_is_cubes::listen::Listener;
-use all_is_cubes::math::{Aab, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, Rgb};
+use all_is_cubes::math::{
+    Aab, Face6, FaceMap, FreeCoordinate, Grid, GridCoordinate, GridPoint, Rgb,
+};
 use all_is_cubes::mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
 use all_is_cubes::mesh::DepthOrdering;
-use all_is_cubes::space::{Grid, Space, SpaceChange};
+use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::universe::URef;
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};

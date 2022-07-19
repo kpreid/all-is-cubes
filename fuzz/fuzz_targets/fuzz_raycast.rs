@@ -2,8 +2,8 @@
 use libfuzzer_sys::fuzz_target;
 extern crate all_is_cubes;
 
+use all_is_cubes::math::Grid;
 use all_is_cubes::raycast::Raycaster;
-use all_is_cubes::space::Grid;
 
 const PRINT: bool = false;
 

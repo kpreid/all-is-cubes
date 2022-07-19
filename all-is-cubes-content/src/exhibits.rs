@@ -31,10 +31,10 @@ use all_is_cubes::drawing::{
 };
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    Face6, FaceMap, FreeCoordinate, Grid, GridCoordinate, GridMatrix, GridPoint, GridRotation,
     GridVector, NotNan, Rgb, Rgba,
 };
-use all_is_cubes::space::{Grid, Space, SpacePhysics};
+use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{rgb_const, rgba_const};
 

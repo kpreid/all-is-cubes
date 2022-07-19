@@ -7,9 +7,9 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{GridCoordinate, GridPoint};
+use all_is_cubes::math::{Grid, GridCoordinate, GridPoint};
 use all_is_cubes::rgba_const;
-use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 
 use crate::DemoBlocks;

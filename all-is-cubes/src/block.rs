@@ -11,9 +11,9 @@ use std::sync::Arc;
 use cgmath::{EuclideanSpace as _, Point3};
 
 use crate::listen::Listener;
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
+use crate::math::{FreeCoordinate, Grid, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
-use crate::space::{Grid, SetCubeError, Space, SpaceChange};
+use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::URef;
 
 mod attributes;

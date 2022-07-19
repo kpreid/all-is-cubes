@@ -24,11 +24,11 @@ use all_is_cubes::inv::Slot;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
+    Face6, FaceMap, FreeCoordinate, Grid, GridCoordinate, GridMatrix, GridPoint, GridRotation,
     GridVector, Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
-use all_is_cubes::space::{Grid, LightPhysics, Space, SpacePhysics};
+use all_is_cubes::space::{LightPhysics, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 

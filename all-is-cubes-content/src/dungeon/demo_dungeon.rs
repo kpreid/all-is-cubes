@@ -15,11 +15,11 @@ use all_is_cubes::content::palette;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    point_to_enclosing_cube, Face6, Face7, FaceMap, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Rgb,
+    point_to_enclosing_cube, Face6, Face7, FaceMap, Grid, GridArray, GridCoordinate, GridPoint,
+    GridRotation, GridVector, Rgb,
 };
 use all_is_cubes::rgb_const;
-use all_is_cubes::space::{Grid, GridArray, Space};
+use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 

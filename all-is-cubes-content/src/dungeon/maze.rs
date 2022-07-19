@@ -3,8 +3,7 @@
 
 use maze_generator::prelude::{Direction, Field, Maze};
 
-use all_is_cubes::math::{Face7, GridPoint};
-use all_is_cubes::space::{Grid, GridArray};
+use all_is_cubes::math::{Face7, Grid, GridArray, GridPoint};
 
 pub fn maze_to_array(maze: &Maze) -> GridArray<Field> {
     GridArray::from_fn(Grid::new([0, 0, 0], [maze.size.0, 1, maze.size.1]), |p| {

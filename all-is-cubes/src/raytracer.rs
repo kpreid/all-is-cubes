@@ -21,10 +21,11 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{Evoxel, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
-use crate::math::{point_to_enclosing_cube, smoothstep};
-use crate::math::{Face7, FreeCoordinate, GridPoint, Rgb, Rgba};
+use crate::math::{
+    point_to_enclosing_cube, smoothstep, Face7, FreeCoordinate, GridArray, GridPoint, Rgb, Rgba,
+};
 use crate::raycast::Ray;
-use crate::space::{BlockIndex, GridArray, PackedLight, Space, SpaceBlockData};
+use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
 use crate::util::{CustomFormat, StatusText};
 
 mod pixel_buf;

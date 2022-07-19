@@ -11,10 +11,9 @@
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use crate::math::{
-    point_to_enclosing_cube, CubeFace, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint,
-    Rgba,
+    point_to_enclosing_cube, CubeFace, Face7, FreeCoordinate, Geometry, Grid, GridCoordinate,
+    GridPoint, Rgba,
 };
-use crate::space::Grid;
 
 /// A ray; a half-infinite line segment (sometimes used as finite by the length of the
 /// direction vector).

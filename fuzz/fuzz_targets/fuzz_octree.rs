@@ -1,7 +1,7 @@
 #![no_main]
 extern crate all_is_cubes;
 
-use all_is_cubes::space::Grid;
+use all_is_cubes::math::Grid;
 use all_is_cubes_gpu::octree_alloc::{Alloctree, AlloctreeHandle};
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};

@@ -16,8 +16,8 @@ use luminance::texture::{
 };
 
 use all_is_cubes::cgmath::Vector3;
+use all_is_cubes::math::Grid;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
-use all_is_cubes::space::Grid;
 
 use crate::in_luminance::types::AicLumBackend;
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};

@@ -4,11 +4,8 @@
 //! [`GltfTextureAllocator`], produces glTF-compatible textures for blocks.
 
 use all_is_cubes::cgmath::Vector3;
-use all_is_cubes::mesh::Texel;
-use all_is_cubes::mesh::TextureAllocator;
-use all_is_cubes::mesh::TextureCoordinate;
-use all_is_cubes::mesh::TextureTile;
-use all_is_cubes::space::Grid;
+use all_is_cubes::math::Grid;
+use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
 #[derive(Debug)]
 pub(crate) struct GltfTextureAllocator {}

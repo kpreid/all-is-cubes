@@ -2,8 +2,7 @@
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
 use all_is_cubes::cgmath::EuclideanSpace;
-use all_is_cubes::math::{GridCoordinate, GridPoint, GridVector};
-use all_is_cubes::space::Grid;
+use all_is_cubes::math::{Grid, GridCoordinate, GridPoint, GridVector};
 
 /// An octree that knows how to allocate box regions of itself. It stores no other data.
 #[derive(Clone, Debug)]

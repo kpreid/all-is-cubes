@@ -21,10 +21,10 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    cube_to_midpoint, Face6, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
-    GridVector, NotNan, Rgb, Rgba,
+    cube_to_midpoint, Face6, FreeCoordinate, Grid, GridCoordinate, GridMatrix, GridPoint,
+    GridRotation, GridVector, NotNan, Rgb, Rgba,
 };
-use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};

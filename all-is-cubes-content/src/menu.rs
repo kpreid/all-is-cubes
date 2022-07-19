@@ -20,8 +20,8 @@ use all_is_cubes::{
     },
     inv::Tool,
     linking::InGenError,
-    math::{Face6, GridMatrix, GridVector},
-    space::{Grid, Space, SpacePhysics, SpaceTransaction},
+    math::{Face6, Grid, GridMatrix, GridVector},
+    space::{Space, SpacePhysics, SpaceTransaction},
     transaction::{Merge, Transaction as _},
     universe::Universe,
     vui::{

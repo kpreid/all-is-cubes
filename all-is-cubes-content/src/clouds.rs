@@ -4,8 +4,8 @@
 //! Cloud generation.
 
 use all_is_cubes::block::{Block, BlockCollision, AIR};
-use all_is_cubes::math::{GridCoordinate, GridPoint, NotNan, Rgb};
-use all_is_cubes::space::{Grid, SetCubeError, Space};
+use all_is_cubes::math::{Grid, GridCoordinate, GridPoint, NotNan, Rgb};
+use all_is_cubes::space::{SetCubeError, Space};
 
 use crate::noise::NoiseFnExt;
 

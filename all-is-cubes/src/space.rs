@@ -18,7 +18,9 @@ use crate::character::Spawn;
 use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
-use crate::math::{Face6, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, NotNan, Rgb};
+use crate::math::{
+    Face6, FreeCoordinate, Grid, GridArray, GridCoordinate, GridMatrix, GridPoint, NotNan, Rgb,
+};
 use crate::time::Tick;
 use crate::transaction::{Merge, Transaction as _};
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
@@ -27,9 +29,6 @@ use crate::util::{CustomFormat, StatusText};
 
 mod builder;
 pub use builder::SpaceBuilder;
-
-mod grid;
-pub use grid::*;
 
 mod light;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
@@ -448,8 +447,8 @@ impl Space {
     ///
     /// ```
     /// use all_is_cubes::block::{AIR, Block};
-    /// use all_is_cubes::math::Rgba;
-    /// use all_is_cubes::space::{Grid, Space};
+    /// use all_is_cubes::math::{Grid, Rgba};
+    /// use all_is_cubes::space::Space;
     ///
     /// let mut space = Space::empty_positive(10, 10, 10);
     /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
@@ -491,8 +490,8 @@ impl Space {
     ///
     /// ```
     /// use all_is_cubes::block::{AIR, Block};
-    /// use all_is_cubes::math::Rgba;
-    /// use all_is_cubes::space::{Grid, Space};
+    /// use all_is_cubes::math::{Grid, Rgba};
+    /// use all_is_cubes::space::Space;
     ///
     /// let mut space = Space::empty_positive(10, 10, 10);
     /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();

@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use cgmath::{Vector3, Zero as _};
 
-use crate::math::{point_to_enclosing_cube, Face6, GridPoint, GridVector};
-use crate::space::{Grid, SpaceTransaction};
-use crate::transaction::Merge;
+use crate::math::{point_to_enclosing_cube, Face6, Grid, GridPoint, GridVector};
+use crate::space::SpaceTransaction;
+use crate::transaction::Merge as _;
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
 
 /// Requested size and relative positioning of a widget or other thing occupying space,

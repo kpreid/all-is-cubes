@@ -1,19 +1,18 @@
 // Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
 // in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
 
-use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::math::Rgba;
-use all_is_cubes::rgba_const;
-use all_is_cubes::universe::Universe;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, AIR};
-
+use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::math::{Grid, Rgba};
 use all_is_cubes::mesh::{
     triangulate_block, triangulate_blocks, triangulate_space, BlockMeshes, BlockVertex,
     MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile,
 };
-use all_is_cubes::space::{Grid, Space};
+use all_is_cubes::rgba_const;
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::Universe;
 
 criterion_group!(benches, mesh_benches);
 criterion_main!(benches);

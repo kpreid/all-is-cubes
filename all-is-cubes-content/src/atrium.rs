@@ -16,11 +16,11 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
-    GridVector, Rgb,
+    Face6, Face7, FaceMap, FreeCoordinate, Grid, GridArray, GridCoordinate, GridMatrix, GridPoint,
+    GridRotation, GridVector, Rgb,
 };
 use all_is_cubes::rgba_const;
-use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpacePhysics};
+use all_is_cubes::space::{SetCubeError, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 

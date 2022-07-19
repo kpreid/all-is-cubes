@@ -6,7 +6,8 @@ use criterion::{
 };
 
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::space::{Grid, Space, SpaceTransaction};
+use all_is_cubes::math::Grid;
+use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::transaction::Transaction;
 
 pub fn space_bulk_mutation(c: &mut Criterion) {

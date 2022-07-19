@@ -7,9 +7,9 @@ use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::math::{Face7, GridCoordinate, GridRotation};
+use crate::math::{Face7, Grid, GridCoordinate, GridRotation};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
-use crate::space::{BlockIndex, Grid, Space};
+use crate::space::{BlockIndex, Space};
 
 /// Computes a triangle mesh of a [`Space`].
 ///

@@ -7,13 +7,12 @@ use std::iter::FusedIterator;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
 
-use crate::math::{Face6, FreeCoordinate, Geometry, GridCoordinate, GridPoint, Rgba};
-use crate::space::Grid;
+use crate::math::{Face6, FreeCoordinate, Geometry, Grid, GridCoordinate, GridPoint, Rgba};
 
 /// Axis-Aligned Box data type.
 ///
 /// Note that this has continuous coordinates, and a discrete analogue exists as
-/// [`Grid`](crate::space::Grid).
+/// [`Grid`](crate::math::Grid).
 #[derive(Copy, Clone, PartialEq)]
 pub struct Aab {
     // TODO: Should we be using NotNan coordinates?
@@ -259,7 +258,7 @@ impl Aab {
     /// expect, while non-integer bounds will be rounded outward:
     ///
     /// ```
-    /// use all_is_cubes::{math::Aab, space::Grid};
+    /// use all_is_cubes::math::{Aab, Grid};
     ///
     /// let grid = Aab::from_lower_upper([3.0, 0.5, 0.0], [5.0, 1.5, 1.0])
     ///     .round_up_to_grid();
@@ -273,7 +272,7 @@ impl Aab {
     /// then they will be clamped.
     ///
     /// ```
-    /// # use all_is_cubes::{math::Aab, space::Grid};
+    /// # use all_is_cubes::math::{Aab, Grid};
     /// use all_is_cubes::math::{FreeCoordinate, GridCoordinate};
     ///
     /// assert_eq!(

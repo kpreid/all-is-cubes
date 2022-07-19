@@ -274,7 +274,7 @@ impl From<GenError> for InGenError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::space::Grid;
+    use crate::math::Grid;
 
     fn _test_gen_error_is_sync()
     where

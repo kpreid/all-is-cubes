@@ -14,8 +14,8 @@ use all_is_cubes::{
         },
         VoxelBrush,
     },
-    math::{Face7, FaceMap, GridMatrix},
-    space::{Grid, SetCubeError, Space},
+    math::{Face7, FaceMap, Grid, GridMatrix},
+    space::{SetCubeError, Space},
     vui::{
         widgets::OneshotController, LayoutGrant, LayoutRequest, Layoutable, Widget,
         WidgetController,

@@ -401,7 +401,7 @@ mod tests {
     use crate::block::AIR;
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
-    use crate::space::Grid;
+    use crate::math::Grid;
     use crate::transaction::TransactionTester;
 
     use super::*;

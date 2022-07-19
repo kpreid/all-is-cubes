@@ -39,10 +39,10 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::{draw_to_blocks, VoxelColor};
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    cube_to_midpoint, point_to_enclosing_cube, Face6, FaceMap, FreeCoordinate, GridCoordinate,
-    GridMatrix, GridPoint, GridVector,
+    cube_to_midpoint, point_to_enclosing_cube, Face6, FaceMap, FreeCoordinate, Grid, GridArray,
+    GridCoordinate, GridMatrix, GridPoint, GridVector,
 };
-use all_is_cubes::space::{Grid, GridArray, SetCubeError, Space, SpaceTransaction};
+use all_is_cubes::space::{SetCubeError, Space, SpaceTransaction};
 
 mod animation;
 use all_is_cubes::universe::Universe;

@@ -12,8 +12,8 @@ use image::{DynamicImage, GenericImageView};
 
 use crate::block::Block;
 use crate::drawing::VoxelBrush;
-use crate::math::{GridPoint, GridRotation, Rgba};
-use crate::space::{Grid, SetCubeError, Space, SpacePhysics};
+use crate::math::{Grid, GridPoint, GridRotation, Rgba};
+use crate::space::{SetCubeError, Space, SpacePhysics};
 
 /// Take the pixels of the image and construct a [`Space`] from it.
 ///

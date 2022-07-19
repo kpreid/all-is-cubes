@@ -3,8 +3,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
+use all_is_cubes::math::Grid;
 use all_is_cubes::raycast::Raycaster;
-use all_is_cubes::space::Grid;
 
 pub fn raycast_bench(c: &mut Criterion) {
     c.bench_function("raycast: single step diagonal", |b| {

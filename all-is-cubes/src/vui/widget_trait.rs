@@ -9,7 +9,8 @@ use std::sync::{Arc, Mutex};
 
 use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
 use crate::inv::EphemeralOpaque;
-use crate::space::{Grid, Space, SpaceTransaction};
+use crate::math::Grid;
+use crate::space::{Space, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::{Merge as _, TransactionConflict};
 use crate::universe::{RefVisitor, VisitRefs};

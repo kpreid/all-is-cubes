@@ -5,8 +5,7 @@ use all_is_cubes::cgmath::Vector3;
 use noise::NoiseFn;
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::math::{cube_to_midpoint, GridPoint};
-use all_is_cubes::space::{Grid, GridArray};
+use all_is_cubes::math::{cube_to_midpoint, Grid, GridArray, GridPoint};
 
 /// Generates a [`Block`]-shape of noise values from a [`NoiseFn`].
 ///

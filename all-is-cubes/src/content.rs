@@ -158,7 +158,8 @@ pub fn make_slab(universe: &mut Universe, numerator: Resolution, denominator: Re
 ///
 /// ```
 /// use all_is_cubes::block::AIR;
-/// use all_is_cubes::space::{Grid, Space};
+/// use all_is_cubes::math::Grid;
+/// use all_is_cubes::space::Space;
 /// use all_is_cubes::content::axes;
 ///
 /// let mut space = Space::empty(Grid::new((-10, -10, -10), (21, 21, 21)));

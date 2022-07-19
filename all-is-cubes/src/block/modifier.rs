@@ -9,8 +9,7 @@ use crate::block::{
 };
 use crate::drawing::VoxelBrush;
 use crate::listen::Listener;
-use crate::math::{Face6, GridCoordinate, GridRotation, Rgb, Rgba};
-use crate::space::{Grid, GridArray};
+use crate::math::{Face6, Grid, GridArray, GridCoordinate, GridRotation, Rgb, Rgba};
 use crate::universe::{RefVisitor, VisitRefs};
 
 /// Modifiers can be applied to a [`Block`] to change the result of
@@ -288,8 +287,8 @@ mod tests {
     use crate::block::{BlockAttributes, BlockCollision, Evoxel, Primitive, AIR};
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::drawing::VoxelBrush;
-    use crate::math::{GridPoint, OpacityCategory, Rgba};
-    use crate::space::{Grid, Space};
+    use crate::math::{Grid, GridPoint, OpacityCategory, Rgba};
+    use crate::space::Space;
     use crate::time::Tick;
     use crate::universe::Universe;
     use cgmath::EuclideanSpace;

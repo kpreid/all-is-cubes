@@ -16,7 +16,7 @@ use crate::math::{
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
-/// [`Grid`]s are used to specify the coordinate extent of [`Space`](super::Space)s, and
+/// [`Grid`]s are used to specify the coordinate extent of [`Space`](crate::space::Space)s, and
 /// regions within them.
 ///
 /// When we refer to “a cube” in a [`Grid`], that is a unit cube which is identified by the
@@ -186,10 +186,10 @@ impl Grid {
     /// Computes the volume of this grid in cubes, i.e. the sum of all sizes.
     ///
     /// ```
-    /// let grid = all_is_cubes::space::Grid::new([-10, 3, 7], [100, 200, 300]);
+    /// let grid = all_is_cubes::math::Grid::new([-10, 3, 7], [100, 200, 300]);
     /// assert_eq!(grid.volume(), 6_000_000);
 
-    /// let grid = all_is_cubes::space::Grid::new([0, 0, 0], [100, 200, 0]);
+    /// let grid = all_is_cubes::math::Grid::new([0, 0, 0], [100, 200, 0]);
     /// assert_eq!(grid.volume(), 0);
     /// ```
     pub fn volume(&self) -> usize {
@@ -210,7 +210,7 @@ impl Grid {
     /// first or last.
     ///
     /// ```
-    /// let grid = all_is_cubes::space::Grid::new((0, 0, 0), (10, 10, 10));
+    /// let grid = all_is_cubes::math::Grid::new((0, 0, 0), (10, 10, 10));
     /// assert_eq!(grid.index((0, 0, 0)), Some(0));
     /// assert_eq!(grid.index((1, 2, 3)), Some(123));
     /// assert_eq!(grid.index((9, 9, 9)), Some(999));
@@ -290,7 +290,7 @@ impl Grid {
     /// may be at a half-block position.
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     /// use cgmath::Point3;
     ///
     /// let grid = Grid::new((0, 0, -2), (10, 3, 4));
@@ -304,7 +304,7 @@ impl Grid {
     ///
     /// ```
     /// use all_is_cubes::math::GridPoint;
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     /// let grid = Grid::new((10, 20, 30), (1, 2, 3));
     /// assert_eq!(
     ///     grid.interior_iter().collect::<Vec<GridPoint>>(),
@@ -325,7 +325,7 @@ impl Grid {
     /// volume.
     ///
     /// ```
-    /// let grid = all_is_cubes::space::Grid::new((4, 4, 4), (6, 6, 6));
+    /// let grid = all_is_cubes::math::Grid::new((4, 4, 4), (6, 6, 6));
     /// assert!(!grid.contains_cube((3, 5, 5)));
     /// assert!(grid.contains_cube((4, 5, 5)));
     /// assert!(grid.contains_cube((9, 5, 5)));
@@ -340,7 +340,7 @@ impl Grid {
     /// TODO: Precisely define the behavior on zero volume grids.
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     /// assert!(Grid::new((4, 4, 4), (6, 6, 6)).contains_grid(
     ///     Grid::new((4, 4, 4), (6, 6, 6))));
     /// assert!(!Grid::new((4, 4, 4), (6, 6, 6)).contains_grid(
@@ -366,7 +366,7 @@ impl Grid {
     /// TODO: Precisely define the behavior on zero volume grids.
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     ///
     /// let g1 = Grid::new([1, 2, 3], [4, 5, 6]);
     /// assert_eq!(g1.intersection(g1), Some(g1));
@@ -398,7 +398,7 @@ impl Grid {
     /// or [`GridOverflowError`] if the volume of the result exceeds [`usize::MAX`].
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     ///
     /// let g1 = Grid::new([1, 2, 3], [1, 1, 1]);
     /// assert_eq!(g1.union(g1), Ok(g1));
@@ -431,7 +431,7 @@ impl Grid {
     /// Returns a random cube contained by the grid, if there are any.
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     /// use rand::SeedableRng;
     /// let mut rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
     ///
@@ -459,7 +459,7 @@ impl Grid {
     /// Moves the grid to another location with unchanged size and orientation.
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     ///
     /// assert_eq!(
     ///     Grid::new((0, 0, 0), (10, 20, 30)).translate((-10, 0, 0)),
@@ -506,7 +506,7 @@ impl Grid {
     /// Panics if the divisor is not positive.
     ///
     /// ```
-    /// # use all_is_cubes::space::Grid;
+    /// # use all_is_cubes::math::Grid;
     /// assert_eq!(
     ///     Grid::new((-10, -10, -10), (20, 20, 20)).divide(10),
     ///     Grid::new((-1, -1, -1), (2, 2, 2)),
@@ -547,7 +547,7 @@ impl Grid {
     /// Scales the grid up by the given factor.
     ///
     /// ```
-    /// # use all_is_cubes::space::Grid;
+    /// # use all_is_cubes::math::Grid;
     /// assert_eq!(
     ///     Grid::new((-1, 2, 3), (4, 5, 6)).multiply(10),
     ///     Grid::new((-10, 20, 30), (40, 50, 60)),
@@ -566,7 +566,7 @@ impl Grid {
     /// instead.
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     /// use all_is_cubes::math::FaceMap;
     ///
     /// assert_eq!(
@@ -603,7 +603,7 @@ impl Grid {
     /// For example, it may be used to construct the walls of a room:
     ///
     /// ```
-    /// use all_is_cubes::space::Grid;
+    /// use all_is_cubes::math::Grid;
     /// use all_is_cubes::math::Face6;
     ///
     /// let interior = Grid::from_lower_upper([10, 10, 10], [20, 20, 20]);
@@ -612,13 +612,13 @@ impl Grid {
     ///
     /// assert_eq!(left_wall, Grid::from_lower_upper([8, 10, 10], [10, 20, 20]));
     /// assert_eq!(right_wall, Grid::from_lower_upper([20, 10, 10], [22, 20, 20]));
-    /// # Ok::<(), all_is_cubes::space::GridOverflowError>(())
+    /// # Ok::<(), all_is_cubes::math::GridOverflowError>(())
     /// ```
     ///
     /// Example of negative thickness:
     ///
     /// ```
-    /// # use all_is_cubes::space::Grid;
+    /// # use all_is_cubes::math::Grid;
     /// # use all_is_cubes::math::Face6;
     ///
     /// let grid = Grid::from_lower_upper([10, 10, 10], [20, 20, 20]);
@@ -631,7 +631,7 @@ impl Grid {
     ///     grid.abut(Face6::PX, -30)?,
     ///     Grid::from_lower_upper([10, 10, 10], [20, 20, 20]),
     /// );
-    /// # Ok::<(), all_is_cubes::space::GridOverflowError>(())
+    /// # Ok::<(), all_is_cubes::math::GridOverflowError>(())
     /// ```
     #[inline]
     pub fn abut(self, face: Face6, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
@@ -772,7 +772,7 @@ impl FusedIterator for GridIter {}
 #[error("{0}")]
 pub struct GridOverflowError(String);
 
-/// A 3-dimensional array with arbitrary element type instead of [`Space`](super::Space)'s
+/// A 3-dimensional array with arbitrary element type instead of [`Space`](crate::space::Space)'s
 /// fixed types.
 ///
 /// TODO: Should we rebuild Space on top of this?

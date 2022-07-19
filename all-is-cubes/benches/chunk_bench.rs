@@ -7,7 +7,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{Point3, Vector2};
 use all_is_cubes::chunking::{ChunkChart, ChunkPos, OctantMask};
-use all_is_cubes::space::Grid;
+use all_is_cubes::math::Grid;
 
 /// Test the performance of strategies to choose chunks to draw.
 pub fn cull_bench(c: &mut Criterion) {

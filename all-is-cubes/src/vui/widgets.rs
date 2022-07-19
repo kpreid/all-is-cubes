@@ -20,8 +20,8 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::EphemeralOpaque;
 use crate::listen::{DirtyFlag, ListenableSource};
-use crate::math::{GridMatrix, GridPoint, GridVector};
-use crate::space::{Grid, SpaceTransaction};
+use crate::math::{Grid, GridMatrix, GridPoint, GridVector};
+use crate::space::SpaceTransaction;
 use crate::time::Tick;
 use crate::vui::{
     ActivatableRegion, InstallVuiError, LayoutGrant, LayoutRequest, Layoutable, Widget,

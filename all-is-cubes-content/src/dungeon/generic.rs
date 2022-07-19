@@ -5,8 +5,8 @@ use all_is_cubes::util::YieldProgress;
 
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, Vector3};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Face6, FaceMap, GridCoordinate, GridPoint, GridVector};
-use all_is_cubes::space::{Grid, GridArray, Space};
+use all_is_cubes::math::{Face6, FaceMap, Grid, GridArray, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::space::Space;
 
 /// Defines the dimensions that dungeon room construction must live within.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

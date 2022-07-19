@@ -10,8 +10,8 @@ use instant::Instant;
 
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::content::palette;
+use all_is_cubes::math::Grid;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
-use all_is_cubes::space::Grid;
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_grid};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
