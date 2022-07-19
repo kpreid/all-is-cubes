@@ -606,8 +606,13 @@ where
     fn stale_blocks(&self, block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>) -> bool {
         self.block_dependencies
             .iter()
-            .copied()
-            .any(|(index, version)| block_meshes.versioning[usize::from(index)] != version)
+            .any(|&(index, version)| block_meshes.versioning[usize::from(index)] != version)
+        // Note: We could also check here to avoid recomputing the mesh while we're still
+        // working on blocks that the mesh needs,
+        // && self.block_dependencies.iter().all(|&(index, _version)| {
+        //     block_meshes.versioning[usize::from(index)] != BlockMeshVersion::NotReady
+        // })
+        // but empirically, I tried that and the startup performance is near-identical.
     }
 }
 
