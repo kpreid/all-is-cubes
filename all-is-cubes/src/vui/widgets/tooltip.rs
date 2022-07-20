@@ -189,7 +189,7 @@ pub(crate) struct TooltipWidget {
 }
 
 impl TooltipWidget {
-    const RESOLUTION: Resolution = 16;
+    const RESOLUTION: Resolution = Resolution::R16;
 
     pub(crate) fn new(
         state: Arc<Mutex<TooltipState>>,
@@ -319,7 +319,11 @@ mod tests {
     fn tooltip_timeout_and_dirty_text() {
         // TODO: reduce boilerplate
         let mut universe = Universe::new();
-        let hud_blocks = &block_on(HudBlocks::new(&mut universe, YieldProgress::noop(), 16));
+        let hud_blocks = &block_on(HudBlocks::new(
+            &mut universe,
+            YieldProgress::noop(),
+            Resolution::R16,
+        ));
 
         // Initial state: no update.
         let mut t = TooltipState::default();

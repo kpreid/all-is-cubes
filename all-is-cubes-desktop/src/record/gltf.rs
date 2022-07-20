@@ -290,7 +290,7 @@ fn convert_camera(name: Option<String>, camera: &Camera) -> gltf_json::Camera {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::block::{Block, AIR};
+    use all_is_cubes::block::{Block, Resolution, AIR};
     use all_is_cubes::camera::GraphicsOptions;
     use all_is_cubes::content::make_some_blocks;
     use all_is_cubes::mesh::{triangulate_blocks, triangulate_space, MeshOptions, SpaceMesh};
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn gltf_smoke_test() {
         // Construct recursive block.
-        let resolution = 4;
+        let resolution = Resolution::R4;
         let mut u = Universe::new();
         let mut blocks = Vec::from(make_some_blocks::<2>());
         blocks.push(AIR);

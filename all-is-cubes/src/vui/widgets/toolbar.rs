@@ -50,7 +50,7 @@ impl Toolbar {
         slot_count: usize,
         universe: &mut Universe,
     ) -> Arc<Self> {
-        let slot_text_resolution: Resolution = 32;
+        let slot_text_resolution = Resolution::R32;
         let slot_text_space = universe.insert_anonymous(
             Space::builder(GridAab::from_lower_size(
                 GridPoint::origin(),

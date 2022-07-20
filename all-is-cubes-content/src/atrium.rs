@@ -9,7 +9,7 @@ use exhaust::Exhaust;
 use noise::Seedable;
 
 use all_is_cubes::block::{
-    space_to_blocks, Block, BlockAttributes, BlockCollision, RotationPlacementRule, AIR,
+    space_to_blocks, Block, BlockAttributes, BlockCollision, Resolution, RotationPlacementRule, AIR,
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
 use all_is_cubes::character::Spawn;
@@ -376,7 +376,7 @@ async fn install_atrium_blocks(
     universe: &mut Universe,
     progress: YieldProgress,
 ) -> Result<BlockProvider<AtriumBlocks>, InGenError> {
-    let resolution = 16;
+    let resolution = Resolution::R16;
     let resolution_g = GridCoordinate::from(resolution);
     let stone_base = Block::from(rgba_const!(0.53, 0.48, 0.40, 1.0));
     let heavy_grout_base = Block::from(rgba_const!(0.1, 0.1, 0.1, 1.0));
@@ -579,7 +579,7 @@ fn generate_arch<'b>(
     universe: &mut Universe,
     stone_range: &[Block], // TODO: clarify
     brick_pattern: impl Fn(GridPoint) -> &'b Block,
-    resolution: u8,
+    resolution: Resolution,
     width_blocks: GridCoordinate,
     height_blocks: GridCoordinate,
 ) -> Result<Space, SetCubeError> {

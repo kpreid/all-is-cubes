@@ -123,8 +123,7 @@ impl GridAab {
     /// If you need such a box at a position other than the origin, use
     /// [`GridAab::translate()`].
     pub const fn for_block(resolution: Resolution) -> GridAab {
-        // The limited range of Resolution lets us write this as const.
-        let size = resolution as GridCoordinate;
+        let size = resolution.to_grid();
         GridAab {
             lower_bounds: GridPoint::new(0, 0, 0),
             sizes: GridVector::new(size, size, size),
@@ -820,7 +819,7 @@ impl<V> GridArray<V> {
     /// [`.translate(offset)`](Self::translate), or use [`GridArray::from_elements()`]
     /// instead.
     pub fn from_element(value: V) -> Self {
-        Self::from_elements(GridAab::for_block(1), [value]).unwrap()
+        Self::from_elements(GridAab::for_block(Resolution::R1), [value]).unwrap()
     }
 
     /// Constructs a [`GridArray`] containing the provided elements, which must be in the
@@ -989,6 +988,7 @@ pub struct ArrayLengthError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::Resolution::*;
     use indoc::indoc;
 
     #[test]
@@ -1004,16 +1004,16 @@ mod tests {
     #[test]
     fn for_block() {
         assert_eq!(
-            GridAab::for_block(1),
-            GridAab::from_lower_size((0, 0, 0), (1, 1, 1))
+            GridAab::for_block(R1),
+            GridAab::from_lower_size([0, 0, 0], [1, 1, 1])
         );
         assert_eq!(
-            GridAab::for_block(10),
-            GridAab::from_lower_size((0, 0, 0), (10, 10, 10))
+            GridAab::for_block(R16),
+            GridAab::from_lower_size([0, 0, 0], [16, 16, 16])
         );
         assert_eq!(
-            GridAab::for_block(Resolution::MAX),
-            GridAab::from_lower_size((0, 0, 0), (255, 255, 255))
+            GridAab::for_block(R256),
+            GridAab::from_lower_size([0, 0, 0], [256, 256, 256])
         );
     }
 
@@ -1172,7 +1172,7 @@ mod tests {
         let element = String::from("x");
         assert_eq!(
             GridArray::from_element(element.clone()),
-            GridArray::from_elements(GridAab::for_block(1), [element]).unwrap(),
+            GridArray::from_elements(GridAab::for_block(Resolution::R1), [element]).unwrap(),
         );
     }
 

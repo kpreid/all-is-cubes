@@ -3,7 +3,7 @@
 
 use std::any::TypeId;
 
-use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, AIR};
+use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, Resolution, AIR};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
@@ -195,7 +195,11 @@ fn visit_refs_block_def_space() {
     let space_ref = u
         .insert("s".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
-    let block_def = BlockDef::new(Block::builder().voxels_ref(1, space_ref).build());
+    let block_def = BlockDef::new(
+        Block::builder()
+            .voxels_ref(Resolution::R1, space_ref)
+            .build(),
+    );
     let block_ref = u.insert("has_refs".into(), block_def).unwrap();
     assert_eq!(ListRefs::list(&block_ref), vec!["s".into()]);
 }

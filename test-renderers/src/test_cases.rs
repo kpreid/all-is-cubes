@@ -13,7 +13,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::block::Block;
+use all_is_cubes::block::{Block, Resolution::R1};
 use all_is_cubes::camera::{
     ExposureOption, FogOption, GraphicsOptions, LightingOption, ToneMappingOperator,
     TransparencyOption, Viewport,
@@ -190,7 +190,7 @@ async fn fog(mut context: RenderTestContext, fog: FogOption) {
 async fn follow_character_change(context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut character_of_a_color = |color: Rgb| -> URef<Character> {
-        let space = Space::builder(GridAab::for_block(1))
+        let space = Space::builder(GridAab::for_block(R1))
             .sky_color(color)
             .build_empty();
         let character = Character::spawn_default(universe.insert_anonymous(space));

@@ -105,11 +105,11 @@ mod tests {
 
     #[test]
     fn falling_collision_partial_block() {
-        const RES: Resolution = 4;
+        const RES: Resolution = Resolution::R4;
         let x_velocity = 0.2;
 
         let u = &mut Universe::new();
-        let block = make_slab(u, RES / 2, RES);
+        let block = make_slab(u, i32::from(RES) / 2, RES);
 
         let mut space = Space::empty_positive(1, 1, 1);
         space.set((0, 0, 0), &block).unwrap();

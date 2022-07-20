@@ -7,7 +7,7 @@ use std::fmt;
 
 use cgmath::{Vector4, Zero as _};
 
-use crate::block::{BlockAttributes, BlockCollision, Resolution};
+use crate::block::{BlockAttributes, BlockCollision, Resolution, Resolution::R1};
 use crate::math::{GridAab, GridArray, OpacityCategory, Rgba};
 use crate::universe::RefError;
 use crate::util::{ConciseDebug, CustomFormat};
@@ -88,7 +88,7 @@ impl EvaluatedBlock {
             attributes,
             color,
             voxels: None,
-            resolution: 1,
+            resolution: R1,
             opaque: color.fully_opaque(),
             visible: !color.fully_transparent(),
             voxel_opacity_mask: if color.fully_transparent() {

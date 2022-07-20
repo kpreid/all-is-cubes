@@ -5,7 +5,7 @@ use cgmath::Zero;
 
 use crate::block::{
     Block, BlockAttributes, BlockChange, BlockCollision, EvalBlockError, EvaluatedBlock, Evoxel,
-    AIR,
+    Resolution::R16, AIR,
 };
 use crate::drawing::VoxelBrush;
 use crate::listen::Listener;
@@ -139,11 +139,12 @@ impl Modifier {
 
                 let (original_bounds, effective_resolution) = match value.voxels.as_ref() {
                     Some(array) => (array.bounds(), value.resolution),
-                    // Treat color blocks as having a resolution of 16. TODO: Improve on this hardcoded constant.
-                    None => (GridAab::for_block(16), 16),
+                    // Treat color blocks as having a resolution of 16. TODO: Improve on this hardcoded constant
+                    None => (GridAab::for_block(R16), R16),
                 };
 
                 // For now, our strategy is to work in units of the block's resolution.
+                // TODO: Generalize to being able to increase resolution to a chosen minimum.
                 let distance_in_res = GridCoordinate::from(distance)
                     * GridCoordinate::from(effective_resolution)
                     / 256;
@@ -284,6 +285,7 @@ impl VisitRefs for Modifier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::Resolution::{R16, R2};
     use crate::block::{BlockAttributes, BlockCollision, Evoxel, Primitive, AIR};
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::drawing::VoxelBrush;
@@ -315,7 +317,7 @@ mod tests {
     // a new field is a potential bug.
     #[test]
     fn rotate_evaluation() {
-        let resolution = 2;
+        let resolution = R2;
         let block_bounds = GridAab::for_block(resolution);
         let rotation = GridRotation::RYXZ;
         let mut universe = Universe::new();
@@ -354,7 +356,7 @@ mod tests {
                         collision: BlockCollision::Hard,
                     }
                 })),
-                resolution: 2,
+                resolution: R2,
                 opaque: false,
                 visible: true,
                 voxel_opacity_mask: Some(GridArray::from_fn(block_bounds, |cube| {
@@ -419,7 +421,7 @@ mod tests {
                     expected_bounds,
                     Evoxel::from_block(&ev_original)
                 )),
-                resolution: 16,
+                resolution: R16,
                 opaque: false,
                 visible: true,
                 voxel_opacity_mask: Some(GridArray::repeat(
@@ -433,7 +435,7 @@ mod tests {
     #[test]
     fn move_voxel_block_evaluation() {
         let mut universe = Universe::new();
-        let resolution = 2;
+        let resolution = R2;
         let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
         let original = Block::builder()
             .voxels_fn(&mut universe, resolution, |_| Block::from(color))

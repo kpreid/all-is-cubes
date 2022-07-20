@@ -127,7 +127,7 @@ fn print_space_impl<F: FnMut(&str)>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, Resolution};
+    use crate::block::{Block, Resolution::R4};
     use crate::content::make_some_blocks;
     use crate::universe::Universe;
 
@@ -192,7 +192,7 @@ mod tests {
     /// Check that blocks with small spaces are handled without out-of-bounds errors
     #[test]
     fn partial_voxels() {
-        let resolution = 4;
+        let resolution = R4;
         let mut universe = Universe::new();
         let mut block_space = Space::empty_positive(4, 2, 4);
         block_space
@@ -200,7 +200,7 @@ mod tests {
             .unwrap();
         let space_ref = universe.insert_anonymous(block_space);
         let partial_block = Block::builder()
-            .voxels_ref(resolution as Resolution, space_ref.clone())
+            .voxels_ref(resolution, space_ref.clone())
             .display_name("P")
             .build();
 

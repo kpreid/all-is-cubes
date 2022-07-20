@@ -16,7 +16,7 @@ use embedded_graphics::primitives::{
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use exhaust::Exhaust;
 
-use crate::block::{Block, BlockCollision, Resolution, AIR, AIR_EVALUATED};
+use crate::block::{Block, BlockCollision, Resolution, Resolution::*, AIR, AIR_EVALUATED};
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::content::palette;
 use crate::drawing::{DrawingPlane, VoxelBrush};
@@ -99,14 +99,14 @@ impl fmt::Display for Icons {
 
 impl Icons {
     pub async fn new(universe: &mut Universe, p: YieldProgress) -> BlockProvider<Icons> {
-        let resolution = 16;
+        let resolution = R16;
 
         BlockProvider::new(p, |key| {
             Ok(match key {
                 Icons::Crosshair => Block::builder()
                     .display_name("Crosshair")
                     .voxels_ref(
-                        64, // TODO: get resolution from image file
+                        R64, // TODO: get resolution from image file
                         universe.insert_anonymous(space_from_image(
                             include_image!("icons/crosshair.png"),
                             GridRotation::RXyZ,
@@ -124,7 +124,7 @@ impl Icons {
                 Icons::Activate => Block::builder()
                     .display_name("Activate")
                     .voxels_ref(
-                        16, // TODO: get resolution from image file
+                        R16, // TODO: get resolution from image file
                         universe.insert_anonymous(space_from_image(
                             include_image!("icons/hand.png"),
                             GridRotation::RXyZ,
@@ -153,14 +153,14 @@ impl Icons {
 
                     let mut space = Space::for_block(resolution).build_empty();
                     let display = &mut space.draw_target(GridMatrix::from_origin(
-                        GridPoint::new(1, 1, 1) * GridCoordinate::from(resolution / 2),
+                        GridPoint::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2),
                         Face7::PX,
                         Face7::NY,
                         Face7::PZ,
                     ));
 
                     // Draw X on circle
-                    Circle::with_center(Point::new(0, 0), (resolution - 4).into())
+                    Circle::with_center(Point::new(0, 0), u32::from(resolution) - 4)
                         .into_styled(
                             PrimitiveStyleBuilder::new()
                                 .fill_color(&background_brush)
@@ -204,7 +204,7 @@ impl Icons {
                     Block::builder()
                         .display_name("Push/Pull")
                         .voxels_ref(
-                            32, // TODO: get resolution from image file,
+                            R32, // TODO: get resolution from image file,
                             universe.insert_anonymous(space_from_image(
                                 include_image!("icons/push.png"),
                                 GridRotation::RXZY,
@@ -380,8 +380,8 @@ struct ButtonBuilder {
 
 impl ButtonBuilder {
     // TODO: We probably want a higher resolution, but it has to wait for texture alloc improvements
-    pub const RESOLUTION: Resolution = 16;
-    pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION as GridCoordinate;
+    pub const RESOLUTION: Resolution = R16;
+    pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION.to_grid();
 
     pub fn new(state: ToggleButtonVisualState) -> Result<Self, InGenError> {
         let active = state.value;

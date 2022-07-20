@@ -8,7 +8,7 @@ use maze_generator::prelude::{Direction, FieldType, Generator};
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
-use all_is_cubes::block::{Block, BlockCollision, RotationPlacementRule, AIR};
+use all_is_cubes::block::{Block, BlockCollision, Resolution::*, RotationPlacementRule, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
@@ -35,7 +35,7 @@ struct DemoRoom {
 
     /// In a *relative* room coordinate system (1 unit = 1 room box),
     /// how big is this room? Occupying multiple rooms' space if this
-    /// is not equal to `GridAab::for_block(1)`.
+    /// is not equal to `GridAab::for_block(R1)`.
     extended_bounds: GridAab,
 
     /// Which faces have doors-to-corridors in them.
@@ -399,7 +399,7 @@ pub(crate) async fn demo_dungeon(
 
         let corridor_only = rng.gen_bool(0.5);
 
-        let mut extended_bounds = GridAab::for_block(1);
+        let mut extended_bounds = GridAab::for_block(R1);
         // Optional high ceiling
         if !corridor_only && rng.gen_bool(0.25) {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::PY, 1));
@@ -508,7 +508,7 @@ pub async fn install_dungeon_blocks(
     universe: &mut Universe,
     progress: YieldProgress,
 ) -> Result<(), GenError> {
-    let resolution = 16;
+    let resolution = R16;
     let resolution_g = GridCoordinate::from(resolution);
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);

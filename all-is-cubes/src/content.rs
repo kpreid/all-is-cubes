@@ -17,7 +17,9 @@ use embedded_graphics::text::Baseline;
 use embedded_graphics::text::Text;
 use embedded_graphics::text::TextStyleBuilder;
 
-use crate::block::{Block, BlockCollision, Resolution, RotationPlacementRule, AIR};
+use crate::block::{
+    Block, BlockCollision, Resolution, Resolution::R16, RotationPlacementRule, AIR,
+};
 use crate::inv::{Slot, Tool};
 use crate::math::{Face6, FreeCoordinate, GridCoordinate, Rgb, Rgba};
 use crate::raycast::Raycaster;
@@ -66,7 +68,7 @@ pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
 /// They will be fully opaque.
 ///
 /// ```
-/// use all_is_cubes::block::Block;
+/// use all_is_cubes::block::{Block, Resolution};
 /// use all_is_cubes::content::make_some_voxel_blocks;
 /// use all_is_cubes::universe::Universe;
 ///
@@ -75,12 +77,12 @@ pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
 /// assert_ne!(blocks[0], blocks[1]);
 /// assert_ne!(blocks[0], blocks[2]);
 /// assert_ne!(blocks[1], blocks[2]);
-/// assert_eq!(blocks[0].evaluate().unwrap().resolution, 16);
+/// assert_eq!(blocks[0].evaluate().unwrap().resolution, Resolution::R16);
 /// ```
 ///
 /// [`Primitive::Recur`]: crate::block::Primitive::Recur
 pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [Block; COUNT] {
-    let resolution = 16;
+    let resolution = R16;
     color_sequence_for_make_blocks(COUNT)
         .map(|(i, color)| {
             let mut block_space = Space::for_block(resolution).build_empty();
@@ -91,7 +93,7 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
             for face in Face6::ALL {
                 Text::with_text_style(
                     &i.to_string(),
-                    Point::new(i32::from(resolution / 2), i32::from(resolution / 2)),
+                    Point::new(i32::from(resolution) / 2, i32::from(resolution) / 2),
                     MonoTextStyle::new(&FONT_9X15_BOLD, palette::ALMOST_BLACK),
                     TextStyleBuilder::new()
                         .baseline(Baseline::Middle)
@@ -133,7 +135,11 @@ fn color_sequence_for_make_blocks(n: usize) -> impl Iterator<Item = (usize, Rgba
 /// TODO: Allow caller-provided colors/pattern.
 /// TODO: Consider writing the size on the faces.
 #[doc(hidden)] // exported for all-is-cubes-content
-pub fn make_slab(universe: &mut Universe, numerator: Resolution, denominator: Resolution) -> Block {
+pub fn make_slab(
+    universe: &mut Universe,
+    numerator: GridCoordinate,
+    denominator: Resolution,
+) -> Block {
     let voxels = [
         Block::from(palette::PLANK),
         Block::from(palette::PLANK * 1.06),
@@ -143,7 +149,7 @@ pub fn make_slab(universe: &mut Universe, numerator: Resolution, denominator: Re
         .collision(BlockCollision::Recur)
         .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
         .voxels_fn(universe, denominator, |cube| {
-            if cube.y >= numerator.into() {
+            if cube.y >= numerator {
                 &AIR
             } else {
                 // Checkerboard pattern

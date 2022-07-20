@@ -30,7 +30,7 @@ use std::ops::{Range, RangeInclusive};
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
+use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, Resolution::R1};
 use crate::math::{Face7, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
@@ -123,7 +123,7 @@ impl<C> Dimensions for DrawingPlane<'_, Space, C> {
             .transform
             .inverse_transform()
             .and_then(|t| self.space.bounds().transform(t))
-            .unwrap_or_else(|| GridAab::for_block(1));
+            .unwrap_or_else(|| GridAab::for_block(R1));
 
         let size = bounds.unsigned_size();
         Rectangle {
@@ -432,7 +432,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{self, AIR};
+    use crate::block::{self, Resolution::R16, AIR};
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
     use crate::raytracer::print_space;
@@ -519,14 +519,14 @@ mod tests {
 
     #[test]
     fn draw_to_blocks_bounds_one_block() {
-        let resolution: GridCoordinate = 16;
+        let resolution: Resolution = R16;
         let z = 4;
         let mut universe = Universe::new();
         let drawable = Rectangle::with_corners(Point::new(0, 0), Point::new(2, 3))
             .into_styled(a_primitive_style());
         let space = draw_to_blocks(
             &mut universe,
-            resolution as Resolution,
+            resolution,
             z,
             z..z + 1,
             BlockAttributes::default(),
@@ -545,7 +545,10 @@ mod tests {
         {
             // TODO: This printing does not produce a useful result; fix it.
             print_space(&*block_space_ref.borrow(), (0., 0., -1.));
-            assert_eq!(offset, GridPoint::new(0, -resolution, 0));
+            assert_eq!(
+                offset,
+                GridPoint::new(0, -GridCoordinate::from(resolution), 0)
+            );
             assert_eq!(
                 block_space_ref.borrow()[(0, -2, z)].color(),
                 a_primitive_color()
@@ -557,14 +560,14 @@ mod tests {
 
     #[test]
     fn draw_to_blocks_bounds_negative_coords_one_block() {
-        let resolution: GridCoordinate = 16;
+        let resolution: Resolution = R16;
         let z = 4;
         let mut universe = Universe::new();
         let drawable = Rectangle::with_corners(Point::new(-3, -2), Point::new(0, 0))
             .into_styled(a_primitive_style());
         let space = draw_to_blocks(
             &mut universe,
-            resolution as Resolution,
+            resolution,
             z,
             z..z + 1,
             BlockAttributes::default(),
@@ -582,7 +585,10 @@ mod tests {
         } = space[(-1, 0, 0)].primitive()
         {
             print_space(&*block_space_ref.borrow(), (0., 0., -1.));
-            assert_eq!(*offset, GridPoint::new(-resolution, 0, 0));
+            assert_eq!(
+                *offset,
+                GridPoint::new(-GridCoordinate::from(resolution), 0, 0)
+            );
             assert_eq!(
                 block_space_ref.borrow()[(-2, 1, z)].color(),
                 a_primitive_color()

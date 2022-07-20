@@ -329,7 +329,7 @@ pub(crate) enum DepthStep<'a, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Block;
+    use crate::block::{Block, Resolution::*};
     use crate::camera::GraphicsOptions;
     use crate::content::{make_slab, palette};
     use crate::math::GridAab;
@@ -347,7 +347,7 @@ mod tests {
 
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
         space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
-        space.set([0, 2, 0], make_slab(universe, 2, 4)).unwrap();
+        space.set([0, 2, 0], make_slab(universe, 2, R4)).unwrap();
 
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
 

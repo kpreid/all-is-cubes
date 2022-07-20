@@ -121,9 +121,11 @@ pub async fn install_landscape_blocks(
     let blade_noise = {
         let blade_noise_v = noise::OpenSimplex::new().set_seed(0x7af8c181);
         let blade_noise_stretch = noise::ScalePoint::new(blade_noise_v).set_y_scale(0.1);
-        array_of_noise(resolution * 2, &blade_noise_stretch, |value| {
-            value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.34)
-        })
+        array_of_noise(
+            resolution.double().unwrap(),
+            &blade_noise_stretch,
+            |value| value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.34),
+        )
     };
 
     let stone_points = [(); 240].map(|_| {

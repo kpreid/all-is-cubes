@@ -7,7 +7,7 @@ use cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 use pretty_assertions::assert_eq;
 
 use super::*;
-use crate::block::{Block, BlockAttributes, Primitive, AIR};
+use crate::block::{Block, BlockAttributes, Primitive, Resolution::*, AIR};
 use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::make_some_blocks;
 use crate::math::{
@@ -152,7 +152,7 @@ fn trivial_voxels_equals_atom() {
     let mut u = Universe::new();
     let atom_block = Block::from(Rgba::new(0.0, 1.0, 0.0, 1.0));
     let trivial_recursive_block = Block::builder()
-        .voxels_fn(&mut u, 1, |_| &atom_block)
+        .voxels_fn(&mut u, R1, |_| &atom_block)
         .unwrap()
         .build();
 
@@ -175,7 +175,7 @@ fn trivial_voxels_equals_atom() {
 #[test]
 fn space_mesh_equals_block_mesh() {
     // Construct recursive block.
-    let resolution = 4;
+    let resolution = R4;
     let mut u = Universe::new();
     let mut blocks = Vec::from(make_some_blocks::<2>());
     blocks.push(AIR);
@@ -207,7 +207,7 @@ fn space_mesh_equals_block_mesh() {
 /// TODO: This test stops being meaningful when we finish migrating the texture allocator to use arbitrary-sized tiles
 #[test]
 fn block_resolution_greater_than_tile() {
-    let block_resolution = 32;
+    let block_resolution = R32;
     let mut u = Universe::new();
     let block = Block::builder()
         .voxels_fn(&mut u, block_resolution, non_uniform_fill)
@@ -226,7 +226,7 @@ fn block_resolution_greater_than_tile() {
 #[rustfmt::skip]
 fn shrunken_box_has_no_extras() {
     // Construct a box whose faces don't touch the outer extent of the volume.
-    let resolution = 8;
+    let resolution = R8;
     let mut u = Universe::new();
     let less_than_full_block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {
@@ -287,7 +287,7 @@ fn shrunken_box_has_no_extras() {
 #[rustfmt::skip]
 fn shrunken_box_uniform_color() {
     // Construct a box whose faces don't touch the outer extent of the volume.
-    let resolution = 8;
+    let resolution = R8;
     let mut u = Universe::new();
     let filler_block = Block::from(Rgba::new(0.0, 1.0, 0.5, 1.0));
     let less_than_full_block = Block::builder()
@@ -393,7 +393,7 @@ fn atom_transparency_thresholded() {
 /// Test [`BlockMesh::fully_opaque`] results from basic voxels.
 #[test]
 fn fully_opaque_voxels() {
-    let resolution = 8;
+    let resolution = R8;
     let mut u = Universe::new();
     let block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {
@@ -429,7 +429,7 @@ fn fully_opaque_voxels() {
 fn fully_opaque_partial_block() {
     let mut u = Universe::new();
     let block = Block::builder()
-        .voxels_ref(8, {
+        .voxels_ref(R8, {
             // The dimensions don't meet the PX face.
             let mut block_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 8, 8]))
                 .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
@@ -487,7 +487,7 @@ fn transparency_split() {
 
 #[test]
 fn handling_allocation_failure() {
-    let resolution = 8;
+    let resolution = R8;
     let mut u = Universe::new();
     let complex_block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {

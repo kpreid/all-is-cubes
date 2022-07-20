@@ -8,7 +8,7 @@ use std::fmt;
 use super::collision::{
     aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
 };
-use crate::block::BlockCollision;
+use crate::block::{BlockCollision, Resolution};
 use crate::math::{Aab, Face7, FreeCoordinate, Geometry as _};
 use crate::physics::{StopAt, POSITION_EPSILON};
 use crate::raycast::Ray;
@@ -350,7 +350,7 @@ impl Body {
                     self.collision_box,
                     ray.scale_direction(ray_step.t_distance()),
                     ray_step.face(),
-                    1,
+                    Resolution::R1,
                     true,
                 );
                 let step_aab = self

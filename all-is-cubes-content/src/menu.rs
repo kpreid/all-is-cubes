@@ -6,7 +6,7 @@ use std::sync::Arc;
 use strum::IntoEnumIterator;
 
 use all_is_cubes::{
-    block::{Block, BlockAttributes},
+    block::{Block, BlockAttributes, Resolution::R16},
     cgmath::{Vector3, Zero as _},
     character::Spawn,
     content::palette,
@@ -51,7 +51,7 @@ impl TemplateButtonWidget {
         // TODO: We should be doing this when the widget is instantiated, not now, but that's not yet possible.
         let text_blocks = draw_to_blocks(
             universe,
-            16,
+            R16,
             0,
             0..1,
             BlockAttributes::default(),

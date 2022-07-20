@@ -232,6 +232,7 @@ fn expsize(size_exponent: u8) -> GridCoordinate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::block::Resolution::*;
 
     #[track_caller]
     fn check_no_overlaps(
@@ -270,12 +271,12 @@ mod tests {
     fn basic_complete_fill() {
         let mut t = Alloctree::new(5); // side length 2^5 cube = eight side length 16 cubes
         let _allocations: Vec<AlloctreeHandle> = (0..8)
-            .map(|i| match t.allocate(GridAab::for_block(16)) {
+            .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => val,
                 None => panic!("basic_complete_fill allocation failure for #{}", i),
             })
             .collect();
-        assert_eq!(None, t.allocate(GridAab::for_block(16)));
+        assert_eq!(None, t.allocate(GridAab::for_block(R16)));
     }
 
     /// Repeatedly free and try to allocate the same space again.
@@ -283,7 +284,7 @@ mod tests {
     fn free_and_allocate_again() {
         let mut t = Alloctree::new(6); // side length 2^6 cube = 64 side length 16 cubes
         let mut allocations: Vec<Option<AlloctreeHandle>> = (0..64)
-            .map(|i| match t.allocate(GridAab::for_block(16)) {
+            .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => Some(val),
                 None => panic!(
                     "free_and_allocate_again initial allocation failure for #{}",
@@ -294,7 +295,7 @@ mod tests {
 
         for h in allocations.iter_mut() {
             t.free(h.take().unwrap());
-            *h = Some(t.allocate(GridAab::for_block(16)).unwrap());
+            *h = Some(t.allocate(GridAab::for_block(R16)).unwrap());
         }
     }
 
@@ -304,9 +305,9 @@ mod tests {
         check_no_overlaps(
             &mut t,
             [
-                GridAab::for_block(16),
-                GridAab::for_block(16),
-                GridAab::for_block(16),
+                GridAab::for_block(R16),
+                GridAab::for_block(R16),
+                GridAab::for_block(R16),
             ],
         );
     }

@@ -8,8 +8,8 @@ use std::convert::TryFrom;
 use std::f64::consts::PI;
 
 use all_is_cubes::block::{
-    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Modifier, Resolution,
-    RotationPlacementRule, AIR,
+    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Modifier,
+    Resolution::*, RotationPlacementRule, AIR,
 };
 use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
@@ -122,7 +122,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
 
     let water_surface_block = Block::builder()
         .collision(BlockCollision::Recur)
-        .voxels_fn(universe, 8, |p| match p.y {
+        .voxels_fn(universe, R8, |p| match p.y {
             0..=3 => &water_voxel,
             4 => &water_surface_voxel,
             _ => &AIR,
@@ -130,12 +130,12 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
         .build();
 
     let window_block = {
-        let window_pane_resolution = 32;
+        let window_pane_resolution = R32;
         let depth = 3;
         let window_frame_block = Block::from(palette::ALMOST_BLACK);
         let window_glass_surface_block = Block::from(rgba_const!(0.5, 0.72, 0.5, 0.6));
         let window_glass_inner_block = Block::from(rgba_const!(0.7, 0.72, 0.7, 0.05));
-        let upper = window_pane_resolution as GridCoordinate - 1;
+        let upper = GridCoordinate::from(window_pane_resolution) - 1;
 
         Block::builder()
             .collision(BlockCollision::Recur)
@@ -189,14 +189,14 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(name: "Knot")]
 async fn KNOT(this: &Exhibit, universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([-2, -2, -1], [5, 5, 3]);
-    let resolution = 32;
+    let resolution = R32;
     let resf = FreeCoordinate::from(resolution);
     let toroidal_radius = resf * 1.5;
     let knot_split_radius = resf * 0.5625;
     let strand_radius = resf * 0.25;
     let twists = 2.5;
 
-    let mut drawing_space = Space::builder(footprint.multiply(resolution))
+    let mut drawing_space = Space::builder(footprint.multiply(resolution.into()))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build_empty();
     let paint1 = Block::from(Rgba::new(0.7, 0.7, 0.7, 1.0));
@@ -204,7 +204,7 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
     let paint3 = Block::from(Rgba::new(0.9, 0.7, 0.1, 1.0));
     drawing_space.fill(drawing_space.bounds(), |p| {
         // Measure from midpoint of odd dimension space
-        let p = p - Vector3::new(1, 1, 1) * (resolution / 2);
+        let p = p - Vector3::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2);
         // Work in floating point
         let p = p.map(FreeCoordinate::from);
 
@@ -246,7 +246,7 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
         }
     })?;
     let space = space_to_blocks(
-        resolution as u8,
+        resolution,
         BlockAttributes {
             display_name: this.name.into(),
             collision: BlockCollision::Recur,
@@ -262,7 +262,7 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
 async fn TEXT(_: &Exhibit, universe: &mut Universe) {
     let space = draw_to_blocks(
         universe,
-        16,
+        R16,
         8,
         8..9,
         BlockAttributes {
@@ -288,7 +288,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
     let mut space = Space::empty(footprint);
 
     let sweep_block = {
-        let resolution = 8;
+        let resolution = R8;
         let mut block_space = Space::for_block(resolution).build_empty();
         // The length of this pattern is set so that the block will sometimes be fully opaque and sometimes be invisible.
         let fills = [
@@ -322,7 +322,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
     };
 
     let fire_block = {
-        let fire_resolution = 12;
+        let fire_resolution = R8;
         Block::builder()
             .animation_hint(AnimationHint::CONTINUOUS)
             .collision(BlockCollision::None)
@@ -347,7 +347,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(name: "Collision")]
 async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
-    let half_block = make_slab(universe, 2, 4);
+    let half_block = make_slab(universe, 2, R4);
 
     let footprint = GridAab::from_lower_size([0, 0, 0], [5, 2, 4]);
     let mut space = Space::empty(footprint);
@@ -376,11 +376,7 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
     for i in 0..(range.len() as GridCoordinate) {
         space.set(
             [4, 0, range.start + i],
-            make_slab(
-                universe,
-                (range.end - i) as Resolution,
-                range.len() as Resolution,
-            ),
+            make_slab(universe, range.end - i, range.len().try_into().unwrap()),
         )?;
     }
 
@@ -393,7 +389,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([0, 0, 0], [5, 2, 3]);
     let mut space = Space::empty(footprint);
 
-    for (i, &resolution) in [1, 2, 3, 8, 16, 32].iter().enumerate() {
+    for (i, &resolution) in [R1, R2, R4, R8, R16, R32].iter().enumerate() {
         let i = i as GridCoordinate;
         let location = GridPoint::new(i.rem_euclid(3) * 2, 0, i.div_euclid(3) * 2);
         space.set(
@@ -404,11 +400,11 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
                     if p.x + p.y + p.z >= GridCoordinate::from(resolution) {
                         return AIR.clone();
                     }
-                    let rescale = if resolution > 8 { 4 } else { 1 };
+                    let rescale = if resolution > R8 { 4 } else { 1 };
                     let color = Rgb::from(p.to_vec().map(|s| {
                         NotNan::new(
                             (s / GridCoordinate::from(rescale)) as f32
-                                / f32::from(resolution / rescale - 1).max(1.),
+                                / f32::from(u16::from(resolution) / rescale - 1).max(1.),
                         )
                         .unwrap()
                     }));
@@ -421,7 +417,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
             location + GridVector::unit_y(),
             &draw_to_blocks(
                 universe,
-                32,
+                R32,
                 0,
                 0..1,
                 BlockAttributes {
@@ -460,7 +456,7 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
             pos + GridVector::unit_y(),
             &draw_to_blocks(
                 universe,
-                32,
+                R32,
                 0,
                 0..1,
                 BlockAttributes {
@@ -552,7 +548,7 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
                     .build(),
             ),
             [0, 1, 0] => Some({
-                let resolution = 64;
+                let resolution = R64;
                 draw_to_blocks(
                     universe,
                     resolution,
@@ -619,7 +615,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
 
     // Room wall block with test card
     let wall_color_block = Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0));
-    let wall_resolution = 16;
+    let wall_resolution = R16;
     let wall_block = {
         let colors_as_blocks: Vec<Block> =
             surface_colors.iter().copied().map(Block::from).collect();

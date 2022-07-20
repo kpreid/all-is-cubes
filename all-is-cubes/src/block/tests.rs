@@ -15,14 +15,15 @@ use pretty_assertions::assert_eq;
 
 use crate::block::{
     builder, AnimationHint, Block, BlockAttributes, BlockBuilder, BlockCollision, BlockDef,
-    BlockDefTransaction, EvalBlockError, Evoxel, Modifier, Primitive, Resolution,
+    BlockDefTransaction, EvalBlockError, Evoxel, Modifier, Primitive, Resolution, Resolution::*,
     RotationPlacementRule, AIR, AIR_EVALUATED,
 };
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::{NullListener, Sink};
 use crate::math::{
-    Face6, GridAab, GridArray, GridPoint, GridRotation, GridVector, OpacityCategory, Rgb, Rgba,
+    Face6, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
+    OpacityCategory, Rgb, Rgba,
 };
 use crate::space::{Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
@@ -95,7 +96,7 @@ fn evaluate_opaque_atom_and_attributes() {
     assert_eq!(e.attributes, attributes);
     assert_eq!(e.color, block.color());
     assert!(e.voxels.is_none());
-    assert_eq!(e.resolution, 1);
+    assert_eq!(e.resolution, R1);
     assert_eq!(e.opaque, true);
     assert_eq!(e.visible, true);
     assert_eq!(
@@ -135,7 +136,7 @@ fn evaluate_invisible_atom() {
 
 #[test]
 fn evaluate_voxels_checked_individually() {
-    let resolution = 2;
+    let resolution = R2;
     let mut universe = Universe::new();
 
     let attributes = BlockAttributes {
@@ -183,7 +184,7 @@ fn evaluate_voxels_checked_individually() {
 #[test]
 fn evaluate_transparent_voxels() {
     let mut universe = Universe::new();
-    let resolution = 4;
+    let resolution = R4;
     let block = Block::builder()
         .voxels_fn(&mut universe, resolution, |point| {
             Block::from(Rgba::new(
@@ -203,7 +204,7 @@ fn evaluate_transparent_voxels() {
     let e = block.evaluate().unwrap();
     assert_eq!(
         e.color,
-        Rgba::new(0.0, 0.0, 0.0, 1.0 - (0.5 / f32::from(resolution.pow(3))))
+        Rgba::new(0.0, 0.0, 0.0, 1.0 - (0.5 / f32::from(resolution).powi(3)))
     );
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, true);
@@ -211,7 +212,7 @@ fn evaluate_transparent_voxels() {
 
 #[test]
 fn evaluate_voxels_not_filling_block() {
-    let resolution = 4;
+    let resolution = R4;
     let mut universe = Universe::new();
     let block = Block::builder()
         .voxels_fn(&mut universe, resolution, |point| {
@@ -232,9 +233,9 @@ fn evaluate_voxels_not_filling_block() {
     let e = block.evaluate().unwrap();
     assert_eq!(
         e.color,
-        Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution.pow(3)))
+        Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(3))
     );
-    assert_eq!(e.resolution, 4);
+    assert_eq!(e.resolution, resolution);
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, true);
 }
@@ -243,7 +244,7 @@ fn evaluate_voxels_not_filling_block() {
 /// even if the space is all opaque, the block should not be counted as opaque.
 #[test]
 fn evaluate_voxels_partial_not_filling() {
-    let resolution = 4;
+    let resolution = R4;
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(2, 4, 4);
     space
@@ -256,42 +257,19 @@ fn evaluate_voxels_partial_not_filling() {
 
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 0.5));
-    assert_eq!(e.resolution, 4);
+    assert_eq!(e.resolution, resolution);
     assert_eq!(e.opaque, false);
     assert_eq!(e.visible, true);
-}
-
-/// A `Resolution` value of zero is in range for the type, but not actually useful.
-/// Check that it evaluates to something sane just in case.
-#[test]
-fn evaluate_voxels_zero_resolution() {
-    let resolution = 0;
-    let mut universe = Universe::new();
-    let mut space = Space::for_block(1).build_empty();
-    // This block should *not* appear in the result.
-    space
-        .fill_uniform(space.bounds(), Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)))
-        .unwrap();
-    let space_ref = universe.insert_anonymous(space);
-    let block = Block::builder()
-        .voxels_ref(resolution as Resolution, space_ref.clone())
-        .build();
-
-    let e = block.evaluate().unwrap();
-    assert_eq!(e.color, Rgba::TRANSPARENT);
-    assert_eq!(e.voxels, None);
-    assert_eq!(e.resolution, 1);
-    assert_eq!(e.opaque, false);
-    assert_eq!(e.visible, false);
 }
 
 /// Tests that the `offset` field of `Primitive::Recur` is respected.
 #[test]
 fn recur_with_offset() {
-    let resolution = 4;
-    let offset = GridVector::new(resolution, 0, 0);
+    let resolution = R4;
+    let resolution_g = GridCoordinate::from(resolution);
+    let offset = GridVector::new(resolution_g, 0, 0);
     let mut universe = Universe::new();
-    let mut space = Space::empty_positive(resolution * 2, resolution, resolution);
+    let mut space = Space::empty_positive(resolution_g * 2, resolution_g, resolution_g);
     space
         .fill(space.bounds(), |point| {
             let point = point.cast::<f32>().unwrap();
@@ -302,7 +280,7 @@ fn recur_with_offset() {
     let block_at_offset = Block::from_primitive(Primitive::Recur {
         attributes: BlockAttributes::default(),
         offset: GridPoint::from_vec(offset),
-        resolution: resolution as Resolution,
+        resolution,
         space: space_ref.clone(),
     });
 
@@ -325,9 +303,9 @@ fn recur_with_offset() {
 
 #[test]
 fn indirect_equivalence() {
-    let resolution = 4;
+    let resolution = R4;
     let mut universe = Universe::new();
-    let mut space = Space::empty_positive(resolution, resolution, resolution);
+    let mut space = Space::empty(GridAab::for_block(resolution));
     // TODO: BlockGen should support constructing indirects (by default, even)
     // and we can use the more concise version
     space
@@ -409,7 +387,7 @@ fn listen_recur() {
     let mut universe = Universe::new();
     let [block_0, block_1] = make_some_blocks();
     let space_ref = universe.insert_anonymous(Space::empty_positive(2, 1, 1));
-    let block = Block::builder().voxels_ref(1, space_ref.clone()).build();
+    let block = Block::builder().voxels_ref(R1, space_ref.clone()).build();
     let sink = Sink::new();
     block.listen(sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
@@ -480,7 +458,7 @@ fn builder_voxels_from_space() {
     assert_eq!(
         Block::builder()
             .display_name("hello world")
-            .voxels_ref(2, space_ref.clone())
+            .voxels_ref(R2, space_ref.clone())
             .build(),
         Block::from_primitive(Primitive::Recur {
             attributes: BlockAttributes {
@@ -488,7 +466,7 @@ fn builder_voxels_from_space() {
                 ..BlockAttributes::default()
             },
             offset: GridPoint::origin(),
-            resolution: 2, // not same as space size
+            resolution: R2, // not same as space size
             space: space_ref
         }),
     );
@@ -498,7 +476,7 @@ fn builder_voxels_from_space() {
 fn builder_voxels_from_fn() {
     let mut universe = Universe::new();
 
-    let resolution = 7;
+    let resolution = R8;
     let block = Block::builder()
         .display_name("hello world")
         .voxels_fn(&mut universe, resolution, |_cube| &AIR)

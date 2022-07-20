@@ -12,6 +12,7 @@ use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
 use ordered_float::NotNan;
 
 use crate::apps::{ControlMessage, InputProcessor};
+use crate::block::Resolution::R16;
 use crate::camera::{FogOption, GraphicsOptions, ViewTransform, Viewport};
 use crate::character::{Character, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
@@ -80,7 +81,7 @@ impl Vui {
     ) -> Self {
         let mut universe = Universe::new();
         // TODO: take YieldProgress as a parameter
-        let hud_blocks = Arc::new(HudBlocks::new(&mut universe, YieldProgress::noop(), 16).await);
+        let hud_blocks = Arc::new(HudBlocks::new(&mut universe, YieldProgress::noop(), R16).await);
 
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
 

@@ -3,7 +3,7 @@
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
-use all_is_cubes::block::{Block, AIR};
+use all_is_cubes::block::{Block, Resolution::R16, AIR};
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::mesh::{
@@ -120,7 +120,7 @@ fn checkerboard_space_bench_setup(
 
 fn checkerboard_block(universe: &mut Universe, voxels: [Block; 2]) -> Block {
     Block::builder()
-        .voxels_ref(16, universe.insert_anonymous(checkerboard_space(voxels)))
+        .voxels_ref(R16, universe.insert_anonymous(checkerboard_space(voxels)))
         .build()
 }
 

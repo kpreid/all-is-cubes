@@ -32,16 +32,11 @@ pub use evaluated::*;
 mod modifier;
 pub use modifier::*;
 
+mod resolution;
+pub use resolution::*;
+
 #[cfg(test)]
 mod tests;
-
-/// Type for the edge length of recursive blocks in terms of their component voxels.
-/// This resolution cubed is the number of voxels making up a block.
-///
-/// This type was chosen as `u8` so as to make it nonnegative and easy to losslessly
-/// convert into larger, possibly signed, sizes. It's plenty of range since a resolution
-/// of 255 would mean 16 million voxels — more than we want to work with.
-pub type Resolution = u8;
 
 // --- Block type declarations ---
 // File organization: This is a series of closely related type definitions together before
@@ -97,7 +92,7 @@ pub enum Primitive {
         offset: GridPoint,
         /// The side length of the cubical volume of sub-blocks (voxels) used for this
         /// block.
-        resolution: u8,
+        resolution: Resolution,
         space: URef<Space>,
     },
 }
@@ -304,20 +299,6 @@ impl Block {
             } => {
                 let block_space = space_ref.try_borrow()?;
 
-                // Don't produce a resolution of 0, as that might cause division-by-zero messes later.
-                // TODO: Actually, should this be an EvalBlockError instead?
-                if resolution == 0 {
-                    return Ok(EvaluatedBlock {
-                        attributes: attributes.clone(),
-                        color: Rgba::TRANSPARENT,
-                        voxels: None,
-                        resolution: 1,
-                        opaque: false,
-                        visible: false,
-                        voxel_opacity_mask: None,
-                    });
-                }
-
                 let resolution_g: GridCoordinate = resolution.into();
                 let full_resolution_bounds =
                     GridAab::from_lower_size(offset, [resolution_g, resolution_g, resolution_g]);
@@ -522,7 +503,7 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     attributes: AIR_ATTRIBUTES,
     color: Rgba::TRANSPARENT,
     voxels: None,
-    resolution: 1,
+    resolution: Resolution::R1,
     opaque: false,
     visible: false,
     voxel_opacity_mask: None,

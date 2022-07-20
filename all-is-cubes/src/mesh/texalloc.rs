@@ -205,11 +205,12 @@ impl TextureTile for TestTextureTile {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::Resolution::*;
 
     /// Test the [`TestTextureAllocator`].
     #[test]
     fn test_texture_allocator() {
-        let bounds = GridAab::for_block(7);
+        let bounds = GridAab::for_block(R8);
         let mut allocator = TestTextureAllocator::new();
         assert_eq!(allocator.count_allocated(), 0);
         assert!(allocator.allocate(bounds).is_some());

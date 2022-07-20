@@ -287,9 +287,10 @@ impl GridRotation {
     /// That is, a [`GridAab`] of that volume will be unchanged by rotation:
     ///
     /// ```
+    /// use all_is_cubes::block::Resolution;
     /// use all_is_cubes::math::{GridAab, GridRotation};
     ///
-    /// let b = GridAab::for_block(8);
+    /// let b = GridAab::for_block(Resolution::R8);
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_matrix(8);
     /// assert_eq!(b.transform(rotation), Some(b));
     /// ```

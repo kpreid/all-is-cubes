@@ -8,7 +8,9 @@
 use cgmath::EuclideanSpace as _;
 use indoc::indoc;
 
-use crate::block::{Block, BlockDef, BlockDefTransaction, EvalBlockError, Primitive, AIR};
+use crate::block::{
+    Block, BlockDef, BlockDefTransaction, EvalBlockError, Primitive, Resolution::*, AIR,
+};
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::Sink;
@@ -80,7 +82,7 @@ fn set_failure_borrow() {
         .insert("bs".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
     let block = Block::builder()
-        .voxels_ref(1, inner_space_ref.clone())
+        .voxels_ref(R1, inner_space_ref.clone())
         .build();
     let mut outer_space = Space::empty_positive(1, 1, 1);
 

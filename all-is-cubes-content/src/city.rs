@@ -15,8 +15,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     text::{Baseline, Text},
 };
 
-use all_is_cubes::block::Block;
-use all_is_cubes::block::AIR;
+use all_is_cubes::block::{Block, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
@@ -291,7 +290,7 @@ pub(crate) async fn demo_city(
         let truncated_name_bounds = draw_text_in_blocks(
             universe,
             &mut space,
-            32,
+            R32,
             exhibit_footprint.size().x + 3,
             plot_transform * name_transform,
             &Text::with_baseline(

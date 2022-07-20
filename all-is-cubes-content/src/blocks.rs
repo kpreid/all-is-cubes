@@ -11,7 +11,7 @@ use noise::Seedable as _;
 
 use all_is_cubes::block::{
     AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution,
-    RotationPlacementRule, AIR,
+    Resolution::*, RotationPlacementRule, AIR,
 };
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
@@ -74,7 +74,7 @@ pub async fn install_demo_blocks(
     universe: &mut Universe,
     p: YieldProgress,
 ) -> Result<(), GenError> {
-    let resolution = 16;
+    let resolution = R16;
     let resolution_g = GridCoordinate::from(resolution);
 
     // In order to have consistent radii from the center point, we need to work with
@@ -323,7 +323,7 @@ pub async fn install_demo_blocks(
                 ];
                 Block::builder()
                     .display_name("Exhibit Background")
-                    .voxels_fn(universe, 4, |cube| {
+                    .voxels_fn(universe, R4, |cube| {
                         &colors[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
                     })?
                     .build()
@@ -335,25 +335,19 @@ pub async fn install_demo_blocks(
 
                 // This shape has to coordinate with the name-drawing code in city::demo_city.
                 // Haven't thought of a good way to abstract/combine it yet.
-                let resolution = 16;
+                let resolution = R16;
+                let resolution_g = GridCoordinate::from(resolution);
                 let top_edge = 10;
 
                 let mut space = Space::for_block(resolution).build_empty();
 
                 // Sign board
                 {
-                    // space.fill_uniform(
-                    //     GridAab::from_lower_upper([0, 8, 15], [16, 16, 16]),
-                    //     &sign_backing,
-                    // )?;
-                    let mut plane = space.draw_target(GridMatrix::from_translation([
-                        0,
-                        0,
-                        (resolution - 1).into(),
-                    ]));
+                    let mut plane =
+                        space.draw_target(GridMatrix::from_translation([0, 0, resolution_g - 1]));
                     Rectangle::with_corners(
-                        Point::new(0, (resolution / 4).into()),
-                        Point::new((resolution - 1).into(), top_edge),
+                        Point::new(0, resolution_g / 4),
+                        Point::new(resolution_g - 1, top_edge),
                     )
                     .draw_styled(&PrimitiveStyle::with_fill(&sign_board), &mut plane)?;
                 }
@@ -365,7 +359,7 @@ pub async fn install_demo_blocks(
                             * GridRotation::RZYX.to_rotation_matrix(),
                     );
                     let style = &PrimitiveStyle::with_stroke(&sign_post, 2);
-                    let z = (resolution - 3).into();
+                    let z = resolution_g - 3;
                     // Vertical post
                     Line::new(Point::new(z, 0), Point::new(z, top_edge - 1))
                         .draw_styled(style, &mut plane)?;
@@ -375,7 +369,7 @@ pub async fn install_demo_blocks(
                     Ok(())
                 };
                 post(2)?;
-                post((resolution - 3).into())?;
+                post(resolution_g - 3)?;
 
                 Block::builder()
                     .display_name("Signboard")
@@ -386,7 +380,7 @@ pub async fn install_demo_blocks(
             }
 
             Clock => {
-                let resolution = 16;
+                let resolution = R16;
                 let mut space = Space::for_block(resolution).build_empty();
                 space.add_behavior(crate::animation::Clock::new());
                 Block::builder()
@@ -568,14 +562,8 @@ mod tests {
     #[test]
     fn square_radius_cases() {
         assert_eq!(
-            [6, 7, 8, 9].map(|x| square_radius(16, GridPoint::new(x, 2, 8))[0]),
+            [6, 7, 8, 9].map(|x| square_radius(R16, GridPoint::new(x, 2, 8))[0]),
             [2, 1, 1, 2]
-        );
-
-        // TODO: Make this work
-        assert_eq!(
-            [3, 4, 5, 6].map(|x| square_radius(9, GridPoint::new(x, 2, 4))[0]),
-            [2, 1, 2, 3]
         );
     }
 }

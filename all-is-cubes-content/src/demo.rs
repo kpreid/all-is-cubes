@@ -133,7 +133,7 @@ impl UniverseTemplate {
             Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
             CornellBox => Some(cornell_box()),
             PhysicsLab => Some(physics_lab(50, 16).await),
-            MengerSponge => Some(menger_sponge(&mut universe, 0, 4)),
+            MengerSponge => Some(menger_sponge(&mut universe, 4)),
             LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
                 &mut universe,
             )),

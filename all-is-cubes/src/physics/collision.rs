@@ -9,7 +9,7 @@ use std::fmt;
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use super::POSITION_EPSILON;
-use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution};
+use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
     Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridArray, GridCoordinate, GridPoint,
     Rgba,
@@ -66,7 +66,7 @@ impl Contact {
 
     pub fn resolution(&self) -> Resolution {
         match *self {
-            Contact::Block(_) => 1,
+            Contact::Block(_) => R1,
             Contact::Voxel { resolution, .. } => resolution,
         }
     }
@@ -211,7 +211,7 @@ where
             aab,
             ray.scale_direction(ray_step.t_distance()),
             ray_step.face().opposite(),
-            1,
+            R1,
             stop_at.reversed(),
         );
         let step_aab = aab.translate(offset_segment.unit_endpoint().to_vec());
@@ -544,6 +544,7 @@ pub(crate) fn nudge_on_ray(
 
 #[cfg(test)]
 mod tests {
+    use crate::block::Resolution::*;
     use crate::block::{Block, AIR};
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::{point_to_enclosing_cube, GridAab};
@@ -571,12 +572,12 @@ mod tests {
     fn collide_along_ray_recursive_from_outside() {
         collide_along_ray_tester(
             1.5,
-            |u| [AIR, make_slab(u, 1, 2)],
+            |u| [AIR, make_slab(u, 1, R2)],
             Some(CollisionRayEnd {
                 t_distance: 0.5, // half of a ray with magnitude 2
                 contact: Contact::Voxel {
                     cube: GridPoint::new(1, 0, 0),
-                    resolution: 2,
+                    resolution: R2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
                 },
@@ -588,12 +589,12 @@ mod tests {
     fn collide_along_ray_recursive_from_inside() {
         collide_along_ray_tester(
             0.75,
-            |u| [AIR, make_slab(u, 1, 2)],
+            |u| [AIR, make_slab(u, 1, R2)],
             Some(CollisionRayEnd {
                 t_distance: 0.125,
                 contact: Contact::Voxel {
                     cube: GridPoint::new(1, 0, 0),
-                    resolution: 2,
+                    resolution: R2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
                 },
@@ -607,12 +608,12 @@ mod tests {
     fn collide_along_ray_two_recursive() {
         collide_along_ray_tester(
             0.75,
-            |u| [make_slab(u, 1, 3), make_slab(u, 1, 2)],
+            |u| [make_slab(u, 1, R4), make_slab(u, 1, R2)],
             Some(CollisionRayEnd {
                 t_distance: 0.125,
                 contact: Contact::Voxel {
                     cube: GridPoint::new(1, 0, 0), // second of 2 blocks is taller
-                    resolution: 2,
+                    resolution: R2,
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
                 },
             }),
@@ -620,12 +621,12 @@ mod tests {
         collide_along_ray_tester(
             0.75,
             // Opposite ordering of the other test
-            |u| [make_slab(u, 1, 2), make_slab(u, 1, 3)],
+            |u| [make_slab(u, 1, R2), make_slab(u, 1, R4)],
             Some(CollisionRayEnd {
                 t_distance: 0.125,
                 contact: Contact::Voxel {
                     cube: GridPoint::new(0, 0, 0), // first of 2 blocks is taller
-                    resolution: 2,
+                    resolution: R2,
                     voxel: CubeFace::new([1, 0, 0], Face7::PY),
                 },
             }),
@@ -664,7 +665,7 @@ mod tests {
         let mut u = Universe::new();
         let mut space = Space::empty_positive(2, 1, 1);
         let [block] = make_some_blocks();
-        let half_block = make_slab(&mut u, 1, 2);
+        let half_block = make_slab(&mut u, 1, R2);
         space.set([0, 0, 0], &block).unwrap();
         space.set([1, 0, 0], &half_block).unwrap();
 
@@ -687,7 +688,7 @@ mod tests {
                     Contact::Block(CubeFace::new([0, 0, 0], Face7::Within)),
                     Contact::Voxel {
                         cube: GridPoint::new(1, 0, 0),
-                        resolution: 2,
+                        resolution: R2,
                         // TODO: the voxel reported here is arbitrary, so this test is fragile
                         voxel: CubeFace::new([0, 0, 0], Face7::Within),
                     }
@@ -726,7 +727,7 @@ mod tests {
                 // Perform nudge
                 // TODO: test non-1 resolution
                 let adjusted_segment =
-                    nudge_on_ray(moving_aab, segment, face_to_nudge.into(), 1, backward);
+                    nudge_on_ray(moving_aab, segment, face_to_nudge.into(), R1, backward);
                 let nudged_aab = moving_aab.translate(adjusted_segment.unit_endpoint().to_vec());
 
                 // Check that the nudge was not too big
