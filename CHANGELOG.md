@@ -13,6 +13,8 @@
     - `math::point_to_enclosing_cube()`
     - `math::Face6`, which is like `math::Face` (now) `Face7` but without the `Within` variant.
     - `DirtyFlag::listening()` which simplifies typical usage.
+    - `GridArray::repeat()` for constructing arrays with uniform contents.
+    - `GridArray::from_element()` for constructing single-element arrays.
     - `GridRotation::ALL_BUT_REFLECTIONS`, as `GridRotation::ALL` but excluding reflections.
     - `SpaceTransaction::draw_target()` allows 2.5D drawing into a transaction in the same way `Space::draw_target()` works on `&mut Space`.
     - `StandardCameras::world_space()`, so that clients don't need to consult the `Character` each frame.

@@ -100,7 +100,7 @@ fn evaluate_opaque_atom_and_attributes() {
     assert_eq!(e.visible, true);
     assert_eq!(
         e.voxel_opacity_mask,
-        GridArray::from_elements(GridAab::for_block(1), [OpacityCategory::Opaque])
+        Some(GridArray::from_element(OpacityCategory::Opaque))
     )
 }
 
@@ -115,7 +115,7 @@ fn evaluate_transparent_atom() {
     assert_eq!(e.visible, true);
     assert_eq!(
         e.voxel_opacity_mask,
-        GridArray::from_elements(GridAab::for_block(1), [OpacityCategory::Partial])
+        Some(GridArray::from_element(OpacityCategory::Partial))
     )
 }
 
@@ -173,10 +173,10 @@ fn evaluate_voxels_checked_individually() {
     assert_eq!(e.visible, true);
     assert_eq!(
         e.voxel_opacity_mask,
-        GridArray::from_elements(
+        Some(GridArray::repeat(
             GridAab::for_block(resolution),
-            vec![OpacityCategory::Opaque; (resolution as usize).pow(3)]
-        )
+            OpacityCategory::Opaque,
+        ))
     )
 }
 

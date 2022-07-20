@@ -802,20 +802,47 @@ impl<V> GridArray<V> {
         }
     }
 
+    /// Constructs a [`GridArray`] by cloning the provided value for each point.
+    ///
+    /// TODO: This feels like it should be called 'filled' or 'cloned', but if so,
+    /// maybe [`FaceMap::repeat`](crate::math::FaceMap::repeat) should also change?
+    pub fn repeat(bounds: GridAab, value: V) -> Self
+    where
+        V: Clone,
+    {
+        Self::from_fn(bounds, |_| value.clone())
+    }
+
+    /// Constructs a [`GridArray`] with a single value, in bounds
+    /// `GridAab::from_lower_size([0, 0, 0], [1, 1, 1])`.
+    ///
+    /// If the single element should be at a different location, you can call
+    /// [`.translate(offset)`](Self::translate), or use [`GridArray::from_elements()`]
+    /// instead.
+    pub fn from_element(value: V) -> Self {
+        Self::from_elements(GridAab::for_block(1), [value]).unwrap()
+    }
+
     /// Constructs a [`GridArray`] containing the provided elements, which must be in the
     /// ordering used by [`GridAab::interior_iter()`].
     ///
-    /// Returns [`None`] if the number of elements does not match
+    /// Returns an [`ArrayLengthError`] if the number of elements does not match
     /// [`bounds.volume()`](GridAab::volume).
-    pub fn from_elements(bounds: GridAab, elements: impl Into<Box<[V]>>) -> Option<Self> {
+    pub fn from_elements(
+        bounds: GridAab,
+        elements: impl Into<Box<[V]>>,
+    ) -> Result<Self, ArrayLengthError> {
         let elements = elements.into();
         if elements.len() == bounds.volume() {
-            Some(GridArray {
+            Ok(GridArray {
                 bounds,
                 contents: elements,
             })
         } else {
-            None
+            Err(ArrayLengthError {
+                input_length: elements.len(),
+                bounds,
+            })
         }
     }
 
@@ -936,7 +963,7 @@ mod grid_array_arb {
                 .arbitrary_iter()?
                 .take(bounds.volume())
                 .collect::<Result<Box<[V]>, _>>()?;
-            GridArray::from_elements(bounds, contents).ok_or(arbitrary::Error::NotEnoughData)
+            GridArray::from_elements(bounds, contents).map_err(|_| arbitrary::Error::NotEnoughData)
         }
 
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
@@ -949,6 +976,14 @@ mod grid_array_arb {
             })
         }
     }
+}
+
+/// Error from [`GridArray::from_elements`] being given the wrong length.
+#[derive(Clone, Copy, Debug, PartialEq, thiserror::Error)]
+#[error("array of length {input_length} cannot fill volume {v} of {bounds:?}", v = self.bounds.volume())]
+pub struct ArrayLengthError {
+    input_length: usize,
+    bounds: GridAab,
 }
 
 #[cfg(test)]
@@ -1114,7 +1149,31 @@ mod tests {
     #[test]
     fn array_from_elements_error() {
         let bounds = GridAab::from_lower_size([10, 0, 0], [4, 1, 1]);
-        assert_eq!(GridArray::from_elements(bounds, vec![10i32, 11, 12]), None);
+        assert_eq!(
+            GridArray::from_elements(bounds, vec![10i32, 11, 12]),
+            Err(ArrayLengthError {
+                input_length: 3,
+                bounds
+            })
+        );
+    }
+
+    #[test]
+    fn array_repeat() {
+        let bounds = GridAab::from_lower_size([10, 0, 0], [2, 2, 1]);
+        assert_eq!(
+            GridArray::repeat(bounds, 9),
+            GridArray::from_elements(bounds, vec![9, 9, 9, 9]).unwrap(),
+        );
+    }
+
+    #[test]
+    fn array_from_element() {
+        let element = String::from("x");
+        assert_eq!(
+            GridArray::from_element(element.clone()),
+            GridArray::from_elements(GridAab::for_block(1), [element]).unwrap(),
+        );
     }
 
     #[test]

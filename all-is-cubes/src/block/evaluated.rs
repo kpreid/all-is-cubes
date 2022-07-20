@@ -94,10 +94,7 @@ impl EvaluatedBlock {
             voxel_opacity_mask: if color.fully_transparent() {
                 None
             } else {
-                Some(
-                    GridArray::from_elements(GridAab::for_block(1), [color.opacity_category()])
-                        .unwrap(),
-                )
+                Some(GridArray::from_element(color.opacity_category()))
             },
         }
     }

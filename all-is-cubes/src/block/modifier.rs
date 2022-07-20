@@ -415,17 +415,17 @@ mod tests {
                     ..ev_original.attributes.clone()
                 },
                 color: color.to_rgb().with_alpha(notnan!(0.5)),
-                voxels: GridArray::from_elements(
+                voxels: Some(GridArray::repeat(
                     expected_bounds,
-                    vec![Evoxel::from_block(&ev_original); expected_bounds.volume()]
-                ),
+                    Evoxel::from_block(&ev_original)
+                )),
                 resolution: 16,
                 opaque: false,
                 visible: true,
-                voxel_opacity_mask: GridArray::from_elements(
+                voxel_opacity_mask: Some(GridArray::repeat(
                     expected_bounds,
-                    vec![OpacityCategory::Opaque; expected_bounds.volume()]
-                ),
+                    OpacityCategory::Opaque
+                )),
             }
         );
     }
@@ -458,17 +458,17 @@ mod tests {
                     ..ev_original.attributes.clone()
                 },
                 color: color.to_rgb().with_alpha(notnan!(0.5)),
-                voxels: GridArray::from_elements(
+                voxels: Some(GridArray::repeat(
                     expected_bounds,
-                    vec![Evoxel::from_block(&ev_original); expected_bounds.volume()]
-                ),
+                    Evoxel::from_block(&ev_original)
+                )),
                 resolution,
                 opaque: false,
                 visible: true,
-                voxel_opacity_mask: GridArray::from_elements(
+                voxel_opacity_mask: Some(GridArray::repeat(
                     expected_bounds,
-                    vec![OpacityCategory::Opaque; expected_bounds.volume()]
-                ),
+                    OpacityCategory::Opaque
+                )),
             }
         );
     }
