@@ -314,7 +314,9 @@ impl SpaceRenderer {
                 view: depth_texture_view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
-                    store: true,
+                    // We don't need to store, because we won't be using this depth information
+                    // in a future pass.
+                    store: false,
                 }),
                 stencil_ops: None,
             }),
