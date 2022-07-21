@@ -25,7 +25,7 @@ use crate::math::{
     cube_to_midpoint, Face7, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
     GridVector, Rgb, Rgba,
 };
-use crate::space::{Space, SpacePhysics};
+use crate::space::Space;
 use crate::universe::Universe;
 
 #[cfg(doc)]
@@ -100,36 +100,20 @@ impl fmt::Display for Icons {
 impl Icons {
     pub async fn new(universe: &mut Universe, p: YieldProgress) -> BlockProvider<Icons> {
         let resolution = 16;
-        let crosshair_resolution = 29; // Odd resolution allows centering
 
         BlockProvider::new(p, |key| {
             Ok(match key {
-                Icons::Crosshair => {
-                    let mut space = Space::empty_positive(
-                        crosshair_resolution.into(),
-                        crosshair_resolution.into(),
-                        1,
-                    );
-                    space.set_physics(SpacePhysics::DEFAULT_FOR_BLOCK);
-                    let center_x2 =
-                        GridPoint::new(1, 1, 0) * (GridCoordinate::from(crosshair_resolution) - 1);
-
-                    let line_block_1 = Block::from(rgba_const!(0.1, 0.1, 0.1, 1.0));
-                    let line_block_2 = line_block_1.clone(); // TODO: experiment with patterning
-                    for i in 5..8 {
-                        for &direction in &[Face7::PX, Face7::PY, Face7::NX, Face7::NY] {
-                            let position_x2 = center_x2 + i * direction.normal_vector() * 2;
-                            space.set(
-                                position_x2 / 2,
-                                [&line_block_1, &line_block_2][i as usize % 2],
-                            )?;
-                        }
-                    }
-                    Block::builder()
-                        .display_name("Crosshair")
-                        .voxels_ref(crosshair_resolution, universe.insert_anonymous(space))
-                        .build()
-                }
+                Icons::Crosshair => Block::builder()
+                    .display_name("Crosshair")
+                    .voxels_ref(
+                        64, // TODO: get resolution from image file
+                        universe.insert_anonymous(space_from_image(
+                            include_image!("icons/crosshair.png"),
+                            GridRotation::RXyZ,
+                            default_srgb,
+                        )?),
+                    )
+                    .build(),
 
                 Icons::EmptySlot => Block::builder()
                     .attributes(AIR_EVALUATED.attributes)

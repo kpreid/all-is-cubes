@@ -10,7 +10,7 @@ use std::io;
 
 use image::{DynamicImage, GenericImageView};
 
-use crate::block::Block;
+use crate::block::{Block, AIR};
 use crate::drawing::VoxelBrush;
 use crate::math::{GridAab, GridPoint, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
@@ -74,8 +74,17 @@ where
 }
 
 /// Simple function for [`space_from_image()`] pixel conversion.
+///
+/// Special case:
+/// All pixels with 0 alpha (regardless of other channel values) are converted to
+/// [`AIR`], to meet normal expectations about collision, selection, and equality.
 pub(crate) fn default_srgb<P: image::Pixel<Subpixel = u8>>(pixel: P) -> VoxelBrush<'static> {
-    VoxelBrush::single(Block::from(Rgba::from_srgb8(pixel.to_rgba().0)))
+    let pixel = pixel.to_rgba();
+    VoxelBrush::single(if pixel[3] == 0 {
+        AIR
+    } else {
+        Block::from(Rgba::from_srgb8(pixel.0))
+    })
 }
 
 /// Helper for [`include_image`] macro.
@@ -119,6 +128,18 @@ mod tests {
             GridAab::from_lower_upper([0, 0, 0], [2, 2, 1])
         );
         assert_eq!(space[(1, 0, 0)], Block::from(Rgb::new(1., 0., 0.)));
+    }
+
+    #[test]
+    fn transparent_pixels_are_air() {
+        assert_eq!(
+            default_srgb(image::Rgba([0, 0, 0, 0])),
+            VoxelBrush::single(AIR)
+        );
+        assert_eq!(
+            default_srgb(image::Rgba([255, 0, 0, 0])),
+            VoxelBrush::single(AIR)
+        );
     }
 
     #[test]
