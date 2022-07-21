@@ -4,8 +4,13 @@ use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
-#[derive(Debug)]
-pub(crate) struct GltfTextureAllocator {}
+/// [`TextureAllocator`] for glTF exports.
+///
+/// You may use this with [`SpaceMesh`] to create meshes that can be exported.
+///
+/// [`SpaceMesh`]: all_is_cubes::mesh::SpaceMesh
+#[derive(Debug, Default)]
+pub struct GltfTextureAllocator {}
 
 impl GltfTextureAllocator {
     pub fn new() -> Self {
@@ -23,8 +28,11 @@ impl TextureAllocator for GltfTextureAllocator {
     }
 }
 
+/// [`TextureTile`] produced by [`GltfTextureAllocator`].
+///
+/// You should not generally need to refer to this type.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct GltfTextureRef {
+pub struct GltfTextureRef {
     pub(crate) bounds: GridAab,
 }
 

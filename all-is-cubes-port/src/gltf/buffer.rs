@@ -8,22 +8,26 @@ use std::path::PathBuf;
 
 use gltf_json::Index;
 
-use crate::record::gltf::glue::{create_accessor, push_and_return_index, u32size, Lef32};
+use super::glue::{create_accessor, push_and_return_index, u32size, Lef32};
 
+/// Designates the location where glTF buffer data (meshes, textures) should be written
+/// (either to disk files or inline in the glTF JSON).
+///
+/// TODO: Add support for `.glb` combined files.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct GltfDataDestination {
+pub struct GltfDataDestination {
     /// If true, all data is unconditionally discarded. For testing only.
-    pub discard: bool,
+    discard: bool,
 
     /// Buffers whose byte length is less than or equal to this will be inlined as `data:` URLs.
-    pub maximum_inline_length: usize,
+    maximum_inline_length: usize,
 
     /// Path (possibly with extension which will be stripped) to use as a base name for data files
     /// beside the glTF file.
     ///
     /// If this is `None` and `maximum_inline_length` does not permit inlining, an error will be
     /// reported on any attempt to write a buffer.
-    pub file_base_path: Option<PathBuf>,
+    file_base_path: Option<PathBuf>,
 }
 
 impl GltfDataDestination {
@@ -36,6 +40,13 @@ impl GltfDataDestination {
         }
     }
 
+    /// `maximum_inline_length` is the maximum length of data which will be stored inline in the
+    /// glTF file as a `data:` URL rather than separately.
+    ///
+    /// `file_base_path` is the file path (optionally with extension which will be stripped) to use as a
+    /// base name for data files beside the glTF file. For example, if `file_base_path` is
+    /// `foo/bar.gltf`, then buffer files will be written to paths like `foo/bar-buffername.glbin`.
+    /// If it is `None`, then buffers may not exceed `maximum_inline_length`.
     pub fn new(file_base_path: Option<PathBuf>, maximum_inline_length: usize) -> Self {
         Self {
             discard: false,

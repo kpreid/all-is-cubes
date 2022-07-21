@@ -98,16 +98,14 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
  "all-is-cubes-gpu",
+ "all-is-cubes-port",
  "anyhow",
- "base64",
  "bytemuck",
  "clap 3.2.14",
  "crossterm",
  "directories-next",
- "dot_vox",
  "futures",
  "glfw",
- "gltf-json",
  "image",
  "indicatif",
  "log",
@@ -120,7 +118,6 @@ dependencies = [
  "simplelog",
  "softbuffer",
  "strum",
- "tempfile",
  "thiserror",
  "trycmd",
  "tui",
@@ -146,6 +143,23 @@ dependencies = [
  "resource",
  "thiserror",
  "wgpu",
+]
+
+[[package]]
+name = "all-is-cubes-port"
+version = "0.4.0"
+dependencies = [
+ "all-is-cubes",
+ "all-is-cubes-content",
+ "anyhow",
+ "base64",
+ "bytemuck",
+ "dot_vox",
+ "gltf-json",
+ "log",
+ "serde_json",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]

@@ -8,14 +8,16 @@ use all_is_cubes::{
 
 use super::glue::Lef32;
 
-/// Vertex type for All is Cubes meshes written directly to glTF buffer files.
-/// All fields are little-endian.
+/// [`GfxVertex`] type for glTF exports.
+///
+/// These vertices may be copied directly to glTF buffers; all fields are stored
+/// little-endian as per the specification.
 ///
 /// These vertices store no normals; they would be redundant since glTF 2.0 specification
 /// § 3.7.2.1 specifies that flat normals must be assumed.
 #[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
-pub(crate) struct GltfVertex {
+pub struct GltfVertex {
     pub(crate) position: [Lef32; 3],
     pub(crate) color_or_texture: [Lef32; 4],
 }

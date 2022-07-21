@@ -10,11 +10,12 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::mesh::{chunked_mesh::ChunkedSpaceMesh, SpaceMesh};
 use all_is_cubes::raytracer::RtRenderer;
+use all_is_cubes_port::gltf::{
+    json as gltf_json, json::Index, GltfDataDestination, GltfTextureAllocator, GltfTextureRef,
+    GltfVertex, GltfWriter,
+};
 
-mod gltf;
-use gltf::{GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter};
 mod options;
-use gltf_json::Index;
 pub(crate) use options::*;
 mod record_main;
 pub(crate) use record_main::{create_recording_session, record_main};
@@ -98,7 +99,7 @@ impl Recorder {
                         // Currently this path should always have a .gltf extension.
                         let file = File::create(&options.output_path)?;
 
-                        let mut wb = GltfWriter::new(gltf::GltfDataDestination::new(
+                        let mut wb = GltfWriter::new(GltfDataDestination::new(
                             Some(options.output_path),
                             2000,
                         ));

@@ -4,9 +4,9 @@ use std::time::Duration;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
-use crate::record::gltf::buffer::create_buffer_and_accessor;
-use crate::record::gltf::glue::{convert_quaternion, push_and_return_index};
-use crate::record::gltf::GltfWriter;
+use super::buffer::create_buffer_and_accessor;
+use super::glue::{convert_quaternion, push_and_return_index};
+use super::GltfWriter;
 
 #[derive(Debug)]
 pub(crate) struct FrameState {

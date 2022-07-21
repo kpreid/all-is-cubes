@@ -1,9 +1,16 @@
 //! Export to the glTF 3D file format.
+//!
+//! To use this, create a [`GltfWriter`].
+//!
+//! TODO: example code here
+//!
+//! TODO: This is not a clean, well-abstracted library API yet.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io;
 use std::time::Duration;
 
+pub use gltf_json as json;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
@@ -13,7 +20,7 @@ use all_is_cubes::mesh::SpaceMesh;
 
 mod buffer;
 use buffer::create_buffer_and_accessor;
-pub(crate) use buffer::GltfDataDestination;
+pub use buffer::GltfDataDestination;
 mod animation;
 use animation::FrameState;
 mod mesh;
@@ -21,20 +28,22 @@ use mesh::{add_mesh, Materials};
 mod glue;
 use glue::{convert_quaternion, empty_node, push_and_return_index, u32size};
 mod texture;
-pub(crate) use texture::{GltfTextureAllocator, GltfTextureRef};
+pub use texture::{GltfTextureAllocator, GltfTextureRef};
 mod vertex;
-pub(crate) use vertex::GltfVertex;
+pub use vertex::GltfVertex;
 
 /// Handles the construction of [`gltf_json::Root`] and the writing of supporting files.
 ///
-/// Life cycle: Create this (providing a [`GltfDataDestination`] for buffers and textures),
-/// call methods to add entities, then call [`GltfWriter::into_root()`] to obtain the main
+/// Life cycle:
+/// 1. Create this (providing a [`GltfDataDestination`] for buffers and textures).
+/// 2. Call methods to add entities that will be exported.
+/// 3. Call [`GltfWriter::into_root()`] to obtain the main
 /// [`gltf_json::Root`] value which should be written to the `.gltf` file.
 ///
 /// TODO: Split this struct into "root and buffers" (knows glTF generically) and
 /// "scene and animation" (knows how we intend to use it). This will simplify some borrows.
 #[derive(Debug)]
-pub(crate) struct GltfWriter {
+pub struct GltfWriter {
     /// Contains all the glTF entities written so far.
     /// Each operation that adds data appends to the vectors of entities inside this.
     /// Entities must not be deleted or reordered, to ensure [`Index`]es stay valid.
@@ -80,6 +89,16 @@ impl GltfWriter {
         }
     }
 
+    /// Add one frame of an animated scene.
+    ///
+    /// `our_camera` should be the current camera state (its `view_transform`s in
+    /// successive frames will be converted into an animation).
+    ///
+    /// `meshes` is a list of every mesh that should be visible in the current scene,
+    /// which should have been produced by previous calls to [`GltfWriter::add_mesh()`].
+    ///
+    /// TODO: This is not a clean API yet; it was designed around the needs of
+    /// `all-is-cubes-desktop`'s recording mode.
     pub fn add_frame(&mut self, our_camera: Option<&Camera>, meshes: &[Index<gltf_json::Mesh>]) {
         // Create camera if and only if one was given and we didn't have one.
         if self.camera.is_none() {
@@ -111,7 +130,8 @@ impl GltfWriter {
         add_mesh(self, name, mesh)
     }
 
-    /// Finish processing frames and return the [`gltf_json::Root`] to be written.
+    /// Finish all scene preparation and return the [`gltf_json::Root`] which is to be
+    /// written to a JSON file.
     pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf_json::Root> {
         let mut scene_nodes = Vec::new();
 

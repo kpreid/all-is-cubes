@@ -37,7 +37,6 @@ use aic_winit::winit_main_loop;
 mod command_options;
 use command_options::GraphicsType;
 mod config_files;
-mod data_files;
 mod glue;
 mod record;
 use record::record_main;
@@ -262,7 +261,7 @@ fn create_universe(
                 .await
                 .map_err(anyhow::Error::from),
             UniverseSource::File(path) => {
-                data_files::load_universe_from_file(yield_progress, &path).await
+                all_is_cubes_port::load_universe_from_file(yield_progress, &path).await
             }
         }
     })?;

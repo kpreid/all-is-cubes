@@ -189,10 +189,11 @@ fn main() -> Result<(), ActionError> {
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
 /// See also [`do_for_all_workspaces`].
-const ALL_NONTEST_PACKAGES: [&str; 6] = [
+const ALL_NONTEST_PACKAGES: [&str; 7] = [
     "all-is-cubes",
     "all-is-cubes-gpu",
     "all-is-cubes-content",
+    "all-is-cubes-port",
     "all-is-cubes-desktop",
     "all-is-cubes-wasm",
     "all-is-cubes-server",

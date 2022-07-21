@@ -8,8 +8,8 @@ use gltf_json::Index;
 
 use all_is_cubes::mesh::SpaceMesh;
 
-use crate::record::gltf::glue::{create_accessor, push_and_return_index, u32size};
-use crate::record::gltf::{GltfTextureRef, GltfVertex, GltfWriter};
+use super::glue::{create_accessor, push_and_return_index, u32size};
+use super::{GltfTextureRef, GltfVertex, GltfWriter};
 
 pub(crate) fn add_mesh(
     writer: &mut GltfWriter,
@@ -216,16 +216,12 @@ impl Materials {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
+    use super::*;
+    use crate::gltf::{tests::gltf_mesh, GltfDataDestination};
     use all_is_cubes::block::Block;
     use all_is_cubes::math::Rgba;
     use all_is_cubes::space::Space;
-
-    use crate::record::gltf::GltfDataDestination;
-
-    use super::super::tests::gltf_mesh;
-    use super::*;
+    use std::time::Duration;
 
     #[test]
     fn no_extra_indices_when_transparent() {

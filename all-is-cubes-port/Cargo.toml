@@ -1,0 +1,37 @@
+[package]
+name = "all-is-cubes-port"
+version = "0.4.0"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+edition = "2021"
+rust-version = "1.62"
+description = "Data import/export for the all-is-cubes engine."
+# TODO: add homepage = "..." when we have one
+repository = "https://github.com/kpreid/all-is-cubes"
+license = "MIT OR Apache-2.0"
+categories = ["games"]
+
+[lib]
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
+
+[features]
+
+[dependencies]
+all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
+# TODO: remove dependency on all-is-cubes-content in favor of hooks to provide said content, for both flexibility and compile time
+all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
+# TODO: remove dependency on anyhow in favor of more precisely designed errors
+anyhow = "1.0"
+dot_vox = "4.1.0"
+# TODO: replace logging with explicit reporting data flow
+log = { version = "0.4.14", default-features = false }
+thiserror = "1.0.22"
+
+# glTF related dependencies
+base64 = "0.13.0" # data URL generation
+bytemuck = { version = "1.7.2", default-features = false, features = ["derive"] }
+gltf-json = { version = "1.0.0", default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
+serde_json = "1.0.64"
+
+[dev-dependencies]
+tempfile = "3.3.0"

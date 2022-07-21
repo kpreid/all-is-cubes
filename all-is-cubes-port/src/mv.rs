@@ -1,14 +1,3 @@
-//! Reading/writing voxel data file formats.
-//!
-//! TODO: This module needs a better name.
-//!
-//! TODO: This module should live somewhere other than the all-is-cubes-desktop crate, so
-//! that it can be used in other situations. I'd make it another crate but I'm not sure
-//! what the crate should be named.
-
-use anyhow::Context;
-use std::path::Path;
-
 use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::character::{Character, Spawn};
@@ -19,24 +8,10 @@ use all_is_cubes::universe::{Name, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_content::free_editing_starter_inventory;
 
-/// Load a [`Universe`] described by the given file (of guessed format).
-///
-/// TODO: Define what errors it returns.
-pub(crate) async fn load_universe_from_file(
-    progress: YieldProgress,
-    path: &Path,
-) -> Result<Universe, anyhow::Error> {
-    let bytes = std::fs::read(path)
-        .with_context(|| format!("Could not read the file '{}'", path.display()))?;
-    load_dot_vox(progress, &bytes).await.with_context(|| {
-        format!(
-            "Could not load '{}' as a MagicaVoxel .vox file",
-            path.display()
-        )
-    })
-}
-
-async fn load_dot_vox(p: YieldProgress, bytes: &[u8]) -> Result<Universe, DotVoxConversionError> {
+pub(crate) async fn load_dot_vox(
+    p: YieldProgress,
+    bytes: &[u8],
+) -> Result<Universe, DotVoxConversionError> {
     let dot_vox::DotVoxData {
         version,
         models,
