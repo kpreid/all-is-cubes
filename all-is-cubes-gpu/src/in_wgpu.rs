@@ -680,6 +680,9 @@ impl EverythingRenderer {
                 } else {
                     wgpu::LoadOp::Load
                 },
+                // We need to store the depth buffer if and only if we are going to do
+                // the lines pass.
+                self.lines_vertex_count > 0,
             )?
         } else {
             SpaceDrawInfo::default()
@@ -702,7 +705,7 @@ impl EverythingRenderer {
                     view: depth_texture_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
-                        store: true,
+                        store: false, // nothing uses the depth buffer after this
                     }),
                     stencil_ops: None,
                 }),
@@ -733,6 +736,7 @@ impl EverythingRenderer {
                 } else {
                     wgpu::LoadOp::Load
                 },
+                false, // nothing uses the ui depth buffer
             )?
         } else {
             SpaceDrawInfo::default()

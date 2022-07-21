@@ -281,6 +281,7 @@ impl SpaceRenderer {
         pipelines: &Pipelines,
         camera: &Camera,
         color_load_op: wgpu::LoadOp<wgpu::Color>,
+        store_depth: bool,
     ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
         let start_time = Instant::now();
 
@@ -314,9 +315,7 @@ impl SpaceRenderer {
                 view: depth_texture_view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
-                    // We don't need to store, because we won't be using this depth information
-                    // in a future pass.
-                    store: false,
+                    store: store_depth,
                 }),
                 stencil_ops: None,
             }),
