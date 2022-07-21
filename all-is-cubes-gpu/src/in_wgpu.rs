@@ -552,11 +552,16 @@ impl EverythingRenderer {
             let mut v: Vec<WgpuLinesVertex> = Vec::new();
 
             if let Some(cursor) = cursor_result {
-                wireframe_vertices::<WgpuLinesVertex, _, _>(
-                    &mut v,
-                    palette::CURSOR_OUTLINE,
-                    cursor,
-                );
+                // Draw cursor only if it's in the world space, because
+                // (1) we don't want cursor boxes on the UI, and
+                // (2) the lines are drawn in the world camera's transform
+                if Some(&cursor.space) == spaces_to_render.world {
+                    wireframe_vertices::<WgpuLinesVertex, _, _>(
+                        &mut v,
+                        palette::CURSOR_OUTLINE,
+                        cursor,
+                    );
+                }
             }
 
             gather_debug_lines(
