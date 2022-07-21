@@ -30,12 +30,12 @@ use crate::{
             create_wgsl_module_from_reloadable, to_wgpu_color, BeltWritingParts, ResizingBuffer,
         },
         pipelines::Pipelines,
-        vertex::{WgpuBlockVertex, WgpuLinesVertex},
+        vertex::WgpuLinesVertex,
     },
     reloadable::{reloadable_str, Reloadable},
-    wireframe_vertices, DrawInfo, FrameBudget, SpaceDrawInfo, SpaceUpdateInfo, UpdateInfo,
+    wireframe_vertices, DrawInfo, FrameBudget, GraphicsResourceError, RenderInfo, SpaceDrawInfo,
+    SpaceUpdateInfo, UpdateInfo,
 };
-use crate::{GraphicsResourceError, RenderInfo};
 
 mod block_texture;
 mod camera;
