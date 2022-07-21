@@ -289,6 +289,12 @@ impl<T> URootRef<T> {
             universe_id: self.universe_id,
         }
     }
+
+    /// Returns the number of weak references to this entry, which is greater than
+    /// or equal to the number of [`URef`]s to it.
+    pub(crate) fn weak_ref_count(&self) -> usize {
+        Arc::weak_count(&self.strong_ref)
+    }
 }
 
 /// Object-safe trait implemented for [`URef`].

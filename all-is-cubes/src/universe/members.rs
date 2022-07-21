@@ -48,6 +48,8 @@ where
         return Err(InsertError::AlreadyExists(name));
     }
 
+    this.wants_gc = true;
+
     let id = this.id;
     let table = this.table_mut();
     match table.entry(name.clone()) {

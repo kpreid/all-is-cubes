@@ -8,6 +8,7 @@ use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::space::Space;
+use crate::time::Tick;
 use crate::transaction::Transaction;
 use crate::universe::{
     InsertError, ListRefs, Name, RefError, URef, Universe, UniverseIndex, UniverseTransaction,
@@ -180,6 +181,24 @@ fn delete_nonexistent_fails() {
     UniverseTransaction::delete(name)
         .execute(&mut u)
         .unwrap_err();
+}
+
+#[test]
+fn gc_explicit() {
+    let mut u = Universe::new();
+    u.insert_anonymous(BlockDef::new(AIR));
+    assert_eq!(1, UniverseIndex::<BlockDef>::iter_by_type(&u).count());
+    u.gc();
+    assert_eq!(0, UniverseIndex::<BlockDef>::iter_by_type(&u).count());
+}
+
+#[test]
+fn gc_implicit() {
+    let mut u = Universe::new();
+    u.insert_anonymous(BlockDef::new(AIR));
+    assert_eq!(1, UniverseIndex::<BlockDef>::iter_by_type(&u).count());
+    u.step(Tick::arbitrary());
+    assert_eq!(0, UniverseIndex::<BlockDef>::iter_by_type(&u).count());
 }
 
 #[test]

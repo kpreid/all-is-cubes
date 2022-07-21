@@ -100,7 +100,13 @@ pub struct Universe {
     spaces: Storage<Space>,
 
     id: UniverseId,
+    /// Next number to assign to a [`Name::Anonym`].
     next_anonym: usize,
+    /// Whether to run a garbage collection on the next step().
+    /// This is set to true whenever a new member is inserted, which policy ensures
+    /// that repeated insertion and dropping references cannot lead to unbounded growth
+    /// as long as steps occur routinely.
+    wants_gc: bool,
 }
 
 impl Universe {
@@ -114,6 +120,7 @@ impl Universe {
 
             id: UniverseId::new(),
             next_anonym: 0,
+            wants_gc: false,
         }
     }
 
@@ -133,6 +140,7 @@ impl Universe {
             spaces,
             id: _,
             next_anonym: _,
+            wants_gc: _,
         } = self;
 
         if let Some(r) = blocks.get(name) {
@@ -156,6 +164,11 @@ impl Universe {
     pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
         let start_time = Instant::now();
+
+        if self.wants_gc {
+            self.gc();
+            self.wants_gc = false;
+        }
 
         let mut transactions = Vec::new();
 
@@ -203,9 +216,10 @@ impl Universe {
     }
 
     /// Delete a member.
-    /// Use [`UniverseTransaction::delete()`] as the public interface to this.
     ///
-    /// Returns whether the entry actually existed
+    /// (Use [`UniverseTransaction::delete()`] as the public interface to this.)
+    ///
+    /// Returns whether the entry actually existed.
     pub(crate) fn delete(&mut self, name: &Name) -> bool {
         let Self {
             blocks,
@@ -213,11 +227,39 @@ impl Universe {
             spaces,
             id: _,
             next_anonym: _,
+            wants_gc: _,
         } = self;
 
         blocks.remove(name).is_some()
             || characters.remove(name).is_some()
             || spaces.remove(name).is_some()
+    }
+
+    /// Delete all anonymous members which have no references to them.
+    ///
+    /// This may happen at any time during operations of the universe; calling this method
+    /// merely ensures that it happens now and not earlier.
+    pub fn gc(&mut self) {
+        let Self {
+            blocks,
+            characters,
+            spaces,
+            id: _,
+            next_anonym: _,
+            wants_gc: _,
+        } = self;
+
+        // TODO: We need a real GC algorithm. For now, let's perform non-cyclic collection by
+        // checking reference counts. If an entry has no weak references to its `Arc`, then
+        // we know that it has no `URef`s.
+        //
+        // Besides not collecting cycles, this algorithm also has the flaw that it keeps
+        // members around if there are `URef`s to them outside of the Universe, whereas the
+        // preferred behavior, for consistency of the game logic, would be that they
+        // go away at a time that is deterministic with respect to the simulation.
+        gc_members(blocks);
+        gc_members(characters);
+        gc_members(spaces);
     }
 }
 
@@ -338,5 +380,18 @@ impl CustomFormat<StatusText> for UniverseStepInfo {
         )?;
         write!(fmt, "{}", self.space_step.custom_format(StatusText))?;
         Ok(())
+    }
+}
+
+/// Helper for [`Universe::gc()`].
+fn gc_members<T>(table: &mut Storage<T>) {
+    let mut dead: Vec<Name> = Vec::new();
+    for (name, root) in table.iter() {
+        if root.weak_ref_count() == 0 {
+            dead.push(name.clone());
+        }
+    }
+    for name in dead {
+        table.remove(&name);
     }
 }
