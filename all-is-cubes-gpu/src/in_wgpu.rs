@@ -305,8 +305,15 @@ impl EverythingRenderer {
 
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
-                // TODO: wild guess at good size
-                std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
+                // Empirically chosen belt chunk size based on tests with
+                // UniverseTemplate::DemoCity.
+                //
+                // StagingBelt docs say that the chunk size should be
+                // "1-4 times less than the total amount of data uploaded per submission"
+                // but it also needs to be bigger than any *single* write operation, or
+                // the belt will allocate buffers exactly that big, and more buffers in
+                // total (due to fragmentation effects, I assume).
+                16 * 1024 * 1024,
             ),
 
             linear_scene_texture_format,
