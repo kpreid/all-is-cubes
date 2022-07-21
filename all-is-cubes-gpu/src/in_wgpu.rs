@@ -483,6 +483,7 @@ impl EverythingRenderer {
         // Ensure SpaceRenderers are pointing at those spaces
         // TODO: we should be able to express this as something like "Layers::for_each_zip()"
         Self::update_space_renderer(
+            "world",
             &mut self.space_renderers.world,
             spaces_to_render.world,
             &self.device,
@@ -490,6 +491,7 @@ impl EverythingRenderer {
             &self.pipelines,
         )?;
         Self::update_space_renderer(
+            "ui",
             &mut self.space_renderers.ui,
             spaces_to_render.ui,
             &self.device,
@@ -605,6 +607,7 @@ impl EverythingRenderer {
 
     /// Create, or set the space of, a [`SpaceRenderer`].
     fn update_space_renderer(
+        label: &str,
         renderer: &mut Option<SpaceRenderer>,
         space: Option<&URef<Space>>,
         device: &wgpu::Device,
@@ -616,7 +619,7 @@ impl EverythingRenderer {
             (r @ None, Some(space)) => {
                 *r = Some(SpaceRenderer::new(
                     space.clone(),
-                    String::from("world"),
+                    String::from(label),
                     device,
                     queue,
                     pipelines,
