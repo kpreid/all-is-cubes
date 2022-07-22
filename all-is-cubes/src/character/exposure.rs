@@ -17,6 +17,15 @@ use crate::math::FreeCoordinate;
 use crate::raycast::Ray;
 use crate::space::{LightPhysics, Space};
 
+/// What average luminance of the exposed scene to try to match
+const TARGET_LUMINANCE: f32 = 0.9;
+/// Proportion by which we apply the exposure adjustment rather than not
+/// (0.0 = none, 1.0 = perfect adaptation). This is less than 1 so that
+/// dark areas stay dark.
+/// TODO: this should be an adjustable game rule + graphics option.
+const ADJUSTMENT_STRENGTH: f32 = 0.5;
+const EXPOSURE_CHANGE_RATE: f32 = 2.0;
+
 pub(crate) struct State {
     /// Incrementally updated samples of neighboring light levels, used for
     /// determining exposure / eye adaptation.
@@ -105,25 +114,105 @@ impl State {
             }
         }
 
-        /// What average luminance of the exposed scene to try to match
-        const TARGET_LUMINANCE: f32 = 0.9;
-        /// Proportion by which we apply the exposure adjustment rather than not
-        /// (0.0 = none, 1.0 = perfect adaptation). This is less than 1 so that
-        /// dark areas stay dark.
-        /// TODO: this should be an adjustable game rule + graphics option.
-        const ADJUSTMENT_STRENGTH: f32 = 0.5;
-        const EXPOSURE_CHANGE_RATE: f32 = 2.0;
-
-        // Combine the light rays into an exposure value update.
-        let luminance_average: f32 = self.luminance_samples.iter().copied().sum::<f32>()
-            * (self.luminance_samples.len() as f32).recip();
-        let derived_exposure = (TARGET_LUMINANCE / luminance_average).clamp(0.1, 10.);
-        // Lerp between full adjustment and no adjustment according to ADJUSTMENT_STRENGTH
-        let derived_exposure =
-            derived_exposure * ADJUSTMENT_STRENGTH + 1. * (1. - ADJUSTMENT_STRENGTH);
-        if derived_exposure.is_finite() {
-            let delta_log = derived_exposure.ln() - self.exposure_log;
+        let target_exposure = compute_target_exposure(self.luminance_average());
+        if target_exposure.is_finite() {
+            let delta_log = target_exposure.ln() - self.exposure_log;
             self.exposure_log += delta_log * dt as f32 * EXPOSURE_CHANGE_RATE;
         }
+    }
+
+    /// Combine the light samples.
+    fn luminance_average(&self) -> f32 {
+        self.luminance_samples.iter().copied().sum::<f32>()
+            * (self.luminance_samples.len() as f32).recip()
+    }
+}
+
+/// Compute the target exposure value (which [`State::exposure()`] is moving towards)
+/// from the observed scene luminance.
+fn compute_target_exposure(luminance: f32) -> f32 {
+    let derived_exposure = (TARGET_LUMINANCE / luminance).clamp(0.1, 10.);
+    // Lerp between full adjustment and no adjustment according to ADJUSTMENT_STRENGTH
+    derived_exposure * ADJUSTMENT_STRENGTH + 1. * (1. - ADJUSTMENT_STRENGTH)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::character::Character;
+    use crate::math::{GridAab, Rgb};
+    use crate::time::Tick;
+    use crate::universe::Universe;
+    use euclid::point3;
+
+    /// [`compute_target_exposure`] is what actually determines the exposure under
+    /// steady-state conditions, so test it in isolation with some examples, because
+    /// nothing else anywhere in the codebase is going to do that. (In particular, rendering
+    /// tests will use fixed exposure.)
+    #[test]
+    fn target_exposure() {
+        assert_eq!(
+            [0.0, 0.01, 0.5, 1.0, 2.0, 100.0, 1000.0].map(compute_target_exposure),
+            [5.5, 5.5, 1.4, 0.95, 0.725, 0.55, 0.55]
+        );
+    }
+
+    /// End-to-end test for character exposure calculation,
+    /// which incidentally tests some of the pieces too.
+    ///
+    /// This test does NOT test the *choice* of exposure (that is, it does not test
+    /// [`compute_target_exposure`]), just how it's updated in a [`Character`].
+    #[test]
+    fn e2e() {
+        // Put a character in a uniformly lit box.
+        let mut universe = Universe::new();
+        let luminance = 3.;
+        let light = Rgb::new(luminance, luminance, luminance);
+
+        // TODO: Also test a version with blocks instead of sky only:
+        // let light_block = Block::builder()
+        //     .color(Rgba::BLACK)
+        //     .light_emission(light)
+        //     .build();
+
+        let space = universe.insert_anonymous({
+            let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [10, 10, 10]))
+                .sky_color(light)
+                .build();
+
+            // space.fill_uniform(space.bounds(), light_block).unwrap();
+            // space
+            //     .fill_uniform(space.bounds().expand(FaceMap::repeat(-1)), AIR)
+            //     .unwrap();
+
+            space.evaluate_light::<std::time::Instant>(0, |_| {});
+            space
+        });
+        let mut character = Character::spawn_default(space);
+        character.body.position = point3(5., 5., 5.);
+
+        // Let exposure sampling reach steady state
+        for i in 0..100 {
+            eprintln!(
+                "{i:3} {exp_log} {exp}",
+                exp_log = character.exposure.exposure_log,
+                exp = character.exposure.exposure(),
+            );
+            let _ = character.step(None, Tick::from_seconds(1.0 / 10.0));
+        }
+
+        // Luminance sampling should match the scene we set up.
+        eprintln!("{:?}", character.exposure.luminance_samples);
+        assert_eq!(character.exposure.luminance_average(), luminance);
+
+        // Exposure produced by the stateful process should closely approach the value from
+        // compute_target_exposure.
+        let expected = compute_target_exposure(luminance);
+        let expected_actual_ratio_difference = character.exposure() / expected - 1.0;
+        assert!(
+            expected_actual_ratio_difference.abs() < 0.001,
+            "actual {actual} != expected {expected} (ratio {expected_actual_ratio_difference})",
+            actual = character.exposure()
+        );
     }
 }
