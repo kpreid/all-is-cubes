@@ -15,7 +15,7 @@ use all_is_cubes::camera::{HeadlessRenderer, RenderError, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes_gpu::in_wgpu::EverythingRenderer;
-use all_is_cubes_gpu::FrameBudget;
+use all_is_cubes_gpu::{FrameBudget, GraphicsResourceError};
 use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main]
@@ -141,15 +141,13 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
         cursor: Option<&'a Cursor>,
     ) -> BoxFuture<'a, Result<(), RenderError>> {
         Box::pin(async move {
-            let _uinfo = self
-                .everything
+            self.everything
                 .update(
                     &self.factory.queue,
                     cursor,
                     &FrameBudget::PRACTICALLY_INFINITE,
                 )
-                .unwrap();
-            // TODO: report RenderError::Read rather than panicking, when applicable
+                .map_err(GraphicsResourceError::into_render_error_or_panic)?;
             Ok(())
         })
     }

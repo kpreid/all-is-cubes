@@ -86,7 +86,9 @@ impl SpaceRenderer {
         queue: &wgpu::Queue,
         pipelines: &Pipelines,
     ) -> Result<Self, GraphicsResourceError> {
-        let space_borrowed = space.borrow();
+        let space_borrowed = space
+            .try_borrow()
+            .map_err(GraphicsResourceError::read_err)?;
 
         let block_texture = AtlasAllocator::new(&space_label, device, queue)?;
         let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.bounds());
@@ -270,6 +272,9 @@ impl SpaceRenderer {
         })
     }
 
+    /// Draw the space as of the last [`Self::update`].
+    ///
+    /// Does not access the [`Space`] contents at all.
     // TODO: needs error return or not?
     #[allow(clippy::too_many_arguments)]
     pub fn draw(

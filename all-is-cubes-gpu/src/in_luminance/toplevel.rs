@@ -237,7 +237,9 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
         // drawing the UI in either case.
         let character_borrow;
         let character: Option<&Character> = if let Some(character_ref) = self.cameras.character() {
-            character_borrow = character_ref.borrow();
+            character_borrow = character_ref
+                .try_borrow()
+                .map_err(GraphicsResourceError::read_err)?;
             Some(&*character_borrow)
         } else {
             None

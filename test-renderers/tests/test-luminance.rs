@@ -32,7 +32,7 @@ use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::{HeadlessRenderer, RenderError};
 use all_is_cubes::character::Cursor;
 use all_is_cubes_gpu::in_luminance::EverythingRenderer;
-use all_is_cubes_gpu::FrameBudget;
+use all_is_cubes_gpu::{FrameBudget, GraphicsResourceError};
 use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main(flavor = "current_thread")]
@@ -182,53 +182,57 @@ impl HeadlessRenderer for LumHeadlessRenderer {
         // but the luminance renderer doesn't currently support that split.
         // This doesn't matter for our test-case usage.
 
-        let UnsendRend {
-            framebuffer,
-            renderer,
-            cursor,
-            viewport_dirty,
-        } = &mut *self.0;
+        let mut inner = move || -> Result<RgbaImage, RenderError> {
+            let UnsendRend {
+                framebuffer,
+                renderer,
+                cursor,
+                viewport_dirty,
+            } = &mut *self.0;
 
-        // must call this to get a fresh viewport so we can update the framebuffer if needed
-        // TODO: kludgey
-        renderer.update_world_camera();
-        let viewport = renderer.cameras().viewport();
+            // must call this to get a fresh viewport so we can update the framebuffer if needed
+            // TODO: kludgey
+            renderer.update_world_camera();
+            let viewport = renderer.cameras().viewport();
 
-        with_context(|context| {
-            if viewport_dirty.get_and_clear() {
-                *framebuffer = create_framebuffer(context, viewport);
-            }
+            with_context(|context| -> Result<(), RenderError> {
+                if viewport_dirty.get_and_clear() {
+                    *framebuffer = create_framebuffer(context, viewport);
+                }
 
-            renderer
-                .render_frame(
-                    context,
-                    framebuffer,
-                    &FrameBudget::PRACTICALLY_INFINITE,
-                    cursor.as_ref(),
-                )
-                .unwrap();
-            if !info_text.is_empty() {
                 renderer
-                    .add_info_text(context, framebuffer, info_text)
-                    .unwrap();
-            }
-        });
+                    .render_frame(
+                        context,
+                        framebuffer,
+                        &FrameBudget::PRACTICALLY_INFINITE,
+                        cursor.as_ref(),
+                    )
+                    .map_err(GraphicsResourceError::into_render_error_or_panic)?;
+                if !info_text.is_empty() {
+                    renderer
+                        .add_info_text(context, framebuffer, info_text)
+                        .map_err(GraphicsResourceError::into_render_error_or_panic)?;
+                }
+                Ok(())
+            })?;
 
-        let texels = framebuffer
-            .color_slot()
-            .get_raw_texels()
-            .expect("Failed to read offscreen buffer");
+            let texels = framebuffer
+                .color_slot()
+                .get_raw_texels()
+                .expect("Failed to read offscreen buffer");
 
-        let mut image = RgbaImage::from_raw(
-            viewport.framebuffer_size.x,
-            viewport.framebuffer_size.y,
-            texels,
-        )
-        .expect("texels did not match expected image size");
-        image::imageops::flip_vertical_in_place(&mut image);
+            let mut image = RgbaImage::from_raw(
+                viewport.framebuffer_size.x,
+                viewport.framebuffer_size.y,
+                texels,
+            )
+            .expect("texels did not match expected image size");
+            image::imageops::flip_vertical_in_place(&mut image);
+            Ok(image)
+        };
 
         // can't defer any of the work because the future wouldn't be Send
-        Box::pin(std::future::ready(Ok(image)))
+        Box::pin(std::future::ready(inner()))
     }
 }
 

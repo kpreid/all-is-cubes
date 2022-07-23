@@ -109,7 +109,7 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
             .csm
             .space()
             .try_borrow()
-            .expect("TODO: return a trivial result instead of panic.");
+            .map_err(GraphicsResourceError::read_err)?;
 
         if self.block_texture.is_none() {
             self.block_texture = Some(LumAtlasAllocator::new(context)?);

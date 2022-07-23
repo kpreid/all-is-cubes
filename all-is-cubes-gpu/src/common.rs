@@ -5,6 +5,8 @@
 
 use std::error::Error;
 
+use all_is_cubes::camera::RenderError;
+use all_is_cubes::universe::RefError;
 use instant::Duration;
 
 use all_is_cubes::apps::Layers;
@@ -24,6 +26,13 @@ pub(crate) mod reloadable;
 /// Error arising when GPU/platform resources could not be obtained, or there is a bug
 /// or incompatibility, and the requested graphics initialization or drawing could not be
 /// completed.
+///
+/// Unless otherwise specified, these errors should be assumed to be recoverable
+/// — invoking the renderer again in the same way next frame might or might not succeed,
+/// but it should do no harm and should recover if possible (i.e. external reinitialization
+/// should not be necessary).
+///
+/// TODO: Merge this with [`RenderError`], probably.
 #[derive(Debug, thiserror::Error)]
 #[error("graphics error (in {0})", context.as_ref().map(|s| s.as_ref()).unwrap_or("?"))]
 pub struct GraphicsResourceError {
@@ -37,6 +46,23 @@ impl GraphicsResourceError {
         GraphicsResourceError {
             context: None,
             source: Box::new(source),
+        }
+    }
+
+    pub(crate) fn read_err(source: RefError) -> Self {
+        GraphicsResourceError {
+            context: Some(String::from("Unable to read scene data")),
+            source: Box::new(source),
+        }
+    }
+
+    /// TODO: make this not panic by expanding the functionality of RenderError
+    pub fn into_render_error_or_panic(self) -> RenderError {
+        if let Some(re) = self.source.downcast_ref::<RefError>() {
+            RenderError::Read(re.clone())
+        } else {
+            // TODO: don't panic
+            panic!("error updating renderer: {}", &self.source);
         }
     }
 }
