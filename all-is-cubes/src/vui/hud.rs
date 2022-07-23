@@ -15,18 +15,72 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
-use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridRotation, Rgba};
+use crate::math::{
+    Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridRotation, GridVector, Rgba,
+};
 use crate::space::{Space, SpacePhysics};
-use crate::universe::{URef, Universe, UniverseIndex};
+use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
 use crate::vui::layout::LayoutTree;
 use crate::vui::widgets::{
     Crosshair, FrameWidget, ToggleButtonVisualState, ToggleButtonWidget, Toolbar, TooltipState,
     TooltipWidget,
 };
-use crate::vui::{Icons, LayoutGrant, Widget, WidgetTree};
+use crate::vui::{Icons, LayoutGrant, LayoutRequest, Widget, WidgetTree};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
+
+/// Pair of a widget tree and a space to instantiate it in, which can be recreated with a different size.
+/// TODO: Give this a better name and location.
+#[derive(Clone, Debug)]
+pub(crate) struct PageInst {
+    tree: WidgetTree,
+    space: Option<URef<Space>>,
+}
+
+impl PageInst {
+    pub fn new(tree: WidgetTree) -> Self {
+        Self { tree, space: None }
+    }
+
+    pub fn get_or_create_space(
+        &mut self,
+        layout: &HudLayout,
+        universe: &mut Universe,
+    ) -> URef<Space> {
+        if let Some(space) = self.space.as_ref() {
+            if space.borrow().bounds() == layout.bounds() {
+                return space.clone();
+            }
+        }
+
+        // Size didn't match, so recreate the space.
+        // TODO: Resize in-place instead.
+        let space = universe.insert_anonymous(layout.new_space());
+        // TODO: error handling for layout
+        space
+            .execute(
+                &self
+                    .tree
+                    .perform_layout(LayoutGrant::new(layout.bounds()))
+                    .expect("layout/widget error")
+                    .installation()
+                    .expect("installation error"),
+            )
+            .expect("transaction error");
+
+        // Initialize lighting
+        space
+            .try_modify(|space| {
+                space.fast_evaluate_light();
+                space.evaluate_light(10, |_| {});
+            })
+            .unwrap();
+
+        self.space = Some(space.clone());
+        space
+    }
+}
 
 /// Knows where and how to place graphics within the HUD space, but does not store
 /// the space or any related state itself; depends only on the screen size and other
@@ -41,6 +95,8 @@ pub(crate) struct HudLayout {
 }
 
 impl HudLayout {
+    pub(crate) const DEPTH_BEHIND_VIEW_PLANE: GridCoordinate = 5;
+
     /// Construct HudLayout with a size that suits the given viewport
     /// (based on pixel resolution and aspect ratio)
     pub fn new(viewport: Viewport) -> Self {
@@ -60,7 +116,10 @@ impl HudLayout {
     }
 
     pub(crate) fn bounds(&self) -> GridAab {
-        GridAab::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
+        GridAab::from_lower_upper(
+            (0, 0, -Self::DEPTH_BEHIND_VIEW_PLANE),
+            (self.size.x, self.size.y, 5),
+        )
     }
 
     /// Create a new space with the size controlled by this layout,
@@ -108,37 +167,6 @@ pub(crate) struct HudInputs {
     pub mouselook_mode: ListenableSource<bool>,
 }
 
-pub(super) fn new_hud_space(
-    universe: &mut Universe,
-    hud_layout: &HudLayout,
-    widget_tree: &WidgetTree,
-) -> URef<Space> {
-    let hud_space = universe
-        .insert("hud".into(), hud_layout.new_space())
-        .unwrap();
-
-    // TODO: error handling
-    hud_space
-        .execute(
-            &widget_tree
-                .perform_layout(LayoutGrant::new(hud_layout.bounds()))
-                .expect("layout/widget error")
-                .installation()
-                .expect("installation error"),
-        )
-        .expect("transaction error");
-
-    // Initialize lighting
-    hud_space
-        .try_modify(|space| {
-            space.fast_evaluate_light();
-            space.evaluate_light(10, |_| {});
-        })
-        .unwrap();
-
-    hud_space
-}
-
 #[allow(clippy::too_many_arguments, clippy::redundant_clone)]
 pub(super) fn new_hud_widget_tree(
     // TODO: terrible mess of tightly coupled parameters
@@ -157,17 +185,7 @@ pub(super) fn new_hud_widget_tree(
                 direction: Face6::NX,
                 children: graphics_options_widgets(hud_inputs),
             }),
-            LayoutTree::leaf(ToggleButtonWidget::new(
-                hud_inputs.paused.clone(),
-                |&value| value,
-                |state| hud_inputs.hud_blocks.icons[Icons::PauseButton(state)].clone(),
-                {
-                    let cc = hud_inputs.control_channel.clone();
-                    move || {
-                        let _ignore_errors = cc.send(ControlMessage::TogglePause);
-                    }
-                },
-            )),
+            LayoutTree::leaf(pause_toggle_button(hud_inputs)),
             LayoutTree::leaf(ToggleButtonWidget::new(
                 hud_inputs.mouselook_mode.clone(),
                 |&value| value,
@@ -269,6 +287,38 @@ fn graphics_toggle_button(
             }
         },
     )
+}
+
+fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
+    ToggleButtonWidget::new(
+        hud_inputs.paused.clone(),
+        |&value| value,
+        |state| hud_inputs.hud_blocks.icons[Icons::PauseButton(state)].clone(),
+        {
+            let cc = hud_inputs.control_channel.clone();
+            move || {
+                let _ignore_errors = cc.send(ControlMessage::TogglePause);
+            }
+        },
+    )
+}
+
+pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> Arc<LayoutTree<Arc<dyn Widget>>> {
+    Arc::new(LayoutTree::Stack {
+        direction: Face6::PZ,
+        children: vec![
+            // TODO: have a better way to communicate our choice of "baseline" alignment
+            Arc::new(LayoutTree::Spacer(LayoutRequest {
+                // magic number 2 allows us to fill the edges of the viewport, ish
+                // TODO: HudLayout should give us the option of "overscan"
+                minimum: GridVector::new(0, 0, HudLayout::DEPTH_BEHIND_VIEW_PLANE + 2),
+            })),
+            LayoutTree::leaf(
+                FrameWidget::with_block(Block::from(Rgba::new(0., 0., 0., 0.7))) as Arc<dyn Widget>,
+            ),
+            LayoutTree::leaf(pause_toggle_button(hud_inputs)),
+        ],
+    })
 }
 
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.

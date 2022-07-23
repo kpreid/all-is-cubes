@@ -62,6 +62,14 @@ impl FrameWidget {
             frame: VoxelBrush::single(Block::from(palette::MENU_FRAME)),
         })
     }
+
+    /// experimental
+    pub(crate) fn with_block(block: Block) -> Arc<Self> {
+        Arc::new(Self {
+            background: VoxelBrush::single(block.clone()),
+            frame: VoxelBrush::single(block),
+        })
+    }
 }
 
 // FrameWidget can be any size with at least 1 depth.

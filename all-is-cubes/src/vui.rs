@@ -18,7 +18,7 @@ use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::Transaction;
-use crate::universe::{URef, Universe, UniverseStepInfo, UniverseTransaction};
+use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::YieldProgress;
 use crate::vui::widgets::TooltipState;
 
@@ -42,17 +42,21 @@ pub(crate) struct Vui {
     universe: Universe,
 
     /// The space that should be displayed to the user, drawn on top of the world.
+    /// The value of this cell is derived from `self.state`.
     current_space: ListenableCell<Option<URef<Space>>>,
+    /// Identifies which “page” the UI should be showing — what
+    /// should be in `current_space`, taken from one of the [`PageInst`]s.
+    state: ListenableCell<VuiPageState>,
 
     changed_viewport: DirtyFlag,
     viewport_source: ListenableSource<Viewport>,
     /// `HudLayout` computed from `viewport_source`.
     last_hud_layout: HudLayout,
-
-    hud_widget_tree: WidgetTree,
-    hud_space: URef<Space>,
     #[allow(dead_code)] // TODO: probably going to need this for more dynamic UIs
     hud_inputs: HudInputs,
+
+    hud_page: PageInst,
+    paused_page: PageInst,
 
     character_source: ListenableSource<Option<URef<Character>>>,
     changed_character: DirtyFlag,
@@ -99,30 +103,59 @@ impl Vui {
             &mut universe,
             tooltip_state.clone(),
         );
-        let hud_space = new_hud_space(&mut universe, &hud_layout, &hud_widget_tree);
 
-        Self {
+        let paused_widget_tree = new_paused_widget_tree(&hud_inputs);
+
+        let mut new_self = Self {
             universe,
-            current_space: ListenableCell::new(Some(hud_space.clone())),
+            current_space: ListenableCell::new(None),
+            state: ListenableCell::new(VuiPageState::Hud),
 
             changed_viewport,
             viewport_source,
             last_hud_layout: hud_layout,
-
-            hud_widget_tree,
-            hud_space,
             hud_inputs,
+
+            hud_page: PageInst::new(hud_widget_tree),
+            paused_page: PageInst::new(paused_widget_tree),
 
             changed_character: DirtyFlag::listening(false, |l| character_source.listen(l)),
             character_source,
             tooltip_state,
-        }
+        };
+        new_self.set_space_from_state();
+        new_self
     }
 
     /// The space that should be displayed to the user, drawn on top of the world.
     // TODO: It'd be more encapsulating if we could provide a _read-only_ URef...
     pub fn current_space(&self) -> ListenableSource<Option<URef<Space>>> {
         self.current_space.as_source()
+    }
+
+    pub(crate) fn set_state(&mut self, state: VuiPageState) {
+        self.state.set(state);
+        self.set_space_from_state();
+    }
+
+    /// Update `self.current_space` from `self.state` and the source of the selected space.
+    fn set_space_from_state(&mut self) {
+        let layout = &self.last_hud_layout;
+        let universe = &mut self.universe;
+
+        let next_space: Option<URef<Space>> = match &*self.state.get() {
+            VuiPageState::Hud => Some(self.hud_page.get_or_create_space(layout, universe)),
+            VuiPageState::Paused => Some(self.paused_page.get_or_create_space(layout, universe)),
+        };
+
+        if next_space.as_ref() != Option::as_ref(&self.current_space.get()) {
+            self.current_space.set(next_space);
+            log::trace!(
+                "UI switched to {:?} ({:?})",
+                self.current_space.get(),
+                self.state.get()
+            );
+        }
     }
 
     /// Computes a [`ViewTransform`] that should be used to view the [`Vui::current_space`].
@@ -179,16 +212,21 @@ impl Vui {
             let new_viewport = self.viewport_source.snapshot();
             let new_layout = HudLayout::new(new_viewport);
             if new_layout != self.last_hud_layout {
-                log::debug!("resizing VUI to {new_layout:?}");
-                // TODO: Once we have garbage collection working, we can skip explicitly
-                // deleting the old space, in favor of making it anonymous.
-                UniverseTransaction::delete(self.hud_space.name().clone())
-                    .execute(&mut self.universe)
-                    .unwrap();
-                self.hud_space =
-                    new_hud_space(&mut self.universe, &new_layout, &self.hud_widget_tree);
-                self.current_space.set(Some(self.hud_space.clone()));
                 self.last_hud_layout = new_layout;
+                self.current_space.set(None); // force reconstruction
+                self.set_space_from_state();
+            }
+        }
+
+        // Decide what state we should be in.
+        {
+            let current_state: &VuiPageState = &*self.state.get();
+            let paused = *self.hud_inputs.paused.get();
+            if paused && matches!(current_state, VuiPageState::Hud) {
+                // TODO: also do this for lost focus
+                self.set_state(VuiPageState::Paused);
+            } else if !paused && matches!(current_state, VuiPageState::Paused) {
+                self.set_state(VuiPageState::Hud);
             }
         }
 
@@ -219,6 +257,17 @@ impl Vui {
             .map_err(|e| ToolError::Internal(e.to_string()))?;
         Ok(())
     }
+}
+
+/// Identifies which “page” the UI should be showing — what should be in
+/// [`Vui::current_space()`].
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum VuiPageState {
+    /// Normal gameplay, with UI elements around the perimeter.
+    Hud,
+    /// Report the paused (or lost-focus) state and offer a button to unpause
+    /// and reactivate mouselook.
+    Paused,
 }
 
 #[cfg(test)]
