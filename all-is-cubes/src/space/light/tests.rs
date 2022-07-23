@@ -79,7 +79,7 @@ fn set_cube_opaque_notification() {
     let sink = Sink::new();
     space.listen(
         sink.listener()
-            .filter(|change| matches!(change, SpaceChange::Lighting(_)).then(|| change)),
+            .filter(|change| matches!(change, SpaceChange::Lighting(_)).then_some(change)),
     );
     // Self-test that the initial condition is not trivially the answer we're looking for
     assert_ne!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);

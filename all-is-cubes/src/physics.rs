@@ -245,11 +245,8 @@ mod tests {
             );
         };
 
-        for case in (&[[1.0, 1.0, 1.0], [1.0, 0.1, 0.1], [0.1, -0.1, -0.047]])
-            .iter()
-            .copied()
-            .map(Vector3::from)
-        {
+        for case in [[1.0, 1.0, 1.0], [1.0, 0.1, 0.1], [0.1, -0.1, -0.047]] {
+            let case = Vector3::from(case);
             for &variant in &[case, -case] {
                 one_test(variant);
             }

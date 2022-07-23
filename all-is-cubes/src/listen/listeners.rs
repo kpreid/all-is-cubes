@@ -102,7 +102,7 @@ impl<M> Sink<M> {
         if let Some(index) = queue
             .iter()
             .enumerate()
-            .filter_map(|(i, m)| (*m == message).then(|| i))
+            .filter_map(|(i, m)| (*m == message).then_some(i))
             .next()
         {
             queue.remove(index);
