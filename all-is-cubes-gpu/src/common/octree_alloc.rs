@@ -1,6 +1,3 @@
-// Copyright 2020-2021 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector};
 

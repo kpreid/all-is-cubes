@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! “Hot-reloadable” data sources such as shaders.
 //!
 //! This module builds on top of the `resource` library to add change notification

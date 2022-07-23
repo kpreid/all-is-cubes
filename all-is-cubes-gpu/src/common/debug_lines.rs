@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::{Character, Cursor};

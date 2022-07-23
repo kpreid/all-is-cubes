@@ -8,7 +8,7 @@ rust-version = "1.62"
 description = "Recursive voxel game."
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 # TODO: revisit categories once it's more settled what's in this package
 categories = ["games", "rendering"]
 

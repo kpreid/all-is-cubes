@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Voxel User Interface.
 //!
 //! We've got all this rendering and interaction code, so let's reuse it for the

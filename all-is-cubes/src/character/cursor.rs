@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! [`Cursor`] type and related items.
 //!
 //! TODO: It's unclear what the scope of this module should be.

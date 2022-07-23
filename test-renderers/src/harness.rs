@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 use std::collections::{btree_map, BTreeMap};
 use std::fs;
 use std::io::{self, Write};

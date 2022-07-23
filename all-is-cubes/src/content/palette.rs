@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Colors to use in the UI and default content.
 //!
 //! This module exists to be a place where we can review the different colors in use

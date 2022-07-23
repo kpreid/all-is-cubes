@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Characters' [`Inventory`] which contains [`Tool`]s for modifying the world.
 //!
 //! TODO: This module needs a better name; I'd be calling it `inventory` if that weren't

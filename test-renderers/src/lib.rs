@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Test harness for [`all_is_cubes`]’ various renderers, supporting comparing the
 //! image outputs of various renderers with each other and reference images.
 

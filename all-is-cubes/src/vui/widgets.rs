@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Specific UI widgets.
 //!
 //! TODO: Decide whether they should all have `Widget` in the name or not.

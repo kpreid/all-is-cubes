@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Triangulator's 2D plane operations (sliced voxels to texels and meshes).
 
 use std::ops::Range;

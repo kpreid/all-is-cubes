@@ -7,7 +7,7 @@ rust-version = "1.62"
 description = "Optional GPU rendering implementation for the all-is-cubes crate."
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 # TODO: revisit categories once it's more settled how useful this is as an engine
 categories = ["games", "graphics", "rendering::engine"]
 

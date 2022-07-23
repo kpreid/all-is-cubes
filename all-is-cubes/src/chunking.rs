@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Algorithms for grouping cubes into cubical batches (chunks).
 //!
 //! For the time being, the chunk size is locked to the constant `CHUNK_SIZE`.

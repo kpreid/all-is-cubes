@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Approximate image comparison and visual diffing.
 
 use image::{buffer::ConvertBuffer, GenericImageView as _, GrayImage, Pixel as _, RgbaImage};

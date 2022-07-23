@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Tools that we could imagine being in the Rust standard library, but aren't.
 
 use std::fmt::{self, Debug, Display};

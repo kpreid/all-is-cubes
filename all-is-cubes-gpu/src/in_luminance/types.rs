@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Core data types for graphics code to use.
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};

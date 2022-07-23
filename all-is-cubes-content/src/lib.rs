@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Demo content for All is Cubes.
 //!
 //! All is Cubes is a “voxel game” where each block is made out of smaller blocks

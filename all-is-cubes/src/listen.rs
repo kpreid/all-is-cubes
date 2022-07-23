@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Mechanism for receiving notifications of state changes.
 //!
 //! Objects which wish to send notifications use [`Notifier`]s, which manage a collection

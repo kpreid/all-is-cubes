@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Tests of [`all_is_cubes_gpu`] that depend on actually creating a graphics context.
 //!
 //! This is a separate test binary so that it can be run without the standard test

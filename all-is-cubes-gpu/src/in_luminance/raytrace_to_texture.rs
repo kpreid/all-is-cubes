@@ -1,6 +1,3 @@
-// Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
-// in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
-
 //! Runs the software raytracer and writes the results into a texture.
 
 // TODO: This is not yet used. Finish hooking it up or delete it.

@@ -7,7 +7,7 @@ rust-version = "1.62"
 description = "Demo/default game content for the all-is-cubes engine."
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 categories = ["games"]
 
 [lib]
