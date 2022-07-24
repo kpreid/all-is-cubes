@@ -309,29 +309,6 @@ impl LayoutTree<Positioned<Arc<dyn Widget>>> {
     }
 }
 
-pub(super) fn validate_widget_transaction(
-    widget: &Arc<dyn Widget>,
-    transaction: &SpaceTransaction,
-    grant: &LayoutGrant,
-) -> Result<(), InstallVuiError> {
-    match transaction.bounds() {
-        None => Ok(()),
-        Some(txn_bounds) => {
-            if grant.bounds.contains_box(txn_bounds) {
-                Ok(())
-            } else {
-                // TODO: This being InstallVuiError isn't great if we might want to validate
-                // transactions happening after installation.
-                Err(InstallVuiError::OutOfBounds {
-                    widget: widget.clone(),
-                    grant: *grant,
-                    erroneous: txn_bounds,
-                })
-            }
-        }
-    }
-}
-
 impl<W: Layoutable> Layoutable for LayoutTree<W> {
     fn requirements(&self) -> LayoutRequest {
         match *self {
@@ -368,6 +345,29 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
                     children: vec![crosshair.clone(), toolbar.clone(), control_bar.clone()],
                 }
                 .requirements()
+            }
+        }
+    }
+}
+
+pub(super) fn validate_widget_transaction(
+    widget: &Arc<dyn Widget>,
+    transaction: &SpaceTransaction,
+    grant: &LayoutGrant,
+) -> Result<(), InstallVuiError> {
+    match transaction.bounds() {
+        None => Ok(()),
+        Some(txn_bounds) => {
+            if grant.bounds.contains_box(txn_bounds) {
+                Ok(())
+            } else {
+                // TODO: This being InstallVuiError isn't great if we might want to validate
+                // transactions happening after installation.
+                Err(InstallVuiError::OutOfBounds {
+                    widget: widget.clone(),
+                    grant: *grant,
+                    erroneous: txn_bounds,
+                })
             }
         }
     }
