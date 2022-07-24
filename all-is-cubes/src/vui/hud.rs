@@ -63,14 +63,10 @@ impl HudLayout {
         GridAab::from_lower_upper((0, 0, -5), (self.size.x, self.size.y, 5))
     }
 
-    // TODO: taking the entire Universe doesn't seem like the best interface
-    // but we want room to set up new blocks. Figure out a route for that.
+    /// Create a new space with the size controlled by this layout,
+    /// and a standard lighting condition.
     // TODO: validate this doesn't crash on wonky sizes.
-    pub(crate) fn new_space(
-        &self,
-        universe: &mut Universe,
-        _hud_blocks: &HudBlocks,
-    ) -> URef<Space> {
+    pub(crate) fn new_space(&self) -> Space {
         let Vector2 { x: w, y: h } = self.size;
         let bounds = self.bounds();
         let mut space = Space::builder(bounds)
@@ -96,7 +92,7 @@ impl HudLayout {
             add_frame(bounds.upper_bounds().z - 1, Rgba::new(0., 1., 1., 1.));
         }
 
-        universe.insert("hud".into(), space).unwrap()
+        space
     }
 }
 
@@ -114,11 +110,12 @@ pub(crate) struct HudInputs {
 
 pub(super) fn new_hud_space(
     universe: &mut Universe,
-    hud_inputs: &HudInputs,
     hud_layout: &HudLayout,
     widget_tree: &Arc<LayoutTree<Arc<dyn Widget>>>,
 ) -> URef<Space> {
-    let hud_space = hud_layout.new_space(universe, &hud_inputs.hud_blocks);
+    let hud_space = universe
+        .insert("hud".into(), hud_layout.new_space())
+        .unwrap();
 
     // TODO: error handling
     hud_space

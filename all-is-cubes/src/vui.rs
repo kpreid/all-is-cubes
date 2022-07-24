@@ -51,7 +51,7 @@ pub(crate) struct Vui {
 
     hud_widget_tree: Arc<LayoutTree<Arc<dyn Widget>>>,
     hud_space: URef<Space>,
-    /// Ingredients for reconstructing the HUD space on resize
+    #[allow(dead_code)] // TODO: probably going to need this for more dynamic UIs
     hud_inputs: HudInputs,
 
     character_source: ListenableSource<Option<URef<Character>>>,
@@ -99,7 +99,7 @@ impl Vui {
             &mut universe,
             tooltip_state.clone(),
         );
-        let hud_space = new_hud_space(&mut universe, &hud_inputs, &hud_layout, &hud_widget_tree);
+        let hud_space = new_hud_space(&mut universe, &hud_layout, &hud_widget_tree);
 
         Self {
             universe,
@@ -185,12 +185,8 @@ impl Vui {
                 UniverseTransaction::delete(self.hud_space.name().clone())
                     .execute(&mut self.universe)
                     .unwrap();
-                self.hud_space = new_hud_space(
-                    &mut self.universe,
-                    &self.hud_inputs,
-                    &new_layout,
-                    &self.hud_widget_tree,
-                );
+                self.hud_space =
+                    new_hud_space(&mut self.universe, &new_layout, &self.hud_widget_tree);
                 self.current_space.set(Some(self.hud_space.clone()));
                 self.last_hud_layout = new_layout;
             }
