@@ -51,19 +51,23 @@ impl WidgetController for OneshotController {
 #[derive(Debug)]
 #[doc(hidden)] // TODO: widget API still in development
 pub struct FrameWidget {
-    _private_placeholder: (),
+    background: VoxelBrush<'static>,
+    frame: VoxelBrush<'static>,
 }
 
 impl FrameWidget {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
-            _private_placeholder: (),
+            background: VoxelBrush::single(Block::from(palette::MENU_BACK)),
+            frame: VoxelBrush::single(Block::from(palette::MENU_FRAME)),
         })
     }
 }
 
+// FrameWidget can be any size with at least 1 depth.
 impl Layoutable for FrameWidget {
     fn requirements(&self) -> LayoutRequest {
+        // TODO: account for size of the chosen VoxelBrushes (currently not possible to change)
         LayoutRequest {
             minimum: GridVector::new(0, 0, 1),
         }
@@ -87,15 +91,12 @@ impl Widget for FrameWidget {
                 bounds.lower_bounds().z,
             ]));
 
-            let background = VoxelBrush::single(Block::from(palette::MENU_BACK));
-            let frame = VoxelBrush::single(Block::from(palette::MENU_FRAME));
-
             background_rect
                 .into_styled(
                     PrimitiveStyleBuilder::new()
                         .stroke_width(1)
-                        .stroke_color(&frame)
-                        .fill_color(&background)
+                        .stroke_color(&self.frame)
+                        .fill_color(&self.background)
                         .build(),
                 )
                 .draw(dt)
