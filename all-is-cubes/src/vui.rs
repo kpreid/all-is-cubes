@@ -49,7 +49,7 @@ pub(crate) struct Vui {
     /// `HudLayout` computed from `viewport_source`.
     last_hud_layout: HudLayout,
 
-    hud_widget_tree: Arc<LayoutTree<Arc<dyn Widget>>>,
+    hud_widget_tree: WidgetTree,
     hud_space: URef<Space>,
     #[allow(dead_code)] // TODO: probably going to need this for more dynamic UIs
     hud_inputs: HudInputs,

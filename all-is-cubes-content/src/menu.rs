@@ -126,7 +126,7 @@ impl vui::WidgetController for TemplateButtonController {
 pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError> {
     let template_iter = UniverseTemplate::iter().filter(UniverseTemplate::include_in_lists);
 
-    let mut vertical_widgets: Vec<Arc<LayoutTree<Arc<dyn Widget>>>> = Vec::with_capacity(10);
+    let mut vertical_widgets: Vec<vui::WidgetTree> = Vec::with_capacity(10);
     vertical_widgets.push(LayoutTree::leaf(Arc::new(LogoTextLarge)));
     for template in template_iter {
         vertical_widgets.push(LayoutTree::spacer(LayoutRequest {

@@ -24,7 +24,7 @@ use crate::vui::widgets::{
     Crosshair, FrameWidget, ToggleButtonVisualState, ToggleButtonWidget, Toolbar, TooltipState,
     TooltipWidget,
 };
-use crate::vui::{Icons, LayoutGrant, Widget};
+use crate::vui::{Icons, LayoutGrant, Widget, WidgetTree};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -111,7 +111,7 @@ pub(crate) struct HudInputs {
 pub(super) fn new_hud_space(
     universe: &mut Universe,
     hud_layout: &HudLayout,
-    widget_tree: &Arc<LayoutTree<Arc<dyn Widget>>>,
+    widget_tree: &WidgetTree,
 ) -> URef<Space> {
     let hud_space = universe
         .insert("hud".into(), hud_layout.new_space())
@@ -148,9 +148,9 @@ pub(super) fn new_hud_widget_tree(
     // TODO: stop mutating the universe in widget construction
     universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
-) -> Arc<LayoutTree<Arc<dyn Widget>>> {
+) -> WidgetTree {
     // Miscellaneous control widgets drawn in the corner
-    let control_bar_widgets: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Stack {
+    let control_bar_widgets: WidgetTree = Arc::new(LayoutTree::Stack {
         direction: Face6::NX,
         children: vec![
             Arc::new(LayoutTree::Stack {
@@ -181,7 +181,7 @@ pub(super) fn new_hud_widget_tree(
             )),
         ],
     });
-    let control_bar_positioning: Arc<LayoutTree<Arc<dyn Widget>>> = if false {
+    let control_bar_positioning: WidgetTree = if false {
         // reveal the bounds by adding a FrameWidget
         Arc::new(LayoutTree::Stack {
             direction: Face6::PZ,
@@ -201,7 +201,7 @@ pub(super) fn new_hud_widget_tree(
         hud_inputs.hud_blocks.clone(),
         universe,
     );
-    let hud_widget_tree: Arc<LayoutTree<Arc<dyn Widget>>> = Arc::new(LayoutTree::Hud {
+    let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
         crosshair: LayoutTree::leaf(Crosshair::new(
             hud_inputs.hud_blocks.icons[Icons::Crosshair].clone(),
             hud_inputs.mouselook_mode.clone(),
@@ -215,9 +215,8 @@ pub(super) fn new_hud_widget_tree(
     hud_widget_tree
 }
 
-// TODO: These arguments should be a bundle of UI-setup context
 #[allow(clippy::redundant_clone)]
-fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<Arc<LayoutTree<Arc<dyn Widget>>>> {
+fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree> {
     vec![
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,

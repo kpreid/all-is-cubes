@@ -8,6 +8,10 @@ use crate::space::SpaceTransaction;
 use crate::transaction::Merge as _;
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
 
+// TODO: can we come up with a way to not even need this type alias?
+// The Arcs are clunky to use.
+pub type WidgetTree = Arc<LayoutTree<Arc<dyn Widget>>>;
+
 /// Requested size and relative positioning of a widget or other thing occupying space,
 /// to be interpreted by a layout algorithm to choose the real position.
 ///
