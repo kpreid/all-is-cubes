@@ -30,8 +30,9 @@ pub trait HeadlessRenderer {
     /// Produce an image of the current state of the scene this renderer was created to
     /// track, as of the last call to [`Self::update()`], with the given overlaid text.
     ///
-    /// This operation does not attempt to access the scene objects and therefore may be
+    /// This operation should not attempt to access the scene objects and therefore may be
     /// called while the [`Universe`] is being stepped, etc.
+    /// (TODO: Not all implementations obey this yet.)
     ///
     /// The returned image is always 8 bits per component and should be in the sRGB color
     /// space. (This trait may be revised in the future to support HDR rendering.)

@@ -3,26 +3,27 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::util::YieldProgress;
-use all_is_cubes::vui::Icons;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use image::RgbaImage;
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::block::{Block, Resolution::R1};
 use all_is_cubes::camera::{
-    ExposureOption, FogOption, GraphicsOptions, LightingOption, ToneMappingOperator,
+    ExposureOption, FogOption, GraphicsOptions, LightingOption, RenderError, ToneMappingOperator,
     TransparencyOption, Viewport,
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, NotNan, Rgb};
 use all_is_cubes::space::{LightPhysics, Space};
-use all_is_cubes::universe::{URef, Universe, UniverseIndex};
+use all_is_cubes::transaction::Transaction;
+use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
+use all_is_cubes::util::YieldProgress;
+use all_is_cubes::vui::Icons;
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;
-use image::RgbaImage;
 
 use crate::{
     finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, UniverseFuture,
@@ -39,6 +40,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
 
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
+    c.insert("error_character_gone", None, error_character_gone);
     c.insert_variants(
         "fog",
         u(fog_test_universe()),
@@ -170,6 +172,47 @@ async fn cursor_basic(mut context: RenderTestContext) {
     context
         .render_comparison_test(COLOR_ROUNDING_MAX_DIFF, cameras, overlays)
         .await;
+}
+
+/// Test what happens when the renderer's character goes away *after* the first frame.
+///
+/// TODO: Split this into more cases:
+/// - resources gone on creation
+/// - space gone but character not gone
+/// - character gone but space not gone
+async fn error_character_gone(context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let mut space = one_cube_space();
+    space
+        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
+        .unwrap();
+    finish_universe_from_space(&mut universe, space);
+    let mut renderer = context.renderer(&universe);
+
+    // Run a first render because this test is about what happens afterward
+    renderer.update(None).await.unwrap();
+    let _image = renderer.draw("").await.unwrap();
+
+    UniverseTransaction::delete("character".into())
+        .execute(&mut universe)
+        .unwrap();
+    drop(universe); // shouldn't make a difference but hey
+
+    // Updating may fail, or it may succeed because there were no change notifications.
+    match renderer.update(None).await {
+        Ok(()) => {}
+        Err(RenderError::Read(RefError::Gone(name)))
+            if name == "character".into() || name == "space".into() => {}
+        Err(e) => panic!("unexpected other error from update(): {e:?}"),
+    }
+    // Drawing should succeed with no data.
+    // TODO: We temporarily also allow failure. Stop that.
+    match renderer.draw("").await {
+        Ok(_image) => {}
+        Err(RenderError::Read(RefError::Gone(name)))
+            if name == "character".into() || name == "space".into() => {}
+        res => panic!("unexpected result from draw(): {res:?}"),
+    }
 }
 
 async fn fog(mut context: RenderTestContext, fog: FogOption) {

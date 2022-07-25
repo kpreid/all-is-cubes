@@ -170,8 +170,19 @@ impl HeadlessRenderer for LumHeadlessRenderer {
         &'a mut self,
         cursor: Option<&'a Cursor>,
     ) -> BoxFuture<'a, Result<(), RenderError>> {
+        // The luminance renderer doesn't split update/draw (yet, probably ever),
+        // so just save the info...
         self.0.cursor = cursor.cloned();
-        Box::pin(std::future::ready(Ok(())))
+        Box::pin(async {
+            // ...and *pretend* we read the character
+            if let Some(character) = self.0.renderer.cameras().character() {
+                character.try_borrow().map_err(RenderError::Read)?;
+            }
+            if let Some(space) = &*self.0.renderer.cameras().world_space().get() {
+                space.try_borrow().map_err(RenderError::Read)?;
+            }
+            Ok(())
+        })
     }
 
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {

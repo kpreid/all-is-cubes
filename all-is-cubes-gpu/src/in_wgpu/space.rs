@@ -195,7 +195,7 @@ impl SpaceRenderer {
             .csm
             .space()
             .try_borrow()
-            .expect("TODO: return a trivial result instead of panic.");
+            .map_err(GraphicsResourceError::read_err)?;
 
         // Update sky color (cheap so we don't bother todo-tracking it)
         self.sky_color = space.physics().sky_color;
