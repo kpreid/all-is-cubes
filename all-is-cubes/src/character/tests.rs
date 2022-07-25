@@ -3,11 +3,12 @@ use std::sync::Arc;
 use cgmath::{Angle as _, Deg, Point3, Vector3};
 
 use crate::block::{Block, AIR};
-use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn};
-use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool};
+use crate::character::{cursor_raycast, Character, CharacterChange, CharacterTransaction, Spawn};
+use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::Sink;
 use crate::math::{Aab, Face6, GridAab, Rgb};
 use crate::physics::BodyTransaction;
+use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{Transaction as _, TransactionTester};
@@ -195,6 +196,35 @@ fn no_superjumping() {
     // Second jump without ticking should do nothing
     character.jump_if_able();
     assert_eq!(character.body.velocity, velocity);
+}
+
+#[test]
+fn click_wrong_space_or_correct_space() {
+    let mut universe = Universe::new();
+    let mut make_space = || {
+        universe.insert_anonymous({
+            let mut sp1 = Space::empty_positive(1, 1, 1);
+            // add something for the raycast to hit
+            sp1.fill_uniform(sp1.bounds(), Block::from(Rgb::ONE))
+                .unwrap();
+            sp1
+        })
+    };
+    let sp1 = make_space();
+    let sp2 = make_space();
+    let character = universe.insert_anonymous(Character::spawn_default(sp2.clone()));
+
+    // Click in wrong space
+    let cursor = cursor_raycast(Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]), &sp1, 10.);
+    assert!(cursor.is_some());
+    let error = Character::click(character.clone(), cursor.as_ref(), 0).unwrap_err();
+    assert!(matches!(error, ToolError::Internal(_)));
+
+    // Click in right space
+    let cursor = cursor_raycast(Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]), &sp2, 10.);
+    assert!(cursor.is_some());
+    let error = Character::click(character, cursor.as_ref(), 0).unwrap_err();
+    assert!(matches!(error, ToolError::NoTool));
 }
 
 // TODO: more tests

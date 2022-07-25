@@ -430,13 +430,28 @@ impl Character {
 
     /// Use this character's selected tool on the given cursor.
     ///
-    /// TODO: Check the cursor refers to the same space as this character?
+    /// Return an error if:
+    /// * The tool is not usable.
+    /// * The cursor does not refer to the same space as this character occupies.
     pub fn click(
         this: URef<Character>,
         cursor: Option<&Cursor>,
         button: usize,
     ) -> Result<UniverseTransaction, ToolError> {
         let tb = this.borrow();
+
+        // Check that this is not a cursor into some other space.
+        // This shouldn't happen according to game rules but it might due to a UI/session
+        // update glitch, and if it does, we do
+        if let Some(cursor_space) = cursor.map(|c| &c.space) {
+            let our_space = &tb.space;
+            if cursor_space != our_space {
+                return Err(ToolError::Internal(format!(
+                    "space mismatch: cursor {cursor_space:?} != character {our_space:?}"
+                )));
+            }
+        }
+
         let slot_index = tb
             .selected_slots
             .get(button)

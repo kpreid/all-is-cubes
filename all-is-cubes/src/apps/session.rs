@@ -312,11 +312,12 @@ impl Session {
     /// TODO: This function needs tests.
     fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
         let cursor_space = self.cursor_result.as_ref().map(|c| &c.space);
+        // TODO: A better condition for this would be "is one of the spaces in the UI universe"
         if cursor_space == Option::as_ref(&self.ui_space().get()) {
             self.ui.click(button, self.cursor_result.clone())
         } else {
             // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
-            // TODO: if the cursor space is not the game space this should be an error
+            // Character::click will validate against being a click in the wrong space.
             if let Some(character_ref) = self.game_character.borrow() {
                 let transaction =
                     Character::click(character_ref.clone(), self.cursor_result.as_ref(), button)?;
