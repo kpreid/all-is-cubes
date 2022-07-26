@@ -1,7 +1,9 @@
 use cgmath::{EuclideanSpace as _, Point2, Vector2, Vector3, Zero as _};
 use std::collections::{HashMap, HashSet};
+use std::sync::mpsc;
 use std::time::Duration;
 
+use crate::apps::ControlMessage;
 use crate::camera::{FogOption, GraphicsOptions, LightingOption, TransparencyOption, Viewport};
 use crate::character::Character;
 use crate::listen::{ListenableCell, ListenableSource};
@@ -83,6 +85,7 @@ impl InputProcessor {
             Key::Character('e') => true,
             Key::Character('c') => true,
             // Used in `InputProcessor::apply_input()`.
+            Key::Escape => true,
             Key::Left => true,
             Key::Right => true,
             Key::Up => true,
@@ -102,6 +105,7 @@ impl InputProcessor {
     fn is_command(key: Key) -> bool {
         #[allow(clippy::match_like_matches_macro)]
         match key {
+            Key::Escape => true,
             Key::Character(d) if d.is_ascii_digit() => true,
             Key::Character('i') => true,
             Key::Character('l') => true,
@@ -267,6 +271,7 @@ impl InputProcessor {
             character: character_opt,
             paused: paused_opt,
             graphics_options,
+            control_channel,
         } = targets;
 
         // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
@@ -300,6 +305,11 @@ impl InputProcessor {
 
         for key in self.command_buffer.drain(..) {
             match key {
+                Key::Escape => {
+                    if let Some(ch) = control_channel {
+                        let _ = ch.try_send(ControlMessage::Back);
+                    }
+                }
                 Key::Character('i') => {
                     if let Some(cell) = graphics_options {
                         cell.update_mut(|options| {
@@ -334,7 +344,7 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('p') => {
-                    // TODO: bind escape key, focus loss, etc to pause
+                    // TODO: eliminate this weird binding once escape-based pausing is working well
                     if let Some(paused) = paused_opt {
                         paused.update_mut(|p| *p = !*p);
                     }
@@ -416,6 +426,9 @@ pub(crate) struct InputTargets<'a> {
     pub character: Option<&'a URef<Character>>,
     pub paused: Option<&'a ListenableCell<bool>>,
     pub graphics_options: Option<&'a ListenableCell<GraphicsOptions>>,
+    // TODO: replace cells with control channel?
+    // TODO: make the control channel a type alias?
+    pub control_channel: Option<&'a mpsc::SyncSender<ControlMessage>>,
 }
 
 /// A platform-neutral representation of keyboard keys for [`InputProcessor`].
@@ -453,6 +466,7 @@ mod tests {
                 character: Some(character),
                 paused: None,
                 graphics_options: None,
+                control_channel: None,
             },
             Tick::arbitrary(),
         );

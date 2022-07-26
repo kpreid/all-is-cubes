@@ -52,6 +52,7 @@ pub struct Session {
     /// TODO: This is originally a quick kludge to make onscreen UI buttons work.
     /// Not sure whether it is a good strategy overall.
     control_channel: mpsc::Receiver<ControlMessage>,
+    control_channel_sender: mpsc::SyncSender<ControlMessage>,
 
     /// Last cursor raycast result.
     /// TODO: This needs to handle clicking on the HUD and thus explicitly point into
@@ -106,7 +107,7 @@ impl Session {
                 game_character.as_source(),
                 paused.as_source(),
                 graphics_options.as_source(),
-                control_send,
+                control_send.clone(),
                 viewport_for_ui,
             )
             .await,
@@ -119,6 +120,7 @@ impl Session {
             game_universe_in_progress: None,
             paused,
             control_channel: control_recv,
+            control_channel_sender: control_send,
             cursor_result: None,
             last_step_info: UniverseStepInfo::default(),
             tick_counter_for_logging: 0,
@@ -188,6 +190,9 @@ impl Session {
         loop {
             match self.control_channel.try_recv() {
                 Ok(msg) => match msg {
+                    ControlMessage::Back => {
+                        self.ui.back();
+                    }
                     ControlMessage::TogglePause => {
                         self.paused.set(!*self.paused.get());
                     }
@@ -248,6 +253,7 @@ impl Session {
                             character: Some(character_ref),
                             paused: Some(&self.paused),
                             graphics_options: Some(&self.graphics_options),
+                            control_channel: Some(&self.control_channel_sender),
                         },
                         game_tick,
                     );
@@ -363,13 +369,31 @@ impl Session {
 }
 
 /// A message sent to the [`Session`], such as from a user interface element.
-// TODO: make public if this proves to be a good approach
 #[non_exhaustive]
 pub(crate) enum ControlMessage {
+    /// Perform the conventional escape/back/pause function:
+    /// * navigate towards the root of a menu tree
+    /// * if at the root, return to game
+    /// * if in-game, pause and open menu
+    Back,
     TogglePause,
     ToggleMouselook,
     /// TODO: this should be "modify user preferences", from which graphics options are derived.
     ModifyGraphicsOptions(Box<dyn FnOnce(Arc<GraphicsOptions>) -> Arc<GraphicsOptions> + Send>),
+}
+
+impl fmt::Debug for ControlMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Manual implementation required due to contained function.
+        match self {
+            Self::Back => write!(f, "Back"),
+            Self::TogglePause => write!(f, "TogglePause"),
+            Self::ToggleMouselook => write!(f, "ToggleMouselook"),
+            Self::ModifyGraphicsOptions(_f) => f
+                .debug_struct("ModifyGraphicsOptions")
+                .finish_non_exhaustive(),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

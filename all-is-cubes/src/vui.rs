@@ -279,6 +279,37 @@ impl Vui {
             .map_err(|e| ToolError::Internal(e.to_string()))?;
         Ok(())
     }
+
+    /// Perform the back/escape key action.
+    ///
+    /// This may cancel out of a menu/dialog, or pause or unpause the game.
+    pub fn back(&mut self) {
+        match *self.state.get() {
+            VuiPageState::Hud => {
+                if !*self.hud_inputs.paused.get() {
+                    // Pause
+                    // TODO: instead of unwrapping, log and visually report the error
+                    // (there should be some simple way to do that).
+                    // TODO: We should have a "set paused state" message instead of toggle.
+                    self.hud_inputs
+                        .control_channel
+                        .send(ControlMessage::TogglePause)
+                        .unwrap();
+                }
+            }
+            VuiPageState::Paused => {
+                if *self.hud_inputs.paused.get() {
+                    // Unpause
+                    self.hud_inputs
+                        .control_channel
+                        .send(ControlMessage::TogglePause)
+                        .unwrap();
+                }
+
+                // self.set_state(VuiPageState::Hud)
+            }
+        }
+    }
 }
 
 /// Identifies which “page” the UI should be showing — what should be in
@@ -314,19 +345,35 @@ mod tests {
     use super::*;
     use futures_executor::block_on;
 
-    fn new_vui_for_test() -> Vui {
-        block_on(Vui::new(
+    fn new_vui_for_test(paused: bool) -> (Vui, mpsc::Receiver<ControlMessage>) {
+        let (cctx, ccrx) = mpsc::sync_channel(1);
+        let vui = block_on(Vui::new(
             &InputProcessor::new(),
             ListenableSource::constant(None),
-            ListenableSource::constant(false),
+            ListenableSource::constant(paused),
             ListenableSource::constant(GraphicsOptions::default()),
-            mpsc::sync_channel(1).0,
+            cctx,
             ListenableSource::constant(Viewport::ARBITRARY),
-        ))
+        ));
+        (vui, ccrx)
     }
 
     #[test]
-    fn vui_smoke_test() {
-        let _ = new_vui_for_test();
+    fn back_pause() {
+        let (mut vui, control_channel) = new_vui_for_test(false);
+        vui.back();
+        let msg = control_channel.try_recv().unwrap();
+        assert!(matches!(msg, ControlMessage::TogglePause), "{msg:?}");
+        assert!(control_channel.try_recv().is_err());
+    }
+
+    #[test]
+    fn back_unpause() {
+        let (mut vui, control_channel) = new_vui_for_test(true);
+        vui.set_state(VuiPageState::Paused);
+        vui.back();
+        let msg = control_channel.try_recv().unwrap();
+        assert!(matches!(msg, ControlMessage::TogglePause), "{msg:?}");
+        assert!(control_channel.try_recv().is_err());
     }
 }
