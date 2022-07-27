@@ -77,7 +77,7 @@ impl SurfaceRenderer {
         let everything = EverythingRenderer::new(
             device.clone(),
             cameras,
-            surface.get_supported_formats(adapter)[0],
+            choose_surface_format(&surface, adapter),
             adapter,
         );
 
@@ -849,6 +849,42 @@ impl EverythingRenderer {
 
         queue.submit(std::iter::once(encoder.finish()));
     }
+}
+
+/// Choose the surface format we would prefer from among the supported formats.
+fn choose_surface_format(surface: &wgpu::Surface, adapter: &wgpu::Adapter) -> wgpu::TextureFormat {
+    /// A structure whose maximum [`Ord`] value corresponds to the texture format we'd rather use.
+    #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+    struct Rank {
+        /// If we can have a float format that gives us (potential) HDR output, do that.
+        is_float: bool,
+        /// Known SRGB outputs are good
+        is_srgb: bool,
+        /// All else being equal, prefer the original preference order
+        /// (earlier elements are better)
+        negated_original_order: isize,
+    }
+
+    let formats = surface.get_supported_formats(adapter);
+    let (index, best) = formats
+        .iter()
+        .copied()
+        .enumerate()
+        .max_by_key(|&(index, format)| {
+            use wgpu::TextureFormat::*;
+            let d = format.describe();
+            Rank {
+                is_srgb: d.srgb,
+                is_float: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat),
+                negated_original_order: -(index as isize),
+            }
+        })
+        .expect("wgpu::Surface::get_supported_formats() was empty");
+    log::debug!(
+        "Chose surface format {best:?}, #{index} out of {formats:?}",
+        index = index + 1
+    );
+    best
 }
 
 const LINEAR_SCENE_TEXTURE_USAGES: wgpu::TextureUsages =
