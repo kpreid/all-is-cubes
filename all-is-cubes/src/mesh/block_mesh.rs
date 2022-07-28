@@ -5,7 +5,7 @@
 use cgmath::{Point2, Point3, Transform as _};
 use std::fmt::Debug;
 
-use crate::block::{EvaluatedBlock, Evoxel};
+use crate::block::{AnimationChange, EvaluatedBlock, Evoxel};
 use crate::content::palette;
 use crate::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
@@ -164,7 +164,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
     options: &MeshOptions,
 ) -> BlockMesh<V, A::Tile> {
     // If this is true, avoid using vertex coloring even on solid rectangles.
-    let prefer_textures = block.attributes.animation_hint.expect_color_update;
+    let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None;
 
     let mut used_any_vertex_colors = false;
 

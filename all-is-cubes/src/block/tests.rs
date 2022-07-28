@@ -566,7 +566,7 @@ fn attributes_debug() {
             animation_hint: AnimationHint::TEMPORARY,
             ..default()
         }),
-        "BlockAttributes { animation_hint: AnimationHint { expect_replace: true, expect_shape_update: false, expect_color_update: false } }",
+        "BlockAttributes { animation_hint: AnimationHint { redefinition: None, replacement: Shape } }",
     );
 
     // Test a case of multiple attributes

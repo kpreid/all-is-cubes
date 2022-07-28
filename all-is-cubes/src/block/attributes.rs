@@ -191,37 +191,36 @@ pub enum RotationPlacementRule {
     },
 }
 
-/// Specifies how the appearance of a [`Block`] might change, for the benefit of rendering
-/// algorithms. This hint applies both to a block's definition changing and to it being
-/// replaced with some successor block.
+/// Specifies how a [`Block`] might change in the very near future, for the benefit
+/// of rendering algorithms. Does not currently describe non-visual aspects of a block.
+///
+/// This should be configured for blocks which either are continuously animated in some
+/// fashion, or for which it is especially important that the specified changes are handled
+/// efficiently, at the possible cost of spending more resources on those blocks. Blocks
+/// which merely might change in response to user action should not set this hint.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
 pub struct AnimationHint {
-    /// Expect that the block might soon be replaced with an unrelated block.
-    /// Suggestion: avoid combining it with other block meshes.
-    pub(crate) expect_replace: bool,
+    /// Ways in which the block's definition might change (via modification to a
+    /// [`BlockDef`] or recursive [`Space`]) such that many instances of this block
+    /// will become another simultaneously.
+    pub redefinition: AnimationChange,
 
-    /// Expect that the block's shape will change; some of its voxels will not be the same
-    /// [`OpacityCategory`](crate::math::OpacityCategory).
-    ///
-    /// Suggestion: use a rendering strategy which is shape-independent.
-    pub(crate) expect_shape_update: bool,
-
-    /// Expect that the block's voxels' colors (and alpha other than the special 0 and 1
-    /// cases) will change.
-    ///
-    /// Suggestion: prepare to update texturing without unnecesarily regenerating the mesh.
-    pub(crate) expect_color_update: bool,
+    /// If this block is likely to be replaced in a [`Space`] by another, this field
+    /// specifies the replacement's relation to this.
+    pub replacement: AnimationChange,
 }
 
 impl AnimationHint {
+    // TODO: get rid of these constants or replace them with a clearer new system
+
     /// There are no expectations that the block is soon going to change.
     ///
     /// This is the default value of this type and within [`BlockAttributes`].
     pub const UNCHANGING: Self = Self {
-        expect_replace: false,
-        expect_shape_update: false,
-        expect_color_update: false,
+        redefinition: AnimationChange::None,
+        replacement: AnimationChange::None,
     };
 
     /// The block is not going to exist in its current form for long.
@@ -230,8 +229,8 @@ impl AnimationHint {
     /// per-block but allows it (and any successors that are also `TEMPORARY`) to be added
     /// and removed cheaply.
     pub const TEMPORARY: Self = Self {
-        expect_replace: true,
-        ..Self::UNCHANGING
+        redefinition: AnimationChange::None,
+        replacement: AnimationChange::Shape,
     };
 
     /// The block's appearance is expected to change very frequently, but not by replacing
@@ -240,20 +239,55 @@ impl AnimationHint {
     /// This suggests using a rendering technique which optimizes for not needing to e.g.
     /// rebuild chunk meshes.
     pub const CONTINUOUS: Self = Self {
-        expect_color_update: true,
-        expect_shape_update: true,
+        redefinition: AnimationChange::Shape,
+        replacement: AnimationChange::None,
         ..Self::UNCHANGING
     };
 
     /// Returns whether this block's value for [`EvaluatedBlock::visible`] is likely to
-    /// change from `false` to `true`.
+    /// change from `false` to `true` for animation reasons.
     pub(crate) fn might_become_visible(&self) -> bool {
-        self.expect_shape_update
+        self.redefinition.might_become_visible() || self.replacement.might_become_visible()
     }
 }
 
 impl Default for AnimationHint {
     fn default() -> Self {
         Self::UNCHANGING
+    }
+}
+
+/// Component of [`AnimationHint`], describing the type of change predicted.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
+pub enum AnimationChange {
+    /// Expect no changes.
+    None,
+    /// Expect that the block’s voxels’ colors will change, while remaining within the
+    /// same [`OpacityCategory`](crate::math::OpacityCategory); that is, the alpha will
+    /// remain 0, remain 1, or remain neither 0 nor 1.
+    ///
+    /// Suggestion to renderers: prepare to update texturing without recomputing an
+    /// otherwise identical mesh.
+    ColorSameCategory,
+    /// Expect that the block’s colors and shape will change; that is, at least some
+    /// voxels’ alpha will move from one [`OpacityCategory`](crate::math::OpacityCategory)
+    /// to another.
+    ///
+    /// Suggestion to renderers: use a rendering strategy which is shape-independent, or
+    /// prepare to efficiently recompute the mesh (don't merge with neighbors).
+    Shape,
+}
+
+impl AnimationChange {
+    /// Helper for [`AnimationHint::might_become_visible`].
+    fn might_become_visible(&self) -> bool {
+        match self {
+            AnimationChange::None => false,
+            // same category implies not becoming visible if invisible
+            AnimationChange::ColorSameCategory => false,
+            AnimationChange::Shape => true,
+        }
     }
 }
