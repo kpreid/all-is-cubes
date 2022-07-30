@@ -2,9 +2,10 @@
 
 use std::borrow::Cow;
 use std::sync::mpsc::{self, TrySendError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use tui::layout::Rect;
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::camera::{Camera, Viewport};
@@ -14,7 +15,6 @@ use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{
     CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RaytraceInfo, RtRenderer,
 };
-use tui::layout::Rect;
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
 use crate::session::{ClockSource, DesktopSession};
@@ -256,9 +256,8 @@ fn run(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) -> cross
             dsession
                 .renderer
                 .send_frame_to_render(&mut dsession.session);
-        } else {
-            // TODO: sleep instead of spinning.
-            std::thread::yield_now();
+        } else if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
+            std::thread::sleep(t - Instant::now());
         }
     }
 }

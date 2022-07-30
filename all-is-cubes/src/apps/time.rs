@@ -76,6 +76,15 @@ impl FrameClock {
         result
     }
 
+    /// Returns the next time at which [`FrameClock::should_step()`], and then
+    /// [`FrameClock::should_draw()`], should be consulted.
+    ///
+    /// [`FrameClock::advance_to()`] must have previously been called to give an absolute
+    /// time reference.
+    pub fn next_step_or_draw_time(&self) -> Option<Instant> {
+        Some(self.last_absolute_time? + Self::STEP_LENGTH)
+    }
+
     /// Indicates whether a new frame should be drawn, given the amount of time that this
     /// [`FrameClock`] has been informed has passed.
     ///

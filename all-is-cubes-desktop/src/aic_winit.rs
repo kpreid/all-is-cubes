@@ -47,6 +47,12 @@ pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
             &mut dsession.session.input_processor,
         );
 
+        // Compute when we want to resume.
+        // Note that handle_winit_event() might override this.
+        if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
+            *control_flow = ControlFlow::WaitUntil(t);
+        }
+
         handle_winit_event(event, &mut dsession, control_flow)
     })
 }

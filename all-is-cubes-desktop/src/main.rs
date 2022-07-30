@@ -226,9 +226,8 @@ fn main() -> Result<(), anyhow::Error> {
                     .unwrap_or(false)
                 {
                     break;
-                } else {
-                    // TODO: sleep instead of spinning (provide a general implementation)
-                    std::thread::yield_now();
+                } else if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
+                    std::thread::sleep(t - Instant::now());
                 }
             }
 
