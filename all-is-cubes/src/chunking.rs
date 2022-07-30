@@ -195,25 +195,34 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
     // (This for loop has been measured as slightly faster than a .filter().collect().)
     for chunk in candidates.interior_iter() {
         let chunk = chunk.to_vec();
-        // By subtracting 1 from all coordinates, we include the chunks intersecting
-        // the view sphere centered on the _farthest corner point_ of the
-        // viewpoint-containing chunk. By taking the max, we include those chunks
-        // visible from anywhere else in the chunk.
-        //
-        // The shape formed (after mirroring) is the Minkowski sum of the view sphere
-        // and the chunk cube.
-        if int_magnitude_squared(chunk.map(
-            #[inline(always)]
-            |s| (s - 1).max(0),
-        )) <= view_distance_in_squared_chunks
-        {
+        if chunk_distance_squared_for_view(chunk) <= view_distance_in_squared_chunks {
             octant_chunks.push(chunk);
         }
     }
+
     // Sort by distance, with coordinates for tiebreakers.
+    // Note that this is NOT the chunk_distance_squared_for_view, because using that value
+    // would not sort the chunks adjacent to the axes distinctly, whereas for this sort
+    // order we must do that so that rendering is properly depth-sorted.
+    //
+    // TODO: Figure out if we can use a single sort order, which would make ChunkCharts of
+    // different sizes more consistent.
     octant_chunks
         .sort_unstable_by_key(|&chunk| (int_magnitude_squared(chunk), chunk.x, chunk.y, chunk.z));
     octant_chunks.into()
+}
+
+fn chunk_distance_squared_for_view(chunk: Vector3<i32>) -> i32 {
+    // By subtracting 1 from all coordinates, we include the chunks intersecting
+    // the view sphere centered on the _farthest corner point_ of the
+    // viewpoint-containing chunk. The shape formed (after mirroring) is the
+    // Minkowski sum of the view sphere and the chunk cube.
+    // The max(0) includes the axis-aligned span of chunks that form the
+    // Minkowski-sum-expanded cube faces.
+    int_magnitude_squared(chunk.map(
+        #[inline(always)]
+        |s| (s - 1).max(0),
+    ))
 }
 
 /// A specification of which octants to include in [`ChunkChart::chunks()`].
