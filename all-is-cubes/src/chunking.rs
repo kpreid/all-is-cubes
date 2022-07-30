@@ -257,15 +257,16 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
         }
     }
 
-    // Sort by distance, with coordinates for tiebreakers.
-    // Note that this is NOT the chunk_distance_squared_for_view, because using that value
-    // would not sort the chunks adjacent to the axes distinctly, whereas for this sort
-    // order we must do that so that rendering is properly depth-sorted.
-    //
-    // TODO: Figure out if we can use a single sort order, which would make ChunkCharts of
-    // different sizes more consistent.
-    octant_chunks
-        .sort_unstable_by_key(|&chunk| (int_magnitude_squared(chunk), chunk.x, chunk.y, chunk.z));
+    // Sort by distance, with coordinates for final tiebreakers so the result is
+    // fully specified.
+    octant_chunks.sort_unstable_by_key(|&chunk| {
+        (
+            chunk_distance_squared_for_view(chunk),
+            chunk.x,
+            chunk.y,
+            chunk.z,
+        )
+    });
     octant_chunks.into()
 }
 
