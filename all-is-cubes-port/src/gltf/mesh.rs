@@ -231,7 +231,7 @@ mod tests {
             .unwrap();
 
         let mut writer = GltfWriter::new(GltfDataDestination::null());
-        let (_, _, mesh_index) = gltf_mesh(&space, &mut writer);
+        let (_, mesh_index) = gltf_mesh(&space, &mut writer);
         let root = writer.into_root(Duration::ZERO).unwrap();
 
         let mesh = root.get(mesh_index).unwrap();

@@ -4,6 +4,8 @@ use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
+use super::GltfDataDestination;
+
 pub(crate) type TexPoint = Vector3<f32>;
 
 /// [`TextureAllocator`] for glTF exports.
@@ -11,16 +13,15 @@ pub(crate) type TexPoint = Vector3<f32>;
 /// You may use this with [`SpaceMesh`] to create meshes that can be exported.
 ///
 /// [`SpaceMesh`]: all_is_cubes::mesh::SpaceMesh
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct GltfTextureAllocator {
-    _placeholder_for_actual_state: (),
+    #[allow(dead_code)] // TODO: work-in-progress code
+    pub(crate) destination: GltfDataDestination,
 }
 
 impl GltfTextureAllocator {
-    pub fn new() -> Self {
-        Self {
-            _placeholder_for_actual_state: (),
-        }
+    pub fn new(destination: GltfDataDestination) -> Self {
+        Self { destination }
     }
 }
 
@@ -31,7 +32,7 @@ impl TextureAllocator for GltfTextureAllocator {
     fn allocate(&mut self, _bounds: GridAab) -> Option<GltfTextureRef> {
         //let result = GltfTextureRef { bounds };
         //Some(result)
-        None // TODO: placeholder
+        None // TODO: do nothing until the texture allocation actually works.
     }
 }
 

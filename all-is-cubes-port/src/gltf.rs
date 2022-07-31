@@ -32,7 +32,8 @@ pub use texture::{GltfTextureAllocator, GltfTextureRef};
 mod vertex;
 pub use vertex::GltfVertex;
 
-/// Handles the construction of [`gltf_json::Root`] and the writing of supporting files.
+/// Handles the construction of [`gltf_json::Root`] and the writing of supporting files
+/// for a single glTF asset.
 ///
 /// Life cycle:
 /// 1. Create this (providing a [`GltfDataDestination`] for buffers and textures).
@@ -86,6 +87,14 @@ impl GltfWriter {
             camera: None,
             frame_states: Vec::new(),
             any_time_visible_meshes: HashSet::new(),
+        }
+    }
+
+    /// Returns a [`TextureAllocator`](all_is_cubes::mesh::TextureAllocator) that writes
+    /// textures into this glTF asset
+    pub fn texture_allocator(&self) -> GltfTextureAllocator {
+        GltfTextureAllocator {
+            destination: self.buffer_dest.clone(),
         }
     }
 
@@ -320,19 +329,17 @@ mod tests {
         space: &Space,
         writer: &mut GltfWriter,
     ) -> (
-        GltfTextureAllocator,
         SpaceMesh<GltfVertex, GltfTextureRef>,
         Index<gltf_json::Mesh>,
     ) {
         let options = &MeshOptions::new(&GraphicsOptions::default());
-        let mut tex = GltfTextureAllocator::new();
-        let blocks = block_meshes_for_space(space, &mut tex, options);
+        let blocks = block_meshes_for_space(space, &mut writer.texture_allocator(), options);
         let mesh: SpaceMesh<GltfVertex, GltfTextureRef> =
             SpaceMesh::new(space, space.bounds(), options, &*blocks);
 
         let index = writer.add_mesh("mesh".into(), &mesh);
 
-        (tex, mesh, index)
+        (mesh, index)
     }
 
     #[test]
@@ -352,7 +359,7 @@ mod tests {
         outer_space.set((0, 0, 0), &recursive_block).unwrap();
 
         let mut writer = GltfWriter::new(GltfDataDestination::null());
-        let (_, _, mesh_index) = gltf_mesh(&outer_space, &mut writer);
+        let (_, mesh_index) = gltf_mesh(&outer_space, &mut writer);
         writer.add_frame(None, &[mesh_index]);
 
         let root = writer.into_root(Duration::ZERO).unwrap();

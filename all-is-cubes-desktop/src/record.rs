@@ -93,29 +93,28 @@ impl Recorder {
             RecordFormat::Gltf => {
                 let (scene_sender, scene_receiver) = mpsc::sync_channel::<MeshRecordMsg>(1);
 
+                // Create file early so we get a prompt error.
+                // Currently this path should always have a .gltf extension.
+                let file = File::create(&options.output_path)?;
+
+                let mut writer =
+                    GltfWriter::new(GltfDataDestination::new(Some(options.output_path), 2000));
+                let tex = writer.texture_allocator();
+
                 std::thread::Builder::new()
                     .name("Mesh data encoder".to_string())
                     .spawn({
-                        // Create file early so we get a prompt error.
-                        // Currently this path should always have a .gltf extension.
-                        let file = File::create(&options.output_path)?;
-
-                        let mut wb = GltfWriter::new(GltfDataDestination::new(
-                            Some(options.output_path),
-                            2000,
-                        ));
-
                         move || {
                             while let Ok(msg) = scene_receiver.recv() {
                                 match msg {
                                     MeshRecordMsg::AddMesh(position, mesh, mesh_index_cell) => {
                                         let position: [i32; 3] = position.0.into();
                                         let mesh_index =
-                                            wb.add_mesh(format!("chunk {position:?}"), &mesh);
+                                            writer.add_mesh(format!("chunk {position:?}"), &mesh);
                                         *mesh_index_cell.lock().unwrap() = Some(mesh_index);
                                     }
                                     MeshRecordMsg::FinishFrame(frame_id, camera, meshes) => {
-                                        wb.add_frame(
+                                        writer.add_frame(
                                             Some(&camera),
                                             &meshes
                                                 .into_iter()
@@ -128,12 +127,13 @@ impl Recorder {
                             }
 
                             // Write and close file
-                            wb.into_root(
-                                options.animation.map_or(Duration::ZERO, |a| a.frame_period),
-                            )
-                            .unwrap()
-                            .to_writer_pretty(&file)
-                            .unwrap();
+                            writer
+                                .into_root(
+                                    options.animation.map_or(Duration::ZERO, |a| a.frame_period),
+                                )
+                                .unwrap()
+                                .to_writer_pretty(&file)
+                                .unwrap();
                             file.sync_all().unwrap();
                             drop(file);
                             // TODO: communicate "successfully completed" or errors on the status channel
@@ -144,7 +144,7 @@ impl Recorder {
                     // TODO: We need to tell the ChunkedSpaceMesh to have an infinite view distance
                     // (or at least as much data as we care about).
                     csm: ChunkedSpaceMesh::new(cameras.world_space().snapshot().unwrap()),
-                    tex: GltfTextureAllocator::new(),
+                    tex,
                     scene_sender: Some(scene_sender),
                     cameras,
                 })
