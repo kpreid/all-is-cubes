@@ -234,15 +234,15 @@ mod tests {
         let (_, _, mesh_index) = gltf_mesh(&space, &mut writer);
         let root = writer.into_root(Duration::ZERO).unwrap();
 
-        let mesh = &root.meshes[mesh_index.value()];
+        let mesh = root.get(mesh_index).unwrap();
         let index_accessor_index = mesh.primitives[0].indices.unwrap();
-        let vertex_accessor_index = mesh.primitives[0].attributes.values().next().unwrap();
-        let vertex_accessor = &root.accessors[vertex_accessor_index.value()];
-        let index_accessor = &root.accessors[index_accessor_index.value()];
-        let vertex_buffer_view = &root.buffer_views[vertex_accessor.buffer_view.unwrap().value()];
-        let index_buffer_view = &root.buffer_views[index_accessor.buffer_view.unwrap().value()];
-        let vertex_buffer = &root.buffers[vertex_buffer_view.buffer.value()];
-        let index_buffer = &root.buffers[index_buffer_view.buffer.value()];
+        let vertex_accessor_index = *mesh.primitives[0].attributes.values().next().unwrap();
+        let vertex_accessor = root.get(vertex_accessor_index).unwrap();
+        let index_accessor = root.get(index_accessor_index).unwrap();
+        let vertex_buffer_view = root.get(vertex_accessor.buffer_view.unwrap()).unwrap();
+        let index_buffer_view = root.get(index_accessor.buffer_view.unwrap()).unwrap();
+        let vertex_buffer = root.get(vertex_buffer_view.buffer).unwrap();
+        let index_buffer = root.get(index_buffer_view.buffer).unwrap();
 
         dbg!(
             vertex_accessor.count,
