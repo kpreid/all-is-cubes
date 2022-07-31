@@ -7,7 +7,10 @@ use crate::drawing::VoxelBrush;
 use crate::math::{Face6, Rgb};
 
 #[cfg(doc)]
-use crate::{block::Block, space::Space};
+use crate::{
+    block::{Block, BlockDef},
+    space::Space,
+};
 
 /// Collection of miscellaneous attribute data for blocks that doesn't come in variants.
 ///

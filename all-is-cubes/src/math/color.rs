@@ -233,7 +233,7 @@ impl Rgba {
     /// This returns the same information as [`Rgba::fully_transparent`] combined with
     /// [`Rgba::fully_opaque`].
     #[inline]
-    pub(crate) fn opacity_category(self) -> OpacityCategory {
+    pub fn opacity_category(self) -> OpacityCategory {
         if self.fully_transparent() {
             OpacityCategory::Invisible
         } else if self.fully_opaque() {
@@ -543,10 +543,14 @@ const fn component_from_srgb8_const(c: u8) -> NotNan<f32> {
 /// frame.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[allow(clippy::exhaustive_enums)]
 #[repr(u8)]
-pub(crate) enum OpacityCategory {
+pub enum OpacityCategory {
+    /// Alpha of zero; completely transparent; completely invisible; need not be drawn.
     Invisible = 0,
+    /// Alpha greater than zero and less than one; requires blending.
     Partial = 1,
+    /// Alpha of one; completely hides what is behind it and does not require blending.
     Opaque = 2,
 }
 
