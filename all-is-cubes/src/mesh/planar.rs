@@ -190,7 +190,8 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
         ),
     };
 
-    for &unit_square_point in QUAD_VERTICES {
+    // Performance note: not using array::map() because, by benchmark, that's slower.
+    vertices.extend(QUAD_VERTICES.iter().map(|&unit_square_point| {
         // Apply bounding rectangle
         let voxel_grid_point =
             low_corner.to_vec() + unit_square_point.mul_element_wise(high_corner - low_corner);
@@ -199,7 +200,7 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
         // Apply scaling to unit cube
         let block_point = voxel_grid_point * transform.voxel_to_block_scale;
 
-        vertices.push(V::from(BlockVertex {
+        V::from(BlockVertex {
             position: transform.position_transform.transform_point(block_point),
             face: transform.face,
             coloring: match coloring {
@@ -219,11 +220,9 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
                     clamp_max,
                 },
             },
-        }));
-    }
-    for &i in QUAD_INDICES {
-        indices.push(index_origin + i);
-    }
+        })
+    }));
+    indices.extend(QUAD_INDICES.iter().map(|&i| index_origin + i));
 }
 
 /// Ingredients for [`push_quad`] that are uniform for a resolution and face.
@@ -262,4 +261,4 @@ const QUAD_VERTICES: &[Vector2<FreeCoordinate>; 4] = &[
     Vector2::new(1.0, 1.0),
 ];
 
-const QUAD_INDICES: &[u32] = &[0, 1, 2, 2, 1, 3];
+const QUAD_INDICES: &[u32; 6] = &[0, 1, 2, 2, 1, 3];
