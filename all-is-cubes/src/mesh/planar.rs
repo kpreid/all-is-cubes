@@ -7,6 +7,7 @@ use cgmath::{
     Zero as _,
 };
 
+use crate::block::Resolution;
 use crate::math::{Face6, FreeCoordinate, GridCoordinate, Rgba};
 use crate::mesh::{BlockVertex, Coloring, TextureCoordinate, TextureTile};
 
@@ -153,31 +154,22 @@ pub(super) enum QuadColoring<'a, T> {
 pub(super) fn push_quad<V: From<BlockVertex>>(
     vertices: &mut Vec<V>,
     indices: &mut Vec<u32>,
-    face: Face6,
+    transform: &QuadTransform,
     depth: FreeCoordinate,
     low_corner: Point2<FreeCoordinate>,
     high_corner: Point2<FreeCoordinate>,
     coloring: QuadColoring<'_, impl TextureTile>,
-    resolution: GridCoordinate,
 ) {
-    // TODO: Refactor so we don't have to do 100% of this anew for each individual quad
-    // This is tricky, though, since the coloring can vary per quad (though the scale _can_ be constant).
-    let transform_f = face.matrix(1).to_free();
-    let transform_t = face
-        .matrix(resolution)
-        .to_free()
-        .cast::<TextureCoordinate>()
-        .unwrap();
     let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5;
     let depth_fudge = Vector3::new(0., 0., half_texel);
-    let voxel_to_block_scale = FreeCoordinate::from(resolution).recip();
 
     let (clamp_min, clamp_max) = match coloring {
         QuadColoring::Solid(_) => (Vector3::zero(), Vector3::zero()),
         QuadColoring::Texture(tile) => (
             tile.grid_to_texcoord(
-                transform_t
+                transform
+                    .texture_transform
                     .transform_point(Point3 {
                         x: low_corner.x as TextureCoordinate + half_texel,
                         y: low_corner.y as TextureCoordinate + half_texel,
@@ -186,7 +178,8 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
                     .to_vec(),
             ),
             tile.grid_to_texcoord(
-                transform_t
+                transform
+                    .texture_transform
                     .transform_point(Point3 {
                         x: high_corner.x as TextureCoordinate - half_texel,
                         y: high_corner.y as TextureCoordinate - half_texel,
@@ -204,18 +197,19 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
         // Apply depth
         let voxel_grid_point = Point3::from_vec(voxel_grid_point.extend(depth));
         // Apply scaling to unit cube
-        let block_point = voxel_grid_point * voxel_to_block_scale;
+        let block_point = voxel_grid_point * transform.voxel_to_block_scale;
 
         vertices.push(V::from(BlockVertex {
-            position: transform_f.transform_point(block_point),
-            face,
+            position: transform.position_transform.transform_point(block_point),
+            face: transform.face,
             coloring: match coloring {
                 // Note: if we're ever looking for microöptimizations, we could try
                 // converting this to a trait for static dispatch.
                 QuadColoring::Solid(color) => Coloring::Solid(color),
                 QuadColoring::Texture(tile) => Coloring::Texture {
                     pos: tile.grid_to_texcoord(
-                        transform_t
+                        transform
+                            .texture_transform
                             .transform_point(
                                 voxel_grid_point.map(|s| s as TextureCoordinate) + depth_fudge,
                             )
@@ -229,6 +223,30 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
     }
     for &i in QUAD_INDICES {
         indices.push(index_origin + i);
+    }
+}
+
+/// Ingredients for [`push_quad`] that are uniform for a resolution and face.
+pub(super) struct QuadTransform {
+    face: Face6,
+    // TODO: only needs to be a Matrix3
+    position_transform: cgmath::Matrix4<FreeCoordinate>,
+    texture_transform: cgmath::Matrix4<TextureCoordinate>,
+    voxel_to_block_scale: FreeCoordinate,
+}
+
+impl QuadTransform {
+    pub fn new(face: Face6, resolution: Resolution) -> Self {
+        Self {
+            face,
+            position_transform: face.matrix(1).to_free(), // TODO: specialize this since there are only 6 values
+            texture_transform: face
+                .matrix(resolution.to_grid())
+                .to_free()
+                .cast::<TextureCoordinate>()
+                .unwrap(),
+            voxel_to_block_scale: FreeCoordinate::from(resolution).recip(),
+        }
     }
 }
 

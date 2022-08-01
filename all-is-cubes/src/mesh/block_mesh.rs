@@ -13,7 +13,7 @@ use crate::math::{
 };
 use crate::mesh::{
     copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
-    GreedyMesher, MeshOptions, QuadColoring, TextureAllocator, TextureTile,
+    GreedyMesher, MeshOptions, QuadColoring, QuadTransform, TextureAllocator, TextureTile,
 };
 use crate::space::Space;
 
@@ -194,13 +194,12 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             indices_transparent.reserve_exact(6);
                             &mut indices_transparent
                         },
-                        face,
+                        &QuadTransform::new(face, block.resolution),
                         /* depth= */ 0.,
                         Point2 { x: 0., y: 0. },
                         Point2 { x: 1., y: 1. },
                         // TODO: Respect the prefer_textures option.
                         QuadColoring::<A::Tile>::Solid(color),
-                        1,
                     );
                     used_any_vertex_colors = true;
                 }
@@ -251,7 +250,8 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
             // Walk through the planes (layers) of the block, figuring out what geometry to
             // generate for each layer and whether it needs a texture.
             for face in Face6::ALL {
-                let transform = face.matrix(block_resolution - 1);
+                let voxel_transform = face.matrix(block_resolution - 1);
+                let quad_transform = QuadTransform::new(face, block.resolution);
 
                 // Rotate the voxel array's extent into our local coordinate system, so we can find
                 // out what range to iterate over.
@@ -292,7 +292,7 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                     for t in rotated_voxel_range.y_range() {
                         for s in rotated_voxel_range.x_range() {
                             let cube: Point3<GridCoordinate> =
-                                transform.transform_point(Point3::new(s, t, layer));
+                                voxel_transform.transform_point(Point3::new(s, t, layer));
 
                             let color = options
                                 .transparency
@@ -416,12 +416,11 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
                             } else {
                                 indices_opaque
                             },
-                            face,
+                            &quad_transform,
                             depth,
                             low_corner.map(FreeCoordinate::from),
                             high_corner.map(FreeCoordinate::from),
                             coloring,
-                            block_resolution,
                         );
                     });
                 }
