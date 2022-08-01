@@ -33,6 +33,8 @@
         - It internally uses reference counting to be predictably cheap to `clone()`; this is intended to help use cases such as transactions which mean that even a block which only exists once in the universe is frequently cloned.
         - Many changes to the functions, associated methods, and `BlockBuilder` were made to support this new structure.
 
+    - Breaking: `mesh::TextureAllocator` implementations may now choose an arbitrary type to represent their texture coordinates. `mesh::BlockVertex` is now generic to accomodate this.
+
     - Breaking: `apps::Session::new()` (formerly `AllIsCubesAppState::new()`) is now an async function.
     - Breaking: `apps::StandardCameras` now works with a `ListenableSource<Viewport>` instead of a `Viewport` and `set_viewport()` method.
     - Breaking: `block::AnimationHint` (from `BlockAttributes::animation_hint`) has been redesigned to be more systematic.

@@ -4,7 +4,7 @@
 // module `all_is_cubes_gpu::block_texture` and figure out better names for
 // both of them.
 
-use std::fmt::Debug;
+use std::fmt;
 
 use cgmath::Vector3;
 
@@ -12,6 +12,7 @@ use crate::block::Evoxel;
 use crate::content::palette;
 use crate::math::{GridAab, GridArray};
 use crate::mesh::TextureCoordinate;
+use crate::util::{ConciseDebug, CustomFormat};
 
 /// Color data accepted by [`TextureAllocator`].
 /// The components are sRGB `[R, G, B, A]`.
@@ -21,7 +22,10 @@ pub type Texel = [u8; 4];
 /// Implement this trait using the target graphics API's 3D texture type.
 pub trait TextureAllocator {
     /// Tile handles produced by this allocator.
-    type Tile: TextureTile;
+    type Tile: TextureTile<Point = Self::Point>;
+
+    /// Type of points within the texture.
+    type Point;
 
     /// Allocate a tile, whose range of texels will be reserved for use as long as the
     /// `Tile` value, and its clones, are not dropped.
@@ -38,16 +42,16 @@ pub trait TextureAllocator {
 /// dropped, the texture allocation will be released and the texture coordinates may
 /// be reused for different data.
 pub trait TextureTile: Clone {
+    /// Type of points within the texture.
+    type Point: Copy;
+
     /// Returns the [`GridAab`] originally passed to the texture allocator for this tile.
     fn bounds(&self) -> GridAab;
 
-    /// Transform a coordinate in the coordinate system of, and within, [`Self::bounds()`]
+    /// Transform a point in the coordinate system of, and within, [`Self::bounds()`]
     /// (that is, where 1 unit = 1 texel) into texture coordinates suitable for the
     /// target [`GfxVertex`](super::GfxVertex) type.
-    fn grid_to_texcoord(
-        &self,
-        in_tile_grid: Vector3<TextureCoordinate>,
-    ) -> Vector3<TextureCoordinate>;
+    fn grid_to_texcoord(&self, in_tile_grid: Vector3<TextureCoordinate>) -> Self::Point;
 
     /// Write texture data as RGBA color.
     ///
@@ -102,6 +106,7 @@ pub struct NoTextures;
 
 impl TextureAllocator for NoTextures {
     type Tile = NoTexture;
+    type Point = NoTexture;
 
     fn allocate(&mut self, _: GridAab) -> Option<Self::Tile> {
         None
@@ -109,20 +114,30 @@ impl TextureAllocator for NoTextures {
 }
 
 /// Uninhabited [`TextureTile`] type; no instance of this ever exists.
+///
+/// TODO: this can and should be just ! (never) when that's available in stable Rust
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_enums)]
 pub enum NoTexture {}
 
 impl TextureTile for NoTexture {
+    type Point = Self;
+
     fn bounds(&self) -> GridAab {
         match *self {}
     }
 
-    fn grid_to_texcoord(&self, _in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
+    fn grid_to_texcoord(&self, _in_tile: Vector3<TextureCoordinate>) -> NoTexture {
         match *self {}
     }
 
     fn write(&mut self, _data: &[Texel]) {
+        match *self {}
+    }
+}
+
+impl CustomFormat<ConciseDebug> for NoTexture {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         match *self {}
     }
 }
@@ -165,6 +180,7 @@ impl Default for TestTextureAllocator {
 
 impl TextureAllocator for TestTextureAllocator {
     type Tile = TestTextureTile;
+    type Point = TtPoint;
 
     fn allocate(&mut self, bounds: GridAab) -> Option<Self::Tile> {
         if self.count_allocated == self.capacity {
@@ -186,11 +202,13 @@ pub struct TestTextureTile {
 }
 
 impl TextureTile for TestTextureTile {
+    type Point = TtPoint;
+
     fn bounds(&self) -> GridAab {
         self.bounds
     }
 
-    fn grid_to_texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
+    fn grid_to_texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Self::Point {
         in_tile
     }
 
@@ -203,6 +221,10 @@ impl TextureTile for TestTextureTile {
         );
     }
 }
+
+/// Texture point for [`TestTextureAllocator`]
+#[doc(hidden)]
+pub type TtPoint = Vector3<TextureCoordinate>;
 
 #[cfg(test)]
 mod tests {

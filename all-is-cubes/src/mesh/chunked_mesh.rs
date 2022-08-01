@@ -68,7 +68,7 @@ where
 impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<D, Vert, Tex, CHUNK_SIZE>
 where
     D: Default,
-    Vert: GfxVertex + PartialEq,
+    Vert: GfxVertex<TexPoint = <<Tex as TextureAllocator>::Tile as TextureTile>::Point> + PartialEq,
     Tex: TextureAllocator,
     Tex::Tile: PartialEq,
 {
@@ -361,7 +361,7 @@ struct VersionedBlockMeshes<Vert, Tile> {
 
 impl<Vert, Tile> VersionedBlockMeshes<Vert, Tile>
 where
-    Vert: GfxVertex + PartialEq,
+    Vert: GfxVertex<TexPoint = <Tile as TextureTile>::Point> + PartialEq,
     Tile: TextureTile + PartialEq,
 {
     fn new() -> Self {
@@ -855,14 +855,16 @@ mod tests {
         universe: Universe,
         space: URef<Space>,
         camera: Camera,
-        csm: ChunkedSpaceMesh<(), BlockVertex, NoTextures, 16>,
+        csm: ChunkedSpaceMesh<(), BlockVertex<NoTexture>, NoTextures, 16>,
     }
 
     impl CsmTester {
         fn new(space: Space) -> Self {
             let mut universe = Universe::new();
             let space_ref = universe.insert_anonymous(space);
-            let csm = ChunkedSpaceMesh::<(), BlockVertex, NoTextures, 16>::new(space_ref.clone());
+            let csm = ChunkedSpaceMesh::<(), BlockVertex<NoTexture>, NoTextures, 16>::new(
+                space_ref.clone(),
+            );
             let camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
             Self {
                 universe,
@@ -875,7 +877,7 @@ mod tests {
         /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
         fn update<F>(&mut self, chunk_render_updater: F) -> CsmUpdateInfo
         where
-            F: FnMut(ChunkMeshUpdate<'_, (), BlockVertex, NoTexture, 16>),
+            F: FnMut(ChunkMeshUpdate<'_, (), BlockVertex<NoTexture>, NoTexture, 16>),
         {
             self.csm.update_blocks_and_some_chunks(
                 &self.camera,

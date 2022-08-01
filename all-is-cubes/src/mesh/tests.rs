@@ -16,7 +16,7 @@ use crate::space::{Space, SpacePhysics};
 use crate::universe::Universe;
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
-fn v_c(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockVertex {
+fn v_c<T>(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockVertex<T> {
     BlockVertex {
         position: position.into(),
         face,
@@ -25,7 +25,11 @@ fn v_c(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockVert
 }
 
 /// Shorthand for writing out an entire [`BlockVertex`] with texturing.
-fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [TextureCoordinate; 3]) -> BlockVertex {
+fn v_t(
+    position: [FreeCoordinate; 3],
+    face: Face6,
+    texture: [TextureCoordinate; 3],
+) -> BlockVertex<TtPoint> {
     let texture = texture.into();
     BlockVertex {
         position: position.into(),
@@ -39,7 +43,7 @@ fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [TextureCoordinate; 
 }
 
 /// Test helper to call `triangulate_block` alone without a `Space`.
-fn test_triangulate_block(block: Block) -> BlockMesh<BlockVertex, TestTextureTile> {
+fn test_triangulate_block(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
@@ -52,7 +56,9 @@ fn test_triangulate_block(block: Block) -> BlockMesh<BlockVertex, TestTextureTil
 
 /// Test helper to call `triangulate_block` alone without a `Space`,
 /// and with the transparency option set to `Threshold(0.5)`.
-fn test_triangulate_block_threshold(block: Block) -> BlockMesh<BlockVertex, TestTextureTile> {
+fn test_triangulate_block_threshold(
+    block: Block,
+) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
     triangulate_block(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
@@ -68,13 +74,13 @@ fn triangulate_blocks_and_space(
     space: &Space,
 ) -> (
     TestTextureAllocator,
-    BlockMeshes<BlockVertex, TestTextureTile>,
-    SpaceMesh<BlockVertex, TestTextureTile>,
+    BlockMeshes<BlockVertex<TtPoint>, TestTextureTile>,
+    SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>,
 ) {
     let options = &MeshOptions::new(&GraphicsOptions::default());
     let mut tex = TestTextureAllocator::new();
     let block_meshes = triangulate_blocks(space, &mut tex, options);
-    let space_mesh: SpaceMesh<BlockVertex, TestTextureTile> =
+    let space_mesh: SpaceMesh<BlockVertex<TtPoint>, TestTextureTile> =
         triangulate_space(space, space.bounds(), options, &*block_meshes);
     (tex, block_meshes, space_mesh)
 }
@@ -102,12 +108,12 @@ fn excludes_hidden_faces_of_blocks() {
 
     // The space rendering should be a 2×2×2 cube of tiles, without any hidden interior faces.
     assert_eq!(
-        Vec::<&BlockVertex>::new(),
+        Vec::<&BlockVertex<TtPoint>>::new(),
         space_mesh
             .vertices()
             .iter()
             .filter(|vertex| vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
-            .collect::<Vec<&BlockVertex>>(),
+            .collect::<Vec<&BlockVertex<TtPoint>>>(),
         "found an interior point"
     );
     assert_eq!(
@@ -124,7 +130,7 @@ fn excludes_hidden_faces_of_blocks() {
 fn no_panic_on_missing_blocks() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    let block_meshes: BlockMeshes<BlockVertex, _> = triangulate_blocks(
+    let block_meshes: BlockMeshes<BlockVertex<TtPoint>, _> = triangulate_blocks(
         &space,
         &mut TestTextureAllocator::new(),
         &MeshOptions::dont_care_for_test(),
@@ -504,7 +510,7 @@ fn handling_allocation_failure() {
     // TODO: Once we support tiling for high resolution blocks, make this a partial failure.
     let capacity = 0;
     tex.set_capacity(capacity);
-    let block_meshes: BlockMeshes<BlockVertex, _> =
+    let block_meshes: BlockMeshes<BlockVertex<TtPoint>, _> =
         triangulate_blocks(&space, &mut tex, &MeshOptions::dont_care_for_test());
 
     // Check results.
@@ -516,7 +522,7 @@ fn handling_allocation_failure() {
 
 #[test]
 fn space_mesh_empty() {
-    let t = SpaceMesh::<BlockVertex, TestTextureTile>::new();
+    let t = SpaceMesh::<BlockVertex<TtPoint>, TestTextureTile>::new();
     assert!(t.is_empty());
     assert_eq!(t.vertices(), &[]);
     // type annotation to prevent spurious inference failures in the presence

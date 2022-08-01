@@ -5,7 +5,7 @@ use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::mesh::{
     triangulate_block, triangulate_blocks, triangulate_space, BlockMeshes, BlockVertex,
-    MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile,
+    MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile, TtPoint,
 };
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
@@ -25,7 +25,11 @@ fn mesh_benches(c: &mut Criterion) {
         b.iter_batched_ref(
             || (),
             |()| {
-                triangulate_block::<BlockVertex, _>(&ev, &mut TestTextureAllocator::new(), options)
+                triangulate_block::<BlockVertex<TtPoint>, _>(
+                    &ev,
+                    &mut TestTextureAllocator::new(),
+                    options,
+                )
             },
             BatchSize::SmallInput,
         );
@@ -42,7 +46,11 @@ fn mesh_benches(c: &mut Criterion) {
         b.iter_batched_ref(
             || (),
             |()| {
-                triangulate_block::<BlockVertex, _>(&ev, &mut TestTextureAllocator::new(), options)
+                triangulate_block::<BlockVertex<TtPoint>, _>(
+                    &ev,
+                    &mut TestTextureAllocator::new(),
+                    options,
+                )
             },
             BatchSize::SmallInput,
         );
@@ -72,7 +80,7 @@ fn mesh_benches(c: &mut Criterion) {
                 assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
                 buffer
             },
-            |buffer: &mut SpaceMesh<BlockVertex, TestTextureTile>| {
+            |buffer: &mut SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>| {
                 // As of this writing, this benchmark is really just "what if we don't allocate
                 // a new Vec". Later, the buffers will hopefully become cleverer and we'll be
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
@@ -100,7 +108,7 @@ fn mesh_benches(c: &mut Criterion) {
 fn checkerboard_space_bench_setup(
     options: &MeshOptions,
     transparent: bool,
-) -> (Space, BlockMeshes<BlockVertex, TestTextureTile>) {
+) -> (Space, BlockMeshes<BlockVertex<TtPoint>, TestTextureTile>) {
     let space = checkerboard_space([
         AIR,
         Block::from(if transparent {

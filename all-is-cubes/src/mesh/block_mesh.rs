@@ -158,11 +158,15 @@ impl<V, T> Default for BlockMesh<V, T> {
 /// Generate [`BlockMesh`] for a block's current appearance.
 ///
 /// This may then be may be used as input to [`triangulate_space`](super::triangulate_space).
-pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
+pub fn triangulate_block<V, A>(
     block: &EvaluatedBlock,
     texture_allocator: &mut A,
     options: &MeshOptions,
-) -> BlockMesh<V, A::Tile> {
+) -> BlockMesh<V, A::Tile>
+where
+    V: From<BlockVertex<<<A as TextureAllocator>::Tile as TextureTile>::Point>>,
+    A: TextureAllocator,
+{
     // If this is true, avoid using vertex coloring even on solid rectangles.
     let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None;
 
@@ -444,11 +448,15 @@ pub fn triangulate_block<V: From<BlockVertex>, A: TextureAllocator>(
 ///
 /// The resulting array is indexed by the `Space`'s
 /// [`BlockIndex`](crate::space::BlockIndex) values.
-pub fn triangulate_blocks<V: From<BlockVertex>, A: TextureAllocator>(
+pub fn triangulate_blocks<V, A>(
     space: &Space,
     texture_allocator: &mut A,
     options: &MeshOptions,
-) -> BlockMeshes<V, A::Tile> {
+) -> BlockMeshes<V, A::Tile>
+where
+    V: From<BlockVertex<<<A as TextureAllocator>::Tile as TextureTile>::Point>>,
+    A: TextureAllocator,
+{
     space
         .block_data()
         .iter()

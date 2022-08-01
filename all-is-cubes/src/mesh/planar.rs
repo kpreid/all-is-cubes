@@ -4,7 +4,6 @@ use std::ops::Range;
 
 use cgmath::{
     ElementWise as _, EuclideanSpace as _, Matrix4, Point2, Point3, Transform as _, Vector2,
-    Vector3,
 };
 
 use crate::block::Resolution;
@@ -151,14 +150,14 @@ pub(super) enum QuadColoring<'a, T> {
 /// `depth`, `low_corner`, and `high_corner` are in units of 1 texel.
 #[inline]
 #[allow(clippy::too_many_arguments)] // TODO: Figure out how to simplify
-pub(super) fn push_quad<V: From<BlockVertex>>(
+pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: TextureTile>(
     vertices: &mut Vec<V>,
     indices: &mut Vec<u32>,
     transform: &QuadTransform,
     depth: FreeCoordinate,
     low_corner: Point2<FreeCoordinate>,
     high_corner: Point2<FreeCoordinate>,
-    coloring: QuadColoring<'_, impl TextureTile>,
+    coloring: QuadColoring<'_, Tex>,
 ) {
     let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5;
@@ -261,11 +260,11 @@ impl QuadTransform {
     /// The depth value is offset by +0.5 texel (into the depth of the voxel being
     /// drawn), to move it from edge coordinates to mid-texel coordinates.
     #[inline]
-    fn transform_texture_point(
+    fn transform_texture_point<T: TextureTile>(
         &self,
-        tile: &impl TextureTile,
+        tile: &T,
         mut point: Point3<TextureCoordinate>,
-    ) -> Vector3<TextureCoordinate> {
+    ) -> T::Point {
         point.z += 0.5;
         tile.grid_to_texcoord(self.texture_transform.transform_point(point).to_vec())
     }

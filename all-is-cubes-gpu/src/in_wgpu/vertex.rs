@@ -4,6 +4,8 @@ use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
 
+pub(crate) type TexPoint = Vector3<f32>;
+
 /// Triangle mesh vertex type that is used for rendering [blocks].
 ///
 /// [blocks]: all_is_cubes::block::Block
@@ -50,9 +52,9 @@ impl WgpuBlockVertex {
     }
 }
 
-impl From<BlockVertex> for WgpuBlockVertex {
+impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
     #[inline]
-    fn from(vertex: BlockVertex) -> Self {
+    fn from(vertex: BlockVertex<TexPoint>) -> Self {
         let position = vertex.position.cast::<f32>().unwrap().to_vec();
         let cube = [0., 0., 0.];
         let normal = vertex.face as u32;
@@ -91,6 +93,7 @@ impl GfxVertex for WgpuBlockVertex {
     const WANTS_DEPTH_SORTING: bool = true;
     type Coordinate = f32;
     type BlockInst = Vector3<f32>;
+    type TexPoint = TexPoint;
 
     #[inline]
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst {

@@ -7,6 +7,7 @@ use all_is_cubes::{
 };
 
 use super::glue::Lef32;
+use super::texture::TexPoint;
 
 /// [`GfxVertex`] type for glTF exports.
 ///
@@ -30,9 +31,9 @@ impl GltfVertex {
     };
 }
 
-impl From<BlockVertex> for GltfVertex {
+impl From<BlockVertex<TexPoint>> for GltfVertex {
     #[inline]
-    fn from(vertex: BlockVertex) -> Self {
+    fn from(vertex: BlockVertex<TexPoint>) -> Self {
         let position = Lef32::from_vec3(vertex.position.cast::<f32>().unwrap().to_vec());
         match vertex.coloring {
             Coloring::Solid(color) => {
@@ -61,6 +62,7 @@ impl GfxVertex for GltfVertex {
     const WANTS_DEPTH_SORTING: bool = false;
     type Coordinate = f32;
     type BlockInst = Vector3<f32>;
+    type TexPoint = TexPoint;
 
     #[inline]
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst {

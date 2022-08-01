@@ -11,9 +11,9 @@ use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
+use crate::in_wgpu::vertex::TexPoint;
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
-use crate::BlockTextureInfo;
-use crate::GraphicsResourceError;
+use crate::{BlockTextureInfo, GraphicsResourceError};
 
 /// Alias for the concrete type of the block texture.
 type BlockTexture = wgpu::Texture;
@@ -177,6 +177,7 @@ impl AtlasAllocator {
 
 impl TextureAllocator for AtlasAllocator {
     type Tile = AtlasTile;
+    type Point = TexPoint;
 
     fn allocate(&mut self, requested_bounds: GridAab) -> Option<AtlasTile> {
         let alloctree = &mut self.backing.lock().unwrap().alloctree;
@@ -197,6 +198,8 @@ impl TextureAllocator for AtlasAllocator {
 }
 
 impl TextureTile for AtlasTile {
+    type Point = TexPoint;
+
     fn bounds(&self) -> GridAab {
         todo!()
     }

@@ -16,7 +16,7 @@ use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
-use crate::in_luminance::types::AicLumBackend;
+use crate::in_luminance::types::{AicLumBackend, TexPoint};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
 use crate::BlockTextureInfo;
 
@@ -182,6 +182,7 @@ impl<Backend: AicLumBackend> LumAtlasAllocator<Backend> {
 
 impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
     type Tile = LumAtlasTile;
+    type Point = TexPoint;
 
     fn allocate(&mut self, requested_bounds: GridAab) -> Option<LumAtlasTile> {
         let alloctree = &mut self.backing.lock().unwrap().alloctree;
@@ -202,6 +203,8 @@ impl<Backend: AicLumBackend> TextureAllocator for LumAtlasAllocator<Backend> {
 }
 
 impl TextureTile for LumAtlasTile {
+    type Point = TexPoint;
+
     fn bounds(&self) -> GridAab {
         todo!()
     }
