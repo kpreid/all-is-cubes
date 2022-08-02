@@ -71,6 +71,7 @@ impl Face6 {
     ];
 
     /// Inverse function of `face as u8`, converting the number to [`Face6`].
+    #[inline]
     pub const fn from_discriminant(d: u8) -> Option<Self> {
         match d {
             1 => Some(Self::NX),
@@ -233,6 +234,7 @@ impl Face7 {
     ];
 
     /// Inverse function of `face as u8`, converting the number to [`Face7`].
+    #[inline]
     pub const fn from_discriminant(d: u8) -> Option<Self> {
         match d {
             0 => Some(Self::Within),
@@ -487,12 +489,14 @@ impl Face7 {
 }
 
 impl From<Face6> for Face7 {
+    #[inline]
     fn from(value: Face6) -> Self {
         value.into7()
     }
 }
 impl TryFrom<Face7> for Face6 {
     type Error = Faceless;
+    #[inline]
     fn try_from(value: Face7) -> Result<Face6, Self::Error> {
         match value {
             Face7::Within => Err(Faceless),
@@ -526,6 +530,7 @@ impl TryFrom<GridVector> for Face6 {
     /// let v = GridVector::new(1, 2, 3);
     /// assert_eq!(Face6::try_from(v), Err(v));
     /// ```
+    #[inline]
     fn try_from(value: GridVector) -> Result<Self, Self::Error> {
         let f7 = Face7::try_from(value)?;
         Face6::try_from(f7).map_err(|_| value)

@@ -310,33 +310,39 @@ impl Rgba {
 }
 
 impl From<Vector3<NotNan<f32>>> for Rgb {
+    #[inline]
     fn from(value: Vector3<NotNan<f32>>) -> Self {
         Self(value)
     }
 }
 impl From<Vector4<NotNan<f32>>> for Rgba {
+    #[inline]
     fn from(value: Vector4<NotNan<f32>>) -> Self {
         Self(value)
     }
 }
 
 impl From<Rgb> for Vector3<f32> {
+    #[inline]
     fn from(value: Rgb) -> Self {
         value.0.map(NotNan::into_inner)
     }
 }
 impl From<Rgba> for Vector4<f32> {
+    #[inline]
     fn from(value: Rgba) -> Self {
         value.0.map(NotNan::into_inner)
     }
 }
 
 impl From<Rgb> for [f32; 3] {
+    #[inline]
     fn from(value: Rgb) -> Self {
         value.0.map(NotNan::into_inner).into()
     }
 }
 impl From<Rgba> for [f32; 4] {
+    #[inline]
     fn from(value: Rgba) -> Self {
         value.0.map(NotNan::into_inner).into()
     }
@@ -344,6 +350,7 @@ impl From<Rgba> for [f32; 4] {
 
 impl TryFrom<Vector3<f32>> for Rgb {
     type Error = FloatIsNan;
+    #[inline]
     fn try_from(value: Vector3<f32>) -> Result<Self, Self::Error> {
         Ok(Self(Vector3::new(
             value.x.try_into()?,
@@ -354,6 +361,7 @@ impl TryFrom<Vector3<f32>> for Rgb {
 }
 impl TryFrom<Vector4<f32>> for Rgba {
     type Error = FloatIsNan;
+    #[inline]
     fn try_from(value: Vector4<f32>) -> Result<Self, Self::Error> {
         Ok(Self(Vector4::new(
             value.x.try_into()?,
@@ -366,34 +374,40 @@ impl TryFrom<Vector4<f32>> for Rgba {
 
 impl Add<Rgb> for Rgb {
     type Output = Self;
+    #[inline]
     fn add(self, other: Self) -> Self {
         Self(self.0 + other.0)
     }
 }
 impl Add<Rgba> for Rgba {
     type Output = Self;
+    #[inline]
     fn add(self, other: Self) -> Self {
         Self(self.0 + other.0)
     }
 }
 impl AddAssign<Rgb> for Rgb {
+    #[inline]
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 impl AddAssign<Rgba> for Rgba {
+    #[inline]
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 impl Sub<Rgb> for Rgb {
     type Output = Self;
+    #[inline]
     fn sub(self, other: Self) -> Self {
         Self(self.0 - other.0)
     }
 }
 impl Sub<Rgba> for Rgba {
     type Output = Self;
+    #[inline]
     fn sub(self, other: Self) -> Self {
         Self(self.0 - other.0)
     }
@@ -402,6 +416,7 @@ impl Sub<Rgba> for Rgba {
 impl Mul<Rgb> for Rgb {
     type Output = Self;
     /// Multiplies two color values componentwise.
+    #[inline]
     fn mul(self, other: Rgb) -> Self {
         Self(self.0.mul_element_wise(other.0))
     }
@@ -410,6 +425,7 @@ impl Mul<Rgb> for Rgb {
 impl Mul<NotNan<f32>> for Rgb {
     type Output = Self;
     /// Multiplies this color value by a scalar.
+    #[inline]
     fn mul(self, scalar: NotNan<f32>) -> Self {
         Self(self.0 * scalar)
     }
@@ -418,6 +434,7 @@ impl Mul<NotNan<f32>> for Rgb {
 impl Mul<f32> for Rgb {
     type Output = Self;
     /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
+    #[inline]
     fn mul(self, scalar: f32) -> Self {
         Self(self.0 * NotNan::new(scalar).unwrap())
     }
@@ -484,6 +501,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgba {
     }
 }
 
+#[inline]
 fn component_to_srgb(c: NotNan<f32>) -> f32 {
     // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_forward_transformation_(CIE_XYZ_to_sRGB)> (version as of Feb 3, 2020)
     // Strip NotNan
@@ -496,6 +514,7 @@ fn component_to_srgb(c: NotNan<f32>) -> f32 {
     }
 }
 
+#[inline]
 fn component_to_srgb8(c: NotNan<f32>) -> u8 {
     (component_to_srgb(c) * 255.).round() as u8
 }

@@ -110,6 +110,7 @@ impl GridAab {
     ///
     /// Panics if `cube` has any coordinates equal to [`GridCoordinate::MAX`](i32::MAX)
     /// since that is not valid, as per [`GridAab::from_lower_size`].
+    #[inline]
     pub fn single_cube(cube: GridPoint) -> GridAab {
         GridAab::from_lower_size(cube, [1, 1, 1])
     }
@@ -119,6 +120,7 @@ impl GridAab {
     ///
     /// If you need such a box at a position other than the origin, use
     /// [`GridAab::translate()`].
+    #[inline]
     pub const fn for_block(resolution: Resolution) -> GridAab {
         let size = resolution.to_grid();
         GridAab {
@@ -236,18 +238,21 @@ impl GridAab {
 
     /// Inclusive upper bounds on cube coordinates, or the most negative corner of the
     /// box.
+    #[inline]
     pub fn lower_bounds(&self) -> GridPoint {
         self.lower_bounds
     }
 
     /// Exclusive upper bounds on cube coordinates, or the most positive corner of the
     /// box.
+    #[inline]
     pub fn upper_bounds(&self) -> GridPoint {
         self.lower_bounds + self.sizes
     }
 
     /// Size of the box in each axis; equivalent to
     /// `self.upper_bounds() - self.lower_bounds()`.
+    #[inline]
     pub fn size(&self) -> GridVector {
         self.sizes
     }
@@ -258,6 +263,7 @@ impl GridAab {
     ///
     /// Compared to [`GridAab::size()`], this is a convenience so that callers needing
     /// unsigned integers do not need to write a fallible-looking conversion.
+    #[inline]
     pub fn unsigned_size(&self) -> Vector3<u32> {
         // Convert the i32 we know to be positive to u32.
         // Declaring the parameter type ensures that if we ever decide to change the numeric type
@@ -266,16 +272,19 @@ impl GridAab {
     }
 
     /// The range of X coordinates for unit cubes within the box.
+    #[inline]
     pub fn x_range(&self) -> Range<GridCoordinate> {
         self.axis_range(0)
     }
 
     /// The range of Y coordinates for unit cubes within the box.
+    #[inline]
     pub fn y_range(&self) -> Range<GridCoordinate> {
         self.axis_range(1)
     }
 
     /// The range of Z coordinates for unit cubes within the box.
+    #[inline]
     pub fn z_range(&self) -> Range<GridCoordinate> {
         self.axis_range(2)
     }
@@ -283,6 +292,7 @@ impl GridAab {
     /// The range of coordinates for cubes within the box along the given axis.
     ///
     /// Panics if `axis >= 3`.
+    #[inline]
     pub fn axis_range(&self, axis: usize) -> Range<GridCoordinate> {
         (self.lower_bounds()[axis])..(self.upper_bounds()[axis])
     }
@@ -297,6 +307,7 @@ impl GridAab {
     /// let b = GridAab::from_lower_size([0, 0, -2], [10, 3, 4]);
     /// assert_eq!(b.center(), Point3::new(5.0, 1.5, 0.0));
     /// ```
+    #[inline]
     pub fn center(&self) -> Point3<FreeCoordinate> {
         self.lower_bounds.map(FreeCoordinate::from) + self.sizes.map(FreeCoordinate::from) / 2.0
     }
@@ -332,6 +343,7 @@ impl GridAab {
     /// assert!(b.contains_cube([9, 5, 5]));
     /// assert!(!b.contains_cube([10, 5, 5]));
     /// ```
+    #[inline]
     pub fn contains_cube(&self, point: impl Into<GridPoint>) -> bool {
         self.index(point).is_some()
     }
@@ -409,6 +421,7 @@ impl GridAab {
     /// g1.union(GridAab::from_lower_size([u, u, u], [1, 1, 1]))
     ///     .unwrap_err();
     /// ```
+    #[inline]
     pub fn union(self, other: GridAab) -> Result<GridAab, GridOverflowError> {
         let lower = self
             .lower_bounds()

@@ -37,6 +37,7 @@ use crate::math::GridCoordinate;
 
 impl Resolution {
     /// Returns the [`Resolution`] that’s twice this one, or [`None`] at the limit.
+    #[inline]
     pub const fn double(self) -> Option<Self> {
         match self {
             Self::R1 => Some(Self::R2),
@@ -53,6 +54,7 @@ impl Resolution {
 
     /// Returns the [`Resolution`] that’s half this one, or [`None`] if `self` is
     /// [`R1`](Self::R1).
+    #[inline]
     pub const fn halve(self) -> Option<Self> {
         match self {
             Self::R1 => None,
@@ -67,6 +69,7 @@ impl Resolution {
         }
     }
 
+    #[inline]
     #[doc(hidden)] // interim while waiting for better const-eval support in Rust
     pub const fn to_grid(self) -> GridCoordinate {
         1 << self as GridCoordinate
@@ -88,6 +91,7 @@ macro_rules! impl_try_from {
     ($t:ty) => {
         impl TryFrom<$t> for Resolution {
             type Error = (); // TODO
+            #[inline]
             fn try_from(value: $t) -> Result<Self, Self::Error> {
                 match value {
                     1 => Ok(Self::R1),
@@ -122,31 +126,37 @@ impl From<Resolution> for i32 {
     ///
     /// assert_eq!(64, i32::from(Resolution::R64));
     /// ```
+    #[inline]
     fn from(r: Resolution) -> i32 {
         1 << (r as i32)
     }
 }
 impl From<Resolution> for u16 {
+    #[inline]
     fn from(r: Resolution) -> u16 {
         1 << (r as u16)
     }
 }
 impl From<Resolution> for u32 {
+    #[inline]
     fn from(r: Resolution) -> u32 {
         1 << (r as u32)
     }
 }
 impl From<Resolution> for usize {
+    #[inline]
     fn from(r: Resolution) -> usize {
         1 << (r as usize)
     }
 }
 impl From<Resolution> for f32 {
+    #[inline]
     fn from(r: Resolution) -> f32 {
         u16::from(r).into()
     }
 }
 impl From<Resolution> for f64 {
+    #[inline]
     fn from(r: Resolution) -> f64 {
         u16::from(r).into()
     }
