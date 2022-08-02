@@ -41,7 +41,7 @@ default = []
 [dependencies]
 arbitrary = { version = "1.0.1", optional = true, features = ["derive"] }
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
-bytemuck = { version = "1.7.2", default-features = false }
+bytemuck = { version = "1.11.0", default-features = false }
 cgmath = "0.18.0"
 downcast-rs = "1.2.0"
 embedded-graphics = "0.7.0"
