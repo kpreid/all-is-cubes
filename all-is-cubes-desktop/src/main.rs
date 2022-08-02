@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 use all_is_cubes::universe::Universe;
 use clap::{CommandFactory as _, Parser as _};
 use futures::executor::block_on;
-use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::{thread_rng, Rng};
 
 use all_is_cubes::apps::Session;
@@ -243,7 +243,9 @@ fn create_universe(
     let start_time = Instant::now();
     let universe_progress_bar = ProgressBar::new(100)
         .with_style(
-            common_progress_style().template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}%      "),
+            common_progress_style()
+                .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}%      ")
+                .unwrap(),
         )
         .with_prefix("Building");
     universe_progress_bar.set_position(0);
@@ -308,7 +310,7 @@ fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(LightUpdatesI
 fn common_progress_style() -> ProgressStyle {
     ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
-        .on_finish(ProgressFinish::AtCurrentPos)
+        .unwrap()
 }
 
 /// Choose a window size (in terms of viewport size) when the user did not request one.

@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 use std::time::Duration;
 
-use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::behavior::AutoRotate;
@@ -46,7 +46,7 @@ pub(crate) fn record_main(
 ) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
-        .on_finish(ProgressFinish::AtCurrentPos);
+        .unwrap();
 
     // Modify graphics options to suit recording
     // TODO: Find a better place to put this policy, and in particular allow the user to
@@ -77,7 +77,7 @@ pub(crate) fn record_main(
         let drawing_progress_bar = ProgressBar::new(options.frame_range().size_hint().0 as u64)
             .with_style(progress_style)
             .with_prefix("Drawing");
-        drawing_progress_bar.enable_steady_tick(1000);
+        drawing_progress_bar.enable_steady_tick(Duration::from_secs(1));
 
         for _ in options.frame_range() {
             // Advance time for next frame.
@@ -99,6 +99,7 @@ pub(crate) fn record_main(
             options.frame_range().end() - options.frame_range().start() + 1,
             "Didn't draw the correct number of frames"
         );
+        drawing_progress_bar.finish();
     }
 
     // Report completion
