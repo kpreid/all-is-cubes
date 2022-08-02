@@ -27,9 +27,11 @@
     allow(clippy::redundant_clone), // Tests prefer regularity over efficiency
 )]
 
+#[cfg_attr(not(any(feature = "luminance", feature = "wgpu")), allow(unused))]
 mod common;
 pub use common::*;
 
+#[cfg(feature = "luminance")]
 pub mod in_luminance;
 
 /// Re-export the version of the `wgpu` crate we're using.
