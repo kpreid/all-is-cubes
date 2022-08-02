@@ -177,17 +177,21 @@ pub(crate) fn map_shader_result<Backend, Sem, Out, Uni>(
 where
     Backend: luminance::backend::shader::Shader,
 {
-    // TODO:
     match program_attempt {
         Err(error) => Err(GraphicsResourceError::new(error)),
         Ok(BuiltProgram { program, warnings }) => {
-            if !warnings.is_empty() {
-                log::warn!(
-                    "Warnings occurred while compiling shader for {:?}",
-                    description
-                );
-                for warning in warnings {
-                    log::warn!("  {}", warning);
+            // NOTE: Logs disabled. Currently, I am not intending to develop the luminance
+            // renderer further, and the existing warnings (unused uniforms) are therefore
+            // just noise that makes it harder to read render test output.
+            if false {
+                if !warnings.is_empty() {
+                    log::warn!(
+                        "Warnings occurred while compiling shader for {:?}",
+                        description
+                    );
+                    for warning in warnings {
+                        log::warn!("  {}", warning);
+                    }
                 }
             }
             Ok(program)
