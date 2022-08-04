@@ -1,7 +1,7 @@
 //! main() for a server that serves the All is Cubes client as well as being a game
 //! server.
 
-use all_is_cubes_server::webserver::server_main;
+use all_is_cubes_server::webserver::start_server;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -19,6 +19,11 @@ async fn main() -> Result<(), anyhow::Error> {
         simplelog::ColorChoice::Auto,
     )?;
 
-    server_main().await?;
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
+
+    let (url, finished) = start_server(addr)?;
+    println!("{url}"); // note: printed *to stdout* for the use of tests
+
+    finished.await?;
     Ok(())
 }
