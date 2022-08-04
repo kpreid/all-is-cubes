@@ -6,6 +6,3 @@
 /all-is-cubes-wasm/node_modules
 /all-is-cubes-wasm/dist
 /all-is-cubes-wasm/pkg
-
-# Copy of build files for web server
-/all-is-cubes-server/static-all-is-cubes-wasm

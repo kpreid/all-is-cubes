@@ -18,9 +18,9 @@ pub fn start_server(
     let static_service = axum::routing::get(crate::embedded_client::client);
     #[cfg(not(feature = "embed"))]
     let static_service = axum::routing::get_service(tower_http::services::ServeDir::new(concat!(
-        // TODO: should be a run-time specified path
+        // TODO: should be a run-time specified path and not depend on the workspace.
         env!("CARGO_MANIFEST_DIR"),
-        "/static-all-is-cubes-wasm/"
+        "/../all-is-cubes-wasm/dist/"
     )))
     .handle_error(handle_error);
 

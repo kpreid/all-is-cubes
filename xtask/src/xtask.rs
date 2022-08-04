@@ -114,7 +114,6 @@ fn main() -> Result<(), ActionError> {
             cmd!("npm start").run()?;
         }
         XtaskCommand::RunGameServer => {
-            update_server_static()?;
             cargo().arg("run").arg("--bin").arg("aic-server").run()?;
         }
         XtaskCommand::Update => {
@@ -159,7 +158,6 @@ fn main() -> Result<(), ActionError> {
             );
         }
         XtaskCommand::PublishAll { for_real } => {
-            update_server_static()?;
             exhaustive_test()?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
@@ -170,16 +168,14 @@ fn main() -> Result<(), ActionError> {
                 }
 
                 let _pushd: Pushd = pushd(package)?;
-                let mut cmd = cargo().arg("publish").args(maybe_dry.iter().copied());
-                if package == "all-is-cubes-server" {
-                    // static-all-is-cubes-wasm counts as dirty despite .gitignore so we must use --allow-dirty
-                    cmd = cmd.arg("--allow-dirty");
-                }
                 if for_real {
                     // Let crates.io pick up the new all-is-cubes version or publishing dependents will fail
                     std::thread::sleep(Duration::from_secs(10));
                 }
-                cmd.run()?;
+                cargo()
+                    .arg("publish")
+                    .args(maybe_dry.iter().copied())
+                    .run()?;
             }
         }
     }
@@ -205,12 +201,16 @@ const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 // Test all combinations of situations (that we've bothered to program test
 // setup for).
 fn exhaustive_test() -> Result<(), ActionError> {
+    // building server with `--feature embed` requires static files
+    update_server_static()?;
+
     do_for_all_packages(TestOrCheck::Test, Features::AllAndNothing)?;
     Ok(())
 }
 
-/// Build the WASM and other static files for the web/game server.
-/// Needed whenever `all-is-cubes-server` is being tested/run/published.
+/// Build the WASM and other 'client' files that the web server might need.
+/// Needed for build whenever `all-is-cubes-server` is being tested/run with
+/// the `embed` feature; needed for run regardless.
 fn update_server_static() -> Result<(), ActionError> {
     ensure_wasm_tools_installed()?;
     {
@@ -218,25 +218,19 @@ fn update_server_static() -> Result<(), ActionError> {
         cmd!("npm run-script build").run()?;
     }
 
-    // TODO: Copy files ourselves instead of involving rsync.
-    cmd!("rsync --archive all-is-cubes-wasm/dist/ all-is-cubes-server/static-all-is-cubes-wasm/")
-        .run()?;
-
     Ok(())
 }
 
 /// Run check or tests for all targets.
-///
-/// TODO: run tests with and without relevant features, like rayon
 fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), ActionError> {
     // Install npm-based tools for all-is-cubes-wasm build.
     ensure_wasm_tools_installed()?;
 
-    // Ensure all-is-cubes-server build will succeed.
+    // Ensure all-is-cubes-server build that might be looking for the files will succeed.
     // Note that this is only an “exists” check not a “up-to-date” check, on the assumption
     // that running server tests will not depend on the specific file contents.
     // TODO: That's a fragile assumption.
-    if !Path::new("all-is-cubes-server/static-all-is-cubes-wasm/").exists() {
+    if !Path::new("all-is-cubes-wasm/dist/").exists() {
         update_server_static()?;
     }
 

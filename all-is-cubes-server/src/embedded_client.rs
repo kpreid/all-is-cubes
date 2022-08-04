@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
 static CLIENT_STATIC: include_dir::Dir<'static> =
-    include_dir::include_dir!("$CARGO_MANIFEST_DIR/static-all-is-cubes-wasm/");
+    include_dir::include_dir!("$CARGO_MANIFEST_DIR/../all-is-cubes-wasm/dist");
 
 /// Handler for client static files
 pub(crate) async fn client(Path(path): Path<String>) -> impl IntoResponse {
