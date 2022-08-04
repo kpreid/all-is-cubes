@@ -4,6 +4,7 @@
 use all_is_cubes_server::webserver::server_main;
 
 #[tokio::main]
-async fn main() {
-    server_main().await;
+async fn main() -> Result<(), anyhow::Error> {
+    server_main().await?;
+    Ok(())
 }
