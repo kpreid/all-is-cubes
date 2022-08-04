@@ -21,6 +21,12 @@ name = "aic-server"
 bench = false
 test = false # any testable code will be in lib
 
+[features]
+# If enabled, the All is Cubes game client static files will be included in the server
+# binary. This is larger and slower to compile but creates a binary not needing any
+# accompanying files.
+embed = []
+
 [dependencies]
 # TODO: server doesn't actually have any game-server functionality so this is unnecessary
 # all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["rayon"] }
@@ -28,3 +34,4 @@ anyhow = "1.0"
 axum = "0.5.13"
 include_dir = "0.7.2"
 tokio = { version = "1.0.0", features = ["macros", "rt-multi-thread"] }
+tower-http = { version = "0.3.4", features = ["fs"] }

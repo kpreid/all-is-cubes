@@ -17,3 +17,6 @@
 #![warn(clippy::wrong_self_convention)]
 
 pub mod webserver;
+
+#[cfg(feature = "embed")]
+mod embedded_client;
