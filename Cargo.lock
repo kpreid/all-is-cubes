@@ -170,6 +170,7 @@ dependencies = [
  "async_fn_traits",
  "axum",
  "include_dir",
+ "mime_guess",
  "reqwest",
  "simplelog",
  "tokio",

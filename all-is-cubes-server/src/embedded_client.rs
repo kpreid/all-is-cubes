@@ -1,6 +1,4 @@
-use std::ffi::OsStr;
-
-use axum::body::{self};
+use axum::body;
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -25,17 +23,13 @@ pub(crate) async fn client(Path(path): Path<String>) -> impl IntoResponse {
         Some(file) => {
             // Note that we're matching the *file's statically known path*, not the provided URL,
             // to ensure that this is not controlled by the request.
-            let content_type = match file.path().extension().and_then(OsStr::to_str) {
-                Some("css") => "text/css;charset=utf-8",
-                Some("html") => "text/html;charset=utf-8",
-                Some("js") => "text/javascript;charset=utf-8",
-                Some("json") => "application/json",
-                Some("wasm") => "application/wasm",
-                _ => "application/octet-stream", // TODO: log unknowns
-            };
+            // TODO: I'd rather have a hardcoded list for our purposes than mime_guess, but
+            // I want to match the non-embedded option and `tower_http::services::ServeDir`
+            // doesn't offer an option that isn't mime_guess.
+            let content_type = mime_guess::from_path(file.path()).first_or_octet_stream();
             Response::builder()
                 .status(StatusCode::OK)
-                .header("Content-Type", content_type)
+                .header("Content-Type", content_type.as_ref())
                 // TODO: content type
                 .body(body::boxed(body::Full::from(file.contents())))
                 .unwrap()
