@@ -47,7 +47,7 @@ thiserror = "1.0.22"
 tui = { version = "0.18.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
-winit = { version = "0.26.1", default-features = false, features = ["x11"] }
+winit = { version = "0.27.1", default-features = false, features = ["x11"] }
 
 [dev-dependencies]
 trycmd = "0.13.1"
