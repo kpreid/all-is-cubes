@@ -141,6 +141,7 @@ impl<V, T> BlockMesh<V, T> {
     /// possible without changing the vertices.
     // TODO: non-public while we decide whether it's a good interface
     #[must_use]
+    #[mutants::skip] // optimization, doesn't change things if it fails
     pub(crate) fn try_update_texture_only(&mut self, block: &EvaluatedBlock) -> bool
     where
         T: TextureTile,

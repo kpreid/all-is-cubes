@@ -453,6 +453,7 @@ impl<T: ?Sized> hash::Hash for EphemeralOpaque<T> {
 }
 
 #[cfg(feature = "arbitrary")]
+#[mutants::skip]
 impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaque<T> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(EphemeralOpaque(if u.arbitrary()? {

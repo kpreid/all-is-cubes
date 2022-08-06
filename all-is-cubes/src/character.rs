@@ -97,6 +97,7 @@ pub struct Character {
 }
 
 impl fmt::Debug for Character {
+    #[mutants::skip]
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Character")
             .field("body", &self.body)
@@ -114,6 +115,7 @@ impl fmt::Debug for Character {
 }
 
 impl CustomFormat<StatusText> for Character {
+    #[mutants::skip] // technically user visible but really debugging
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         writeln!(fmt, "{}", self.body.custom_format(StatusText))?;
         if let Some(info) = &self.last_step_info {

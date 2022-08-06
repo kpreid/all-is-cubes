@@ -164,6 +164,7 @@ mod sbb {
 }
 
 #[cfg(feature = "arbitrary")]
+#[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for Space {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         use crate::content::make_some_blocks;

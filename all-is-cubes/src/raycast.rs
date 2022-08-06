@@ -229,6 +229,7 @@ impl Raycaster {
     /// This makes the iterator finite: [`next()`](Self::next) will return [`None`]
     /// forevermore once there are no more cubes intersecting the bounds to report.
     #[must_use]
+    #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     pub fn within(mut self, bounds: GridAab) -> Self {
         self.set_bounds(bounds);
         self
@@ -259,6 +260,7 @@ impl Raycaster {
     }
 
     #[inline(always)]
+    #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     fn step(&mut self) -> Result<(), ()> {
         // t_max stores the t-value at which we cross a cube boundary along the
         // X axis, per component. Therefore, choosing the least t_max axis
@@ -282,6 +284,7 @@ impl Raycaster {
     ///
     /// If this step would overflow the [`GridCoordinate`] range, returns [`Err`].
     #[inline(always)]
+    #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     fn step_on_axis(&mut self, axis: usize) -> Result<(), ()> {
         assert!(
             self.step[axis] != 0,
@@ -355,6 +358,7 @@ impl Raycaster {
     /// In the case where the current position is outside the bounds but might intersect
     /// the bounds later, attempt to move the position to intersect sooner.
     #[inline(always)]
+    #[mutants::skip] // an optimization not a behavior change
     fn fast_forward(&mut self) {
         let bounds: GridAab = self.bounds.unwrap();
 
@@ -408,6 +412,7 @@ impl Iterator for Raycaster {
 
     /// Returns a [`RaycastStep`] describing the next cube face intersected by the ray.
     #[inline]
+    #[mutants::skip] // thoroughly tested otherwise
     fn next(&mut self) -> Option<RaycastStep> {
         loop {
             if self.emit_current {

@@ -115,6 +115,7 @@ impl VisitRefs for Spawn {
 }
 
 #[cfg(feature = "arbitrary")]
+#[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for Spawn {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {

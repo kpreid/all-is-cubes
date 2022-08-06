@@ -490,6 +490,7 @@ impl fmt::Debug for Rgba {
 }
 
 #[cfg(feature = "arbitrary")]
+#[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for Rgb {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Rgb::new_nn(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
@@ -500,6 +501,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgb {
     }
 }
 #[cfg(feature = "arbitrary")]
+#[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for Rgba {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Rgba::new_nn(

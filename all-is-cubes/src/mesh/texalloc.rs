@@ -64,6 +64,7 @@ pub trait TextureTile: Clone {
 impl<T: TextureAllocator> TextureAllocator for &T {
     type Tile = T::Tile;
     type Point = T::Point;
+    #[mutants::skip] // trivial
     fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
         <T as TextureAllocator>::allocate(self, bounds)
     }
@@ -71,6 +72,7 @@ impl<T: TextureAllocator> TextureAllocator for &T {
 impl<T: TextureAllocator> TextureAllocator for std::sync::Arc<T> {
     type Tile = T::Tile;
     type Point = T::Point;
+    #[mutants::skip] // trivial
     fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
         <T as TextureAllocator>::allocate(self, bounds)
     }
@@ -78,6 +80,7 @@ impl<T: TextureAllocator> TextureAllocator for std::sync::Arc<T> {
 impl<T: TextureAllocator> TextureAllocator for std::rc::Rc<T> {
     type Tile = T::Tile;
     type Point = T::Point;
+    #[mutants::skip] // trivial
     fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
         <T as TextureAllocator>::allocate(self, bounds)
     }
