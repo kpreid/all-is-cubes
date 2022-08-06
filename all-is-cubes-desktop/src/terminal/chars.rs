@@ -17,14 +17,12 @@ pub(super) fn image_patch_to_character(
     char_pos: Vector2<usize>,
 ) -> (&str, Colors) {
     let options = &image.options;
-    // This condition must match TerminalOptions::rays_per_character
-    if !matches!(
-        options.characters,
-        CharacterMode::Names | CharacterMode::Shades
-    ) {
-        let [[&(ref text1, color1)], [&(_, color2)]] = image.get_patch(char_pos);
-        if options.colors == ColorMode::None {
-            // Use "black and white" graphic characters — the alternative would be a blank screen.
+    // This match's `get_patch()` calls must match TerminalOptions::rays_per_character.
+    match (options.characters, options.colors) {
+        (CharacterMode::Split | CharacterMode::Shapes, ColorMode::None) => {
+            // Use "black and white" graphic characters.
+            // (Split mode would otherwise be blank.)
+            let [[&(ref text1, color1)], [&(_, color2)]] = image.get_patch(char_pos);
 
             let lum1 = color1.unwrap_or(Rgba::TRANSPARENT).luminance();
             let lum2 = color2.unwrap_or(Rgba::TRANSPARENT).luminance();
@@ -66,7 +64,11 @@ pub(super) fn image_patch_to_character(
                     background: None,
                 },
             )
-        } else {
+        }
+        (CharacterMode::Split | CharacterMode::Shapes, _) => {
+            // Split with colors always divides the character cell into an upper and
+            // lower half. Shapes mode currently falls back to that too.
+            let [[&(_, color1)], [&(_, color2)]] = image.get_patch(char_pos);
             let color1 = options.colors.convert(color1);
             let color2 = options.colors.convert(color2);
             if color1 == color2 {
@@ -89,22 +91,23 @@ pub(super) fn image_patch_to_character(
                 )
             }
         }
-    } else {
-        let [[&(ref text, color)]] = image.get_patch(char_pos);
-        match options.characters {
-            CharacterMode::Names => {
-                let mapped_color = match options.colors.convert(color) {
-                    Some(color) => Colors::new(Color::Black, color),
-                    None => Colors::new(Color::Reset, Color::Reset),
-                };
-                (text, mapped_color)
-            }
-            CharacterMode::Shades => (
+        (CharacterMode::Names, _) => {
+            // Names mode always uses the text and the mapped color straight.
+            let [[&(ref text, color)]] = image.get_patch(char_pos);
+            let mapped_color = match options.colors.convert(color) {
+                Some(color) => Colors::new(Color::Black, color),
+                None => Colors::new(Color::Reset, Color::Reset),
+            };
+            (text, mapped_color)
+        }
+        (CharacterMode::Shades, _) => {
+            // Shades mode always presents grayscale color
+            let [[&(_, color)]] = image.get_patch(char_pos);
+            (
                 [" ", "░", "▒", "▓", "█"]
                     [(color.unwrap_or(Rgba::TRANSPARENT).luminance() * 4.999) as usize],
                 Colors::new(Color::Reset, Color::Reset),
-            ),
-            CharacterMode::Split | CharacterMode::Shapes => unreachable!(),
+            )
         }
     }
 }
