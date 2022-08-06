@@ -1,23 +1,15 @@
-use std::borrow::Cow;
 use std::fmt;
 
 use cgmath::{ElementWise, EuclideanSpace as _, InnerSpace, Vector3};
 use embedded_graphics::geometry::Point;
-use embedded_graphics::mono_font::iso_8859_1::{FONT_5X8, FONT_6X12};
-use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
-use embedded_graphics::prelude::{Drawable, PixelColor, Primitive, Size};
-use embedded_graphics::primitives::{
-    Circle, Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle,
-    StrokeAlignment, StyledDrawable,
-};
-use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
+use embedded_graphics::prelude::{Drawable, Primitive};
+use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
 use exhaust::Exhaust;
 
-use crate::block::{Block, BlockCollision, Resolution, Resolution::*, AIR, AIR_EVALUATED};
+use crate::block::{Block, BlockCollision, Resolution::*, AIR, AIR_EVALUATED};
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
-use crate::content::palette;
-use crate::drawing::{DrawingPlane, VoxelBrush};
-use crate::linking::{BlockModule, BlockProvider, InGenError};
+use crate::drawing::VoxelBrush;
+use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
     cube_to_midpoint, Face7, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
     GridVector, Rgb, Rgba,
@@ -28,17 +20,14 @@ use crate::universe::Universe;
 #[cfg(doc)]
 use crate::inv::Tool;
 use crate::util::YieldProgress;
-use crate::vui::widgets::ToggleButtonVisualState;
 
-/// Blocks that are icons for tools or UI components.
+/// Blocks that are icons for [`Tool`]s.
 ///
 /// TODO: Consider splitting the tools part from the UI part, especially as tool icons may
 /// end up being game-specific?
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
 pub enum Icons {
-    /// HUD crosshair indicating cursor position.
-    Crosshair,
     /// Icon for an empty toolbar slot.
     EmptySlot,
     /// Icon for [`Tool::Activate`],
@@ -52,17 +41,7 @@ pub enum Icons {
     /// Icon for [`Tool::PushPull`].
     PushPull,
     /// Icon for [`Tool::Jetpack`].
-    Jetpack {
-        active: bool,
-    },
-    // TODO: Should we do a `Button(ButtonLabel, ToggleButtonVisualState)` variant instead?
-    // Probably this whole business of Icons being responsible for this job should go away.
-    PauseButton(ToggleButtonVisualState),
-    MouselookButton(ToggleButtonVisualState),
-    DebugInfoTextButton(ToggleButtonVisualState),
-    DebugChunkBoxesButton(ToggleButtonVisualState),
-    DebugCollisionBoxesButton(ToggleButtonVisualState),
-    DebugLightRaysButton(ToggleButtonVisualState),
+    Jetpack { active: bool },
 }
 
 impl BlockModule for Icons {
@@ -74,7 +53,6 @@ impl BlockModule for Icons {
 impl fmt::Display for Icons {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Icons::Crosshair => write!(f, "crosshair"),
             Icons::EmptySlot => write!(f, "empty-slot"),
             Icons::Activate => write!(f, "activate"),
             Icons::Delete => write!(f, "delete"),
@@ -82,14 +60,6 @@ impl fmt::Display for Icons {
             Icons::EditBlock => write!(f, "edit-block"),
             Icons::PushPull => write!(f, "push"),
             Icons::Jetpack { active } => write!(f, "jetpack/{}", active),
-            Icons::PauseButton(state) => write!(f, "pause-button/{}", state),
-            Icons::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
-            Icons::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{}", state),
-            Icons::DebugChunkBoxesButton(state) => write!(f, "debug-chunk-boxes-button/{}", state),
-            Icons::DebugCollisionBoxesButton(state) => {
-                write!(f, "debug-collision-boxes-button/{}", state)
-            }
-            Icons::DebugLightRaysButton(state) => write!(f, "debug-light-rays-button/{}", state),
         }
     }
 }
@@ -100,18 +70,6 @@ impl Icons {
 
         BlockProvider::new(p, |key| {
             Ok(match key {
-                Icons::Crosshair => Block::builder()
-                    .display_name("Crosshair")
-                    .voxels_ref(
-                        R64, // TODO: get resolution from image file
-                        universe.insert_anonymous(space_from_image(
-                            include_image!("icons/crosshair.png"),
-                            GridRotation::RXyZ,
-                            default_srgb,
-                        )?),
-                    )
-                    .build(),
-
                 Icons::EmptySlot => Block::builder()
                     .attributes(AIR_EVALUATED.attributes)
                     .display_name("")
@@ -309,188 +267,10 @@ impl Icons {
                         })?
                         .build()
                 }
-
-                Icons::PauseButton(state) => {
-                    let mut button_builder = ButtonBuilder::new(state)?;
-
-                    // Draw pause symbol
-                    for x in [-3, 2] {
-                        Line::new(Point::new(x, -4), Point::new(x, 3)).draw_styled(
-                            &PrimitiveStyle::with_stroke(button_builder.label_color, 3),
-                            &mut button_builder.label_draw_target(),
-                        )?;
-                    }
-
-                    button_builder.into_block(universe, "Pause")
-                }
-
-                Icons::MouselookButton(state) => {
-                    let mut button_builder = ButtonBuilder::new(state)?;
-
-                    // Draw crosshair
-                    // TODO: Suspicious inconsistency between x and y coordinates
-                    let style = PrimitiveStyle::with_stroke(button_builder.label_color, 2);
-                    Line::new(Point::new(-1, -4), Point::new(-1, 3))
-                        .draw_styled(&style, &mut button_builder.label_draw_target())?;
-                    Line::new(Point::new(-4, 0), Point::new(3, 0))
-                        .draw_styled(&style, &mut button_builder.label_draw_target())?;
-
-                    button_builder.into_block(universe, "Mouselook")
-                }
-
-                Icons::DebugInfoTextButton(state) => {
-                    let mut button_builder = ButtonBuilder::new(state)?;
-                    button_builder.draw_text(&FONT_6X12, "i")?;
-                    button_builder.into_block(universe, "Debug: Info Text")
-                }
-
-                Icons::DebugChunkBoxesButton(state) => {
-                    let mut button_builder = ButtonBuilder::new(state)?;
-                    button_builder.draw_text(&FONT_5X8, "Ch")?;
-                    button_builder.into_block(universe, "Debug: Chunk Boxes")
-                }
-
-                Icons::DebugCollisionBoxesButton(state) => {
-                    let mut button_builder = ButtonBuilder::new(state)?;
-                    button_builder.draw_text(&FONT_5X8, "Co")?;
-                    button_builder.into_block(universe, "Debug: Collision Boxes")
-                }
-
-                Icons::DebugLightRaysButton(state) => {
-                    let mut button_builder = ButtonBuilder::new(state)?;
-                    button_builder.draw_text(&FONT_5X8, "Li")?;
-                    button_builder.into_block(universe, "Debug: Light Rays at Cursor")
-                }
             })
         })
         .await
         .unwrap()
-    }
-}
-
-struct ButtonBuilder {
-    space: Space,
-    active: bool,
-    label_z: GridCoordinate,
-    label_color: Rgba,
-}
-
-impl ButtonBuilder {
-    // TODO: We probably want a higher resolution, but it has to wait for texture alloc improvements
-    pub const RESOLUTION: Resolution = R16;
-    pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION.to_grid();
-
-    pub fn new(state: ToggleButtonVisualState) -> Result<Self, InGenError> {
-        let active = state.value;
-        let back_block = Block::from(if active {
-            palette::BUTTON_ACTIVATED_BACK
-        } else {
-            palette::BUTTON_BACK
-        });
-        let cap_rim_block = Block::from(palette::BUTTON_BACK.map_rgb(|rgb| rgb * 1.1));
-
-        let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
-        let back_brush = VoxelBrush::new(vec![
-            ([0, 0, 0], &back_block),
-            ([0, 0, 1], &back_block),
-            ([0, 0, 2], &back_block),
-            ([0, 0, 3], &back_block),
-            ([0, 0, 4], &back_block),
-            ([0, 0, 5], &back_block),
-            ([0, 0, 6], &back_block),
-            ([0, 0, 7], &back_block),
-            // up to but not including BUTTON_LABEL_Z
-        ]);
-        let cap_rim_brush = VoxelBrush::new(vec![([0, 0, 7], &cap_rim_block)]);
-
-        let outer_rectangle = Rectangle::with_corners(
-            Point::new(1, 1),
-            Point::new(Self::RESOLUTION_G - 2, Self::RESOLUTION_G - 2),
-        );
-        let rr = |inset: i32| {
-            RoundedRectangle::with_equal_corners(
-                outer_rectangle.offset(-inset),
-                Size::new(3 - inset as u32, 3 - inset as u32),
-            )
-        };
-
-        let mut space = Space::for_block(Self::RESOLUTION).build_empty();
-        let draw_target = &mut space.draw_target(
-            GridMatrix::from_translation([0, Self::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
-        );
-
-        // unwrap()s because if this drawing fails, tests will catch that — no parameters
-        rr(0)
-            .into_styled(
-                PrimitiveStyleBuilder::new()
-                    .fill_color(&back_brush)
-                    .stroke_color(&frame_brush)
-                    .stroke_width(1)
-                    .stroke_alignment(StrokeAlignment::Inside)
-                    .build(),
-            )
-            .draw(draw_target)?;
-        rr(1)
-            .into_styled(
-                PrimitiveStyleBuilder::new()
-                    .stroke_color(&cap_rim_brush)
-                    .stroke_width(1)
-                    .stroke_alignment(StrokeAlignment::Inside)
-                    .build(),
-            )
-            .draw(draw_target)?;
-
-        Ok(ButtonBuilder {
-            space,
-            active,
-            label_z: 8,
-            label_color: if active {
-                palette::BUTTON_ACTIVATED_LABEL
-            } else {
-                palette::BUTTON_LABEL
-            },
-        })
-    }
-
-    pub fn into_block(self, universe: &mut Universe, label: impl Into<Cow<'static, str>>) -> Block {
-        Block::builder()
-            .display_name(label)
-            .light_emission(if self.active {
-                palette::BUTTON_ACTIVATED_GLOW
-            } else {
-                Rgb::ZERO
-            })
-            .voxels_ref(Self::RESOLUTION, universe.insert_anonymous(self.space))
-            .build()
-    }
-
-    /// Returns an [`embedded_graphics::DrawTarget`] for drawing the button label, with a
-    /// Y-down coordinate system whose origin is centered on the button (or more precisely,
-    /// (0, 0) is the lower-right pixel closest to the center, since e-g uses a convention
-    /// where coordinates identify pixels, not their edges).
-    pub fn label_draw_target<C: PixelColor>(&mut self) -> DrawingPlane<'_, Space, C> {
-        self.space.draw_target(
-            GridMatrix::from_translation([
-                Self::RESOLUTION_G / 2,
-                Self::RESOLUTION_G / 2 - 1,
-                self.label_z,
-            ]) * GridMatrix::FLIP_Y,
-        )
-    }
-
-    // Draw a text label (only one or two characters will fit).
-    pub fn draw_text(&mut self, font: &MonoFont<'_>, text: &str) -> Result<(), InGenError> {
-        Text::with_text_style(
-            text,
-            Point::new(-1, -1),
-            MonoTextStyle::new(font, self.label_color),
-            TextStyleBuilder::new()
-                .baseline(Baseline::Middle)
-                .alignment(Alignment::Center)
-                .build(),
-        )
-        .draw(&mut self.label_draw_target())?;
-        Ok(())
     }
 }
 

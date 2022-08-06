@@ -21,7 +21,7 @@ use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::vui::Icons;
+use all_is_cubes::vui::{Icons, UiBlocks};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;
 
@@ -310,7 +310,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
         .await;
 }
 
-/// Display all the [`Icons`].
+/// Display all the [`Icons`] and [`UiBlocks`].
 ///
 /// This is more of a content test than a renderer test, except that it also
 /// exercises the renderers with various block shapes.
@@ -320,9 +320,20 @@ async fn icons(mut context: RenderTestContext) {
         .await
         .install(universe)
         .unwrap();
+    // TODO: In the future UiBlocks might have too many pieces and we might want to filter them
+    // or drop this entirely.
+    let ui_blocks = UiBlocks::new(universe, YieldProgress::noop())
+        .await
+        .install(universe)
+        .unwrap();
+    let all_blocks: Vec<Block> = icons
+        .iter()
+        .map(|(_, block)| block.clone())
+        .chain(ui_blocks.iter().map(|(_, block)| block.clone()))
+        .collect();
 
     // Compute layout
-    let count = icons.iter().count() as GridCoordinate;
+    let count = all_blocks.len() as GridCoordinate;
     let row_length = 4;
     let bounds = GridAab::from_lower_upper(
         [0, 0, 0],
@@ -330,7 +341,7 @@ async fn icons(mut context: RenderTestContext) {
     );
     let aspect_ratio = f64::from(bounds.size().y) / f64::from(bounds.size().x);
 
-    // Fill space with icons
+    // Fill space with blocks
     let mut space = Space::builder(bounds)
         .spawn_position(Point3::new(
             FreeCoordinate::from(bounds.size().x) / 2.,
@@ -338,10 +349,10 @@ async fn icons(mut context: RenderTestContext) {
             FreeCoordinate::from(bounds.size().y) * 1.5,
         ))
         .build_empty();
-    for (index, (_key, icon)) in icons.iter().enumerate() {
+    for (index, block) in all_blocks.into_iter().enumerate() {
         let index = index as GridCoordinate;
         space
-            .set([index % row_length, index / row_length, 0], icon)
+            .set([index % row_length, index / row_length, 0], block)
             .unwrap();
     }
 

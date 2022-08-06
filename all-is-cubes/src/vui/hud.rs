@@ -21,12 +21,11 @@ use crate::math::{
 use crate::space::{Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
-use crate::vui::layout::LayoutTree;
 use crate::vui::widgets::{
     Crosshair, FrameWidget, ToggleButtonVisualState, ToggleButtonWidget, Toolbar, TooltipState,
     TooltipWidget,
 };
-use crate::vui::{Icons, LayoutGrant, LayoutRequest, Widget, WidgetTree};
+use crate::vui::{Icons, LayoutGrant, LayoutRequest, LayoutTree, UiBlocks, Widget, WidgetTree};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -189,7 +188,7 @@ pub(super) fn new_hud_widget_tree(
             LayoutTree::leaf(ToggleButtonWidget::new(
                 hud_inputs.mouselook_mode.clone(),
                 |&value| value,
-                |state| hud_inputs.hud_blocks.icons[Icons::MouselookButton(state)].clone(),
+                |state| hud_inputs.hud_blocks.blocks[UiBlocks::MouselookButton(state)].clone(),
                 {
                     let cc = hud_inputs.control_channel.clone();
                     move || {
@@ -221,7 +220,7 @@ pub(super) fn new_hud_widget_tree(
     );
     let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
         crosshair: LayoutTree::leaf(Crosshair::new(
-            hud_inputs.hud_blocks.icons[Icons::Crosshair].clone(),
+            hud_inputs.hud_blocks.blocks[UiBlocks::Crosshair].clone(),
             hud_inputs.mouselook_mode.clone(),
         )),
         toolbar: Arc::new(LayoutTree::Stack {
@@ -238,25 +237,25 @@ fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree> {
     vec![
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            Icons::DebugInfoTextButton,
+            UiBlocks::DebugInfoTextButton,
             |g| g.debug_info_text,
             |g, v| g.debug_info_text = v,
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            Icons::DebugChunkBoxesButton,
+            UiBlocks::DebugChunkBoxesButton,
             |g| g.debug_chunk_boxes,
             |g, v| g.debug_chunk_boxes = v,
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            Icons::DebugCollisionBoxesButton,
+            UiBlocks::DebugCollisionBoxesButton,
             |g| g.debug_collision_boxes,
             |g, v| g.debug_collision_boxes = v,
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            Icons::DebugLightRaysButton,
+            UiBlocks::DebugLightRaysButton,
             |g| g.debug_light_rays_at_cursor,
             |g, v| g.debug_light_rays_at_cursor = v,
         )),
@@ -266,14 +265,14 @@ fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree> {
 /// Generate a button that toggles a boolean graphics option.
 fn graphics_toggle_button(
     hud_inputs: &HudInputs,
-    icon_ctor: fn(ToggleButtonVisualState) -> Icons,
+    icon_ctor: fn(ToggleButtonVisualState) -> UiBlocks,
     getter: fn(&GraphicsOptions) -> bool,
     setter: fn(&mut GraphicsOptions, bool),
 ) -> Arc<dyn Widget> {
     ToggleButtonWidget::new(
         hud_inputs.graphics_options.clone(),
         getter,
-        |state| hud_inputs.hud_blocks.icons[icon_ctor(state)].clone(),
+        |state| hud_inputs.hud_blocks.blocks[icon_ctor(state)].clone(),
         {
             let cc = hud_inputs.control_channel.clone();
             move || {
@@ -293,7 +292,7 @@ fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
     ToggleButtonWidget::new(
         hud_inputs.paused.clone(),
         |&value| value,
-        |state| hud_inputs.hud_blocks.icons[Icons::PauseButton(state)].clone(),
+        |state| hud_inputs.hud_blocks.blocks[UiBlocks::PauseButton(state)].clone(),
         {
             let cc = hud_inputs.control_channel.clone();
             move || {
@@ -324,6 +323,7 @@ pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> Arc<LayoutTree<A
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.
 #[derive(Debug, Clone)]
 pub(crate) struct HudBlocks {
+    pub(crate) blocks: BlockProvider<UiBlocks>,
     pub(crate) icons: BlockProvider<Icons>,
     pub(crate) text: VoxelBrush<'static>,
     pub(crate) toolbar_left_cap: VoxelBrush<'static>,
@@ -342,7 +342,9 @@ impl HudBlocks {
     ) -> Self {
         let resolution_g = GridCoordinate::from(resolution);
 
-        let icons = Icons::new(universe, p).await.install(universe).unwrap();
+        let [p1, p2] = p.split(0.5);
+        let ui_blocks = UiBlocks::new(universe, p1).await.install(universe).unwrap();
+        let icons = Icons::new(universe, p2).await.install(universe).unwrap();
 
         let text_brush = VoxelBrush::new::<_, Block>(vec![
             ([0, 0, 1], palette::HUD_TEXT_FILL.into()),
@@ -449,6 +451,7 @@ impl HudBlocks {
         };
 
         Self {
+            blocks: ui_blocks,
             icons,
             text: text_brush,
             toolbar_middle: slice_drawing(GridAab::from_lower_upper((0, -1, -1), (1, 2, 2))),
