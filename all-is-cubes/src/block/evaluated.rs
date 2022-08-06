@@ -209,3 +209,23 @@ impl Evoxel {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::{AnimationHint, Block, AIR};
+
+    #[test]
+    fn visible_or_animated() {
+        fn va(block: Block) -> bool {
+            block.evaluate().unwrap().visible_or_animated()
+        }
+        assert!(!va(AIR));
+        assert!(!va(Block::builder().color(Rgba::TRANSPARENT).build()));
+        assert!(va(Block::builder().color(Rgba::WHITE).build()));
+        assert!(va(Block::builder()
+            .color(Rgba::TRANSPARENT)
+            .animation_hint(AnimationHint::TEMPORARY)
+            .build()));
+    }
+}
