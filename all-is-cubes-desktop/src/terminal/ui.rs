@@ -19,7 +19,7 @@ use all_is_cubes::util::{CustomFormat, StatusText};
 
 use crate::session::DesktopSession;
 use crate::terminal::chars::{image_patch_to_character, write_colored_and_measure};
-use crate::terminal::{sync_viewport, FrameOutput, TerminalRenderer};
+use crate::terminal::{sync_viewport, TerminalRenderer, TextRayImage};
 
 /// Fills the window slot of [`DesktopSession`].
 /// Tracks the terminal state and acts as communication channel.
@@ -78,16 +78,9 @@ impl TerminalWindow {
     /// If it is false, does not affect the cursor position and uses newlines.
     pub(super) fn write_frame(
         &mut self,
-        frame: FrameOutput,
+        image: TextRayImage,
         draw_into_rect: bool,
     ) -> crossterm::Result<()> {
-        let FrameOutput {
-            viewport,
-            options,
-            image,
-            info: _,
-        } = frame;
-
         // Now separately draw the frame data. This is done because we want to use a precise
         // strategy for measuring the width of characters (draw them and read back the cursor
         // position) whereas tui-rs assumes that `unicode_width`'s answers match the terminal.
@@ -100,10 +93,17 @@ impl TerminalWindow {
         let mut current_color = None;
 
         // TODO: aim for less number casting
-        let image_size_in_characters = viewport
+        let image_size_in_characters = image
+            .viewport
             .framebuffer_size
             .map(|s| s as usize)
-            .div_element_wise(options.characters.rays_per_character().map(usize::from));
+            .div_element_wise(
+                image
+                    .options
+                    .characters
+                    .rays_per_character()
+                    .map(usize::from),
+            );
 
         let mut rect = self.viewport_position;
         // Clamp rect to match the actual image data size, to avoid trying to read the
@@ -117,12 +117,8 @@ impl TerminalWindow {
             }
             let mut x = 0;
             while x < rect.width {
-                let (text, color) = image_patch_to_character(
-                    &options,
-                    &*image,
-                    Vector2::new(x as usize, y as usize),
-                    image_size_in_characters,
-                );
+                let (text, color) =
+                    image_patch_to_character(&image, Vector2::new(x as usize, y as usize));
 
                 let width = write_colored_and_measure(
                     backend,
@@ -166,9 +162,9 @@ impl Drop for TerminalWindow {
 /// This function also stores the current scene viewport for future frames.
 pub(super) fn write_ui(
     dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>,
-    frame: &FrameOutput,
+    frame: &TextRayImage,
 ) -> crossterm::Result<()> {
-    let FrameOutput { info, .. } = frame;
+    let TextRayImage { info, .. } = frame;
     let mut viewport_rect = None;
     dsession.window.tui.draw(|f| {
         const HELP_TEXT: &str = "\

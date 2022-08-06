@@ -9,24 +9,20 @@ use crossterm::QueueableCommand as _;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::math::Rgba;
 
-use crate::terminal::options::{CharacterMode, ColorMode, TerminalOptions};
+use super::options::{CharacterMode, ColorMode};
+use super::TextRayImage;
 
-pub(crate) fn image_patch_to_character<'i>(
-    options: &TerminalOptions,
-    image: &'i [(String, Option<Rgba>)],
+pub(super) fn image_patch_to_character(
+    image: &TextRayImage,
     char_pos: Vector2<usize>,
-    char_size: Vector2<usize>,
-) -> (&'i str, Colors) {
-    let row = char_size.x;
+) -> (&str, Colors) {
+    let options = &image.options;
     // This condition must match TerminalOptions::rays_per_character
-    // TODO: Refactor to read patches separately from picking graphic characters
     if !matches!(
         options.characters,
         CharacterMode::Names | CharacterMode::Shades
     ) {
-        // TODO: This is a mess
-        let (ref text1, color1) = image[(char_pos.y * 2) * row + char_pos.x];
-        let (_, color2) = image[(char_pos.y * 2 + 1) * row + char_pos.x];
+        let [[&(ref text1, color1)], [&(_, color2)]] = image.get_patch(char_pos);
         if options.colors == ColorMode::None {
             // Use "black and white" graphic characters — the alternative would be a blank screen.
 
@@ -94,7 +90,7 @@ pub(crate) fn image_patch_to_character<'i>(
             }
         }
     } else {
-        let (ref text, color) = image[char_pos.y * row + char_pos.x];
+        let [[&(ref text, color)]] = image.get_patch(char_pos);
         match options.characters {
             CharacterMode::Names => {
                 let mapped_color = match options.colors.convert(color) {

@@ -12,9 +12,7 @@ use all_is_cubes::camera::{Camera, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::Rgba;
-use all_is_cubes::raytracer::{
-    CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RaytraceInfo, RtRenderer,
-};
+use all_is_cubes::raytracer::{CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RtRenderer};
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
 use crate::session::{ClockSource, DesktopSession};
@@ -22,6 +20,8 @@ use crate::session::{ClockSource, DesktopSession};
 mod chars;
 mod options;
 pub(crate) use options::TerminalOptions;
+mod ray_image;
+use ray_image::TextRayImage;
 mod ui;
 use ui::{write_ui, TerminalWindow};
 
@@ -66,22 +66,12 @@ pub(crate) struct TerminalRenderer {
 
     buffer_reuse_out: mpsc::Receiver<RtRenderer<CharacterRtData>>,
     render_pipe_in: mpsc::SyncSender<FrameInput>,
-    render_pipe_out: mpsc::Receiver<FrameOutput>,
+    render_pipe_out: mpsc::Receiver<TextRayImage>,
 }
 
 struct FrameInput {
     options: TerminalOptions,
     scene: RtRenderer<CharacterRtData>,
-}
-
-/// A frame's pixels and all the context needed to interpret it (which duplicates fields
-/// in TerminalMain, but must be carried due to the pipelined rendering).
-struct FrameOutput {
-    /// The `framebuffer_size` of this viewport is equal to the size of the `image` data.
-    viewport: Viewport,
-    options: TerminalOptions,
-    image: Vec<TextAndColor>,
-    info: RaytraceInfo,
 }
 
 pub(crate) fn create_terminal_session(
@@ -129,7 +119,7 @@ pub(crate) fn create_terminal_session(
                         &mut image,
                     );
                     // Ignore send errors as they just mean we're shutting down or died elsewhere
-                    let _ = render_thread_out.send(FrameOutput {
+                    let _ = render_thread_out.send(TextRayImage {
                         viewport,
                         options,
                         image,

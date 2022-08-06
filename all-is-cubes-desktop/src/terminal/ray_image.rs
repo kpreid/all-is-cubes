@@ -1,0 +1,61 @@
+use all_is_cubes::camera::Viewport;
+use all_is_cubes::cgmath::{ElementWise as _, Vector2};
+use all_is_cubes::raytracer::RaytraceInfo;
+
+use super::{TerminalOptions, TextAndColor};
+
+/// Raw output of the raytracer, not yet converted into formatted characters,
+/// plus all the context needed to interpret it.
+pub(super) struct TextRayImage {
+    /// The `framebuffer_size` of this viewport is equal to the size of the `image` data.
+    pub viewport: Viewport,
+    /// Options at the time the frame was started, which determine the viewport's
+    /// `framebuffer_size` relative to the terminal size — that is, how many rays per
+    /// character, and how those multiple rays were meant to be combined and presented.
+    pub options: TerminalOptions,
+    /// Raw raytrace outputs, in the usual left-right top-down raster order.
+    pub image: Vec<TextAndColor>,
+    /// Not relevant to the image per se, but it is convenient to carry along the info
+    /// through this path.
+    pub info: RaytraceInfo,
+}
+
+impl TextRayImage {
+    pub fn patch_size(&self) -> Vector2<u8> {
+        self.options.characters.rays_per_character()
+    }
+
+    /// Get a patch (rectangular group of ray results) from the image.
+    ///
+    /// Panics if the array size doesn't match `patch_size()`.
+    pub fn get_patch<const W: usize, const H: usize>(
+        &self,
+        character_position: Vector2<usize>,
+    ) -> [[&TextAndColor; W]; H] {
+        let patch_size = self.patch_size().map(usize::from);
+        let data: &[TextAndColor] = &self.image;
+        let image_row_length = usize::try_from(self.viewport.framebuffer_size.x).unwrap();
+        let base_image_pos = character_position.mul_element_wise(patch_size);
+
+        assert!(
+            patch_size.x == W && patch_size.y == H,
+            "patch size mismatch"
+        );
+
+        let mut y = 0;
+        // TODO: replace this with std::array::from_fn when that's stable
+        [(); H].map(|()| {
+            let mut x = 0;
+            let row = [(); W].map(|()| {
+                let value =
+                    &data[(base_image_pos.y + y) * image_row_length + (base_image_pos.x + x)];
+                x += 1;
+                value
+            });
+            y += 1;
+            row
+        })
+    }
+}
+
+// TODO: write tests for get_patch
