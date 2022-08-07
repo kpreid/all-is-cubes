@@ -129,7 +129,7 @@ pub trait GfxVertex: From<BlockVertex> + Copy + Sized {
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst;
 
     /// Transforms a vertex belonging to a general model of a block to its instantiation
-    /// in a specific location in space and lighting conditions.
+    /// in a specific location in space.
     fn instantiate_vertex(&mut self, block: Self::BlockInst);
 
     /// Returns the position of this vertex.

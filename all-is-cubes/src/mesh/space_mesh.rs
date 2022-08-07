@@ -225,7 +225,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                     }
                 }
 
-                // Copy vertices, offset to the block position and with lighting
+                // Copy vertices, offset to the block position
                 let index_offset_usize = self.vertices.len();
                 let index_offset: u32 = index_offset_usize
                     .try_into()
