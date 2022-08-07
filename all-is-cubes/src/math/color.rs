@@ -94,6 +94,13 @@ impl Rgb {
         Self(Vector3::new(r, g, b))
     }
 
+    /// Constructs a shade of gray (components all equal). Panics if any component is NaN.
+    /// No other range checks are performed.
+    #[inline]
+    pub fn from_luminance(luminance: f32) -> Self {
+        Self::new(luminance, luminance, luminance)
+    }
+
     /// Adds an alpha component to produce an [Rgba] color.
     #[inline]
     pub const fn with_alpha(self, alpha: NotNan<f32>) -> Rgba {
@@ -190,6 +197,13 @@ impl Rgba {
     #[inline]
     pub const fn new_nn(r: NotNan<f32>, g: NotNan<f32>, b: NotNan<f32>, a: NotNan<f32>) -> Self {
         Self(Vector4::new(r, g, b, a))
+    }
+
+    /// Constructs a shade of gray (components all equal). Panics if any component is NaN.
+    /// No other range checks are performed.
+    #[inline]
+    pub fn from_luminance(luminance: f32) -> Self {
+        Rgb::new(luminance, luminance, luminance).with_alpha_one()
     }
 
     /// Returns the red color component. Values are linear (gamma = 1).

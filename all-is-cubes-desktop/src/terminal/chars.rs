@@ -196,3 +196,107 @@ fn fallback_measure_str(text: &str) -> u16 {
         .try_into()
         .unwrap_or(u16::MAX)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::terminal::{TerminalOptions, TextAndColor};
+    use all_is_cubes::camera::Viewport;
+    use all_is_cubes::raytracer::RaytraceInfo;
+
+    fn test_image(
+        options: TerminalOptions,
+        dimensions: Vector2<u32>,
+        characters: impl IntoIterator<Item = char>,
+        colors: impl IntoIterator<Item = Rgba>,
+    ) -> TextRayImage {
+        let image: Vec<TextAndColor> = characters
+            .into_iter()
+            .map(|c| c.to_string())
+            .zip(colors.into_iter().map(Some))
+            .collect();
+        assert!(dimensions.x as usize * dimensions.y as usize == image.len());
+        TextRayImage {
+            viewport: Viewport::with_scale(1.0, dimensions), // scale is ignored
+            options,
+            image,
+            info: RaytraceInfo::default(),
+        }
+    }
+
+    /// Get one text row of the image as processed by [`image_patch_to_character`],
+    /// ignoring colors.
+    fn get_row(image: &TextRayImage, y: usize) -> String {
+        //let reset = Colors::new(Color::Reset, Color::Reset);
+        (0..image.viewport.framebuffer_size.x as usize)
+            .map(|x| {
+                let (text, _color) = image_patch_to_character(image, Vector2::new(x, y));
+                //assert_eq!(color, reset);
+                text
+            })
+            .collect()
+    }
+
+    fn mode_no_color(characters: CharacterMode) -> TerminalOptions {
+        TerminalOptions {
+            colors: ColorMode::None,
+            characters,
+        }
+    }
+
+    #[test]
+    fn char_mode_shades() {
+        let colors: [Rgba; 10] = [0.0, 0.9, 1.1, 1.9, 2.1, 2.9, 3.1, 3.9, 4.1, 5.0]
+            .map(|v| Rgba::from_luminance(v / 5.0));
+        let image = &test_image(
+            mode_no_color(CharacterMode::Shades),
+            Vector2::new(colors.len() as u32, 1),
+            std::iter::repeat('*'),
+            colors,
+        );
+        assert_eq!(get_row(image, 0), "  ░░▒▒▓▓██");
+    }
+
+    #[test]
+    fn char_mode_split_same_luminance() {
+        // TODO: copy-pasted; pick break points more appropriate to this test
+        let colors = [0.0, 0.9, 1.1, 1.9, 2.1, 2.9, 3.1, 3.9, 4.1, 5.0]
+            .map(|v| Rgba::from_luminance(v / 5.0));
+        let image = &test_image(
+            mode_no_color(CharacterMode::Split),
+            Vector2::new(colors.len() as u32, 2),
+            std::iter::repeat('*'),
+            colors.into_iter().chain(colors), // 2 rows of same color
+        );
+        assert_eq!(get_row(image, 0), "  ***▄▀███");
+    }
+
+    /// Shapes is the same as Shades when top and bottom are the same
+    #[test]
+    fn char_mode_shapes_same_luminance() {
+        let colors = [0.0, 0.9, 1.1, 1.9, 2.1, 2.9, 3.1, 3.9, 4.1, 5.0]
+            .map(|v| Rgba::from_luminance(v / 5.0));
+        let image = &test_image(
+            mode_no_color(CharacterMode::Shapes),
+            Vector2::new(colors.len() as u32, 2),
+            std::iter::repeat('*'),
+            colors.into_iter().chain(colors), // 2 rows of same color
+        );
+        assert_eq!(get_row(image, 0), "  ░░▒▒▓▓██");
+    }
+
+    #[test]
+    fn char_mode_split_upper() {
+        // TODO: copy-pasted; pick break points more appropriate to this test
+        let colors: [Rgba; 10] = [0.0, 0.9, 1.1, 1.9, 2.1, 2.9, 3.1, 3.9, 4.1, 5.0]
+            .map(|v| Rgba::from_luminance(v / 5.0));
+        let image = &test_image(
+            mode_no_color(CharacterMode::Shapes),
+            Vector2::new(colors.len() as u32, 2),
+            std::iter::repeat('*'),
+            [Rgba::BLACK; 10].into_iter().chain(colors), // black above ramp
+        );
+        // TODO: test the rest of the split by ramping to white-white
+        assert_eq!(get_row(image, 0), "   ▁▁▂▂▃▃▄");
+    }
+}
