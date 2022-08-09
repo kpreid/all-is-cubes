@@ -141,20 +141,21 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
             block_texture_allocator,
             deadline, // TODO: decrease deadline by some guess at texture writing time
             |u| {
-                update_chunk_tess(context, u.mesh, u.render_data);
-            },
-            |u| {
-                // Disable dynamic depth sorting because luminance bug
-                // https://github.com/phaazon/luminance-rs/issues/483
-                // means indices_mut() can fail and corrupt other buffers.
-                // TODO: Reenble this and also in-place chunk updating when bug is fixed
-                if !cfg!(target_family = "wasm") {
-                    if let Some(tess) = u.render_data {
-                        let range = u.mesh.transparent_range(DepthOrdering::Within);
-                        tess.indices_mut()
-                            .expect("failed to map indices for depth sorting")[range.clone()]
-                        .copy_from_slice(&u.mesh.indices()[range]);
+                if u.indices_only {
+                    // Disable dynamic depth sorting because luminance bug
+                    // https://github.com/phaazon/luminance-rs/issues/483
+                    // means indices_mut() can fail and corrupt other buffers.
+                    // TODO: Reenble this and also in-place chunk updating when bug is fixed
+                    if !cfg!(target_family = "wasm") {
+                        if let Some(tess) = u.render_data {
+                            let range = u.mesh.transparent_range(DepthOrdering::Within);
+                            tess.indices_mut()
+                                .expect("failed to map indices for depth sorting")[range.clone()]
+                            .copy_from_slice(&u.mesh.indices()[range]);
+                        }
                     }
+                } else {
+                    update_chunk_tess(context, u.mesh, u.render_data)
                 }
             },
         );

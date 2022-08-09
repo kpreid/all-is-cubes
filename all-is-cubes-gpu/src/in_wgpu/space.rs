@@ -1,6 +1,5 @@
 //! Manages meshes for rendering a [`Space`].
 
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
 
@@ -185,7 +184,7 @@ impl SpaceRenderer {
         deadline: Instant,
         queue: &wgpu::Queue,
         camera: &Camera,
-        bwp: BeltWritingParts<'_, '_>,
+        mut bwp: BeltWritingParts<'_, '_>,
     ) -> Result<SpaceUpdateInfo, GraphicsResourceError> {
         let start_time = Instant::now();
 
@@ -218,31 +217,28 @@ impl SpaceRenderer {
         }
         let end_light_update = Instant::now();
 
-        // TODO: kludge; refactor to avoid needing it
-        let rcbwp = RefCell::new(bwp);
-
         // Update chunks
         let csm_info = self.csm.update_blocks_and_some_chunks(
             camera,
             &mut self.block_texture,
             deadline, // TODO: decrease deadline by some guess at texture writing time
             |u| {
-                update_chunk_buffers(rcbwp.borrow_mut().reborrow(), u, &self.space_label);
-            },
-            |u| {
-                if let Some(index_buf) = u.render_data.as_ref().and_then(|b| b.index_buf.get()) {
-                    let index_buf_bytes = bytemuck::cast_slice::<u32, u8>(u.mesh.indices());
-                    if let Some(len) = index_buf_bytes
-                        .len()
-                        .try_into()
-                        .ok()
-                        .and_then(wgpu::BufferSize::new)
+                if u.indices_only {
+                    if let Some(index_buf) = u.render_data.as_ref().and_then(|b| b.index_buf.get())
                     {
-                        rcbwp
-                            .borrow_mut()
-                            .write_buffer(index_buf, 0, len)
-                            .copy_from_slice(index_buf_bytes);
+                        let index_buf_bytes = bytemuck::cast_slice::<u32, u8>(u.mesh.indices());
+                        if let Some(len) = index_buf_bytes
+                            .len()
+                            .try_into()
+                            .ok()
+                            .and_then(wgpu::BufferSize::new)
+                        {
+                            bwp.write_buffer(index_buf, 0, len)
+                                .copy_from_slice(index_buf_bytes);
+                        }
                     }
+                } else {
+                    update_chunk_buffers(bwp.reborrow(), u, &self.space_label);
                 }
             },
         );

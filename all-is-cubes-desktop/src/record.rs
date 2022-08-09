@@ -185,11 +185,16 @@ impl Recorder {
                     .scene_sender
                     .as_ref()
                     .expect("cannot send_frame() after no_more_frames()");
+                // TODO: this glue logic belongs in our gltf module and crate,
+                // not here
                 rec.csm.update_blocks_and_some_chunks(
                     &rec.cameras.cameras().world,
                     &mut rec.tex,
                     Instant::now() + Duration::from_secs(86400),
                     |u| {
+                        if u.indices_only {
+                            return;
+                        }
                         // We could probably get away with reusing the cells but this is safer.
                         let new_cell = MeshIndexCell::default();
                         // Ignore error since finish_frame() will catch it anyway
@@ -200,7 +205,6 @@ impl Recorder {
                         ));
                         *u.render_data = new_cell;
                     },
-                    |_u| { /* no index sorting to do */ },
                 );
                 sender
                     .send(MeshRecordMsg::FinishFrame(
