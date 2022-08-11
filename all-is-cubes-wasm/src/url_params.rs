@@ -11,13 +11,14 @@ use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes_content::UniverseTemplate;
 
 #[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 pub struct OptionsInUrl {
     pub template: UniverseTemplate,
     pub graphics_options: GraphicsOptions,
     pub renderer: RendererOption,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum RendererOption {
     Luminance,
     #[default]

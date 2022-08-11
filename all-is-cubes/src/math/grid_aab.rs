@@ -988,7 +988,7 @@ mod grid_array_arb {
 }
 
 /// Error from [`GridArray::from_elements`] being given the wrong length.
-#[derive(Clone, Copy, Debug, PartialEq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("array of length {input_length} cannot fill volume {v} of {bounds:?}", v = self.bounds.volume())]
 pub struct ArrayLengthError {
     input_length: usize,

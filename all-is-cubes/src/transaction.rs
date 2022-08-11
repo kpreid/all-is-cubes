@@ -173,6 +173,7 @@ pub enum ExecuteError {
 /// mechanics _may_ result in transactions repeatedly failing. Hence, it does not contain
 /// full details on the failure.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[error("Transaction precondition not met: {location}: {problem}")]
 pub struct PreconditionFailed {
     // TODO: Figure out how to have at least a little dynamic information. `Option<[i32; 3]>` ???
@@ -247,6 +248,7 @@ impl CommitError {
 
 /// Error type returned by [`Merge::check_merge`].
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[non_exhaustive] // We might want to add further information later
 #[error("Conflict between transactions")]
 pub struct TransactionConflict {}

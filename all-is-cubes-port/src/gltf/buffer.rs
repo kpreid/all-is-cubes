@@ -15,6 +15,7 @@ use super::glue::{create_accessor, push_and_return_index, u32size, Lef32};
 ///
 /// TODO: Add support for `.glb` combined files.
 #[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 pub struct GltfDataDestination {
     /// If true, all data is unconditionally discarded. For testing only.
     discard: bool,

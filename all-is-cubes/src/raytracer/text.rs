@@ -42,6 +42,7 @@ impl RtBlockData for CharacterRtData {
 /// Implements [`PixelBuf`] for text output: captures the first characters of block names
 /// rather than colors.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 pub struct CharacterBuf {
     /// Text to draw, if determined yet.
     hit_text: Option<String>,

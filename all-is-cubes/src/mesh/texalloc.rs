@@ -174,7 +174,7 @@ impl TextureAllocator for TestTextureAllocator {
 /// Tile type for [`TestTextureAllocator`].
 ///
 /// This type is public so that it may be used in benchmarks and such.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[doc(hidden)]
 pub struct TestTextureTile {
     bounds: GridAab,

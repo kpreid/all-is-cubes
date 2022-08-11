@@ -32,6 +32,7 @@ impl TextureAllocator for GltfTextureAllocator {
 ///
 /// You should not generally need to refer to this type.
 #[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 pub struct GltfTextureRef {
     pub(crate) bounds: GridAab,
 }
