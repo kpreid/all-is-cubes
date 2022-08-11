@@ -122,6 +122,7 @@ type PredicateRes = Result<(), Box<dyn Error>>;
 
 struct TransactionAndPredicate<'a, Tr, Ta> {
     transaction: Tr,
+    #[allow(clippy::type_complexity)] // https://github.com/rust-lang/rust-clippy/issues/9299
     predicate: Rc<dyn Fn(&Ta, &Ta) -> PredicateRes + 'a>,
 }
 
