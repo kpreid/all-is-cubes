@@ -42,18 +42,10 @@ impl TextRayImage {
             "patch size mismatch"
         );
 
-        let mut y = 0;
-        // TODO: replace this with std::array::from_fn when that's stable
-        [(); H].map(|()| {
-            let mut x = 0;
-            let row = [(); W].map(|()| {
-                let value =
-                    &data[(base_image_pos.y + y) * image_row_length + (base_image_pos.x + x)];
-                x += 1;
-                value
-            });
-            y += 1;
-            row
+        std::array::from_fn(|y| {
+            std::array::from_fn(|x| {
+                &data[(base_image_pos.y + y) * image_row_length + (base_image_pos.x + x)]
+            })
         })
     }
 }

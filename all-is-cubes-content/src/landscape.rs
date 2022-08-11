@@ -125,7 +125,7 @@ pub async fn install_landscape_blocks(
         )
     };
 
-    let stone_points = [(); 240].map(|_| {
+    let stone_points: [_; 240] = std::array::from_fn(|_| {
         (
             Aab::from_cube(GridPoint::origin()).random_point(rng),
             scale_color(colors[Stone].clone(), rng.gen_range(0.9..1.1), 0.02),
@@ -134,7 +134,7 @@ pub async fn install_landscape_blocks(
     let stone_pattern = voronoi_pattern(resolution, &stone_points);
 
     // TODO: give dirt a palette of varying hue and saturation
-    let dirt_points = [(); 1024].map(|_| {
+    let dirt_points: [_; 1024] = std::array::from_fn(|_| {
         (
             Aab::from_cube(GridPoint::origin()).random_point(rng),
             scale_color(colors[Dirt].clone(), rng.gen_range(0.9..1.1), 0.02),
