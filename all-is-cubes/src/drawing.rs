@@ -429,11 +429,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::EvalBlockError;
     use crate::block::{self, Resolution::R16, AIR};
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
     use crate::raytracer::print_space;
-    use crate::universe::Universe;
+    use crate::universe::{Name, RefError, URef, Universe};
+    use cgmath::One;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle, Rectangle};
 
     /// Test using a particular color type with [`DrawingPlane`].
@@ -501,9 +503,20 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn draw_set_failure() {
-        todo!("test a case where a SetCubeError is propagated");
+        let name = Name::from("foo");
+        let dead_block = Block::builder()
+            .voxels_ref(R1, URef::new_gone(name.clone()))
+            .build();
+        let mut space = Space::empty_positive(100, 100, 100);
+
+        // This should fail with SetCubeError::EvalBlock since the block has no valid definition
+        assert_eq!(
+            Pixel(Point::new(0, 0), &dead_block)
+                .draw(&mut space.draw_target(GridMatrix::one()))
+                .unwrap_err(),
+            SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone(name)))
+        );
     }
 
     fn a_primitive_style() -> PrimitiveStyle<Rgba> {

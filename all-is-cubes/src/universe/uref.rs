@@ -39,10 +39,28 @@ pub struct URef<T> {
     name: Name,
 
     /// ID of the universe this ref belongs to.
-    universe_id: UniverseId,
+    ///
+    /// None if it was created by [`Self::new_gone()`] or not yet inserted into a universe.
+    universe_id: Option<UniverseId>,
 }
 
 impl<T: 'static> URef<T> {
+    /// Constructs a [`URef`] that does not refer to a value, as if it used to but
+    /// is now defunct.
+    ///
+    /// When dereferenced, this will always produce the error [`RefError::Gone`].
+    /// When compared, this will be equal to any other created with the same name.
+    ///
+    /// This may be used in tests to exercise error handling.
+    #[doc(hidden)] // TODO: decide if this is good API
+    pub fn new_gone(name: Name) -> URef<T> {
+        URef {
+            weak_ref: Weak::new(),
+            name,
+            universe_id: None,
+        }
+    }
+
     pub fn name(&self) -> &Name {
         &self.name
     }
@@ -53,8 +71,7 @@ impl<T: 'static> URef<T> {
     ///
     /// Returns [`None`] if this [`URef`] is not yet associated with a universe.
     pub fn universe_id(&self) -> Option<UniverseId> {
-        // the None case is not yet implemented
-        Some(self.universe_id)
+        self.universe_id
     }
 
     /// Borrow the value, in the sense of `RefCell::borrow`, and panic on failure.
@@ -283,7 +300,7 @@ impl<T> URootRef<T> {
         URef {
             weak_ref: Arc::downgrade(&self.strong_ref),
             name: self.name.clone(),
-            universe_id: self.universe_id,
+            universe_id: Some(self.universe_id),
         }
     }
 
@@ -356,6 +373,29 @@ mod tests {
             r.try_modify(|_| {}).unwrap_err(),
             RefError::InUse(Name::Anonym(0))
         );
+    }
+
+    #[test]
+    fn new_gone_properties() {
+        let name = Name::from("foo");
+        let r: URef<Space> = URef::new_gone(name.clone());
+        assert_eq!(r.name(), &name);
+        assert_eq!(r.universe_id(), None);
+        assert_eq!(r.try_borrow().unwrap_err(), RefError::Gone(name.clone()));
+        assert_eq!(
+            r.try_borrow_mut().unwrap_err(),
+            RefError::Gone(name.clone())
+        );
+    }
+
+    /// Note: Equality behavior is inherited from Weak::new and Weak::ptr_eq,
+    /// not necessarily what we actually want.
+    #[test]
+    fn new_gone_equality() {
+        let name = Name::from("foo");
+        let r1: URef<Space> = URef::new_gone(name.clone());
+        let r2: URef<Space> = URef::new_gone(name.clone());
+        assert_eq!(r1, r2);
     }
 
     #[test]
