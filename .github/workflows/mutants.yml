@@ -1,0 +1,43 @@
+name: Mutation Testing
+
+permissions: {}
+
+on: [workflow_dispatch]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  mutants:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        # Not sure if this is strictly necessary -- but it is if GitHub Actions images aren't
+        # always as up to date than we want.
+        run: rustup toolchain install stable --profile=minimal
+
+      - name: Install cargo-mutants
+        run: cargo install --version 1.2.1 cargo-mutants
+
+      - name: Run mutation testing for all-is-cubes
+        timeout-minutes: 60
+        # TODO: un-exclude src/vui eventually
+        # TODO: maybe un-exclude fmt()
+        run: cargo mutants -d all-is-cubes/ --exclude-re '::fmt ->' --exclude tests.rs --exclude src/vui* -- --all-features
+        # TODO: Other crates' reasons for non-inclusion:
+        #   all-is-cubes-content: insufficient test coverage
+        #   all-is-cubes-desktop: insufficient test coverage, unclear if even feasible
+        #   all-is-cubes-gpu: mainly tested via test-renderers which won't run directly
+        #   all-is-cubes-port: TODO add it
+        #   all-is-cubes-server: TODO write enough tests that this is workable
+        #   all-is-cubes-wasm: not relevantly testable
+
+      - name: Save results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: mutation-report
+          path: "*/mutants.out"

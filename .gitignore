@@ -9,3 +9,7 @@
 
 # Generated file (by xtask) which is an input to NPM build
 /all-is-cubes-wasm/static/third-party-licenses.html
+
+# Tool outputs
+mutants.out
+mutants.out.old
