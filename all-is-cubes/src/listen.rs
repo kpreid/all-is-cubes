@@ -69,12 +69,16 @@ impl<M: Clone + Send> Notifier<M> {
     /// let mut sink = Sink::new();
     /// notifier_1.listen(Notifier::forwarder(Arc::downgrade(&notifier_2)));
     /// notifier_2.listen(sink.listener());
+    /// # assert_eq!(notifier_1.count(), 1);
+    /// # assert_eq!(notifier_2.count(), 1);
     ///
     /// notifier_1.notify("a");
     /// assert_eq!(sink.drain(), vec!["a"]);
     /// drop(notifier_2);
     /// notifier_1.notify("a");
     /// assert!(sink.drain().is_empty());
+    ///
+    /// # assert_eq!(notifier_1.count(), 0);
     /// ```
     pub fn forwarder(this: Weak<Self>) -> NotifierForwarder<M> {
         NotifierForwarder(this)
@@ -85,6 +89,16 @@ impl<M: Clone + Send> Notifier<M> {
         for listener in self.listeners.read().unwrap().iter() {
             listener.receive(message.clone());
         }
+    }
+
+    /// Computes the exact count of listeners, including asking all current listeners
+    /// if they are [`alive()`](Listener::alive).
+    ///
+    /// This operation is intended for testing purposes.
+    pub fn count(&self) -> usize {
+        let mut listeners = self.listeners.write().unwrap();
+        Self::cleanup(&mut listeners);
+        listeners.len()
     }
 
     /// Discard all dead weak pointers in `listeners`.

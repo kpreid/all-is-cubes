@@ -224,6 +224,34 @@ impl<M> Listener<M> for DirtyFlagListener {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::listen::Notifier;
+
+    #[test]
+    fn null_alive() {
+        let notifier: Notifier<()> = Notifier::new();
+        notifier.listen(NullListener);
+        assert_eq!(notifier.count(), 0);
+    }
+
+    #[test]
+    fn sink_alive() {
+        let notifier: Notifier<()> = Notifier::new();
+        let sink = Sink::new();
+        notifier.listen(sink.listener());
+        assert_eq!(notifier.count(), 1);
+        drop(sink);
+        assert_eq!(notifier.count(), 0);
+    }
+
+    #[test]
+    fn dirty_flag_alive() {
+        let notifier: Notifier<()> = Notifier::new();
+        let flag = DirtyFlag::new(false);
+        notifier.listen(flag.listener());
+        assert_eq!(notifier.count(), 1);
+        drop(flag);
+        assert_eq!(notifier.count(), 0);
+    }
 
     #[test]
     fn dirty_flag_debug() {
