@@ -3,8 +3,8 @@
 use std::ops::Range;
 
 use cgmath::{
-    ElementWise as _, EuclideanSpace as _, Point2, Point3, Transform as _, Vector2, Vector3,
-    Zero as _,
+    ElementWise as _, EuclideanSpace as _, Matrix4, Point2, Point3, Transform as _, Vector2,
+    Vector3,
 };
 
 use crate::block::Resolution;
@@ -162,90 +162,112 @@ pub(super) fn push_quad<V: From<BlockVertex>>(
 ) {
     let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5;
-    let depth_fudge = Vector3::new(0., 0., half_texel);
+    let face = transform.face;
 
-    let (clamp_min, clamp_max) = match coloring {
-        QuadColoring::Solid(_) => (Vector3::zero(), Vector3::zero()),
-        QuadColoring::Texture(tile) => (
-            tile.grid_to_texcoord(
-                transform
-                    .texture_transform
-                    .transform_point(Point3 {
-                        x: low_corner.x as TextureCoordinate + half_texel,
-                        y: low_corner.y as TextureCoordinate + half_texel,
-                        z: depth as TextureCoordinate + half_texel,
-                    })
-                    .to_vec(),
-            ),
-            tile.grid_to_texcoord(
-                transform
-                    .texture_transform
-                    .transform_point(Point3 {
-                        x: high_corner.x as TextureCoordinate - half_texel,
-                        y: high_corner.y as TextureCoordinate - half_texel,
-                        z: depth as TextureCoordinate + half_texel,
-                    })
-                    .to_vec(),
-            ),
-        ),
+    // This iterator computes the coordinates but not the vertex --
+    // it is shared between the colored and textured cases.
+    let position_iter = QUAD_VERTICES.iter().map(|&unit_square_point| {
+        let rectangle_point =
+            low_corner.to_vec() + unit_square_point.mul_element_wise(high_corner - low_corner);
+        Point3::from_vec(rectangle_point.extend(depth))
+    });
+
+    // Compute and push the four vertices.
+    match coloring {
+        QuadColoring::Solid(color) => {
+            // Performance note: not using array::map() because, by benchmark, that's slower.
+            vertices.extend(position_iter.map(|voxel_grid_point| {
+                V::from(BlockVertex {
+                    position: transform.transform_position(voxel_grid_point),
+                    face,
+                    coloring: Coloring::Solid(color),
+                })
+            }));
+        }
+        QuadColoring::Texture(tile) => {
+            let clamp_min = transform.transform_texture_point(
+                tile,
+                Point3 {
+                    x: low_corner.x as TextureCoordinate + half_texel,
+                    y: low_corner.y as TextureCoordinate + half_texel,
+                    z: depth as TextureCoordinate,
+                },
+            );
+            let clamp_max = transform.transform_texture_point(
+                tile,
+                Point3 {
+                    x: high_corner.x as TextureCoordinate - half_texel,
+                    y: high_corner.y as TextureCoordinate - half_texel,
+                    z: depth as TextureCoordinate,
+                },
+            );
+
+            vertices.extend(position_iter.map(|voxel_grid_point| {
+                V::from(BlockVertex {
+                    position: transform.transform_position(voxel_grid_point),
+                    face,
+                    coloring: Coloring::Texture {
+                        pos: transform.transform_texture_point(
+                            tile,
+                            voxel_grid_point.map(|s| s as TextureCoordinate),
+                        ),
+                        clamp_min,
+                        clamp_max,
+                    },
+                })
+            }));
+        }
     };
 
-    // Performance note: not using array::map() because, by benchmark, that's slower.
-    vertices.extend(QUAD_VERTICES.iter().map(|&unit_square_point| {
-        // Apply bounding rectangle
-        let voxel_grid_point =
-            low_corner.to_vec() + unit_square_point.mul_element_wise(high_corner - low_corner);
-        // Apply depth
-        let voxel_grid_point = Point3::from_vec(voxel_grid_point.extend(depth));
-        // Apply scaling to unit cube
-        let block_point = voxel_grid_point * transform.voxel_to_block_scale;
-
-        V::from(BlockVertex {
-            position: transform.position_transform.transform_point(block_point),
-            face: transform.face,
-            coloring: match coloring {
-                // Note: if we're ever looking for microöptimizations, we could try
-                // converting this to a trait for static dispatch.
-                QuadColoring::Solid(color) => Coloring::Solid(color),
-                QuadColoring::Texture(tile) => Coloring::Texture {
-                    pos: tile.grid_to_texcoord(
-                        transform
-                            .texture_transform
-                            .transform_point(
-                                voxel_grid_point.map(|s| s as TextureCoordinate) + depth_fudge,
-                            )
-                            .to_vec(),
-                    ),
-                    clamp_min,
-                    clamp_max,
-                },
-            },
-        })
-    }));
     indices.extend(QUAD_INDICES.iter().map(|&i| index_origin + i));
 }
 
-/// Ingredients for [`push_quad`] that are uniform for a resolution and face.
+/// Ingredients for [`push_quad`] that are uniform for a resolution and face,
+/// so they can be computed only six times per block.
 pub(super) struct QuadTransform {
     face: Face6,
-    // TODO: only needs to be a Matrix3
+    // TODO: specialize transforms since there are only 6 possible values plus scale,
+    // so we don't need as many ops as a full matrix-vector multiplication?
+    // Or would the branching needed make it pointless?
     position_transform: cgmath::Matrix4<FreeCoordinate>,
     texture_transform: cgmath::Matrix4<TextureCoordinate>,
-    voxel_to_block_scale: FreeCoordinate,
 }
 
 impl QuadTransform {
     pub fn new(face: Face6, resolution: Resolution) -> Self {
+        let voxel_to_block_scale = FreeCoordinate::from(resolution).recip();
         Self {
             face,
-            position_transform: face.matrix(1).to_free(), // TODO: specialize this since there are only 6 values
+            position_transform: face.matrix(1).to_free()
+                * Matrix4::from_scale(voxel_to_block_scale),
             texture_transform: face
                 .matrix(resolution.to_grid())
                 .to_free()
                 .cast::<TextureCoordinate>()
-                .unwrap(),
-            voxel_to_block_scale: FreeCoordinate::from(resolution).recip(),
+                .unwrap(/* infallible float-to-float conversion */),
         }
+    }
+
+    #[inline]
+    fn transform_position(&self, voxel_grid_point: Point3<f64>) -> Point3<f64> {
+        // TODO: position_transform should incorporate this
+        self.position_transform.transform_point(voxel_grid_point)
+    }
+
+    /// Transform a point from quad U-V-depth coordinates within the texture tile
+    /// with a scale of 1 unit = 1 texel/voxel, to global texture coordinates for
+    /// the final vertex.
+    ///
+    /// The depth value is offset by +0.5 texel (into the depth of the voxel being
+    /// drawn), to move it from edge coordinates to mid-texel coordinates.
+    #[inline]
+    fn transform_texture_point(
+        &self,
+        tile: &impl TextureTile,
+        mut point: Point3<TextureCoordinate>,
+    ) -> Vector3<TextureCoordinate> {
+        point.z += 0.5;
+        tile.grid_to_texcoord(self.texture_transform.transform_point(point).to_vec())
     }
 }
 
