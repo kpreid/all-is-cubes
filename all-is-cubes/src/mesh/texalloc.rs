@@ -101,24 +101,29 @@ pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(
 pub struct NoTextures;
 
 impl TextureAllocator for NoTextures {
-    type Tile = NoTextures;
+    type Tile = NoTexture;
 
     fn allocate(&mut self, _: GridAab) -> Option<Self::Tile> {
         None
     }
 }
 
-impl TextureTile for NoTextures {
+/// Uninhabited [`TextureTile`] type; no instance of this ever exists.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_enums)]
+pub enum NoTexture {}
+
+impl TextureTile for NoTexture {
     fn bounds(&self) -> GridAab {
-        unimplemented!()
+        match *self {}
     }
 
     fn grid_to_texcoord(&self, _in_tile: Vector3<TextureCoordinate>) -> Vector3<TextureCoordinate> {
-        unimplemented!()
+        match *self {}
     }
 
     fn write(&mut self, _data: &[Texel]) {
-        unimplemented!()
+        match *self {}
     }
 }
 

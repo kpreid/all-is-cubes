@@ -728,7 +728,7 @@ mod tests {
     use crate::block::Block;
     use crate::camera::{GraphicsOptions, TransparencyOption, Viewport};
     use crate::math::GridCoordinate;
-    use crate::mesh::{BlockVertex, NoTextures};
+    use crate::mesh::{BlockVertex, NoTexture, NoTextures};
     use crate::space::SpaceTransaction;
     use crate::universe::Universe;
 
@@ -875,7 +875,7 @@ mod tests {
         /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
         fn update<F>(&mut self, chunk_render_updater: F) -> CsmUpdateInfo
         where
-            F: FnMut(ChunkMeshUpdate<'_, (), BlockVertex, NoTextures, 16>),
+            F: FnMut(ChunkMeshUpdate<'_, (), BlockVertex, NoTexture, 16>),
         {
             self.csm.update_blocks_and_some_chunks(
                 &self.camera,
