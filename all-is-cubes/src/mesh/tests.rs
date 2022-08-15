@@ -70,6 +70,7 @@ fn test_triangulate_block_threshold(
 }
 
 /// Test helper to call `triangulate_blocks` followed directly by [`triangulate_space`].
+#[allow(clippy::type_complexity)]
 fn triangulate_blocks_and_space(
     space: &Space,
 ) -> (
