@@ -17,7 +17,7 @@ use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::content::palette;
 use crate::drawing::{DrawingPlane, VoxelBrush};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
-use crate::math::{GridCoordinate, GridMatrix, GridRotation, Rgb, Rgba};
+use crate::math::{GridAab, GridCoordinate, GridMatrix, GridRotation, Rgb, Rgba};
 use crate::space::Space;
 use crate::universe::Universe;
 
@@ -151,10 +151,11 @@ struct ButtonBuilder {
 
 impl ButtonBuilder {
     // TODO: We probably want a higher resolution so that button icons can have more detail, but that will require updating all the uses
-    pub const RESOLUTION: Resolution = R16;
+    pub const RESOLUTION: Resolution = R32;
     pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION.to_grid();
 
     pub fn new(state: ToggleButtonVisualState) -> Result<Self, InGenError> {
+        let label_z = 12;
         let active = state.value;
         let back_block = Block::from(if active {
             palette::BUTTON_ACTIVATED_BACK
@@ -164,31 +165,31 @@ impl ButtonBuilder {
         let cap_rim_block = Block::from(palette::BUTTON_BACK.map_rgb(|rgb| rgb * 1.1));
 
         let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
-        let back_brush = VoxelBrush::new(vec![
-            ([0, 0, 0], &back_block),
-            ([0, 0, 1], &back_block),
-            ([0, 0, 2], &back_block),
-            ([0, 0, 3], &back_block),
-            ([0, 0, 4], &back_block),
-            ([0, 0, 5], &back_block),
-            ([0, 0, 6], &back_block),
-            ([0, 0, 7], &back_block),
-            // up to but not including BUTTON_LABEL_Z
-        ]);
-        let cap_rim_brush = VoxelBrush::new(vec![([0, 0, 7], &cap_rim_block)]);
+        let back_brush = VoxelBrush::new((0..label_z).map(|z| ([0, 0, z], &back_block)).collect());
+        let cap_rim_brush = VoxelBrush::new(vec![([0, 0, label_z - 1], &cap_rim_block)]);
 
+        let outer_inset = 2;
         let outer_rectangle = Rectangle::with_corners(
-            Point::new(1, 1),
-            Point::new(Self::RESOLUTION_G - 2, Self::RESOLUTION_G - 2),
+            Point::new(outer_inset, outer_inset),
+            Point::new(
+                // - 1 because e-g rectangles are specified in terms of their outermost pixels
+                Self::RESOLUTION_G - outer_inset - 1,
+                Self::RESOLUTION_G - outer_inset - 1,
+            ),
         );
         let rr = |inset: i32| {
             RoundedRectangle::with_equal_corners(
                 outer_rectangle.offset(-inset),
-                Size::new(3 - inset as u32, 3 - inset as u32),
+                Size::new(5 - inset as u32, 5 - inset as u32),
             )
         };
 
-        let mut space = Space::for_block(Self::RESOLUTION).build_empty();
+        let mut space = Space::builder(GridAab::from_lower_size(
+            [0, 0, 0],
+            // this will need to be changed if we want to support thick labels
+            [Self::RESOLUTION_G, Self::RESOLUTION_G, label_z + 1],
+        ))
+        .build_empty();
         let draw_target = &mut space.draw_target(
             GridMatrix::from_translation([0, Self::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
         );
@@ -199,12 +200,12 @@ impl ButtonBuilder {
                 PrimitiveStyleBuilder::new()
                     .fill_color(&back_brush)
                     .stroke_color(&frame_brush)
-                    .stroke_width(1)
+                    .stroke_width(2)
                     .stroke_alignment(StrokeAlignment::Inside)
                     .build(),
             )
             .draw(draw_target)?;
-        rr(1)
+        rr(2)
             .into_styled(
                 PrimitiveStyleBuilder::new()
                     .stroke_color(&cap_rim_brush)
@@ -217,7 +218,7 @@ impl ButtonBuilder {
         Ok(ButtonBuilder {
             space,
             active,
-            label_z: 8,
+            label_z,
             label_color: if active {
                 palette::BUTTON_ACTIVATED_LABEL
             } else {
