@@ -2,23 +2,22 @@ use std::borrow::Cow;
 use std::fmt;
 
 use embedded_graphics::geometry::Point;
-use embedded_graphics::mono_font::iso_8859_1::{FONT_5X8, FONT_6X12};
+use embedded_graphics::image::Image as EgImage;
 use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
-use embedded_graphics::prelude::{Drawable, PixelColor, Primitive, Size};
+use embedded_graphics::prelude::{Dimensions, Drawable, PixelColor, Primitive, Size};
 use embedded_graphics::primitives::{
-    Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment,
-    StyledDrawable,
+    PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment,
 };
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use exhaust::Exhaust;
 
 use crate::block::{Block, Resolution, Resolution::*};
-use crate::content::load_image::{default_srgb, include_image, space_from_image};
+use crate::content::load_image::{default_srgb, include_image, space_from_image, ImageAdapter};
 use crate::content::palette;
 use crate::drawing::{DrawingPlane, VoxelBrush};
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{GridAab, GridCoordinate, GridMatrix, GridRotation, Rgb, Rgba};
-use crate::space::Space;
+use crate::space::{Space, SpacePhysics};
 use crate::universe::Universe;
 
 #[cfg(doc)]
@@ -85,53 +84,40 @@ impl UiBlocks {
 
                 UiBlocks::PauseButton(state) => {
                     let mut button_builder = ButtonBuilder::new(state)?;
-
-                    // Draw pause symbol
-                    for x in [-3, 2] {
-                        Line::new(Point::new(x, -4), Point::new(x, 3)).draw_styled(
-                            &PrimitiveStyle::with_stroke(button_builder.label_color, 3),
-                            &mut button_builder.label_draw_target(),
-                        )?;
-                    }
-
+                    button_builder.draw_icon(include_image!("icons/button-pause.png"))?;
                     button_builder.into_block(universe, "Pause")
                 }
 
                 UiBlocks::MouselookButton(state) => {
                     let mut button_builder = ButtonBuilder::new(state)?;
-
-                    // Draw crosshair
-                    // TODO: Suspicious inconsistency between x and y coordinates
-                    let style = PrimitiveStyle::with_stroke(button_builder.label_color, 2);
-                    Line::new(Point::new(-1, -4), Point::new(-1, 3))
-                        .draw_styled(&style, &mut button_builder.label_draw_target())?;
-                    Line::new(Point::new(-4, 0), Point::new(3, 0))
-                        .draw_styled(&style, &mut button_builder.label_draw_target())?;
-
+                    button_builder.draw_icon(include_image!("icons/button-mouselook.png"))?;
                     button_builder.into_block(universe, "Mouselook")
                 }
 
                 UiBlocks::DebugInfoTextButton(state) => {
                     let mut button_builder = ButtonBuilder::new(state)?;
-                    button_builder.draw_text(&FONT_6X12, "i")?;
+                    button_builder.draw_icon(include_image!("icons/button-debug-info-text.png"))?;
                     button_builder.into_block(universe, "Debug: Info Text")
                 }
 
                 UiBlocks::DebugChunkBoxesButton(state) => {
                     let mut button_builder = ButtonBuilder::new(state)?;
-                    button_builder.draw_text(&FONT_5X8, "Ch")?;
+                    button_builder
+                        .draw_icon(include_image!("icons/button-debug-chunk-boxes.png"))?;
                     button_builder.into_block(universe, "Debug: Chunk Boxes")
                 }
 
                 UiBlocks::DebugCollisionBoxesButton(state) => {
                     let mut button_builder = ButtonBuilder::new(state)?;
-                    button_builder.draw_text(&FONT_5X8, "Co")?;
+                    button_builder
+                        .draw_icon(include_image!("icons/button-debug-collision-boxes.png"))?;
                     button_builder.into_block(universe, "Debug: Collision Boxes")
                 }
 
                 UiBlocks::DebugLightRaysButton(state) => {
                     let mut button_builder = ButtonBuilder::new(state)?;
-                    button_builder.draw_text(&FONT_5X8, "Li")?;
+                    button_builder
+                        .draw_icon(include_image!("icons/button-debug-light-rays.png"))?;
                     button_builder.into_block(universe, "Debug: Light Rays at Cursor")
                 }
             })
@@ -189,6 +175,7 @@ impl ButtonBuilder {
             // this will need to be changed if we want to support thick labels
             [Self::RESOLUTION_G, Self::RESOLUTION_G, label_z + 1],
         ))
+        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build_empty();
         let draw_target = &mut space.draw_target(
             GridMatrix::from_translation([0, Self::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
@@ -253,7 +240,15 @@ impl ButtonBuilder {
         )
     }
 
-    // Draw a text label (only one or two characters will fit).
+    pub fn draw_icon(&mut self, icon: &image::DynamicImage) -> Result<(), InGenError> {
+        let id = &ImageAdapter::adapt(icon, default_srgb);
+        EgImage::new(&id, -id.bounding_box().center() - Point::new(1, 1))
+            .draw(&mut self.label_draw_target())?;
+        Ok(())
+    }
+
+    /// Draw a text label (only a few characters will fit).
+    #[allow(unused)] // TODO: delete this if we continue to have only icon buttons
     pub fn draw_text(&mut self, font: &MonoFont<'_>, text: &str) -> Result<(), InGenError> {
         Text::with_text_style(
             text,
