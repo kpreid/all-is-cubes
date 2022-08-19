@@ -3,14 +3,110 @@
 //! TODO: stuff in this module is kind of duplicative of [`crate::drawing`]...
 
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::io;
+use std::ops::Deref;
 
+use cgmath::Point3;
+use embedded_graphics::image::ImageDrawable;
+use embedded_graphics::prelude::{Dimensions as _, DrawTarget, Point, Size};
+use embedded_graphics::primitives::{PointsIter, Rectangle};
+use embedded_graphics::Drawable;
 use image::{DynamicImage, GenericImageView};
 
 use crate::block::{Block, AIR};
 use crate::drawing::VoxelBrush;
-use crate::math::{GridAab, GridPoint, GridRotation, Rgba};
+use crate::math::{GridAab, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
+
+/// Adapter from [`image::GenericImageView`] to [`embedded_graphics::Drawable`].
+pub(crate) struct ImageAdapter<'b, I>
+where
+    I: Deref,
+    I::Target: GenericImageView,
+{
+    image_ref: I,
+    color_map: HashMap<<I::Target as GenericImageView>::Pixel, VoxelBrush<'b>>,
+    max_brush: GridAab,
+}
+
+impl<'b, I> ImageAdapter<'b, I>
+where
+    I: Deref,
+    I::Target: GenericImageView + Sized,
+    <I::Target as GenericImageView>::Pixel: Eq + Hash,
+{
+    pub fn adapt(
+        image_ref: I,
+        mut pixel_function: impl FnMut(<I::Target as GenericImageView>::Pixel) -> VoxelBrush<'b>,
+    ) -> Self {
+        let mut color_map: HashMap<<I::Target as GenericImageView>::Pixel, VoxelBrush<'b>> =
+            HashMap::new();
+        let mut max_brush: Option<GridAab> = None;
+        for (_, _, pixel) in image_ref.pixels() {
+            let brush = color_map
+                .entry(pixel)
+                .or_insert_with(|| pixel_function(pixel));
+            if let Some(bounds) = brush.bounds() {
+                max_brush = max_brush.map(|m| m.union(bounds).unwrap()).or(Some(bounds));
+            }
+        }
+
+        Self {
+            image_ref,
+            color_map,
+            max_brush: max_brush.unwrap_or_else(|| GridAab::single_cube(Point3::new(0, 0, 0))),
+        }
+    }
+}
+
+/// Note: This implementation is on references so it can return [`VoxelBrush`]es
+/// borrowing from itself.
+impl<'b, I> ImageDrawable for &'b ImageAdapter<'b, I>
+where
+    I: Deref,
+    I::Target: GenericImageView,
+    <I::Target as GenericImageView>::Pixel: Eq + Hash,
+{
+    type Color = &'b VoxelBrush<'b>;
+
+    fn draw<D>(&self, target: &mut D) -> Result<(), <D as DrawTarget>::Error>
+    where
+        D: DrawTarget<Color = Self::Color>,
+    {
+        self.draw_sub_image(target, &self.bounding_box())
+    }
+
+    fn draw_sub_image<D>(
+        &self,
+        target: &mut D,
+        area: &Rectangle,
+    ) -> Result<(), <D as DrawTarget>::Error>
+    where
+        D: DrawTarget<Color = Self::Color>,
+    {
+        target.fill_contiguous(
+            area,
+            PointsIter::points(area).map(|Point { x, y }| {
+                self.color_map
+                    .get(&self.image_ref.get_pixel(x as u32, y as u32))
+                    .expect("image contains inconsistent color")
+            }),
+        )
+    }
+}
+
+impl<I> embedded_graphics::geometry::OriginDimensions for &'_ ImageAdapter<'_, I>
+where
+    I: Deref,
+    I::Target: GenericImageView,
+{
+    fn size(&self) -> Size {
+        let (width, height) = self.image_ref.dimensions();
+        // TODO: use max_brush to expand this
+        Size { width, height }
+    }
+}
 
 /// Take the pixels of the image and construct a [`Space`] from it.
 ///
@@ -18,12 +114,11 @@ use crate::space::{SetCubeError, Space, SpacePhysics};
 ///
 /// TODO: Allow `SpaceBuilder` controls somehow. Maybe this belongs as a method on SpaceBuilder.
 /// TODO: pixel_function should have a Result return
-/// TODO: Should this go through the [`crate::space::DrawingPlane`] mechanism?
 #[doc(hidden)] // still experimental API
 pub fn space_from_image<'b, I, F>(
     image: &I,
     transform: GridRotation,
-    mut pixel_function: F,
+    pixel_function: F,
 ) -> Result<Space, SetCubeError>
 where
     I: GenericImageView,
@@ -31,21 +126,14 @@ where
     F: FnMut(I::Pixel) -> VoxelBrush<'b>,
 {
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
-    let transform = transform.to_positive_octant_matrix(image.width().max(image.height()) as i32);
-    let inverse_rot = transform.decompose().unwrap().0.inverse();
+    // ... and find a way to make this more consistent and obviously-correct.
+    let transform_within_space =
+        transform.to_positive_octant_matrix(image.width().max(image.height()) as i32);
+    let transform_for_drawing =
+        transform.to_positive_octant_matrix(image.width().max(image.height()) as i32 - 1);
+    let inverse_rot = transform_within_space.decompose().unwrap().0.inverse();
 
-    // Collect all colors so we know the brush sizes and have memoized them
-    let mut brushes: HashMap<I::Pixel, VoxelBrush<'b>> = HashMap::new();
-    let mut max_brush: Option<GridAab> = None;
-    for (_, _, pixel) in image.pixels() {
-        let brush = brushes
-            .entry(pixel)
-            .or_insert_with(|| pixel_function(pixel));
-        if let Some(bounds) = brush.bounds() {
-            max_brush = max_brush.map(|m| m.union(bounds).unwrap()).or(Some(bounds));
-        }
-    }
-    let max_brush = max_brush.unwrap_or_else(|| GridAab::from_lower_size([0, 0, 0], [0, 0, 0]));
+    let ia = ImageAdapter::adapt(image, pixel_function);
 
     // Compute bounds including the brush sizes.
     // Note: Subtracting 1 from dimensions because the brush block will effectively add 1.
@@ -57,23 +145,19 @@ where
         [image.width() as i32 - 1, image.height() as i32 - 1, 0],
     )
     .minkowski_sum(
-        max_brush
+        ia.max_brush
             .transform(inverse_rot.to_positive_octant_matrix(1))
             .unwrap(),
     )
     .unwrap()
-    .transform(transform)
+    .transform(transform_within_space)
     .unwrap();
 
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build_empty();
-    for (x, y, pixel) in image.pixels() {
-        brushes[&pixel].paint(
-            &mut space,
-            transform.transform_cube(GridPoint::new(x as i32, y as i32, 0)),
-        )?;
-    }
+    embedded_graphics::image::Image::new(&&ia, Point::zero())
+        .draw(&mut space.draw_target(transform_for_drawing))?;
     Ok(space)
 }
 
