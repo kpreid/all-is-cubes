@@ -29,8 +29,9 @@ where
     I::Pixel: Eq + std::hash::Hash,
     F: FnMut(I::Pixel) -> VoxelBrush<'b>,
 {
-    // TODO: let caller control the transform offsets
+    // TODO: let caller control the transform offsets (not necessarily positive-octant)
     let transform = transform.to_positive_octant_matrix(image.width().max(image.height()) as i32);
+    let inverse_rot = transform.decompose().unwrap().0.inverse();
 
     // Collect all colors so we know the brush sizes and have memoized them
     let mut brushes: HashMap<I::Pixel, VoxelBrush<'b>> = HashMap::new();
@@ -43,6 +44,7 @@ where
             max_brush = max_brush.map(|m| m.union(bounds).unwrap()).or(Some(bounds));
         }
     }
+    let max_brush = max_brush.unwrap_or_else(|| GridAab::from_lower_size([0, 0, 0], [0, 0, 0]));
 
     // Compute bounds including the brush sizes.
     // Note: Subtracting 1 from dimensions because the brush block will effectively add 1.
@@ -53,9 +55,13 @@ where
         [0, 0, 0],
         [image.width() as i32 - 1, image.height() as i32 - 1, 0],
     )
-    .transform(transform)
+    .minkowski_sum(
+        max_brush
+            .transform(inverse_rot.to_positive_octant_matrix(1))
+            .unwrap(),
+    )
     .unwrap()
-    .minkowski_sum(max_brush.unwrap_or_else(|| GridAab::from_lower_size([0, 0, 0], [0, 0, 0])))
+    .transform(transform)
     .unwrap();
 
     let mut space = Space::builder(bounds)
@@ -128,6 +134,21 @@ mod tests {
     }
 
     #[test]
+    fn basic_image_transformed() {
+        let image = test_image();
+        let space = space_from_image(&image, GridRotation::RxZY, default_srgb).unwrap();
+        assert_eq!(
+            space.bounds(),
+            GridAab::from_lower_upper([0, 0, 0], [2, 1, 2])
+        );
+        // X is flipped
+        assert_eq!(space[(1, 0, 0)], Block::from(Rgb::new(0., 0., 0.)));
+        assert_eq!(space[(0, 0, 0)], Block::from(Rgb::new(1., 0., 0.)));
+        // and Y becomes Z
+        assert_eq!(space[(0, 0, 1)], Block::from(Rgb::new(1., 1., 0.)));
+    }
+
+    #[test]
     fn transparent_pixels_are_air() {
         assert_eq!(
             default_srgb(image::Rgba([0, 0, 0, 0])),
@@ -140,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn adds_brush_bounds() {
+    fn bounds_are_affected_by_brush() {
         let image = test_image();
         let space = space_from_image(&image, GridRotation::IDENTITY, |pixel| {
             default_srgb(pixel).translate([10, 0, 0])
