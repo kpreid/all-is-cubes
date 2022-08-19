@@ -12,6 +12,8 @@ use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
     Vector2, Vector3,
 };
+use all_is_cubes::content::load_image::{default_srgb, space_from_image};
+use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::drawing::{
     draw_to_blocks,
     embedded_graphics::{
@@ -33,7 +35,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
-use all_is_cubes::{rgb_const, rgba_const};
+use all_is_cubes::{include_image, rgb_const, rgba_const};
 
 use crate::{
     four_walls, make_slab, make_some_blocks, make_some_voxel_blocks, palette, AnimatedVoxels,
@@ -45,16 +47,17 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     TRANSPARENCY_LARGE,
     TRANSPARENCY_SMALL,
     COLLISION,
-    TEXT,
     RESOLUTIONS,
     ANIMATION,
     MAKE_SOME_BLOCKS,
     MOVED_BLOCKS,
     ROTATIONS,
-    COLOR_LIGHTS,
     CHUNK_CHART,
+    COLOR_LIGHTS,
+    IMAGES,
     SWIMMING_POOL,
     COLORS,
+    TEXT,
 ];
 
 macro_rules! exhibit {
@@ -793,4 +796,40 @@ async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
             .build(),
     )?;
     Ok(space)
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(name: "space_from_image")]
+async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
+    // TODO: it would be nice if this exhibit visualized the generated bounding box somehow
+
+    let mut make_block = |rotation: GridRotation| -> Block {
+        let terrain_map_function = |pixel: image::Rgba<u8>| -> VoxelBrush<'static> {
+            let image::Rgba([r, g, b, _a]) = pixel;
+            if r > b || g > b {
+                let block = Block::from(Rgba::from_srgb8(pixel.0));
+                VoxelBrush::new(vec![([0, 0, 0], block.clone()), ([0, 0, 1], block)])
+                    .transform(rotation.to_rotation_matrix())
+            } else {
+                default_srgb(pixel)
+            }
+        };
+
+        let image = include_image!("exhibits/terrain-image.png");
+        let image_space = universe
+            .insert_anonymous(space_from_image(image, rotation, terrain_map_function).unwrap());
+        Block::builder()
+            .collision(BlockCollision::Recur)
+            .display_name(format!("{rotation:?}"))
+            .voxels_ref(R16, image_space)
+            .build()
+    };
+
+    let mut outer_space = Space::empty(GridAab::from_lower_size([0, 0, 0], [4, 1, 1]));
+    outer_space.set([0, 0, 0], make_block(GridRotation::RXYZ))?;
+    outer_space.set([1, 0, 0], make_block(GridRotation::RXyZ))?;
+    outer_space.set([2, 0, 0], make_block(GridRotation::RXZY))?;
+    outer_space.set([3, 0, 0], make_block(GridRotation::RxYZ))?;
+
+    Ok(outer_space)
 }

@@ -80,6 +80,7 @@ dependencies = [
  "exhaust",
  "futures-core",
  "futures-executor",
+ "image",
  "instant",
  "log",
  "macro_rules_attribute",

@@ -19,7 +19,8 @@ use crate::space::{SetCubeError, Space, SpacePhysics};
 /// TODO: Allow `SpaceBuilder` controls somehow. Maybe this belongs as a method on SpaceBuilder.
 /// TODO: pixel_function should have a Result return
 /// TODO: Should this go through the [`crate::space::DrawingPlane`] mechanism?
-pub(crate) fn space_from_image<'b, I, F>(
+#[doc(hidden)] // still experimental API
+pub fn space_from_image<'b, I, F>(
     image: &I,
     transform: GridRotation,
     mut pixel_function: F,
@@ -81,7 +82,8 @@ where
 /// Special case:
 /// All pixels with 0 alpha (regardless of other channel values) are converted to
 /// [`AIR`], to meet normal expectations about collision, selection, and equality.
-pub(crate) fn default_srgb<P: image::Pixel<Subpixel = u8>>(pixel: P) -> VoxelBrush<'static> {
+#[doc(hidden)] // still experimental API
+pub fn default_srgb<P: image::Pixel<Subpixel = u8>>(pixel: P) -> VoxelBrush<'static> {
     let pixel = pixel.to_rgba();
     VoxelBrush::single(if pixel[3] == 0 {
         AIR
@@ -91,7 +93,8 @@ pub(crate) fn default_srgb<P: image::Pixel<Subpixel = u8>>(pixel: P) -> VoxelBru
 }
 
 /// Helper for [`include_image`] macro.
-pub(crate) fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DynamicImage {
+#[doc(hidden)]
+pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DynamicImage {
     match image::load(io::Cursor::new(bytes), image::ImageFormat::Png) {
         Ok(i) => i,
         // TODO: include error source chain
@@ -99,13 +102,21 @@ pub(crate) fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DynamicIm
     }
 }
 
+#[doc(hidden)]
+pub use ::image::DynamicImage as DynamicImageForIncludeImage;
+#[doc(hidden)]
+pub use ::once_cell::sync::Lazy as LazyForIncludeImage;
+
 /// Load an image from a relative path, memoized.
+#[doc(hidden)]
+#[macro_export]
 macro_rules! include_image {
     ( $path:literal ) => {{
-        static IMAGE: ::once_cell::sync::Lazy<::image::DynamicImage> =
-            ::once_cell::sync::Lazy::new(|| {
-                $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
-            });
+        static IMAGE: $crate::content::load_image::LazyForIncludeImage<
+            $crate::content::load_image::DynamicImageForIncludeImage,
+        > = $crate::content::load_image::LazyForIncludeImage::new(|| {
+            $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
+        });
         &*IMAGE
     }};
 }

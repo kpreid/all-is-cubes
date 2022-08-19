@@ -23,8 +23,9 @@ use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
 use crate::universe::Universe;
 
-// TODO: make public with better API
-pub(crate) mod load_image;
+/// TODO: make public with better API
+#[doc(hidden)]
+pub mod load_image;
 
 pub mod palette;
 

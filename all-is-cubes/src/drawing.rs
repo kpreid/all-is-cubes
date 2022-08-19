@@ -308,6 +308,14 @@ impl<'a> VoxelBrush<'a> {
         self
     }
 
+    #[must_use]
+    pub fn transform(mut self, transform: GridMatrix) -> Self {
+        for (block_offset, _) in self.0.iter_mut() {
+            *block_offset = transform.transform_point(*block_offset);
+        }
+        self
+    }
+
     /// Computes the region affected by this brush.
     ///
     /// TODO: This does not currently report behaviors but it should, once they have
