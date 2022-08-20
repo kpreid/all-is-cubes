@@ -384,8 +384,8 @@ impl Character {
                     ray_origin,
                     // Fixed 90° FOV
                     vt.transform_vector(Vector3::new(
-                        (indexf).rem_euclid(sqrtedge) * 2. - 1.,
-                        (indexf).div_euclid(sqrtedge) * 2. - 1.,
+                        (indexf).rem_euclid(sqrtedge) / sqrtedge * 2. - 1.,
+                        (indexf).div_euclid(sqrtedge) / sqrtedge * 2. - 1.,
                         -1.0,
                     )),
                 );
