@@ -178,6 +178,7 @@ fn run(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) -> cross
                     | KeyEvent {
                         code: KeyCode::Char('c' | 'd'),
                         modifiers: KeyModifiers::CONTROL,
+                        ..
                     },
                 ) => {
                     return Ok(());
@@ -185,10 +186,12 @@ fn run(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) -> cross
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('n'),
                     modifiers: _,
+                    ..
                 }) => options.colors = options.colors.cycle(),
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('m'),
                     modifiers: _,
+                    ..
                 }) => {
                     options.characters = options.characters.cycle();
                     sync_viewport(dsession);
@@ -222,6 +225,8 @@ fn run(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) -> cross
                         | MouseEventKind::ScrollUp => {}
                     }
                 }
+                Event::FocusGained | Event::FocusLost => {}
+                Event::Paste(_) => {}
             }
         }
 
