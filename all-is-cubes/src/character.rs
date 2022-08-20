@@ -214,8 +214,9 @@ impl Character {
     pub fn listen(&self, listener: impl Listener<CharacterChange> + Send + Sync + 'static) {
         self.notifier.listen(listener)
     }
-    /// Computes the view transform for this character's eye; the translation and rotation from
-    /// the [`Space`]'s coordinate system to one where the look direction is the -Z axis.
+    /// Computes the view transform for this character's eye; translation and rotation from
+    /// the camera coordinate system (whose look direction is the -Z axis) to the [`Space`]'s
+    /// coordinate system.
     ///
     /// See the documentation for [`ViewTransform`] for the interpretation of this transform.
     pub fn view(&self) -> ViewTransform {
