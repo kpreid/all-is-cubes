@@ -24,7 +24,7 @@ wgpu = ["dep:wgpu"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
-bytemuck = { version = "1.7.2", default-features = false, features = ["derive"] }
+bytemuck = { version = "1.12.1", default-features = false, features = ["derive"] }
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.21", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.17", default-features = false }

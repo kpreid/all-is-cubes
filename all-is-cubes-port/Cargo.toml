@@ -29,7 +29,7 @@ thiserror = "1.0.22"
 
 # glTF related dependencies
 base64 = "0.13.0" # data URL generation
-bytemuck = { version = "1.7.2", default-features = false, features = ["derive"] }
+bytemuck = { version = "1.12.1", default-features = false, features = ["derive"] }
 gltf-json = { version = "1.0.0", default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
 serde_json = "1.0.64"
 
