@@ -27,7 +27,7 @@ anyhow = "1.0"
 bytemuck = { version = "1.12.1", default-features = false }
 clap = { version = "3.2.8", default-features = false, features = ["cargo", "derive", "std", "suggestions"] }
 # Note: keep crossterm in sync with tui's crossterm dependency.
-crossterm = "0.23.2"
+crossterm = "0.25.0"
 directories-next = "2.0.0"
 futures = { version = "0.3.17", default-features = false, features = ["std", "executor"] }
 glfw = "0.44.0"
