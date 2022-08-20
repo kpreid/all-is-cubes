@@ -4,6 +4,7 @@ use winit::monitor::MonitorHandle;
 use all_is_cubes::apps::InputProcessor;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
+use winit::window::CursorGrabMode;
 
 pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {
     let size: Vector2<u32> = Vector2::<u32>::from(<[u32; 2]>::from(size));
@@ -206,7 +207,11 @@ pub fn map_key(key: winit::event::VirtualKeyCode) -> Option<all_is_cubes::apps::
 
 pub fn sync_cursor_grab(window: &winit::window::Window, input_processor: &mut InputProcessor) {
     let wants = input_processor.wants_pointer_lock();
-    match window.set_cursor_grab(wants) {
+    let mode = match wants {
+        true => CursorGrabMode::Locked,
+        false => CursorGrabMode::None,
+    };
+    match window.set_cursor_grab(mode) {
         Ok(()) => {
             window.set_cursor_visible(!wants);
             input_processor.has_pointer_lock(wants);

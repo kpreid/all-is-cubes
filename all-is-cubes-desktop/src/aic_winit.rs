@@ -236,6 +236,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
                         }
                     }
                 }
+                WindowEvent::Ime(..) => unreachable!("ime not enabled"),
                 WindowEvent::ReceivedCharacter(..) => {}
                 WindowEvent::ModifiersChanged(..) => {}
 
@@ -284,6 +285,9 @@ fn handle_winit_event<Ren: RendererToWinit>(
                     .set(physical_size_to_viewport(scale_factor, *new_inner_size)),
                 WindowEvent::Focused(has_focus) => {
                     input_processor.key_focus(has_focus);
+                }
+                WindowEvent::Occluded(_) => {
+                    // TODO: disable rendering if occluded
                 }
 
                 // Unused
