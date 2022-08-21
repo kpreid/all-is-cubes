@@ -33,7 +33,7 @@ use all_is_cubes::math::{
     Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint, GridRotation,
     GridVector, NotNan, Rgb, Rgba,
 };
-use all_is_cubes::space::{Space, SpacePhysics};
+use all_is_cubes::space::{SetCubeError, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
@@ -386,52 +386,53 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(name: "Resolutions")]
 async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
-    let footprint = GridAab::from_lower_size([0, 0, 0], [5, 2, 3]);
+    let footprint = GridAab::from_lower_size([0, 0, 0], [5, 3, 3]);
     let mut space = Space::empty(footprint);
 
-    for (i, &resolution) in [R1, R2, R4, R8, R16, R32].iter().enumerate() {
-        let i = i as GridCoordinate;
-        let location = GridPoint::new(i.rem_euclid(3) * 2, 0, i.div_euclid(3) * 2);
-        space.set(
-            location,
-            Block::builder()
-                .collision(BlockCollision::Recur)
-                .voxels_fn(universe, resolution, |p| {
-                    if p.x + p.y + p.z >= GridCoordinate::from(resolution) {
-                        return AIR.clone();
-                    }
-                    let rescale = if resolution > R8 { 4 } else { 1 };
-                    let color = Rgb::from(p.to_vec().map(|s| {
-                        NotNan::new(
-                            (s / GridCoordinate::from(rescale)) as f32
-                                / f32::from(u16::from(resolution) / rescale - 1).max(1.),
-                        )
-                        .unwrap()
-                    }));
-                    Block::from(color)
-                })?
-                .build(),
-        )?;
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
-        space.set(
-            location + GridVector::unit_y(),
-            &draw_to_blocks(
-                universe,
-                R32,
-                0,
-                0..1,
-                BlockAttributes {
-                    display_name: resolution.to_string().into(),
-                    collision: BlockCollision::None,
-                    ..BlockAttributes::default()
-                },
-                &Text::with_baseline(
-                    &resolution.to_string(),
-                    Point::new(0, -1),
-                    MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
-                    Baseline::Bottom,
-                ),
-            )?[GridPoint::origin()],
+    for (i, &resolution) in (0i32..).zip([R1, R2, R4, R8, R16, R32].iter()) {
+        stack(
+            &mut space,
+            GridPoint::new(i.rem_euclid(3) * 2, 0, i.div_euclid(3) * 2),
+            [
+                pedestal,
+                &Block::builder()
+                    .collision(BlockCollision::Recur)
+                    .voxels_fn(universe, resolution, |p| {
+                        if p.x + p.y + p.z >= GridCoordinate::from(resolution) {
+                            return AIR.clone();
+                        }
+                        let rescale = if resolution > R8 { 4 } else { 1 };
+                        let color = Rgb::from(p.to_vec().map(|s| {
+                            NotNan::new(
+                                (s / GridCoordinate::from(rescale)) as f32
+                                    / f32::from(u16::from(resolution) / rescale - 1).max(1.),
+                            )
+                            .unwrap()
+                        }));
+                        Block::from(color)
+                    })?
+                    .build(),
+                &draw_to_blocks(
+                    universe,
+                    R32,
+                    0,
+                    0..1,
+                    BlockAttributes {
+                        display_name: resolution.to_string().into(),
+                        collision: BlockCollision::None,
+                        ..BlockAttributes::default()
+                    },
+                    &Text::with_baseline(
+                        &resolution.to_string(),
+                        Point::new(0, -1),
+                        MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                        Baseline::Bottom,
+                    ),
+                )?[GridPoint::origin()],
+            ],
         )?;
     }
 
@@ -451,25 +452,28 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
     space.set(center, central_block)?;
 
     let mut place_rotated_arrow = |pos: GridPoint, rot: GridRotation| -> Result<(), InGenError> {
-        space.set(pos, pointing_block.clone().rotate(rot))?;
-        space.set(
-            pos + GridVector::unit_y(),
-            &draw_to_blocks(
-                universe,
-                R32,
-                0,
-                0..1,
-                BlockAttributes {
-                    collision: BlockCollision::None,
-                    ..BlockAttributes::default()
-                },
-                &Text::with_baseline(
-                    &format!("{:?}", rot),
-                    Point::new(0, -1),
-                    MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
-                    Baseline::Bottom,
-                ),
-            )?[GridPoint::origin()],
+        stack(
+            &mut space,
+            pos,
+            [
+                &pointing_block.clone().rotate(rot),
+                &draw_to_blocks(
+                    universe,
+                    R32,
+                    0,
+                    0..1,
+                    BlockAttributes {
+                        collision: BlockCollision::None,
+                        ..BlockAttributes::default()
+                    },
+                    &Text::with_baseline(
+                        &format!("{:?}", rot),
+                        Point::new(0, -1),
+                        MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                        Baseline::Bottom,
+                    ),
+                )?[GridPoint::origin()],
+            ],
         )?;
         Ok(())
     };
@@ -803,7 +807,12 @@ async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
 async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
     // TODO: it would be nice if this exhibit visualized the generated bounding box somehow
 
-    let mut make_block = |rotation: GridRotation| -> Block {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
+
+    let mut outer_space = Space::empty(GridAab::from_lower_size([0, 0, 0], [4, 2, 1]));
+
+    let mut place = |position: [i32; 3], rotation: GridRotation| -> Result<(), InGenError> {
         let terrain_map_function = |pixel: image::Rgba<u8>| -> VoxelBrush<'static> {
             let image::Rgba([r, g, b, _a]) = pixel;
             if r > b || g > b {
@@ -818,18 +827,37 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
         let image = include_image!("exhibits/terrain-image.png");
         let image_space = universe
             .insert_anonymous(space_from_image(image, rotation, terrain_map_function).unwrap());
-        Block::builder()
+        let block = Block::builder()
             .collision(BlockCollision::Recur)
             .display_name(format!("{rotation:?}"))
             .voxels_ref(R16, image_space)
-            .build()
-    };
+            .build();
 
-    let mut outer_space = Space::empty(GridAab::from_lower_size([0, 0, 0], [4, 1, 1]));
-    outer_space.set([0, 0, 0], make_block(GridRotation::RXYZ))?;
-    outer_space.set([1, 0, 0], make_block(GridRotation::RXyZ))?;
-    outer_space.set([2, 0, 0], make_block(GridRotation::RXZY))?;
-    outer_space.set([3, 0, 0], make_block(GridRotation::RxYZ))?;
+        stack(&mut outer_space, position, [pedestal, &block])?;
+        Ok(())
+    };
+    place([0, 0, 0], GridRotation::RXYZ)?;
+    place([1, 0, 0], GridRotation::RXyZ)?;
+    place([2, 0, 0], GridRotation::RXZY)?;
+    place([3, 0, 0], GridRotation::RxYZ)?;
 
     Ok(outer_space)
+}
+
+/// Place a series of blocks on top of each other, starting at the specified point.
+///
+/// TODO: think about whether this should be instead returning a VoxelBrush or a SpaceTransaction or something, for the future of composable worldgen
+fn stack<'b, B>(
+    space: &mut Space,
+    origin: impl Into<GridPoint>,
+    blocks: impl IntoIterator<Item = B>,
+) -> Result<(), SetCubeError>
+where
+    B: Into<std::borrow::Cow<'b, Block>>,
+{
+    let origin = origin.into();
+    for (y, block) in (0..).zip(blocks) {
+        space.set(origin + GridVector::unit_y() * y, block)?;
+    }
+    Ok(())
 }
