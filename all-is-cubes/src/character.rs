@@ -411,13 +411,22 @@ impl Character {
             }
         }
 
+        /// What average luminance of the exposed scene to try to match
         const TARGET_LUMINANCE: f32 = 0.9;
+        /// Proportion by which we apply the exposure adjustment rather than not
+        /// (0.0 = none, 1.0 = perfect adaptation). This is less than 1 so that
+        /// dark areas stay dark.
+        /// TODO: this should be an adjustable game rule + graphics option.
+        const ADJUSTMENT_STRENGTH: f32 = 0.5;
         const EXPOSURE_CHANGE_RATE: f32 = 2.0;
 
         // Combine the light rays into an exposure value update.
         let light_average: Rgb = self.light_samples.iter().copied().sum::<Rgb>()
             * (self.light_samples.len() as f32).recip();
         let derived_exposure = (TARGET_LUMINANCE / light_average.luminance()).clamp(0.1, 10.);
+        // Lerp between full adjustment and no adjustment according to ADJUSTMENT_STRENGTH
+        let derived_exposure =
+            derived_exposure * ADJUSTMENT_STRENGTH + 1. * (1. - ADJUSTMENT_STRENGTH);
         if derived_exposure.is_finite() {
             let delta_log = derived_exposure.ln() - self.exposure_log;
             self.exposure_log += delta_log * dt as f32 * EXPOSURE_CHANGE_RATE;
