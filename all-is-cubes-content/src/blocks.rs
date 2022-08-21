@@ -46,6 +46,7 @@ pub enum DemoBlocks {
     Curb,
     CurbCorner,
     ExhibitBackground,
+    Pedestal,
     Signboard,
     Clock,
     Explosion(u8),
@@ -106,6 +107,8 @@ pub async fn install_demo_blocks(
     let lamp_globe = Block::from(Rgba::WHITE);
     let lamppost_metal = Block::from(palette::ALMOST_BLACK);
     let lamppost_edge = Block::from(palette::ALMOST_BLACK * 1.12);
+
+    let pedestal_voxel = Block::from(palette::STONE);
 
     use DemoBlocks::*;
     BlockProvider::<DemoBlocks>::new(p, |key| {
@@ -325,6 +328,24 @@ pub async fn install_demo_blocks(
                     })?
                     .build()
             }
+
+            Pedestal => Block::builder()
+                .display_name("Pedestal")
+                .collision(BlockCollision::Recur)
+                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .voxels_fn(universe, resolution, |cube| {
+                    // TODO: fancier shape
+                    let shape: [GridCoordinate; 16] =
+                        [6, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 7, 8, 8];
+                    let [radius, secondary] = square_radius(resolution, cube);
+                    let size = shape.get(cube.y as usize).copied().unwrap_or(0);
+                    if radius <= size && (radius != secondary || radius < size) {
+                        &pedestal_voxel
+                    } else {
+                        &AIR
+                    }
+                })?
+                .build(),
 
             Signboard => {
                 let sign_board = Block::from(palette::PLANK);
