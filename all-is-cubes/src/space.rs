@@ -160,26 +160,34 @@ impl Space {
             bounds,
             spawn,
             physics,
+            initial_fill,
         } = builder;
 
         let volume = bounds.volume();
 
+        // Set up initial block state
+        // TODO: make failure to evaluate a reported error rather than panicking
+        let todo = Default::default();
+        let mut block_data = SpaceBlockData::new(
+            initial_fill.clone(),
+            // initial-creation version of listener_for_block()
+            SpaceBlockChangeListener {
+                todo: Arc::downgrade(&todo),
+                index: 0,
+            },
+        )
+        .expect("evaluation of block for newly created space failed");
+        block_data.count = volume;
+
         Space {
             bounds,
+            block_data: if volume > 0 { vec![block_data] } else { vec![] },
             block_to_index: {
                 let mut map = HashMap::new();
                 if volume > 0 {
-                    map.insert(AIR, 0);
+                    map.insert(initial_fill, 0);
                 }
                 map
-            },
-            block_data: if volume > 0 {
-                vec![SpaceBlockData {
-                    count: volume,
-                    ..SpaceBlockData::NOTHING
-                }]
-            } else {
-                vec![]
             },
             contents: vec![0; volume].into_boxed_slice(),
 
@@ -193,7 +201,7 @@ impl Space {
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
             cubes_wanting_ticks: HashSet::new(),
             notifier: Notifier::new(),
-            todo: Default::default(),
+            todo,
         }
     }
 

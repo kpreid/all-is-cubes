@@ -1,5 +1,6 @@
 use cgmath::{EuclideanSpace, InnerSpace, Point3};
 
+use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::math::{FreeCoordinate, Rgb};
 use crate::space::{GridAab, LightPhysics, Space, SpacePhysics};
@@ -15,15 +16,27 @@ pub struct SpaceBuilder {
     pub(super) bounds: GridAab,
     pub(super) spawn: Option<Spawn>,
     pub(super) physics: SpacePhysics,
+    pub(super) initial_fill: Block,
 }
 
 impl SpaceBuilder {
+    /// Use [`Space::builder()`] as the public way to call this.
     pub(super) const fn new(bounds: GridAab) -> Self {
         Self {
             bounds,
             spawn: None,
             physics: SpacePhysics::DEFAULT,
+            initial_fill: AIR,
         }
+    }
+
+    /// Sets the [`Block`] that the space's volume will be filled with.
+    ///
+    /// Caution: If [evaluating](Block::evaluate) the block fails, constructing the space
+    /// will panic. Future versions may improve on this.
+    pub fn filled_with(mut self, block: Block) -> Self {
+        self.initial_fill = block;
+        self
     }
 
     /// Sets the value for [`Space::physics`], which determines global characteristics
@@ -85,7 +98,6 @@ impl SpaceBuilder {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Space {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use crate::block::AIR;
         use crate::content::make_some_blocks;
 
         // TODO: Should be reusing GridArray as Arbitrary for this.
@@ -124,4 +136,36 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
 
         Ok(space)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::math::Rgba;
+
+    use super::*;
+
+    #[test]
+    fn defaults() {
+        let bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
+        let space = Space::builder(bounds).build_empty();
+        space.consistency_check();
+        assert_eq!(space.bounds(), bounds);
+        assert_eq!(space[bounds.lower_bounds()], AIR);
+        assert_eq!(space.physics(), &SpacePhysics::default());
+        assert_eq!(space.spawn(), &Spawn::default_for_new_space(bounds));
+    }
+
+    #[test]
+    fn filled_with() {
+        let bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
+        let block = Block::from(Rgba::WHITE);
+        let space = Space::builder(bounds)
+            .filled_with(block.clone())
+            .build_empty();
+        space.consistency_check();
+        assert_eq!(space[bounds.lower_bounds()], block);
+    }
+
+    // TODO: test and implement initial fill that has a tick_action
+    // TODO: test all builder features
 }
