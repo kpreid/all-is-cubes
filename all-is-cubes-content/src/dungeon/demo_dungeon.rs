@@ -43,6 +43,8 @@ struct DemoRoom {
     floor: FloorKind,
     corridor_only: bool,
     lit: bool,
+
+    grants_item: Option<Block>,
 }
 
 impl DemoRoom {
@@ -70,6 +72,7 @@ struct DemoTheme {
     lamp_block: Block,
     /// TODO: replace window glass with openings that are too small to pass through
     window_glass_block: Block,
+    item_pedestal: Block,
 }
 
 impl DemoTheme {
@@ -324,6 +327,18 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     }
                 }
 
+                // Item.
+                if let Some(block) = &room_data.grants_item {
+                    // note that this is the nominal floor, not the possibly extended downward floor
+                    let floor_middle =
+                        point_to_enclosing_cube(floor_layer.abut(Face6::PY, 1).unwrap().center())
+                            .unwrap();
+                    space.set(floor_middle, &self.item_pedestal)?;
+                    // TODO: This should be in pick-up-able form as opposed to placed,
+                    // once such a distinction is actually implemented
+                    space.set(floor_middle + GridVector::unit_y(), block)?;
+                }
+
                 // Set spawn.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
                 if matches!(room_data.maze_field_type, FieldType::Start) {
@@ -378,6 +393,7 @@ pub(crate) async fn demo_dungeon(
         wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),
         lamp_block: demo_blocks[DemoBlocks::Lamp].clone(),
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
+        item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
     };
 
     let mut maze_seed = [0; 32];
@@ -404,10 +420,10 @@ pub(crate) async fn demo_dungeon(
         // Floor pit
         let floor = if !corridor_only
             && matches!(maze_field.field_type, FieldType::Normal)
-            && rng.gen_bool(0.5)
+            && rng.gen_bool(0.25)
         {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::NY, 1));
-            *[FloorKind::Chasm, FloorKind::Bridge]
+            *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
                 .choose(&mut rng)
                 .unwrap()
         } else {
@@ -447,6 +463,24 @@ pub(crate) async fn demo_dungeon(
             floor,
             corridor_only,
             lit: !windowed_faces[Face7::PY] && rng.gen_bool(0.75),
+            grants_item: (matches!(floor, FloorKind::Solid) && !corridor_only && rng.gen_bool(0.5))
+                .then(|| {
+                    // Random assortment of blocks to provide
+                    // TODO: make this things like keys for doors
+                    Block::clone(
+                        [
+                            &demo_blocks[DemoBlocks::Lamp],
+                            &demo_blocks[DemoBlocks::Signboard],
+                            // TODO: can't do this until we have an "item" form: &demo_blocks[DemoBlocks::Explosion(0)],
+                            &landscape_blocks[LandscapeBlocks::Leaves],
+                            &landscape_blocks[LandscapeBlocks::Grass],
+                            &landscape_blocks[LandscapeBlocks::Dirt],
+                            &landscape_blocks[LandscapeBlocks::Stone],
+                        ]
+                        .choose(&mut rng)
+                        .unwrap(),
+                    )
+                }),
         })
     });
 
