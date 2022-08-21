@@ -244,14 +244,23 @@ pub(crate) async fn demo_city(
     let [exhibits_progress, final_progress] = p.finish_and_cut(0.6).await.split(0.8);
 
     // Exhibits
-    for (exhibit, exhibit_progress) in DEMO_CITY_EXHIBITS
+    'exhibit: for (exhibit, exhibit_progress) in DEMO_CITY_EXHIBITS
         .iter()
         .zip(exhibits_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
     {
         let start_exhibit_time = Instant::now();
-        let exhibit_space = (exhibit.factory)(exhibit, universe)
-            .await
-            .expect("exhibit generation failure. TODO: place an error marker and continue instead");
+        let exhibit_space = match (exhibit.factory)(exhibit, universe).await {
+            Ok(s) => s,
+            Err(error) => {
+                // TODO: include cause chain in logging.
+                // TODO: put the error on a sign in place of the exhibit
+                log::error!(
+                    "Exhibit generation failure.\nExhibit: {name}\nError: {error}",
+                    name = exhibit.name
+                );
+                continue 'exhibit;
+            }
+        };
         exhibit_progress.progress(0.7).await;
 
         let exhibit_footprint = exhibit_space.bounds();
