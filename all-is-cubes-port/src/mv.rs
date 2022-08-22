@@ -1,3 +1,5 @@
+//! Import of MagicaVoxel `.vox` files.
+
 use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::character::{Character, Spawn};
@@ -133,4 +135,23 @@ impl From<DotVoxConversionError> for InGenError {
     fn from(error: DotVoxConversionError) -> Self {
         InGenError::other(error)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn invalid_file_error() {
+        let error = load_dot_vox(YieldProgress::noop(), &[]).await.unwrap_err();
+        assert!(
+            matches!(
+                error,
+                DotVoxConversionError::Parse("Not a valid MagicaVoxel .vox file")
+            ),
+            "{error:?}"
+        );
+    }
+
+    // TODO: add tests of loading valid files (we will need to create test data files)
 }
