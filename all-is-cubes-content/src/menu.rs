@@ -162,7 +162,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
             spawn.set_inventory(vec![Tool::Activate.into()]);
             spawn
         })
-        .build_empty();
+        .build();
 
     // TODO: These errors ought to autoconvert into InGenError
     tree.perform_layout(LayoutGrant::new(bounds))

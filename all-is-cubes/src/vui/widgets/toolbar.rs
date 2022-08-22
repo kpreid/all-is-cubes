@@ -59,7 +59,7 @@ impl Toolbar {
                 ),
             ))
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-            .build_empty(),
+            .build(),
         );
         Arc::new(Self {
             hud_blocks,

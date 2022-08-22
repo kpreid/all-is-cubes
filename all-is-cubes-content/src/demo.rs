@@ -198,7 +198,7 @@ fn cornell_box() -> Result<Space, InGenError> {
             spawn.set_eye_position(Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into());
             spawn
         })
-        .build_empty();
+        .build();
 
     let white: Block = Rgba::new(1.0, 1.0, 1.0, 1.0).into();
     let red: Block = Rgba::new(0.57, 0.025, 0.025, 1.0).into();
@@ -256,7 +256,7 @@ async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InG
             spawn.set_inventory(free_editing_starter_inventory(false));
             spawn
         })
-        .build_empty();
+        .build();
     let shell_radius: GridCoordinate = shell_radius.into();
     let planet_radius: GridCoordinate = planet_radius.into();
 

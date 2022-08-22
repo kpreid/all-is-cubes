@@ -132,7 +132,7 @@ impl HudLayout {
                 sky_color: palette::HUD_SKY,
                 ..SpacePhysics::default()
             })
-            .build_empty();
+            .build();
 
         if false {
             // Visualization of the bounds of the space we're drawing.
@@ -366,7 +366,7 @@ impl HudBlocks {
         let toolbar_frame_voxel_bounds = toolbar_frame_block_bounds.multiply(resolution_g);
         let mut toolbar_drawing_space = Space::builder(toolbar_frame_voxel_bounds)
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-            .build_empty();
+            .build();
 
         // Draw background for icons to “rest on”
         let horizontal_drawing = &mut toolbar_drawing_space.draw_target(

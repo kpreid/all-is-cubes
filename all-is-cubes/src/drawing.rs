@@ -417,7 +417,7 @@ where
 
     let mut drawing_space = Space::builder(drawing_bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build_empty();
+        .build();
     object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
         [0, 0, z],
         Face7::PX,

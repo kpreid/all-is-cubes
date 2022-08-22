@@ -339,8 +339,7 @@ mod tests {
     fn surface_iter_smoke_test() {
         let universe = &mut Universe::new();
 
-        let mut space =
-            Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 3, 1])).build_empty();
+        let mut space = Space::empty(GridAab::from_lower_size([0, 0, 0], [1, 3, 1]));
 
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
         space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
@@ -395,10 +394,10 @@ mod tests {
     /// Test that exiting a block at the edge of the space still reports the exit t-distance.
     #[test]
     fn surface_iter_exit_block_at_end_of_space() {
-        let mut space =
-            Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1])).build_empty();
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
-        space.set([0, 0, 0], Block::from(solid_test_color)).unwrap();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .filled_with(Block::from(solid_test_color))
+            .build();
 
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
 

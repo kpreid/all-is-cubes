@@ -493,8 +493,7 @@ mod tests {
     /// Set up a `Modifier::Move`, let it run, and then allow assertions to be made about the result.
     fn move_block_test(direction: Face6, velocity: i16, checker: impl FnOnce(&Space, &Block)) {
         let [block] = make_some_blocks();
-        let mut space =
-            Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2])).build_empty();
+        let mut space = Space::empty(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]));
         let [move_out, move_in] = Modifier::paired_move(direction, 0, velocity);
         space
             .set([0, 0, 0], move_out.attach(block.clone()))

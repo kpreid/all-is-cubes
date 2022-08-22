@@ -240,7 +240,7 @@ pub async fn install_demo_blocks(
                 .build(),
 
             Arrow => {
-                let mut space = Space::for_block(resolution).build_empty();
+                let mut space = Space::for_block(resolution).build();
 
                 // Support legs, identifying the down / -Y direction.
                 let leg = Block::from(palette::STEEL);
@@ -357,7 +357,7 @@ pub async fn install_demo_blocks(
                 let resolution_g = GridCoordinate::from(resolution);
                 let top_edge = 10;
 
-                let mut space = Space::for_block(resolution).build_empty();
+                let mut space = Space::for_block(resolution).build();
 
                 // Sign board
                 {
@@ -399,7 +399,7 @@ pub async fn install_demo_blocks(
 
             Clock => {
                 let resolution = R16;
-                let mut space = Space::for_block(resolution).build_empty();
+                let mut space = Space::for_block(resolution).build();
                 space.add_behavior(crate::animation::Clock::new());
                 Block::builder()
                     .display_name("Clock")

@@ -186,7 +186,7 @@ fn reflectance_is_clamped() {
     let sky_color = rgb_const!(0.5, 0.5, 0.5);
     let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 3, 3]))
         .sky_color(sky_color)
-        .build_empty();
+        .build();
     space.set([1, 1, 1], &over_unity_block).unwrap();
     space.set([3, 1, 1], &over_unity_block).unwrap();
     space.evaluate_light(0, |_| {});

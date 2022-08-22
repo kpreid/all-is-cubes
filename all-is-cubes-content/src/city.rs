@@ -105,7 +105,7 @@ pub(crate) async fn demo_city(
             spawn.set_inventory(inventory);
             spawn
         })
-        .build_empty();
+        .build();
 
     // Fill basic layers, underground and top
     space.fill_uniform(planner.y_range(-ground_depth, 0), &landscape_blocks[Stone])?;

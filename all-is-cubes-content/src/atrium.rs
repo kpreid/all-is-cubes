@@ -80,7 +80,7 @@ pub(crate) async fn atrium(
             spawn
         })
         .sky_color(Rgb::new(1.0, 1.0, 0.9843) * 4.0)
-        .build_empty();
+        .build();
 
     // Outer walls
     four_walls(
@@ -532,7 +532,7 @@ async fn install_atrium_blocks(
                 // .light_emission(rgb_const!(1.4, 1.0, 0.8) * 4.0)
                 .collision(BlockCollision::Recur)
                 .voxels_ref(resolution, {
-                    let mut space = Space::for_block(resolution).build_empty();
+                    let mut space = Space::for_block(resolution).build();
                     // Use a darker color to dampen the effect of interior light
                     let body_block = Block::from(palette::STEEL * 0.2);
                     space.fill(
@@ -595,7 +595,7 @@ fn generate_arch<'b>(
             ],
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build_empty();
+        .build();
         space.fill(space.bounds(), |p| {
             // Flip middle of first block, so that the arch to our left appears on it
             let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {

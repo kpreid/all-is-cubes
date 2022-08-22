@@ -155,7 +155,7 @@ where
 
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build_empty();
+        .build();
     embedded_graphics::image::Image::new(&&ia, Point::zero())
         .draw(&mut space.draw_target(transform_for_drawing))?;
     Ok(space)

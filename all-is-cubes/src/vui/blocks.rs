@@ -176,7 +176,7 @@ impl ButtonBuilder {
             [Self::RESOLUTION_G, Self::RESOLUTION_G, label_z + 1],
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build_empty();
+        .build();
         let draw_target = &mut space.draw_target(
             GridMatrix::from_translation([0, Self::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
         );

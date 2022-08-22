@@ -33,7 +33,7 @@ pub fn lighting_bench_space(_universe: &mut Universe) -> Result<Space, InGenErro
             spawn.set_inventory(free_editing_starter_inventory(true));
             spawn
         })
-        .build_empty();
+        .build();
 
     // Ground level
     space

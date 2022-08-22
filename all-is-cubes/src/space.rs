@@ -149,9 +149,9 @@ impl Space {
 
     /// Constructs a [`Space`] that is entirely filled with [`AIR`].
     ///
-    /// Equivalent to `Space::builder(bounds).build_empty()`
+    /// Equivalent to `Space::builder(bounds).build()`
     pub fn empty(bounds: GridAab) -> Space {
-        Space::builder(bounds).build_empty()
+        Space::builder(bounds).build()
     }
 
     /// Implementation of [`SpaceBuilder`]'s terminal methods.

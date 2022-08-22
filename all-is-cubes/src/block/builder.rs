@@ -169,8 +169,8 @@ impl<C> BlockBuilder<C> {
         F: FnMut(GridPoint) -> B,
         B: std::borrow::Borrow<Block>,
     {
-        let mut space = Space::for_block(resolution).build_empty();
-        // TODO: Teach the SpaceBuilder to accept a function in the same way
+        let mut space = Space::for_block(resolution).build();
+        // TODO: Teach the SpaceBuilder to accept a function in the same way?
         space.fill(space.bounds(), |point| Some(function(point)))?;
         Ok(self.voxels_ref(resolution, universe.insert_anonymous(space)))
     }

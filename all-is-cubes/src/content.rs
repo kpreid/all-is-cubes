@@ -83,10 +83,9 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
     let resolution = R16;
     color_sequence_for_make_blocks(COUNT)
         .map(|(i, color)| {
-            let mut block_space = Space::for_block(resolution).build_empty();
-            block_space
-                .fill_uniform(block_space.bounds(), Block::from(color))
-                .unwrap();
+            let mut block_space = Space::for_block(resolution)
+                .filled_with(Block::from(color))
+                .build();
             axes(&mut block_space).unwrap();
             for face in Face6::ALL {
                 Text::with_text_style(

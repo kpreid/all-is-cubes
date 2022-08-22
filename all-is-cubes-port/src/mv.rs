@@ -91,7 +91,7 @@ fn convert_dot_vox_model(
             maximum_distance: extent.y_range().len() as u16,
         })
         .sky_color(Rgb::ONE)
-        .build_empty();
+        .build();
     for v in model.voxels {
         // Coordinates are Z-up right-handed compared to our Y-up right-handed,
         // so swap Z into Y and invert Y as Z.

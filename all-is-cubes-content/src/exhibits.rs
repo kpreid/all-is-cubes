@@ -198,7 +198,7 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
 
     let mut drawing_space = Space::builder(footprint.multiply(resolution.into()))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build_empty();
+        .build();
     let paint1 = Block::from(Rgba::new(0.7, 0.7, 0.7, 1.0));
     let paint2 = Block::from(Rgba::new(0.1, 0.1, 0.9, 1.0));
     let paint3 = Block::from(Rgba::new(0.9, 0.7, 0.1, 1.0));
@@ -289,7 +289,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
 
     let sweep_block = {
         let resolution = R8;
-        let mut block_space = Space::for_block(resolution).build_empty();
+        let mut block_space = Space::for_block(resolution).build();
         // The length of this pattern is set so that the block will sometimes be fully opaque and sometimes be invisible.
         let fills = [
             AIR,
@@ -329,7 +329,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
             .light_emission(rgb_const!(1.4, 1.0, 0.8) * 8.0)
             .voxels_ref(fire_resolution, {
                 let fire_bounds = GridAab::for_block(fire_resolution);
-                let mut space = Space::for_block(fire_resolution).build_empty();
+                let mut space = Space::for_block(fire_resolution).build();
                 space.set([0, 0, 0], Rgb::ONE)?; // placeholder for not fully transparent so first pass lighting is better
                 space.add_behavior(Fire::new(fire_bounds));
                 universe.insert_anonymous(space)
@@ -623,8 +623,9 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
     let wall_block = {
         let colors_as_blocks: Vec<Block> =
             surface_colors.iter().copied().map(Block::from).collect();
-        let mut wall_block_space = Space::for_block(wall_resolution).build_empty();
-        wall_block_space.fill_uniform(wall_block_space.bounds(), &wall_color_block)?;
+        let mut wall_block_space = Space::for_block(wall_resolution)
+            .filled_with(wall_color_block.clone())
+            .build();
         for rotation in [
             GridRotation::IDENTITY,
             GridRotation::CLOCKWISE,

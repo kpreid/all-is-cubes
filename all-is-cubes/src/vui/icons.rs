@@ -106,7 +106,7 @@ impl Icons {
                         .stroke_width(1)
                         .build();
 
-                    let mut space = Space::for_block(resolution).build_empty();
+                    let mut space = Space::for_block(resolution).build();
                     let display = &mut space.draw_target(GridMatrix::from_origin(
                         GridPoint::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2),
                         Face7::PX,

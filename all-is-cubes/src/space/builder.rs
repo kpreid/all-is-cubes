@@ -9,7 +9,7 @@ use crate::space::{GridAab, LightPhysics, Space, SpacePhysics};
 ///
 /// To create one, call [`Space::builder()`](Space::builder).
 ///
-/// TODO: Allow specifying behaviors and initial block contents.
+/// TODO: Allow specifying behaviors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
 pub struct SpaceBuilder {
@@ -88,9 +88,8 @@ impl SpaceBuilder {
         self
     }
 
-    /// Construct a new [`Space`] filled with [`AIR`](crate::block::AIR), with the bounds
-    /// and settings of this builder.
-    pub fn build_empty(self) -> Space {
+    /// Construct a [`Space`] with the contents and settings from this builder.
+    pub fn build(self) -> Space {
         Space::new_from_builder(self)
     }
 }
@@ -106,7 +105,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
         let mut space = Space::builder(bounds)
             .physics(u.arbitrary()?)
             .spawn(u.arbitrary()?)
-            .build_empty();
+            .build();
 
         // Generate some blocks to put in the space
         let mut blocks = Vec::from(make_some_blocks::<2>()); // TODO: generate arbitrary blocks with attributes
@@ -147,7 +146,7 @@ mod tests {
     #[test]
     fn defaults() {
         let bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
-        let space = Space::builder(bounds).build_empty();
+        let space = Space::builder(bounds).build();
         space.consistency_check();
         assert_eq!(space.bounds(), bounds);
         assert_eq!(space[bounds.lower_bounds()], AIR);
@@ -159,9 +158,7 @@ mod tests {
     fn filled_with() {
         let bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
         let block = Block::from(Rgba::WHITE);
-        let space = Space::builder(bounds)
-            .filled_with(block.clone())
-            .build_empty();
+        let space = Space::builder(bounds).filled_with(block.clone()).build();
         space.consistency_check();
         assert_eq!(space[bounds.lower_bounds()], block);
     }

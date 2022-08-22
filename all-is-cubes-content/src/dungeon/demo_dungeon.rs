@@ -489,7 +489,7 @@ pub(crate) async fn demo_dungeon(
         .expand(FaceMap::symmetric([30, 1, 30]));
     let mut space = Space::builder(space_bounds)
         .sky_color(palette::DAY_SKY_COLOR * 2.0)
-        .build_empty();
+        .build();
 
     // Fill in (under)ground areas
     space.fill_uniform(

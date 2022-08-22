@@ -434,15 +434,13 @@ fn fully_opaque_partial_block() {
     let mut u = Universe::new();
     let block = Block::builder()
         .voxels_ref(R8, {
-            // The dimensions don't meet the PX face.
-            let mut block_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 8, 8]))
-                .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-                .build_empty();
-            // But the blocks are all opaque.
-            block_space
-                .fill_uniform(block_space.bounds(), Block::from(Rgba::WHITE))
-                .unwrap();
-            u.insert_anonymous(block_space)
+            // The dimensions don't meet the PX face, but the blocks are all opaque.
+            u.insert_anonymous(
+                Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 8, 8]))
+                    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                    .filled_with(Block::from(Rgba::WHITE))
+                    .build(),
+            )
         })
         .build();
     assert_eq!(

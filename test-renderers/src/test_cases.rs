@@ -107,7 +107,7 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
             spawn.set_look_direction([0., 0., -1.]);
             spawn
         })
-        .build_empty();
+        .build();
 
     let dr = Vector3::new(1, 0, 0);
     let dg = Vector3::new(1, 1, 0);
@@ -232,7 +232,7 @@ async fn follow_character_change(context: RenderTestContext) {
     let mut character_of_a_color = |color: Rgb| -> URef<Character> {
         let space = Space::builder(GridAab::for_block(R1))
             .sky_color(color)
-            .build_empty();
+            .build();
         let character = Character::spawn_default(universe.insert_anonymous(space));
         universe.insert_anonymous(character)
     };
@@ -270,7 +270,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
     let mut space = Space::builder(bounds)
         .sky_color(rgb_const!(0.5, 0.5, 0.5))
         .spawn(looking_at_one_cube_spawn(bounds))
-        .build_empty();
+        .build();
     space
         .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
         .unwrap();
@@ -348,7 +348,7 @@ async fn icons(mut context: RenderTestContext) {
             FreeCoordinate::from(bounds.size().y) / 2.,
             FreeCoordinate::from(bounds.size().y) * 1.5,
         ))
-        .build_empty();
+        .build();
     for (index, block) in all_blocks.into_iter().enumerate() {
         let index = index as GridCoordinate;
         space
@@ -487,7 +487,7 @@ async fn sky_and_info_text(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
         .sky_color(rgb_const!(1.0, 0.5, 0.0))
-        .build_empty();
+        .build();
     finish_universe_from_space(&mut universe, space);
     let overlays = Overlays {
         cursor: None,
@@ -616,17 +616,13 @@ fn unaltered_color_options() -> GraphicsOptions {
 
 fn one_cube_space() -> Space {
     let bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
-    let mut space = Space::builder(bounds)
+
+    Space::builder(bounds)
         .sky_color(rgb_const!(0.5, 0.5, 0.5))
         .spawn(looking_at_one_cube_spawn(bounds))
-        .build_empty();
-
-    // Fill the cube with a default block -- tests can replace this.
-    space
-        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
-        .unwrap();
-
-    space
+        // Fill the cube with a default block -- tests can replace this.
+        .filled_with(Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
+        .build()
 }
 
 fn looking_at_one_cube_spawn(bounds: GridAab) -> Spawn {
@@ -643,7 +639,7 @@ fn ui_space(universe: &mut Universe) -> URef<Space> {
     let mut ui_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 4, 4]))
         .light_physics(all_is_cubes::space::LightPhysics::None)
         .sky_color(rgb_const!(1.0, 1.0, 0.5)) // blatantly wrong color that should not be seen
-        .build_empty();
+        .build();
     ui_space
         .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
         .unwrap();
@@ -661,7 +657,7 @@ async fn fog_test_universe() -> Arc<Universe> {
             spawn.set_look_direction(Vector3::new(0.4, 0., -1.0));
             spawn
         })
-        .build_empty();
+        .build();
 
     // Bottom floor
     space
@@ -711,7 +707,7 @@ async fn light_test_universe() -> Arc<Universe> {
     let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
     let mut space = Space::builder(bounds)
         .spawn_position(Point3::new(0., 0., 8.))
-        .build_empty();
+        .build();
 
     // Back wall
     space

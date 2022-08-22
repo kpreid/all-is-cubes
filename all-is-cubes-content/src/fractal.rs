@@ -41,7 +41,7 @@ pub(crate) fn menger_sponge(
             );
             spawn
         })
-        .build_empty();
+        .build();
     visit_menger_sponge_points(world_levels, GridPoint::origin(), &mut |cube| {
         space.set(cube, &leaf_block)?;
         Ok::<_, InGenError>(())

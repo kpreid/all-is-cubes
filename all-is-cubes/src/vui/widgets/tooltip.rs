@@ -203,7 +203,7 @@ impl TooltipWidget {
             ),
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build_empty();
+        .build();
         Arc::new(Self {
             width_in_hud,
             hud_blocks,
