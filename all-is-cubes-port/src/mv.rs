@@ -3,12 +3,12 @@
 use all_is_cubes::block::Block;
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::character::{Character, Spawn};
+use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{GridAab, GridPoint, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{Name, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_content::free_editing_starter_inventory;
 
 pub(crate) async fn load_dot_vox(
     p: YieldProgress,

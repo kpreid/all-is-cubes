@@ -151,7 +151,6 @@ name = "all-is-cubes-port"
 version = "0.4.0"
 dependencies = [
  "all-is-cubes",
- "all-is-cubes-content",
  "anyhow",
  "base64",
  "bytemuck",

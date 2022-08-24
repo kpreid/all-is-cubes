@@ -18,8 +18,6 @@ bench = false
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
-# TODO: remove dependency on all-is-cubes-content in favor of hooks to provide said content, for both flexibility and compile time
-all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 # TODO: remove dependency on anyhow in favor of more precisely designed errors
 anyhow = "1.0"
 dot_vox = "4.1.0"
