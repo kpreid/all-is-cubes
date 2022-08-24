@@ -23,6 +23,7 @@ crate-type = ["cdylib"]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
+all-is-cubes-port = { path = "../all-is-cubes-port", version = "0.4.0" }
 console_log = "0.2"
 console_error_panic_hook = "0.1.5"
 form_urlencoded = "1.0.1"
@@ -49,10 +50,15 @@ features = [
   "console",
   "AddEventListenerOptions",
   "CssStyleDeclaration", # HTMLElement.style for dynamic styling
+  "DataTransfer", # file drag-and-drop
+  "DataTransferItem",  # file drag-and-drop
+  "DataTransferItemList", # file drag-and-drop
   "Document",
   "DomTokenList", # classList
+  "DragEvent", # file drag-and-drop
   "Element",
   "EventTarget",
+  "File",  # file drag-and-drop - DataTransferItem.getAsFile()
   "FocusEvent",
   "HtmlElement",
   "HtmlProgressElement",

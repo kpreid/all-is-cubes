@@ -3,14 +3,15 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::time::Duration;
 
-use js_sys::Error;
+use js_sys::{ArrayBuffer, Error, Uint8Array};
 use rand::{thread_rng, Rng as _};
 use send_wrapper::SendWrapper;
 use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
-    console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,
-    HtmlProgressElement, KeyboardEvent, MouseEvent, Text,
+    console, AddEventListenerOptions, DataTransferItem, Document, DragEvent, Element, Event,
+    FocusEvent, HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text,
 };
 
 use all_is_cubes::apps::{CursorIcon, Key, Session, StandardCameras};
@@ -20,6 +21,7 @@ use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_wgpu;
+use all_is_cubes_port::file::NonDiskFile;
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl, RendererOption};
@@ -362,6 +364,60 @@ impl WebGameRoot {
             // Safari still does not have unprefixed fullscreen API as of version 16.1
             add_event_listener(target, "webkitfullscreenchange", listener, &options);
         }
+
+        // File drop listener.
+        // TODO: This code does not ever run. Probably need some additional handlers to
+        // register as being a drop target.
+        self.add_canvas_to_self_event_listener("drop", false, move |this, event: DragEvent| {
+            let mut found_file = None;
+            if let Some(data_transfer) = event.data_transfer() {
+                let items = data_transfer.items();
+                for i in 0..items.length() {
+                    let item: DataTransferItem = items.get(i).unwrap();
+                    match item.kind().as_str() {
+                        "string" => {}
+                        "file" => {
+                            if let Ok(Some(file)) = item.get_as_file() {
+                                found_file = Some(file);
+                            }
+                        }
+                        other_kind => {
+                            console::warn_1(&JsValue::from(format!(
+                                "unrecognized drag item kind: {other_kind:?}"
+                            )));
+                        }
+                    }
+                }
+            }
+
+            if let Some(found_file) = found_file {
+                // We've found a file to use. Further steps must be async.
+                event.prevent_default();
+
+                let this = this.self_ref.upgrade().unwrap();
+                spawn_local(async move {
+                    match JsFuture::from(found_file.array_buffer()).await {
+                        Ok(buffer) => {
+                            let buffer: ArrayBuffer = buffer.dyn_into().unwrap();
+                            // TODO: error reporting
+                            let universe = all_is_cubes_port::load_universe_from_file(
+                                YieldProgress::noop(),
+                                &NonDiskFile::from_name_and_data_source(found_file.name(), || {
+                                    Ok(Uint8Array::new(&buffer).to_vec())
+                                }),
+                            )
+                            .await
+                            .unwrap();
+                            this.borrow_mut().session.set_universe(universe);
+                        }
+                        Err(e) => {
+                            // TODO: present error to UI
+                            console::error_2(&JsValue::from_str("failed to load file"), &e);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     fn add_canvas_to_self_event_listener<E, F>(&self, event_name: &str, passive: bool, callback: F)

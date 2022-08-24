@@ -195,6 +195,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
  "all-is-cubes-gpu",
+ "all-is-cubes-port",
  "console_error_panic_hook",
  "console_log",
  "form_urlencoded",
