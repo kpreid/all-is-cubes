@@ -86,7 +86,7 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
         // TODO: Offer confirmation before replacing the current universe.
         // Also a progress bar and other UI.
         self.session.set_universe_async(async move {
-            all_is_cubes_port::load_universe_from_file(YieldProgress::noop(), &path)
+            all_is_cubes_port::load_universe_from_file(YieldProgress::noop(), &*path)
                 .await
                 .map_err(|e| {
                     // TODO: show error in user interface

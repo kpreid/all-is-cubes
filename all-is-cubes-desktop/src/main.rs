@@ -323,7 +323,7 @@ fn create_universe(
                 .await
                 .map_err(anyhow::Error::from),
             UniverseSource::File(path) => {
-                all_is_cubes_port::load_universe_from_file(yield_progress, &path).await
+                all_is_cubes_port::load_universe_from_file(yield_progress, &*path).await
             }
         }
     })?;

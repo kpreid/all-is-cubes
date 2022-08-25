@@ -43,11 +43,11 @@
 #![warn(missing_docs)]
 
 use anyhow::Context;
-use std::path::Path;
 
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
+pub mod file;
 pub mod gltf;
 mod mv;
 use mv::load_dot_vox;
@@ -58,14 +58,15 @@ use mv::load_dot_vox;
 /// TODO: Make a from-bytes version of this.
 pub async fn load_universe_from_file(
     progress: YieldProgress,
-    path: &Path,
+    file: impl file::Fileish,
 ) -> Result<Universe, anyhow::Error> {
-    let bytes = std::fs::read(path)
-        .with_context(|| format!("Could not read the file '{}'", path.display()))?;
+    let bytes = file
+        .read()
+        .with_context(|| format!("Could not read the file '{}'", file.display_full_path()))?;
     load_dot_vox(progress, &bytes).await.with_context(|| {
         format!(
             "Could not load '{}' as a MagicaVoxel .vox file",
-            path.display()
+            file.display_full_path()
         )
     })
 }
