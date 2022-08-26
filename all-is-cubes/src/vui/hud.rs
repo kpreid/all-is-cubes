@@ -346,7 +346,7 @@ impl HudBlocks {
         let ui_blocks = UiBlocks::new(universe, p1).await.install(universe).unwrap();
         let icons = Icons::new(universe, p2).await.install(universe).unwrap();
 
-        let text_brush = VoxelBrush::new::<_, Block>(vec![
+        let text_brush = VoxelBrush::new::<_, Block>([
             ([0, 0, 1], palette::HUD_TEXT_FILL.into()),
             ([1, 0, 0], palette::HUD_TEXT_STROKE.into()),
             ([-1, 0, 0], palette::HUD_TEXT_STROKE.into()),
@@ -445,8 +445,7 @@ impl HudBlocks {
             VoxelBrush::new(
                 points
                     .interior_iter()
-                    .map(|p| (p, toolbar_blocks_space[p].clone()))
-                    .collect(),
+                    .map(|p| (p, toolbar_blocks_space[p].clone())),
             )
         };
 

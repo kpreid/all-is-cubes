@@ -151,8 +151,8 @@ impl ButtonBuilder {
         let cap_rim_block = Block::from(palette::BUTTON_BACK.map_rgb(|rgb| rgb * 1.1));
 
         let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
-        let back_brush = VoxelBrush::new((0..label_z).map(|z| ([0, 0, z], &back_block)).collect());
-        let cap_rim_brush = VoxelBrush::new(vec![([0, 0, label_z - 1], &cap_rim_block)]);
+        let back_brush = VoxelBrush::new((0..label_z).map(|z| ([0, 0, z], &back_block)));
+        let cap_rim_brush = VoxelBrush::new([([0, 0, label_z - 1], &cap_rim_block)]);
 
         let outer_inset = 2;
         let outer_rectangle = Rectangle::with_corners(

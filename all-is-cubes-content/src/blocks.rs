@@ -442,7 +442,7 @@ pub async fn install_demo_blocks(
                         // Expand for the first 0.25 seconds out to ~5 blocks
                         if i % 3 == 0 {
                             if i % 6 == 0 {
-                                Some(VoxelBrush::new(vec![
+                                Some(VoxelBrush::new([
                                     ([0, 0, 0], next.clone()),
                                     ([1, 0, 0], next.clone()),
                                     ([-1, 0, 0], next.clone()),
@@ -452,7 +452,7 @@ pub async fn install_demo_blocks(
                                     ([0, 0, -1], next.clone()),
                                 ]))
                             } else {
-                                Some(VoxelBrush::new(vec![
+                                Some(VoxelBrush::new([
                                     ([0, 0, 0], next.clone()),
                                     ([1, 1, 0], next.clone()),
                                     ([-1, 1, 0], next.clone()),
@@ -469,11 +469,11 @@ pub async fn install_demo_blocks(
                                 ]))
                             }
                         } else {
-                            Some(VoxelBrush::new(vec![([0, 0, 0], next.clone())]))
+                            Some(VoxelBrush::new([([0, 0, 0], next.clone())]))
                         }
                     } else {
                         // Just fade
-                        Some(VoxelBrush::new(vec![([0, 0, 0], next.clone())]))
+                        Some(VoxelBrush::new([([0, 0, 0], next.clone())]))
                     }
                 };
             } else {

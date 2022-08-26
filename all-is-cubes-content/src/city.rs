@@ -65,7 +65,7 @@ pub(crate) async fn demo_city(
     let mut planner = CityPlanner::new(bounds);
 
     // Prepare brushes.
-    let lamp_brush = VoxelBrush::new(vec![
+    let lamp_brush = VoxelBrush::new([
         ((0, 0, 0), &demo_blocks[LamppostBase]),
         ((0, 1, 0), &demo_blocks[LamppostSegment]),
         ((0, 2, 0), &demo_blocks[LamppostTop]),

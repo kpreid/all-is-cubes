@@ -82,7 +82,7 @@ where
 {
     let foreground_text_block: Block = palette::LOGO_FILL.into();
     let background_text_block: Block = palette::LOGO_STROKE.into();
-    let brush = VoxelBrush::new(vec![
+    let brush = VoxelBrush::new([
         ((0, 0, 1), &foreground_text_block),
         ((1, 0, 0), &background_text_block),
         ((-1, 0, 0), &background_text_block),

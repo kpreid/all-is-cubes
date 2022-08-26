@@ -92,7 +92,7 @@ impl Icons {
                     let x_radius = i32::from(resolution) * 3 / 16;
                     let background_block_1: Block = Rgba::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
                     let background_block_2: Block = Rgba::new(0.8, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
-                    let background_brush = VoxelBrush::new(vec![
+                    let background_brush = VoxelBrush::new([
                         ((0, 0, 1), &background_block_1),
                         ((1, 0, 0), &background_block_2),
                         ((-1, 0, 0), &background_block_2),
@@ -174,24 +174,17 @@ impl Icons {
                                             VoxelBrush::new(vec![([0, 0, 0], dots(0))])
                                         }
                                         [0, 127, 0, 255] => VoxelBrush::new(
-                                            (0..16)
-                                                .into_iter()
-                                                .map(|y| ([0, y, 0], dots(y)))
-                                                .collect(),
+                                            (0..16).into_iter().map(|y| ([0, y, 0], dots(y))),
                                         ),
                                         [0, 255, 0, 255] => VoxelBrush::new(
-                                            (0..16)
-                                                .into_iter()
-                                                .map(|y| ([0, y, 0], dots(y + 1)))
-                                                .collect(),
+                                            (0..16).into_iter().map(|y| ([0, y, 0], dots(y + 1))),
                                         ),
                                         [255, 0, 0, 255] => VoxelBrush::new(
                                             (0..16)
                                                 .into_iter()
-                                                .map(|y| ([0, y, 0], bcolor.clone()))
-                                                .collect(),
+                                                .map(|y| ([0, y, 0], bcolor.clone())),
                                         ),
-                                        _ => VoxelBrush::new(vec![([0, 0, 0], bcolor)]),
+                                        _ => VoxelBrush::new([([0, 0, 0], bcolor)]),
                                     }
                                     .translate([8, 8, 0])
                                 },

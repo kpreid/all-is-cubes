@@ -182,7 +182,7 @@ impl<'a> PixelColor for &'a Block {
 }
 impl<'a> VoxelColor<'a> for &'a Block {
     fn into_blocks(self) -> VoxelBrush<'a> {
-        VoxelBrush::new(vec![([0, 0, 0], self)])
+        VoxelBrush::new([([0, 0, 0], self)])
     }
 }
 
@@ -223,7 +223,7 @@ impl<'a> VoxelBrush<'a> {
     /// Makes a [`VoxelBrush`] which paints the specified blocks at the specified offsets
     /// from each pixel position.
     // TODO: revisit what generics the parameter types have.
-    pub fn new<V, B>(blocks: Vec<(V, B)>) -> Self
+    pub fn new<V, B>(blocks: impl IntoIterator<Item = (V, B)>) -> Self
     where
         V: Into<GridPoint>,
         B: Into<Cow<'a, Block>>,
@@ -241,7 +241,7 @@ impl<'a> VoxelBrush<'a> {
     where
         B: Into<Cow<'a, Block>>,
     {
-        Self::new(vec![((0, 0, 0), block)])
+        Self::new([([0, 0, 0], block)])
     }
 
     /// Copies each of the brush's blocks into the `Space` relative to the given origin
@@ -491,12 +491,12 @@ mod tests {
         let [block_0, block_1] = make_some_blocks();
         let mut space = Space::empty_positive(100, 100, 100);
 
-        let brush = VoxelBrush::new(vec![((0, 0, 0), &block_0), ((0, 1, 1), &block_1)]);
+        let brush = VoxelBrush::new([([0, 0, 0], &block_0), ([0, 1, 1], &block_1)]);
         Pixel(Point::new(2, 3), &brush)
             .draw(&mut space.draw_target(GridMatrix::from_translation([0, 0, 4])))?;
 
-        assert_eq!(&space[(2, 3, 4)], &block_0);
-        assert_eq!(&space[(2, 4, 5)], &block_1);
+        assert_eq!(&space[[2, 3, 4]], &block_0);
+        assert_eq!(&space[[2, 4, 5]], &block_1);
         Ok(())
     }
 
@@ -621,7 +621,7 @@ mod tests {
         let [block] = make_some_blocks();
         assert_eq!(
             VoxelBrush::single(&block),
-            VoxelBrush::new(vec![((0, 0, 0), &block)]),
+            VoxelBrush::new([((0, 0, 0), &block)]),
         );
     }
 
@@ -629,8 +629,8 @@ mod tests {
     fn voxel_brush_translate() {
         let [block] = make_some_blocks();
         assert_eq!(
-            VoxelBrush::new(vec![((1, 2, 3), &block)]).translate((10, 20, 30)),
-            VoxelBrush::new(vec![((11, 22, 33), &block)]),
+            VoxelBrush::new([((1, 2, 3), &block)]).translate((10, 20, 30)),
+            VoxelBrush::new([((11, 22, 33), &block)]),
         );
     }
 
