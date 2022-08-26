@@ -1,24 +1,26 @@
 use std::f64::consts::TAU;
 
+use all_is_cubes::content::load_image::space_from_image;
+use all_is_cubes::drawing::VoxelBrush;
 use exhaust::Exhaust;
 use maze_generator::prelude::{Direction, FieldType, Generator};
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{Block, BlockCollision, Resolution::*, RotationPlacementRule, AIR};
-use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     point_to_enclosing_cube, Face6, Face7, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Rgb,
+    GridRotation, GridVector, Rgb, Rgba,
 };
-use all_is_cubes::rgb_const;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes::{include_image, rgb_const};
 
 use crate::dungeon::{build_dungeon, d2f, m2gp, maze_to_array, DungeonGrid, Theme};
 use crate::{four_walls, DemoBlocks, LandscapeBlocks};
@@ -545,10 +547,6 @@ pub async fn install_dungeon_blocks(
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
 
     let light_voxel = Block::from(Rgb::new(0.7, 0.7, 0.0));
-    let stone_color = Rgb::new(0.5, 0.5, 0.5);
-    let stone_floor_voxel = Block::from(stone_color);
-    let stone_grout_1 = Block::from(stone_color * 0.8);
-    let stone_grout_2 = Block::from(stone_color * 0.9);
     let spike_metal = Block::from(palette::STEEL);
 
     use DungeonBlocks::*;
@@ -568,26 +566,19 @@ pub async fn install_dungeon_blocks(
                     }
                 })?
                 .build(),
-            FloorTile => Block::builder()
-                .display_name("Floor Tile")
-                .voxels_fn(universe, resolution, |cube| {
-                    let edges = cube
-                        .to_vec()
-                        .map(|c| u8::from(c == 0 || c == resolution_g - 1))
-                        .dot(Vector3::new(1, 1, 1));
-                    let bottom_edges = cube
-                        .to_vec()
-                        .map(|c| u8::from(c == 0))
-                        .dot(Vector3::new(1, 1, 1));
-                    if edges >= 2 && bottom_edges > 0 {
-                        &stone_grout_1
-                    } else if edges >= 2 {
-                        &stone_grout_2
-                    } else {
-                        &stone_floor_voxel
-                    }
-                })?
-                .build(),
+            FloorTile => {
+                let resolution = R32;
+                let space =
+                    space_from_image(include_image!("floor.png"), GridRotation::RXZY, |pixel| {
+                        let block = Block::from(Rgba::from_srgb8(pixel.0));
+                        VoxelBrush::with_thickness(block, 0..resolution.into())
+                            .transform(GridRotation::RXZY.to_rotation_matrix())
+                    })?;
+                Block::builder()
+                    .display_name("Floor Tile")
+                    .voxels_ref(resolution, universe.insert_anonymous(space))
+                    .build()
+            }
             Spikes => Block::builder()
                 .display_name("Spikes")
                 .collision(BlockCollision::None)
