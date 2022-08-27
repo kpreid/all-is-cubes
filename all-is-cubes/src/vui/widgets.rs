@@ -25,6 +25,8 @@ use crate::vui::{
     WidgetController, WidgetTransaction,
 };
 
+mod text;
+pub(crate) use text::*;
 mod toolbar;
 pub(crate) use toolbar::*;
 mod tooltip;
