@@ -815,11 +815,10 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
 
     let mut place = |position: [i32; 3], rotation: GridRotation| -> Result<(), InGenError> {
         let terrain_map_function = |pixel: image::Rgba<u8>| -> VoxelBrush<'static> {
-            let image::Rgba([r, g, b, _a]) = pixel;
-            if r > b || g > b {
+            let image::Rgba([r, g, b, a]) = pixel;
+            if (r > b || g > b) && a > 0 {
                 let block = Block::from(Rgba::from_srgb8(pixel.0));
-                VoxelBrush::new([([0, 0, 0], block.clone()), ([0, 0, 1], block)])
-                    .transform(rotation.to_rotation_matrix())
+                VoxelBrush::with_thickness(block, 0..2).transform(rotation.to_rotation_matrix())
             } else {
                 default_srgb(pixel)
             }

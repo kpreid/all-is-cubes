@@ -21,6 +21,8 @@
     - `StandardCameras::world_space()`, so that clients don't need to consult the `Character` each frame.
     - `Universe::get_any()` allows looking up universe members without knowing their type.
     - `UniverseTransaction::insert()` allows inserting objects into a `Universe` via transaction rather than directly.
+    - `VoxelBrush::transform()` allows rotating a `VoxelBrush`.
+    - `VoxelBrush::with_thickness()` allows easily constructing a brush with a Z-axis stack of one block.
     - Most `Listener` implementations now also implement `Clone` and `Debug`. This allows taking a listener and registering it with more than one `Notifier`. Relatedly, some uses of `-> impl Listener` have been replaced with concrete types.
 
 ### Changed

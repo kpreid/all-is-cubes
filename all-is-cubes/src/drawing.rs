@@ -244,6 +244,15 @@ impl<'a> VoxelBrush<'a> {
         Self::new([([0, 0, 0], block)])
     }
 
+    /// Makes a [`VoxelBrush`] which paints the specified block within the specified Z-axis range.
+    pub fn with_thickness<B>(block: B, range: Range<GridCoordinate>) -> Self
+    where
+        B: Into<Cow<'a, Block>>,
+    {
+        let block = block.into();
+        Self::new(range.map(|z| (GridPoint::new(0, 0, z), block.clone())))
+    }
+
     /// Copies each of the brush's blocks into the `Space` relative to the given origin
     /// point.
     ///
