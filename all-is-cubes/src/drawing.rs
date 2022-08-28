@@ -32,6 +32,61 @@ use crate::math::{Face7, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVec
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
+/// Convert a bounding-box rectangle, as from [`embedded_graphics::geometry::Dimensions`],
+/// to a [`GridAab`] which encloses the voxels that would be affected by drawing a
+/// [`Drawable`] with those bounds on a [`DrawingPlane`] with the given `transform`.
+///
+/// `max_brush` should be the union of bounds of [`VoxelBrush`]es used by the drawable.
+/// If using plain colors, `GridAab::single_cube(GridPoint::origin())` is the appropriate
+/// input.
+///
+/// TODO: This function still has some bugs to work out
+///
+/// TODO: This function needs a better name
+pub fn rectangle_to_aab(
+    rectangle: Rectangle,
+    transform: GridMatrix,
+    max_brush: GridAab,
+) -> GridAab {
+    // Note that embedded_graphics uses the convention that coordinates *identify pixels*,
+    // not the boundaries between pixels. Thus, a rectangle whose bottom_right corner is
+    // 1, 1 includes the pixel with coordinates 1, 1. This is consistent with our “cube”
+    // coordinate convention, but not with `GridAab`'s meaning of upper bounds. However,
+    // accounting for `max_brush` will conveniently fix that for us in exactly the right
+    // way, since it is precisely about identifying the volume occupied by drawing a
+    // 2D-pixel.
+
+    // TODO: prove that all of these unwrap()s can't fail unless we would be hitting
+    // numeric overflow anyway
+
+    let inverse_rot = transform.decompose().unwrap().0.inverse();
+
+    // Construct rectangle whose edges *exclude* the direction in which the
+    // drawn pixels overhang.
+    let type_converted_excluding_size = GridAab::from_lower_size(
+        [rectangle.top_left.x, rectangle.top_left.y, 0],
+        [
+            (rectangle.size.width - 1) as i32,
+            (rectangle.size.height - 1) as i32,
+            0,
+        ],
+    );
+
+    // Account what the brush does -- assuming the brush is *not* rotated by the
+    // transform, so we must cancel it out.
+    // TODO: We want to change this to rotate the brush, but must do it globally
+    // consistently in both drawing and size-computation.
+    let with_brush_size = type_converted_excluding_size
+        .minkowski_sum(
+            max_brush
+                .transform(inverse_rot.to_positive_octant_matrix(1))
+                .unwrap(),
+        )
+        .unwrap();
+
+    with_brush_size.transform(transform).unwrap()
+}
+
 /// Adapter to use a [`Space`] or [`SpaceTransaction`] as a [`DrawTarget`].
 /// Use [`Space::draw_target`] to construct this.
 ///
@@ -432,11 +487,81 @@ mod tests {
     use crate::block::EvalBlockError;
     use crate::block::{self, Resolution::R16, AIR};
     use crate::content::make_some_blocks;
-    use crate::math::Rgba;
+    use crate::math::{GridRotation, Rgba};
     use crate::raytracer::print_space;
     use crate::universe::{Name, RefError, URef, Universe};
-    use cgmath::One;
-    use embedded_graphics::primitives::{Primitive, PrimitiveStyle, Rectangle};
+    use cgmath::{One, Zero};
+    use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
+
+    /// With identity transform, rectangle_to_aab's output matches exactly as one might
+    /// expect.
+    #[test]
+    fn rectangle_to_aab_simple() {
+        assert_eq!(
+            rectangle_to_aab(
+                Rectangle::new(Point::new(3, 4), Size::new(10, 20)),
+                GridMatrix::one(),
+                GridAab::single_cube(GridPoint::origin())
+            ),
+            GridAab::from_lower_size([3, 4, 0], [10, 20, 1])
+        );
+    }
+
+    #[test]
+    fn rectangle_to_aab_y_flipped() {
+        assert_eq!(
+            rectangle_to_aab(
+                Rectangle::new(Point::new(3, 4), Size::new(10, 20)),
+                GridMatrix::FLIP_Y,
+                GridAab::single_cube(GridPoint::origin())
+            ),
+            GridAab::from_lower_size([3, -4 - 20, 0], [10, 20, 1])
+        );
+    }
+
+    #[test]
+    fn rectangle_to_aab_with_brush() {
+        assert_eq!(
+            rectangle_to_aab(
+                Rectangle::new(Point::new(10, 10), Size::new(10, 10)),
+                GridMatrix::one(),
+                GridAab::from_lower_size([0, 0, 0], [2, 1, 2])
+            ),
+            GridAab::from_lower_upper([10, 10, 0], [21, 20, 2])
+        );
+    }
+
+    /// Test [`rectangle_to_aab`] vs. `<DrawingPlane as Dimensions>::bounding_box()`.
+    #[test]
+    fn rectangle_to_aab_consistent_with_bounds() {
+        let space_bounds = GridAab::from_lower_upper([-5, -20, -100], [30, 10, 100]);
+        let mut space = Space::builder(space_bounds).build();
+        let unit = GridAab::single_cube(GridPoint::origin());
+        println!(
+            "Space bounds: {space_bounds:?} size {:?}\n\n",
+            space_bounds.size()
+        );
+        let mut all_good = true;
+        for rotation in GridRotation::ALL {
+            // Note: these translations must fall within the space_bounds.
+            for translation in [GridVector::zero(), GridVector::new(10, 5, 0)] {
+                let transform =
+                    GridMatrix::from_translation(translation) * rotation.to_rotation_matrix();
+                let plane: DrawingPlane<'_, Space, VoxelBrush<'static>> =
+                    space.draw_target(transform);
+                let plane_bbox = plane.bounding_box();
+                let bounds_converted = rectangle_to_aab(plane_bbox, transform, unit);
+                // We can't do an equality test, because the bounds_converted will be flat
+                // on some axis (which axis depending on the rotation), but it should
+                // always be contained within the space bounds (given that the space bounds
+                // contain the transformed origin).
+                let good = space_bounds.contains_box(bounds_converted);
+                println!("{rotation:?} → rect {plane_bbox:?} → 3d {bounds_converted:?} ({good:?})");
+                all_good &= good;
+            }
+        }
+        assert!(all_good);
+    }
 
     /// Test using a particular color type with [`DrawingPlane`].
     fn test_color_drawing<'c, C>(color_value: C, expected_block: &Block)

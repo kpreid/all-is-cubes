@@ -15,7 +15,7 @@ use embedded_graphics::Drawable;
 use image::{DynamicImage, GenericImageView};
 
 use crate::block::{Block, AIR};
-use crate::drawing::VoxelBrush;
+use crate::drawing::{rectangle_to_aab, VoxelBrush};
 use crate::math::{GridAab, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
 
@@ -127,37 +127,29 @@ where
 {
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
     // ... and find a way to make this more consistent and obviously-correct.
+    // It is suspicious that we're using two different transforms.
     let transform_within_space =
         transform.to_positive_octant_matrix(image.width().max(image.height()) as i32);
     let transform_for_drawing =
         transform.to_positive_octant_matrix(image.width().max(image.height()) as i32 - 1);
-    let inverse_rot = transform_within_space.decompose().unwrap().0.inverse();
 
-    let ia = ImageAdapter::adapt(image, pixel_function);
+    let ia = &ImageAdapter::adapt(image, pixel_function);
+    let eg_image = embedded_graphics::image::Image::new(&ia, Point::zero());
 
     // Compute bounds including the brush sizes.
-    // Note: Subtracting 1 from dimensions because the brush block will effectively add 1.
     // Note: This strategy will overestimate the size in case a brush has X/Y size but is
-    // never used near the edge. To fix that, we should use a dynamically resized Space
+    // never used near the edge. To fix that, we could use a dynamically resized Space
     // instead of this pessimistic choice.
-    let bounds: GridAab = GridAab::from_lower_upper(
-        [0, 0, 0],
-        [image.width() as i32 - 1, image.height() as i32 - 1, 0],
-    )
-    .minkowski_sum(
-        ia.max_brush
-            .transform(inverse_rot.to_positive_octant_matrix(1))
-            .unwrap(),
-    )
-    .unwrap()
-    .transform(transform_within_space)
-    .unwrap();
+    let bounds: GridAab = rectangle_to_aab(
+        eg_image.bounding_box(),
+        transform_within_space,
+        ia.max_brush,
+    );
 
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build();
-    embedded_graphics::image::Image::new(&&ia, Point::zero())
-        .draw(&mut space.draw_target(transform_for_drawing))?;
+    eg_image.draw(&mut space.draw_target(transform_for_drawing))?;
     Ok(space)
 }
 
