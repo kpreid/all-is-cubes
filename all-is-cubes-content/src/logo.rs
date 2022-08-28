@@ -9,9 +9,9 @@ use all_is_cubes::{
             prelude::{Dimensions as _, Drawable, Point},
             text::{Alignment, Baseline, Text, TextStyleBuilder},
         },
-        VoxelBrush,
+        rectangle_to_aab, VoxelBrush,
     },
-    math::{Face7, FaceMap, GridAab, GridMatrix},
+    math::{FaceMap, GridAab, GridMatrix},
     space::{SetCubeError, Space},
     vui::{
         widgets::OneshotController, LayoutGrant, LayoutRequest, Layoutable, Widget,
@@ -58,19 +58,16 @@ pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) -> Result<()
 
 pub fn logo_text_extent() -> GridAab {
     logo_text_drawable(|d| {
-        let bounding_box = d.bounding_box();
-        let top_left_2d = bounding_box.top_left;
-        let bottom_right_2d = bounding_box.bottom_right().unwrap();
-        GridAab::from_lower_upper(
-            [top_left_2d.x, -(bottom_right_2d.y - 1), 0],
-            [bottom_right_2d.x - 1, -top_left_2d.y, 2],
+        rectangle_to_aab(
+            d.bounding_box(),
+            GridMatrix::FLIP_Y,
+            d.character_style.text_color.unwrap().bounds().unwrap(),
         )
-        .expand(FaceMap::from_fn(|f| {
-            // Expand horizontally due to the VoxelBrush's size. TODO: We should be able to ask the brush to do this.
-            [Face7::PX, Face7::PY, Face7::NX, Face7::NY]
-                .contains(&f)
-                .into()
-        }))
+        .expand(FaceMap {
+            px: -1, // font has blank column right edge
+            ny: -3, // unused rows given the ascii-only characters
+            ..Default::default()
+        })
     })
 }
 
@@ -100,4 +97,12 @@ where
             .build(),
     );
     f(text)
+}
+
+#[test]
+fn logo_extent_as_expected() {
+    assert_eq!(
+        logo_text_extent(),
+        GridAab::from_lower_upper([-54, -6, 0], [55, 8, 2])
+    );
 }
