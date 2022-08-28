@@ -1,5 +1,9 @@
 {
-    "rust-analyzer.cargo.allFeatures": true,
+    "editor.rulers": [
+        90,
+        100
+    ],
+    "rust-analyzer.cargo.features": "all",
     "rust-analyzer.checkOnSave.command": "clippy",
     "rust-analyzer.checkOnSave.allTargets": true,
     "rust-analyzer.imports.granularity.group": "module",
