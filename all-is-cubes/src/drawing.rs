@@ -126,7 +126,7 @@ impl<C> Dimensions for DrawingPlane<'_, Space, C> {
         Rectangle {
             top_left: Point {
                 x: bounds.lower_bounds().x,
-                y: bounds.upper_bounds().y,
+                y: bounds.lower_bounds().y,
             },
             size: Size {
                 width: size.x,
