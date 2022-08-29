@@ -28,7 +28,9 @@ use std::ops::Range;
 pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, Resolution::R1};
-use crate::math::{Face7, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
+use crate::math::{
+    Face7, FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+};
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
@@ -39,6 +41,14 @@ use crate::universe::Universe;
 /// `max_brush` should be the union of bounds of [`VoxelBrush`]es used by the drawable.
 /// If using plain colors, `GridAab::single_cube(GridPoint::origin())` is the appropriate
 /// input.
+///
+/// Please note that coordinate behavior may be surprising. [`embedded_graphics`]
+/// considers coordinates to refer to pixel centers, which is similar but not identical
+/// to our use of [`GridPoint`] to identify a cube by its low corner. The `transform` is
+/// then applied to those coordinates. So, for example, applying [`GridMatrix::FLIP_Y`]
+/// to a [`Rectangle`] whose top-left corner is `[0, 0]` will result in a [`GridAab`]
+/// which *includes* the <var>y</var> = 0 row — not one which abuts it and is strictly in
+/// the negative y range.
 ///
 /// TODO: This function still has some bugs to work out
 ///
@@ -56,13 +66,10 @@ pub fn rectangle_to_aab(
     // way, since it is precisely about identifying the volume occupied by drawing a
     // 2D-pixel.
 
-    // TODO: prove that all of these unwrap()s can't fail unless we would be hitting
-    // numeric overflow anyway
-
-    let inverse_rot = transform.decompose().unwrap().0.inverse();
+    // TODO: propagate numeric overflow cases
 
     // Construct rectangle whose edges *exclude* the direction in which the
-    // drawn pixels overhang.
+    // drawn pixels overhang, because that's going to change.
     let type_converted_excluding_size = GridAab::from_lower_size(
         [rectangle.top_left.x, rectangle.top_left.y, 0],
         [
@@ -72,19 +79,14 @@ pub fn rectangle_to_aab(
         ],
     );
 
-    // Account what the brush does -- assuming the brush is *not* rotated by the
+    // Transform into the target 3D coordinate system.
+    let transformed = type_converted_excluding_size.transform(transform).unwrap();
+
+    // Account for the brush size -- assuming the brush is *not* rotated by the
     // transform, so we must cancel it out.
     // TODO: We want to change this to rotate the brush, but must do it globally
     // consistently in both drawing and size-computation.
-    let with_brush_size = type_converted_excluding_size
-        .minkowski_sum(
-            max_brush
-                .transform(inverse_rot.to_positive_octant_matrix(1))
-                .unwrap(),
-        )
-        .unwrap();
-
-    with_brush_size.transform(transform).unwrap()
+    transformed.minkowski_sum(max_brush).unwrap()
 }
 
 /// Adapter to use a [`Space`] or [`SpaceTransaction`] as a [`DrawTarget`].
@@ -174,7 +176,12 @@ impl<C> Dimensions for DrawingPlane<'_, Space, C> {
         let bounds = self
             .transform
             .inverse_transform()
-            .and_then(|t| self.space.bounds().transform(t))
+            .and_then(|t| {
+                self.space
+                    .bounds()
+                    .expand(FaceMap::from_fn(|f| if f.is_positive() { -1 } else { 0 }))
+                    .transform(t)
+            })
             .unwrap_or_else(|| GridAab::for_block(R1));
 
         let size = bounds.unsigned_size();
@@ -184,8 +191,8 @@ impl<C> Dimensions for DrawingPlane<'_, Space, C> {
                 y: bounds.lower_bounds().y,
             },
             size: Size {
-                width: size.x,
-                height: size.y,
+                width: size.x + 1,
+                height: size.y + 1,
             },
         }
     }
@@ -515,7 +522,7 @@ mod tests {
                 GridMatrix::FLIP_Y,
                 GridAab::single_cube(GridPoint::origin())
             ),
-            GridAab::from_lower_size([3, -4 - 20, 0], [10, 20, 1])
+            GridAab::from_lower_size([3, -4 - 20 + 1, 0], [10, 20, 1])
         );
     }
 
@@ -531,12 +538,16 @@ mod tests {
         );
     }
 
-    /// Test [`rectangle_to_aab`] vs. `<DrawingPlane as Dimensions>::bounding_box()`.
+    /// Test [`rectangle_to_aab`] vs. `<DrawingPlane as Dimensions>::bounding_box()` vs.
+    /// actually drawing.
     #[test]
     fn rectangle_to_aab_consistent_with_bounds() {
         let space_bounds = GridAab::from_lower_upper([-5, -20, -100], [30, 10, 100]);
         let mut space = Space::builder(space_bounds).build();
-        let unit = GridAab::single_cube(GridPoint::origin());
+        // TODO: also test bigger brushes
+        let brush = VoxelBrush::single(Block::from(Rgba::WHITE));
+        let style = PrimitiveStyle::with_fill(&brush);
+        let brush_box = brush.bounds().unwrap();
         println!(
             "Space bounds: {space_bounds:?} size {:?}\n\n",
             space_bounds.size()
@@ -550,14 +561,26 @@ mod tests {
                 let plane: DrawingPlane<'_, Space, VoxelBrush<'static>> =
                     space.draw_target(transform);
                 let plane_bbox = plane.bounding_box();
-                let bounds_converted = rectangle_to_aab(plane_bbox, transform, unit);
+                let bounds_converted = rectangle_to_aab(plane_bbox, transform, brush_box);
                 // We can't do an equality test, because the bounds_converted will be flat
                 // on some axis (which axis depending on the rotation), but it should
                 // always be contained within the space bounds (given that the space bounds
                 // contain the transformed origin).
-                let good = space_bounds.contains_box(bounds_converted);
-                println!("{rotation:?} → rect {plane_bbox:?} → 3d {bounds_converted:?} ({good:?})");
-                all_good &= good;
+                let good_bounds = space_bounds.contains_box(bounds_converted);
+
+                // Try actually drawing (to transaction, since that has an easy bounds check,
+                // and this is a test of the box calculation, not of the drawing).
+                let mut txn = SpaceTransaction::default();
+                plane_bbox
+                    .into_styled(style)
+                    .draw(&mut txn.draw_target(transform))
+                    .unwrap();
+                let txn_bounds = txn.bounds().unwrap();
+                let good_txn = txn_bounds.contains_box(bounds_converted);
+
+                println!("{rotation:?} → rect {plane_bbox:?} → 3d {bounds_converted:?} ({good_bounds:?})");
+                println!("  drew {txn_bounds:?} ({good_txn:?})");
+                all_good &= good_bounds && good_txn;
             }
         }
         assert!(all_good);

@@ -65,7 +65,7 @@ pub fn logo_text_extent() -> GridAab {
         )
         .expand(FaceMap {
             px: -1, // font has blank column right edge
-            ny: -3, // unused rows given the ascii-only characters
+            ny: -2, // unused rows given the ascii-only characters
             ..Default::default()
         })
     })
@@ -103,6 +103,6 @@ where
 fn logo_extent_as_expected() {
     assert_eq!(
         logo_text_extent(),
-        GridAab::from_lower_upper([-54, -6, 0], [55, 8, 2])
+        GridAab::from_lower_upper([-54, -6, 0], [55, 9, 2])
     );
 }
