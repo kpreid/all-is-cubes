@@ -167,14 +167,6 @@ impl From<Rgb888> for Rgb {
 pub trait VoxelColor<'a>: PixelColor {
     /// Returns a corresponding [`VoxelBrush`], the most general form of blocky drawing.
     fn into_blocks(self) -> VoxelBrush<'a>;
-
-    /// Returns the range of Z coordinates that the blocks painted by this color value
-    /// occupy.
-    ///
-    /// The default implementation assumes there is no depth beyond the Z=0 plane.
-    fn depth_range(self) -> RangeInclusive<GridCoordinate> {
-        0..=0
-    }
 }
 
 impl<'a> PixelColor for &'a Block {
@@ -351,13 +343,6 @@ impl<'a> PixelColor for &'a VoxelBrush<'a> {
 impl<'a> VoxelColor<'a> for &'a VoxelBrush<'a> {
     fn into_blocks(self) -> VoxelBrush<'a> {
         self.as_ref()
-    }
-
-    fn depth_range(self) -> RangeInclusive<GridCoordinate> {
-        let zs = self.0.iter().map(|&(GridPoint { z, .. }, _)| z);
-        let min = zs.clone().fold(0, GridCoordinate::min);
-        let max = zs.fold(0, GridCoordinate::max);
-        min..=max
     }
 }
 
