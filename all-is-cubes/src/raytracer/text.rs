@@ -19,6 +19,7 @@ impl RtBlockData for CharacterRtData {
 
     fn from_block(_: RtOptionsRef<'_, Self::Options>, s: &SpaceBlockData) -> Self {
         // TODO: For more Unicode correctness, index by grapheme cluster
+        // TODO: allow customizing the fallback character
         Self(
             s.evaluated()
                 .attributes
@@ -26,7 +27,7 @@ impl RtBlockData for CharacterRtData {
                 .chars()
                 .next()
                 .map(|c| Cow::Owned(c.to_string()))
-                .unwrap_or(Cow::Borrowed(" ")),
+                .unwrap_or(Cow::Borrowed("#")),
         )
     }
 
