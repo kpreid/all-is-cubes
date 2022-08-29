@@ -317,20 +317,18 @@ impl<'a> VoxelBrush<'a> {
         self
     }
 
-    /// Computes the region affected by this brush.
+    /// Computes the region affected by this brush, as if it were painted at the origin.
     ///
-    /// TODO: This does not currently report behaviors but it should, once they have
-    /// formalized regions of attachment.
-    ///
-    /// TODO: Handle the case where the total volume is too large. (Maybe GridAab should
-    /// lose that restriction.)
-    pub(crate) fn bounds(&self) -> Option<GridAab> {
+    /// Returns [`None`] if the brush is empty.
+    pub fn bounds(&self) -> Option<GridAab> {
         let mut bounds: Option<GridAab> = None;
         for &(cube, _) in self.0.iter() {
+            let cube = GridAab::single_cube(cube);
             if let Some(bounds) = &mut bounds {
-                *bounds = (*bounds).union(GridAab::single_cube(cube)).unwrap();
+                // TODO: don't panic?
+                *bounds = (*bounds).union(cube).unwrap();
             } else {
-                bounds = Some(GridAab::single_cube(cube));
+                bounds = Some(cube);
             }
         }
         bounds
