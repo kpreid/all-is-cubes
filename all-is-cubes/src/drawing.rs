@@ -560,6 +560,7 @@ mod tests {
             &drawable,
         )
         .unwrap();
+        print_space(&space, [0., 1., -1.]);
         assert_eq!(
             space.bounds(),
             GridAab::from_lower_size([0, -1, 0], [1, 1, 1])
@@ -570,8 +571,7 @@ mod tests {
             ..
         } = space[(0, -1, 0)].primitive()
         {
-            // TODO: This printing does not produce a useful result; fix it.
-            print_space(&*block_space_ref.borrow(), (0., 0., -1.));
+            print_space(&*block_space_ref.borrow(), [0., 1., -1.]);
             assert_eq!(
                 offset,
                 GridPoint::new(0, -GridCoordinate::from(resolution), 0)
@@ -601,6 +601,7 @@ mod tests {
             &drawable,
         )
         .unwrap();
+        print_space(&space, [0., 1., -1.]);
         assert_eq!(
             space.bounds(),
             GridAab::from_lower_size([-1, 0, 0], [1, 1, 1])
@@ -611,7 +612,7 @@ mod tests {
             ..
         } = space[(-1, 0, 0)].primitive()
         {
-            print_space(&*block_space_ref.borrow(), (0., 0., -1.));
+            print_space(&*block_space_ref.borrow(), [0., 1., -1.]);
             assert_eq!(
                 *offset,
                 GridPoint::new(-GridCoordinate::from(resolution), 0, 0)
