@@ -22,7 +22,7 @@ use embedded_graphics::prelude::{DrawTarget, Drawable, Pixel};
 use embedded_graphics::primitives::Rectangle;
 use std::borrow::{Borrow, Cow};
 use std::marker::PhantomData;
-use std::ops::{Range, RangeInclusive};
+use std::ops::Range;
 
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
