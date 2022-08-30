@@ -132,7 +132,7 @@ mod tests {
         // (even though we didn't even trigger notifier cleanup by calling count())
         drop(gate);
         notifier.notify(2);
-        assert_eq!(sink.drain(), vec![]);
+        assert_eq!(sink.drain(), Vec::<i32>::new());
 
         assert_eq!(notifier.count(), 0);
     }
