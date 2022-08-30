@@ -102,6 +102,7 @@ fn main() -> Result<(), ActionError> {
                 let timeout = 5; // seconds
 
                 cmd!("cargo +nightly fuzz run")
+                    .env("RUST_BACKTRACE", "1")
                     .arg(&target.name)
                     .arg("--")
                     .arg(format!("-timeout={timeout}"))

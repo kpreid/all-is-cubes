@@ -204,3 +204,11 @@ jobs:
       # Note: The specified timeout value is per-fuzz-target; as of this writing
       # there are 6 fuzz targets and so the total time will be 720 seconds = 12 minutes.
       run: cargo xtask fuzz 120
+
+    # Save the fuzz artifacts so we can repro elsewhere
+    - name: Save fuzz artifacts
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: fuzz-artifacts
+        path: fuzz/artifacts
