@@ -290,13 +290,11 @@ impl SpaceRenderer {
         queue.write_buffer(
             &self.camera_buffer,
             0,
-            // The [] around the camera is needed for bytemuck, so that both input and output
-            // are slices.
-            bytemuck::cast_slice::<ShaderSpaceCamera, u8>(&[ShaderSpaceCamera::new(
+            bytemuck::bytes_of(&ShaderSpaceCamera::new(
                 camera,
                 self.sky_color,
                 self.light_texture.light_lookup_offset(),
-            )]),
+            )),
         );
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

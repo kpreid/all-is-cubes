@@ -740,14 +740,15 @@ impl EverythingRenderer {
         };
         let ui_to_submit_time = Instant::now();
 
+        // Write the postprocess camera data.
+        // Note: this can't use the StagingBelt because it was already finish()ed.
         queue.write_buffer(
             &self.postprocess_camera_buffer,
-            0, // The [] around the camera is needed for bytemuck, so that both input and output
-            // are slices.
-            bytemuck::cast_slice::<ShaderPostprocessCamera, u8>(&[ShaderPostprocessCamera::new(
+            0,
+            bytemuck::bytes_of(&ShaderPostprocessCamera::new(
                 self.cameras.graphics_options(),
                 !output_needs_clearing,
-            )]),
+            )),
         );
 
         queue.submit(std::iter::once(encoder.finish()));
