@@ -538,49 +538,61 @@ mod tests {
         );
     }
 
-    /// Test [`rectangle_to_aab`] vs. `<DrawingPlane as Dimensions>::bounding_box()` vs.
-    /// actually drawing.
+    /// Test consistency between [`rectangle_to_aab`], the cubes affected by actual drawing,
+    /// and `<DrawingPlane as Dimensions>::bounding_box()`.
     #[test]
-    fn rectangle_to_aab_consistent_with_bounds() {
+    fn rectangle_to_aab_consistent_with_drawing_and_bounding_box() {
+        // The bounds of this space will be used as the test case, by constructing various
+        // transformed DrawingPlanes and seeing what they think their bounding box is.
         let space_bounds = GridAab::from_lower_upper([-5, -20, -100], [30, 10, 100]);
         let mut space = Space::builder(space_bounds).build();
-        // TODO: also test bigger brushes
+
+        // Brush to nominally draw with.
+        // TODO: also test bigger or offset brushes
         let brush = VoxelBrush::single(Block::from(Rgba::WHITE));
         let style = PrimitiveStyle::with_fill(&brush);
         let brush_box = brush.bounds().unwrap();
+
         println!(
             "Space bounds: {space_bounds:?} size {:?}\n\n",
             space_bounds.size()
         );
+
         let mut all_good = true;
         for rotation in GridRotation::ALL {
-            // Note: these translations must fall within the space_bounds.
+            // Pick a translation to test.
+            // Note: these translations must not cause the depth axis to exit the space_bounds.
             for translation in [GridVector::zero(), GridVector::new(10, 5, 0)] {
+                // The transform we're testing with.
                 let transform =
                     GridMatrix::from_translation(translation) * rotation.to_rotation_matrix();
-                let plane: DrawingPlane<'_, Space, VoxelBrush<'static>> =
-                    space.draw_target(transform);
+
+                // Fetch what DrawingPlane thinks the nominal bounding box is.
+                let plane: DrawingPlane<'_, _, VoxelBrush<'static>> = space.draw_target(transform);
                 let plane_bbox = plane.bounding_box();
+                // Convert that back to a GridAab in the space's coordinate system.
                 let bounds_converted = rectangle_to_aab(plane_bbox, transform, brush_box);
                 // We can't do an equality test, because the bounds_converted will be flat
                 // on some axis (which axis depending on the rotation), but it should
                 // always be contained within the space bounds (given that the space bounds
                 // contain the transformed origin).
-                let good_bounds = space_bounds.contains_box(bounds_converted);
+                let bounding_box_fits = space_bounds.contains_box(bounds_converted);
 
-                // Try actually drawing (to transaction, since that has an easy bounds check,
-                // and this is a test of the box calculation, not of the drawing).
+                // Try actually drawing (to transaction, since that has an easy bounds check),
+                // and see what the bounds of the drawing are.
                 let mut txn = SpaceTransaction::default();
                 plane_bbox
                     .into_styled(style)
                     .draw(&mut txn.draw_target(transform))
                     .unwrap();
                 let txn_bounds = txn.bounds().unwrap();
-                let good_txn = txn_bounds.contains_box(bounds_converted);
+                let txn_matches_bounding_box = txn_bounds == bounds_converted;
 
-                println!("{rotation:?} → rect {plane_bbox:?} → 3d {bounds_converted:?} ({good_bounds:?})");
-                println!("  drew {txn_bounds:?} ({good_txn:?})");
-                all_good &= good_bounds && good_txn;
+                println!("{rotation:?} → rect {plane_bbox:?}");
+                println!("  rectangle_to_aab() = {bounds_converted:?} ({bounding_box_fits:?})");
+                println!("  drawing() = {txn_bounds:?} ({txn_matches_bounding_box:?})");
+                println!();
+                all_good &= bounding_box_fits && txn_matches_bounding_box;
             }
         }
         assert!(all_good);
