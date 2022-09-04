@@ -42,7 +42,8 @@ impl Widget for LogoTextLarge {
             &drawing_space,
             drawing_space.bounds(),
             GridMatrix::from_translation(
-                position.bounds.lower_bounds() - logo_extent.lower_bounds(),
+                position.shrink_to(logo_extent.size()).bounds.lower_bounds()
+                    - logo_extent.lower_bounds(),
             ),
         ))))
     }

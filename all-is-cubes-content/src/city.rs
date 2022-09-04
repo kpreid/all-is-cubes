@@ -1,6 +1,10 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
+use std::sync::Arc;
+
+use all_is_cubes::transaction::Transaction;
+use all_is_cubes::vui::{install_widgets, LayoutGrant};
 use futures_core::future::BoxFuture;
 use instant::Instant;
 use noise::Seedable as _;
@@ -12,7 +16,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     text::{Baseline, Text},
 };
 
-use all_is_cubes::block::{Block, Resolution::*, AIR};
+use all_is_cubes::block::{Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
@@ -27,12 +31,10 @@ use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{LightPhysics, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes::vui::LayoutTree;
 
 use crate::{
-    clouds::clouds,
-    draw_text_in_blocks,
-    logo::{logo_text, logo_text_extent},
-    noise::NoiseFnExt,
+    clouds::clouds, draw_text_in_blocks, logo::LogoTextLarge, noise::NoiseFnExt,
     space_to_space_copy, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
 };
 
@@ -243,6 +245,21 @@ pub(crate) async fn demo_city(
     );
     let [exhibits_progress, final_progress] = p.finish_and_cut(0.6).await.split(0.8);
 
+    // All is Cubes logo
+    let logo_location = space
+        .bounds()
+        .abut(Face6::NZ, -3)
+        .unwrap()
+        .abut(Face6::PY, -(sky_height - 12))
+        .unwrap();
+    install_widgets(
+        LayoutGrant::new(logo_location),
+        &LayoutTree::leaf(Arc::new(LogoTextLarge)),
+    )
+    .map_err(InGenError::other)?
+    .execute(&mut space)?;
+    planner.occupied_plots.push(logo_location);
+
     // Exhibits
     'exhibit: for (exhibit, exhibit_progress) in DEMO_CITY_EXHIBITS
         .iter()
@@ -334,20 +351,6 @@ pub(crate) async fn demo_city(
         exhibit_progress.progress(1.0).await;
     }
 
-    if false {
-        // A visual test of logo_text_extent().
-        // TODO: Transplant this to an automated test.
-        space.fill_uniform(
-            logo_text_extent()
-                .transform(GridMatrix::from_translation([0, 12, -radius_xz]))
-                .unwrap(),
-            Block::from(Rgb::ONE),
-        )?;
-    }
-    logo_text(
-        GridMatrix::from_translation([0, 12, -radius_xz]),
-        &mut space,
-    )?;
     final_progress.progress(0.5).await;
 
     // Enable light computation
