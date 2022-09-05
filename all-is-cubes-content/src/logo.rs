@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use all_is_cubes::{
     block::Block,
-    cgmath::One,
     drawing::{
         embedded_graphics::{
             mono_font::{iso_8859_1::FONT_9X15_BOLD, MonoTextStyle},
@@ -12,14 +11,14 @@ use all_is_cubes::{
         rectangle_to_aab, VoxelBrush,
     },
     math::{FaceMap, GridAab, GridMatrix},
-    space::{SetCubeError, Space},
+    space::SpaceTransaction,
     vui::{
         widgets::OneshotController, LayoutGrant, LayoutRequest, Layoutable, Widget,
         WidgetController,
     },
 };
 
-use crate::{palette, space_to_transaction_copy};
+use crate::palette;
 
 /// All is Cubes logo text as a widget, at "1:1" scale.
 #[derive(Clone, Debug)]
@@ -35,29 +34,24 @@ impl Layoutable for LogoTextLarge {
 impl Widget for LogoTextLarge {
     fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
         let logo_extent = logo_text_extent();
-        let mut drawing_space = Space::empty(logo_extent);
-        logo_text(GridMatrix::one(), &mut drawing_space).unwrap();
 
-        Box::new(OneshotController(Some(space_to_transaction_copy(
-            &drawing_space,
-            drawing_space.bounds(),
-            GridMatrix::from_translation(
-                position.shrink_to(logo_extent.size()).bounds.lower_bounds()
-                    - logo_extent.lower_bounds(),
-            ),
-        ))))
+        let txn = logo_text_drawable(|d| {
+            let mut txn = SpaceTransaction::default();
+            d.draw(&mut txn.draw_target(
+                GridMatrix::from_translation(
+                    position.shrink_to(logo_extent.size()).bounds.lower_bounds()
+                        - logo_extent.lower_bounds(),
+                ) * GridMatrix::FLIP_Y,
+            ))
+            .unwrap();
+            txn
+        });
+
+        Box::new(OneshotController(Some(txn)))
     }
 }
 
-/// Draw the All Is Cubes logo text.
-pub fn logo_text(midpoint_transform: GridMatrix, space: &mut Space) -> Result<(), SetCubeError> {
-    logo_text_drawable(|d| {
-        d.draw(&mut space.draw_target(midpoint_transform * GridMatrix::FLIP_Y))
-    })?;
-    Ok(())
-}
-
-pub fn logo_text_extent() -> GridAab {
+fn logo_text_extent() -> GridAab {
     logo_text_drawable(|d| {
         rectangle_to_aab(
             d.bounding_box(),
