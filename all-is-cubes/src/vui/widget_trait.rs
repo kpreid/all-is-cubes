@@ -11,8 +11,7 @@ use crate::space::{Space, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::{Merge as _, TransactionConflict};
 use crate::universe::{RefVisitor, VisitRefs};
-use crate::vui::layout::Layoutable;
-use crate::vui::{validate_widget_transaction, LayoutGrant, Positioned};
+use crate::vui::{validate_widget_transaction, LayoutGrant, Layoutable, Positioned};
 
 /// Transaction type produced by [`WidgetController`]s.
 /// Placeholder for likely wanting to change this later.

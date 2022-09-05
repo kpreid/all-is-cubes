@@ -12,6 +12,24 @@ use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
 // The Arcs are clunky to use.
 pub type WidgetTree = Arc<LayoutTree<Arc<dyn Widget>>>;
 
+/// Lay out a widget tree and produce the transaction to install it.
+///
+/// This is a combination of:
+///
+/// * [`LayoutTree::perform_layout()`] to choose locations
+/// * [`LayoutTree::installation()`] to convert the tree to a transaction
+///
+/// with error propagation from all operations and constraint of the input type.
+///
+/// TODO: This function needs a better name and location. Also, it would be nice if it could
+/// help with handling the potential error resulting from executing the transaction.
+pub fn install_widgets(
+    grant: LayoutGrant,
+    tree: &WidgetTree,
+) -> Result<SpaceTransaction, InstallVuiError> {
+    tree.perform_layout(grant).unwrap(/* currently infallible */).installation()
+}
+
 /// Requested size and relative positioning of a widget or other thing occupying space,
 /// to be interpreted by a layout algorithm to choose the real position.
 ///

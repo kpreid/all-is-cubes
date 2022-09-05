@@ -25,7 +25,9 @@ use crate::vui::widgets::{
     Crosshair, FrameWidget, ToggleButtonVisualState, ToggleButtonWidget, Toolbar, TooltipState,
     TooltipWidget,
 };
-use crate::vui::{Icons, LayoutGrant, LayoutRequest, LayoutTree, UiBlocks, Widget, WidgetTree};
+use crate::vui::{
+    install_widgets, Icons, LayoutGrant, LayoutRequest, LayoutTree, UiBlocks, Widget, WidgetTree,
+};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -59,12 +61,8 @@ impl PageInst {
         // TODO: error handling for layout
         space
             .execute(
-                &self
-                    .tree
-                    .perform_layout(LayoutGrant::new(layout.bounds()))
-                    .expect("layout/widget error")
-                    .installation()
-                    .expect("installation error"),
+                &install_widgets(LayoutGrant::new(layout.bounds()), &self.tree)
+                    .expect("layout/widget error"),
             )
             .expect("transaction error");
 
@@ -302,7 +300,7 @@ fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
     )
 }
 
-pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> Arc<LayoutTree<Arc<dyn Widget>>> {
+pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> WidgetTree {
     Arc::new(LayoutTree::Stack {
         direction: Face6::PZ,
         children: vec![

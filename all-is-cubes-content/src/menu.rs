@@ -22,8 +22,8 @@ use all_is_cubes::{
     transaction::{Merge, Transaction as _},
     universe::Universe,
     vui::{
-        self, widgets::FrameWidget, LayoutGrant, LayoutRequest, LayoutTree, Layoutable, Widget,
-        WidgetController,
+        self, install_widgets, widgets::FrameWidget, LayoutGrant, LayoutRequest, LayoutTree,
+        Layoutable, WidgetController,
     },
 };
 
@@ -136,7 +136,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
             universe, template,
         )?)));
     }
-    let tree: LayoutTree<Arc<dyn Widget>> = LayoutTree::Stack {
+    let tree: vui::WidgetTree = Arc::new(LayoutTree::Stack {
         direction: Face6::PZ,
         children: vec![
             LayoutTree::leaf(FrameWidget::new()),
@@ -145,7 +145,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
                 children: vertical_widgets,
             }),
         ],
-    };
+    });
 
     let size = tree.requirements().minimum;
     let bounds = GridAab::from_lower_size([0, 0, 0], size);
@@ -165,9 +165,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         .build();
 
     // TODO: These errors ought to autoconvert into InGenError
-    tree.perform_layout(LayoutGrant::new(bounds))
-        .unwrap()
-        .installation()
+    install_widgets(LayoutGrant::new(bounds), &tree)
         .map_err(|e| InGenError::Other(e.into()))?
         .execute(&mut space)
         .map_err(InGenError::Transaction)?; // TODO: shouldn't need to convert
