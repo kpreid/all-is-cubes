@@ -26,7 +26,7 @@ use crate::vui::{
 };
 
 mod text;
-pub(crate) use text::*;
+pub use text::*;
 mod toolbar;
 pub(crate) use toolbar::*;
 mod tooltip;

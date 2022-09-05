@@ -19,6 +19,7 @@ use crate::vui::{widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, Widget
 /// TODO: Give this a more precise name, and a nice constructor...
 #[derive(Clone, Debug)]
 #[doc(hidden)]
+#[allow(clippy::exhaustive_structs)] // TODO: find a better strategy
 pub struct LargeText {
     pub text: Cow<'static, str>,
     /// Needs to be a function to be Send+Sync
@@ -65,7 +66,7 @@ impl Widget for LargeText {
         drawable
             .draw(&mut txn.draw_target(
                 GridMatrix::from_translation(
-                    position.shrink_to(logo_extent.size()).bounds.lower_bounds()
+                    position.shrink_to(draw_bounds.size()).bounds.lower_bounds()
                         - draw_bounds.lower_bounds(),
                 ) * GridMatrix::FLIP_Y,
             ))

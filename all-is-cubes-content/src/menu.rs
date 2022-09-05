@@ -27,7 +27,7 @@ use all_is_cubes::{
     },
 };
 
-use crate::{logo::LogoTextLarge, UniverseTemplate};
+use crate::{logo::logo_text, UniverseTemplate};
 
 #[derive(Debug)]
 struct TemplateButtonWidget {
@@ -127,7 +127,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     let template_iter = UniverseTemplate::iter().filter(UniverseTemplate::include_in_lists);
 
     let mut vertical_widgets: Vec<vui::WidgetTree> = Vec::with_capacity(10);
-    vertical_widgets.push(LayoutTree::leaf(Arc::new(LogoTextLarge)));
+    vertical_widgets.push(LayoutTree::leaf(logo_text()));
     for template in template_iter {
         vertical_widgets.push(LayoutTree::spacer(LayoutRequest {
             minimum: GridVector::new(1, 1, 1),

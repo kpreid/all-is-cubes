@@ -1,8 +1,6 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
-use std::sync::Arc;
-
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::vui::{install_widgets, LayoutGrant};
 use futures_core::future::BoxFuture;
@@ -34,8 +32,8 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes::vui::LayoutTree;
 
 use crate::{
-    clouds::clouds, draw_text_in_blocks, logo::LogoTextLarge, noise::NoiseFnExt,
-    space_to_space_copy, wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
+    clouds::clouds, draw_text_in_blocks, logo::logo_text, noise::NoiseFnExt, space_to_space_copy,
+    wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
 };
 
 pub(crate) async fn demo_city(
@@ -254,7 +252,7 @@ pub(crate) async fn demo_city(
         .unwrap();
     install_widgets(
         LayoutGrant::new(logo_location),
-        &LayoutTree::leaf(Arc::new(LogoTextLarge)),
+        &LayoutTree::leaf(logo_text()),
     )
     .map_err(InGenError::other)?
     .execute(&mut space)?;
