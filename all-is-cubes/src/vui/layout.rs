@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use cgmath::{Vector3, Zero as _};
 
-use crate::math::{point_to_enclosing_cube, Face6, GridAab, GridPoint, GridVector};
+use crate::math::{point_to_enclosing_cube, Face6, GridAab, GridCoordinate, GridPoint, GridVector};
 use crate::space::SpaceTransaction;
 use crate::transaction::Merge as _;
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
@@ -65,15 +65,21 @@ impl LayoutGrant {
 
     /// Shrink the bounds to the requested size, obeying the gravity
     /// parameter to choose where to position the result.
+    ///
+    /// If the given size is larger than this grant on any axis then that axis will be
+    /// unchanged.
     #[must_use]
     pub fn shrink_to(self, sizes: GridVector) -> Self {
+        // Ensure we don't enlarge the size of self by clamping the proposed size
+        let sizes = sizes.zip(self.bounds.size(), GridCoordinate::min);
+
         let mut origin = GridPoint::new(0, 0, 0);
         for axis in 0..3 {
             let l = self.bounds.lower_bounds()[axis];
             let h = self.bounds.upper_bounds()[axis] - sizes[axis];
             origin[axis] = match self.gravity[axis] {
                 Align::Low => l,
-                Align::Center => l + (h - l) / 2,
+                Align::Center => l + (h - l) / 2, // TODO: check and document rounding behavior
                 Align::High => h,
             };
         }
@@ -502,6 +508,19 @@ mod tests {
                     },
                 }
             ]
+        );
+    }
+
+    #[test]
+    fn shrink_to_bigger_than_grant_does_not_enlarge_grant() {
+        // X axis is too small already
+        // Y axis is exactly right
+        // Z axis is too large and thus subject to centering
+        // (because LayoutGrant::new sets gravity to center)
+        assert_eq!(
+            LayoutGrant::new(GridAab::from_lower_size([0, 0, 0], [5, 10, 20]))
+                .shrink_to(Vector3::new(10, 10, 10)),
+            LayoutGrant::new(GridAab::from_lower_size([0, 0, 5], [5, 10, 10]))
         );
     }
 }
