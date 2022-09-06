@@ -6,20 +6,22 @@ use std::error::Error;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 
-use embedded_graphics::prelude::{Point, Primitive};
-use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
+use cgmath::EuclideanSpace;
+use embedded_graphics::prelude::Point;
+use embedded_graphics::primitives::{Primitive as _, PrimitiveStyleBuilder, Rectangle};
 use embedded_graphics::Drawable;
 use exhaust::Exhaust;
 
 use crate::behavior::BehaviorSetTransaction;
-use crate::block::{Block, AIR};
+use crate::block::{Block, BlockAttributes, Primitive, Resolution, AIR};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::EphemeralOpaque;
 use crate::listen::{DirtyFlag, ListenableSource};
-use crate::math::{GridAab, GridMatrix, GridPoint, GridVector};
-use crate::space::SpaceTransaction;
+use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use crate::space::{Space, SpaceTransaction};
 use crate::time::Tick;
+use crate::universe::URef;
 use crate::vui::{
     ActivatableRegion, InstallVuiError, LayoutGrant, LayoutRequest, Layoutable, Widget,
     WidgetController, WidgetTransaction,
@@ -120,6 +122,96 @@ impl Widget for FrameWidget {
                 .unwrap();
         }
 
+        OneshotController::new(txn)
+    }
+}
+
+/// Widget that takes a [`Space`] and displays it shrunken, such as for a text label,
+/// with no interactive behavior.
+///
+/// TODO: add a click response feature
+#[derive(Clone, Debug)]
+pub struct Voxels {
+    space: URef<Space>,
+    region: GridAab,
+    scale: Resolution,
+}
+
+impl Voxels {
+    /// Create [`Voxels`] that displays the specified `region` of the `space`.
+    ///
+    /// When the `region`'s dimensions are not multiples of `scale`, their alignment within the
+    /// block grid will be determined by the layout gravity. Note that areas of `space` outside of
+    /// `region` may be displayed in that case.
+    pub const fn new(space: URef<Space>, region: GridAab, scale: Resolution) -> Self {
+        // Design note: We could take `region` from `space` but that'd require locking it,
+        // and the caller is very likelyto already have that information.
+        Self {
+            region,
+            space,
+            scale,
+        }
+    }
+}
+
+impl Layoutable for Voxels {
+    fn requirements(&self) -> LayoutRequest {
+        let scale = GridCoordinate::from(self.scale);
+
+        LayoutRequest {
+            // Divide rounding up.
+            // Note: Not using GridAab::divide because that would take into account the
+            // absolute position, which we *don't* want.
+            minimum: self.region.size().map(|size| (size + scale - 1) / scale),
+        }
+    }
+}
+
+impl Widget for Voxels {
+    fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
+        // This is similar but not identical to block::space_to_blocks().
+
+        let scale_g = GridCoordinate::from(self.scale);
+        let position = position.shrink_to(self.requirements().minimum);
+
+        // Calculate where the voxels should land in the blocks, respecting layout gravity,
+        // by using the shrink_to algorithm again.
+        let grant_in_voxels =
+            GridAab::from_lower_size(GridPoint::origin(), position.bounds.size() * scale_g);
+        let gravity_offset_in_voxels: GridVector = LayoutGrant {
+            bounds: grant_in_voxels,
+            gravity: position.gravity,
+        }
+        .shrink_to(self.region.size())
+        .bounds
+        .lower_bounds()
+        .to_vec();
+        // gravity_offset_in_voxels is now the offset within the low-corner block at
+        // which the low-corner voxels should start.
+
+        let attributes = BlockAttributes::default(); // TODO customizability
+        let block_to_voxels_transform = {
+            // Apply gravity and the translation that was requested
+            GridMatrix::from_translation(
+                self.region.lower_bounds().to_vec() - gravity_offset_in_voxels)
+            // Scale up from blocks to voxels
+            * GridMatrix::from_scale(scale_g)
+            // Subtract the absolute position to get relative position
+            * GridMatrix::from_translation(-position.bounds.lower_bounds().to_vec())
+        };
+
+        let mut txn = SpaceTransaction::default();
+        for cube in position.bounds.interior_iter() {
+            txn.set_overwrite(
+                cube,
+                Block::from_primitive(Primitive::Recur {
+                    attributes: attributes.clone(),
+                    offset: block_to_voxels_transform.transform_cube(cube),
+                    resolution: self.scale,
+                    space: self.space.clone(),
+                }),
+            )
+        }
         OneshotController::new(txn)
     }
 }
@@ -314,5 +406,90 @@ impl WidgetController for CrosshairController {
         } else {
             SpaceTransaction::default()
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use cgmath::{Point3, Vector3};
+
+    use crate::block::Resolution::*;
+    use crate::transaction::Transaction;
+    use crate::universe::Universe;
+    use crate::vui::{install_widgets, Align, LayoutTree};
+
+    use super::*;
+
+    /// Create a Space to put a widget in.
+    /// TODO: if this is a useful test helper it should live somewhere else
+    #[track_caller]
+    fn instantiate_widget<W: Widget + 'static>(grant: LayoutGrant, widget: W) -> (GridAab, Space) {
+        let mut space = Space::builder(grant.bounds).build();
+        let txn = install_widgets(grant, &LayoutTree::leaf(Arc::new(widget)))
+            .expect("widget instantiation");
+        txn.execute(&mut space).expect("widget transaction");
+        (txn.bounds().unwrap(), space)
+    }
+
+    fn test_voxels_widget(voxel_space_bounds: GridAab, grant: LayoutGrant) -> (GridAab, Space) {
+        let mut universe = Universe::new();
+        let v_space = universe.insert_anonymous(Space::builder(voxel_space_bounds).build());
+        instantiate_widget(grant, Voxels::new(v_space, voxel_space_bounds, R8))
+    }
+
+    // TODO: not sure if this is actually something the widget system wants to support or not
+    #[test]
+    fn voxels_in_too_small_grant_succeeds() {
+        let v_space_bounds = GridAab::from_lower_upper([0, 0, 0], [7, 8, 9]);
+        let output_origin = GridPoint::new(100, 100, 100);
+        let _output = test_voxels_widget(
+            v_space_bounds,
+            LayoutGrant::new(GridAab::single_cube(output_origin)),
+        );
+        // TODO assertions about resulting blocks
+    }
+
+    #[test]
+    fn voxels_alignment() {
+        // Space bounds such that X is smaller, Y is exact, and Z is bigger than one block
+        // TODO: test voxel space lower bounds being nonzero
+        let v_space_bounds = GridAab::from_lower_upper([0, 0, 0], [7, 8, 9]);
+        // (TODO: put something in v_space so we can visualize)
+        // Arbitrary nonzero origin point
+        let output_origin = GridPoint::new(100, 100, 100);
+        let grant = LayoutGrant {
+            bounds: GridAab::from_lower_size(output_origin, [3, 3, 3]),
+            gravity: Vector3::new(Align::Low, Align::Center, Align::High),
+        };
+        let (output_bounds, output) = test_voxels_widget(v_space_bounds, grant);
+        assert_eq!(
+            output_bounds,
+            GridAab::from_lower_size([100, 101, 101], [1, 1, 2])
+        );
+        // Expect two adjacent recursive blocks
+        match *output[[100, 101, 101]].primitive() {
+            Primitive::Recur {
+                attributes: _,
+                offset,
+                resolution,
+                space: _,
+            } => {
+                assert_eq!(resolution, R8);
+                assert_eq!(offset, Point3::new(0, 0, -7));
+            }
+            ref p => panic!("unexpected primitive {p:?}"),
+        }
+        match *output[[100, 101, 102]].primitive() {
+            Primitive::Recur {
+                attributes: _,
+                offset,
+                resolution,
+                space: _,
+            } => {
+                assert_eq!(resolution, R8);
+                assert_eq!(offset, Point3::new(0, 0, 1));
+            }
+            ref p => panic!("unexpected primitive {p:?}"),
+        }
     }
 }
