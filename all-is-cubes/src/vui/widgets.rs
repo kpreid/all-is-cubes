@@ -32,11 +32,18 @@ pub(crate) use toolbar::*;
 mod tooltip;
 pub(crate) use tooltip::*;
 
-/// Generic widget controller that only does something initialize.
+/// Generic widget controller that only does something on `initialize()`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 #[doc(hidden)] // TODO: widget API still in development and this is particularly dubious
 pub struct OneshotController(pub Option<WidgetTransaction>);
+
+impl OneshotController {
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(transaction: WidgetTransaction) -> Box<dyn WidgetController> {
+        Box::new(Self(Some(transaction)))
+    }
+}
 
 impl WidgetController for OneshotController {
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
@@ -113,7 +120,7 @@ impl Widget for FrameWidget {
                 .unwrap();
         }
 
-        Box::new(OneshotController(Some(txn)))
+        OneshotController::new(txn)
     }
 }
 

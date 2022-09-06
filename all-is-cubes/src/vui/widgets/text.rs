@@ -72,7 +72,7 @@ impl Widget for LargeText {
             ))
             .unwrap();
 
-        Box::new(widgets::OneshotController(Some(txn)))
+        widgets::OneshotController::new(txn)
     }
 }
 
