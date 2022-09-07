@@ -1,10 +1,9 @@
-use std::convert::TryInto;
 use std::sync::{mpsc, Arc, Mutex};
 
 use cgmath::Vector2;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Primitive as _, Transform as _};
-use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Triangle};
+use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder};
 use embedded_graphics::Drawable as _;
 
 use crate::apps::ControlMessage;
@@ -328,8 +327,6 @@ pub(crate) struct HudBlocks {
     pub(crate) toolbar_right_cap: VoxelBrush<'static>,
     pub(crate) toolbar_divider: VoxelBrush<'static>,
     pub(crate) toolbar_middle: VoxelBrush<'static>,
-    /// Index is a bitmask of "selected_slots[i] == this slot"
-    pub(crate) toolbar_pointer: [VoxelBrush<'static>; 4],
 }
 
 impl HudBlocks {
@@ -393,43 +390,6 @@ impl HudBlocks {
                 .unwrap();
         }
 
-        // Draw pointers. The pointers are placed above the frames in a (none, 0, 1, 0&1) bitmask pattern.
-        // TODO: Remove Y flip
-        let vertical_drawing = &mut toolbar_drawing_space.draw_target(GridMatrix::FLIP_Y);
-        let pointer_offset = Point::new(resolution_g / 2, -resolution_g);
-        let pointer_z = resolution_g / 2;
-        // TODO: use different related colors
-        let pointer_fill =
-            VoxelBrush::single(palette::HUD_TOOLBAR_BACK).translate((0, 0, pointer_z));
-        let pointer_stroke =
-            VoxelBrush::single(palette::HUD_TOOLBAR_FRAME).translate((0, 0, pointer_z));
-        let pointer_style = PrimitiveStyleBuilder::new()
-            .fill_color(&pointer_fill)
-            .stroke_color(&pointer_stroke)
-            .stroke_width(stroke_width as u32)
-            .build();
-        for i in 0..frame_count {
-            let translation =
-                pointer_offset + Point::new(resolution_g * frame_spacing_blocks * i, 0);
-            // TODO: Replace these triangles with maybe mouse button icons?
-            if i & 1 != 0 {
-                // Selection 0/left-click icon.
-                Triangle::new(Point::new(-5, -5), Point::new(0, 0), Point::new(0, -5))
-                    .into_styled(pointer_style)
-                    .translate(translation)
-                    .draw(vertical_drawing)
-                    .unwrap();
-            }
-            if i & 2 != 0 {
-                // Selection 1/right-click icon.
-                Triangle::new(Point::new(0, -5), Point::new(0, 0), Point::new(5, -5))
-                    .into_styled(pointer_style)
-                    .translate(translation)
-                    .draw(vertical_drawing)
-                    .unwrap();
-            }
-        }
-
         // TODO: use a name for the space
         let toolbar_blocks_space = space_to_blocks(
             resolution,
@@ -465,19 +425,6 @@ impl HudBlocks {
                 ]),
             )
             .translate([-(frame_spacing_blocks * (frame_count - 1) + 1), 0, 0]),
-            toolbar_pointer: {
-                (0..frame_count)
-                    .map(|i| {
-                        slice_drawing(GridAab::from_lower_size(
-                            [i * frame_spacing_blocks, 1, -1],
-                            [1, 1, 3],
-                        ))
-                        .translate([-(i * frame_spacing_blocks), 0, 0])
-                    })
-                    .collect::<Vec<_>>()
-                    .try_into()
-                    .unwrap()
-            },
         }
     }
 }

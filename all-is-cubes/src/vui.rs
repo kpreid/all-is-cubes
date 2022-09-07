@@ -22,9 +22,9 @@ use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::YieldProgress;
 use crate::vui::widgets::TooltipState;
 
-mod blocks;
-#[doc(hidden)]
-pub use blocks::UiBlocks; // public for testing only
+#[doc(hidden)] // public for use by test-renderers only
+pub mod blocks;
+pub(crate) use blocks::UiBlocks;
 mod hud;
 use hud::*;
 mod icons;

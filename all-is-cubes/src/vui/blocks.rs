@@ -11,7 +11,7 @@ use embedded_graphics::primitives::{
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use exhaust::Exhaust;
 
-use crate::block::{Block, Resolution, Resolution::*};
+use crate::block::{Block, Resolution, Resolution::*, AIR};
 use crate::content::load_image::{default_srgb, include_image, space_from_image, ImageAdapter};
 use crate::content::palette;
 use crate::drawing::{DrawingPlane, VoxelBrush};
@@ -33,6 +33,11 @@ pub enum UiBlocks {
     /// HUD crosshair indicating cursor position.
     Crosshair,
 
+    /// Marker indicating that a toolbar item is bound to a mouse button.
+    ///
+    /// Each array element is the relationship of this toolbar item to that button index.
+    ToolbarPointer([ToolbarButtonState; 3]),
+
     // TODO: Should we do a `Button(ButtonLabel, ToggleButtonVisualState)` variant instead?
     PauseButton(ToggleButtonVisualState),
     MouselookButton(ToggleButtonVisualState),
@@ -52,6 +57,9 @@ impl fmt::Display for UiBlocks {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UiBlocks::Crosshair => write!(f, "crosshair"),
+            UiBlocks::ToolbarPointer([b0, b1, b2]) => {
+                write!(f, "toolbar-pointer/{b0}-{b1}-{b2}")
+            }
             UiBlocks::PauseButton(state) => write!(f, "pause-button/{}", state),
             UiBlocks::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
             UiBlocks::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{}", state),
@@ -78,6 +86,29 @@ impl UiBlocks {
                             include_image!("icons/crosshair.png"),
                             GridRotation::RXyZ,
                             default_srgb,
+                        )?),
+                    )
+                    .build(),
+
+                UiBlocks::ToolbarPointer([
+                    ToolbarButtonState::Unmapped,
+                    ToolbarButtonState::Unmapped,
+                    ToolbarButtonState::Unmapped,
+                ]) => AIR,
+                UiBlocks::ToolbarPointer(buttons) => Block::builder()
+                    .display_name("Selected")
+                    .voxels_ref(
+                        R32, // TODO: get resolution from image file
+                        universe.insert_anonymous(space_from_image(
+                            include_image!("icons/toolbar-sel-cursor.png"),
+                            GridRotation::RXyZ,
+                            |color| match color {
+                                // Map placeholder colors to the color for each button's state.
+                                image::Rgba([255, 0, 0, 255]) => buttons[0].brush(),
+                                image::Rgba([0, 255, 0, 255]) => buttons[1].brush(),
+                                image::Rgba([0, 0, 255, 255]) => buttons[2].brush(),
+                                _ => default_srgb(color),
+                            },
                         )?),
                     )
                     .build(),
@@ -124,6 +155,43 @@ impl UiBlocks {
         })
         .await
         .unwrap()
+    }
+}
+
+/// The state of a mouse button's relationship to a toolbar slot.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[doc(hidden)] // public only because UiBlocks is
+#[allow(clippy::exhaustive_enums)]
+pub enum ToolbarButtonState {
+    /// This button is not mapped to this toolbar slot.
+    Unmapped,
+    /// This button is mapped to this toolbar slot.
+    Mapped,
+    /// This button is mapped to this toolbar slot and being pressed.
+    Pressed,
+}
+
+impl ToolbarButtonState {
+    fn brush(self) -> VoxelBrush<'static> {
+        match self {
+            // same color as the icon image has for a background
+            // (but TODO: this choice of constant doesn't make sense)
+            Self::Unmapped => VoxelBrush::with_thickness(palette::HUD_TOOLBAR_BACK, 0..1),
+            Self::Mapped => VoxelBrush::with_thickness(palette::BUTTON_BACK, 0..3),
+            // TODO: figure out a palette color for this
+            Self::Pressed => VoxelBrush::with_thickness(rgba_const!(0.1, 0.1, 0.1, 1.0), 0..2),
+        }
+    }
+}
+
+impl fmt::Display for ToolbarButtonState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unmapped => "u",
+            Self::Mapped => "m",
+            Self::Pressed => "p",
+        }
+        .fmt(f)
     }
 }
 

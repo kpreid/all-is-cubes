@@ -21,7 +21,10 @@ use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::vui::{Icons, UiBlocks};
+use all_is_cubes::vui::{
+    blocks::{ToolbarButtonState, UiBlocks},
+    Icons,
+};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;
 
@@ -320,17 +323,27 @@ async fn icons(mut context: RenderTestContext) {
         .await
         .install(universe)
         .unwrap();
-    // TODO: In the future UiBlocks might have too many pieces and we might want to filter them
-    // or drop this entirely.
+    let icons = icons.iter().map(|(_, block)| block.clone());
+
     let ui_blocks = UiBlocks::new(universe, YieldProgress::noop())
         .await
         .install(universe)
         .unwrap();
-    let all_blocks: Vec<Block> = icons
+    let ui_blocks = ui_blocks
         .iter()
-        .map(|(_, block)| block.clone())
-        .chain(ui_blocks.iter().map(|(_, block)| block.clone()))
-        .collect();
+        .filter(|&(key, _)| match key {
+            // Filter out large number of pointer blocks
+            UiBlocks::ToolbarPointer([
+                ToolbarButtonState::Unmapped,
+                ToolbarButtonState::Mapped,
+                ToolbarButtonState::Pressed
+            ]) => true,
+            UiBlocks::ToolbarPointer(_) => false,
+            _ => true,
+        })
+        .map(|(_, block)| block.clone());
+
+    let all_blocks: Vec<Block> = icons.chain(ui_blocks).collect();
 
     // Compute layout
     let count = all_blocks.len() as GridCoordinate;

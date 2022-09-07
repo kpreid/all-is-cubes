@@ -10,7 +10,6 @@ use embedded_graphics::Drawable;
 use crate::block::{Block, BlockAttributes, Primitive, Resolution, AIR};
 use crate::character::Character;
 use crate::content::palette;
-use crate::drawing::VoxelBrush;
 use crate::inv::Slot;
 use crate::listen::{DirtyFlag, Gate, ListenableSource, Listener};
 use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
@@ -18,9 +17,11 @@ use crate::space::{Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::Merge as _;
 use crate::universe::{URef, Universe};
+use crate::vui::blocks::ToolbarButtonState;
 use crate::vui::hud::HudBlocks;
 use crate::vui::{
-    InstallVuiError, LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction,
+    InstallVuiError, LayoutRequest, Layoutable, UiBlocks, Widget, WidgetController,
+    WidgetTransaction,
 };
 
 /// Widget that displays inventory contents in toolbar format.
@@ -197,19 +198,23 @@ impl ToolbarController {
             )?;
             // Draw pointers.
             // TODO: magic number in how many selections we display
-            let this_slot_selected_mask: usize = (0..2_usize)
-                .map(|sel| {
-                    usize::from(
-                        selected_slots
-                            .get(sel)
-                            .map(|&i| i == index)
-                            .unwrap_or(false),
-                    ) << sel
-                })
-                .sum();
-            let brush: &VoxelBrush<'_> =
-                &self.definition.hud_blocks.toolbar_pointer[this_slot_selected_mask];
-            txn = txn.merge(brush.paint_transaction(position)).unwrap();
+            let this_slot_selected_mask = std::array::from_fn(|sel| {
+                if selected_slots
+                    .get(sel)
+                    .map(|&i| i == index)
+                    .unwrap_or(false)
+                {
+                    ToolbarButtonState::Mapped
+                } else {
+                    ToolbarButtonState::Unmapped
+                }
+            });
+            txn.set_overwrite(
+                position + GridVector::unit_y(),
+                self.definition.hud_blocks.blocks
+                    [UiBlocks::ToolbarPointer(this_slot_selected_mask)]
+                .clone(),
+            );
         }
 
         Ok(txn)
