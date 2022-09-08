@@ -10,8 +10,9 @@ pub struct DiffResult {
     /// For example, the zero element of this array contains a count of the pixels
     /// that were considered equal.
     pub histogram: [usize; 256],
-    /// An image intended for human viewing of which pixels are different.
-    pub diff_image: RgbaImage,
+    /// An image intended for human viewing of which pixels are different,
+    /// or None if the sizes were different.
+    pub diff_image: Option<RgbaImage>,
 }
 
 impl DiffResult {
@@ -33,11 +34,17 @@ impl DiffResult {
 ///
 /// Panics if the images do not have equal sizes.
 pub fn diff(expected: &RgbaImage, actual: &RgbaImage) -> DiffResult {
-    assert_eq!(
-        expected.dimensions(),
-        actual.dimensions(),
-        "Image sizes are not equal"
-    );
+    if expected.dimensions() != actual.dimensions() {
+        return DiffResult {
+            // dummy very-bad histogram
+            histogram: {
+                let mut h = [0; 256];
+                h[255] = usize::MAX;
+                h
+            },
+            diff_image: None,
+        };
+    }
 
     let hd1 = half_diff(expected, actual);
     let hd2 = half_diff(actual, expected);
@@ -58,7 +65,7 @@ pub fn diff(expected: &RgbaImage, actual: &RgbaImage) -> DiffResult {
 
     DiffResult {
         histogram,
-        diff_image: combined_diff.convert(),
+        diff_image: Some(combined_diff.convert()),
     }
 }
 
@@ -191,7 +198,7 @@ mod tests {
             diff_result,
             DiffResult {
                 histogram: expected_histogram,
-                diff_image: expected_diff_image
+                diff_image: Some(expected_diff_image)
             }
         );
 
@@ -205,22 +212,18 @@ mod tests {
     }
 
     #[test]
-    fn alpha_only_difference() {
-        let delta = 55u8;
+    fn mismatched_sizes() {
+        let expected = ImageBuffer::from_raw(1, 1, vec![0, 0, 0, 255u8]).unwrap();
+        let actual = ImageBuffer::from_raw(1, 2, vec![0, 0, 0, 255, 0, 0, 0, 255u8]).unwrap();
         assert_eq!(
-            diff_vecs(
-                (1, 1),
-                vec![100, 200, 30, 100],
-                vec![100, 200, 30, 100 + delta],
-                Rgba([0, 0, 0, 255]),
-            ),
+            diff(&expected, &actual),
             DiffResult {
                 histogram: {
                     let mut h = [0; 256];
-                    h[usize::from(delta)] = 1;
+                    h[255] = usize::MAX;
                     h
                 },
-                diff_image: RgbaImage::from_raw(1, 1, vec![delta, delta, delta, 255]).unwrap()
+                diff_image: None
             }
         );
     }

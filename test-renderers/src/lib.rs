@@ -20,6 +20,7 @@
     allow(clippy::redundant_clone), // Tests prefer regularity over efficiency
 )]
 
+use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -166,10 +167,13 @@ pub fn compare_rendered_image(
 
     // Compare expected and actual images
     let diff_result = diff::diff(&expected_image, &actual_image);
-    diff_result
-        .diff_image
-        .save(&diff_file_path)
-        .expect("failed to write renderer diff image");
+    if let Some(image) = &diff_result.diff_image {
+        image
+            .save(&diff_file_path)
+            .expect("failed to write renderer diff image");
+    } else {
+        fs::remove_file(&diff_file_path).expect("failed to delete renderer diff image");
+    }
 
     ComparisonRecord::from_paths(
         &expected_file_path,
