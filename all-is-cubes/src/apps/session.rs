@@ -294,18 +294,16 @@ impl Session {
     ///
     /// TODO: Clicks should be passed through `InputProcessor` instead of being an entirely separate path.
     pub fn click(&mut self, button: usize) {
-        match self.click_impl(button) {
-            Ok(()) => {}
-            Err(e) => {
-                if let ToolError::Internal(_) = e {
-                    // Log the message because the UI text field currently doesn't
-                    // fit long errors at all.
-                    // TODO: include source() chain
-                    log::error!("Error applying tool: {e}")
-                }
-                self.ui.show_tool_error(e);
-            }
+        let result = self.click_impl(button);
+
+        if let Err(error @ ToolError::Internal(_)) = &result {
+            // Log the message because the UI text field currently doesn't
+            // fit long errors at all.
+            // TODO: include source() chain
+            log::error!("Error applying tool: {error}")
         }
+
+        self.ui.show_click_result(button, result);
     }
 
     /// Implementation of click interpretation logic, called by [`Self::click`].

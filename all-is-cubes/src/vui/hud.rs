@@ -25,7 +25,8 @@ use crate::vui::widgets::{
     TooltipWidget,
 };
 use crate::vui::{
-    install_widgets, Icons, LayoutGrant, LayoutRequest, LayoutTree, UiBlocks, Widget, WidgetTree,
+    install_widgets, CueNotifier, Icons, LayoutGrant, LayoutRequest, LayoutTree, UiBlocks, Widget,
+    WidgetTree,
 };
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
@@ -158,6 +159,7 @@ impl HudLayout {
 pub(crate) struct HudInputs {
     pub hud_blocks: Arc<HudBlocks>,
     pub control_channel: mpsc::SyncSender<ControlMessage>,
+    pub cue_channel: CueNotifier,
     pub graphics_options: ListenableSource<GraphicsOptions>,
     pub paused: ListenableSource<bool>,
     pub mouselook_mode: ListenableSource<bool>,
@@ -209,6 +211,7 @@ pub(super) fn new_hud_widget_tree(
         Arc::clone(&hud_inputs.hud_blocks),
         hud_layout.toolbar_positions,
         universe,
+        hud_inputs.cue_channel.clone(),
     );
     let tooltip: Arc<dyn Widget> = TooltipWidget::new(
         Arc::clone(&tooltip_state),

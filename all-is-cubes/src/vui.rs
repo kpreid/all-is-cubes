@@ -13,7 +13,7 @@ use crate::block::Resolution::R16;
 use crate::camera::{FogOption, GraphicsOptions, ViewTransform, Viewport};
 use crate::character::{Character, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
-use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
+use crate::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::time::Tick;
@@ -64,6 +64,8 @@ pub(crate) struct Vui {
     character_source: ListenableSource<Option<URef<Character>>>,
     changed_character: DirtyFlag,
     tooltip_state: Arc<Mutex<TooltipState>>,
+    /// Messages from session to UI that don't fit as [`ListenableSource`] changes.
+    cue_channel: CueNotifier,
 }
 
 impl Vui {
@@ -88,6 +90,7 @@ impl Vui {
         let hud_blocks = Arc::new(HudBlocks::new(&mut universe, YieldProgress::noop(), R16).await);
 
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
+        let cue_channel: CueNotifier = Arc::new(Notifier::new());
 
         // TODO: terrible mess of tightly coupled parameters
         let changed_viewport = DirtyFlag::listening(false, |l| viewport_source.listen(l));
@@ -95,6 +98,7 @@ impl Vui {
         let hud_inputs = HudInputs {
             hud_blocks,
             control_channel,
+            cue_channel: cue_channel.clone(),
             graphics_options,
             paused,
             mouselook_mode: input_processor.mouselook_mode(),
@@ -125,6 +129,7 @@ impl Vui {
             changed_character: DirtyFlag::listening(false, |l| character_source.listen(l)),
             character_source,
             tooltip_state,
+            cue_channel,
         };
         new_self.set_space_from_state();
         new_self
@@ -236,13 +241,24 @@ impl Vui {
         self.universe.step(tick)
     }
 
-    pub fn show_tool_error(&mut self, error: ToolError) {
+    /// Present the UI visual response to a click (that has already been handled),
+    /// either a small indication that a button was pressed or an error message.
+    pub fn show_click_result(&self, button: usize, result: Result<(), ToolError>) {
+        self.cue_channel.notify(CueMessage::Clicked(button));
+        match result {
+            Ok(()) => {}
+            Err(error) => self.show_tool_error(error),
+        }
+    }
+
+    fn show_tool_error(&self, error: ToolError) {
         // TODO: review text formatting
         if let Ok(mut state) = self.tooltip_state.lock() {
             state.set_message(error.to_string().into());
         }
     }
 
+    /// Handle clicks that hit the UI itself
     pub fn click(&mut self, _button: usize, cursor: Option<Cursor>) -> Result<(), ToolError> {
         if cursor.as_ref().map(|c| &c.space) != Option::as_ref(&self.current_space.get()) {
             return Err(ToolError::Internal(String::from(
@@ -271,6 +287,23 @@ pub(crate) enum VuiPageState {
     /// Report the paused (or lost-focus) state and offer a button to unpause
     /// and reactivate mouselook.
     Paused,
+}
+
+/// Channel for broadcasting, from session to widgets, various user interface responses
+/// to events (that don't fit into the [`ListenableSource`] model).
+///
+/// TODO: This `Arc` is a kludge; probably Notifier should have some kind of clonable
+/// add-a-listener handle to itself, and that would help out other situations too.
+pub(crate) type CueNotifier = Arc<Notifier<CueMessage>>;
+
+/// Message from session to widget.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum CueMessage {
+    /// User clicked the specified button and it was handled as a tool usage.
+    ///
+    /// TODO: This needs to communicate "which space" or be explicitly restricted to the
+    /// world space.
+    Clicked(usize),
 }
 
 #[cfg(test)]

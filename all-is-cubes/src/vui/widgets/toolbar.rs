@@ -1,16 +1,17 @@
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::EuclideanSpace;
 use embedded_graphics::mono_font::{iso_8859_1, MonoTextStyle};
 use embedded_graphics::prelude::Point;
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use embedded_graphics::Drawable;
+use instant::Duration;
 
 use crate::block::{Block, BlockAttributes, Primitive, Resolution, AIR};
 use crate::character::Character;
 use crate::content::palette;
-use crate::inv::Slot;
+use crate::inv::{Slot, TOOL_SELECTIONS};
 use crate::listen::{DirtyFlag, Gate, ListenableSource, Listener};
 use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Space, SpacePhysics, SpaceTransaction};
@@ -20,8 +21,8 @@ use crate::universe::{URef, Universe};
 use crate::vui::blocks::ToolbarButtonState;
 use crate::vui::hud::HudBlocks;
 use crate::vui::{
-    InstallVuiError, LayoutRequest, Layoutable, UiBlocks, Widget, WidgetController,
-    WidgetTransaction,
+    CueMessage, CueNotifier, InstallVuiError, LayoutRequest, Layoutable, UiBlocks, Widget,
+    WidgetController, WidgetTransaction,
 };
 
 /// Widget that displays inventory contents in toolbar format.
@@ -32,6 +33,8 @@ pub(crate) struct Toolbar {
     hud_blocks: Arc<HudBlocks>,
     /// Which character we display the inventory of
     character_source: ListenableSource<Option<URef<Character>>>,
+    cue_channel: CueNotifier,
+
     slot_count: usize,
     /// Space for drawing per-slot text labels
     slot_text_space: URef<Space>,
@@ -47,6 +50,7 @@ impl Toolbar {
         hud_blocks: Arc<HudBlocks>,
         slot_count: usize,
         universe: &mut Universe,
+        cue_channel: CueNotifier,
     ) -> Arc<Self> {
         let slot_text_resolution = Resolution::R32;
         let slot_text_space = universe.insert_anonymous(
@@ -65,6 +69,7 @@ impl Toolbar {
         Arc::new(Self {
             hud_blocks,
             character_source,
+            cue_channel,
             slot_text_resolution,
             slot_text_space,
             slot_count,
@@ -91,6 +96,11 @@ impl Widget for Toolbar {
         let todo_change_character =
             DirtyFlag::listening(false, |l| self.character_source.listen(l));
         let todo_inventory = DirtyFlag::new(true);
+        let todo_more = Arc::new(Mutex::new(ToolbarTodo {
+            button_pressed_decay: [Duration::ZERO; TOOL_SELECTIONS],
+        }));
+        self.cue_channel
+            .listen(CueListener(Arc::downgrade(&todo_more)));
 
         let character = self.character_source.snapshot();
 
@@ -103,6 +113,7 @@ impl Widget for Toolbar {
         Box::new(ToolbarController {
             todo_change_character,
             todo_inventory,
+            todo_more,
             character,
             character_listener_gate,
             // TODO: obey gravity when positioning within the grant
@@ -123,6 +134,7 @@ struct ToolbarController {
     definition: Arc<Toolbar>,
     todo_change_character: DirtyFlag,
     todo_inventory: DirtyFlag,
+    todo_more: Arc<Mutex<ToolbarTodo>>,
     /// Latest character we've fetched from character_source,
     /// and the character whose inventory changes todo_inventory is tracking
     /// TODO: Generalize to noncharacters
@@ -141,6 +153,7 @@ impl ToolbarController {
         &self,
         slots: &[Slot],
         selected_slots: &[usize],
+        pressed: [bool; TOOL_SELECTIONS],
     ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         // Update stack count text.
         // TODO: This needs to stop being direct modification, eventually, at least if
@@ -192,14 +205,17 @@ impl ToolbarController {
                 Some(stack.icon(&self.definition.hud_blocks.icons).into_owned()),
             )?;
             // Draw pointers.
-            // TODO: magic number in how many selections we display
             let this_slot_selected_mask = std::array::from_fn(|sel| {
                 if selected_slots
                     .get(sel)
                     .map(|&i| i == index)
                     .unwrap_or(false)
                 {
-                    ToolbarButtonState::Mapped
+                    if pressed[sel] {
+                        ToolbarButtonState::Pressed
+                    } else {
+                        ToolbarButtonState::Mapped
+                    }
                 } else {
                     ToolbarButtonState::Unmapped
                 }
@@ -277,7 +293,7 @@ impl WidgetController for ToolbarController {
         Ok(txn)
     }
 
-    fn step(&mut self, _: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         if self.todo_change_character.get_and_clear() {
             self.character = self.definition.character_source.snapshot();
 
@@ -289,17 +305,62 @@ impl WidgetController for ToolbarController {
             self.todo_inventory.set();
         }
 
-        Ok(if self.todo_inventory.get_and_clear() {
-            if let Some(inventory_source) = &self.character {
-                let character = inventory_source.borrow();
-                let slots: &[Slot] = &character.inventory().slots;
-                self.write_items(slots, &character.selected_slots())?
-            } else {
-                // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
-                WidgetTransaction::default()
+        // Extract button pressed state from todo (don't hold the lock more than necessary)
+        let mut pressed_buttons: [bool; TOOL_SELECTIONS] = [false; TOOL_SELECTIONS];
+        let mut should_update_pointers = false;
+        {
+            let mut todo = self.todo_more.lock().unwrap();
+            for (i, t) in todo.button_pressed_decay.iter_mut().enumerate() {
+                if *t != Duration::ZERO {
+                    // include a final goes-to-zero update
+                    should_update_pointers = true;
+                }
+                *t = t.saturating_sub(tick.delta_t);
+                pressed_buttons[i] = *t != Duration::ZERO;
             }
-        } else {
-            WidgetTransaction::default()
-        })
+        }
+
+        // TODO: minimize work by separating full slot updates from pointers-only updates
+        Ok(
+            if self.todo_inventory.get_and_clear() || should_update_pointers {
+                if let Some(inventory_source) = &self.character {
+                    let character = inventory_source.borrow();
+                    let slots: &[Slot] = &character.inventory().slots;
+                    self.write_items(slots, &character.selected_slots(), pressed_buttons)?
+                } else {
+                    // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
+                    WidgetTransaction::default()
+                }
+            } else {
+                WidgetTransaction::default()
+            },
+        )
+    }
+}
+
+#[derive(Debug)]
+struct ToolbarTodo {
+    button_pressed_decay: [Duration; TOOL_SELECTIONS],
+}
+
+struct CueListener(Weak<Mutex<ToolbarTodo>>);
+
+impl Listener<CueMessage> for CueListener {
+    fn receive(&self, message: CueMessage) {
+        match message {
+            CueMessage::Clicked(button) => {
+                if let Some(cell) = self.0.upgrade() {
+                    if let Ok(mut todo) = cell.lock() {
+                        if let Some(t) = todo.button_pressed_decay.get_mut(button) {
+                            *t = Duration::from_millis(200);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn alive(&self) -> bool {
+        self.0.strong_count() > 0
     }
 }
