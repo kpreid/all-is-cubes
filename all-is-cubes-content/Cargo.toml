@@ -25,7 +25,7 @@ arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "rand/std", "rand/std_rn
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
-arbitrary = { version = "1.0.1", optional = true, features = ["derive"] }
+arbitrary = { version = "1.1.6", optional = true, features = ["derive"] }
 exhaust = "0.1.0"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 # TODO: all-is-cubes should be reexporting image since the load_image module reveals it
