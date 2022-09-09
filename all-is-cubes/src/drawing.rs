@@ -336,7 +336,7 @@ impl<'a> VoxelBrush<'a> {
     /// out-of-bounds drawing, but transactions do not support this and will fail instead.
     pub fn paint_transaction_mut(&self, transaction: &mut SpaceTransaction, origin: GridPoint) {
         for (offset, block) in &self.0 {
-            transaction.set_overwrite(origin + offset.to_vec(), block.to_owned().into_owned());
+            transaction.set_overwrite(origin + offset.to_vec(), Block::clone(block));
         }
     }
 

@@ -189,12 +189,7 @@ impl ToolbarController {
             txn.set(
                 position,
                 None,
-                Some(
-                    stack
-                        .icon(&self.definition.hud_blocks.icons)
-                        .to_owned()
-                        .into_owned(),
-                ),
+                Some(stack.icon(&self.definition.hud_blocks.icons).into_owned()),
             )?;
             // Draw pointers.
             // TODO: magic number in how many selections we display
