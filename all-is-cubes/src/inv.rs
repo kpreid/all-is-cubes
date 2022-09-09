@@ -7,3 +7,8 @@ mod inventory;
 pub use inventory::*;
 mod tool;
 pub use tool::*;
+
+/// There are a few places where an assumption currently has to be made about the maximum
+/// number of usable mouse-buttons (or equivalent) that the user has. This constant
+/// documents that assumption.
+pub const TOOL_SELECTIONS: usize = 3;

@@ -12,7 +12,9 @@ use ordered_float::NotNan;
 
 use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
-use crate::inv::{Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
+use crate::inv::{
+    Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError, TOOL_SELECTIONS,
+};
 use crate::listen::{Listener, Notifier};
 use crate::math::{Aab, Face6, Face7, FreeCoordinate, Rgb};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
@@ -84,7 +86,7 @@ pub struct Character {
     inventory: Inventory,
 
     /// Indices into [`Self::inventory`] slots.
-    selected_slots: [usize; 3],
+    selected_slots: [usize; TOOL_SELECTIONS],
 
     /// Notifier for modifications.
     notifier: Notifier<CharacterChange>,
@@ -239,7 +241,7 @@ impl Character {
         self.behaviors.insert(behavior);
     }
 
-    pub fn selected_slots(&self) -> [usize; 3] {
+    pub fn selected_slots(&self) -> [usize; TOOL_SELECTIONS] {
         self.selected_slots
     }
 

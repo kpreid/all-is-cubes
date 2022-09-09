@@ -15,6 +15,7 @@ use crate::block::{Block, Resolution, Resolution::*, AIR};
 use crate::content::load_image::{default_srgb, include_image, space_from_image, ImageAdapter};
 use crate::content::palette;
 use crate::drawing::{DrawingPlane, VoxelBrush};
+use crate::inv::TOOL_SELECTIONS;
 use crate::linking::{BlockModule, BlockProvider, InGenError};
 use crate::math::{GridAab, GridCoordinate, GridMatrix, GridRotation, Rgb, Rgba};
 use crate::space::{Space, SpacePhysics};
@@ -36,7 +37,7 @@ pub enum UiBlocks {
     /// Marker indicating that a toolbar item is bound to a mouse button.
     ///
     /// Each array element is the relationship of this toolbar item to that button index.
-    ToolbarPointer([ToolbarButtonState; 3]),
+    ToolbarPointer([ToolbarButtonState; TOOL_SELECTIONS]),
 
     // TODO: Should we do a `Button(ButtonLabel, ToggleButtonVisualState)` variant instead?
     PauseButton(ToggleButtonVisualState),
