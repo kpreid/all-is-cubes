@@ -238,7 +238,7 @@ impl Raycaster {
     ///
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
     pub(crate) fn set_bounds(&mut self, bounds: GridAab) {
-        if self.bounds == None {
+        if self.bounds.is_none() {
             self.bounds = Some(bounds);
         } else {
             unimplemented!("multiple uses of .within()");
