@@ -9,7 +9,8 @@ use cgmath::{EuclideanSpace, Point3, Transform, Vector3};
 
 use crate::block::Resolution;
 use crate::math::{
-    Aab, Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridVector,
+    sort_two, Aab, Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint,
+    GridVector,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -503,9 +504,7 @@ impl GridAab {
 
         // Swap coordinates in case of rotation or reflection.
         for axis in 0..3 {
-            if p1[axis] > p2[axis] {
-                std::mem::swap(&mut p1[axis], &mut p2[axis]);
-            }
+            sort_two(&mut p1[axis], &mut p2[axis]);
         }
         Some(Self::from_lower_upper(p1, p2))
     }

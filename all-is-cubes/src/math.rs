@@ -97,6 +97,14 @@ pub(crate) fn point_checked_add(p: GridPoint, v: GridVector) -> Option<GridPoint
     })
 }
 
+/// Sort exactly two items; swap them if `a > b`.
+#[inline]
+pub(crate) fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
+    if *a > *b {
+        std::mem::swap(a, b);
+    }
+}
+
 /// Common features of objects that have a location and shape in space.
 pub trait Geometry {
     /// Type of coordinates; generally determines whether this object can be translated by a
