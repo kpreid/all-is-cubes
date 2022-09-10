@@ -184,32 +184,35 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: TextureTile>(
             }));
         }
         QuadColoring::Texture(tile) => {
-            let clamp_min = transform.transform_texture_point(
-                tile,
-                Point3 {
-                    x: low_corner.x as TextureCoordinate + half_texel,
-                    y: low_corner.y as TextureCoordinate + half_texel,
-                    z: depth as TextureCoordinate,
-                },
-            );
-            let clamp_max = transform.transform_texture_point(
-                tile,
-                Point3 {
-                    x: high_corner.x as TextureCoordinate - half_texel,
-                    y: high_corner.y as TextureCoordinate - half_texel,
-                    z: depth as TextureCoordinate,
-                },
-            );
+            // Transform planar texture coordinates into the 3D coordinate system.
+            let mut clamp_min = transform.transform_texture_point(Point3 {
+                x: low_corner.x as TextureCoordinate + half_texel,
+                y: low_corner.y as TextureCoordinate + half_texel,
+                z: depth as TextureCoordinate,
+            });
+            let mut clamp_max = transform.transform_texture_point(Point3 {
+                x: high_corner.x as TextureCoordinate - half_texel,
+                y: high_corner.y as TextureCoordinate - half_texel,
+                z: depth as TextureCoordinate,
+            });
+
+            // Ensure the transformed clamp range is not inverted.
+            for axis in 0..3 {
+                crate::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
+            }
+
+            // Convert to global texture coordinates in the texture tile's format.
+            let clamp_min = tile.grid_to_texcoord(clamp_min);
+            let clamp_max = tile.grid_to_texcoord(clamp_max);
 
             vertices.extend(position_iter.map(|voxel_grid_point| {
                 V::from(BlockVertex {
                     position: transform.transform_position(voxel_grid_point),
                     face,
                     coloring: Coloring::Texture {
-                        pos: transform.transform_texture_point(
-                            tile,
+                        pos: tile.grid_to_texcoord(transform.transform_texture_point(
                             voxel_grid_point.map(|s| s as TextureCoordinate),
-                        ),
+                        )),
                         clamp_min,
                         clamp_max,
                     },
@@ -252,20 +255,19 @@ impl QuadTransform {
         self.position_transform.transform_point(voxel_grid_point)
     }
 
-    /// Transform a point from quad U-V-depth coordinates within the texture tile
-    /// with a scale of 1 unit = 1 texel/voxel, to global texture coordinates for
-    /// the final vertex.
+    /// Transform a point from quad U-V-depth coordinates with a scale of
+    /// 1 unit = 1 texel/voxel, to 0-to-1 coordinates within the 3D TextureTile space.
     ///
     /// The depth value is offset by +0.5 texel (into the depth of the voxel being
     /// drawn), to move it from edge coordinates to mid-texel coordinates.
     #[inline]
-    fn transform_texture_point<T: TextureTile>(
+    fn transform_texture_point(
         &self,
-        tile: &T,
         mut point: Point3<TextureCoordinate>,
-    ) -> T::Point {
+    ) -> Point3<TextureCoordinate> {
+        // todo: incorporate z offset into the matrix
         point.z += 0.5;
-        tile.grid_to_texcoord(self.texture_transform.transform_point(point))
+        self.texture_transform.transform_point(point)
     }
 }
 
