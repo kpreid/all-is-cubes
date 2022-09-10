@@ -249,7 +249,6 @@ impl QuadTransform {
 
     #[inline]
     fn transform_position(&self, voxel_grid_point: Point3<f64>) -> Point3<f64> {
-        // TODO: position_transform should incorporate this
         self.position_transform.transform_point(voxel_grid_point)
     }
 
@@ -266,7 +265,7 @@ impl QuadTransform {
         mut point: Point3<TextureCoordinate>,
     ) -> T::Point {
         point.z += 0.5;
-        tile.grid_to_texcoord(self.texture_transform.transform_point(point).to_vec())
+        tile.grid_to_texcoord(self.texture_transform.transform_point(point))
     }
 }
 

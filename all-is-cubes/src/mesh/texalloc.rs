@@ -6,7 +6,7 @@
 
 use std::fmt;
 
-use cgmath::Vector3;
+use cgmath::Point3;
 
 use crate::block::Evoxel;
 use crate::content::palette;
@@ -51,7 +51,7 @@ pub trait TextureTile: Clone {
     /// Transform a point in the coordinate system of, and within, [`Self::bounds()`]
     /// (that is, where 1 unit = 1 texel) into texture coordinates suitable for the
     /// target [`GfxVertex`](super::GfxVertex) type.
-    fn grid_to_texcoord(&self, in_tile_grid: Vector3<TextureCoordinate>) -> Self::Point;
+    fn grid_to_texcoord(&self, in_tile_grid: Point3<TextureCoordinate>) -> Self::Point;
 
     /// Write texture data as RGBA color.
     ///
@@ -127,7 +127,7 @@ impl TextureTile for NoTexture {
         match *self {}
     }
 
-    fn grid_to_texcoord(&self, _in_tile: Vector3<TextureCoordinate>) -> NoTexture {
+    fn grid_to_texcoord(&self, _in_tile: Point3<TextureCoordinate>) -> NoTexture {
         match *self {}
     }
 
@@ -208,7 +208,7 @@ impl TextureTile for TestTextureTile {
         self.bounds
     }
 
-    fn grid_to_texcoord(&self, in_tile: Vector3<TextureCoordinate>) -> Self::Point {
+    fn grid_to_texcoord(&self, in_tile: Point3<TextureCoordinate>) -> Self::Point {
         in_tile
     }
 
@@ -224,7 +224,7 @@ impl TextureTile for TestTextureTile {
 
 /// Texture point for [`TestTextureAllocator`]
 #[doc(hidden)]
-pub type TtPoint = Vector3<TextureCoordinate>;
+pub type TtPoint = Point3<TextureCoordinate>;
 
 #[cfg(test)]
 mod tests {

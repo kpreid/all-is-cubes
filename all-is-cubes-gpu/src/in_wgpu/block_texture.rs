@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use instant::Instant;
 
-use all_is_cubes::cgmath::Vector3;
+use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
@@ -204,10 +204,7 @@ impl TextureTile for AtlasTile {
         todo!()
     }
 
-    fn grid_to_texcoord(
-        &self,
-        in_tile_grid: Vector3<TextureCoordinate>,
-    ) -> Vector3<TextureCoordinate> {
+    fn grid_to_texcoord(&self, in_tile_grid: Point3<TextureCoordinate>) -> TexPoint {
         (in_tile_grid + self.offset) * self.scale
     }
 

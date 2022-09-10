@@ -1,6 +1,6 @@
 //! [`GltfTextureAllocator`], produces glTF-compatible textures for blocks.
 
-use all_is_cubes::cgmath::Vector3;
+use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
@@ -51,7 +51,7 @@ impl TextureTile for GltfTextureRef {
         self.bounds
     }
 
-    fn grid_to_texcoord(&self, _in_tile_grid: Vector3<TextureCoordinate>) -> TexPoint {
+    fn grid_to_texcoord(&self, _in_tile_grid: Point3<TextureCoordinate>) -> TexPoint {
         todo!()
     }
 }

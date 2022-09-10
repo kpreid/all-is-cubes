@@ -4,7 +4,7 @@ use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
 
-pub(crate) type TexPoint = Vector3<f32>;
+pub(crate) type TexPoint = Point3<f32>;
 
 /// Triangle mesh vertex type that is used for rendering [blocks].
 ///

@@ -12,7 +12,7 @@ use luminance::texture::{
     Dim3, MagFilter, MinFilter, Sampler, TexelUpload, Texture, TextureError, Wrap,
 };
 
-use all_is_cubes::cgmath::Vector3;
+use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
@@ -211,8 +211,8 @@ impl TextureTile for LumAtlasTile {
 
     fn grid_to_texcoord(
         &self,
-        in_tile_grid: Vector3<TextureCoordinate>,
-    ) -> Vector3<TextureCoordinate> {
+        in_tile_grid: Point3<TextureCoordinate>,
+    ) -> Point3<TextureCoordinate> {
         (in_tile_grid + self.offset) * self.scale
     }
 
