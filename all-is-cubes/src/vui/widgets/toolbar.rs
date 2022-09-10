@@ -148,12 +148,11 @@ impl ToolbarController {
         self.first_slot_position + GridVector::unit_x() * 2 * slot_index as GridCoordinate
     }
 
-    /// Helper for WidgetController impl; generates a transaction without using self.character
+    /// Returns a transaction to draw items and their stack counts, without using self.character
+    /// but only the given inputs.
     fn write_items(
         &self,
         slots: &[Slot],
-        selected_slots: &[usize],
-        pressed: [bool; TOOL_SELECTIONS],
     ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         // Update stack count text.
         // TODO: This needs to stop being direct modification, eventually, at least if
@@ -204,7 +203,20 @@ impl ToolbarController {
                 None,
                 Some(stack.icon(&self.definition.hud_blocks.icons).into_owned()),
             )?;
-            // Draw pointers.
+        }
+
+        Ok(txn)
+    }
+
+    /// Returns a transaction to draw the selected-slot pointers.
+    fn write_pointers(
+        &self,
+        selected_slots: &[usize],
+        pressed: [bool; TOOL_SELECTIONS],
+    ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+        let mut txn = SpaceTransaction::default();
+        for index in 0..self.definition.slot_count {
+            let position = self.slot_position(index);
             let this_slot_selected_mask = std::array::from_fn(|sel| {
                 if selected_slots
                     .get(sel)
@@ -320,21 +332,35 @@ impl WidgetController for ToolbarController {
             }
         }
 
-        // TODO: minimize work by separating full slot updates from pointers-only updates
-        Ok(
-            if self.todo_inventory.get_and_clear() || should_update_pointers {
-                if let Some(inventory_source) = &self.character {
-                    let character = inventory_source.borrow();
-                    let slots: &[Slot] = &character.inventory().slots;
-                    self.write_items(slots, &character.selected_slots(), pressed_buttons)?
-                } else {
-                    // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
-                    WidgetTransaction::default()
-                }
+        // TODO: consolidate the two character borrows
+
+        let should_update_inventory = self.todo_inventory.get_and_clear();
+        let slots_txn = if should_update_inventory {
+            if let Some(inventory_source) = &self.character {
+                let character = inventory_source.borrow();
+                self.write_items(&character.inventory().slots)?
             } else {
+                // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
                 WidgetTransaction::default()
-            },
-        )
+            }
+        } else {
+            WidgetTransaction::default()
+        };
+
+        // should_update_inventory is currently true when the selected_slots value changes.
+        // TODO: it should be separate by listening more precisely to the CharacterChange
+        let pointers_txn = if should_update_inventory || should_update_pointers {
+            if let Some(inventory_source) = &self.character {
+                let character = inventory_source.borrow();
+                self.write_pointers(&character.selected_slots(), pressed_buttons)?
+            } else {
+                self.write_pointers(&[], pressed_buttons)?
+            }
+        } else {
+            WidgetTransaction::default()
+        };
+
+        Ok(slots_txn.merge(pointers_txn).unwrap())
     }
 }
 
