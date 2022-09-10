@@ -87,27 +87,18 @@ jobs:
     # latest versions is intended to catch bugs in *our dependencies*; and the
     # two are sufficiently unlikely to interact that it doesn't seem worth
     # spending the CI latency to do both.
-    #
-    # TODO: aic_disable_wgpu_comparison=1 is a temporary kludge to deal with the quirks
-    # of software rendering. Take it out and make the wgpu render tests pass properly.
     - name: Run basic tests
       if: ${{ !matrix.primary && runner.os != 'Windows' }}
       run: cargo xtask test
-      env:
-        aic_disable_wgpu_comparison: 1 
     - name: Run exhaustive tests
       if: ${{ matrix.primary }}
       run: cargo xtask test-more
-      env:
-        aic_disable_wgpu_comparison: 1
     - name: Run Windows test
       # Temporary kludge because I haven't gotten npm (or xtask invoking npm)
       # working on Windows. So, we'll run only the desktop + render tests
       # and avoid mentioning all-is-cubes-wasm or all-is-cubes-server
       if: ${{ runner.os == 'Windows' }}
       run: cargo test -p all-is-cubes -p all-is-cubes-content -p all-is-cubes-desktop -p test-renderers
-      env:
-        aic_disable_wgpu_comparison: 1
     
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output

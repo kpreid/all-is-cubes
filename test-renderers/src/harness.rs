@@ -110,15 +110,6 @@ impl RenderTestContext {
 
         self.comparison_log.lock().unwrap().push(outcome.clone());
 
-        if self.renderer_factory.id() == RendererId::Wgpu
-            && std::env::var("aic_disable_wgpu_comparison").is_ok()
-        {
-            // TODO: This is a kludge to not have failing CI due to mismatches that
-            // occur under software rendering available in CI.
-            // <https://github.com/kpreid/all-is-cubes/issues/173> also applies.
-            // We should fix the bugs instead of disabling testing.
-            return;
-        }
         outcome.panic_if_unsuccessful(); // TODO: have a better failure result?
     }
 }
