@@ -6,7 +6,7 @@ use pretty_assertions::assert_eq;
 use super::*;
 use crate::block::{Block, BlockAttributes, Primitive, Resolution::*, AIR};
 use crate::camera::{GraphicsOptions, TransparencyOption};
-use crate::content::make_some_blocks;
+use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::math::{
     Face6::{self, *},
     Face7, FaceMap, FreeCoordinate, GridAab, GridPoint, GridRotation, Rgba,
@@ -567,4 +567,47 @@ fn depth_ordering_from_view_direction() {
     assert_eq!(problems, vec![]);
 }
 
-// TODO: more tests
+/// Test that clamp_min < clamp_max, and that `pos` is within the range (± 0.5) too.
+///
+/// (It'd be nice if this was instead a debug assertion when constructing vertices, but
+/// the data is a fully `pub` struct and enum.)
+#[test]
+fn texture_clamp_coordinate_ordering() {
+    const ALL_TRUE: Point3<bool> = Point3::new(true, true, true);
+
+    let mut universe = Universe::new();
+    let [block] = make_some_voxel_blocks(&mut universe);
+    let mesh = test_triangulate_block(block);
+    for (face, face_mesh) in mesh.faces.iter() {
+        for vertex in face_mesh.vertices.iter() {
+            let mut had_any_textured = false;
+            match vertex.coloring {
+                Coloring::Solid(_) => {}
+                Coloring::Texture {
+                    pos,
+                    clamp_min,
+                    clamp_max,
+                } => {
+                    had_any_textured = true;
+                    assert!(
+                        clamp_min.zip(clamp_max, |min, max| min <= max) == ALL_TRUE,
+                        "clamp should be {clamp_min:?} <= {clamp_max:?}"
+                    );
+                    // Texture coordinates may be outside the clamp by 0.5 because the clamp
+                    // coordinates are deliberately kept within the bounds by a half-texel
+                    // (which has no visual effect on the nearest-neighbor interpolated texels
+                    // but ensures good numerical results).
+                    assert!(
+                        clamp_min.zip(pos, |min, pos| min - 0.5 <= pos) == ALL_TRUE
+                            && pos.zip(clamp_max, |pos, max| pos <= max + 0.5) == ALL_TRUE,
+                        "{clamp_min:?} <= {pos:?} <= {clamp_max:?}"
+                    );
+                }
+            }
+            assert!(
+                had_any_textured,
+                "test invalid: {face:?} has no textured vertices"
+            )
+        }
+    }
+}
