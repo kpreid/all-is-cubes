@@ -33,9 +33,7 @@ pub async fn main() -> test_renderers::HarnessResult {
     // Pick an adapter.
     // TODO: Replace this with
     //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
-    // once we have fixed https://github.com/kpreid/all-is-cubes/issues/173 which seemingly
-    // manifests on low-power GPUs in general (?!)
-    // Or, how about we test on *all* available adapters?
+    // (which defaults to low-power) or even better, test on *all* available adapters?
     let mut adapter: Option<wgpu::Adapter> =
         wgpu::util::initialize_adapter_from_env(&instance, wgpu::Backends::all());
     if adapter.is_none() {
