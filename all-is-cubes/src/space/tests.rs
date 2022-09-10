@@ -11,7 +11,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::Sink;
-use crate::math::{GridPoint, Rgba};
+use crate::math::{GridCoordinate, GridPoint, Rgba};
 use crate::space::{
     GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
 };
@@ -159,6 +159,28 @@ fn set_updates_evaluated_on_replaced_block() {
     // Confirm the data is correct
     assert_eq!(space.get_evaluated((0, 0, 0)), &block.evaluate().unwrap());
     space.consistency_check(); // bonus testing
+}
+
+/// No arithmetic overflow when modifying a block at the numeric range upper bound.
+#[test]
+fn set_no_neighbor_overflow_high() {
+    let [block] = make_some_blocks();
+    let one_less = GridCoordinate::MAX - 1;
+    let high_corner = GridPoint::new(one_less, one_less, one_less);
+    let mut space = Space::empty(GridAab::from_lower_size(high_corner, [1, 1, 1]));
+    space.set(high_corner, block.clone()).unwrap();
+}
+/// No arithmetic overflow when modifying a block at the numeric range lower bound.
+#[test]
+fn set_no_neighbor_overflow_low() {
+    let [block] = make_some_blocks();
+    let low_corner = GridPoint::new(
+        GridCoordinate::MIN,
+        GridCoordinate::MIN,
+        GridCoordinate::MIN,
+    );
+    let mut space = Space::empty(GridAab::from_lower_size(low_corner, [1, 1, 1]));
+    space.set(low_corner, block.clone()).unwrap();
 }
 
 #[test]

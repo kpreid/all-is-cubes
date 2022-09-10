@@ -16,7 +16,8 @@ use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::{
-    Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix, GridPoint, NotNan, Rgb,
+    point_checked_add, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
+    GridPoint, NotNan, Rgb,
 };
 use crate::time::Tick;
 use crate::transaction::{Merge, Transaction as _};
@@ -429,10 +430,11 @@ impl Space {
                 self.light_needs_update(position, PackedLightScalar::MAX);
             }
             for face in Face6::ALL {
-                let neighbor = position + face.normal_vector();
-                // Skip neighbor light updates in the definitely-black-inside case.
-                if !self.get_evaluated(neighbor).opaque {
-                    self.light_needs_update(neighbor, PackedLightScalar::MAX);
+                if let Some(neighbor) = point_checked_add(position, face.normal_vector()) {
+                    // Skip neighbor light updates in the definitely-black-inside case.
+                    if !self.get_evaluated(neighbor).opaque {
+                        self.light_needs_update(neighbor, PackedLightScalar::MAX);
+                    }
                 }
             }
         }

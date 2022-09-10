@@ -88,6 +88,15 @@ pub(crate) fn smoothstep(x: f64) -> f64 {
     3. * x.powi(2) - 2. * x.powi(3)
 }
 
+#[inline]
+pub(crate) fn point_checked_add(p: GridPoint, v: GridVector) -> Option<GridPoint> {
+    Some(GridPoint {
+        x: p.x.checked_add(v.x)?,
+        y: p.y.checked_add(v.y)?,
+        z: p.z.checked_add(v.z)?,
+    })
+}
+
 /// Common features of objects that have a location and shape in space.
 pub trait Geometry {
     /// Type of coordinates; generally determines whether this object can be translated by a
