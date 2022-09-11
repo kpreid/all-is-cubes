@@ -3,7 +3,10 @@ use std::sync::Arc;
 use strum::IntoEnumIterator;
 
 use all_is_cubes::{
-    block::{Block, BlockAttributes, Resolution::R16},
+    block::{
+        Block, BlockAttributes,
+        Resolution::{self, R16},
+    },
     cgmath::{Vector3, Zero as _},
     character::Spawn,
     content::palette,
@@ -22,8 +25,9 @@ use all_is_cubes::{
     transaction::{Merge, Transaction as _},
     universe::Universe,
     vui::{
-        self, install_widgets, widgets::FrameWidget, LayoutGrant, LayoutRequest, LayoutTree,
-        Layoutable, WidgetController,
+        self, install_widgets,
+        widgets::{self, FrameWidget},
+        LayoutGrant, LayoutRequest, LayoutTree, Layoutable, WidgetController,
     },
 };
 
@@ -126,8 +130,27 @@ impl vui::WidgetController for TemplateButtonController {
 pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError> {
     let template_iter = UniverseTemplate::iter().filter(UniverseTemplate::include_in_lists);
 
+    let logo_text_inner_widget = LayoutTree::leaf(logo_text());
+    let mut logo_text_space = Space::builder(GridAab::from_lower_size(
+        [0, 0, 0],
+        logo_text_inner_widget.requirements().minimum,
+    ))
+    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+    .build();
+    let lb = logo_text_space.bounds();
+    // TODO: These errors ought to autoconvert into InGenError
+    install_widgets(LayoutGrant::new(lb), &logo_text_inner_widget)
+        .map_err(|e| InGenError::Other(e.into()))?
+        .execute(&mut logo_text_space)
+        .map_err(InGenError::Transaction)?; // TODO: shouldn't need to convert
+    let logo_widget = widgets::Voxels::new(
+        universe.insert_anonymous(logo_text_space),
+        lb,
+        Resolution::R4,
+    );
+
     let mut vertical_widgets: Vec<vui::WidgetTree> = Vec::with_capacity(10);
-    vertical_widgets.push(LayoutTree::leaf(logo_text()));
+    vertical_widgets.push(LayoutTree::leaf(Arc::new(logo_widget)));
     for template in template_iter {
         vertical_widgets.push(LayoutTree::spacer(LayoutRequest {
             minimum: GridVector::new(1, 1, 1),
