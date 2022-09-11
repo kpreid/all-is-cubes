@@ -82,6 +82,20 @@ impl GridMatrix {
         }
     }
 
+    /// Construct a uniform scaling matrix.
+    ///
+    /// Note that since this is an integer matrix, there is no possibility  of scaling less
+    /// than 1 other than 0!
+    #[inline]
+    pub fn from_scale(scale: GridCoordinate) -> Self {
+        Self {
+            x: Vector3::new(scale, 0, 0),
+            y: Vector3::new(0, scale, 0),
+            z: Vector3::new(0, 0, scale),
+            w: Vector3::new(0, 0, 0),
+        }
+    }
+
     /// Construct a transformation to a translated and rotated coordinate system from
     /// an origin in the target coordinate system and basis vectors expressed as [`Face7`]s.
     ///
