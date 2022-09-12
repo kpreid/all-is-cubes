@@ -52,9 +52,10 @@
         - `Grid::new()` is now `GridAab::from_lower_size()`.
         - `Grid::checked_new()` is now `GridAab::checked_from_lower_size()`.
     
-    - Renamed: `space::SpaceBuilder::build_empty()` is now `build()`.
-    - Renamed: `math::Face` is now `math::Face7`.
     - Renamed: `apps::AllIsCubesAppState` to `apps::Session`.
+    - Renamed: `math::Face` is now `math::Face7`.
+    - Renamed: `mesh::triangulate_block()` is now `mesh::BlockMesh::new()`.
+    - Renamed: `space::SpaceBuilder::build_empty()` is now `build()`.
     - Renamed: `transaction::UniverseTransaction` is now `universe::UniverseTransaction`.
 
 - `all-is-cubes-gpu` library:

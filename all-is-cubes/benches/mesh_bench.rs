@@ -4,8 +4,8 @@ use all_is_cubes::block::{Block, Resolution::R16, AIR};
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::mesh::{
-    triangulate_block, triangulate_blocks, triangulate_space, BlockMeshes, BlockVertex,
-    MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile, TtPoint,
+    triangulate_blocks, triangulate_space, BlockMesh, BlockMeshes, BlockVertex, MeshOptions,
+    SpaceMesh, TestTextureAllocator, TestTextureTile, TtPoint,
 };
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
@@ -25,7 +25,7 @@ fn mesh_benches(c: &mut Criterion) {
         b.iter_batched_ref(
             || (),
             |()| {
-                triangulate_block::<BlockVertex<TtPoint>, _>(
+                BlockMesh::<BlockVertex<TtPoint>, _>::new(
                     &ev,
                     &mut TestTextureAllocator::new(),
                     options,
@@ -46,7 +46,7 @@ fn mesh_benches(c: &mut Criterion) {
         b.iter_batched_ref(
             || (),
             |()| {
-                triangulate_block::<BlockVertex<TtPoint>, _>(
+                BlockMesh::<BlockVertex<TtPoint>, _>::new(
                     &ev,
                     &mut TestTextureAllocator::new(),
                     options,

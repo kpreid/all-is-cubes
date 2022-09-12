@@ -42,9 +42,9 @@ fn v_t(
     }
 }
 
-/// Test helper to call `triangulate_block` alone without a `Space`.
-fn test_triangulate_block(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
-    triangulate_block(
+/// Test helper to create [`BlockMesh`] alone without a `Space`.
+fn test_block_mesh(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
+    BlockMesh::new(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
         &MeshOptions {
@@ -54,12 +54,10 @@ fn test_triangulate_block(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestT
     )
 }
 
-/// Test helper to call `triangulate_block` alone without a `Space`,
+/// Test helper to create [`BlockMesh`] alone without a `Space`,
 /// and with the transparency option set to `Threshold(0.5)`.
-fn test_triangulate_block_threshold(
-    block: Block,
-) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
-    triangulate_block(
+fn test_block_mesh_threshold(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
+    BlockMesh::new(
         &block.evaluate().unwrap(),
         &mut TestTextureAllocator::new(),
         &MeshOptions {
@@ -69,7 +67,7 @@ fn test_triangulate_block_threshold(
     )
 }
 
-/// Test helper to call `triangulate_blocks` followed directly by [`triangulate_space`].
+/// Test helper to call [`triangulate_blocks`] followed directly by [`triangulate_space`].
 #[allow(clippy::type_complexity)]
 fn triangulate_blocks_and_space(
     space: &Space,
@@ -360,19 +358,19 @@ fn except_within<T: Clone>(without: T, within: T) -> FaceMap<T> {
 #[test]
 fn atom_transparency() {
     assert_eq!(
-        test_triangulate_block(Block::from(Rgba::WHITE))
+        test_block_mesh(Block::from(Rgba::WHITE))
             .faces
             .map(|_, ft| ft.fully_opaque),
         except_within(true, false)
     );
     assert_eq!(
-        test_triangulate_block(Block::from(Rgba::TRANSPARENT))
+        test_block_mesh(Block::from(Rgba::TRANSPARENT))
             .faces
             .map(|_, ft| ft.fully_opaque),
         except_within(false, false)
     );
     assert_eq!(
-        test_triangulate_block(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.5)))
+        test_block_mesh(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.5)))
             .faces
             .map(|_, ft| ft.fully_opaque),
         except_within(false, false)
@@ -383,12 +381,12 @@ fn atom_transparency() {
 fn atom_transparency_thresholded() {
     // Threshold means that partial transparency should produce exactly the same mesh as 0 or 1
     assert_eq!(
-        test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.25))).faces,
-        test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.0))).faces,
+        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.25))).faces,
+        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.0))).faces,
     );
     assert_eq!(
-        test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.75))).faces,
-        test_triangulate_block_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 1.0))).faces,
+        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.75))).faces,
+        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 1.0))).faces,
     );
 
     // TODO: also test voxels -- including self-occlusion (thresholded voxel in front of truly opaque voxel)
@@ -412,9 +410,7 @@ fn fully_opaque_voxels() {
         .unwrap()
         .build();
     assert_eq!(
-        test_triangulate_block(block)
-            .faces
-            .map(|_, ft| ft.fully_opaque),
+        test_block_mesh(block).faces.map(|_, ft| ft.fully_opaque),
         FaceMap {
             within: false,
             nx: true,
@@ -444,9 +440,7 @@ fn fully_opaque_partial_block() {
         })
         .build();
     assert_eq!(
-        test_triangulate_block(block)
-            .faces
-            .map(|_, ft| ft.fully_opaque),
+        test_block_mesh(block).faces.map(|_, ft| ft.fully_opaque),
         FaceMap {
             within: false,
             nx: true,
@@ -577,7 +571,7 @@ fn texture_clamp_coordinate_ordering() {
 
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
-    let mesh = test_triangulate_block(block);
+    let mesh = test_block_mesh(block);
     for (face, face_mesh) in mesh.faces.iter() {
         for vertex in face_mesh.vertices.iter() {
             let mut had_any_textured = false;

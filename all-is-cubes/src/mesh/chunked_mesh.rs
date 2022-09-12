@@ -13,9 +13,7 @@ use crate::camera::Camera;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use crate::listen::Listener;
 use crate::math::{GridCoordinate, GridPoint};
-use crate::mesh::{
-    triangulate_block, BlockMesh, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
-};
+use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile};
 use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText, TimeStats};
@@ -451,7 +449,7 @@ where
                 // Updated the texture in-place. No need for mesh updates.
             } else {
                 let new_block_mesh =
-                    triangulate_block(new_evaluated_block, block_texture_allocator, mesh_options);
+                    BlockMesh::new(new_evaluated_block, block_texture_allocator, mesh_options);
 
                 // Only invalidate the chunks if we actually have different data.
                 // Note: This comparison depends on such things as the definition of PartialEq

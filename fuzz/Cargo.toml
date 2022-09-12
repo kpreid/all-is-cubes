@@ -31,6 +31,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "fuzz_mesh"
+path = "fuzz_targets/fuzz_mesh.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "fuzz_physics"
 path = "fuzz_targets/fuzz_physics.rs"
 test = false
@@ -42,11 +48,6 @@ path = "fuzz_targets/fuzz_raycast.rs"
 test = false
 doc = false
 
-[[bin]]
-name = "fuzz_triangulator"
-path = "fuzz_targets/fuzz_triangulator.rs"
-test = false
-doc = false
 
 [[bin]]
 name = "fuzz_universe"

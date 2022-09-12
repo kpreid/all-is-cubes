@@ -12,14 +12,14 @@ use crate::util::{ConciseDebug, CustomFormat};
 /// TODO: Delete this type alias now that we're generic over texture coordinates.
 pub type TextureCoordinate = f32;
 
-/// Basic vertex data type from [`triangulate_block`].
+/// Basic vertex data type for a [`BlockMesh`].
 /// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`GfxVertex`])
 /// to provide a specialized version fit for the target graphics API.
 ///
 /// `T` is the type of texture-coordinate points being used. That is, one `T` value
 /// should identify one point in the block's 3D texture, such as `T = Point3<f32>`).
 ///
-/// [`triangulate_block`]: super::triangulate_block
+/// [`BlockMesh`]: super::BlockMesh
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct BlockVertex<T> {
@@ -108,7 +108,7 @@ where
 ///
 /// The life cycle of a [`GfxVertex`]:
 ///
-/// * First, it is constructed by [`triangulate_block`](super::triangulate_block)
+/// * First, it is constructed by [`BlockMesh::new()`]
 ///   for a particular [`Block`] value, and stored in a [`BlockMesh`].
 /// * Then, wherever that block appears in a [`Space`], the block vertices are copied
 ///   to become the [`SpaceMesh`]’s vertices, and [`GfxVertex::instantiate_vertex`] is
@@ -116,6 +116,7 @@ where
 ///
 /// [`Block`]: crate::block::Block
 /// [`BlockMesh`]: crate::mesh::BlockMesh
+/// [`BlockMesh::new()`]: crate::mesh::BlockMesh::new()
 /// [`Space`]: crate::space::Space
 /// [`SpaceMesh`]: crate::mesh::SpaceMesh
 pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized {
