@@ -151,6 +151,7 @@ pub enum InstallVuiError {
 
     /// A transaction conflict arose between two widgets or parts of a widget's installation.
     #[error("transaction conflict involving a widget")]
+    #[non_exhaustive]
     Conflict {
         // TODO: Include the widget(s) involved, once `Arc<dyn Widget>` is piped around everywhere
         // and not just sometimes Widget or sometimes WidgetController.
@@ -175,6 +176,13 @@ pub enum InstallVuiError {
 
         /// The widget.
         widget: Arc<dyn Widget>,
+    },
+
+    #[error("installing widget tree failed")]
+    #[non_exhaustive]
+    ExecuteInstallation {
+        #[source]
+        error: crate::transaction::ExecuteError,
     },
 }
 

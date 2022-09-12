@@ -4,8 +4,8 @@ use std::sync::Arc;
 use cgmath::{Vector3, Zero as _};
 
 use crate::math::{point_to_enclosing_cube, Face6, GridAab, GridCoordinate, GridPoint, GridVector};
-use crate::space::SpaceTransaction;
-use crate::transaction::Merge as _;
+use crate::space::{Space, SpaceBuilder, SpaceTransaction};
+use crate::transaction::{Merge as _, Transaction};
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
 
 // TODO: can we come up with a way to not even need this type alias?
@@ -20,6 +20,9 @@ pub type WidgetTree = Arc<LayoutTree<Arc<dyn Widget>>>;
 /// * [`LayoutTree::installation()`] to convert the tree to a transaction
 ///
 /// with error propagation from all operations and constraint of the input type.
+///
+/// See also [`LayoutTree::to_space()`] if you do not need to install widgets in an
+/// already-existing [`Space`].
 ///
 /// TODO: This function needs a better name and location. Also, it would be nice if it could
 /// help with handling the potential error resulting from executing the transaction.
@@ -313,6 +316,30 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 }
             }
         }))
+    }
+}
+
+impl LayoutTree<Arc<dyn Widget>> {
+    pub fn to_space<B: crate::space::SpaceBuilderBounds>(
+        self: Arc<Self>,
+        builder: SpaceBuilder<B>,
+        gravity: Gravity,
+    ) -> Result<Space, InstallVuiError> {
+        let mut space = builder
+            .bounds_if_not_set(|| GridAab::from_lower_size([0, 0, 0], self.requirements().minimum))
+            .build();
+
+        install_widgets(
+            LayoutGrant {
+                bounds: space.bounds(),
+                gravity,
+            },
+            &self,
+        )?
+        .execute(&mut space)
+        .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
+
+        Ok(space)
     }
 }
 
