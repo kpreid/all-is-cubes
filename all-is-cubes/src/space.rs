@@ -27,6 +27,7 @@ use crate::util::{CustomFormat, StatusText};
 
 mod builder;
 pub use builder::SpaceBuilder;
+pub(crate) use builder::SpaceBuilderBounds;
 
 mod light;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
@@ -138,14 +139,16 @@ impl Space {
     ///
     /// This means that its bounds are as per [`GridAab::for_block()`], and its
     /// [`physics`](Self::physics) is [`SpacePhysics::DEFAULT_FOR_BLOCK`].
-    pub fn for_block(resolution: Resolution) -> SpaceBuilder {
-        SpaceBuilder::new(GridAab::for_block(resolution)).physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+    pub fn for_block(resolution: Resolution) -> SpaceBuilder<GridAab> {
+        SpaceBuilder::new()
+            .bounds(GridAab::for_block(resolution))
+            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
     }
 
     /// Returns a [`SpaceBuilder`] with the given bounds and all default values,
     /// which may be used to construct a new [`Space`].
-    pub fn builder(bounds: GridAab) -> SpaceBuilder {
-        SpaceBuilder::new(bounds)
+    pub fn builder(bounds: GridAab) -> SpaceBuilder<GridAab> {
+        SpaceBuilder::new().bounds(bounds)
     }
 
     /// Constructs a [`Space`] that is entirely filled with [`AIR`].
@@ -156,7 +159,7 @@ impl Space {
     }
 
     /// Implementation of [`SpaceBuilder`]'s terminal methods.
-    fn new_from_builder(builder: SpaceBuilder) -> Self {
+    fn new_from_builder(builder: SpaceBuilder<GridAab>) -> Self {
         let SpaceBuilder {
             bounds,
             spawn,

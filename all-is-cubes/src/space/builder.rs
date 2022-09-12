@@ -10,26 +10,20 @@ use crate::space::{GridAab, LightPhysics, Space, SpacePhysics};
 /// To create one, call [`Space::builder()`](Space::builder).
 ///
 /// TODO: Allow specifying behaviors.
+///
+/// # Type parameters
+///
+/// * `B` is either `()` or `GridAab` according to whether the bounds have been specified.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
-pub struct SpaceBuilder {
-    pub(super) bounds: GridAab,
+pub struct SpaceBuilder<B> {
+    pub(super) bounds: B,
     pub(super) spawn: Option<Spawn>,
     pub(super) physics: SpacePhysics,
     pub(super) initial_fill: Block,
 }
 
-impl SpaceBuilder {
-    /// Use [`Space::builder()`] as the public way to call this.
-    pub(super) const fn new(bounds: GridAab) -> Self {
-        Self {
-            bounds,
-            spawn: None,
-            physics: SpacePhysics::DEFAULT,
-            initial_fill: AIR,
-        }
-    }
-
+impl<B> SpaceBuilder<B> {
     /// Sets the [`Block`] that the space's volume will be filled with.
     ///
     /// Caution: If [evaluating](Block::evaluate) the block fails, constructing the space
@@ -68,7 +62,42 @@ impl SpaceBuilder {
         self.spawn = Some(spawn);
         self
     }
+}
 
+impl<B: SpaceBuilderBounds> SpaceBuilder<B> {
+    /// Set the bounds unless they have already been set.
+    pub(crate) fn bounds_if_not_set(
+        self,
+        bounds_fn: impl FnOnce() -> GridAab,
+    ) -> SpaceBuilder<GridAab> {
+        // Delegate to the trait. (This method exists so the trait need not be imported.)
+        SpaceBuilderBounds::bounds_if_not_set(self, bounds_fn)
+    }
+}
+
+impl SpaceBuilder<()> {
+    /// Use [`SpaceBuilder::default()`] as the public way to call this.
+    pub(super) const fn new() -> Self {
+        Self {
+            bounds: (),
+            spawn: None,
+            physics: SpacePhysics::DEFAULT,
+            initial_fill: AIR,
+        }
+    }
+
+    /// Set the bounds of the space, outside which no blocks may be placed.
+    pub fn bounds(self, bounds: GridAab) -> SpaceBuilder<GridAab> {
+        SpaceBuilder {
+            bounds,
+            spawn: self.spawn,
+            physics: self.physics,
+            initial_fill: self.initial_fill,
+        }
+    }
+}
+
+impl SpaceBuilder<GridAab> {
     /// Sets the default spawn location of new characters.
     ///
     /// Panics if any of the given coordinates is infinite or NaN.
@@ -89,10 +118,50 @@ impl SpaceBuilder {
     }
 
     /// Construct a [`Space`] with the contents and settings from this builder.
+    ///
+    /// The builder must have had bounds specified.
     pub fn build(self) -> Space {
         Space::new_from_builder(self)
     }
 }
+
+impl Default for SpaceBuilder<()> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Module for sealed trait
+mod sbb {
+    use super::*;
+
+    /// Helper for [`SpaceBuilder::bounds_if_not_set()`].
+    pub trait SpaceBuilderBounds: Sized {
+        fn bounds_if_not_set(
+            builder: SpaceBuilder<Self>,
+            bounds_fn: impl FnOnce() -> GridAab,
+        ) -> SpaceBuilder<GridAab>;
+    }
+
+    impl SpaceBuilderBounds for () {
+        fn bounds_if_not_set(
+            builder: SpaceBuilder<Self>,
+            bounds_fn: impl FnOnce() -> GridAab,
+        ) -> SpaceBuilder<GridAab> {
+            builder.bounds(bounds_fn())
+        }
+    }
+
+    impl SpaceBuilderBounds for GridAab {
+        fn bounds_if_not_set(
+            builder: SpaceBuilder<Self>,
+            _bounds_fn: impl FnOnce() -> GridAab,
+        ) -> SpaceBuilder<GridAab> {
+            builder
+        }
+    }
+}
+pub(crate) use sbb::SpaceBuilderBounds;
 
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Space {
@@ -163,6 +232,29 @@ mod tests {
         assert_eq!(space[bounds.lower_bounds()], block);
     }
 
-    // TODO: test and implement initial fill that has a tick_action
+    #[test]
+    fn bounds_if_not_set_when_not_set() {
+        let bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
+        assert_eq!(SpaceBuilder::new()
+            .bounds_if_not_set(|| bounds)
+            .build()
+            .bounds(), 
+            bounds);
+    }
+
+    #[test]
+    fn bounds_if_not_set_when_already_set() {
+        let first_bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
+        let ignored_bounds = GridAab::from_lower_size([100, 2, 3], [1, 1, 1]);
+        assert_eq!(Space::builder(first_bounds)
+            .bounds_if_not_set(|| ignored_bounds)
+            .build()
+            .bounds(), 
+            first_bounds);
+    }
+
+    // TODO: test and implement initial fill that has a tick_action that needs to be
+    // activated properly
+    
     // TODO: test all builder features
 }
