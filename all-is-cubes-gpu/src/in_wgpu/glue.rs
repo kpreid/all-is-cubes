@@ -15,7 +15,7 @@ use crate::reloadable::Reloadable;
 use crate::GraphicsResourceError;
 
 /// TODO: Revisit whether this generic conversion is appropriate;
-/// we should be *handling* some or all of SurfaceError with a retry.
+/// we should be *handling* some or all of [`wgpu::SurfaceError`] with a retry.
 impl From<wgpu::SurfaceError> for GraphicsResourceError {
     fn from(source: wgpu::SurfaceError) -> Self {
         GraphicsResourceError::new(source)

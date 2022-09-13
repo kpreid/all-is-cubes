@@ -221,7 +221,7 @@ fn fits(request: GridAab, size_exponent: u8) -> bool {
     max_edge_length <= expsize(size_exponent)
 }
 
-/// Convert size_exponent to actual size.
+/// Convert `size_exponent` to actual size.
 fn expsize(size_exponent: u8) -> GridCoordinate {
     1 << GridCoordinate::from(size_exponent)
 }

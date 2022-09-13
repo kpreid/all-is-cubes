@@ -293,9 +293,9 @@ pub struct ToolInput {
 impl ToolInput {
     /// Generic handler for a tool that replaces one cube.
     ///
-    /// TODO: This should probably be replaced with a Transaction whose failure
-    /// is translated into the ToolError, since this code is basically doing
-    /// SpaceTransaction::check anyway.
+    /// TODO: This should probably be replaced with a `Transaction` whose failure
+    /// is translated into the `ToolError`, since this code is basically doing
+    /// `SpaceTransaction::check` anyway.
     fn set_cube(
         &self,
         cube: GridPoint,
@@ -402,7 +402,7 @@ pub enum ToolError {
 /// within a [`Universe`](crate::universe::Universe).
 ///
 /// TODO: relocate this type once we figure out where it belongs.
-/// TODO: Probably they should be their own kind of UniverseMember, so that they can
+/// TODO: Probably they should be their own kind of `UniverseMember`, so that they can
 /// be reattached in the future.
 pub struct EphemeralOpaque<T: ?Sized>(pub(crate) Option<Arc<T>>);
 

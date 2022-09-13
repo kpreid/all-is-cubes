@@ -42,6 +42,7 @@ pub struct SpaceMesh<V, T> {
 }
 
 impl<V, T> SpaceMesh<V, T> {
+    #[allow(clippy::doc_markdown)] // https://github.com/rust-lang/rust-clippy/issues/9473
     /// Computes a triangle mesh of a [`Space`].
     ///
     /// Shorthand for

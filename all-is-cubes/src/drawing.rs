@@ -211,7 +211,7 @@ impl<C> Dimensions for DrawingPlane<'_, SpaceTransaction, C> {
         }
     }
 }
-/// Adapt embedded_graphics's most general color type to ours.
+/// Adapt [`embedded_graphics`]'s most general color type to ours.
 // TODO: Also adapt the other types, so that if someone wants to use them they can.
 impl From<Rgb888> for Rgb {
     #[inline]
@@ -258,7 +258,7 @@ impl<'a> VoxelColor<'a> for Rgba {
     }
 }
 
-/// Adapt embedded_graphics's most general color type to ours.
+/// Adapt [`embedded_graphics`]'s most general color type to ours.
 impl<'a> VoxelColor<'a> for Rgb888 {
     fn into_blocks(self) -> VoxelBrush<'a> {
         VoxelBrush::single(Block::from(Rgb::from(self)))
@@ -500,7 +500,7 @@ mod tests {
     use cgmath::{One, Zero};
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
 
-    /// With identity transform, rectangle_to_aab's output matches exactly as one might
+    /// With identity transform, `rectangle_to_aab`'s output matches exactly as one might
     /// expect.
     #[test]
     fn rectangle_to_aab_simple() {
@@ -682,7 +682,7 @@ mod tests {
     fn a_primitive_style() -> PrimitiveStyle<Rgba> {
         PrimitiveStyle::with_fill(a_primitive_color())
     }
-    /// Cube color corresponding to a_primitive_style().
+    /// Cube color corresponding to `a_primitive_style()`.
     fn a_primitive_color() -> Rgba {
         Rgba::new(0.0, 0.5, 1.5, 1.0)
     }
@@ -787,7 +787,7 @@ mod tests {
         );
     }
 
-    /// Test that VoxelBrush::bounds() gives the same result as SpaceTransaction::bounds().
+    /// Test that `VoxelBrush::bounds()` gives the same result as `SpaceTransaction::bounds()`.
     #[test]
     fn voxel_brush_bounds() {
         for brush_vec in [

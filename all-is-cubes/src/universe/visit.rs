@@ -16,7 +16,7 @@ pub trait VisitRefs {
 /// Callback used by [`VisitRefs::visit_refs`].
 ///
 /// This is a trait rather than a function type so that it can be generic over `T` in
-/// URef<T>`.
+/// `URef<T>`.
 pub trait RefVisitor {
     fn visit(&mut self, r: &dyn URefErased);
 }

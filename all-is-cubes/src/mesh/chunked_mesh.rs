@@ -384,7 +384,7 @@ where
     /// always equal `space.block_data().len()`. They may not be fully updated yet, but
     /// they will be the correct length.
     ///
-    /// TODO: Missing handling for mesh_options changing.
+    /// TODO: Missing handling for `mesh_options` changing.
     fn update<A>(
         &mut self,
         todo: &mut HashSet<BlockIndex>,

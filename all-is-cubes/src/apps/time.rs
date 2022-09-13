@@ -21,7 +21,7 @@ impl FrameClock {
     const STEP_LENGTH_MICROS: u64 = 1_000_000 / 60;
     const STEP_LENGTH: Duration = Duration::from_micros(Self::STEP_LENGTH_MICROS);
     /// Number of steps per frame to permit.
-    /// This sets how low the frame rate can go below STEP_LENGTH before game time
+    /// This sets how low the frame rate can go below [`STEP_LENGTH`] before game time
     /// slows down.
     pub(crate) const CATCH_UP_STEPS: u8 = 2;
     const ACCUMULATOR_CAP: Duration =

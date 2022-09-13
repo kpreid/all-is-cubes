@@ -61,8 +61,6 @@ impl GridAab {
     ///
     /// Returns [`Err`] if the sizes are non-negative or the resulting range would cause
     /// numeric overflow.
-    ///
-    /// TODO: Rename this to be parallel with from_lower_upper
     pub fn checked_from_lower_size(
         lower_bounds: impl Into<GridPoint>,
         sizes: impl Into<GridVector>,

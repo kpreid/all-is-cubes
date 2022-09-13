@@ -84,7 +84,7 @@ impl PageInst {
 /// parameters not primarily dependent on user interaction. This split is intended to
 /// simplify the problem of adapting to size changes.
 ///
-/// TODO: Since introducing widgets, HudLayout does much less work. Think about whether it should exist.
+/// TODO: Since introducing widgets, `HudLayout` does much less work. Think about whether it should exist.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HudLayout {
     size: Vector2<GridCoordinate>,
@@ -94,7 +94,7 @@ pub(crate) struct HudLayout {
 impl HudLayout {
     pub(crate) const DEPTH_BEHIND_VIEW_PLANE: GridCoordinate = 5;
 
-    /// Construct HudLayout with a size that suits the given viewport
+    /// Construct `HudLayout` with a size that suits the given viewport
     /// (based on pixel resolution and aspect ratio)
     pub fn new(viewport: Viewport) -> Self {
         // Note: Dimensions are enforced to be odd so that the crosshair can work.

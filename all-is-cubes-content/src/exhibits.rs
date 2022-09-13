@@ -846,7 +846,7 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
 
 /// Place a series of blocks on top of each other, starting at the specified point.
 ///
-/// TODO: think about whether this should be instead returning a VoxelBrush or a SpaceTransaction or something, for the future of composable worldgen
+/// TODO: think about whether this should be instead returning a `VoxelBrush` or a `SpaceTransaction` or something, for the future of composable worldgen
 fn stack<'b, B>(
     space: &mut Space,
     origin: impl Into<GridPoint>,

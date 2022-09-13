@@ -18,7 +18,7 @@ use crate::reloadable::{reloadable_str, Reloadable};
 /// (They are, however, replaced in the event of a shader edit and hot-reload, and in
 /// the future we might decide that some graphics options changes affect this too.)
 ///
-/// Design note: This was originally intended as a shared component for SpaceRenderer,
+/// Design note: This was originally intended as a shared component for `SpaceRenderer`,
 /// but it turned out that we want to reuse the same shader module and camera buffer for
 /// debug lines as well as blocks, so this got generalized. It might yet become a bundle
 /// of more things, or stay scoped to "only the 3D world rendering".

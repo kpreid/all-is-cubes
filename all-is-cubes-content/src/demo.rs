@@ -163,7 +163,7 @@ impl Default for UniverseTemplate {
 }
 
 /// TODO: This should be a general Universe tool for "insert a generated value or report an error"
-/// but for now was written to help out UniverseTemplate::build
+/// but for now was written to help out `UniverseTemplate::build`
 fn insert_generated_space(
     universe: &mut Universe,
     name: Name,

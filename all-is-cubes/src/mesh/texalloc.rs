@@ -56,7 +56,7 @@ pub trait TextureTile: Clone {
     /// Write texture data as RGBA color.
     ///
     /// `data` must be of length `self.bounds().volume()`.
-    /// TODO: Replace it with a GridArray (requires changing the ordering).
+    // TODO: Replace it with a GridArray (requires changing the ordering).
     fn write(&mut self, data: &[Texel]);
 }
 

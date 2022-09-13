@@ -53,7 +53,7 @@ impl GraphicsResourceError {
         }
     }
 
-    /// TODO: make this not panic by expanding the functionality of RenderError
+    /// TODO: make this not panic by expanding the functionality of [`RenderError`]
     pub fn into_render_error_or_panic(self) -> RenderError {
         if let Some(re) = self.source.downcast_ref::<RefError>() {
             RenderError::Read(re.clone())

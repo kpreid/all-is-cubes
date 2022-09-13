@@ -170,8 +170,8 @@ where
 
     /// Returns the [`StandardCameras`] this renderer contains.
     ///
-    /// TODO: Should this be a standard part of HeadlessRenderer and/or other traits? It's likely
-    /// to be useful for dealing with cursors and such matters, I think.
+    /// TODO: Should this be a standard part of [`HeadlessRenderer`] and/or other traits?
+    /// It's likely to be useful for dealing with cursors and such matters, I think.
     pub fn cameras(&self) -> &StandardCameras {
         &self.cameras
     }

@@ -295,7 +295,7 @@ impl LightPhysics {
 /// Given a block and its neighbors, which directions should we cast rays to find light
 /// falling on it?
 ///
-/// The returned FaceMap's `within` value is meaningless.
+/// The returned [`FaceMap`]'s `within` value is meaningless.
 fn directions_to_seek_light(neighborhood: FaceMap<&EvaluatedBlock>) -> FaceMap<f32> {
     if neighborhood.within.visible_or_animated() {
         // Non-opaque blocks should work the same as blocks which have all six adjacent faces present.
@@ -349,9 +349,9 @@ struct LightRayState {
 }
 
 impl LightRayState {
-    /// * origin_cube: cube we are actually starting from
-    /// * abstract_ray: ray as if we were lighting the [0, 0, 0] cube
-    /// * ray_weight_by_faces: how much influence this ray should have on the
+    /// * `origin_cube`: cube we are actually starting from
+    /// * `abstract_ray`: ray as if we were lighting the [0, 0, 0] cube
+    /// * `ray_weight_by_faces`: how much influence this ray should have on the
     ///   total illumination
     fn new(origin_cube: GridPoint, abstract_ray: Ray, ray_weight_by_faces: f32) -> Self {
         let translated_ray =
@@ -378,7 +378,7 @@ impl LightBuffer {
 
     /// Process a ray intersecting a single cube.
     ///
-    /// The caller should check ray_state.alpha to decide when to stop calling this.
+    /// The caller should check `ray_state.alpha` to decide when to stop calling this.
     #[inline]
     #[allow(clippy::too_many_arguments)]
     fn traverse<D>(
@@ -488,14 +488,14 @@ impl LightBuffer {
 
     /// Add the given color to the sum counting it as having the given weight,
     /// as if it was an entire ray's contribution
-    /// (that is, incrementing total_rays).
+    /// (that is, incrementing `self.total_rays`).
     fn add_weighted_light(&mut self, color: Rgb, weight: f32) {
         self.incoming_light += color * weight;
         self.total_rays += 1;
         self.total_ray_weight += weight;
     }
 
-    /// Return the PackedLight value accumulated here
+    /// Return the [`PackedLight`] value accumulated here
     fn finish(&self, origin_is_opaque: bool) -> PackedLight {
         // if total_rays is zero then incoming_light is zero so the result will be zero.
         // We just need to avoid dividing by zero.

@@ -1065,7 +1065,7 @@ mod tests {
         );
     }
 
-    /// Regression test from a fuzz test case where fast_forward would perform poorly,
+    /// Regression test from a fuzz test case where `fast_forward` would perform poorly,
     /// requiring a large number of steps. Note that this test is not intended to
     /// detect the poor performance, but to confirm that the _fix_ doesn't change the
     /// behavior.

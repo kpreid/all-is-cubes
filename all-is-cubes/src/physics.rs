@@ -310,7 +310,7 @@ mod tests {
     /// Takes the maximum length on all coordinate axes; all points forming a cube
     /// centered on the origin will have the same value for this norm.
     ///
-    /// https://en.wikipedia.org/wiki/Uniform_norm
+    /// See also <https://en.wikipedia.org/wiki/Uniform_norm>
     fn max_norm<S: num_traits::real::Real>(v: Vector3<S>) -> S {
         v[0].abs().max(v[1].abs()).max(v[2].abs())
     }

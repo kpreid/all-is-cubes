@@ -183,7 +183,7 @@ pub struct PreconditionFailed {
 
 /// Type of “unexpected errors” from [`Transaction::commit()`].
 //
-/// Design note: CommitError doesn't need to be cheap because it should never happen
+/// Design note: `CommitError` doesn't need to be cheap because it should never happen
 /// during normal game operation; it exists because we want to do better than panicking
 /// if it does, and give a report that's detailed enough that someone might be able to
 /// fix the underlying bug.

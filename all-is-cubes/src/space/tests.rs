@@ -134,7 +134,7 @@ fn set_error_format() {
     );
 }
 
-/// EvaluatedBlock data is updated when a new block index is allocated.
+/// `EvaluatedBlock` data is updated when a new block index is allocated.
 #[test]
 fn set_updates_evaluated_on_added_block() {
     let [block] = make_some_blocks();
@@ -148,7 +148,7 @@ fn set_updates_evaluated_on_added_block() {
     space.consistency_check(); // bonus testing
 }
 
-/// EvaluatedBlock data is updated when a block index is reused.
+/// `EvaluatedBlock` data is updated when a block index is reused.
 #[test]
 fn set_updates_evaluated_on_replaced_block() {
     let [block] = make_some_blocks();

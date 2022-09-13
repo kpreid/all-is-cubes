@@ -256,7 +256,7 @@ impl QuadTransform {
     }
 
     /// Transform a point from quad U-V-depth coordinates with a scale of
-    /// 1 unit = 1 texel/voxel, to 0-to-1 coordinates within the 3D TextureTile space.
+    /// 1 unit = 1 texel/voxel, to 0-to-1 coordinates within the 3D `TextureTile` space.
     ///
     /// The depth value is offset by +0.5 texel (into the depth of the voxel being
     /// drawn), to move it from edge coordinates to mid-texel coordinates.

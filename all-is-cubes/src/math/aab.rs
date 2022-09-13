@@ -428,7 +428,7 @@ mod tests {
         }
     }
 
-    /// This would be a doc test except corner_points is not public for now
+    /// This would be a doc test except `corner_points` is not public for now
     /// (since it's oddball and not fully nailed down).
     #[test]
     fn aab_corner_points() {

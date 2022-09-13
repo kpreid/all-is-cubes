@@ -167,8 +167,8 @@ impl DemoTheme {
     }
 
     /// Box of the room, in space coordinates, that might be smaller or bigger than the
-    /// DungeonGrid's box.
-    /// TODO: Should we teach DungeonGrid to help with this?
+    /// [`DungeonGrid`]'s box.
+    /// TODO: Should we teach `DungeonGrid` to help with this?
     fn actual_room_box(&self, room_position: GridPoint, room_data: &DemoRoom) -> GridAab {
         if room_data.corridor_only {
             self.corridor_box

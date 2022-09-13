@@ -243,7 +243,7 @@ impl TextureTile for LumAtlasTile {
 }
 
 /// Compared by reference. This definition of equality is cheaper and non-panicking
-/// vs. the derived behavior of RefCell::eq which is to borrow and compare the contents.
+/// vs. the derived behavior of [`RefCell::eq`] which is to borrow and compare the contents.
 impl PartialEq for LumAtlasTile {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.backing, &other.backing)

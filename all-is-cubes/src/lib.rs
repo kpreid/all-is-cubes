@@ -157,6 +157,7 @@
 #![warn(unused_extern_crates)]
 #![warn(unused_lifetimes)]
 #![warn(clippy::cast_lossless)]
+#![warn(clippy::doc_markdown)]
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
 #![warn(clippy::return_self_not_must_use)]

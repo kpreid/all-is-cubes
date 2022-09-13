@@ -196,7 +196,7 @@ fn reflectance_is_clamped() {
     assert!(light.red() <= sky_color.red());
 }
 
-/// Helper to construct a space with LightPhysics set to None
+/// Helper to construct a space with `LightPhysics` set to None
 fn space_with_disabled_light() -> Space {
     let mut space = Space::empty_positive(1, 1, 1);
     space.set_physics(SpacePhysics {

@@ -33,7 +33,7 @@ pub(crate) enum LightStatus {
 
 /// Lighting within a [`Space`]; an [`Rgb`] value stored with reduced precision and range.
 ///
-/// TODO: This now stores additional information. Rename to 'SpaceLight' or some such.
+/// TODO: This now stores additional information. Rename to '`SpaceLight`' or some such.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PackedLight {
     // LightStatus being other than Visible is mutually exclusive with value being nonzero,

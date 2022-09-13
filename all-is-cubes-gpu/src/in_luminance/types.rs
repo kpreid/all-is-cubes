@@ -277,7 +277,7 @@ pub struct LinesVertex {
 }
 
 impl LinesVertex {
-    /// Can't use name `new` because luminance::Vertex grabs it
+    /// Can't use name `new` because [`luminance::Vertex`] grabs it
     #[inline]
     pub(crate) fn new_basic(direct_position: Point3<FreeCoordinate>, color: Rgba) -> Self {
         Self {

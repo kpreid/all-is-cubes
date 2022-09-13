@@ -126,7 +126,7 @@ enum AnyTransaction {
     Space(TransactionInUniverse<Space>),
 }
 
-/// Not-an-associated-type alias for check values produced by AnyTransaction.
+/// Not-an-associated-type alias for check values produced by [`AnyTransaction`].
 /// TODO: Make this a newtype struct since we're bothering to name it.
 type AnyTransactionCheck = Box<dyn Any>;
 

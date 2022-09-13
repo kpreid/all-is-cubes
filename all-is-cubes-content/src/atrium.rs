@@ -660,7 +660,7 @@ fn lookup_multiblock_2d(
     }
 }
 
-/// Kludge to allow for representing multi-block structures in AtriumBlocks.
+/// Kludge to allow for representing multi-block structures in [`AtriumBlocks`].
 /// This represents an integer in {0, 1, 2, 3, 4}, which is the biggest dimension
 /// we have.
 ///
@@ -674,7 +674,7 @@ enum UpTo5 {
     U4,
 }
 impl UpTo5 {
-    /// Basically a TryFrom without an error type
+    /// Basically a `TryFrom` without an error type
     fn new(input: GridCoordinate) -> Option<Self> {
         Some(match input {
             0 => UpTo5::U0,

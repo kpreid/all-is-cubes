@@ -371,7 +371,7 @@ pub struct LinesUniformInterface {
 impl LinesUniformInterface {
     /// Set all the uniforms, given necessary parameters.
     ///
-    /// TODO: Deduplicate code between this and BlockUniformInterface
+    /// TODO: Deduplicate code between this and `BlockUniformInterface`
     pub(super) fn initialize<Backend: AicLumBackend>(
         &self,
         program_iface: &mut ProgramInterface<'_, Backend>,

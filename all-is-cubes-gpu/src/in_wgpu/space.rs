@@ -72,7 +72,7 @@ struct ChunkBuffers {
 const INDEX_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
 
 impl SpaceRenderer {
-    /// TODO: Simplify callers by making it possible to create a SpaceRenderer without a space.
+    /// TODO: Simplify callers by making it possible to create a `SpaceRenderer` without a space.
     /// Besides simpler initialization, this will also allow reusing allocated resources across a
     /// period of no space.
     pub fn new(

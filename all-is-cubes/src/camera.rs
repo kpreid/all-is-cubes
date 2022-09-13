@@ -272,9 +272,9 @@ impl Camera {
         true
     }
 
-    /// Helper for aab_in_view; finds if two sets of points' projections onto a line intersect.
+    /// Helper for [`aab_in_view`]; finds if two sets of points' projections onto a line intersect.
     ///
-    /// Note: NOT #[inline] because profiling shows that to have a negative effect.
+    /// Note: NOT `#[inline]` because profiling shows that to have a negative effect.
     fn separated_along(
         points1: impl IntoIterator<Item = Point3<FreeCoordinate>>,
         points2: impl IntoIterator<Item = Point3<FreeCoordinate>>,

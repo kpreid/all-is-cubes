@@ -5,7 +5,7 @@ use crate::character::Character;
 use crate::space::Space;
 use crate::universe::{InsertError, Name, URef, URootRef, Universe, UniverseIndex, UniverseIter};
 
-/// A BTreeMap is used to ensure that the iteration order is deterministic across
+/// A `BTreeMap` is used to ensure that the iteration order is deterministic across
 /// runs/versions.
 pub(super) type Storage<T> = BTreeMap<Name, URootRef<T>>;
 

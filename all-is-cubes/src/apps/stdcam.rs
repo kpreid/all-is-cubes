@@ -283,7 +283,7 @@ impl StandardCameras {
     /// This implements [`GraphicsOptions::show_ui`] by returning [`None`] when the option is
     /// false.
     ///
-    /// TODO: Make this also a ListenableSource
+    /// TODO: Make this also a [`ListenableSource`]
     pub fn ui_space(&self) -> Option<&URef<Space>> {
         self.ui_space.as_ref()
     }

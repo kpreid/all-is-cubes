@@ -76,7 +76,7 @@ impl<T: 'static> URef<T> {
 
     /// Borrow the value, in the sense of `RefCell::borrow`, and panic on failure.
     ///
-    /// TODO: Update docs to discuss RwLock instead of RefCell, once we have a policy
+    /// TODO: Update docs to discuss `RwLock` instead of `RefCell`, once we have a policy
     /// about waiting for locks.
     #[track_caller]
     pub fn borrow(&self) -> UBorrow<T> {
@@ -85,7 +85,7 @@ impl<T: 'static> URef<T> {
 
     /// Borrow the value, in the sense of `RefCell::try_borrow`.
     ///
-    /// TODO: Update docs to discuss RwLock instead of RefCell, once we have a policy
+    /// TODO: Update docs to discuss `RwLock` instead of `RefCell`, once we have a policy
     /// about waiting for locks.
     pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
         let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
@@ -388,7 +388,7 @@ mod tests {
         );
     }
 
-    /// Note: Equality behavior is inherited from Weak::new and Weak::ptr_eq,
+    /// Note: Equality behavior is inherited from `Weak::new` and `Weak::ptr_eq`,
     /// not necessarily what we actually want.
     #[test]
     fn new_gone_equality() {

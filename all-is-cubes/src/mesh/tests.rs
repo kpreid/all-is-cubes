@@ -562,7 +562,7 @@ fn depth_ordering_from_view_direction() {
     assert_eq!(problems, vec![]);
 }
 
-/// Test that clamp_min < clamp_max, and that `pos` is within the range (± 0.5) too.
+/// Test that `clamp_min < clamp_max`, and that `pos` is within the range (± 0.5) too.
 ///
 /// (It'd be nice if this was instead a debug assertion when constructing vertices, but
 /// the data is a fully `pub` struct and enum.)
