@@ -48,6 +48,7 @@ mod block_vertex;
 pub use block_vertex::*;
 mod block_mesh;
 pub use block_mesh::*;
+mod cache;
 pub mod dynamic;
 mod index_vec;
 pub use index_vec::*;
