@@ -302,7 +302,7 @@ mod trace_image {
     ///
     /// TODO: Add a mechanism for incrementally rendering (not 100% of pixels) for
     /// interactive use.
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "threads")]
     pub(super) fn trace_scene_to_image_impl<P, E, O>(
         scene: super::RtScene<'_, P>,
         encoder: E,
@@ -357,7 +357,7 @@ mod trace_image {
     ///
     /// TODO: Add a mechanism for incrementally rendering (not 100% of pixels) for
     /// interactive use.
-    #[cfg(not(feature = "rayon"))]
+    #[cfg(not(feature = "threads"))]
     pub(super) fn trace_scene_to_image_impl<P, E, O>(
         scene: super::RtScene<'_, P>,
         encoder: E,

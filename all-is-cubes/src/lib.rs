@@ -98,9 +98,10 @@
 //!
 //! This crate, `all_is_cubes`, defines the following feature flags:
 //!
-//! * `rayon`:
-//!   Enable use of [`rayon`] for multithreaded raytracing.
-//!   This feature does not affect the public API.
+//! * `threads`:
+//!   Enable use of threads for parallel and background processing, including via
+//!   [`rayon`]’s global thread pool.
+//!   This feature does not affect the public API, only performance and dependencies.
 //! * `arbitrary`: Adds implementations of the [`arbitrary::Arbitrary`] trait for
 //!   fuzzing / property testing on types defined by this crate.
 //!
@@ -139,7 +140,7 @@
     not(feature = "arbitrary"),
     doc = "[`arbitrary::Arbitrary`]: https://docs.rs/arbitrary/1.0.2/arbitrary/trait.Arbitrary.html"
 )]
-#![cfg_attr(not(feature = "rayon"), doc = "[`rayon`]: https://docs.rs/rayon/")]
+#![cfg_attr(not(feature = "threads"), doc = "[`rayon`]: https://docs.rs/rayon/")]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::needless_update)]

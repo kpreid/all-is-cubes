@@ -37,6 +37,8 @@ harness = false
 
 [features]
 default = []
+arbitrary = ["dep:arbitrary"]
+threads = ["dep:rayon"]
 
 [dependencies]
 arbitrary = { version = "1.1.6", optional = true, features = ["derive"] }

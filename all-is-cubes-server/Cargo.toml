@@ -28,7 +28,7 @@ embed = []
 
 [dependencies]
 # TODO: server doesn't actually have any game-server functionality so this is unnecessary
-# all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["rayon"] }
+# all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["threads"] }
 anyhow = "1.0"
 axum = { version = "0.5.13", features = ["tower-log"] }
 include_dir = "0.7.2"

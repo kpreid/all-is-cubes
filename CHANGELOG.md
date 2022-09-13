@@ -61,6 +61,8 @@
     - Renamed: `space::SpaceBuilder::build_empty()` is now `build()`.
     - Renamed: `transaction::UniverseTransaction` is now `universe::UniverseTransaction`.
 
+    - Renamed: The feature `"rayon"` is now `"threads"`.
+
 - `all-is-cubes-gpu` library:
     - To allow for working with alternative GPU APIs, everything specific to `luminance` has been moved into a submodule `in_luminance`.
       Some non-specific types have remained at the top level.

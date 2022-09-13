@@ -12,7 +12,6 @@ use luminance::context::GraphicsContext;
 use luminance::texture::{MagFilter, MinFilter};
 use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;
-#[cfg(feature = "rayon")]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::rc::Rc;
 
@@ -109,10 +108,7 @@ where
                 let color = Rgb888::new(r, g, b);
                 Pixel(point, color)
             };
-            #[cfg(feature = "rayon")]
             let traces: Vec<Pixel<Rgb888>> = this_frame_pixels.into_par_iter().map(trace).collect();
-            #[cfg(not(feature = "rayon"))]
-            let traces: Vec<Pixel<Rgb888>> = this_frame_pixels.into_iter().map(trace).collect();
             let tracing_duration = Instant::now().duration_since(start_time);
 
             match tracing_duration.cmp(&Duration::from_millis(10)) {

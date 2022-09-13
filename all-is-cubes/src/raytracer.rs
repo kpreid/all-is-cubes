@@ -13,7 +13,7 @@ use std::fmt;
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3};
 use cgmath::{Point3, Vector4};
 use ordered_float::NotNan;
-#[cfg(feature = "rayon")]
+#[cfg(feature = "threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{Evoxel, Resolution, AIR};
@@ -261,7 +261,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         self.trace_scene_to_text_impl::<P, F, E>(camera, line_ending, write)
     }
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "threads")]
     fn trace_scene_to_text_impl<P, F, E>(
         &self,
         camera: &Camera,
@@ -297,7 +297,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         Ok(info_sum.result())
     }
 
-    #[cfg(not(feature = "rayon"))]
+    #[cfg(not(feature = "threads"))]
     fn trace_scene_to_text_impl<P, F, E>(
         &self,
         camera: &Camera,
@@ -542,7 +542,7 @@ impl<P: PixelBuf> TracingState<P> {
 pub use updating::*;
 mod updating;
 
-#[cfg(feature = "rayon")]
+#[cfg(feature = "threads")]
 mod rayon_helper {
     use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator as _};
     use std::iter::{empty, once, Sum};
