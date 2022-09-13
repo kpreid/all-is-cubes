@@ -67,7 +67,7 @@ fn test_block_mesh_threshold(block: Block) -> BlockMesh<BlockVertex<TtPoint>, Te
     )
 }
 
-/// Test helper to call [`block_meshes_for_space`] followed directly by [`triangulate_space`].
+/// Test helper to call [`block_meshes_for_space`] followed directly by [`SpaceMesh::new`].
 #[allow(clippy::type_complexity)]
 fn triangulate_blocks_and_space(
     space: &Space,
@@ -80,7 +80,7 @@ fn triangulate_blocks_and_space(
     let mut tex = TestTextureAllocator::new();
     let block_meshes = block_meshes_for_space(space, &mut tex, options);
     let space_mesh: SpaceMesh<BlockVertex<TtPoint>, TestTextureTile> =
-        triangulate_space(space, space.bounds(), options, &*block_meshes);
+        SpaceMesh::new(space, space.bounds(), options, &*block_meshes);
     (tex, block_meshes, space_mesh)
 }
 
@@ -124,7 +124,7 @@ fn excludes_hidden_faces_of_blocks() {
     );
 }
 
-/// Run [`triangulate_space`] with stale block data and confirm it does not panic.
+/// Run [`SpaceMesh::new`] with stale block data and confirm it does not panic.
 #[test]
 fn no_panic_on_missing_blocks() {
     let [block] = make_some_blocks();
@@ -138,9 +138,10 @@ fn no_panic_on_missing_blocks() {
 
     // This should not panic; visual glitches are preferable to failure.
     space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
-    triangulate_space(
+
+    SpaceMesh::new(
         &space,
-        space.bounds(),
+        (&space).bounds(),
         &MeshOptions::dont_care_for_test(),
         &*block_meshes,
     );
@@ -173,7 +174,7 @@ fn trivial_voxels_equals_atom() {
     assert_eq!(tex.count_allocated(), 0);
 }
 
-/// [`triangulate_space`] of a 1×1×1 space has the same geometry as the contents.
+/// [`SpaceMesh`] of a 1×1×1 space has the same geometry as the contents.
 #[test]
 fn space_mesh_equals_block_mesh() {
     // Construct recursive block.

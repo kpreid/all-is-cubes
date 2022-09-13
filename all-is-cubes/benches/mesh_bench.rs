@@ -4,8 +4,8 @@ use all_is_cubes::block::{Block, Resolution::R16, AIR};
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::mesh::{
-    block_meshes_for_space, triangulate_space, BlockMesh, BlockMeshes, BlockVertex, MeshOptions,
-    SpaceMesh, TestTextureAllocator, TestTextureTile, TtPoint,
+    block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, MeshOptions, SpaceMesh,
+    TestTextureAllocator, TestTextureTile, TtPoint,
 };
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
@@ -65,7 +65,7 @@ fn mesh_benches(c: &mut Criterion) {
         // are shared between all cases.
         b.iter_batched_ref(
             || (),
-            |()| triangulate_space(&space, space.bounds(), options, &*block_meshes),
+            |()| SpaceMesh::new(&space, space.bounds(), options, &*block_meshes),
             BatchSize::SmallInput,
         );
     });
@@ -99,7 +99,7 @@ fn mesh_benches(c: &mut Criterion) {
         let (space, block_meshes) = checkerboard_space_bench_setup(options, true);
         b.iter_batched_ref(
             || (),
-            |()| triangulate_space(&space, space.bounds(), options, &*block_meshes),
+            |()| SpaceMesh::new(&space, space.bounds(), options, &*block_meshes),
             BatchSize::SmallInput,
         );
     });

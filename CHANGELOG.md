@@ -57,6 +57,7 @@
     - Renamed: `mesh::SpaceMesh::new()` is now `mesh::SpaceMesh::default()`.
     - Renamed: `mesh::triangulate_block()` is now `mesh::BlockMesh::new()`.
     - Renamed: `mesh::triangulate_blocks()` is now `mesh::block_meshes_for_space()`.
+    - Renamed: `mesh::triangulate_space()` is now `mesh::SpaceMesh::new()`.
     - Renamed: `space::SpaceBuilder::build_empty()` is now `build()`.
     - Renamed: `transaction::UniverseTransaction` is now `universe::UniverseTransaction`.
 

@@ -8,27 +8,6 @@ use crate::math::{Face7, GridAab, GridCoordinate, GridRotation};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 use crate::space::{BlockIndex, Space};
 
-/// Computes a triangle mesh of a [`Space`].
-///
-/// Shorthand for
-/// <code>[SpaceMesh::new()].[compute](SpaceMesh::compute)(space, bounds, block_meshes)</code>.
-#[inline]
-pub fn triangulate_space<'p, V, T, P>(
-    space: &Space,
-    bounds: GridAab,
-    options: &MeshOptions,
-    block_meshes: P,
-) -> SpaceMesh<V, T>
-where
-    V: GfxVertex + 'p,
-    P: BlockMeshProvider<'p, V, T>,
-    T: TextureTile + 'p,
-{
-    let mut this = SpaceMesh::new();
-    this.compute(space, bounds, options, block_meshes);
-    this
-}
-
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
 ///
@@ -63,6 +42,27 @@ pub struct SpaceMesh<V, T> {
 }
 
 impl<V, T> SpaceMesh<V, T> {
+    /// Computes a triangle mesh of a [`Space`].
+    ///
+    /// Shorthand for
+    /// <code>[SpaceMesh::new()].[compute](SpaceMesh::compute)(space, bounds, block_meshes)</code>.
+    #[inline]
+    pub fn new<'p, P>(
+        space: &Space,
+        bounds: GridAab,
+        options: &MeshOptions,
+        block_meshes: P,
+    ) -> SpaceMesh<V, T>
+    where
+        V: GfxVertex + 'p,
+        P: BlockMeshProvider<'p, V, T>,
+        T: TextureTile + 'p,
+    {
+        let mut this = Self::default();
+        this.compute(space, bounds, options, block_meshes);
+        this
+    }
+
     /// The vertices of the mesh, in an arbitrary order. Use [`indices()`](`Self::indices`)
     /// and the range methods to determine how to use them.
     #[inline]
@@ -436,8 +436,8 @@ impl<'a, V, T> BlockMeshProvider<'a, V, T> for &'a [BlockMesh<V, T>] {
     }
 }
 
-/// Identifies a back-to-front order in which to draw triangles (resulting from
-/// [`triangulate_space`]), based on the direction from which they are being viewed.
+/// Identifies a back-to-front order in which to draw triangles (of a [`SpaceMesh`]),
+/// based on the direction from which they are being viewed.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DepthOrdering {
