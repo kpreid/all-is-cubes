@@ -90,7 +90,7 @@ where
         }
     }
 
-    /// Returns a reference to the [`Space`] this triangulates.
+    /// Returns a reference to the [`Space`] this watches.
     pub fn space(&self) -> &URef<Space> {
         &self.space
     }
@@ -562,13 +562,13 @@ where
             let vertices = self.mesh.vertices().len();
             if vertices == 0 {
                 log::trace!(
-                    "triangulated {:?}+ in {:.3} ms, 0",
+                    "meshed {:?}+ in {:.3} ms, 0",
                     chunk_origin.custom_format(ConciseDebug),
                     duration_ms,
                 );
             } else {
                 log::trace!(
-                    "triangulated {:?}+ in {:.3} ms, {} in {:.3} µs/v",
+                    "meshed {:?}+ in {:.3} ms, {} in {:.3} µs/v",
                     chunk_origin.custom_format(ConciseDebug),
                     duration_ms,
                     vertices,

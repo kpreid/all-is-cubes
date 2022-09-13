@@ -69,7 +69,7 @@ fn test_block_mesh_threshold(block: Block) -> BlockMesh<BlockVertex<TtPoint>, Te
 
 /// Test helper to call [`block_meshes_for_space`] followed directly by [`SpaceMesh::new`].
 #[allow(clippy::type_complexity)]
-fn triangulate_blocks_and_space(
+fn mesh_blocks_and_space(
     space: &Space,
 ) -> (
     TestTextureAllocator,
@@ -103,7 +103,7 @@ fn excludes_hidden_faces_of_blocks() {
     space
         .fill(space.bounds(), |p| Some(non_uniform_fill(p)))
         .unwrap();
-    let (_, _, space_mesh) = triangulate_blocks_and_space(&space);
+    let (_, _, space_mesh) = mesh_blocks_and_space(&space);
 
     // The space rendering should be a 2×2×2 cube of tiles, without any hidden interior faces.
     assert_eq!(
@@ -159,12 +159,12 @@ fn trivial_voxels_equals_atom() {
         .unwrap()
         .build();
 
-    let (_, _, space_rendered_a) = triangulate_blocks_and_space(&{
+    let (_, _, space_rendered_a) = mesh_blocks_and_space(&{
         let mut space = Space::empty_positive(1, 1, 1);
         space.set((0, 0, 0), &atom_block).unwrap();
         space
     });
-    let (tex, _, space_rendered_r) = triangulate_blocks_and_space(&{
+    let (tex, _, space_rendered_r) = mesh_blocks_and_space(&{
         let mut space = Space::empty_positive(1, 1, 1);
         space.set((0, 0, 0), &trivial_recursive_block).unwrap();
         space
@@ -191,7 +191,7 @@ fn space_mesh_equals_block_mesh() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &recursive_block).unwrap();
 
-    let (tex, block_meshes, space_rendered) = triangulate_blocks_and_space(&outer_space);
+    let (tex, block_meshes, space_rendered) = mesh_blocks_and_space(&outer_space);
 
     eprintln!("{:#?}", block_meshes);
     eprintln!("{:#?}", space_rendered);
@@ -219,7 +219,7 @@ fn block_resolution_greater_than_tile() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &block).unwrap();
 
-    let (_, _, _) = triangulate_blocks_and_space(&outer_space);
+    let (_, _, _) = mesh_blocks_and_space(&outer_space);
     // TODO: Figure out how to make a useful assert. At least this is "it doesn't panic".
 }
 
@@ -244,7 +244,7 @@ fn shrunken_box_has_no_extras() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
 
-    let (tex, _, space_rendered) = triangulate_blocks_and_space(&outer_space);
+    let (tex, _, space_rendered) = mesh_blocks_and_space(&outer_space);
 
     assert_eq!(tex.count_allocated(), 1);
     assert_eq!(
@@ -306,7 +306,7 @@ fn shrunken_box_uniform_color() {
     let mut outer_space = Space::empty_positive(1, 1, 1);
     outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
 
-    let (tex, _, space_rendered) = triangulate_blocks_and_space(&outer_space);
+    let (tex, _, space_rendered) = mesh_blocks_and_space(&outer_space);
 
     assert_eq!(tex.count_allocated(), 0);
     assert_eq!(
@@ -465,7 +465,7 @@ fn transparency_split() {
         .set([2, 0, 0], Block::from(Rgba::new(0.0, 0.0, 1.0, 0.5)))
         .unwrap();
 
-    let (_, _, space_rendered) = triangulate_blocks_and_space(&space);
+    let (_, _, space_rendered) = mesh_blocks_and_space(&space);
     // 2 cubes...
     assert_eq!(space_rendered.vertices().len(), 6 * 4 * 2);
     // ...one of which is opaque...
