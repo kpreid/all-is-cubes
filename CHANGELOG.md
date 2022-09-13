@@ -54,6 +54,7 @@
     
     - Renamed: `apps::AllIsCubesAppState` to `apps::Session`.
     - Renamed: `math::Face` is now `math::Face7`.
+    - Renamed: `mesh::SpaceMesh::new()` is now `mesh::SpaceMesh::default()`.
     - Renamed: `mesh::triangulate_block()` is now `mesh::BlockMesh::new()`.
     - Renamed: `mesh::triangulate_blocks()` is now `mesh::block_meshes_for_space()`.
     - Renamed: `space::SpaceBuilder::build_empty()` is now `build()`.

@@ -74,7 +74,7 @@ fn mesh_benches(c: &mut Criterion) {
         let (space, block_meshes) = checkerboard_space_bench_setup(options, false);
         b.iter_batched_ref(
             || {
-                let mut buffer = SpaceMesh::new();
+                let mut buffer = SpaceMesh::default();
                 buffer.compute(&space, space.bounds(), options, &*block_meshes);
                 // Sanity check that we're actually rendering as much as we expect.
                 assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);

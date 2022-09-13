@@ -515,7 +515,7 @@ fn handling_allocation_failure() {
 
 #[test]
 fn space_mesh_empty() {
-    let t = SpaceMesh::<BlockVertex<TtPoint>, TestTextureTile>::new();
+    let t = SpaceMesh::<BlockVertex<TtPoint>, TestTextureTile>::default();
     assert!(t.is_empty());
     assert_eq!(t.vertices(), &[]);
     // type annotation to prevent spurious inference failures in the presence

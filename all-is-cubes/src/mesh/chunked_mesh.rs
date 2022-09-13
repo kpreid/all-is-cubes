@@ -520,7 +520,7 @@ where
     fn new(position: ChunkPos<CHUNK_SIZE>) -> Self {
         Self {
             position,
-            mesh: SpaceMesh::new(),
+            mesh: SpaceMesh::default(),
             render_data: D::default(),
             block_dependencies: Vec::new(),
         }

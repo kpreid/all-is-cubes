@@ -63,21 +63,6 @@ pub struct SpaceMesh<V, T> {
 }
 
 impl<V, T> SpaceMesh<V, T> {
-    /// Construct an empty [`SpaceMesh`] which draws nothing.
-    #[inline]
-    pub fn new() -> Self {
-        // We need a Range constant to be able to initialize the array with copies of it.
-        const ZERO_RANGE: Range<usize> = Range { start: 0, end: 0 };
-        Self {
-            vertices: Vec::new(),
-            indices: Vec::new(),
-            opaque_range: ZERO_RANGE,
-            transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
-            block_indices_used: BitVec::new(),
-            textures_used: Vec::new(),
-        }
-    }
-
     /// The vertices of the mesh, in an arbitrary order. Use [`indices()`](`Self::indices`)
     /// and the range methods to determine how to use them.
     #[inline]
@@ -395,9 +380,19 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 }
 
 impl<V, T> Default for SpaceMesh<V, T> {
+    /// Construct an empty [`SpaceMesh`] which draws nothing.
     #[inline]
     fn default() -> Self {
-        Self::new()
+        // We need a Range constant to be able to initialize the array with copies of it.
+        const ZERO_RANGE: Range<usize> = Range { start: 0, end: 0 };
+        Self {
+            vertices: Vec::new(),
+            indices: Vec::new(),
+            opaque_range: ZERO_RANGE,
+            transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+            block_indices_used: BitVec::new(),
+            textures_used: Vec::new(),
+        }
     }
 }
 
