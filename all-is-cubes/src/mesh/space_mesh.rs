@@ -148,7 +148,8 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// Computes triangles for the contents of `space` within `bounds` and stores them
     /// in `self`.
     ///
-    /// `block_meshes` should be the result of [`triangulate_blocks`] or equivalent,
+    /// `block_meshes` should be the result of [`block_meshes_for_space`] or another
+    /// [`BlockMeshProvider`],
     /// and must be up-to-date with the [`Space`]'s blocks or the result will be inaccurate
     /// and may contain severe lighting errors.
     ///
@@ -157,7 +158,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// `block_meshes` (as opposed to, for example, using face opacity data not the
     /// same as the meshes and thus producing a rendering with gaps in it).
     ///
-    /// [`triangulate_blocks`]: super::triangulate_blocks
+    /// [`block_meshes_for_space`]: super::block_meshes_for_space
     pub fn compute<'p, P>(
         &mut self,
         space: &Space,
@@ -429,7 +430,8 @@ fn extend_giving_range<T>(
 /// This trait allows the caller of [`SpaceMesh::compute`] to provide an
 /// implementation which e.g. lazily computes meshes.
 ///
-/// TODO: This isn't currently used for anything.
+/// TODO: This currently only has one implementation and should be discarded if it is not
+/// a useful abstraction.
 pub trait BlockMeshProvider<'a, V, T> {
     fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>>;
 }

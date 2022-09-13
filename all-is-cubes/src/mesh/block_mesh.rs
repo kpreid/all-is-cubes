@@ -63,7 +63,7 @@ impl<V> Default for BlockFaceMesh<V> {
 
 /// A triangle mesh for a single [`Block`].
 ///
-/// Get it from [`BlockMesh::new()`] or [`triangulate_blocks`].
+/// Get it from [`BlockMesh::new()`] or [`block_meshes_for_space`].
 /// Pass it to [`triangulate_space`](super::triangulate_space) to assemble blocks into an
 /// entire scene or chunk ([`SpaceMesh`](super::SpaceMesh)).
 ///
@@ -446,12 +446,12 @@ impl<V, T> Default for BlockMesh<V, T> {
     }
 }
 
-/// Computes [`BlockMeshes`] for blocks present in a [`Space`].
+/// Computes [`BlockMeshes`] for blocks currently present in a [`Space`].
 /// Pass the result to [`triangulate_space`](super::triangulate_space) to use it.
 ///
 /// The resulting array is indexed by the `Space`'s
 /// [`BlockIndex`](crate::space::BlockIndex) values.
-pub fn triangulate_blocks<V, A>(
+pub fn block_meshes_for_space<V, A>(
     space: &Space,
     texture_allocator: &mut A,
     options: &MeshOptions,
@@ -468,6 +468,6 @@ where
 }
 
 /// Array of [`BlockMesh`] indexed by a [`Space`]'s block indices; a convenience
-/// alias for the return type of [`triangulate_blocks`].
+/// alias for the return type of [`block_meshes_for_space`].
 /// Pass it to [`triangulate_space`](super::triangulate_space) to use it.
 pub type BlockMeshes<V, A> = Box<[BlockMesh<V, A>]>;

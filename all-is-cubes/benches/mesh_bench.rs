@@ -4,7 +4,7 @@ use all_is_cubes::block::{Block, Resolution::R16, AIR};
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::mesh::{
-    triangulate_blocks, triangulate_space, BlockMesh, BlockMeshes, BlockVertex, MeshOptions,
+    block_meshes_for_space, triangulate_space, BlockMesh, BlockMeshes, BlockVertex, MeshOptions,
     SpaceMesh, TestTextureAllocator, TestTextureTile, TtPoint,
 };
 use all_is_cubes::rgba_const;
@@ -118,7 +118,7 @@ fn checkerboard_space_bench_setup(
         }),
     ]);
 
-    let block_meshes = triangulate_blocks(&space, &mut TestTextureAllocator::new(), options);
+    let block_meshes = block_meshes_for_space(&space, &mut TestTextureAllocator::new(), options);
 
     (space, block_meshes)
 }

@@ -67,7 +67,7 @@ fn test_block_mesh_threshold(block: Block) -> BlockMesh<BlockVertex<TtPoint>, Te
     )
 }
 
-/// Test helper to call [`triangulate_blocks`] followed directly by [`triangulate_space`].
+/// Test helper to call [`block_meshes_for_space`] followed directly by [`triangulate_space`].
 #[allow(clippy::type_complexity)]
 fn triangulate_blocks_and_space(
     space: &Space,
@@ -78,7 +78,7 @@ fn triangulate_blocks_and_space(
 ) {
     let options = &MeshOptions::new(&GraphicsOptions::default());
     let mut tex = TestTextureAllocator::new();
-    let block_meshes = triangulate_blocks(space, &mut tex, options);
+    let block_meshes = block_meshes_for_space(space, &mut tex, options);
     let space_mesh: SpaceMesh<BlockVertex<TtPoint>, TestTextureTile> =
         triangulate_space(space, space.bounds(), options, &*block_meshes);
     (tex, block_meshes, space_mesh)
@@ -129,7 +129,7 @@ fn excludes_hidden_faces_of_blocks() {
 fn no_panic_on_missing_blocks() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    let block_meshes: BlockMeshes<BlockVertex<TtPoint>, _> = triangulate_blocks(
+    let block_meshes: BlockMeshes<BlockVertex<TtPoint>, _> = block_meshes_for_space(
         &space,
         &mut TestTextureAllocator::new(),
         &MeshOptions::dont_care_for_test(),
@@ -504,7 +504,7 @@ fn handling_allocation_failure() {
     let capacity = 0;
     tex.set_capacity(capacity);
     let block_meshes: BlockMeshes<BlockVertex<TtPoint>, _> =
-        triangulate_blocks(&space, &mut tex, &MeshOptions::dont_care_for_test());
+        block_meshes_for_space(&space, &mut tex, &MeshOptions::dont_care_for_test());
 
     // Check results.
     assert_eq!(tex.count_allocated(), capacity);
