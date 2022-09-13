@@ -12,11 +12,15 @@ pub(crate) type TexPoint = Vector3<f32>;
 ///
 /// [`SpaceMesh`]: all_is_cubes::mesh::SpaceMesh
 #[derive(Debug, Default)]
-pub struct GltfTextureAllocator {}
+pub struct GltfTextureAllocator {
+    _placeholder_for_actual_state: (),
+}
 
 impl GltfTextureAllocator {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            _placeholder_for_actual_state: (),
+        }
     }
 }
 

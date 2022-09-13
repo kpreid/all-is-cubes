@@ -24,7 +24,7 @@ pub struct GltfVertex {
 }
 
 impl GltfVertex {
-    /// Placeholder constant value for offset_of calculations.
+    /// Placeholder constant value for [`bytemuck::offset_of`] calculations.
     pub(crate) const DUMMY: GltfVertex = GltfVertex {
         position: [Lef32::ZERO; 3],
         color_or_texture: [Lef32::ZERO; 4],
