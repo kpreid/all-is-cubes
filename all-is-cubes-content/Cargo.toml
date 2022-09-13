@@ -41,7 +41,7 @@ rand_xoshiro = "0.6.0"
 strum = { version = "0.24.0", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
-criterion = { version = "0.3.3", features = ["async_futures"] }
+criterion = { version = "0.4.0", features = ["async_futures", "cargo_bench_support", "html_reports"] }
 # Note: This is a executor for tests and does not imply any more general requirement
 # for using `futures-executor` with All is Cubes.
 futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
