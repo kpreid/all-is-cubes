@@ -253,8 +253,7 @@ pub(crate) async fn demo_city(
     install_widgets(
         LayoutGrant::new(logo_location),
         &LayoutTree::leaf(logo_text()),
-    )
-    .map_err(InGenError::other)?
+    )?
     .execute(&mut space)?;
     planner.occupied_plots.push(logo_location);
 

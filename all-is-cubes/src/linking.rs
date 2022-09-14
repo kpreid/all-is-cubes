@@ -21,6 +21,7 @@ use crate::space::SetCubeError;
 use crate::transaction::ExecuteError;
 use crate::universe::{InsertError, Name, URef, Universe, UniverseIndex};
 use crate::util::YieldProgress;
+use crate::vui::InstallVuiError;
 
 fn name_in_module<E: BlockModule>(key: &E) -> Name {
     Name::from(format!("{}/{}", E::namespace(), key).as_str())
@@ -252,6 +253,11 @@ pub enum InGenError {
     // TODO: This isn't very coherent; we're just aggregating various errors
     #[error(transparent)]
     Transaction(#[from] ExecuteError),
+
+    /// Failed during installing UI widgets.
+    // TODO: This isn't very coherent; we're just aggregating various errors
+    #[error(transparent)]
+    Ui(#[from] InstallVuiError),
 }
 
 impl InGenError {

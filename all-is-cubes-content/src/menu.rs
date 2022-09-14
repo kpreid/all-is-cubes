@@ -138,11 +138,8 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
     .build();
     let lb = logo_text_space.bounds();
-    // TODO: These errors ought to autoconvert into InGenError
-    install_widgets(LayoutGrant::new(lb), &logo_text_inner_widget)
-        .map_err(|e| InGenError::Other(e.into()))?
-        .execute(&mut logo_text_space)
-        .map_err(InGenError::Transaction)?; // TODO: shouldn't need to convert
+    install_widgets(LayoutGrant::new(lb), &logo_text_inner_widget)?
+        .execute(&mut logo_text_space)?;
     let logo_widget = widgets::Voxels::new(
         universe.insert_anonymous(logo_text_space),
         lb,
@@ -187,11 +184,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         })
         .build();
 
-    // TODO: These errors ought to autoconvert into InGenError
-    install_widgets(LayoutGrant::new(bounds), &tree)
-        .map_err(|e| InGenError::Other(e.into()))?
-        .execute(&mut space)
-        .map_err(InGenError::Transaction)?; // TODO: shouldn't need to convert
+    install_widgets(LayoutGrant::new(bounds), &tree)?.execute(&mut space)?;
 
     Ok(space)
 }
