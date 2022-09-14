@@ -21,13 +21,13 @@ use all_is_cubes::{
     inv::Tool,
     linking::InGenError,
     math::{Face6, GridAab, GridMatrix, GridVector},
-    space::{Space, SpacePhysics, SpaceTransaction},
+    space::{Space, SpaceBuilder, SpacePhysics, SpaceTransaction},
     transaction::{Merge, Transaction as _},
     universe::Universe,
     vui::{
         self, install_widgets,
         widgets::{self, FrameWidget},
-        LayoutGrant, LayoutRequest, LayoutTree, Layoutable, WidgetController,
+        Align, LayoutGrant, LayoutRequest, LayoutTree, Layoutable, WidgetController,
     },
 };
 
@@ -130,18 +130,12 @@ impl vui::WidgetController for TemplateButtonController {
 pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError> {
     let template_iter = UniverseTemplate::iter().filter(UniverseTemplate::include_in_lists);
 
-    let logo_text_inner_widget = LayoutTree::leaf(logo_text());
-    let mut logo_text_space = Space::builder(GridAab::from_lower_size(
-        [0, 0, 0],
-        logo_text_inner_widget.requirements().minimum,
-    ))
-    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-    .build();
-    let lb = logo_text_space.bounds();
-    install_widgets(LayoutGrant::new(lb), &logo_text_inner_widget)?
-        .execute(&mut logo_text_space)?;
+    let logo_text_space = LayoutTree::leaf(logo_text()).to_space(
+        SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+        Vector3::new(Align::Center, Align::Center, Align::Low),
+    )?;
     let logo_widget = widgets::Voxels::new(
-        lb,
+        logo_text_space.bounds(),
         universe.insert_anonymous(logo_text_space),
         Resolution::R4,
     );
@@ -170,6 +164,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     let size = tree.requirements().minimum;
     let bounds = GridAab::from_lower_size([0, 0, 0], size);
 
+    // TODO: can't use LayoutTree::to_space here because we want to use the bounds for looking_at_space
     let mut space = Space::builder(bounds)
         .physics({
             let mut p = SpacePhysics::default();
