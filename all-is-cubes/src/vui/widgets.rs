@@ -143,9 +143,9 @@ impl Voxels {
     /// When the `region`'s dimensions are not multiples of `scale`, their alignment within the
     /// block grid will be determined by the layout gravity. Note that areas of `space` outside of
     /// `region` may be displayed in that case.
-    pub const fn new(space: URef<Space>, region: GridAab, scale: Resolution) -> Self {
+    pub const fn new(region: GridAab, space: URef<Space>, scale: Resolution) -> Self {
         // Design note: We could take `region` from `space` but that'd require locking it,
-        // and the caller is very likelyto already have that information.
+        // and the caller is very likely to already have that information.
         Self {
             region,
             space,
@@ -433,8 +433,14 @@ mod tests {
 
     fn test_voxels_widget(voxel_space_bounds: GridAab, grant: LayoutGrant) -> (GridAab, Space) {
         let mut universe = Universe::new();
-        let v_space = universe.insert_anonymous(Space::builder(voxel_space_bounds).build());
-        instantiate_widget(grant, Voxels::new(v_space, voxel_space_bounds, R8))
+        instantiate_widget(
+            grant,
+            Voxels::new(
+                voxel_space_bounds,
+                universe.insert_anonymous(Space::builder(voxel_space_bounds).build()),
+                R8,
+            ),
+        )
     }
 
     // TODO: not sure if this is actually something the widget system wants to support or not

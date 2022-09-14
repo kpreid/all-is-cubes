@@ -141,8 +141,8 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     install_widgets(LayoutGrant::new(lb), &logo_text_inner_widget)?
         .execute(&mut logo_text_space)?;
     let logo_widget = widgets::Voxels::new(
-        universe.insert_anonymous(logo_text_space),
         lb,
+        universe.insert_anonymous(logo_text_space),
         Resolution::R4,
     );
 
