@@ -5,6 +5,7 @@ use std::num::NonZeroU32;
 use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::Point3;
+use fnv::{FnvHashMap, FnvHashSet};
 use indoc::indoc;
 use instant::{Duration, Instant};
 
@@ -42,7 +43,7 @@ where
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.borrow().chunks`.
-    chunks: HashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<D, Vert, Tex, CHUNK_SIZE>>,
+    chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<D, Vert, Tex, CHUNK_SIZE>>,
 
     /// Resized as needed upon each [`Self::update_blocks_and_some_chunks()`].
     chunk_chart: ChunkChart<CHUNK_SIZE>,
@@ -80,7 +81,7 @@ where
             space,
             todo: todo_rc,
             block_meshes: VersionedBlockMeshes::new(),
-            chunks: HashMap::new(),
+            chunks: FnvHashMap::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Point3::new(0, 0, 0)),
             chunks_were_missing: true,
@@ -396,7 +397,7 @@ where
     /// TODO: Missing handling for `mesh_options` changing.
     fn update<A>(
         &mut self,
-        todo: &mut HashSet<BlockIndex>,
+        todo: &mut FnvHashSet<BlockIndex>,
         space: &Space,
         block_texture_allocator: &mut A,
         mesh_options: &MeshOptions,
@@ -640,18 +641,18 @@ pub struct ChunkMeshUpdate<'a, D, V, T, const CHUNK_SIZE: GridCoordinate> {
 struct CsmTodo<const CHUNK_SIZE: GridCoordinate> {
     all_blocks_and_chunks: bool,
     // TODO: Benchmark using a BitVec instead.
-    blocks: HashSet<BlockIndex>,
+    blocks: FnvHashSet<BlockIndex>,
     /// Membership in this table indicates that the chunk *exists;* todos for chunks
     /// outside of the view area are not tracked.
-    chunks: HashMap<ChunkPos<CHUNK_SIZE>, ChunkTodo>,
+    chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkTodo>,
 }
 
 impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
     fn initially_dirty() -> Self {
         Self {
             all_blocks_and_chunks: true,
-            blocks: HashSet::new(),
-            chunks: HashMap::new(),
+            blocks: HashSet::default(),
+            chunks: HashMap::default(),
         }
     }
 

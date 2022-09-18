@@ -43,6 +43,7 @@ dependencies = [
  "downcast-rs",
  "embedded-graphics",
  "exhaust",
+ "fnv",
  "futures-channel",
  "futures-core",
  "futures-executor",
