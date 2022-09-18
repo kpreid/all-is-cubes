@@ -13,7 +13,7 @@ use crate::block::EvaluatedBlock;
 use crate::camera::Camera;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use crate::listen::Listener;
-use crate::math::{GridCoordinate, GridPoint};
+use crate::math::{FreeCoordinate, GridCoordinate, GridPoint};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile};
 use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::universe::URef;
@@ -149,7 +149,9 @@ where
         let graphics_options = camera.options();
         let mesh_options = MeshOptions::new(graphics_options);
         let view_point = camera.view_position();
+
         let view_chunk = point_to_chunk(view_point);
+        let view_chunk_is_different = self.view_chunk != view_chunk;
         self.view_chunk = view_chunk;
 
         let mut todo = self.todo.lock().unwrap();
@@ -200,6 +202,22 @@ where
         // and can start updating chunk meshes.
 
         let block_update_to_chunk_scan_time = Instant::now();
+
+        // Drop out-of-range chunks from todo.chunks and self.chunks.
+        // We do this before allocating new ones to keep maximum memory usage lower.
+        if view_chunk_is_different {
+            // TODO: Implement an algorithm to efficiently update when moving to an adjacent chunk.
+            // Not urgently needed, though.
+            let cache_distance = FreeCoordinate::from(CHUNK_SIZE);
+            let retention_distance_squared =
+                (camera.view_distance().ceil() + cache_distance).powi(2) as i32;
+            self.chunks.retain(|pos, _| {
+                pos.min_distance_squared_from(view_chunk) <= retention_distance_squared
+            });
+            todo.chunks.retain(|pos, _| {
+                pos.min_distance_squared_from(view_chunk) <= retention_distance_squared
+            });
+        }
 
         // Update some chunk geometry.
         let chunk_bounds = space.bounds().divide(CHUNK_SIZE);
@@ -268,8 +286,6 @@ where
         } else {
             None
         };
-
-        // TODO: flush todo.chunks and self.chunks of out-of-range chunks.
 
         if all_done_with_blocks && !chunks_are_missing && self.complete_time.is_none() {
             let t = Instant::now();
@@ -732,15 +748,19 @@ impl ChunkTodo {
 
 #[cfg(test)]
 mod tests {
+    use cgmath::EuclideanSpace as _;
+    use ordered_float::NotNan;
+
     use super::*;
     use crate::block::Block;
     use crate::camera::{GraphicsOptions, TransparencyOption, Viewport};
-    use crate::math::GridCoordinate;
+    use crate::math::{FreeCoordinate, GridAab, GridCoordinate};
     use crate::mesh::{BlockVertex, NoTexture, NoTextures};
     use crate::space::SpaceTransaction;
     use crate::universe::Universe;
 
     const CHUNK_SIZE: GridCoordinate = 16;
+    const LARGE_VIEW_DISTANCE: f64 = 200.0;
 
     fn read_todo_chunks(
         todo: &Mutex<CsmTodo<CHUNK_SIZE>>,
@@ -867,13 +887,19 @@ mod tests {
     }
 
     impl CsmTester {
-        fn new(space: Space) -> Self {
+        fn new(space: Space, view_distance: f64) -> Self {
             let mut universe = Universe::new();
             let space_ref = universe.insert_anonymous(space);
-            let csm = ChunkedSpaceMesh::<(), BlockVertex<NoTexture>, NoTextures, 16>::new(
+            let csm = ChunkedSpaceMesh::<(), BlockVertex<NoTexture>, NoTextures, CHUNK_SIZE>::new(
                 space_ref.clone(),
             );
-            let camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
+            let camera = Camera::new(
+                GraphicsOptions {
+                    view_distance: NotNan::new(view_distance).unwrap(),
+                    ..GraphicsOptions::default()
+                },
+                Viewport::ARBITRARY,
+            );
             Self {
                 universe,
                 space: space_ref,
@@ -896,11 +922,18 @@ mod tests {
                 chunk_render_updater,
             )
         }
+
+        /// Move camera to a position measured in chunks.
+        fn move_camera_to(&mut self, position: impl Into<Point3<FreeCoordinate>>) {
+            let mut view_transform = self.camera.get_view_transform();
+            view_transform.disp = position.into().to_vec() * f64::from(CHUNK_SIZE);
+            self.camera.set_view_transform(view_transform);
+        }
     }
 
     #[test]
     fn basic_chunk_presence() {
-        let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1));
+        let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1), LARGE_VIEW_DISTANCE);
         tester.update(|_| {});
         assert_ne!(None, tester.csm.chunk(ChunkPos::new(0, 0, 0)));
         // There should not be a chunk where there's no Space
@@ -910,7 +943,7 @@ mod tests {
 
     #[test]
     fn sort_view_every_frame_only_if_transparent() {
-        let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1));
+        let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1), LARGE_VIEW_DISTANCE);
         tester.update(|u| {
             assert!(!u.indices_only);
         });
@@ -952,7 +985,7 @@ mod tests {
             .set([0, 0, 0], Block::from(rgba_const!(1., 1., 1., 0.25)))
             .unwrap();
 
-        let mut tester = CsmTester::new(space);
+        let mut tester = CsmTester::new(space, 200.0);
         tester.camera.set_options(options.clone());
 
         let mut vertices = None;
@@ -966,5 +999,40 @@ mod tests {
         vertices = None;
         tester.update(|u| vertices = Some(u.mesh.vertices().len()));
         assert_eq!(vertices, Some(0));
+    }
+
+    /// Check that chunks out of view are eventually dropped.
+    #[test]
+    fn drop_chunks_when_moving() {
+        // use small view distance in a large space (especially large in x)
+        let mut tester = CsmTester::new(
+            Space::builder(GridAab::from_lower_upper(
+                [-1000, -100, -100],
+                [1000, 100, 100],
+            ))
+            .build(),
+            f64::from(CHUNK_SIZE) / 2.0,
+        );
+        // middle of the first chunk
+        tester.move_camera_to([0.5, 0.5, 0.5]);
+
+        tester.update(|_| {});
+        // Save the chunk count we got after initial update.
+        // Note: We don't *actually* care what this is exactly, but we want to compare
+        // it to future counts.
+        let initial_chunk_count = tester.csm.iter_chunks().count();
+        assert_eq!(initial_chunk_count, 3usize.pow(3));
+
+        // Move over one chunk at a time repeatedly.
+        for i in 1..30 {
+            let position = Point3::new(1.5 + f64::from(i), 0.5, 0.5);
+            tester.move_camera_to(position);
+            tester.update(|_| {});
+            let count = tester.csm.iter_chunks().count();
+            println!("{i}: {position:?}, {count} chunks");
+        }
+        // Check that there is not indefinite accumulation of chunks.
+        // (But allow some slop for a caching policy.)
+        assert!(tester.csm.iter_chunks().count() < initial_chunk_count * 3);
     }
 }
