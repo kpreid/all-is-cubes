@@ -341,6 +341,14 @@ where
             chunk_mesh_callback_times,
             depth_sort_time: depth_sort_end_time.map(|t| t.duration_since(chunk_scan_end_time)),
             block_updates,
+
+            // TODO: remember this rather than computing it
+            chunk_count: self.chunks.len(),
+            chunk_total_cpu_byte_size: self
+                .chunks
+                .values()
+                .map(|chunk| chunk.mesh().total_byte_size())
+                .sum(),
         }
     }
 
@@ -373,6 +381,11 @@ pub struct CsmUpdateInfo {
     depth_sort_time: Option<Duration>,
     /// Time spent on building block meshes this frame.
     pub block_updates: TimeStats,
+
+    /// Number of chunks that currently exist.
+    pub chunk_count: usize,
+    /// Total in-memory size of chunk data (not counting [`ChunkMesh::render_data`]).
+    pub chunk_total_cpu_byte_size: usize,
 }
 
 impl CustomFormat<StatusText> for CsmUpdateInfo {
@@ -386,6 +399,8 @@ impl CustomFormat<StatusText> for CsmUpdateInfo {
             chunk_mesh_callback_times,
             depth_sort_time,
             block_updates,
+            chunk_count,
+            chunk_total_cpu_byte_size,
         } = self;
         write!(
             fmt,
@@ -395,7 +410,8 @@ impl CustomFormat<StatusText> for CsmUpdateInfo {
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}
                       upload   {chunk_mesh_callback_times}
-                      depthsort {depth_sort_time}\
+                      depthsort {depth_sort_time}
+                Mem: {chunk_mib} MiB for {chunk_count} chunks\
             "},
             flaws = flaws,
             prep_time = prep_time.custom_format(StatusText),
@@ -406,6 +422,8 @@ impl CustomFormat<StatusText> for CsmUpdateInfo {
             depth_sort_time = depth_sort_time
                 .unwrap_or(Duration::ZERO)
                 .custom_format(StatusText),
+            chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
+            chunk_count = chunk_count,
         )
     }
 }
