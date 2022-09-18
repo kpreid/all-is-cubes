@@ -69,7 +69,7 @@ fn test_block_mesh_threshold(block: Block) -> BlockMesh<BlockVertex<TtPoint>, Te
 
 /// Test helper to call [`block_meshes_for_space`] followed directly by [`SpaceMesh::new`].
 #[allow(clippy::type_complexity)]
-fn mesh_blocks_and_space(
+pub(crate) fn mesh_blocks_and_space(
     space: &Space,
 ) -> (
     TestTextureAllocator,

@@ -146,6 +146,29 @@ impl<V, T> SpaceMesh<V, T> {
             assert!(index < self.vertices.len() as u32);
         }
     }
+
+    /// Returns the total memory (not counting allocator overhead) occupied by this
+    /// [`SpaceMesh`] value and all its owned objects.
+    pub fn total_byte_size(&self) -> usize {
+        use std::mem::size_of;
+
+        let SpaceMesh {
+            vertices,
+            indices,
+            opaque_range: _,
+            transparent_ranges: _,
+            block_indices_used,
+            textures_used,
+            flaws: _,
+        } = self;
+
+        // TODO: type alias for index type instead of u32?
+        size_of::<Self>()
+            + vertices.capacity() * size_of::<V>()
+            + indices.capacity() * size_of::<u32>()
+            + block_indices_used.capacity() / 8
+            + textures_used.capacity() * size_of::<T>()
+    }
 }
 
 impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
@@ -656,5 +679,50 @@ impl DepthOrdering {
             DepthOrdering::Any | DepthOrdering::Within => self,
             DepthOrdering::Direction(rot) => DepthOrdering::Direction(rot * GridRotation::Rxyz),
         }
+    }
+}
+
+/// See also [`super::tests`]. This module is for tests that are very specific to
+/// [`SpaceMesh`] as a data type itself.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::Block;
+    use crate::math::{GridPoint, Rgba};
+    use crate::mesh::{tests::mesh_blocks_and_space, BlockVertex, TestTextureTile, TtPoint};
+    use std::mem;
+
+    type TestMesh = SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>;
+
+    #[test]
+    fn empty_mesh() {
+        let mesh = TestMesh::default();
+        assert!(mesh.is_empty());
+        assert_eq!(mesh.vertices(), &[]);
+        // type annotation to prevent spurious inference failures in the presence
+        // of other compiler errors
+        assert_eq!(mesh.indices(), &[] as &[u32]);
+    }
+
+    /// An empty mesh shouldn't allocate anything beyond itself.
+    #[test]
+    fn size_of_empty() {
+        let mesh = TestMesh::default();
+        assert_eq!(dbg!(mesh.total_byte_size()), mem::size_of::<TestMesh>());
+    }
+
+    #[test]
+    fn size_of_nonempty() {
+        let space = Space::builder(GridAab::single_cube(GridPoint::origin()))
+            .filled_with(Block::from(Rgba::WHITE))
+            .build();
+        let (_, _, mesh) = mesh_blocks_and_space(&space);
+
+        let expected_data_size = mesh.vertices().len() * mem::size_of::<BlockVertex<TtPoint>>()
+            + mesh.indices().len() * mem::size_of::<u32>();
+
+        let actual_size = dbg!(mesh.total_byte_size());
+        assert!(actual_size > mem::size_of::<TestMesh>() + expected_data_size);
+        assert!(actual_size <= mem::size_of::<TestMesh>() + expected_data_size * 3);
     }
 }
