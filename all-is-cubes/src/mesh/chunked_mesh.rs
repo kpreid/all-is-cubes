@@ -324,22 +324,31 @@ pub struct CsmUpdateInfo {
 
 impl CustomFormat<StatusText> for CsmUpdateInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        let CsmUpdateInfo {
+            total_time: _,
+            prep_time,
+            chunk_scan_time,
+            chunk_mesh_generation_times,
+            chunk_mesh_callback_times,
+            depth_sort_time,
+            block_updates,
+        } = self;
         write!(
             fmt,
             indoc! {"
-                Space prep     {}
-                Block mesh gen {}
-                Chunk scan     {}
-                      mesh gen {}
-                      upload   {}
-                      depthsort {}\
+                Space prep     {prep_time}
+                Block mesh gen {block_updates}
+                Chunk scan     {chunk_scan_time}
+                      mesh gen {chunk_mesh_generation_times}
+                      upload   {chunk_mesh_callback_times}
+                      depthsort {depth_sort_time}\
             "},
-            self.prep_time.custom_format(StatusText),
-            self.block_updates,
-            self.chunk_scan_time.custom_format(StatusText),
-            self.chunk_mesh_generation_times,
-            self.chunk_mesh_callback_times,
-            self.depth_sort_time
+            prep_time = prep_time.custom_format(StatusText),
+            block_updates = block_updates,
+            chunk_scan_time = chunk_scan_time.custom_format(StatusText),
+            chunk_mesh_generation_times = chunk_mesh_generation_times,
+            chunk_mesh_callback_times = chunk_mesh_callback_times,
+            depth_sort_time = depth_sort_time
                 .unwrap_or(Duration::ZERO)
                 .custom_format(StatusText),
         )
