@@ -39,6 +39,15 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     pub fn bounds(self) -> GridAab {
         GridAab::from_lower_size(self.0 * CHUNK_SIZE, [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE])
     }
+
+    /// Returns the squared distance along the shortest line from `origin_chunk`'s bounds
+    /// to this chunk's bounds.
+    ///
+    /// This is the same criterion that [`ChunkChart`] uses for
+    /// deciding whether a chunk is included in the chart or not.
+    pub fn min_distance_squared_from(self, origin_chunk: ChunkPos<CHUNK_SIZE>) -> GridCoordinate {
+        chunk_distance_squared_for_view(self.0 - origin_chunk.0) * CHUNK_SIZE.pow(2)
+    }
 }
 
 /// Scale a cube position to obtain the containing chunk.
@@ -221,7 +230,7 @@ fn chunk_distance_squared_for_view(chunk: Vector3<i32>) -> i32 {
     // Minkowski-sum-expanded cube faces.
     int_magnitude_squared(chunk.map(
         #[inline(always)]
-        |s| (s - 1).max(0),
+        |s| (s.abs() - 1).max(0),
     ))
 }
 
@@ -401,6 +410,38 @@ mod tests {
         for cube in GridAab::from_lower_size([-1, -1, -1], [32, 32, 32]).interior_iter() {
             assert!(cube_to_chunk::<16>(cube).bounds().contains_cube(cube));
         }
+    }
+
+    #[test]
+    fn min_distance_squared_cases() {
+        fn test(pos: [GridCoordinate; 3]) -> GridCoordinate {
+            // Arbitrary offset to exercise the subtraction
+            let origin_point = Point3::new(100, 200, 300);
+            // Arbitrary chunk size
+            const CS: GridCoordinate = 32;
+            let grid_distance = ChunkPos::<CS>(origin_point + Vector3::from(pos))
+                .min_distance_squared_from(ChunkPos(origin_point));
+            assert_eq!(grid_distance % CS.pow(2), 0);
+            grid_distance / CS.pow(2)
+        }
+        // Origin and all adjacent chunks are zero distance apart
+        assert_eq!(0, test([0, 0, 0]));
+        assert_eq!(0, test([1, 0, 0]));
+        assert_eq!(0, test([-1, 0, 0]));
+        assert_eq!(0, test([1, 1, 1]));
+        // Separated by one chunk, answer is 1
+        assert_eq!(1, test([2, 0, 0]));
+        // Separated by one diagonal, answer is 1+1+1 (diagonal squared)
+        assert_eq!(3, test([2, 2, 2]));
+        // Try negative numbers too
+        assert_eq!(3, test([-2, 2, 2]));
+        assert_eq!(3, test([-2, -2, 2]));
+    }
+
+    #[test]
+    #[ignore]
+    fn min_distance_squared_consistent_with_chart() {
+        todo!("implement check that min_distance_squared_from matches ChunkChart");
     }
 
     // TODO: test for point_to_chunk
