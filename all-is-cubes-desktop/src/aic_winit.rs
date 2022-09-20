@@ -236,7 +236,9 @@ fn handle_winit_event<Ren: RendererToWinit>(
                         }
                     }
                 }
-                WindowEvent::Ime(..) => unreachable!("ime not enabled"),
+                WindowEvent::Ime(ime_event) => {
+                    log::warn!("received IME event even though IME not enabled: {ime_event:?}");
+                }
                 WindowEvent::ReceivedCharacter(..) => {}
                 WindowEvent::ModifiersChanged(..) => {}
 
@@ -345,7 +347,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
             log::error!("event for a window we aren't managing: {:?}", e)
         }
 
-        Event::UserEvent(()) => unreachable!("not using UserEvent"),
+        e @ Event::UserEvent(()) => log::error!("unexpected UserEvent: {e:?}"),
         Event::Suspended => {}
         Event::Resumed => {}
         Event::RedrawEventsCleared => {}
