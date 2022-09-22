@@ -1,6 +1,8 @@
 //! Algorithms for grouping cubes into cubical batches (chunks).
 //!
-//! For the time being, the chunk size is locked to the constant `CHUNK_SIZE`.
+//! Note: this module is currently private and a little crufty.
+//! We will probably want to expose it but clean up the API first, particularly
+//! clarifying the treatment of distances and squared distances.
 
 use std::iter::FusedIterator;
 use std::ops::RangeTo;
