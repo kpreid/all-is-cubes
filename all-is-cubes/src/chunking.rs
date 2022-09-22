@@ -467,6 +467,7 @@ mod tests {
     use super::*;
     use crate::raytracer::print_space;
     use pretty_assertions::assert_eq;
+    use rand::{Rng, SeedableRng};
     use std::collections::HashSet;
 
     #[test]
@@ -674,6 +675,8 @@ mod tests {
         }
     }
 
+    /// Test a large chart shrunk, against a small chart enlarged.
+    /// They should give the same answer.
     #[test]
     fn chunk_chart_resize() {
         let chart1 = ChunkChart::<16>::new(200.0);
@@ -687,6 +690,50 @@ mod tests {
                 .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
                 .collect::<Vec<_>>()
         );
+    }
+
+    /// As `chunk_chart_resize` but randomized for more coverage.
+    #[test]
+    #[ignore = "TODO: enable this when we have cleverer resizing that might be wrong"]
+    fn chunk_chart_resize_rand() {
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+        for _ in 0..50 {
+            let target_size = rng.gen_range(0.0..200.0);
+            let small_size = rng.gen_range(0.0..target_size);
+            let big_size = rng.gen_range(target_size..200.0);
+            print!("{small_size:?} -> {target_size:?} <- {big_size:?} | ");
+
+            let exact = ChunkChart::<16>::new(target_size);
+            let mut enlarged = ChunkChart::<16>::new(small_size);
+            enlarged.resize_if_needed(target_size);
+            let mut shrunk = ChunkChart::new(big_size);
+            shrunk.resize_if_needed(target_size);
+
+            println!(
+                "enlarged {} exact {} shrunk {}",
+                enlarged.octant_range.end, exact.octant_range.end, shrunk.octant_range.end
+            );
+
+            // Check the internal data, because if that's wrong then it's easier to debug
+            assert_eq!(
+                &enlarged.octant_chunks[enlarged.octant_range],
+                &exact.octant_chunks[exact.octant_range]
+            );
+            assert_eq!(
+                &shrunk.octant_chunks[shrunk.octant_range],
+                &exact.octant_chunks[exact.octant_range]
+            );
+
+            // Check the public interface
+            assert_eq!(
+                enlarged
+                    .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
+                    .collect::<Vec<_>>(),
+                shrunk
+                    .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 
     #[test]
