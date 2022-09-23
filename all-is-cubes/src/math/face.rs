@@ -652,7 +652,7 @@ impl<V> FaceMap<V> {
     }
 
     /// Iterate over the map entries by reference.
-    pub fn iter<'s>(&'s self) -> impl Iterator<Item = (Face7, &V)> + 's {
+    pub fn iter(&self) -> impl Iterator<Item = (Face7, &V)> {
         Face7::ALL.iter().copied().map(move |f| (f, &self[f]))
     }
 

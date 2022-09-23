@@ -141,7 +141,7 @@ fn no_panic_on_missing_blocks() {
 
     SpaceMesh::new(
         &space,
-        (&space).bounds(),
+        space.bounds(),
         &MeshOptions::dont_care_for_test(),
         &*block_meshes,
     );
