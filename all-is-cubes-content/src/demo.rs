@@ -4,11 +4,13 @@ use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
 
 use all_is_cubes::block::Block;
-use all_is_cubes::cgmath::Point3;
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
-use all_is_cubes::linking::{GenError, InGenError};
-use all_is_cubes::math::{FreeCoordinate, GridAab, GridVector, Rgb, Rgba};
+use all_is_cubes::linking::{BlockProvider, GenError, InGenError};
+use all_is_cubes::math::{
+    Face7, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, Rgba,
+};
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
@@ -16,6 +18,7 @@ use all_is_cubes::util::YieldProgress;
 use crate::fractal::menger_sponge;
 use crate::menu::template_menu;
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
+use crate::{wavy_landscape, LandscapeBlocks};
 
 /// Generate a `#[test]` function for each element of [`UniverseTemplate`].
 /// This macro is used as a derive macro via [`macro_rules_derive`].
@@ -68,6 +71,8 @@ pub enum UniverseTemplate {
     Fail,
     DemoCity,
     Dungeon,
+    /// Large space with separate floating islands.
+    Islands,
     Atrium,
     CornellBox,
     MengerSponge,
@@ -87,7 +92,9 @@ impl UniverseTemplate {
     pub fn include_in_lists(&self) -> bool {
         use UniverseTemplate::*;
         match self {
-            DemoCity | Dungeon | Atrium | CornellBox | MengerSponge | LightingBench => true,
+            DemoCity | Dungeon | Atrium | Islands | CornellBox | MengerSponge | LightingBench => {
+                true
+            }
 
             // Itself a list of templates!
             Menu => false,
@@ -123,6 +130,7 @@ impl UniverseTemplate {
             ))),
             DemoCity => Some(demo_city(&mut universe, p.take().unwrap()).await),
             Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), seed).await),
+            Islands => Some(islands(&mut universe, p.take().unwrap(), 1000).await),
             Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
             CornellBox => Some(cornell_box()),
             MengerSponge => Some(menger_sponge(&mut universe, 4)),
@@ -168,6 +176,58 @@ fn insert_generated_space(
         Ok(space) => Ok(universe.insert(name, space)?),
         Err(e) => Err(GenError::failure(e, name)),
     }
+}
+
+async fn islands(
+    universe: &mut Universe,
+    p: YieldProgress,
+    diameter: GridCoordinate,
+) -> Result<Space, InGenError> {
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+
+    // Set up dimensions
+    let bounds = {
+        let height = 400;
+        let low_corner = diameter / -2;
+        GridAab::from_lower_size(
+            [low_corner, height / -2, low_corner],
+            [diameter, height, diameter],
+        )
+    };
+
+    let mut space = Space::builder(bounds)
+        .spawn({
+            let mut spawn = Spawn::default_for_new_space(bounds);
+            spawn.set_inventory(free_editing_starter_inventory(true));
+            spawn.set_eye_position(bounds.center());
+            // TODO: Make this tidier by having a "shrink to centermost point or cube" operation on GridAab
+            let cp = bounds.center().map(|c| c as GridCoordinate);
+            spawn.set_bounds(GridAab::from_lower_size(
+                cp - GridVector::new(30, 30, 30),
+                [60, 60, 60],
+            ));
+            spawn
+        })
+        .build();
+
+    // Set up grid in which islands are placed
+    let island_stride = 50;
+    let island_grid = bounds.divide(island_stride);
+
+    for (i, island_pos) in island_grid.interior_iter().enumerate() {
+        let cell_bounds = GridAab::from_lower_size(
+            Point3::from_vec(island_pos.to_vec() * island_stride),
+            [island_stride, island_stride, island_stride],
+        )
+        .intersection(bounds)
+        .expect("island outside space bounds");
+        // TODO: randomize island location in cell?
+        let occupied_bounds = cell_bounds.expand(FaceMap::repeat(-10).with(Face7::PY, -25));
+        wavy_landscape(occupied_bounds, &mut space, &landscape_blocks, 0.5)?;
+        p.progress(i as f32 / island_grid.volume() as f32).await;
+    }
+
+    Ok(space)
 }
 
 #[rustfmt::skip]
@@ -232,7 +292,6 @@ async fn arbitrary_space(
     seed: u64,
 ) -> Result<Space, InGenError> {
     use all_is_cubes::cgmath::{Vector3, Zero};
-    use all_is_cubes::math::FaceMap;
     use arbitrary::{Arbitrary, Error, Unstructured};
     use rand::{RngCore, SeedableRng};
 
@@ -286,12 +345,32 @@ mod tests {
     }
 
     pub(super) fn check_universe_template(template: UniverseTemplate) {
-        let result = block_on(
-            template
-                .clone()
-                .build(YieldProgress::noop(), 0x7f16dfe65954583e),
-        );
+        let result = if let UniverseTemplate::Islands = template {
+            // Kludge: the islands template is known to be very slow.
+            // We should work on making what it does faster, but for now, let's
+            // run a much smaller instance of it for the does-it-succeed test.
+            // TODO: This should instead be handled by the template having an official
+            // user-configurable size parameter.
+            block_on(async {
+                let mut universe = Universe::new();
+                install_demo_blocks(&mut universe, YieldProgress::noop())
+                    .await
+                    .unwrap();
+                islands(&mut universe, YieldProgress::noop(), 100)
+                    .await
+                    .unwrap();
+            });
+            return; // TODO: skipping final test because we didn't create the character
+        } else {
+            block_on(
+                template
+                    .clone()
+                    .build(YieldProgress::noop(), 0x7f16dfe65954583e),
+            )
+        };
+
         if matches!(template, UniverseTemplate::Fail) {
+            // The Fail template _should_ return an error
             result.unwrap_err();
         } else {
             let mut u = result.unwrap();
