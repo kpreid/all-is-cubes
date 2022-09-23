@@ -8,9 +8,7 @@ use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::{GenError, InGenError};
-use all_is_cubes::math::{
-    FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb, Rgba,
-};
+use all_is_cubes::math::{FreeCoordinate, GridAab, GridVector, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
@@ -72,7 +70,6 @@ pub enum UniverseTemplate {
     Dungeon,
     Atrium,
     CornellBox,
-    PhysicsLab,
     MengerSponge,
     LightingBench,
 
@@ -90,8 +87,7 @@ impl UniverseTemplate {
     pub fn include_in_lists(&self) -> bool {
         use UniverseTemplate::*;
         match self {
-            DemoCity | Dungeon | Atrium | CornellBox | PhysicsLab | MengerSponge
-            | LightingBench => true,
+            DemoCity | Dungeon | Atrium | CornellBox | MengerSponge | LightingBench => true,
 
             // Itself a list of templates!
             Menu => false,
@@ -129,7 +125,6 @@ impl UniverseTemplate {
             Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), seed).await),
             Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
             CornellBox => Some(cornell_box()),
-            PhysicsLab => Some(physics_lab(50, 16).await),
             MengerSponge => Some(menger_sponge(&mut universe, 4)),
             LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
                 &mut universe,
@@ -226,86 +221,6 @@ fn cornell_box() -> Result<Space, InGenError> {
     space.fill_uniform(GridAab::from_lower_size([29, 0, 36], [16, 16, 15]), &white)?;
     // Block #2
     space.fill_uniform(GridAab::from_lower_size([10, 0, 13], [18, 33, 15]), &white)?;
-
-    Ok(space)
-}
-
-/// Generate a space which is both completely enclosed and has a convenient flat surface
-/// for adding stuff to and, as the name suggests, testing physics.
-///
-/// TODO: The original premise of this was that it would be useful as a default setup for
-/// physics tests. But it hasn't actually been used for that. Evaluate whether it was ever
-/// a good idea.
-/// TODO: Add some lights.
-/// TODO: Define exactly what the radii mean so users can build things on surfaces.
-async fn physics_lab(shell_radius: u16, planet_radius: u16) -> Result<Space, InGenError> {
-    assert!(shell_radius > planet_radius);
-    let space_radius = shell_radius + 1; // TODO check off-by-one consistency
-    let bounds = GridAab::from_lower_size(
-        GridPoint::new(-1, -1, -1) * space_radius.into(),
-        GridVector::new(1, 1, 1) * (space_radius * 2 + 1).into(),
-    );
-    let mut space = Space::builder(bounds)
-        .spawn({
-            let mut spawn = Spawn::default_for_new_space(bounds);
-            spawn.set_eye_position(Point3::new(
-                0.,
-                FreeCoordinate::from(planet_radius) + 2.,
-                0.,
-            ));
-            spawn.set_inventory(free_editing_starter_inventory(false));
-            spawn
-        })
-        .build();
-    let shell_radius: GridCoordinate = shell_radius.into();
-    let planet_radius: GridCoordinate = planet_radius.into();
-
-    let outer_wall_block = Block::builder()
-        .display_name("Celestial Cube")
-        .color(Rgba::new(0.2, 0.2, 0.2, 1.0))
-        .build();
-    let floor_1 = Block::builder()
-        .display_name("Floor")
-        .color(Rgba::new(0.5, 0.5, 0.5, 1.0))
-        .build();
-    let floor_2 = Block::builder()
-        .display_name("Floor")
-        .color(Rgba::new(0.95, 0.95, 0.95, 1.0))
-        .build();
-
-    // Outer walls
-    // TODO: Build some utilities for symmetric systematic constructions so we don't have to handcode this.
-    let mut place_outer_wall = |p| {
-        // TODO: add some random stars
-        space.set(p, &outer_wall_block)
-    };
-    for x in -shell_radius..=shell_radius {
-        for y in -shell_radius..=shell_radius {
-            if x.abs() == shell_radius || y.abs() == shell_radius {
-                for z in -shell_radius..=shell_radius {
-                    place_outer_wall((x, y, z))?;
-                }
-            } else {
-                place_outer_wall((x, y, shell_radius))?;
-                place_outer_wall((x, y, -shell_radius))?;
-            }
-        }
-    }
-
-    // Inner surface.
-    space.fill(
-        GridAab::from_lower_upper(
-            GridPoint::new(-1, -1, -1) * planet_radius,
-            GridPoint::new(1, 1, 1) * planet_radius,
-        ),
-        |GridPoint { x, y, z }| {
-            Some(if (x + y + z).rem_euclid(2) == 0 {
-                &floor_1
-            } else {
-                &floor_2
-            })
-        },
-    )?;
 
     Ok(space)
 }

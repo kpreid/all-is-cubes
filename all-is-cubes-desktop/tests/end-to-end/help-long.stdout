@@ -61,7 +61,7 @@ OPTIONS:
             
             [default: demo-city]
             [possible values: menu, blank, fail, demo-city, dungeon, atrium, cornell-box,
-            physics-lab, menger-sponge, lighting-bench[..]]
+            menger-sponge, lighting-bench[..]]
 
     -v, --verbose
             Additional logging to stderr
