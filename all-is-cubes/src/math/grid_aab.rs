@@ -222,16 +222,21 @@ impl GridAab {
     #[inline(always)] // very hot code
     pub fn index(&self, point: impl Into<GridPoint>) -> Option<usize> {
         let point = point.into();
-        let mut deoffsetted = Vector3 { x: 0, y: 0, z: 0 };
+        let mut deoffsetted: Vector3<usize> = Vector3 { x: 0, y: 0, z: 0 };
         for i in 0..3 {
-            deoffsetted[i] = point[i].checked_sub(self.lower_bounds[i])?;
-            if deoffsetted[i] < 0 || deoffsetted[i] >= self.sizes[i] {
+            let deoffsetted_component = point[i].checked_sub(self.lower_bounds[i])?;
+            if deoffsetted_component < 0 || deoffsetted_component >= self.sizes[i] {
                 return None;
             }
+            // This cannot overflow because:
+            // * We just checked it is not negative
+            // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
+            // * We don't support platforms with `usize` smaller than 32 bits
+            deoffsetted[i] = usize::try_from(deoffsetted_component).unwrap();
         }
         Some(
-            ((deoffsetted[0] * self.sizes[1] + deoffsetted[1]) * self.sizes[2] + deoffsetted[2])
-                as usize,
+            (deoffsetted[0] * self.sizes[1] as usize + deoffsetted[1]) * self.sizes[2] as usize
+                + deoffsetted[2],
         )
     }
 
@@ -1025,7 +1030,7 @@ mod tests {
     }
 
     #[test]
-    fn index_overflow() {
+    fn index_overflow_low() {
         // Indexing calculates (point - lower_bounds), so this would overflow in the negative direction if the overflow weren't checked.
         // Note that MAX - 1 is the highest allowed lower bound since the exclusive upper bound must be representable.
         let low = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
@@ -1035,12 +1040,26 @@ mod tests {
         assert_eq!(low.index([GridCoordinate::MIN, 0, 0]), None);
         // But, an actually in-bounds cube should still work.
         assert_eq!(low.index([GridCoordinate::MAX - 1, 0, 0]), Some(0));
+    }
 
+    #[test]
+    fn index_overflow_high() {
         let high = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
         assert_eq!(high.index([0, 0, 0]), None);
         assert_eq!(high.index([1, 0, 0]), None);
         assert_eq!(high.index([2, 0, 0]), None);
         assert_eq!(high.index([GridCoordinate::MAX - 1, 0, 0]), Some(0));
+    }
+
+    #[test]
+    fn index_not_overflow_large_volume() {
+        let aab = GridAab::from_lower_size([0, 0, 0], [2000, 2000, 2000]);
+        // This value fits in a 32-bit `usize` and is therefore a valid index,
+        // but it does not fit in a `GridCoordinate` = `i32`.
+        assert_eq!(
+            aab.index([1500, 1500, 1500]),
+            Some(((1500 * 2000) + 1500) * 2000 + 1500)
+        );
     }
 
     #[test]
