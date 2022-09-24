@@ -227,12 +227,13 @@ impl VisitRefs for ActivatableRegion {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::assert_send_sync;
 
-    fn _assert_error_is_sync()
-    where
-        InstallVuiError: Send + Sync,
-    {
+    #[test]
+    fn error_is_send_sync() {
+        assert_send_sync::<InstallVuiError>()
     }
+
     fn _assert_widget_trait_is_object_safe(_: &dyn Widget) {}
     fn _assert_controller_trait_is_object_safe(_: &dyn WidgetController) {}
 }

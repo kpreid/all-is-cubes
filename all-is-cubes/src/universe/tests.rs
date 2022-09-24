@@ -10,12 +10,12 @@ use crate::transaction::Transaction;
 use crate::universe::{
     InsertError, ListRefs, Name, RefError, URef, Universe, UniverseIndex, UniverseTransaction,
 };
+use crate::util::assert_send_sync;
 
-fn _test_thread_safety()
-where
-    URef<Character>: Send + Sync,
-    Universe: Send + Sync,
-{
+#[test]
+fn thread_safety() {
+    assert_send_sync::<URef<Character>>();
+    assert_send_sync::<Universe>();
 }
 
 #[test]

@@ -374,6 +374,12 @@ impl Display for TimeStats {
 }
 
 #[cfg(test)]
+pub(crate) fn assert_send_sync<T: Send + Sync>() {
+    // We don't need to do anything in this function; the call to it having been successfully
+    // compiled is the assertion.
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -390,9 +396,8 @@ mod tests {
         assert_eq!("<Foo>", format!("{:?}", Foo.custom_format(ConciseDebug)));
     }
 
-    fn _yield_progress_is_sync()
-    where
-        YieldProgress: Send + Sync,
-    {
+    #[test]
+    fn yield_progress_is_sync() {
+        assert_send_sync::<YieldProgress>()
     }
 }

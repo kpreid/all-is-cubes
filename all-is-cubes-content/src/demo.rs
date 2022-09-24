@@ -280,7 +280,7 @@ mod tests {
     use futures_core::future::BoxFuture;
     use futures_executor::block_on;
 
-    fn _assert_build_future_is_send() {
+    fn _test_build_future_is_send() {
         let _: BoxFuture<'_, _> =
             Box::pin(UniverseTemplate::Atrium.build(YieldProgress::noop(), 0));
     }

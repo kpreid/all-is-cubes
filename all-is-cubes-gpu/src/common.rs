@@ -100,9 +100,10 @@ const VERY_LONG: Duration = Duration::from_secs(86400 * 7);
 mod tests {
     use super::*;
 
-    fn _test_graphics_resource_error_is_sync()
-    where
-        GraphicsResourceError: Send + Sync,
-    {
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn graphics_resource_error_is_sync() {
+        assert_send_sync::<GraphicsResourceError>()
     }
 }

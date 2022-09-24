@@ -474,11 +474,12 @@ mod eg {
 
 #[cfg(test)]
 mod tests {
+    use crate::util::assert_send_sync;
+
     use super::*;
 
-    fn _renderer_is_send_sync()
-    where
-        RtRenderer: Send + Sync + 'static,
-    {
+    #[test]
+    fn renderer_is_send_sync() {
+        assert_send_sync::<RtRenderer>()
     }
 }

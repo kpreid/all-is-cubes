@@ -279,12 +279,12 @@ mod tests {
     use super::*;
     use crate::block::Resolution::*;
     use crate::math::GridAab;
+    use crate::util::assert_send_sync;
 
-    fn _test_gen_error_is_sync()
-    where
-        GenError: Send + Sync,
-        InGenError: Send + Sync,
-    {
+    #[test]
+    fn errors_are_send_sync() {
+        assert_send_sync::<GenError>();
+        assert_send_sync::<InGenError>();
     }
 
     #[test]
